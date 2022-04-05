@@ -11,6 +11,7 @@ nodeSelector: {}
 tolerations: []
 replicaCount: 2
 revisionHistoryLimit: 2
+containerRegistry: eu.gcr.io/stashify-218417
 imagePullPolicy: IfNotPresent
 image: IMAGE_TO_REPLACE
 debug: False

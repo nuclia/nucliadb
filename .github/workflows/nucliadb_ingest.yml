@@ -31,6 +31,13 @@ on:
       - "nucliadb_protos/python/**"
       - "nucliadb_cluster/nucliadb_cluster/**"
 
+env:
+  HASH: $(git rev-parse --short "$GITHUB_SHA")
+  BRANCH: ${GITHUB_REF##*/}
+  PROJECT_ID: ${{ secrets.PROJECT_ID }}
+  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  IMAGE_NAME: ingest
+
 jobs:
   # Job to run pre-checks
   pre-checks:
@@ -108,12 +115,6 @@ jobs:
     needs: tests
     if: github.event_name == 'push'
 
-    env:
-      HASH: $(git rev-parse --short "$GITHUB_SHA")
-      BRANCH: ${GITHUB_REF##*/}
-      PROJECT_ID: ${{ secrets.PROJECT_ID }}
-      IMAGE_NAME: eu.gcr.io/${{ secrets.PROJECT_ID }}/ingest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -132,27 +133,24 @@ jobs:
       # Build docker image
       - name: Image
         run: |-
-          docker build -t $IMAGE_NAME:$GITHUB_SHA . -f Dockerfile.ingest
+          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:$GITHUB_SHA . -f Dockerfile.ingest
       - name: Tag
         run: |-
-          docker tag $IMAGE_NAME:$GITHUB_SHA $IMAGE_NAME:latest
+          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:$GITHUB_SHA $CONTAINER_REGISTRY/$IMAGE_NAME:latest
       - name: Push sha
         if: github.event_name == 'push'
         run: |-
-          docker push $IMAGE_NAME:$GITHUB_SHA
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:$GITHUB_SHA
       - name: Push latest
         if: github.event_name == 'push'
         run: |-
-          docker push $IMAGE_NAME:latest
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:latest
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'push'
-
-    env:
-      IMAGE_NAME: eu.gcr.io/${{ secrets.PROJECT_ID }}/ingest
 
     steps:
       - name: Checkout repository

@@ -50,7 +50,7 @@ spec:
       - name: ingest
         securityContext:
           privileged: true
-        image: {{ .Values.image }}
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
           exec:
