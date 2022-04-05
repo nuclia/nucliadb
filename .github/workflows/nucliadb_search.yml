@@ -48,6 +48,7 @@ jobs:
         uses: actions/setup-python@v3.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
       - name: Install package
         run: |
@@ -67,6 +68,9 @@ jobs:
         python-version: [3.9]
 
     steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0
         with:
@@ -79,13 +83,11 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
       - name: Setup Python
         uses: actions/setup-python@v3.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
       - name: Install the package
         run: |
@@ -135,6 +137,9 @@ jobs:
       IMAGE_NAME: eu.gcr.io/${{ secrets.PROJECT_ID }}/search
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0
         with:
@@ -145,9 +150,6 @@ jobs:
 
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
-
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
       # Build docker image
       - name: Image

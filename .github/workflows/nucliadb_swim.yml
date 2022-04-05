@@ -32,6 +32,7 @@ jobs:
         uses: actions/setup-python@v3.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
       - name: Install package
         run: |
@@ -61,6 +62,7 @@ jobs:
         uses: actions/setup-python@v3.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "pip"
 
       - name: Install the package
         run: |
