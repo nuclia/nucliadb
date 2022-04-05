@@ -58,7 +58,7 @@ regex = "1.5.5"
 lazy_static = "1.4.0"
 
 # Text Service
-tantivy = "0.16.1"
+tantivy = "0.17.0"
 rayon = "1.5.1"
 
 async-stream = "0.3.2"
