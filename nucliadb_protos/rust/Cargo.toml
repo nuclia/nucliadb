@@ -18,7 +18,7 @@ prost-wkt-build = "0.3"
 
 [dependencies]
 tonic = "0.6"
-prost-types = "0.9"
+prost-types = "0.10"
 prost-wkt = "0.3"
 prost-wkt-types = "0.3"
 prost = { version = "0.9", default-features = false, features = ["prost-derive"] }
