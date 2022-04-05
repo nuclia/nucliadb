@@ -119,6 +119,6 @@ jobs:
           pytest -rfE --cov=nucliadb_one -s --tb=native -v --cov-report xml --cov-append nucliadb_one/nucliadb_one
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
