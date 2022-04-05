@@ -13,7 +13,7 @@ documentation = "https://nuclia.com"
 
 [build-dependencies]
 tonic-build = "0.6"
-prost-build = "0.9"
+prost-build = "0.10"
 prost-wkt-build = "0.3"
 
 [dependencies]
