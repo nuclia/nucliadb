@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package knowledgebox;
+
+enum KnowledgeBoxResponseStatus {
+    OK = 0;
+    CONFLICT = 1;
+    NOTFOUND = 2;
+    ERROR = 3;
+
+}
+
+// ID
+
+message KnowledgeBoxID {
+    string slug = 1;
+    string uuid = 2;
+}
+
+// GET
+
+message KnowledgeBox {
+    string slug = 1;
+    string uuid = 2;
+    KnowledgeBoxResponseStatus status = 3;
+
+    KnowledgeBoxConfig config = 4;
+}
+
+
+message KnowledgeBoxConfig {
+    string title = 1;
+    string description = 2;
+    repeated string enabled_filters = 3;
+    repeated string enabled_insights = 4;
+    string slug = 5;
+}
+
+// NEW
+
+message KnowledgeBoxNew {
+    string slug = 1;
+    KnowledgeBoxConfig config = 2;
+    string forceuuid = 3;
+}
+
+
+message NewKnowledgeBoxResponse {
+    KnowledgeBoxResponseStatus status = 1;
+    string uuid = 2;
+}
+
+// SEARCH / LIST
+
+message KnowledgeBoxPrefix {
+    string prefix = 1;
+}
+
+// UPDATE
+
+message KnowledgeBoxUpdate {
+    string slug = 1;
+    string uuid = 2;
+    KnowledgeBoxConfig config = 3;
+}
+
+message UpdateKnowledgeBoxResponse {
+    KnowledgeBoxResponseStatus status = 1;
+    string uuid = 2;
+}
+
+// GC
+
+message GCKnowledgeBoxResponse {
+
+}
+
+// DELETE
+
+message DeleteKnowledgeBoxResponse {
+    KnowledgeBoxResponseStatus status = 1;
+}
+
+
+// Labels on a Knowledge Box
+
+
+message Label {
+    string title = 2;
+    string related = 3;
+    string text = 4;
+    string uri = 5;
+}
+
+message LabelSet {
+    string title = 1;
+    string color = 2;
+    repeated Label labels = 3;
+}
+
+message Labels {
+    map<string, LabelSet> labelset = 1;
+}
+
+
+// Entities on a Knowledge Box
+
+
+message Entity {
+    string value = 2;
+    bool merged = 3;
+    repeated string represents = 4;
+}
+
+message EntitiesGroup {
+    map<string, Entity> entities = 1;
+    string title = 2;
+    string color = 3;
+}
+
+
+message Widget {
+    string id = 1;
+    string description = 2;
+    enum WidgetMode {
+        BUTTON = 0;
+        INPUT = 1;
+        FORM = 2;
+    }
+    WidgetMode mode = 3;
+
+    message WidgetFeatures {
+        bool useFilters = 1;
+        bool suggestEntities = 2;
+        bool suggestSentences = 3;
+        bool suggestParagraphs = 4;
+    }
+    WidgetFeatures features = 4;
+
+    repeated string filters = 5;
+    repeated string topEntities = 6;
+    map<string, string> style = 7;
+}

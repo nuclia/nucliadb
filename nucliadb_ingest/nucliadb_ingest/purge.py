@@ -1,0 +1,147 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+import asyncio
+import logging
+import sys
+
+from sentry_sdk import capture_exception
+
+from nucliadb_ingest.orm.exceptions import NodeError, ShardNotFound
+from nucliadb_ingest.orm.knowledgebox import (
+    KB_TO_DELETE,
+    KB_TO_DELETE_BASE,
+    KB_TO_DELETE_STORAGE,
+    KB_TO_DELETE_STORAGE_BASE,
+    KnowledgeBox,
+)
+from nucliadb_ingest.sentry import SENTRY, set_sentry
+from nucliadb_ingest.utils import get_driver
+from nucliadb_utils.exceptions import ShardsNotFound
+from nucliadb_utils.settings import running_settings
+from nucliadb_utils.utilities import get_storage
+
+logger = logging.getLogger("nucliadb_ingest")
+
+
+async def main():
+
+    logger.info("START PURGING KB")
+    # Clean up all kb marked to delete
+    driver = await get_driver()
+    storage = await get_storage(
+        gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"]
+    )
+    async for key in driver.keys(match=KB_TO_DELETE_BASE, count=-1):
+        logger.info(f"Purging kb {key}")
+        try:
+            kbid = key.split("/")[2]
+        except:
+            logger.info(
+                f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_BASE}"
+            )
+            continue
+
+        try:
+            await KnowledgeBox.purge(driver, kbid)
+            logger.info(f"  √ Successfully Purged {kbid}")
+        except (ShardsNotFound, ShardNotFound) as exc:
+            capture_exception(exc)
+            logger.info(f"  > {exc}")
+            logger.info(f"  > will delete all stored keys for this kb anyway")
+            await KnowledgeBox.delete_all_kb_keys(driver, kbid)
+        except NodeError as exc:
+            capture_exception(exc)
+            logger.info(
+                f"  X At least one node was unavailable while purging {kbid}, skipping"
+            )
+            continue
+
+        except Exception as exc:
+            capture_exception(exc)
+            logger.info(
+                f"  X ERROR while executing KnowledgeBox.purge of {kbid}, skipping: {exc.__class__.__name__} {exc}"
+            )
+            continue
+
+        # Now delete the  tikv delete mark
+        try:
+            txn = await driver.begin()
+            key_to_purge = KB_TO_DELETE.format(kbid=kbid)
+            await txn.delete(key_to_purge)
+            await txn.txn.commit()
+            logger.info(f"  √ Deleted {key_to_purge}")
+        except Exception as exc:
+            capture_exception(exc)
+            logger.info(f"  X Error while deleting key {key_to_purge}")
+            await txn.txn.abort()
+
+    logger.info("END PURGING KB")
+
+    # Last iteration deleted all kbs, and set their storages marked to be deleted also in tikv
+    # Here we'll delete those storage buckets
+    logger.info("START PURGING KB STORAGE")
+    async for key in driver.keys(match=KB_TO_DELETE_STORAGE_BASE, count=-1):
+        logger.info(f"Purging storage {key}")
+        try:
+            kbid = key.split("/")[2]
+        except:
+            logger.info(
+                f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_STORAGE_BASE}"
+            )
+            continue
+
+        deleted = await storage.delete_kb(kbid)
+        if deleted:
+            # Now delete the  tikv delete mark
+            try:
+                txn = await driver.begin()
+                key_to_purge = KB_TO_DELETE_STORAGE.format(kbid=kbid)
+                await txn.delete(key_to_purge)
+                logger.info(f"  √ Deleted storage of {key_to_purge}")
+            except Exception as exc:
+                capture_exception(exc)
+                logger.info(f"  X Error while deleting key {key_to_purge}")
+                await txn.txn.abort()
+            else:
+                await txn.txn.commit()
+
+        else:
+            logger.info(
+                f"  . Didn't have anything to delete anything for {key_to_purge}"
+            )
+    logger.info("END PURGING KB STORAGE")
+    await storage.finalize()
+
+
+def run() -> int:
+    if running_settings.sentry_url and SENTRY:
+        set_sentry(
+            running_settings.sentry_url,
+            running_settings.running_environment,
+            running_settings.logging_integration,
+        )
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
+        stream=sys.stderr,
+    )
+
+    return asyncio.run(main())

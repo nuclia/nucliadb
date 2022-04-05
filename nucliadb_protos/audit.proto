@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "nucliadb_protos/nodereader.proto";
+
+message AuditRequest {
+  enum AuditType {
+    VISITED = 0;
+    MODIFIED = 1;
+    DELETED = 2;
+    NEW = 3;
+    STARTED = 4;
+    STOPPED = 5;
+    SEARCH = 6;
+  }
+  AuditType type = 1;
+  string kbid = 2;
+  string userid = 4;
+
+  google.protobuf.Timestamp time = 5;
+
+  repeated string fields = 6;
+
+  nodereader.SearchRequest search = 7;
+  float timeit = 8;
+  string origin = 9;
+  string rid = 10;
+  string task = 11;
+  int32 resources = 12;
+}

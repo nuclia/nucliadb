@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package noderesources;
+
+import "google/protobuf/timestamp.proto";
+import public "nucliadb_protos/utils.proto";
+
+message TextInformation {
+    string text = 1;
+    repeated string labels = 2;
+}
+
+message IndexMetadata {
+    google.protobuf.Timestamp modified = 1; // Tantivy doc & para
+    google.protobuf.Timestamp created = 2; // Tantivy doc & para
+}
+
+message ShardId {
+    string id = 1;
+}
+
+message ShardIds {
+    repeated ShardId ids = 1;
+}
+
+message ShardCreated {
+    string id = 1;
+    enum DocumentService {
+        DOCUMENT_V0 = 0;
+    }
+    DocumentService document_service = 2;
+    enum ParagraphService {
+        PARAGRAPH_V0 = 0;
+    }
+    ParagraphService paragraph_service = 3;
+    enum VectorService {
+        VECTOR_V0 = 0;
+    }
+    VectorService vector_service = 4;
+    enum RelationService {
+        RELATION_V0 = 0;
+    }
+    RelationService relation_service = 5;
+}
+
+
+message ResourceID {
+    string shard_id = 1;
+    string uuid = 2;
+}
+
+
+message Shard {
+    string shard_id = 1;
+    uint64 resources = 2;
+    uint64 paragraphs = 3;
+    uint64 sentences = 4;
+}
+
+message ShardList {
+    repeated Shard shards = 1;
+}
+
+message EmptyResponse {}
+message EmptyQuery {}
+
+message VectorSentence {
+    repeated float vector = 1;
+}
+
+message IndexParagraph {
+    int32 start = 1; // Start end position in field text
+    int32 end = 2; // Start end position in field text
+    repeated string labels = 3; // Paragraph specific labels
+    map<string, VectorSentence> sentences = 4; // key is full id for vectors
+    string field = 5;
+    string split = 6; // split were it belongs
+    uint64 index = 7;
+}
+
+message IndexParagraphs {
+    // id of the paragraph f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
+    map<string, IndexParagraph> paragraphs = 1;
+}
+
+message Resource {
+    ResourceID resource = 1;
+
+    IndexMetadata metadata = 2;
+
+    // Doc index
+    map<string, TextInformation> texts = 3; // Tantivy doc filled by field allways full
+    // Key is RID/FIELDID
+
+    repeated string labels = 4; // Document labels allways serialized full
+
+    enum ResourceStatus {
+        PROCESSED = 0;
+        EMPTY = 1;
+        ERROR = 2;
+        DELETE = 3;
+        PENDING = 4;
+    }
+
+    ResourceStatus status = 5; // Tantivy doc
+
+    // Paragraph
+    map<string, IndexParagraphs> paragraphs = 6; // Paragraphs by field
+
+    repeated string paragraphs_to_delete = 7;
+    repeated string sentences_to_delete = 8;
+
+    // Relations
+    repeated utils.Relation relations = 9;
+    repeated utils.Relation relations_to_delete = 10;
+
+    string shard_id = 11;
+}

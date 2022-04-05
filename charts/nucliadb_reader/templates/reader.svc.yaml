@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: reader
+  labels:
+    app: reader
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: reader
+  ports:
+    - name: http-reader
+      port: {{ .Values.serving.port }}

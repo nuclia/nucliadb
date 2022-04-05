@@ -1,0 +1,48 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
+use async_trait::async_trait;
+use nucliadb_protos::{Resource, ResourceId};
+
+use crate::result::NodeResult;
+
+/// All services should have the same interface
+pub trait ServiceConfiguration: Send + Sync + Sized + 'static {}
+
+/// Start and stop
+#[async_trait]
+pub trait ServiceChild<C: ServiceConfiguration>: Sized {
+    /// Start is to start the service
+    async fn start(config: &C) -> NodeResult<Self>;
+
+    /// To Stop the service
+    async fn stop(&self) -> NodeResult<()>;
+}
+
+pub trait WriterChild {
+    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+}
+
+pub trait ReaderChild {
+    type Request;
+    type Response;
+    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response>;
+    fn reload(&self);
+}

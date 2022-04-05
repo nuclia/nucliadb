@@ -1,0 +1,52 @@
+# NucliaDB Ingest Settings
+config:
+  pull_time: 100
+  node_replicas: 2
+  swim_binding_host: "0.0.0.0"
+  swim_host_key: "ingest.key"
+  monitor: False
+
+affinity: {}
+nodeSelector: {}
+tolerations: []
+replicaCount: 2
+revisionHistoryLimit: 2
+imagePullPolicy: IfNotPresent
+image: IMAGE_TO_REPLACE
+debug: False
+resources: {}
+#  limits:
+#    memory: "600Mi"
+#  requests:
+#    cpu: "300m"
+
+serving:
+  grpc: 8030
+  monitor: 50101
+  metrics: 8081
+  swim: 4440
+
+# Value of ports to where this component connects to
+services:
+  # This must match the redis or tikv driver on nucliadb_shared
+  maindb: 6379 | 2379
+  nats: 4222
+
+running:
+  sentry_url:
+  swim_level: INFO
+  activity_log_level: INFO
+
+# secret containing NATS user credentials
+## credential names inside the secret should be consistent with
+## what's configured on nucliadb_shared
+##   .Values.transaction.transaction_jetstream_auth
+##   .Values.cache.cache_pubsub_nats_auth
+nats:
+  secretName: nats-creds
+
+indexing:
+  index_jetstream_auth:
+  index_jetstream_servers:
+    - nats1
+  index_jetstream_target: "node.{node}"

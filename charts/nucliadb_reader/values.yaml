@@ -1,0 +1,50 @@
+# NucliaDB Reader Settings
+
+affinity: {}
+nodeSelector: {}
+tolerations: []
+replicaCount: 2
+revisionHistoryLimit: 2
+debug: False
+imagePullPolicy: IfNotPresent
+image: IMAGE_TO_REPLACE
+resources: {}
+#  limits:
+#    memory: "600Mi"
+#  requests:
+#    cpu: "300m"
+
+serving:
+  port: 8080
+
+services:
+  # This must match the redis or tikv driver on nucliadb_shared
+  maindb: 6379 | 2379
+  nats: 4222
+
+running:
+  sentry_url:
+
+vs:
+  gateway:
+  host:
+
+# secret containing NATS user credentials
+## credential names inside the secret should be consistent with
+## what's configured on nucliadb_shared
+##   .Values.transaction.transaction_jetstream_auth
+##   .Values.cache.cache_pubsub_nats_auth
+nats:
+  secretName: nats-creds
+
+zone:
+
+# This configuration must match the one in ingest
+# THis is needed as reader component uses the orm module in ingest
+ingest:
+  driver: redis # tikv | redis
+  driver_redis_url: xx
+  driver_tikv_url: xx
+
+serviceMonitor:
+  enabled: False

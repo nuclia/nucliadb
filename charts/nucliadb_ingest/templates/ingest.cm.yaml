@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app: ingest
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  GRPC_PORT: {{ .Values.serving.grpc | quote }}
+  INNER_METRICS_HOST: "0.0.0.0"
+  INNER_METRICS_PORT: {{ .Values.serving.metrics | quote }}
+
+  PULL_TIME: {{ .Values.config.pull_time | quote }}
+  NODE_REPLICAS: {{ .Values.config.node_replicas | quote }}
+  SWIM_BINDING_HOST: "0.0.0.0"
+  SWIM_BINDING_PORT: {{ .Values.serving.swim | quote }}
+  SWIM_HOST_KEY: {{ .Values.config.swim_host_key }}
+{{- if .Values.debug }}
+  DEBUG: "True"
+  LOG_LEVEL: "DEBUG"
+{{- end }}
+  SWIM_LEVEL: {{ .Values.running.swim_level }}
+  ACTIVITY_LOG_LEVEL: {{ .Values.running.activity_log_level }}
+{{- if .Values.config.monitor }}
+  MONITOR: "True"
+{{- end }}
+  MONITOR_PORT: {{ .Values.serving.monitor | quote }}
+  SENTRY_URL: {{ .Values.running.sentry_url }}
+
+  INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}
+  INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
+  INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}

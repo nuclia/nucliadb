@@ -1,0 +1,4 @@
+protobuf
+grpcio
+grpcio-tools==1.44.0
+mypy-protobuf>=3.0.0

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ingest
+  labels:
+    app: ingest
+    app.kubernetes.io/name: ingest
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: ingest-headless
+  selector:
+    matchLabels:
+      app: ingest
+      app.kubernetes.io/name: ingest
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/managed-by: {{ .Release.Service }}
+  template:
+    metadata:
+      name: ingest
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: ingest
+        app.kubernetes.io/name: ingest
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+      containers:
+      - name: ingest
+        securityContext:
+          privileged: true
+        image: {{ .Values.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          initialDelaySeconds: 2
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
+          initialDelaySeconds: 2
+        command: ["/entrypoint.sh"]
+        args: ["ndb_ingest"]
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: {{ .Release.Name }}-config
+        ports:
+        - containerPort: {{ .Values.serving.grpc }}
+        - containerPort: {{ .Values.serving.monitor }}
+        - containerPort: {{ .Values.serving.metrics }}
+        - name: swim
+          containerPort: {{ .Values.serving.swim }}
+          protocol: UDP
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+{{- if .Values.nats.secretName }}
+        volumeMounts:
+          - name: nats-creds
+            readOnly: true
+            mountPath: /appsecrets
+      volumes:
+      - name: nats-creds
+        secret:
+          secretName: {{ .Values.nats.secretName }}
+{{- end }}

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+// Ask for information to be retrieved
+
+// Public interface of nucliadb to connect external
+
+// Get information from trainer
+// Authentication based on certificate
+
+
+message ResourceGet {
+    string kb = 1;
+    string uuid = 2;
+
+    bool core = 3;
+    bool files = 4;
+    bool links = 5;
+    bool relations = 6;
+    bool extracted = 7;
+    bool vectors = 8;
+    bool metadata = 9;
+    bool large_metadata = 10;
+    bool origin = 11;
+    bool conversation = 12;
+
+}
+
+service TrainingService {
+    rpc GetLearningToRank(X) returns (X) {}
+    rpc GetResource(ResourceGet) returns (resources.Resource) {}
+    rpc GetResourcesList(X) returns (X) {}
+}

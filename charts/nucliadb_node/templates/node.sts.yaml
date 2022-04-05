@@ -1,0 +1,176 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: node
+  labels:
+    app: node
+    app.kubernetes.io/name: node
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: node
+  selector:
+    matchLabels:
+      app: node
+      app.kubernetes.io/name: node
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/managed-by: {{ .Release.Service }}
+  template:
+    metadata:
+      name: node
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: node
+        app.kubernetes.io/name: node
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+    spec:
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+{{- if .Values.nats.secretName }}
+      volumes:
+      - name: nats-creds
+        secret:
+          secretName: {{ .Values.nats.secretName }}
+{{- end }}
+      containers:
+      - name: sidecar
+        image: {{ .Values.image_sidecar }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_sidecar }}"]
+          initialDelaySeconds: 2
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_sidecar }}"]
+          initialDelaySeconds: 2
+        command: ["node_sidecar"]
+        envFrom:
+        - configMapRef:
+            name: node-config
+        - configMapRef:
+            name: nucliadb-config
+        ports:
+        - name: grpc-sidecar
+          containerPort: {{ .Values.serving.grpc_sidecar }}
+          protocol: TCP
+        resources:
+{{ toYaml .Values.resources.sidecar | indent 10 }}
+        volumeMounts:
+        - name: node-pv
+          mountPath: {{ .Values.config.data_path }}
+{{- if .Values.nats.secretName }}
+        - name: nats-creds
+          readOnly: true
+          mountPath: /appsecrets
+{{- end }}
+      - name: writer
+        securityContext:
+          privileged: true
+        image: {{ .Values.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_writer }}", "-service=nodewriter.NodeWriter"]
+          initialDelaySeconds: 2
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_writer }}", "-service=nodewriter.NodeWriter"]
+          initialDelaySeconds: 2
+        command: ["/entrypoint.sh"]
+        args: ["node_writer"]
+        envFrom:
+        - configMapRef:
+            name: node-config
+        - configMapRef:
+            name: nucliadb-config
+        ports:
+        - name: grpc-writer
+          containerPort: {{ .Values.serving.grpc_writer }}
+          protocol: TCP
+        - name: swim
+          containerPort: {{ .Values.serving.swim_port }}
+          protocol: UDP
+        resources:
+{{ toYaml .Values.resources.writer | indent 10 }}
+        volumeMounts:
+        - name: node-pv
+          mountPath: {{ .Values.config.data_path }}
+      - name: reader
+        securityContext:
+          privileged: true
+        image: {{ .Values.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_reader }}", "-service=nodereader.NodeReader"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 10
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_reader }}", "-service=nodereader.NodeReader"]
+          initialDelaySeconds: 2
+        command: ["/entrypoint.sh"]
+        args: ["node_reader"]
+        envFrom:
+        - configMapRef:
+            name: node-config
+        - configMapRef:
+            name: nucliadb-config
+        ports:
+        - name: grpc-reader
+          containerPort: {{ .Values.serving.grpc_reader }}
+          protocol: TCP
+        resources:
+{{ toYaml .Values.resources.reader | indent 10 }}
+        volumeMounts:
+        - name: node-pv
+          mountPath: {{ .Values.config.data_path }}
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 5775
+            name: zk-compact-trft
+            protocol: UDP
+          - containerPort: 5778
+            name: config-rest
+            protocol: TCP
+          - containerPort: 6831
+            name: jg-compact-trft
+            protocol: UDP
+          - containerPort: 6832
+            name: jg-binary-trft
+            protocol: UDP
+          - containerPort: 14271
+            name: admin-http
+            protocol: TCP
+        args:
+          - "--reporter.grpc.host-port=dns:///{{ .Values.tracing.collectorHostPort }}"
+          - --reporter.type=grpc
+  volumeClaimTemplates:
+  - metadata:
+      name: node-pv
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ .Values.storage.class }}
+      resources:
+        requests:
+          storage: {{ .Values.storage.size }}

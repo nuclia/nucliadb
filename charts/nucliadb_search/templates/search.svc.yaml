@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: search
+  labels:
+    app: search
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: search
+  ports:
+    - name: http-search
+      port: {{ .Values.serving.port }}

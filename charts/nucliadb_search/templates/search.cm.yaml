@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: search-config
+  labels:
+    app: search
+    app.kubernetes.io/name: search
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+data:
+  SENTRY_URL: {{ .Values.running.sentry_url }}
+  SWIM_HOST_KEY: {{ .Values.swim.key }}
+  SWIM_BINDING_PORT: {{ .Values.swim.binding.port | quote }}
+  SWIM_BINDING_HOST: {{ .Values.swim.binding.host }}
+  SEARCH_TIMEOUT: {{ .Values.config.search_timeout | quote }}
+  SWIM_LEVEL: {{ .Values.running.swim_level }}

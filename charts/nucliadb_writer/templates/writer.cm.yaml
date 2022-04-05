@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: writer-config
+  labels:
+    app: writer
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  DM_REDIS_HOST: {{ .Values.config.dm_redis_host }}
+  DM_REDIS_PORT: {{ .Values.config.dm_redis_port | quote }}
+  SENTRY_URL: {{ .Values.running.sentry_url }}

@@ -1,0 +1,121 @@
+name: nucliadb One (py)
+env:
+  API_VERSION: 1
+  COMPONENT: nucliadb-one
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_one.yml"
+      - "charts/nucliadb/**"
+      - "nucliadb_one/**"
+      - "Dockerfile.one"
+      - "nucliadb_utils/**"
+      - "nucliadb_swim/**"
+      - "nucliadb_ingest/**"
+      - "nucliadb_writer/**"
+      - "nucliadb_one/**"
+      - "nucliadb_reader/**"
+      - "nucliadb_search/**"
+      - "nucliadb_models/**"
+      - "nucliadb_protos/**"
+      - "nucliadb_cluster/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_one.yml"
+      - "charts/nucliadb/**"
+      - "nucliadb_one/**"
+      - "Dockerfile.one"
+      - "nucliadb_utils/**"
+      - "nucliadb_swim/**"
+      - "nucliadb_ingest/**"
+      - "nucliadb_writer/**"
+      - "nucliadb_one/**"
+      - "nucliadb_reader/**"
+      - "nucliadb_search/**"
+      - "nucliadb_models/**"
+      - "nucliadb_protos/**"
+      - "nucliadb_cluster/**"
+
+jobs:
+  # Job to run pre-checks
+  pre-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: |
+          pip install -r code-requirements.txt
+      - name: Run pre-checks
+        run: |
+          flake8 nucliadb_one --config=nucliadb_one/setup.cfg
+          isort -c --profile black nucliadb_one/
+          black --check --verbose nucliadb_one
+
+  # Job to run tests
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      # Setup gcloud CLI
+      - uses: google-github-actions/setup-gcloud@v0
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      # setup docker, as we need to pull the node image to run the tests
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
+
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the package
+        run: |
+          pip install -r test-requirements.txt
+          pip install -r nucliadb_one/requirements-sources.txt
+          pip install -e nucliadb_swim
+          pip install -e nucliadb_cluster
+          pip install -r nucliadb_ingest/requirements.txt
+          pip install -e nucliadb_ingest
+          pip install -r nucliadb_search/requirements.txt
+          pip install -e nucliadb_search
+          pip install -r nucliadb_writer/requirements.txt
+          pip install -e nucliadb_writer
+          pip install -r nucliadb_reader/requirements.txt
+          pip install -e nucliadb_reader
+
+      - name: Check mypy
+        run: |
+          MYPYPATH=./mypy_stubs mypy nucliadb_one/
+
+      - name: Run tests
+        run: |
+          pytest -rfE --cov=nucliadb_one -s --tb=native -v --cov-report xml --cov-append nucliadb_one/nucliadb_one
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage.xml

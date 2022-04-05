@@ -1,0 +1,23 @@
+name: nucliadb Licences check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Check License Header
+        uses: apache/skywalking-eyes@main # always prefer to use a revision instead of `main`.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # needed only when you want License-Eye to comment on the pull request.
+        # with:
+        # Optional: set the log level. The default value is `info`.
+        # log: debug
+        # Optional: set the config file. The default value is `.licenserc.yaml`.
+        # config: .licenserc.yaml

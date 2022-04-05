@@ -1,0 +1,44 @@
+FROM python:3.9
+
+RUN mkdir -p /usr/src/app
+
+RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop
+
+# Copy requirements from all packages to install them before
+# transfering the source code.
+COPY nucliadb_swim/requirements.txt /usr/src/app/requirements-swim.txt
+COPY nucliadb_cluster/requirements.txt /usr/src/app/requirements-cluster.txt
+COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
+COPY nucliadb_protos/python/requirements.txt /usr/src/app/requirements-protos.txt
+COPY nucliadb_models/requirements.txt /usr/src/app/requirements-models.txt
+COPY nucliadb_ingest/requirements.txt /usr/src/app/requirements-ingest.txt
+COPY nucliadb_reader/requirements.txt /usr/src/app/requirements-reader.txt
+
+RUN set -eux; \
+    pip install --no-cache-dir \
+    -r /usr/src/app/requirements-swim.txt \
+    -r /usr/src/app/requirements-cluster.txt \
+    -r /usr/src/app/requirements-utils.txt \
+    -r /usr/src/app/requirements-protos.txt \
+    -r /usr/src/app/requirements-models.txt \
+    -r /usr/src/app/requirements-ingest.txt \
+    -r /usr/src/app/requirements-reader.txt
+
+# Copy source code
+COPY nucliadb_swim /usr/src/app/nucliadb_swim
+COPY nucliadb_cluster /usr/src/app/nucliadb_cluster
+COPY nucliadb_utils /usr/src/app/nucliadb_utils
+COPY nucliadb_protos /usr/src/app/nucliadb_protos
+COPY nucliadb_models /usr/src/app/nucliadb_models
+COPY nucliadb_ingest /usr/src/app/nucliadb_ingest
+COPY nucliadb_reader /usr/src/app/nucliadb_reader
+
+WORKDIR /usr/src/app
+
+# Install all dependendencies on packages on the nucliadb repo
+# and finally the main component.
+RUN pip install -r nucliadb_reader/requirements-sources.txt
+RUN pip install --no-deps -e /usr/src/app/nucliadb_reader
+
+# HTTP
+EXPOSE 8080/tcp

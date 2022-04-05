@@ -1,0 +1,78 @@
+name: nucliadb Utils (py)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_utils.yml"
+      - "nucliadb_utils/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_utils.yml"
+      - "nucliadb_utils/**"
+
+jobs:
+  # Job to run pre-checks
+  pre-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: |
+          pip install -r code-requirements.txt
+      - name: Run pre-checks
+        run: |
+          flake8 nucliadb_utils --config=nucliadb_utils/setup.cfg
+          isort -c --profile black nucliadb_utils/
+          black --check --verbose nucliadb_utils
+
+  # Job to run tests
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the package
+        run: |
+          pip install -r test-requirements.txt
+          pip install -r nucliadb_utils/requirements-sources.txt
+          pip install -r nucliadb_utils/requirements.txt
+          pip install -e nucliadb_utils
+
+      - name: Check mypy
+        run: |
+          MYPYPATH=./mypy_stubs mypy nucliadb_utils/
+
+      - name: Run tests
+        run: |
+          pytest -rfE --cov=nucliadb_utils -s --tb=native -v --cov-report xml --cov-append nucliadb_utils/nucliadb_utils
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage.xml

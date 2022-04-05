@@ -1,0 +1,91 @@
+FROM python:3.9 as tikv_driver
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH \
+    RUST_VERSION=1.57.0 \
+    CLIENT_VERSION=0.0.3
+
+RUN set -eux; \
+    dpkgArch="$(dpkg --print-architecture)"; \
+    case "${dpkgArch##*-}" in \
+        amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='3dc5ef50861ee18657f9db2eeb7392f9c2a6c95c90ab41e45ab4ca71476b4338' ;; \
+        armhf) rustArch='armv7-unknown-linux-gnueabihf'; rustupSha256='67777ac3bc17277102f2ed73fd5f14c51f4ca5963adadf7f174adf4ebc38747b' ;; \
+        arm64) rustArch='aarch64-unknown-linux-gnu'; rustupSha256='32a1532f7cef072a667bac53f1a5542c99666c4071af0c9549795bbdb2069ec1' ;; \
+        i386) rustArch='i686-unknown-linux-gnu'; rustupSha256='e50d1deb99048bc5782a0200aa33e4eea70747d49dffdc9d06812fd22a372515' ;; \
+        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
+    esac; \
+    url="https://static.rust-lang.org/rustup/archive/1.24.3/${rustArch}/rustup-init"; \
+    wget "$url"; \
+    echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
+    chmod +x rustup-init; \
+    ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
+    rm rustup-init; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
+    rustup --version; \
+    cargo --version; \
+    rustc --version;
+
+RUN apt-get update -y && apt-get install --yes --no-install-recommends  cmake && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 
+
+RUN pip install maturin
+
+RUN set -eux; \
+    wget "https://github.com/tikv/client-py/archive/refs/tags/${CLIENT_VERSION}.tar.gz"; \
+    tar -xzf 0.0.3.tar.gz; \
+    cd client-py-${CLIENT_VERSION}; \
+    maturin build; \
+    cp target/wheels/tikv_client-${CLIENT_VERSION}-*.whl /
+
+# --------------------------------------------
+
+FROM python:3.9
+
+COPY --from=tikv_driver /tikv_client*.whl /
+RUN pip install tikv_client-*.whl
+
+RUN mkdir -p /usr/src/app
+
+RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop
+
+RUN curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.1/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe
+
+# Copy requirements from all packages to install them before
+# transfering the source code.
+COPY nucliadb_swim/requirements.txt /usr/src/app/requirements-swim.txt
+COPY nucliadb_cluster/requirements.txt /usr/src/app/requirements-cluster.txt
+COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
+COPY nucliadb_protos/python/requirements.txt /usr/src/app/requirements-protos.txt
+COPY nucliadb_ingest/requirements.txt /usr/src/app/requirements-ingest.txt
+
+RUN set -eux; \
+    pip install --no-cache-dir \
+    -r /usr/src/app/requirements-swim.txt \
+    -r /usr/src/app/requirements-cluster.txt \
+    -r /usr/src/app/requirements-utils.txt \
+    -r /usr/src/app/requirements-protos.txt \
+    -r /usr/src/app/requirements-ingest.txt
+
+# Copy source code
+COPY nucliadb_swim /usr/src/app/nucliadb_swim
+COPY nucliadb_cluster /usr/src/app/nucliadb_cluster
+COPY nucliadb_utils /usr/src/app/nucliadb_utils
+COPY nucliadb_protos /usr/src/app/nucliadb_protos
+COPY nucliadb_ingest /usr/src/app/nucliadb_ingest
+
+COPY test_logging.ini /
+COPY nucliadb_ingest/entrypoint.sh /
+RUN chmod 750 /entrypoint.sh
+
+WORKDIR /usr/src/app
+
+RUN pip install -r nucliadb_ingest/requirements-sources.txt
+RUN pip install --no-deps -e /usr/src/app/nucliadb_ingest
+
+# SWIM
+EXPOSE 4440/udp
+# METRICS
+EXPOSE 8081/tcp
+# GRPC
+EXPOSE 8030/tcp

@@ -1,0 +1,4 @@
+-e ./nucliadb_protos/python
+-e ./nucliadb_utils
+-e ./nucliadb_swim
+-e ./nucliadb_cluster

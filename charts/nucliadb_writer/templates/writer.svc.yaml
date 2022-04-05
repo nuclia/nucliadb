@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: writer
+  labels:
+    app: writer
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: writer
+  ports:
+    - name: http-writer
+      port: {{ .Values.serving.port }}

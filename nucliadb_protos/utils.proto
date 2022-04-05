@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package utils;
+
+message EntityRelation {
+    string entity = 1;
+    string entity_type = 2;
+}
+
+message Relation {
+    enum RelationType {
+        CHILD = 0;  // Child resource
+        ABOUT = 2;  // related with label (GENERATED)
+        ENTITY = 3;  // related with an entity (GENERATED)
+        COLAB = 4;  // related with user (GENERATED)
+        OTHER = 5;  // related with something
+    }
+
+    RelationType relation = 1;
+
+    // Relations can be with a resource, label, user or entity
+    oneof target {
+        string resource = 2;
+        string label = 3;
+        string user = 4;
+        EntityRelation entity = 5;
+        string other = 6;
+    }
+
+    map<string, string> properties = 7;
+    oneof source {
+        EntityRelation from_entity = 8;
+    }
+}
+
+message ExtractedText {
+    string text = 1;
+    map<string, string> split_text = 2;
+    repeated string deleted_splits = 3;
+}
+
+
+message Vector {
+    int32 start = 1;
+    int32 end = 2;
+    int32 start_paragraph = 3;
+    int32 end_paragraph = 4;
+    bytes vector = 5;
+}
+
+message Vectors {
+    repeated Vector vectors = 1;
+}
+
+message VectorObject {
+    Vectors vectors = 1;
+    map<string, Vectors> split_vectors = 2;
+    repeated string deleted_splits = 3;
+}

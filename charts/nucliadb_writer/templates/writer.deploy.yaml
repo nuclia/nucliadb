@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: writer
+  labels:
+    app: writer
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      app: writer
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: writer
+      labels:
+        app: writer
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+      annotations:
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.config.dm_redis_port }},{{.Values.services.maindb }},{{.Values.services.nats }}"
+    spec:
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+      containers:
+      - name: writer
+        image: {{ .Values.image }}
+        securityContext:
+          privileged: true
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: {{ .Values.serving.port }}
+          initialDelaySeconds: 20
+          timeoutSeconds: 10
+          periodSeconds: 20
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: {{ .Values.serving.port }}
+          initialDelaySeconds: 20
+          timeoutSeconds: 10
+          periodSeconds: 20
+        command: [
+          "uvicorn",
+          "--port={{ .Values.serving.port }}",
+          "--host=0.0.0.0",
+          "nucliadb_writer.app:application"
+        ]
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: writer-config
+        ports:
+        - containerPort: {{ .Values.serving.port }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+{{- if .Values.nats.secretName }}
+        volumeMounts:
+          - name: nats-creds
+            readOnly: true
+            mountPath: /appsecrets
+      volumes:
+      - name: nats-creds
+        secret:
+          secretName: {{ .Values.nats.secretName }}
+{{- end }}

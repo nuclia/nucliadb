@@ -1,0 +1,9 @@
+import typing
+from opentelemetry.context.context import Context
+from opentelemetry.propagators import textmap
+
+class TraceContextTextMapPropagator(textmap.TextMapPropagator):
+    def extract(self, carrier: textmap.CarrierT, context: typing.Optional[Context] = ..., getter: textmap.Getter = ...) -> Context: ...
+    def inject(self, carrier: textmap.CarrierT, context: typing.Optional[Context] = ..., setter: textmap.Setter = ...) -> None: ...
+    @property
+    def fields(self) -> typing.Set[str]: ...

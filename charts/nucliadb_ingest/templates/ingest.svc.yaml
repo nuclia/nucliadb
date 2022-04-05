@@ -1,0 +1,18 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: ingest
+  labels:
+    app: ingest
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  type: ClusterIP
+  selector:
+    app: ingest
+  ports:
+    - name: grpc-ingest
+      port: {{ .Values.serving.grpc }}
+      appProtocol: grpc

@@ -1,0 +1,386 @@
+syntax = "proto3";
+
+package resources;
+
+import public "nucliadb_protos/utils.proto";
+import "google/protobuf/timestamp.proto";
+
+message CloudFile {
+    string uri = 1;
+    int32 size = 2;
+    string content_type = 3;
+    string bucket_name = 4;
+    enum Source {
+        FLAPS = 0;
+        GCS = 1;
+        S3 = 2;
+        LOCAL = 3;
+    }
+    Source source = 5;
+    string filename = 6;
+
+    // Temporal upload information
+    string resumable_uri = 7;
+    int64 offset = 8;
+    string upload_uri = 9;
+    repeated string parts = 10;
+    string old_uri = 11;
+    string old_bucket = 12;
+    string md5 = 13;
+}
+
+
+message Basic {
+    string slug = 1;
+    string icon = 2;
+    string title = 3;
+    string summary = 4;
+    string thumbnail = 5;  // reference to inner thumbnail
+    string layout = 6;
+
+    google.protobuf.Timestamp created = 7;
+    google.protobuf.Timestamp modified = 8;
+
+    Metadata metadata = 9;
+
+    // Not Basic
+    UserMetadata usermetadata = 10;
+    repeated UserFieldMetadata fieldmetadata = 11;
+
+    // Only for read operations
+    string uuid = 12;
+
+    repeated string labels = 13;
+}
+
+
+// Block behaviors
+
+message Origin {
+    enum Source {
+        WEB = 0;
+        DESKTOP = 1;
+        API = 2;
+    }
+    Source source = 1;
+    string source_id = 2;
+    string url = 3;
+    google.protobuf.Timestamp created = 4;
+    google.protobuf.Timestamp modified = 5;
+    map<string, string> metadata = 6;
+    repeated string tags = 7;
+    repeated string colaborators = 8;
+    string filename = 9;
+    repeated string related = 10;
+}
+
+message Relations {
+    repeated utils.Relation relations = 1;
+}
+
+
+message MessageContent {
+    enum Format {
+        PLAIN = 0;
+        HTML = 1;
+        MARKDOWN = 2;
+        RST = 3;
+    }
+    string text = 1;
+    Format format = 2;
+    repeated CloudFile attachments = 4;
+}
+
+message Message {
+    google.protobuf.Timestamp timestamp = 1;
+    string who = 2;
+    repeated string to = 3;
+    MessageContent content = 4;
+    string ident = 5;
+}
+
+message Conversation {
+    repeated Message messages = 1;
+}
+
+message FieldConversation {
+    int32 pages = 1;
+    int32 size = 2;
+}
+
+message NestedPosition {
+    int64 start = 1;
+    int64 end = 2;
+    int64 page = 3;
+}
+
+message FileExtractedData {
+    string language = 1;
+    string md5 = 2;
+    map<string, string> metadata = 3;
+    map<string, string> nested = 4;
+    map<string, CloudFile> file_generated = 5;
+    map<string, RowsPreview> file_rows_previews = 6;
+
+    CloudFile file_preview = 7;
+    FilePages file_pages_previews = 8;
+    CloudFile file_thumbnail = 9;
+
+    string field = 10;
+    string icon = 11;
+    map<string, NestedPosition> nested_position = 12;
+}
+
+message LinkExtractedData {
+    google.protobuf.Timestamp date = 1;
+    string language = 2;
+    string title = 4;
+    map<string, string> metadata = 5;
+
+    CloudFile link_thumbnail = 6;
+    CloudFile link_preview = 7;
+    string field = 8;
+    CloudFile link_image = 9;
+    string description = 10;
+    string type = 11;
+    string embed = 12;
+}
+
+message ExtractedTextWrapper {
+    oneof file_or_data {
+        utils.ExtractedText body = 1;
+        CloudFile file = 2;
+    }
+    FieldID field = 3;
+}
+
+
+message ExtractedVectorsWrapper {
+    oneof file_or_data {
+        utils.VectorObject vectors = 1;
+        CloudFile file = 2;    
+    }
+    FieldID field = 3;
+}
+
+message Sentence {
+    int32 start = 1;
+    int32 end = 2;
+    string key = 3;
+}
+
+message Paragraph {
+    uint32 start = 1;
+    uint32 end = 2;
+    repeated uint32 start_seconds = 3;
+    repeated uint32 end_seconds = 4;
+    enum TypeParagraph {
+        TEXT = 0;
+        OCR = 1;
+        INCEPTION = 2;
+        DESCRIPTION = 3;
+        TRANSCRIPT = 4;
+    }
+    TypeParagraph kind = 5;
+
+    repeated Classification classifications = 6;
+    repeated Sentence sentences = 7;
+    string key = 8;
+}
+
+message FieldMetadata {
+    repeated string links = 1;
+    repeated Paragraph paragraphs = 2;
+    map<string, string> ner = 3;  // Document
+    repeated Classification classifications = 4;
+    google.protobuf.Timestamp last_index = 5;
+    google.protobuf.Timestamp last_understanding = 6;
+    google.protobuf.Timestamp last_extract = 7;
+    google.protobuf.Timestamp last_summary = 8;
+    CloudFile thumbnail = 9;
+    string language = 10;
+    string summary = 11;
+
+}
+
+message FieldComputedMetadata {
+    FieldMetadata metadata = 1;
+    map<string, FieldMetadata> split_metadata = 2;
+    repeated string deleted_splits = 3;
+}
+
+message FieldComputedMetadataWrapper {
+    FieldComputedMetadata metadata = 1;
+    FieldID field = 4;
+}
+
+// Mutable behaviors
+
+message Metadata {
+    map<string, string> metadata = 1;
+    string language = 2;
+    repeated string languages = 3;
+    bool useful = 4;
+    enum Status {
+        PENDING = 0;
+        PROCESSED = 1;
+        ERROR = 2;
+    }
+    Status status = 5;
+}
+
+message FieldText {
+    enum Format {
+        PLAIN = 0;
+        HTML = 1;
+        RST = 2;
+        MARKDOWN = 3;
+    }
+    string body = 1;
+    Format format = 2;
+}
+
+message Block {
+    int32 x = 1;
+    int32 y = 2;
+    int32 cols = 3;
+    int32 rows = 4;
+    enum TypeBlock {
+        TITLE = 0;
+        DESCRIPTION = 1;
+        RICHTEXT = 2;
+        TEXT = 3;
+        ATTACHMENTS = 4;
+        COMMENTS = 5;
+        CLASSIFICATIONS = 6;
+    }
+    TypeBlock type = 5;
+    string ident = 6;
+    string payload = 7;
+    CloudFile file = 8;
+}
+
+message LayoutContent {
+    map<string, Block> blocks = 1;
+    repeated string deleted_blocks = 2;
+}
+
+message FieldLayout {
+    enum Format {
+        NUCLIAv1 = 0;
+    }
+    LayoutContent body = 1;
+    Format format = 2;
+}
+
+message Classification {
+    string labelset = 1;
+    string label = 2;
+}
+
+message UserMetadata {
+    repeated Classification classifications = 1;
+    repeated utils.Relation relations = 3;
+}
+
+message TokenSplit {
+    string token = 1;
+    string klass = 2;
+}
+
+message UserFieldMetadata {
+    repeated TokenSplit token = 1;
+    repeated Paragraph paragraphs = 2;
+    FieldID field = 3;
+}
+
+message FieldLink {
+    google.protobuf.Timestamp added = 1;
+    map<string, string> headers = 2;
+    map<string, string> cookies = 3;
+    string uri = 4;
+    string language = 5;
+    map<string, string> localstorage = 6;
+}
+
+message Keyword {
+    string value = 1;
+}
+
+message FieldKeywordset {
+    repeated Keyword keywords = 1;
+}
+
+message FieldDatetime {
+    google.protobuf.Timestamp value = 1;
+}
+
+message FieldFile {
+    google.protobuf.Timestamp added = 1;
+    CloudFile file = 2;
+    string language = 3;
+    string password = 4;
+}
+
+
+message Entity {
+    string token = 1;
+    string root = 2;
+    string type = 3;
+}
+
+message FieldLargeMetadata {
+    repeated Entity entities = 1;
+    map<string, int32> tokens = 2;
+
+}
+
+message LargeComputedMetadata {
+    FieldLargeMetadata metadata = 1;
+    map<string, FieldLargeMetadata> split_metadata = 2;
+    repeated string deleted_splits = 3;    
+}
+
+message LargeComputedMetadataWrapper {
+    oneof file_or_data {
+        LargeComputedMetadata real = 1;
+        CloudFile file = 2;
+    }
+    FieldID field = 3;
+}
+
+message PagePositions {
+    int64 start = 1;
+    int64 end = 2;
+}
+
+message FilePages {
+    repeated CloudFile pages = 1;
+    repeated PagePositions positions = 2;
+}
+
+message RowsPreview {
+    message Sheet {
+        message Row {
+            repeated string cell = 1;
+        }
+        repeated Row rows = 1;
+    }
+    map<string, Sheet> sheets = 1;
+}
+
+enum FieldType {
+    FILE = 0;
+    LINK = 1;
+    DATETIME = 2;
+    KEYWORDSET = 3;
+    TEXT = 4;
+    LAYOUT = 5;
+    GENERIC = 6;  // Base title/summary fields
+    CONVERSATION = 7;
+}
+
+message FieldID {
+    FieldType field_type = 1;
+    string field = 2;
+}
