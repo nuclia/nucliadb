@@ -81,7 +81,7 @@ sentry = "0.24.2"
 # indradb-lib = { version = "1", features = ["rocksdb-datastore"] }
 
 [build-dependencies]
-tonic-build = "0.5.2"
+tonic-build = "0.7.0"
 
 [features]
 ci-test = []

@@ -12,7 +12,7 @@ homepage = "https://nuclia.com/"
 documentation = "https://nuclia.com"
 
 [build-dependencies]
-tonic-build = "0.6"
+tonic-build = "0.7"
 prost-build = "0.9"
 prost-wkt-build = "0.3"
 
