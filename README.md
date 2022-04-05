@@ -1,4 +1,9 @@
-![CI](https://github.com/stashify/nucliadb/actions/workflows/nucliadb_one.yml/badge.svg)
+![nucliadb_one](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_one.yml/badge.svg)
+![nucliadb_writer](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_writer.yml/badge.svg)
+![nucliadb_reader](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_reader.yml/badge.svg)
+![nucliadb_ingest](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_ingest.yml/badge.svg)
+![nucliadb_node](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_node.yml/badge.svg)
+![nucliadb_search](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_search.yml/badge.svg)
 [![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS)](https://codecov.io/gh/nuclia/nucliadb)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![License: AGPL V3](https://img.shields.io/badge/license-AGPL%20V3-blue)](LICENCE.md)
@@ -71,10 +76,7 @@ docker run redis
 docker run minio
 ```
 
-```
-pip install nucliadb
-nucliadb
-```
+TODO
 
 ### Create a Knowledge box container
 
@@ -109,13 +111,51 @@ curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
 
 - [Upload a file](https://docs.nuclia.dev/docs/quick-start/push)
 
+# 💬 Community
+
+- Chat with us in [Discord][discord]
+- 📝 [Blog Posts](blogs)
+- Follow us on [Twitter][twitter]
+
+# 🙋 FAQ
+
+### How is NucliaDB different from traditional search engines like Elasticsearch or Solr?
+
+The core difference and advantage of NucliaDB is its architecture that is built from the ground up for cloud and unestructured data. Its vector index plus standard keyword and fuzzy search provides an API to use all extracted and learned information from Nuclia Understanding API and provide super NLP powers to any application with low code and peace in mind.
+
+### What license does NucliaDB use?
+
+NucliaDB is open-source under the GNU Affero General Public License Version 3 - AGPLv3. Fundamentally, this means that you are free to use Quickwit for your project, as long as you don't modify NucliaDB. If you do, you have to make the modifications public.
+
+### What is Nuclia's business model?
+
+Our business model relies on our our Nuclia Learning API and Nuclia Understanding API. We also offer NucliaDB as a Service at our multi cloud provider infrastructure: `https://nuclia.cloud`
+
+# 🤝 Contribute and spread the word
+
+We are always super happy to have contributions: code, documentation, issues, feedback, or even saying hello on discord! Here is how you can get started:
+
+- Have a look through GitHub issues labeled "Good first issue".
+- Read our [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md)
+- Create a fork of NucliaDB and submit your pull request!
+
+✨ And to thank you for your contributions, claim your swag by emailing us at info at nuclia.com.
+
 ## Reference
 
-- [Nuclia](https://docs.nuclia.dev/)
+- [Nuclia Documentation](https://docs.nuclia.dev/)
 - [API Reference](https://docs.nuclia.dev/docs/api)
 - [NucliaDB internal documentation](docs/internal/)
 
 ## Meta
 
+- [Rust Code Style](CODE_STYLE_RUST.md)
+- [Python Code Style](CODE_STYLE_PYTHON.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Contributing](CONTRIBUTING.md)
+
+[website]: https://nuclia.com/
+[cloud]: https://nuclia.cloud/
+[twitter]: https://twitter.com/nuclia_
+[discord]: https://discord.gg/W6RKm2Vnhq
+[blogs]: https://nuclia.com/blog
