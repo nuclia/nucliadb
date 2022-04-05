@@ -21,5 +21,5 @@ tonic = "0.6"
 prost-types = "0.9"
 prost-wkt = "0.3"
 prost-wkt-types = "0.3"
-prost = { version = "0.9", default-features = false, features = ["prost-derive"] }
+prost = { version = "0.10", default-features = false, features = ["prost-derive"] }
 serde = { version = "1.0", features = ["derive"] }
