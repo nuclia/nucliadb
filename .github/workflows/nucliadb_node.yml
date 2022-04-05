@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v2
@@ -70,7 +70,7 @@ jobs:
     name: Check Licenses
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: EmbarkStudios/cargo-deny-action@v1
         name: cargo deny
         with:
@@ -81,7 +81,7 @@ jobs:
     name: Code Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -105,7 +105,7 @@ jobs:
           profile: default
           override: true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v1
 
@@ -126,7 +126,7 @@ jobs:
           profile: default
           override: true
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v1
 
@@ -155,7 +155,7 @@ jobs:
         run: gcloud auth configure-docker --quiet
 
       - name: Checkout the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v2
@@ -204,7 +204,7 @@ jobs:
         run: gcloud auth configure-docker --quiet
 
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Build docker image
       - name: Image
@@ -244,7 +244,7 @@ jobs:
         run: gcloud auth configure-docker --quiet
 
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Build docker image
       - name: Image
@@ -274,7 +274,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set helm package image
         id: version_step
