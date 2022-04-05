@@ -22,7 +22,7 @@ path = "src/bin/writer.rs"
 
 [dependencies]
 tonic = "0.6"
-tonic-health = "0.5"
+tonic-health = "0.6"
 prost = "0.8.0"
 async-std = "1.10.0"
 prost-types = "0.8.0"
