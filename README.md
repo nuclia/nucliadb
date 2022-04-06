@@ -55,7 +55,7 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 - Blob support with Azure Blob storage
 - Index relations on index storage
 
-## Achitecture
+## Architecture
 
 <p align="center">
   <img src="docs/assets/images/arquitecture.svg" alt="Architecture" width="500px" style="background-color: #fff">
@@ -121,7 +121,7 @@ curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
 
 ### How is NucliaDB different from traditional search engines like Elasticsearch or Solr?
 
-The core difference and advantage of NucliaDB is its architecture that is built from the ground up for cloud and unestructured data. Its vector index plus standard keyword and fuzzy search provides an API to use all extracted and learned information from Nuclia Understanding API and provide super NLP powers to any application with low code and peace in mind.
+The core difference and advantage of NucliaDB is its architecture that is built from the ground up for cloud and unstructured data. Its vector index plus standard keyword and fuzzy search provide an API to use all extracted and learned information from Nuclia Understanding API and provide super NLP powers to any application with low code and peace of mind.
 
 ### What license does NucliaDB use?
 
@@ -129,7 +129,7 @@ NucliaDB is open-source under the GNU Affero General Public License Version 3 - 
 
 ### What is Nuclia's business model?
 
-Our business model relies on our our Nuclia Learning API and Nuclia Understanding API. We also offer NucliaDB as a Service at our multi cloud provider infrastructure: `https://nuclia.cloud`
+Our business model relies on our Nuclia Learning API and Nuclia Understanding API. We also offer NucliaDB as a Service at our multi cloud provider infrastructure: [https://nuclia.cloud](https://nuclia.cloud).
 
 # 🤝 Contribute and spread the word
 
