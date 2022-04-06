@@ -383,6 +383,7 @@ class Resource:
     async def apply_extracted(self, message: BrokerMessage):
         errors = False
         field_obj: Field
+        basic_modified = False
         for error in message.errors:
             field_obj = await self.get_field(error.field, error.field_type, load=False)
             await field_obj.set_error(error)
@@ -394,10 +395,10 @@ class Resource:
 
         if errors:
             self.basic.metadata.status = PBMetadata.Status.ERROR
-            await self.set_basic(self.basic)
+            basic_modified = True
         elif errors is False and message.txseqid > 0:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
-            await self.set_basic(self.basic)
+            basic_modified = True
 
         for extracted_text in message.extracted_text:
             field_obj = await self.get_field(
@@ -418,6 +419,7 @@ class Resource:
                 self.basic.thumbnail = CloudLink.format_reader_download_uri(
                     link_extracted_data.link_thumbnail.uri
                 )
+                basic_modified = True
             await field_link.set_link_extracted_data(link_extracted_data)
 
         for file_extracted_data in message.file_extracted_data:
@@ -428,10 +430,12 @@ class Resource:
             )
             if file_extracted_data.icon != "" and self.basic.icon == "":
                 self.basic.icon = file_extracted_data.icon
+                basic_modified = True
             if file_extracted_data.file_thumbnail and self.basic.thumbnail == "":
                 self.basic.thumbnail = CloudLink.format_reader_download_uri(
                     file_extracted_data.file_thumbnail.uri
                 )
+                basic_modified = True
             await field_file.set_file_extracted_data(file_extracted_data)
 
         # Metadata should go first
@@ -458,6 +462,7 @@ class Resource:
                 self.basic.thumbnail = CloudLink.format_reader_download_uri(
                     field_metadata.metadata.metadata.thumbnail.uri
                 )
+                basic_modified = True
 
         # Upload to binary storage
         # Vector indexing
@@ -490,6 +495,9 @@ class Resource:
         for relation in message.relations:
             self.indexer.brain.relations.append(relation)
         await self.set_relations(message.relations)  # type: ignore
+
+        if basic_modified:
+            await self.set_basic(self.basic)
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
