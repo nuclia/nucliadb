@@ -144,6 +144,7 @@ async def serialize(
     kb = KnowledgeBox(txn, storage, cache, kbid)
     orm_resource = await kb.get(rid)
     if orm_resource is None:
+        await txn.abort()
         return None
 
     resource = Resource(id=rid)
