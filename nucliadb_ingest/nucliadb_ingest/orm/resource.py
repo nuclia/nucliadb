@@ -219,19 +219,21 @@ class Resource:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
         basic = await self.get_basic()
-        await brain.set_global_tags(basic, origin)
+        if basic is not None:
+            await brain.set_global_tags(basic, origin)
         fields = await self.get_fields()
         for ((type_id, field_id), field) in fields.items():
-            fieldid = FieldID(field_type=type_id, field=field_id)
+            fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             await self.compute_global_text_field(fieldid, brain)
 
             field_metadata = await field.get_field_metadata()
             field_key = self.generate_field_id(fieldid)
-            brain.apply_field_metadata(field_key, field_metadata, [], {})
+            if field_metadata is not None:
+                brain.apply_field_metadata(field_key, field_metadata, [], {})
 
             vo = await field.get_vectors()
-            field_key = self.generate_field_id(fieldid)
-            brain.apply_field_vectors(field_key, vo, [], {})
+            if vo is not None:
+                brain.apply_field_vectors(field_key, vo, [], {})
         return brain
 
     async def generate_broker_message(self) -> BrokerMessage:

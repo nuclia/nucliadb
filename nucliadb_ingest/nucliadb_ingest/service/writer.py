@@ -19,7 +19,6 @@
 #
 import traceback
 from typing import AsyncIterator, Optional
-from nucliadb_ingest.orm.shard import Shard
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
@@ -72,9 +71,10 @@ from nucliadb_ingest.orm import NODES
 from nucliadb_ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
+from nucliadb_ingest.orm.node import Node
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.orm.resource import Resource as ResourceORM
-from nucliadb_ingest.orm.node import Node
+from nucliadb_ingest.orm.shard import Shard
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
 from nucliadb_ingest.utils import get_driver
@@ -476,7 +476,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
         if shard is not None:
-            count = await shard.add_resource(brain, 0)
+            count = await shard.add_resource(brain.brain, 0)
             if count > settings.max_node_fields:
                 shard = await Node.create_shard_by_kbid(txn, request.kbid)
         response = IndexStatus()
