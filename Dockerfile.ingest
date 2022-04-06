@@ -16,6 +16,7 @@ COPY nucliadb_swim/requirements.txt /usr/src/app/requirements-swim.txt
 COPY nucliadb_cluster/requirements.txt /usr/src/app/requirements-cluster.txt
 COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
 COPY nucliadb_protos/python/requirements.txt /usr/src/app/requirements-protos.txt
+COPY nucliadb_models/requirements.txt /usr/src/app/requirements-models.txt
 COPY nucliadb_ingest/requirements.txt /usr/src/app/requirements-ingest.txt
 
 RUN set -eux; \
@@ -24,6 +25,7 @@ RUN set -eux; \
     -r /usr/src/app/requirements-cluster.txt \
     -r /usr/src/app/requirements-utils.txt \
     -r /usr/src/app/requirements-protos.txt \
+    -r /usr/src/app/requirements-models.txt \
     -r /usr/src/app/requirements-ingest.txt
 
 # Copy source code
@@ -31,6 +33,7 @@ COPY nucliadb_swim /usr/src/app/nucliadb_swim
 COPY nucliadb_cluster /usr/src/app/nucliadb_cluster
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
+COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb_ingest /usr/src/app/nucliadb_ingest
 
 COPY test_logging.ini /
@@ -48,4 +51,3 @@ EXPOSE 4440/udp
 EXPOSE 8081/tcp
 # GRPC
 EXPOSE 8030/tcp
-
