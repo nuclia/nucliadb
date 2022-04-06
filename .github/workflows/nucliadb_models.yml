@@ -1,0 +1,41 @@
+name: nucliadb Models (py)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_models.yml"
+      - "nucliadb_models/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_models.yml"
+      - "nucliadb_models/**"
+
+jobs:
+  # Job to run pre-checks
+  pre-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9]
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: |
+          pip install -r code-requirements.txt
+      - name: Run pre-checks
+        run: |
+          flake8 nucliadb_models --config=nucliadb_models/setup.cfg
+          isort -c --profile black nucliadb_models/
+          black --check --verbose nucliadb_models
