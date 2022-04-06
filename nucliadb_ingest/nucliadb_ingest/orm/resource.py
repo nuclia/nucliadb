@@ -47,6 +47,7 @@ from nucliadb_ingest.fields.link import Link
 from nucliadb_ingest.fields.text import Text
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.brain import ResourceBrain
+from nucliadb_models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:
@@ -390,6 +391,10 @@ class Resource:
                 FieldType.LINK,
                 load=False,
             )
+            if link_extracted_data.link_thumbnail and self.basic.thumbnail == "":
+                self.basic.thumbnail = CloudLink.format_reader_download_uri(
+                    link_extracted_data.link_thumbnail.uri
+                )
             await field_link.set_link_extracted_data(link_extracted_data)
 
         for file_extracted_data in message.file_extracted_data:
@@ -400,6 +405,10 @@ class Resource:
             )
             if file_extracted_data.icon != "" and self.basic.icon == "":
                 self.basic.icon = file_extracted_data.icon
+            if file_extracted_data.file_thumbnail and self.basic.thumbnail == "":
+                self.basic.thumbnail = CloudLink.format_reader_download_uri(
+                    file_extracted_data.file_thumbnail.uri
+                )
             await field_file.set_file_extracted_data(file_extracted_data)
 
         # Metadata should go first
@@ -418,6 +427,14 @@ class Resource:
             self.indexer.apply_field_metadata(
                 field_key, metadata, replace_field, replace_splits
             )
+
+            if (
+                field_metadata.metadata.metadata.thumbnail
+                and self.basic.thumbnail == ""
+            ):
+                self.basic.thumbnail = CloudLink.format_reader_download_uri(
+                    field_metadata.metadata.metadata.thumbnail.uri
+                )
 
         # Upload to binary storage
         # Vector indexing
