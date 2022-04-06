@@ -19,9 +19,7 @@
 #
 
 from enum import Enum
-from typing import List
-
-from fastapi import HTTPException
+from typing import List, Optional
 
 import nucliadb_models as models
 from nucliadb_ingest.fields.base import Field
@@ -137,7 +135,7 @@ async def serialize(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-) -> Resource:
+) -> Optional[Resource]:
     storage = await get_storage()
     cache = await get_cache()
     driver = await get_driver()

@@ -13,6 +13,7 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_utils/**"
       - "nucliadb_ingest/**"
+      - "nucliadb_models/**"
       - "Dockerfile.reader"
   push:
     branches:
@@ -23,6 +24,7 @@ on:
       - "nucliadb_reader/**"
       - "nucliadb_models/**"
       - "nucliadb_ingest/**"
+      - "nucliadb_models/**"
       - "Dockerfile.reader"
 
 jobs:

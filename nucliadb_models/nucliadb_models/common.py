@@ -94,16 +94,19 @@ class CloudLink(BaseModel):
     content_type: Optional[str]
     filename: Optional[str]
 
-    def dict(self, **kwargs):
-        match = STORAGE_FILE_MATCH.match(self.uri)
+    @staticmethod
+    def format_reader_download_uri(uri: str) -> str:
+        match = STORAGE_FILE_MATCH.match(uri)
         if not match:
-            return BaseModel.dict(self)
+            return uri
 
         url_params = match.groupdict()
         url_params["download_type"] = DOWNLOAD_TYPE_MAP[url_params["download_type"]]
         url_params["field_type"] = FIELD_TYPE_CHAR_MAP[url_params["field_type"]]
+        return DOWNLOAD_URI.format(**url_params).rstrip("/")
 
-        self.uri = DOWNLOAD_URI.format(**url_params).rstrip("/")
+    def dict(self, **kwargs):
+        self.uri = self.format_reader_download_uri(self.uri)
         return BaseModel.dict(self)
 
 
@@ -140,7 +143,7 @@ class Paragraph(BaseModel):
     start_seconds: Optional[List[int]]
     end_seconds: Optional[List[int]]
 
-    class TypeParagraph(Enum):
+    class TypeParagraph(str, Enum):
         TEXT = "TEXT"
         OCR = "OCR"
         INCEPTION = "INCEPTION"

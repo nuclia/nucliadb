@@ -11,6 +11,7 @@ on:
       - "charts/nucliadb_writer/**"
       - "nucliadb_writer/**"
       - "nucliadb_utils/**"
+      - "nucliadb_models/**"
       - "Dockerfile.writer"
   push:
     branches:
@@ -20,6 +21,7 @@ on:
       - "charts/nucliadb_writer/**"
       - "nucliadb_writer/**"
       - "nucliadb_utils/**"
+      - "nucliadb_models/**"
       - "Dockerfile.writer"
 
 jobs:

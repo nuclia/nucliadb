@@ -17,6 +17,7 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_protos/python/**"
       - "nucliadb_cluster/nucliadb_cluster/**"
+      - "nucliadb_models/**"
   push:
     branches:
       - main
@@ -31,6 +32,7 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_protos/python/**"
       - "nucliadb_cluster/nucliadb_cluster/**"
+      - "nucliadb_models/**"
 
 jobs:
   # Job to run pre-checks

@@ -198,7 +198,7 @@ async def get_resource_field(
         ]
     ),
     page: Union[Literal["last", "first"], int] = Query("last"),
-) -> ResourceField:
+) -> Response:
     storage = await get_storage()
     cache = await get_cache()
     driver = await get_driver()
@@ -269,4 +269,6 @@ async def get_resource_field(
             resource_field.error = Error(body=error.error, type=error.code)
 
     await txn.abort()
-    return resource_field
+    return Response(
+        content=resource_field.json(exclude_unset=True), media_type="application/json"
+    )
