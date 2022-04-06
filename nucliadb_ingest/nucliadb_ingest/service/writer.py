@@ -19,6 +19,7 @@
 #
 import traceback
 from typing import AsyncIterator, Optional
+from nucliadb_ingest.orm.shard import Shard
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
@@ -73,6 +74,7 @@ from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.orm.resource import Resource as ResourceORM
+from nucliadb_ingest.orm.node import Node
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
 from nucliadb_ingest.utils import get_driver
@@ -453,5 +455,29 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         partition = partitioning.generate_partition(request.kbid, request.rid)
         await transaction.commit(bm, partition)
 
+        response = IndexStatus()
+        return response
+
+    async def ReIndex(self, request: IndexResource, context) -> IndexStatus:  # type: ignore
+        txn = await self.proc.driver.begin()
+        storage = await get_storage()
+        cache = await get_cache()
+
+        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+        brain = await resobj.generate_index_message()
+        shard: Optional[Shard] = await kbobj.get_resource_shard(request.rid)
+        if shard is None:
+            # Its a new resource
+            # Check if we have enough resource to create a new shard
+            shard = await Node.actual_shard(txn, request.kbid)
+            if shard is None:
+                shard = await Node.create_shard_by_kbid(txn, request.kbid)
+            await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
+
+        if shard is not None:
+            count = await shard.add_resource(brain, 0)
+            if count > settings.max_node_fields:
+                shard = await Node.create_shard_by_kbid(txn, request.kbid)
         response = IndexStatus()
         return response

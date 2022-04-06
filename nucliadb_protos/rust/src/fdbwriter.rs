@@ -979,6 +979,20 @@ pub mod writer_client {
             let path = http::uri::PathAndQuery::from_static("/fdbwriter.Writer/Index");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn re_index(
+            &mut self,
+            request: impl tonic::IntoRequest<super::IndexResource>,
+        ) -> Result<tonic::Response<super::IndexStatus>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/fdbwriter.Writer/ReIndex");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 #[doc = r" Generated server implementations."]
@@ -1097,6 +1111,10 @@ pub mod writer_server {
             request: tonic::Request<super::ListMembersRequest>,
         ) -> Result<tonic::Response<super::ListMembersResponse>, tonic::Status>;
         async fn index(
+            &self,
+            request: tonic::Request<super::IndexResource>,
+        ) -> Result<tonic::Response<super::IndexStatus>, tonic::Status>;
+        async fn re_index(
             &self,
             request: tonic::Request<super::IndexResource>,
         ) -> Result<tonic::Response<super::IndexStatus>, tonic::Status>;
@@ -1868,6 +1886,37 @@ pub mod writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = IndexSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/fdbwriter.Writer/ReIndex" => {
+                    #[allow(non_camel_case_types)]
+                    struct ReIndexSvc<T: Writer>(pub Arc<T>);
+                    impl<T: Writer> tonic::server::UnaryService<super::IndexResource> for ReIndexSvc<T> {
+                        type Response = super::IndexStatus;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::IndexResource>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).re_index(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ReIndexSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,

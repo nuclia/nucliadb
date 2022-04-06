@@ -40,7 +40,7 @@ from nucliadb_ingest.fields.base import Field
 from nucliadb_ingest.fields.conversation import Conversation
 from nucliadb_ingest.fields.date import Datetime
 from nucliadb_ingest.fields.file import File
-from nucliadb_ingest.fields.generic import Generic
+from nucliadb_ingest.fields.generic import VALID_GLOBAL, Generic
 from nucliadb_ingest.fields.keywordset import Keywordset
 from nucliadb_ingest.fields.layout import Layout
 from nucliadb_ingest.fields.link import Link
@@ -215,6 +215,25 @@ class Resource:
         self.modified = True
         self.relations = relations
 
+    async def generate_index_message(self) -> ResourceBrain:
+        brain = ResourceBrain(rid=self.uuid)
+        origin = await self.get_origin()
+        basic = await self.get_basic()
+        await brain.set_global_tags(basic, origin)
+        fields = await self.get_fields()
+        for ((type_id, field_id), field) in fields.items():
+            fieldid = FieldID(field_type=type_id, field=field_id)
+            await self.compute_global_text_field(fieldid, brain)
+
+            field_metadata = await field.get_field_metadata()
+            field_key = self.generate_field_id(fieldid)
+            brain.apply_field_metadata(field_key, field_metadata, [], {})
+
+            vo = await field.get_vectors()
+            field_key = self.generate_field_id(fieldid)
+            brain.apply_field_vectors(field_key, vo, [], {})
+        return brain
+
     async def generate_broker_message(self) -> BrokerMessage:
         # Go for all fields and recreate brain
         bm = BrokerMessage()
@@ -288,6 +307,10 @@ class Resource:
                 if type_id is None:
                     raise AttributeError("Invalid field type")
                 result.append((type_id, field))
+
+            for generic in VALID_GLOBAL:
+                result.append((FieldType.GENERIC, generic))
+
             self.all_fields_keys = result
         return self.all_fields_keys
 
@@ -471,29 +494,29 @@ class Resource:
     def generate_field_id(self, field: FieldID) -> str:
         return f"{KB_REVERSE_REVERSE[field.field_type]}/{field.field}"
 
-    async def compute_global_tags(self):
+    async def compute_global_tags(self, brain: ResourceBrain):
         origin = await self.get_origin()
         basic = await self.get_basic()
         if basic is None:
             raise KeyError("Resource not found")
-        self.indexer.set_global_tags(basic=basic, origin=origin)
+        brain.set_global_tags(basic=basic, origin=origin)
         for type, field in await self.get_fields_ids():
             fieldobj = await self.get_field(field, type, load=False)
             fieldid = FieldID(field_type=type, field=field)  # type: ignore
             fieldkey = self.generate_field_id(fieldid)
             extracted_metadata = await fieldobj.get_field_metadata()
             if extracted_metadata is not None:
-                self.indexer.apply_field_tags_globally(fieldkey, extracted_metadata)
+                brain.apply_field_tags_globally(fieldkey, extracted_metadata)
             if type == FieldType.KEYWORDSET:
                 field_data = await fieldobj.db_get_value()
-                self.indexer.process_keywordset_fields(fieldkey, field_data)
+                brain.process_keywordset_fields(fieldkey, field_data)
 
     async def compute_global_text(self):
         # For each extracted
         for fieldid in self._modified_extracted_text:
-            await self.compute_global_text_field(fieldid)
+            await self.compute_global_text_field(fieldid, self.indexer)
 
-    async def compute_global_text_field(self, fieldid: FieldID):
+    async def compute_global_text_field(self, fieldid: FieldID, brain: ResourceBrain):
         fieldobj = await self.get_field(fieldid.field, fieldid.field_type, load=False)
         fieldkey = self.generate_field_id(fieldid)
         extracted_text = await fieldobj.get_extracted_text()
@@ -502,7 +525,7 @@ class Resource:
         field_text = extracted_text.text
         for _, split in extracted_text.split_text.items():
             field_text += f" {split} "
-        self.indexer.apply_field_text(fieldkey, field_text)
+        brain.apply_field_text(fieldkey, field_text)
 
     async def get_all(self):
         if self.basic is None:

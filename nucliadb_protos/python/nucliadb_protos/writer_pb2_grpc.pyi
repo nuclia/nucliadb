@@ -198,6 +198,10 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus] = ...
 
+    ReIndex: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.IndexResource,
+        nucliadb_protos.writer_pb2.IndexStatus] = ...
+
 
 class WriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -340,6 +344,12 @@ class WriterServicer(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def Index(self,
+        request: nucliadb_protos.writer_pb2.IndexResource,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.IndexStatus: ...
+
+    @abc.abstractmethod
+    def ReIndex(self,
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.IndexStatus: ...

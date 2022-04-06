@@ -154,7 +154,7 @@ class Processor:
 
             if resource:
                 await resource.compute_global_text()
-                await resource.compute_global_tags()
+                await resource.compute_global_tags(resource.indexer)
 
             if resource and resource.modified:
                 shard: Optional[Shard] = await kb.get_resource_shard(uuid)

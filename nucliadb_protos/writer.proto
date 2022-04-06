@@ -371,4 +371,5 @@ service Writer {
     rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
 
     rpc Index(IndexResource) returns (IndexStatus) {}
+    rpc ReIndex(IndexResource) returns (IndexStatus) {}
 }
