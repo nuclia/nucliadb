@@ -10,6 +10,7 @@ replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
 imagePullPolicy: IfNotPresent
+containerRegistry: eu.gcr.io/stashify-218417
 image: IMAGE_TO_REPLACE
 image_sidecar: IMAGE_SIDECAR_TO_REPLACE
 resources:
