@@ -373,10 +373,12 @@ def node(natsd: str, gcs: str):
     images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server
     images.settings["nucliadb_node_sidecar"]["env"]["GCS_BUCKET"] = "test"
     images.settings["nucliadb_node_sidecar"]["env"]["FILE_BACKEND"] = "gcs"
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_INDEXING_BUCKET"] = "indexing"
+    images.settings["nucliadb_node_sidecar"]["env"][
+        "GCS_INDEXING_BUCKET"
+    ] = "indexing_{env}_{nuclia_id}"
     images.settings["nucliadb_node_sidecar"]["env"][
         "GCS_DEADLETTER_BUCKET"
-    ] = "deadletter"
+    ] = "deadletter_{env}_{nuclia_id}"
 
     images.settings["nucliadb_node_sidecar"]["env"][
         "READER_LISTEN_ADDRESS"

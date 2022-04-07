@@ -57,7 +57,7 @@ class NucliaSettings(BaseSettings):
 
     nuclia_zone: Optional[str] = "dev"
     zone_key: Optional[str] = ""
-    nuclia_id: Optional[str] = ""
+    nuclia_id: Optional[str] = "nuclia"
     onprem: bool = True
 
     nuclia_jwt_key: Optional[str] = None

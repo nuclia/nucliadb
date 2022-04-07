@@ -52,3 +52,30 @@ async def storage_test(storage: Storage):
 
     deleted = await storage.schedule_delete_kb(kbid)
     assert deleted
+
+
+@pytest.mark.asyncio
+async def test_storage_settings(mocker):
+    from nucliadb_utils.settings import storage_settings
+    from nucliadb_utils.storages.settings import settings as extended_storage_settings
+    from nucliadb_utils.utilities import Utility, clean_utility, get_storage
+
+    clean_utility(Utility.STORAGE)
+    extended_storage_settings.s3_deadletter_bucket = "test_s3_{zone}_{env}_deadletter"
+    extended_storage_settings.s3_indexing_bucket = "test_s3_{zone}_{env}_indexer"
+    storage_settings.file_backend = "s3"
+
+    s3_storage = await get_storage()
+    assert s3_storage.deadletter_bucket == "test_s3_dev_local_deadletter"
+    assert s3_storage.indexing_bucket == "test_s3_dev_local_indexer"
+
+    clean_utility(Utility.STORAGE)
+    extended_storage_settings.gcs_deadletter_bucket = "test_gcs_{zone}_{env}_deadletter"
+    extended_storage_settings.gcs_indexing_bucket = "test_gcs_{zone}_{env}_indexer"
+    storage_settings.file_backend = "gcs"
+
+    gcs_storage = await get_storage()
+    assert gcs_storage.deadletter_bucket == "test_gcs_dev_local_deadletter"
+    assert gcs_storage.indexing_bucket == "test_gcs_dev_local_indexer"
+
+    clean_utility(Utility.STORAGE)

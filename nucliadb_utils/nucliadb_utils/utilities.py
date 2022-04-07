@@ -17,7 +17,12 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import audit_settings, nuclia_settings, storage_settings
+from nucliadb_utils.settings import (
+    audit_settings,
+    nuclia_settings,
+    running_settings,
+    storage_settings,
+)
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.transaction import TransactionUtility
@@ -42,6 +47,7 @@ class Utility(str, Enum):
     PUBSUB = "pubsub"
     INDEXING = "indexing"
     AUDIT = "audit"
+    STORAGE = "storage"
 
 
 def get_utility(ident: Utility):
@@ -53,44 +59,74 @@ def set_utility(ident: Utility, util: Any):
 
 
 def clean_utility(ident: Utility):
-    del MAIN[ident]
+    if ident in MAIN:
+        del MAIN[ident]
 
 
 async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
 
-    if storage_settings.file_backend == "s3" and "storage" not in MAIN:
+    if storage_settings.file_backend == "s3" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.s3 import S3Storage
 
-        MAIN["storage"] = S3Storage(
+        if extended_storage_settings.s3_deadletter_bucket is None:
+            raise RuntimeError("Missing s3_deadletter_bucket setting")
+
+        if extended_storage_settings.s3_indexing_bucket is None:
+            raise RuntimeError("Missing s3_deadletter_bucket setting")
+
+        util = S3Storage(
             aws_client_id=storage_settings.s3_client_id,
             aws_client_secret=storage_settings.s3_client_secret,
             endpoint_url=storage_settings.s3_endpoint,
             verify_ssl=storage_settings.s3_verify_ssl,
-            deadletter_bucket=extended_storage_settings.s3_deadletter_bucket,
-            indexing_bucket=extended_storage_settings.s3_indexing_bucket,
+            deadletter_bucket=extended_storage_settings.s3_deadletter_bucket.format(
+                zone=nuclia_settings.nuclia_zone,
+                env=running_settings.running_environment,
+            ),
+            indexing_bucket=extended_storage_settings.s3_indexing_bucket.format(
+                zone=nuclia_settings.nuclia_zone,
+                env=running_settings.running_environment,
+            ),
             use_ssl=storage_settings.s3_ssl,
             region_name=storage_settings.s3_region_name,
             max_pool_connections=storage_settings.s3_max_pool_connections,
             bucket=storage_settings.s3_bucket,
         )
-        await MAIN["storage"].initialize()
-    elif storage_settings.file_backend == "gcs" and "storage" not in MAIN:
+
+        set_utility(Utility.STORAGE, util)
+        await util.initialize()
+
+    elif storage_settings.file_backend == "gcs" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.gcs import GCSStorage
 
-        MAIN["storage"] = GCSStorage(
+        if extended_storage_settings.gcs_deadletter_bucket is None:
+            raise RuntimeError("Missing gcs_deadletter_bucket setting")
+
+        if extended_storage_settings.gcs_indexing_bucket is None:
+            raise RuntimeError("Missing gcs_deadletter_bucket setting")
+
+        gcs_util = GCSStorage(
             url=storage_settings.gcs_endpoint_url,
             account_credentials=storage_settings.gcs_base64_creds,
             bucket=storage_settings.gcs_bucket,
             location=storage_settings.gcs_location,
             project=storage_settings.gcs_project,
-            deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
-            indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
+            deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket.format(
+                zone=nuclia_settings.nuclia_zone,
+                env=running_settings.running_environment,
+            ),
+            indexing_bucket=extended_storage_settings.gcs_indexing_bucket.format(
+                zone=nuclia_settings.nuclia_zone,
+                env=running_settings.running_environment,
+            ),
             executor=ThreadPoolExecutor(extended_storage_settings.gcs_threads),
             labels=storage_settings.gcs_bucket_labels,
             scopes=gcs_scopes,
         )
-        await MAIN["storage"].initialize()
-    return MAIN.get("storage", None)
+        set_utility(Utility.STORAGE, gcs_util)
+        await gcs_util.initialize()
+
+    return MAIN[Utility.STORAGE]
 
 
 def get_local_storage() -> LocalStorage:
