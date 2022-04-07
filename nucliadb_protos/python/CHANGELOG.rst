@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.0.21 (unreleased)
+0.0.21 (2022-04-07)
 -------------------
 
 - Add audit log proto
