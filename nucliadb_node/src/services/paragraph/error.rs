@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::result::NodeError;
+use crate::result::InternalError;
 
 #[derive(Debug)]
 pub struct ParagraphError {
@@ -38,4 +38,4 @@ impl From<tantivy::TantivyError> for ParagraphError {
     }
 }
 
-impl NodeError for ParagraphError {}
+impl InternalError for ParagraphError {}

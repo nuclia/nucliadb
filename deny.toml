@@ -117,6 +117,8 @@ exceptions = [
 {name = "nucliadb-node", allow=["AGPL-3.0"], version = "*"},
 {name = "nucliadb-swim", allow=["MIT"], version = "*"},
 {name = "nucliadb-cluster", allow=["AGPL-3.0"], version = "*"},
+{name = "nucliadb_cluster_rust", allow=["Apache-2.0 WITH LLVM-exception"], version = "*"},
+{name = "target-lexicon", allow=["Apache-2.0 WITH LLVM-exception"], version = "*"},
 ]
 
 # Some crates don't have (easily) machine readable licensing information,

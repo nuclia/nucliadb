@@ -18,7 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
-use tantivy::schema::{Cardinality, FacetOptions, Field, IntOptions, Schema, STORED, STRING, TEXT};
+use tantivy::schema::{
+    Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
+};
 
 #[derive(Debug, Clone)]
 pub struct FieldSchema {
@@ -41,15 +43,15 @@ pub fn timestamp_to_datetime_utc(timestamp: &prost_wkt_types::Timestamp) -> Date
 impl FieldSchema {
     pub fn new() -> Self {
         let mut sb = Schema::builder();
-        let num_options: IntOptions = IntOptions::default()
+        let num_options: NumericOptions = NumericOptions::default()
             .set_indexed()
             .set_fast(Cardinality::SingleValue);
 
-        let date_options = IntOptions::default()
+        let date_options = NumericOptions::default()
             .set_indexed()
             .set_fast(Cardinality::SingleValue);
 
-        let facet_options = FacetOptions::default().set_indexed().set_stored();
+        let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_text_field("uuid", STRING | STORED);
         let field = sb.add_facet_field("field", facet_options.clone());

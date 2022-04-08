@@ -17,126 +17,327 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-extern crate tokio;
-#[macro_use]
-extern crate log;
-
-use std::{
-    net::ToSocketAddrs,
-    sync::mpsc::{Receiver, Sender},
-    thread::JoinHandle,
+use nucliadb_node::reader::NodeReaderService as RustReaderService;
+use nucliadb_node::writer::NodeWriterService as RustWriterService;
+use nucliadb_protos::{
+    op_status, DelRelationsRequest, DelVectorFieldRequest, DocumentSearchRequest, OpStatus,
+    ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest,
+    SetRelationsRequest, SetVectorFieldRequest, ShardId, VectorSearchRequest,
 };
-
-use nucliadb_node::cluster::{Cluster as RustCluster, Member as RustMember};
+use pyo3::exceptions;
 use pyo3::prelude::*;
-use std::sync::mpsc::channel;
-use tokio::runtime::Runtime;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+type RawProtos = Vec<u8>;
 
 #[pyclass]
-pub struct Node {
-    reader: tokio::task::JoinHandle,
-    writer: Receiver<Vec<RustMember>>,
-    _t_handle: JoinHandle<()>,
+pub struct NodeReader {
+    reader: Arc<RwLock<RustReaderService>>,
+}
+impl Default for NodeReader {
+    fn default() -> NodeReader {
+        NodeReader::new()
+    }
 }
 
 #[pymethods]
-impl Node {
-    #[new]
-    fn new(
-        node_id: String,
-        listen_addr: &str,
-        node_type: char,
-        timeout: u64,
-        interval: u64,
-    ) -> Node {
-        let node_reader_service = NodeReaderService::new();
-
-        std::fs::create_dir_all(Configuration::shards_path())?;
-        if !Configuration::lazy_loading() {
-            node_reader_service.load_shards().await?;
-        }
-        let reader_task = tokio::spawn(async move {
-            let addr = Configuration::reader_listen_address();
-            info!("Reader listening for gRPC requests at: {:?}", addr);
-            let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-            health_reporter
-                .set_serving::<NodeReaderServer<NodeReaderService>>()
-                .await;
-            Server::builder()
-                .add_service(health_service)
-                .add_service(NodeReaderServer::new(node_reader_service))
-                .serve(addr)
-                .await
-                .expect("Error starting gRPC writer");
-        });
-        info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
-
-        Cluster {
-            tx_command,
-            rx_members,
-            _t_handle: t_handle,
+impl NodeReader {
+    #[staticmethod]
+    pub fn new() -> NodeReader {
+        NodeReader {
+            reader: Arc::new(RwLock::new(RustReaderService::new())),
         }
     }
-
-    fn get_members(&self) -> Vec<Member> {
-        self.tx_command
-            .send("get_members".to_string())
-            .expect("Error sending command");
-
-        self.rx_members
-            .recv()
-            .expect("Error receiving members from PyCluster")
-            .into_iter()
-            .map(Member::from)
-            .collect()
+    pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let shard_id = bincode::deserialize(&shard_id).unwrap();
+            let mut lock = reader.write().await;
+            match lock.get_shard(&shard_id).await {
+                Some(_) => Ok(bincode::serialize(&shard_id).unwrap()),
+                None => Err(exceptions::PyTypeError::new_err("Not found")),
+            }
+        })
     }
-
-    fn add_peer_node(&self, addr: &str) {
-        let command = format!("add_peer_node|{}", addr);
-        self.tx_command
-            .send(command)
-            .expect("Error sending command");
+    pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let lock = reader.write().await;
+            let shards = lock.get_shards().await;
+            Ok(bincode::serialize(&shards).unwrap())
+        })
+    }
+    pub fn search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = reader.write().await;
+            let search_request: SearchRequest = bincode::deserialize(&request).unwrap();
+            let shard_id = ShardId {
+                id: search_request.shard.clone(),
+            };
+            let response = lock.search(&shard_id, search_request).await;
+            match response {
+                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+            }
+        })
+    }
+    pub fn vector_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = reader.write().await;
+            let vector_request: VectorSearchRequest = bincode::deserialize(&request).unwrap();
+            let shard_id = ShardId {
+                id: vector_request.id.clone(),
+            };
+            let response = lock.vector_search(&shard_id, vector_request).await;
+            match response {
+                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+            }
+        })
+    }
+    pub fn document_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = reader.write().await;
+            let document_request: DocumentSearchRequest = bincode::deserialize(&request).unwrap();
+            let shard_id = ShardId {
+                id: document_request.id.clone(),
+            };
+            let response = lock.document_search(&shard_id, document_request).await;
+            match response {
+                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+            }
+        })
+    }
+    pub fn paragraph_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = reader.write().await;
+            let paragraph_request: ParagraphSearchRequest = bincode::deserialize(&request).unwrap();
+            let shard_id = ShardId {
+                id: paragraph_request.id.clone(),
+            };
+            let response = lock.paragraph_search(&shard_id, paragraph_request).await;
+            match response {
+                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+            }
+        })
+    }
+    pub fn relation_search<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        let _: RelationSearchRequest = bincode::deserialize(&request).unwrap();
+        todo!()
     }
 }
 
-#[cfg(test)]
-mod test {
-    use std::time::Duration;
+#[pyclass]
+pub struct NodeWriter {
+    writer: Arc<RwLock<RustWriterService>>,
+}
 
-    use log::{debug, LevelFilter};
-
-    use crate::Cluster;
-
-    fn init() {
-        let _ = env_logger::builder()
-            .is_test(true)
-            .filter_level(LevelFilter::Trace)
-            .try_init();
+impl Default for NodeWriter {
+    fn default() -> NodeWriter {
+        NodeWriter::new()
+    }
+}
+#[pymethods]
+impl NodeWriter {
+    #[staticmethod]
+    pub fn new() -> NodeWriter {
+        NodeWriter {
+            writer: Arc::new(RwLock::new(RustWriterService::new())),
+        }
     }
 
-    #[test]
-    fn swim() {
-        init();
-        let cluster = Cluster::new("cluster1".to_string(), "localhost:4444", 'N', 2);
+    pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let shard_id = bincode::deserialize(&shard_id).unwrap();
+            let mut lock = writer.write().await;
+            match lock.get_shard(&shard_id).await {
+                Some(_) => Ok(bincode::serialize(&shard_id).unwrap()),
+                None => Err(exceptions::PyTypeError::new_err("Not found")),
+            }
+        })
+    }
 
-        let cluster2 = Cluster::new("cluster2".to_string(), "localhost:5555", 'W', 2);
-        cluster2.add_peer_node("localhost:4444");
+    pub fn new_shard<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut w = writer.write().await;
+            let shard = w.new_shard().await;
+            Ok(bincode::serialize(&shard).unwrap())
+        })
+    }
 
-        let mut count = 0;
-        while count < 100 {
-            let members = cluster.get_members();
-            debug!("Members: {:?}", members);
+    pub fn delete_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let shard_id = bincode::deserialize(&shard_id).unwrap();
+            let mut w = writer.write().await;
+            match w.delete_shard(&shard_id).await {
+                Some(Ok(_)) => Ok(bincode::serialize(&shard_id).unwrap()),
+                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+                None => Err(exceptions::PyTypeError::new_err("Shard not found")),
+            }
+        })
+    }
 
-            std::thread::sleep(Duration::from_millis(1000));
-            count += 1;
-        }
+    pub fn list_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let w = writer.read().await;
+            let shard_ids = w.get_shard_ids();
+            Ok(bincode::serialize(&shard_ids).unwrap())
+        })
+    }
+
+    pub fn set_resource<'p>(&self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = writer.write().await;
+            let resource: Resource = bincode::deserialize(&resource).unwrap();
+            let shard_id = ShardId {
+                id: resource.shard_id.clone(),
+            };
+            match lock.set_resource(&shard_id, &resource).await {
+                Some(Ok(count)) => {
+                    let status = OpStatus {
+                        status: 0,
+                        detail: "Success!".to_string(),
+                        count: count as u64,
+                        shard_id: shard_id.id.clone(),
+                    };
+                    Ok(bincode::serialize(&status).unwrap())
+                }
+                Some(Err(e)) => {
+                    let status = op_status::Status::Error as i32;
+                    let detail = format!("Error: {}", e);
+                    let op_status = OpStatus {
+                        status,
+                        detail,
+                        count: 0_u64,
+                        shard_id: shard_id.id.clone(),
+                    };
+                    Ok(bincode::serialize(&op_status).unwrap())
+                }
+                None => {
+                    let message = format!("Error loading shard {:?}", shard_id);
+                    Err(exceptions::PyTypeError::new_err(message))
+                }
+            }
+        })
+    }
+
+    pub fn remove_resource<'p>(&self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = writer.write().await;
+            let resource: ResourceId = bincode::deserialize(&resource).unwrap();
+            let shard_id = ShardId {
+                id: resource.shard_id.clone(),
+            };
+            match lock.remove_resource(&shard_id, &resource).await {
+                Some(Ok(count)) => {
+                    let status = OpStatus {
+                        status: 0,
+                        detail: "Success!".to_string(),
+                        count: count as u64,
+                        shard_id: shard_id.id.clone(),
+                    };
+                    Ok(bincode::serialize(&status).unwrap())
+                }
+                Some(Err(e)) => {
+                    let status = op_status::Status::Error as i32;
+                    let detail = format!("Error: {}", e);
+                    let op_status = OpStatus {
+                        status,
+                        detail,
+                        count: 0_u64,
+                        shard_id: shard_id.id.clone(),
+                    };
+                    Ok(bincode::serialize(&op_status).unwrap())
+                }
+                None => {
+                    let message = format!("Error loading shard {:?}", shard_id);
+                    Err(exceptions::PyTypeError::new_err(message))
+                }
+            }
+        })
+    }
+
+    pub fn set_vectors_field<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let writer = self.writer.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = writer.write().await;
+            let request: SetVectorFieldRequest = bincode::deserialize(&request).unwrap();
+            let shard_id = ShardId {
+                id: request.shard_id.clone(),
+            };
+            match lock.set_vector_field(&shard_id, &request).await {
+                Some(Ok(_)) => {
+                    let status = OpStatus {
+                        status: 0,
+                        detail: "Success!".to_string(),
+                        count: 0,
+                        shard_id: shard_id.id.clone(),
+                    };
+                    Ok(bincode::serialize(&status).unwrap())
+                }
+                Some(Err(e)) => {
+                    let status = op_status::Status::Error as i32;
+                    let detail = format!("Error: {}", e);
+                    let op_status = OpStatus {
+                        status,
+                        detail,
+                        count: 0_u64,
+                        shard_id: shard_id.id.clone(),
+                    };
+                    Ok(bincode::serialize(&op_status).unwrap())
+                }
+                None => {
+                    let message = format!("Error loading shard {:?}", shard_id);
+                    Err(exceptions::PyTypeError::new_err(message))
+                }
+            }
+        })
+    }
+
+    pub fn del_vectors_field<'p>(
+        &self,
+        request: RawProtos,
+        _py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let _request: DelVectorFieldRequest = bincode::deserialize(&request).unwrap();
+        todo!()
+    }
+
+    pub fn set_relations<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        let _request: SetRelationsRequest = bincode::deserialize(&request).unwrap();
+        todo!()
+    }
+
+    pub fn del_relations<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        let _request: DelRelationsRequest = bincode::deserialize(&request).unwrap();
+        todo!()
+    }
+
+    pub fn gc<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
+        let _request: ShardId = bincode::deserialize(&request).unwrap();
+        todo!()
     }
 }
 
-/// A Python module implemented in Rust.
 #[pymodule]
 fn nucliadb_cluster_rust(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<Cluster>()?;
-    m.add_class::<Member>()?;
+    m.add_class::<NodeWriter>()?;
+    m.add_class::<NodeReader>()?;
     Ok(())
 }

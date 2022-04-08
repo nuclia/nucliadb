@@ -31,7 +31,7 @@ use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order, T
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::paragraph::config::ParagraphServiceConfiguration;
 use crate::services::paragraph::error::ParagraphError;
 use crate::services::paragraph::schema::timestamp_to_datetime_utc;
@@ -58,7 +58,7 @@ impl Debug for ParagraphWriterService {
 
 #[async_trait]
 impl ServiceChild<ParagraphServiceConfiguration> for ParagraphWriterService {
-    async fn start(config: &ParagraphServiceConfiguration) -> NodeResult<Self> {
+    async fn start(config: &ParagraphServiceConfiguration) -> InternalResult<Self> {
         info!("Starting Paragraph Service");
         match ParagraphWriterService::open(config).await {
             Ok(service) => Ok(service),
@@ -75,7 +75,7 @@ impl ServiceChild<ParagraphServiceConfiguration> for ParagraphWriterService {
         }
     }
 
-    async fn stop(&self) -> NodeResult<()> {
+    async fn stop(&self) -> InternalResult<()> {
         info!("Stopping Paragraph Service");
         self.writer.write().unwrap().commit().unwrap();
         Ok(())
@@ -83,7 +83,7 @@ impl ServiceChild<ParagraphServiceConfiguration> for ParagraphWriterService {
 }
 
 impl WriterChild for ParagraphWriterService {
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+    fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let resource_id = resource.resource.as_ref().unwrap();
         let mut modified = false;
 
@@ -118,7 +118,7 @@ impl WriterChild for ParagraphWriterService {
             }
         }
     }
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.write().unwrap().delete_term(uuid_term);
@@ -258,7 +258,7 @@ impl ParagraphWriterService {
                     "Adding paragraph for {} with labels as {:?} [{} - {}]: {} ({})",
                     field, labels, start_pos, end_pos, text, paragraph_id
                 );
-                self.writer.write().unwrap().add_document(subdoc);
+                self.writer.write().unwrap().add_document(subdoc).unwrap();
             }
         }
 

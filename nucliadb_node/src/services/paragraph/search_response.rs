@@ -56,40 +56,36 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
                     let uuid = doc
                         .get_first(schema.uuid)
                         .expect("document doesn't appear to have uuid.")
-                        .text()
+                        .as_text()
                         .unwrap()
                         .to_string();
 
                     let field = doc
                         .get_first(schema.field)
                         .expect("document doesn't appear to have uuid.")
-                        .path()
+                        .as_facet()
                         .unwrap()
-                        .to_string();
+                        .to_path_string();
 
-                    let start_pos = doc
-                        .get_first(schema.start_pos)
-                        .unwrap()
-                        .u64_value()
-                        .unwrap();
+                    let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
-                    let end_pos = doc.get_first(schema.end_pos).unwrap().u64_value().unwrap();
+                    let end_pos = doc.get_first(schema.end_pos).unwrap().as_u64().unwrap();
 
                     let paragraph = doc
                         .get_first(schema.paragraph)
                         .expect("document doesn't appear to have end_pos.")
-                        .text()
+                        .as_text()
                         .unwrap()
                         .to_string();
 
                     let split = doc
                         .get_first(schema.split)
                         .unwrap_or(&default_split)
-                        .text()
+                        .as_text()
                         .unwrap()
                         .to_string();
 
-                    let index = doc.get_first(schema.index).unwrap().u64_value().unwrap();
+                    let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
 
                     let result = paragraph_search_response::Result {
                         uuid,

@@ -20,7 +20,7 @@
 use async_trait::async_trait;
 use nucliadb_protos::{Resource, ResourceId};
 
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 
 /// All services should have the same interface
 pub trait ServiceConfiguration: Send + Sync + Sized + 'static {}
@@ -29,20 +29,20 @@ pub trait ServiceConfiguration: Send + Sync + Sized + 'static {}
 #[async_trait]
 pub trait ServiceChild<C: ServiceConfiguration>: Sized {
     /// Start is to start the service
-    async fn start(config: &C) -> NodeResult<Self>;
+    async fn start(config: &C) -> InternalResult<Self>;
 
     /// To Stop the service
-    async fn stop(&self) -> NodeResult<()>;
+    async fn stop(&self) -> InternalResult<()>;
 }
 
 pub trait WriterChild {
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+    fn set_resource(&mut self, resource: &Resource) -> InternalResult<()>;
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()>;
 }
 
 pub trait ReaderChild {
     type Request;
     type Response;
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response>;
+    fn search(&self, request: &Self::Request) -> InternalResult<Self::Response>;
     fn reload(&self);
 }

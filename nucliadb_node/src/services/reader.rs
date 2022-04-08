@@ -32,7 +32,7 @@ use tracing::*;
 
 // use super::vector::service::VectorService;
 use crate::config::Configuration;
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::field::config::FieldServiceConfiguration;
 use crate::services::field::reader::FieldReaderService;
 use crate::services::paragraph::config::ParagraphServiceConfiguration;
@@ -77,7 +77,7 @@ impl ShardReaderService {
     }
 
     /// Start the service
-    pub async fn start(id: &str) -> NodeResult<ShardReaderService> {
+    pub async fn start(id: &str) -> InternalResult<ShardReaderService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
             true => info!("Loading shard with id {}", id),
@@ -145,7 +145,7 @@ impl ShardReaderService {
         }
     }
 
-    pub async fn search(&self, search_request: SearchRequest) -> NodeResult<SearchResponse> {
+    pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload).await;
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
@@ -208,7 +208,7 @@ impl ShardReaderService {
     pub async fn paragraph_search(
         &self,
         search_request: ParagraphSearchRequest,
-    ) -> NodeResult<ParagraphSearchResponse> {
+    ) -> InternalResult<ParagraphSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         task::spawn_blocking(move || paragraph_reader_service.search(&search_request))
@@ -219,7 +219,7 @@ impl ShardReaderService {
     pub async fn document_search(
         &self,
         search_request: DocumentSearchRequest,
-    ) -> NodeResult<DocumentSearchResponse> {
+    ) -> InternalResult<DocumentSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let field_reader_service = self.field_reader_service.clone();
         task::spawn_blocking(move || field_reader_service.search(&search_request))
@@ -230,7 +230,7 @@ impl ShardReaderService {
     pub async fn vector_search(
         &self,
         search_request: VectorSearchRequest,
-    ) -> NodeResult<VectorSearchResponse> {
+    ) -> InternalResult<VectorSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let vector_reader_service = self.vector_reader_service.clone();
         task::spawn_blocking(move || vector_reader_service.search(&search_request))

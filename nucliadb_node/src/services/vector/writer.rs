@@ -25,7 +25,7 @@ use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_vectors::writer::Writer;
 use tracing::*;
 
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::service::{ServiceChild, WriterChild};
 use crate::services::vector::config::VectorServiceConfiguration;
 
@@ -43,7 +43,7 @@ impl Debug for VectorWriterService {
 
 #[async_trait]
 impl ServiceChild<VectorServiceConfiguration> for VectorWriterService {
-    async fn start(config: &VectorServiceConfiguration) -> NodeResult<Self> {
+    async fn start(config: &VectorServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
             tokio::fs::create_dir_all(&path).await.unwrap();
@@ -51,7 +51,7 @@ impl ServiceChild<VectorServiceConfiguration> for VectorWriterService {
         Ok(VectorWriterService::new(config))
     }
 
-    async fn stop(&self) -> NodeResult<()> {
+    async fn stop(&self) -> InternalResult<()> {
         info!("Stopping vector writer Service");
         self.index.write().unwrap().flush();
         Ok(())
@@ -59,7 +59,7 @@ impl ServiceChild<VectorServiceConfiguration> for VectorWriterService {
 }
 
 impl WriterChild for VectorWriterService {
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         self.index
             .write()
             .unwrap()
@@ -67,7 +67,7 @@ impl WriterChild for VectorWriterService {
         self.index.write().unwrap().flush();
         Ok(())
     }
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+    fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
                 for index in paragraph.paragraphs.values() {

@@ -25,7 +25,7 @@ use nucliadb_protos::{
 use nucliadb_vectors::reader::Reader;
 use tracing::*;
 
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::service::{ReaderChild, ServiceChild};
 use crate::services::vector::config::VectorServiceConfiguration;
 
@@ -43,14 +43,14 @@ impl Debug for VectorReaderService {
 
 #[async_trait]
 impl ServiceChild<VectorServiceConfiguration> for VectorReaderService {
-    async fn start(config: &VectorServiceConfiguration) -> NodeResult<Self> {
+    async fn start(config: &VectorServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
             tokio::fs::create_dir_all(&path).await.unwrap();
         }
         Ok(VectorReaderService::new(config))
     }
-    async fn stop(&self) -> NodeResult<()> {
+    async fn stop(&self) -> InternalResult<()> {
         info!("Stopping vector reader Service");
         Ok(())
     }
@@ -59,7 +59,7 @@ impl ServiceChild<VectorServiceConfiguration> for VectorReaderService {
 impl ReaderChild for VectorReaderService {
     type Request = VectorSearchRequest;
     type Response = VectorSearchResponse;
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         debug!(
             "{} {} {}",
             self.no_results,
