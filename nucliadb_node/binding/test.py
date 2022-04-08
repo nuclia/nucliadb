@@ -17,16 +17,35 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_protos.nodewriter_pb2 import EmptyQuery, ShardCreated
+from nucliadb_protos.nodewriter_pb2 import ShardCreated
+from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.nodereader_pb2 import SearchRequest, SearchResponse
 import nucliadb_node_binding
 import asyncio
 
 
 async def main():
     writer = nucliadb_node_binding.NodeWriter.new()
+    reader = nucliadb_node_binding.NodeReader.new()
     shard = await writer.new_shard()
     pb = ShardCreated()
     pb.ParseFromString(bytearray(shard))
+
+    resourcepb = Resource()
+    resourcepb.resource.uuid = "001"
+    resourcepb.resource.shard_id = pb.id
+    resourcepb.texts["field1"].text = "My lovely text"
+    resourcepb.status = Resource.ResourceStatus.PROCESSED
+    resourcepb.shard_id = pb.id
+    await writer.set_resource(resourcepb.SerializeToString())
+
+    searchpb = SearchRequest()
+    searchpb.shard = pb.id
+    searchpb.body = "text"
+    pbresult = await reader.search(resourcepb.SerializeToString())
+    pb = SearchResponse()
+    pb.ParseFromString(bytearray(pbresult))
+
     print(pb)
 
 
