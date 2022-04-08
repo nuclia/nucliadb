@@ -50,7 +50,7 @@ thiserror = "1"
 mockall = "0.11"
 prost-wkt-types = "0.3"
 opentelemetry = "0.16"
-tracing-opentelemetry = "0.16"
+tracing-opentelemetry = "0.17"
 unicode-segmentation = "1.9.0"
 # Test dependencies
 tempfile = "3.2.0"
