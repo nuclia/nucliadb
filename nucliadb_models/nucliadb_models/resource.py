@@ -234,6 +234,6 @@ FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
     resources_pb2.FieldType.KEYWORDSET: FieldTypeName.KEYWORDSET,
     resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
     resources_pb2.FieldType.LAYOUT: FieldTypeName.LAYOUT,
-    # resources_pb2.FieldType.GENERIC: "generic",
+    resources_pb2.FieldType.GENERIC: "generic",
     resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
 }
