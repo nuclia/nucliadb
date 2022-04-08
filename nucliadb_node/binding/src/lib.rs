@@ -54,10 +54,11 @@ impl NodeReader {
     pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let shard_id = bincode::deserialize(&shard_id).unwrap();
+            let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+
             let mut lock = reader.write().await;
             match lock.get_shard(&shard_id).await {
-                Some(_) => Ok(bincode::serialize(&shard_id).unwrap()),
+                Some(_) => Ok(shard_id.encode_to_vec()),
                 None => Err(exceptions::PyTypeError::new_err("Not found")),
             }
         })
@@ -67,20 +68,20 @@ impl NodeReader {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let lock = reader.write().await;
             let shards = lock.get_shards().await;
-            Ok(bincode::serialize(&shards).unwrap())
+            Ok(shards.encode_to_vec())
         })
     }
     pub fn search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = reader.write().await;
-            let search_request: SearchRequest = bincode::deserialize(&request).unwrap();
+            let search_request = SearchRequest::decode(&mut Cursor::new(request)).unwrap();
             let shard_id = ShardId {
                 id: search_request.shard.clone(),
             };
             let response = lock.search(&shard_id, search_request).await;
             match response {
-                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
                 None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
             }
@@ -90,13 +91,13 @@ impl NodeReader {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = reader.write().await;
-            let vector_request: VectorSearchRequest = bincode::deserialize(&request).unwrap();
+            let vector_request = VectorSearchRequest::decode(&mut Cursor::new(request)).unwrap();
             let shard_id = ShardId {
                 id: vector_request.id.clone(),
             };
             let response = lock.vector_search(&shard_id, vector_request).await;
             match response {
-                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
                 None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
             }
@@ -106,13 +107,14 @@ impl NodeReader {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = reader.write().await;
-            let document_request: DocumentSearchRequest = bincode::deserialize(&request).unwrap();
+            let document_request =
+                DocumentSearchRequest::decode(&mut Cursor::new(request)).unwrap();
             let shard_id = ShardId {
                 id: document_request.id.clone(),
             };
             let response = lock.document_search(&shard_id, document_request).await;
             match response {
-                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
                 None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
             }
@@ -122,20 +124,21 @@ impl NodeReader {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = reader.write().await;
-            let paragraph_request: ParagraphSearchRequest = bincode::deserialize(&request).unwrap();
+            let paragraph_request =
+                ParagraphSearchRequest::decode(&mut Cursor::new(request)).unwrap();
             let shard_id = ShardId {
                 id: paragraph_request.id.clone(),
             };
             let response = lock.paragraph_search(&shard_id, paragraph_request).await;
             match response {
-                Some(Ok(response)) => Ok(bincode::serialize(&response).unwrap()),
+                Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
                 None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
             }
         })
     }
     pub fn relation_search<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _: RelationSearchRequest = bincode::deserialize(&request).unwrap();
+        let _ = RelationSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         todo!()
     }
 }
@@ -184,7 +187,8 @@ impl NodeWriter {
     pub fn delete_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let shard_id = bincode::deserialize(&shard_id).unwrap();
+            let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+
             let mut w = writer.write().await;
             match w.delete_shard(&shard_id).await {
                 Some(Ok(_)) => Ok(shard_id.encode_to_vec()),
@@ -207,7 +211,8 @@ impl NodeWriter {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = writer.write().await;
-            let resource: Resource = bincode::deserialize(&resource).unwrap();
+            let resource = Resource::decode(&mut Cursor::new(resource)).unwrap();
+
             let shard_id = ShardId {
                 id: resource.shard_id.clone(),
             };
@@ -244,7 +249,8 @@ impl NodeWriter {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = writer.write().await;
-            let resource: ResourceId = bincode::deserialize(&resource).unwrap();
+            let resource = ResourceId::decode(&mut Cursor::new(resource)).unwrap();
+
             let shard_id = ShardId {
                 id: resource.shard_id.clone(),
             };
@@ -281,7 +287,8 @@ impl NodeWriter {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = writer.write().await;
-            let request: SetVectorFieldRequest = bincode::deserialize(&request).unwrap();
+            let request = SetVectorFieldRequest::decode(&mut Cursor::new(request)).unwrap();
+
             let shard_id = ShardId {
                 id: request.shard_id.clone(),
             };
@@ -319,22 +326,22 @@ impl NodeWriter {
         request: RawProtos,
         _py: Python<'p>,
     ) -> PyResult<&'p PyAny> {
-        let _request: DelVectorFieldRequest = bincode::deserialize(&request).unwrap();
+        let _request = DelVectorFieldRequest::decode(&mut Cursor::new(request)).unwrap();
         todo!()
     }
 
     pub fn set_relations<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _request: SetRelationsRequest = bincode::deserialize(&request).unwrap();
+        let _request = SetRelationsRequest::decode(&mut Cursor::new(request)).unwrap();
         todo!()
     }
 
     pub fn del_relations<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _request: DelRelationsRequest = bincode::deserialize(&request).unwrap();
+        let _request = DelRelationsRequest::decode(&mut Cursor::new(request)).unwrap();
         todo!()
     }
 
     pub fn gc<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _request: ShardId = bincode::deserialize(&request).unwrap();
+        let _request = ShardId::decode(&mut Cursor::new(request)).unwrap();
         todo!()
     }
 }
