@@ -28,6 +28,7 @@ use nucliadb_protos::{
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
+use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 type RawProtos = Vec<u8>;
@@ -161,10 +162,11 @@ impl NodeWriter {
     pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            let shard_id = bincode::deserialize(&shard_id).unwrap();
+            let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+
             let mut lock = writer.write().await;
             match lock.get_shard(&shard_id).await {
-                Some(_) => Ok(bincode::serialize(&shard_id).unwrap()),
+                Some(_) => Ok(shard_id.encode_to_vec()),
                 None => Err(exceptions::PyTypeError::new_err("Not found")),
             }
         })
@@ -175,9 +177,7 @@ impl NodeWriter {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut w = writer.write().await;
             let shard = w.new_shard().await;
-            let buf = shard.encode_to_vec().unwrap();
-            Ok(buf)
-            // Ok(bincode::serialize(&shard).unwrap())
+            Ok(shard.encode_to_vec())
         })
     }
 
@@ -187,7 +187,7 @@ impl NodeWriter {
             let shard_id = bincode::deserialize(&shard_id).unwrap();
             let mut w = writer.write().await;
             match w.delete_shard(&shard_id).await {
-                Some(Ok(_)) => Ok(bincode::serialize(&shard_id).unwrap()),
+                Some(Ok(_)) => Ok(shard_id.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
                 None => Err(exceptions::PyTypeError::new_err("Shard not found")),
             }
@@ -199,7 +199,7 @@ impl NodeWriter {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let w = writer.read().await;
             let shard_ids = w.get_shard_ids();
-            Ok(bincode::serialize(&shard_ids).unwrap())
+            Ok(shard_ids.encode_to_vec())
         })
     }
 
@@ -219,7 +219,7 @@ impl NodeWriter {
                         count: count as u64,
                         shard_id: shard_id.id.clone(),
                     };
-                    Ok(bincode::serialize(&status).unwrap())
+                    Ok(status.encode_to_vec())
                 }
                 Some(Err(e)) => {
                     let status = op_status::Status::Error as i32;
@@ -230,7 +230,7 @@ impl NodeWriter {
                         count: 0_u64,
                         shard_id: shard_id.id.clone(),
                     };
-                    Ok(bincode::serialize(&op_status).unwrap())
+                    Ok(op_status.encode_to_vec())
                 }
                 None => {
                     let message = format!("Error loading shard {:?}", shard_id);
@@ -256,7 +256,7 @@ impl NodeWriter {
                         count: count as u64,
                         shard_id: shard_id.id.clone(),
                     };
-                    Ok(bincode::serialize(&status).unwrap())
+                    Ok(status.encode_to_vec())
                 }
                 Some(Err(e)) => {
                     let status = op_status::Status::Error as i32;
@@ -267,7 +267,7 @@ impl NodeWriter {
                         count: 0_u64,
                         shard_id: shard_id.id.clone(),
                     };
-                    Ok(bincode::serialize(&op_status).unwrap())
+                    Ok(op_status.encode_to_vec())
                 }
                 None => {
                     let message = format!("Error loading shard {:?}", shard_id);
@@ -293,7 +293,7 @@ impl NodeWriter {
                         count: 0,
                         shard_id: shard_id.id.clone(),
                     };
-                    Ok(bincode::serialize(&status).unwrap())
+                    Ok(status.encode_to_vec())
                 }
                 Some(Err(e)) => {
                     let status = op_status::Status::Error as i32;
@@ -304,7 +304,7 @@ impl NodeWriter {
                         count: 0_u64,
                         shard_id: shard_id.id.clone(),
                     };
-                    Ok(bincode::serialize(&op_status).unwrap())
+                    Ok(op_status.encode_to_vec())
                 }
                 None => {
                     let message = format!("Error loading shard {:?}", shard_id);
