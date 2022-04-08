@@ -8,7 +8,7 @@
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![License: AGPL V3](https://img.shields.io/badge/license-AGPL%20V3-blue)](LICENCE.md)
 ![Twitter Follow](https://img.shields.io/twitter/follow/nuclia_?color=%231DA1F2&logo=Twitter&style=plastic)
-[![Discord](https://img.shields.io/discord/911636727150575649?logo=Discord&logoColor=%23FFFFFF&style=plastic)](https://discord.gg/W6RKm2Vnhq)
+[![Discord](https://img.shields.io/discord/911636727150575649?logo=Discord&logoColor=%23FFFFFF&style=plastic)](https://discord.gg/6wMQ8a3bHX)
 ![Rust](https://img.shields.io/badge/Rust-black?logo=rust&style=plastic)
 ![Python](https://img.shields.io/badge/Python-black?logo=python&style=plastic)
 
@@ -157,5 +157,5 @@ We are always super happy to have contributions: code, documentation, issues, fe
 [website]: https://nuclia.com/
 [cloud]: https://nuclia.cloud/
 [twitter]: https://twitter.com/nuclia_
-[discord]: https://discord.gg/W6RKm2Vnhq
+[discord]: https://discord.gg/6wMQ8a3bHX
 [blogs]: https://nuclia.com/blog
