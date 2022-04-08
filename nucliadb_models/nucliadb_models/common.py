@@ -124,6 +124,7 @@ class FieldTypeName(str, Enum):
     CONVERSATION = "conversation"
     KEYWORDSET = "keywordset"
     DATETIME = "datetime"
+    GENERIC = "generic"
 
 
 class Classification(BaseModel):
