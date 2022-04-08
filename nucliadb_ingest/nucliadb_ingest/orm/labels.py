@@ -31,6 +31,8 @@ BASE_TAGS: Dict[str, List[str]] = {
     "s": [],  # languages p (Principal) s (ALL)
     "u": [],  # contributors s (Source) o (Origin)
     "p": [],  # paragraph labels
+    "f": [],  # field keyword field (field/keyword)
+    "fg": [],  # field keyword (keywords) flat
 }
 
 KB_LABELS = "/kbs/{kbid}/"

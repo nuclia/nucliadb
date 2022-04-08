@@ -30,9 +30,9 @@ class Generic(Field):
     async def set_value(self, payload: str):
         if self.id not in VALID_GLOBAL:
             raise AttributeError(self.id)
-        self.resource.basic.__setattribute__(self.id, payload)
+        setattr(self.resource.basic, self.id, payload)
 
     async def get_value(self) -> str:
         if self.id not in VALID_GLOBAL:
             raise AttributeError(self.id)
-        return self.resource.basic.get(self.id)
+        return getattr(self.resource.basic, self.id)

@@ -249,7 +249,7 @@ class ResourceBrain:
         # all field keywords
         if field:
             for keyword in field.keywords:
-                self.tags["f"].append(f"{field_key}/{keyword}")
+                self.tags["f"].append(f"{field_key}/{keyword.value}")
                 self.tags["fg"].append(keyword.value)
 
     def apply_field_tags_globally(
