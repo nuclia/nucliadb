@@ -35,6 +35,7 @@ from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility
 @pytest.fixture(scope="function")
 def test_settings_reader(cache, gcs, fake_node, redis_driver):  # type: ignore
     from nucliadb_utils.settings import running_settings, storage_settings
+    from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
     running_settings.debug = False
     print(f"Redis ready at {redis_driver.url}")
@@ -42,6 +43,8 @@ def test_settings_reader(cache, gcs, fake_node, redis_driver):  # type: ignore
     storage_settings.gcs_endpoint_url = gcs
     storage_settings.file_backend = "gcs"
     storage_settings.gcs_bucket = "test"
+    extended_storage_settings.gcs_deadletter_bucket = "dlt_{env}_{zone}"
+    extended_storage_settings.gcs_indexing_bucket = "idx_{env}_{zone}"
 
     set_utility(Utility.CACHE, cache)
     yield
