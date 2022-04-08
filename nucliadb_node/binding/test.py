@@ -22,6 +22,7 @@ from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_protos.nodereader_pb2 import SearchRequest, SearchResponse
 import nucliadb_node_binding
 import asyncio
+from datetime import datetime
 
 
 async def main():
@@ -37,12 +38,14 @@ async def main():
     resourcepb.texts["field1"].text = "My lovely text"
     resourcepb.status = Resource.ResourceStatus.PROCESSED
     resourcepb.shard_id = pb.id
+    resourcepb.metadata.created.FromDatetime(datetime.now())
+    resourcepb.metadata.modified.FromDatetime(datetime.now())
     await writer.set_resource(resourcepb.SerializeToString())
 
     searchpb = SearchRequest()
     searchpb.shard = pb.id
     searchpb.body = "text"
-    pbresult = await reader.search(resourcepb.SerializeToString())
+    pbresult = await reader.search(searchpb.SerializeToString())
     pb = SearchResponse()
     pb.ParseFromString(bytearray(pbresult))
 
