@@ -24,6 +24,8 @@ use nucliadb_protos::{
     ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest,
     SetRelationsRequest, SetVectorFieldRequest, ShardId, VectorSearchRequest,
 };
+
+use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 use std::sync::Arc;
@@ -173,7 +175,9 @@ impl NodeWriter {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut w = writer.write().await;
             let shard = w.new_shard().await;
-            Ok(bincode::serialize(&shard).unwrap())
+            let buf = shard.encode_to_vec().unwrap();
+            Ok(buf)
+            // Ok(bincode::serialize(&shard).unwrap())
         })
     }
 
@@ -336,7 +340,7 @@ impl NodeWriter {
 }
 
 #[pymodule]
-fn nucliadb_cluster_rust(_py: Python, m: &PyModule) -> PyResult<()> {
+fn nucliadb_node_binding(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<NodeWriter>()?;
     m.add_class::<NodeReader>()?;
     Ok(())
