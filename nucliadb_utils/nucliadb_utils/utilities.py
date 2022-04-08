@@ -126,6 +126,9 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         set_utility(Utility.STORAGE, gcs_util)
         await gcs_util.initialize()
 
+    if MAIN.get(Utility.STORAGE) is None:
+        raise AttributeError()
+
     return MAIN[Utility.STORAGE]
 
 
