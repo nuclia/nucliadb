@@ -266,7 +266,7 @@ async def get_resource_field(
     if ResourceFieldProperties.ERROR in show:
         error = await field.get_error()
         if error is not None:
-            resource_field.error = Error(body=error.error, type=error.code)
+            resource_field.error = Error(body=error.error, code=error.code)
 
     await txn.abort()
     return Response(
