@@ -392,6 +392,7 @@ class S3Storage(Storage):
 
         missing = False
         deleted = False
+        conflict = False
         try:
             res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
             if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
@@ -402,6 +403,12 @@ class S3Storage(Storage):
                 missing = True
 
         if missing is False:
-            await self._s3aioclient.delete_bucket(Bucket=bucket_name)
-            deleted = True
-        return deleted
+            try:
+                res = await self._s3aioclient.delete_bucket(Bucket=bucket_name)
+            except botocore.exceptions.ClientError as e:
+                error_code = int(e.response["Error"]["Code"])
+                if error_code == 409:
+                    conflict = True
+                if error_code in (200, 204):
+                    deleted = True
+        return deleted, conflict

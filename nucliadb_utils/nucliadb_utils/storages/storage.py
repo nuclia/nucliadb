@@ -22,7 +22,7 @@ from __future__ import annotations
 import abc
 import hashlib
 from io import BytesIO
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, Type
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.noderesources_pb2 import Resource as BrainResource
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
@@ -362,7 +362,7 @@ class Storage:
     async def create_kb(self, kbid: str) -> bool:
         raise NotImplementedError()
 
-    async def delete_kb(self, kbid: str) -> bool:
+    async def delete_kb(self, kbid: str) -> Tuple[bool, bool]:
         raise NotImplementedError()
 
     async def schedule_delete_kb(self, kbid: str) -> bool:

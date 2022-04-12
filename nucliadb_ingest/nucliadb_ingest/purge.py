@@ -27,7 +27,6 @@ from nucliadb_ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb_ingest.orm.knowledgebox import (
     KB_TO_DELETE,
     KB_TO_DELETE_BASE,
-    KB_TO_DELETE_STORAGE,
     KB_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
 )
@@ -107,26 +106,34 @@ async def main():
             )
             continue
 
-        deleted = await storage.delete_kb(kbid)
-        if deleted:
-            # Now delete the  tikv delete mark
+        deleted, conflict = await storage.delete_kb(kbid)
+
+        delete_marker = False
+        if conflict:
+            logger.info(
+                f"  . Nothing was deleted for {key}, (Bucket not yet empty), will try next time"
+            )
+        elif not deleted:
+            logger.info(
+                f"  ! Expected bucket for {key} was not found, will delete marker"
+            )
+            delete_marker = True
+        elif deleted:
+            logger.info(f"  √ Bucket successfully deleted")
+            delete_marker = True
+
+        if delete_marker:
             try:
                 txn = await driver.begin()
-                key_to_purge = KB_TO_DELETE_STORAGE.format(kbid=kbid)
-                await txn.delete(key_to_purge)
-                logger.info(f"  √ Deleted storage of {key_to_purge}")
+                await txn.delete(key)
+                logger.info(f"  √ Deleted storage deletion marker {key}")
             except Exception as exc:
                 capture_exception(exc)
-                logger.info(f"  X Error while deleting key {key_to_purge}")
+                logger.info(f"  X Error while deleting key {key}")
                 await txn.txn.abort()
             else:
                 await txn.txn.commit()
 
-        else:
-            logger.info(
-                f"  . Didn't have anything to delete anything for {key_to_purge}"
-            )
-    logger.info("END PURGING KB STORAGE")
     await storage.finalize()
 
 
