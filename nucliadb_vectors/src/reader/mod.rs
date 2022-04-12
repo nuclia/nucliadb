@@ -68,6 +68,7 @@ impl Reader {
         use crate::query_post_search::{PostSearchQuery, PostSearchValue};
         use crate::query_search::{SearchQuery, SearchValue};
 
+        self.reload();
         let is_filtered_search = !labels.is_empty();
         let label_analysis = FindLabelsQuery {
             labels,
