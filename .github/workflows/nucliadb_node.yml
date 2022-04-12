@@ -174,6 +174,11 @@ jobs:
           pip install -r nucliadb_node/requirements.txt
           pip install -e nucliadb_node
 
+      - name: Install rust binding for testing
+        run: |
+          maturin sdist -m nucliadb_node/binding/Cargo.toml
+          pip install target/wheels/*.tar.gz
+
       - name: Check mypy
         run: |
           MYPYPATH=./mypy_stubs mypy nucliadb_node/

@@ -17,12 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_protos.nodewriter_pb2 import ShardCreated
-from nucliadb_protos.noderesources_pb2 import Resource
-from nucliadb_protos.nodereader_pb2 import SearchRequest, SearchResponse
-import nucliadb_node_binding
 import asyncio
 from datetime import datetime
+
+import nucliadb_node_binding  # type: ignore
+from nucliadb_protos.nodereader_pb2 import SearchRequest, SearchResponse
+from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.nodewriter_pb2 import ShardCreated
 
 
 async def main():
