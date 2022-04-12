@@ -176,7 +176,7 @@ jobs:
 
       - name: Install rust binding for testing
         run: |
-          maturin sdist -m nucliadb_node/binding/Cargo.toml
+          maturin build -m nucliadb_node/binding/Cargo.toml
           pip install target/wheels/*.tar.gz
 
       - name: Check mypy
