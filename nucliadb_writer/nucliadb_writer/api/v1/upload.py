@@ -29,6 +29,8 @@ from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version  # type: ignore
+from grpc import StatusCode as GrpcStatusCode
+from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.resources_pb2 import FieldFile
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
@@ -47,7 +49,11 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 from nucliadb_writer.api.models import CreateResourcePayload
-from nucliadb_writer.exceptions import ConflictError
+from nucliadb_writer.exceptions import (
+    ConflictError,
+    IngestNotAvailable,
+    ResourceNotFound,
+)
 from nucliadb_writer.processing import PushPayload, Source
 from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.basic import parse_basic
@@ -57,7 +63,9 @@ from nucliadb_writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
 from nucliadb_writer.tus.exceptions import (
     HTTPBadRequest,
     HTTPConflict,
+    HTTPNotFound,
     HTTPPreconditionFailed,
+    HTTPServiceUnavailable,
     InvalidTUSMetadata,
 )
 from nucliadb_writer.tus.utils import parse_tus_metadata
@@ -166,10 +174,12 @@ async def post(
         path, rid, field = await start_upload_field(
             kbid, path_rid, field, metadata.get("md5")
         )
-    except KeyError:
-        return Response(status_code=404)
+    except ResourceNotFound:
+        raise HTTPNotFound("Resource is not found or not yet available")
     except ConflictError:
-        raise HTTPConflict("Resource already exists")
+        raise HTTPConflict("A resource with the same uploaded file already exists")
+    except IngestNotAvailable:
+        raise HTTPServiceUnavailable("Upload not available right now, try again")
 
     if implies_resource_creation:
         # When uploading a file to a new kb resource, we want to  allow multiple
@@ -425,10 +435,12 @@ async def upload(
         path, rid, valid_field = await start_upload_field(
             kbid, path_rid, field, md5_user
         )
-    except KeyError:
-        return Response(status_code=404)
+    except ResourceNotFound:
+        raise HTTPNotFound("Resource is not found or not yet available")
     except ConflictError:
-        raise HTTPConflict("Resource already exists")
+        raise HTTPConflict("A resource with the same uploaded file already exists")
+    except IngestNotAvailable:
+        raise HTTPServiceUnavailable("Upload not available right now, try again")
 
     dm = get_dm()
     storage_manager = get_storage_manager()
@@ -534,12 +546,18 @@ async def start_upload_field(
     elif rid is None and md5 is not None:
         pbrequest.rid = md5
 
-    response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
+    try:
+        response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
+    except AioRpcError as exc:
+        if exc.code() is GrpcStatusCode.UNAVAILABLE:
+            raise IngestNotAvailable()
+        else:
+            raise exc
 
     if response.found is False and rid is not None:
-        raise KeyError("Resource not found")
+        raise ResourceNotFound()
     elif response.found is True and rid is None and md5 is not None:
-        raise ConflictError("Resource already exists")
+        raise ConflictError()
 
     if rid is None and md5 is None:
         rid = uuid.uuid4().hex
