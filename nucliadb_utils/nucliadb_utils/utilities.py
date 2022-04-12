@@ -42,6 +42,7 @@ class Utility(str, Enum):
     PUBSUB = "pubsub"
     INDEXING = "indexing"
     AUDIT = "audit"
+    STORAGE = "storage"
 
 
 def get_utility(ident: Utility):
@@ -58,10 +59,10 @@ def clean_utility(ident: Utility):
 
 async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
 
-    if storage_settings.file_backend == "s3" and "storage" not in MAIN:
+    if storage_settings.file_backend == "s3" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.s3 import S3Storage
 
-        MAIN["storage"] = S3Storage(
+        s3util = S3Storage(
             aws_client_id=storage_settings.s3_client_id,
             aws_client_secret=storage_settings.s3_client_secret,
             endpoint_url=storage_settings.s3_endpoint,
@@ -73,11 +74,13 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
             max_pool_connections=storage_settings.s3_max_pool_connections,
             bucket=storage_settings.s3_bucket,
         )
-        await MAIN["storage"].initialize()
-    elif storage_settings.file_backend == "gcs" and "storage" not in MAIN:
+        set_utility(Utility.STORAGE, s3util)
+        await s3util.initialize()
+
+    elif storage_settings.file_backend == "gcs" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.gcs import GCSStorage
 
-        MAIN["storage"] = GCSStorage(
+        gcsutil = GCSStorage(
             url=storage_settings.gcs_endpoint_url,
             account_credentials=storage_settings.gcs_base64_creds,
             bucket=storage_settings.gcs_bucket,
@@ -89,8 +92,13 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
             labels=storage_settings.gcs_bucket_labels,
             scopes=gcs_scopes,
         )
-        await MAIN["storage"].initialize()
-    return MAIN.get("storage", None)
+        set_utility(Utility.STORAGE, gcsutil)
+        await gcsutil.initialize()
+
+    if MAIN.get(Utility.STORAGE) is None:
+        raise AttributeError()
+
+    return MAIN[Utility.STORAGE]
 
 
 def get_local_storage() -> LocalStorage:

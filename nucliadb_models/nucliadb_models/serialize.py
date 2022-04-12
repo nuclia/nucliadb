@@ -249,7 +249,7 @@ async def serialize(
                     resource.data.links = {}
                 if field.id not in resource.data.links:
                     resource.data.links[field.id] = LinkFieldData()
-                if include_value:
+                if include_value and value is not None:
                     resource.data.links[field.id].value = models.FieldLink.from_message(
                         value
                     )
@@ -259,7 +259,7 @@ async def serialize(
                     error = await field.get_error()
                     if error is not None:
                         resource.data.links[field.id].error = Error(
-                            body=error.error, type=error.code
+                            body=error.error, code=error.code
                         )
 
                 if include_extracted_data:
