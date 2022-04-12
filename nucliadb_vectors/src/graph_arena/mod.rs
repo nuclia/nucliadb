@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 #![allow(unused)]
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
@@ -112,17 +113,29 @@ impl Arena {
             None => self.fresh_label_id.fresh(),
         }
     }
-    pub fn load_node_from_disk(&mut self, id: NodeId, node: Node) {
-        self.nodes.insert(id, node);
+    pub fn load_node_from_disk(&mut self, id: NodeId, node: Node) -> bool {
+        if let Entry::Vacant(e) = self.nodes.entry(id) {
+            e.insert(node);
+            true
+        } else {
+            false
+        }
     }
-    pub fn load_edge_from_disk(&mut self, id: EdgeId, edge: Edge) {
-        self.edges.insert(id, edge);
+    pub fn load_edge_from_disk(&mut self, id: EdgeId, edge: Edge) -> bool {
+        if let Entry::Vacant(e) = self.edges.entry(id) {
+            e.insert(edge);
+            true
+        } else {
+            false
+        }
     }
     pub fn delete_node(&mut self, node_id: NodeId) {
         self.deleted_nodes.push(node_id);
+        self.nodes.remove(&node_id);
     }
     pub fn delete_edge(&mut self, edge_id: EdgeId) {
-        self.deleted_edges.push(edge_id)
+        self.deleted_edges.push(edge_id);
+        self.edges.remove(&edge_id);
     }
     pub fn delete_label(&mut self, label_id: LabelId) {
         self.deleted_labels.push(label_id)
@@ -134,10 +147,7 @@ impl Arena {
         self.no_nodes() == 0
     }
     pub fn no_nodes(&self) -> usize {
-        self.nodes.len() - self.deleted_nodes.len()
-    }
-    pub fn no_edges(&self) -> usize {
-        self.edges.len() - self.deleted_edges.len()
+        self.nodes.len()
     }
     pub fn get_edge(&self, id: EdgeId) -> &Edge {
         self.edges.get(&id).unwrap()
@@ -180,10 +190,10 @@ impl LockArena {
     pub fn free_label(&self) -> LabelId {
         self.arena.write().unwrap().free_label()
     }
-    pub fn load_node_from_disk(&self, id: NodeId, node: Node) {
+    pub fn load_node_from_disk(&self, id: NodeId, node: Node) -> bool {
         self.arena.write().unwrap().load_node_from_disk(id, node)
     }
-    pub fn load_edge_from_disk(&self, id: EdgeId, edge: Edge) {
+    pub fn load_edge_from_disk(&self, id: EdgeId, edge: Edge) -> bool {
         self.arena.write().unwrap().load_edge_from_disk(id, edge)
     }
     pub fn delete_node(&self, node_id: NodeId) {
@@ -203,9 +213,6 @@ impl LockArena {
     }
     pub fn no_nodes(&self) -> usize {
         self.arena.read().unwrap().no_nodes()
-    }
-    pub fn no_edges(&self) -> usize {
-        self.arena.read().unwrap().no_edges()
     }
     pub fn get_edge(&self, id: EdgeId) -> Edge {
         self.arena.read().unwrap().get_edge(id).clone()
