@@ -23,3 +23,11 @@ class SendToProcessError(Exception):
 
 class ConflictError(Exception):
     pass
+
+
+class ResourceNotFound(Exception):
+    pass
+
+
+class IngestNotAvailable(Exception):
+    pass
