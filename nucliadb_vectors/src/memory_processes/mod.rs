@@ -38,12 +38,14 @@ pub fn load_node_in_writer(
         index.add_node_from_disk(node_id, top_layer);
         for (layer_id, (out_edges, in_edges)) in disk_node.neighbours.into_iter().enumerate() {
             for edge in out_edges {
-                arena.load_edge_from_disk(edge.my_id, edge.edge);
-                index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                if arena.load_edge_from_disk(edge.my_id, edge.edge) {
+                    index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                }
             }
             for edge in in_edges {
-                arena.load_edge_from_disk(edge.my_id, edge.edge);
-                index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                if arena.load_edge_from_disk(edge.my_id, edge.edge) {
+                    index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                }
             }
         }
     }

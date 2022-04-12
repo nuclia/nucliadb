@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::sync::{Arc, Mutex};
+
 use crate::reader::Reader;
 use crate::writer::Writer;
 
@@ -76,4 +78,60 @@ fn insert_delete_all() {
     assert_eq!(writer.no_vectors(), 50);
     writer.delete_document("KEY".to_string());
     assert_eq!(writer.no_vectors(), 0);
+}
+
+
+fn _concurrency_test() {
+    fn reader_process(reader: Reader, lock: Arc<Mutex<()>>) {
+        loop {
+            let query = vec![rand::random::<f32>(); 8];
+            let no_results = 10;
+            let l = lock.lock().unwrap();
+            let result = reader.search(query, vec![], no_results);
+            println!("READ {result:?}");
+            std::mem::drop(l);
+        }
+    }
+
+    fn writer_process(mut writer: Writer, lock: Arc<Mutex<()>>) {
+        let mut current_key = 0;
+        let mut labels = vec![];
+        for i in 0..50 {
+            labels.push(format!("LABEL_{}", i));
+        }
+        loop {
+            let mut delete = vec![];
+            for _ in 0..100 {
+                let key = format!("KEY_{}", current_key);
+                let vec = vec![rand::random::<f32>(); 8];
+                if rand::random::<usize>() % 2 == 0 {
+                    delete.push(key.clone());
+                }
+                let l = lock.lock().unwrap();
+                writer.insert(key.clone(), vec, labels.clone());
+                writer.flush();
+                println!("INSERT {key}");
+                std::mem::drop(l);
+
+                current_key += 1;
+            }
+            for delete in delete {
+                let l = lock.lock().unwrap();
+                writer.delete_vector(delete.clone());
+                writer.flush();
+                println!("DELETE {delete}");
+                std::mem::drop(l);
+            }
+        }
+    }
+    let lock = Arc::new(Mutex::new(()));
+    let temp_dir = tempfile::tempdir().unwrap();
+    let writer = Writer::new(temp_dir.path().to_str().unwrap());
+    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let reader_lock = lock.clone();
+    let writer_lock = lock.clone();
+    let rp = std::thread::spawn(move || reader_process(reader, reader_lock));
+    let wp = std::thread::spawn(move || writer_process(writer, writer_lock));
+    rp.join().unwrap();
+    wp.join().unwrap();
 }

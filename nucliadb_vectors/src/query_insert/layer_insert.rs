@@ -49,6 +49,7 @@ impl<'a> Query for LayerInsertQuery<'a> {
     type Output = LayerInsertValue;
 
     fn run(&mut self) -> Self::Output {
+        println!("LAYER {}", self.layer);
         let LayerSearchValue { neighbours } = LayerSearchQuery {
             elem: self.arena.get_node(self.new_element).vector,
             layer: self.layer,
@@ -68,6 +69,7 @@ impl<'a> Query for LayerInsertQuery<'a> {
             let edge_id = self.arena.insert_edge(Edge { dist });
             self.index
                 .connect(self.layer, self.new_element, node_id, edge_id);
+            let edge_id = self.arena.insert_edge(Edge { dist });
             self.index
                 .connect(self.layer, node_id, self.new_element, edge_id);
             if self.index.out_edges(self.layer, node_id).len() > self.m_max {
