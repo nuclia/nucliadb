@@ -36,7 +36,7 @@ use tantivy::{
 use tracing::*;
 
 use super::schema::FieldSchema;
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::field::config::FieldServiceConfiguration;
 use crate::services::field::error::FieldError;
 use crate::services::field::search_query::SearchQuery;
@@ -68,7 +68,7 @@ impl Debug for FieldReaderService {
 
 #[async_trait]
 impl ServiceChild<FieldServiceConfiguration> for FieldReaderService {
-    async fn start(config: &FieldServiceConfiguration) -> NodeResult<Self> {
+    async fn start(config: &FieldServiceConfiguration) -> InternalResult<Self> {
         info!("Starting Text Service");
         match FieldReaderService::open(config).await {
             Ok(service) => Ok(service),
@@ -85,7 +85,7 @@ impl ServiceChild<FieldServiceConfiguration> for FieldReaderService {
         }
     }
 
-    async fn stop(&self) -> NodeResult<()> {
+    async fn stop(&self) -> InternalResult<()> {
         info!("Stopping Reader Text Service");
         Ok(())
     }
@@ -94,7 +94,7 @@ impl ServiceChild<FieldServiceConfiguration> for FieldReaderService {
 impl ReaderChild for FieldReaderService {
     type Request = DocumentSearchRequest;
     type Response = DocumentSearchResponse;
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         let result = self.do_search(request);
         info!("Document search at {}:{}", line!(), file!());
         Ok(result)
@@ -222,16 +222,16 @@ impl FieldReaderService {
                     let uuid = doc
                         .get_first(self.schema.uuid)
                         .expect("document doesn't appear to have uuid.")
-                        .text()
+                        .as_text()
                         .unwrap()
                         .to_string();
 
                     let field = doc
                         .get_first(self.schema.field)
                         .expect("document doesn't appear to have field.")
-                        .path()
+                        .as_facet()
                         .unwrap()
-                        .to_string();
+                        .to_path_string();
 
                     let result = DSResult {
                         uuid,
@@ -296,16 +296,16 @@ impl FieldReaderService {
                     let uuid = doc
                         .get_first(self.schema.uuid)
                         .expect("document doesn't appear to have uuid.")
-                        .text()
+                        .as_text()
                         .unwrap()
                         .to_string();
 
                     let field = doc
                         .get_first(self.schema.field)
                         .expect("document doesn't appear to have field.")
-                        .path()
+                        .as_facet()
                         .unwrap()
-                        .to_string();
+                        .to_path_string();
 
                     let result = DSResult {
                         uuid,

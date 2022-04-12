@@ -17,8 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashMap;
-use std::path::Path;
 
 use async_std::sync::{Arc, RwLock};
 use nucliadb_protos::node_writer_server::NodeWriter;
@@ -30,78 +28,19 @@ use nucliadb_protos::{
 use opentelemetry::global;
 use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use uuid::Uuid;
 
-use crate::config::Configuration;
-use crate::services::writer::ShardWriterService;
 use crate::utils::MetadataMap;
+use crate::writer::NodeWriterService;
 
-pub type ShardWriterDB = Arc<RwLock<HashMap<String, ShardWriterService>>>;
-
-/// Stores the shards internal memory database
-#[derive(Debug)]
-pub struct NodeWriterService {
-    /// The hashmap of shards on memory
-    pub shards: ShardWriterDB,
-}
-
-impl NodeWriterService {
-    pub fn new() -> NodeWriterService {
-        NodeWriterService {
-            shards: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-    /// Stop all shards on memory
-    pub async fn shutdown(&self) {
-        for (shard_id, shard) in self.shards.write().await.iter_mut() {
-            info!("Stopping shard {}", shard_id);
-            ShardWriterService::stop(shard).await;
-        }
-    }
-
-    pub async fn load_shards(&self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("Recovering shards from {}...", Configuration::shards_path());
-        for entry in std::fs::read_dir(Configuration::shards_path())? {
-            let entry = entry?;
-            let shard_id = String::from(entry.file_name().to_str().unwrap());
-
-            let shard: ShardWriterService = ShardWriterService::start(&shard_id.to_string())
-                .await
-                .map_err(|e| e.as_tonic_status())?;
-            self.shards.write().await.insert(shard_id.clone(), shard);
-            info!("Shard loaded: {:?}", shard_id);
-        }
-        Ok(())
-    }
-
-    async fn load_shard(&self, shard_id: &str) {
-        info!("{}: Loading shard", shard_id);
-        let in_memory = self.shards.read().await.contains_key(shard_id);
-        if !in_memory {
-            info!("{}: Shard was in memory", shard_id);
-            let in_disk = Path::new(&Configuration::shards_path_id(shard_id)).exists();
-            if in_disk {
-                info!("{}: Shard was in disk", shard_id);
-                let shard = ShardWriterService::start(shard_id).await.unwrap();
-                info!("{}: Loaded shard", shard_id);
-                self.shards
-                    .write()
-                    .await
-                    .insert(shard_id.to_string(), shard);
-                info!("{}: Inserted on memory", shard_id);
-            }
-        }
-    }
-}
-
-impl Default for NodeWriterService {
-    fn default() -> Self {
-        Self::new()
+pub struct NodeWriterGRPCDriver(Arc<RwLock<NodeWriterService>>);
+impl From<NodeWriterService> for NodeWriterGRPCDriver {
+    fn from(node: NodeWriterService) -> NodeWriterGRPCDriver {
+        NodeWriterGRPCDriver(Arc::new(RwLock::new(node)))
     }
 }
 
 #[tonic::async_trait]
-impl NodeWriter for NodeWriterService {
+impl NodeWriter for NodeWriterGRPCDriver {
     async fn get_shard(
         &self,
         request: tonic::Request<ShardId>,
@@ -110,22 +49,17 @@ impl NodeWriter for NodeWriterService {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
-        let shard_request = request.into_inner();
-        let shard_id = shard_request.id.as_str();
-        self.load_shard(shard_id).await;
-        info!("{:?}: Ready reading", shard_id);
-
-        match self.shards.read().await.get(shard_id) {
-            Some(shard) => {
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        let exists = writer.get_shard(&shard_id).await.is_some();
+        std::mem::drop(writer);
+        match exists {
+            true => {
                 info!("{:?}: Ready readed", shard_id);
-
-                let result_shard = ShardId {
-                    id: String::from(&shard.id),
-                };
-                Ok(tonic::Response::new(result_shard))
+                Ok(tonic::Response::new(shard_id))
             }
-            None => {
-                let message = format!("Shard not found {}", shard_id);
+            false => {
+                let message = format!("Shard not found {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
         }
@@ -139,25 +73,9 @@ impl NodeWriter for NodeWriterService {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
         info!("Creating new shard");
-        let new_id = Uuid::new_v4().to_string();
-        let new_shard = ShardWriterService::start(&new_id).await.unwrap();
-
-        let document_version = new_shard.document_service_version;
-        let vector_version = new_shard.vector_service_version;
-        let paragraph_version = new_shard.paragraph_service_version;
-        let relation_version = new_shard.relation_service_version;
-        match self.shards.write().await.insert(new_id.clone(), new_shard) {
-            Some(_) => Err(tonic::Status::internal(
-                "A shard with this uuid already exists.".to_string(),
-            )),
-            None => Ok(tonic::Response::new(ShardCreated {
-                id: new_id,
-                document_service: document_version,
-                paragraph_service: paragraph_version,
-                vector_service: vector_version,
-                relation_service: relation_version,
-            })),
-        }
+        let mut writer = self.0.write().await;
+        let response = writer.new_shard().await;
+        Ok(tonic::Response::new(response))
     }
 
     async fn delete_shard(
@@ -170,34 +88,20 @@ impl NodeWriter for NodeWriterService {
 
         info!("gRPC delete_shard {:?}", request);
 
-        let delete_request = request.into_inner();
-        let shard_id = &delete_request.id;
-        self.load_shard(shard_id).await;
-
-        let result = match self.shards.write().await.get_mut(shard_id) {
-            Some(shard) => match shard.delete().await {
-                Err(e) => {
-                    let error_msg = format!("Error deleting shard {}: {}", shard_id, e);
-                    error!("{}", error_msg);
-                    Err(tonic::Status::internal(error_msg))
-                }
-                Ok(_) => Ok(tonic::Response::new(ShardId {
-                    id: String::from(shard_id),
-                })),
-            },
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.delete_shard(&shard_id).await {
+            Some(Ok(_)) => Ok(tonic::Response::new(shard_id)),
+            Some(Err(e)) => {
+                let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
+            }
             None => {
-                let message = format!("Shard not found {}", shard_id);
+                let message = format!("Shard not found {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
-        };
-
-        // We need to delete the shard
-        match self.shards.write().await.remove(shard_id) {
-            Some(shard) => info!("Remove {} from the DashMap succesfully.", shard.id),
-            None => error!("Error removing shard from DashMap."),
         }
-
-        result
     }
 
     async fn list_shards(
@@ -209,17 +113,9 @@ impl NodeWriter for NodeWriterService {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
 
-        let shards = self.shards.read().await;
-        let mut result: Vec<ShardId> = Vec::with_capacity(shards.len());
-
-        for (shard_id, _service) in shards.iter() {
-            let result_shard = ShardId {
-                id: shard_id.to_string(),
-            };
-            result.push(result_shard);
-        }
+        let ids = self.0.read().await.get_shard_ids();
         info!("Shards listed");
-        Ok(tonic::Response::new(ShardIds { ids: result }))
+        Ok(tonic::Response::new(ids))
     }
 
     // Incremental call that can be call multiple times for the same resource
@@ -233,36 +129,34 @@ impl NodeWriter for NodeWriterService {
         Span::current().set_parent(parent_cx);
 
         let resource = request.into_inner();
-        let shard_id = &resource.shard_id;
-        self.load_shard(shard_id).await;
-
-        match self.shards.write().await.get_mut(shard_id) {
-            Some(shard) => match shard.set_resource(&resource).await {
-                Ok(_) => {
-                    info!("Set resource ends correctly");
-                    let count = shard.count();
-                    let status = OpStatus {
-                        status: 0,
-                        detail: "Success!".to_string(),
-                        count: count as u64,
-                        shard_id: shard_id.to_string(),
-                    };
-                    Ok(tonic::Response::new(status))
-                }
-                Err(e) => {
-                    let status = op_status::Status::Error as i32;
-                    let detail = format!("Error: {}", e);
-                    let op_status = OpStatus {
-                        status,
-                        detail,
-                        count: 0_u64,
-                        shard_id: shard_id.to_string(),
-                    };
-                    Ok(tonic::Response::new(op_status))
-                }
-            },
+        let shard_id = ShardId {
+            id: resource.shard_id.clone(),
+        };
+        let mut writer = self.0.write().await;
+        match writer.set_resource(&shard_id, &resource).await {
+            Some(Ok(count)) => {
+                info!("Set resource ends correctly");
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(op_status))
+            }
             None => {
-                let message = format!("Error loading shard {}", shard_id);
+                let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
         }
@@ -276,35 +170,34 @@ impl NodeWriter for NodeWriterService {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
         let resource = request.into_inner();
-        let shard_id = &resource.shard_id;
-        self.load_shard(shard_id).await;
-        match self.shards.write().await.get_mut(shard_id) {
-            Some(shard) => match shard.remove_resource(&resource).await {
-                Ok(_) => {
-                    info!("remove resource ends correctly");
-                    let count = shard.count();
-                    let status = OpStatus {
-                        status: 0,
-                        detail: "Success!".to_string(),
-                        count: count as u64,
-                        shard_id: shard_id.to_string(),
-                    };
-                    Ok(tonic::Response::new(status))
-                }
-                Err(e) => {
-                    let status = op_status::Status::Error as i32;
-                    let detail = format!("Error: {}", e);
-                    let op_status = OpStatus {
-                        status,
-                        detail,
-                        count: 0_u64,
-                        shard_id: shard_id.to_string(),
-                    };
-                    Ok(tonic::Response::new(op_status))
-                }
-            },
+        let shard_id = ShardId {
+            id: resource.shard_id.clone(),
+        };
+        let mut writer = self.0.write().await;
+        match writer.remove_resource(&shard_id, &resource).await {
+            Some(Ok(count)) => {
+                info!("Remove resource ends correctly");
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(op_status))
+            }
             None => {
-                let message = format!("Shard not found {}", shard_id);
+                let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
         }
@@ -339,34 +232,34 @@ impl NodeWriter for NodeWriterService {
         Span::current().set_parent(parent_cx);
 
         let vector_request = request.into_inner();
-        let shard_id = &vector_request.shard_id;
-        self.load_shard(shard_id).await;
+        let shard_id = ShardId {
+            id: vector_request.shard_id.clone(),
+        };
+        let mut writer = self.0.write().await;
 
-        match self.shards.write().await.get_mut(shard_id) {
-            Some(shard) => match shard.set_vector_field(&vector_request).await {
-                Ok(_) => {
-                    let status = OpStatus {
-                        status: 0,
-                        detail: "Success!".to_string(),
-                        count: 0_u64,
-                        shard_id: shard_id.to_string(),
-                    };
-                    Ok(tonic::Response::new(status))
-                }
-                Err(e) => {
-                    let status = op_status::Status::Error as i32;
-                    let detail = format!("Error: {}", e);
-                    let op_status = OpStatus {
-                        status,
-                        detail,
-                        count: 0_u64,
-                        shard_id: shard_id.to_string(),
-                    };
-                    Ok(tonic::Response::new(op_status))
-                }
-            },
+        match writer.set_vector_field(&shard_id, &vector_request).await {
+            Some(Ok(_)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: 0,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(op_status))
+            }
             None => {
-                let message = format!("Shard not found {}", shard_id);
+                let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
         }
@@ -413,7 +306,7 @@ mod tests {
     use crate::utils::socket_to_endpoint;
 
     async fn start_test_server(address: SocketAddr) -> anyhow::Result<()> {
-        let node_writer = NodeWriterService::new();
+        let node_writer = NodeWriterGRPCDriver::from(NodeWriterService::new());
         std::fs::create_dir_all(Configuration::shards_path())?;
 
         let _ = tokio::spawn(async move {

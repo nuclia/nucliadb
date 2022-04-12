@@ -23,6 +23,7 @@ use std::time::Instant;
 
 use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster};
 use nucliadb_node::config::Configuration;
+use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
 use tonic::transport::Server;
@@ -43,13 +44,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start_bootstrap = Instant::now();
 
-    let node_writer_service = NodeWriterService::new();
+    let mut node_writer_service = NodeWriterService::new();
 
     std::fs::create_dir_all(Configuration::shards_path())?;
     if !Configuration::lazy_loading() {
         node_writer_service.load_shards().await?;
     }
 
+    let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service);
     let host_key_path = Configuration::host_key_path();
     let swim_addr = Configuration::swim_addr();
     let swim_peers_addrs = Configuration::swim_peers_addrs();
@@ -77,12 +79,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Writer listening for gRPC requests at: {:?}", addr);
         let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
         health_reporter
-            .set_serving::<NodeWriterServer<NodeWriterService>>()
+            .set_serving::<NodeWriterServer<NodeWriterGRPCDriver>>()
             .await;
 
         Server::builder()
             .add_service(health_service)
-            .add_service(NodeWriterServer::new(node_writer_service))
+            .add_service(NodeWriterServer::new(grpc_driver))
             .serve(addr)
             .await
             .expect("Error starting gRPC writer");

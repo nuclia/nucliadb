@@ -24,7 +24,7 @@ use nucliadb_protos::{Resource, ResourceId, SetVectorFieldRequest};
 use tracing::*;
 
 use crate::config::Configuration;
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::field::config::FieldServiceConfiguration;
 use crate::services::field::writer::FieldWriterService;
 use crate::services::paragraph::config::ParagraphServiceConfiguration;
@@ -48,7 +48,7 @@ pub struct ShardWriterService {
 
 impl ShardWriterService {
     /// Start the service
-    pub async fn start(id: &str) -> NodeResult<ShardWriterService> {
+    pub async fn start(id: &str) -> InternalResult<ShardWriterService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
             true => info!("Loading shard with id {}", id),
@@ -98,7 +98,7 @@ impl ShardWriterService {
         }
     }
 
-    pub async fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+    pub async fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
         let text_task = tokio::task::spawn_blocking(move || {
@@ -125,7 +125,7 @@ impl ShardWriterService {
         Ok(())
     }
 
-    pub async fn remove_resource(&mut self, resource: &ResourceId) -> NodeResult<()> {
+    pub async fn remove_resource(&mut self, resource: &ResourceId) -> InternalResult<()> {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
         let text_task = tokio::task::spawn_blocking(move || {

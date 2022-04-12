@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::result::NodeError;
+use crate::result::InternalError;
 
 #[derive(Debug)]
 pub struct FieldError {
@@ -39,4 +39,4 @@ impl From<tantivy::TantivyError> for FieldError {
     }
 }
 
-impl NodeError for FieldError {}
+impl InternalError for FieldError {}

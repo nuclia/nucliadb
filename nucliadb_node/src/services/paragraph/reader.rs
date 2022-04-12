@@ -33,16 +33,12 @@ use tantivy::{
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::paragraph::config::ParagraphServiceConfiguration;
 use crate::services::paragraph::error::ParagraphError;
 use crate::services::paragraph::search_query::{Distance, SearchQuery};
 use crate::services::paragraph::search_response::SearchResponse;
 use crate::services::service::{ReaderChild, ServiceChild};
-
-pub struct TextServiceConfiguration {
-    pub path: String,
-}
 
 pub struct ParagraphReaderService {
     index: Index,
@@ -61,7 +57,7 @@ impl Debug for ParagraphReaderService {
 
 #[async_trait]
 impl ServiceChild<ParagraphServiceConfiguration> for ParagraphReaderService {
-    async fn start(config: &ParagraphServiceConfiguration) -> NodeResult<Self> {
+    async fn start(config: &ParagraphServiceConfiguration) -> InternalResult<Self> {
         info!("Starting Paragraph Service");
         match ParagraphReaderService::open(config).await {
             Ok(service) => Ok(service),
@@ -78,7 +74,7 @@ impl ServiceChild<ParagraphServiceConfiguration> for ParagraphReaderService {
         }
     }
 
-    async fn stop(&self) -> NodeResult<()> {
+    async fn stop(&self) -> InternalResult<()> {
         info!("Stopping Paragraph Reader Service");
         Ok(())
     }
@@ -87,7 +83,7 @@ impl ServiceChild<ParagraphServiceConfiguration> for ParagraphReaderService {
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
-    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response> {
+    fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         let query = {
             let first_attemp = SearchQuery::process(request, &self.schema, Distance::Low).unwrap();
             if first_attemp.is_empty() {

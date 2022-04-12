@@ -22,9 +22,9 @@
 // #![warn(missing_docs)]
 #![allow(clippy::bool_assert_comparison)]
 
-mod result;
-
 pub mod services;
+
+pub mod result;
 
 /// Global configuration enviromental variables
 pub mod config;

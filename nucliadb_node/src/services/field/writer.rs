@@ -31,7 +31,7 @@ use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 use tracing::*;
 
 use super::schema::FieldSchema;
-use crate::result::NodeResult;
+use crate::result::InternalResult;
 use crate::services::field::config::FieldServiceConfiguration;
 use crate::services::field::error::FieldError;
 use crate::services::field::schema::timestamp_to_datetime_utc;
@@ -54,7 +54,7 @@ impl Debug for FieldWriterService {
 
 #[async_trait]
 impl ServiceChild<FieldServiceConfiguration> for FieldWriterService {
-    async fn start(config: &FieldServiceConfiguration) -> NodeResult<Self> {
+    async fn start(config: &FieldServiceConfiguration) -> InternalResult<Self> {
         info!("Starting Text Service");
         match FieldWriterService::open(config).await {
             Ok(service) => Ok(service),
@@ -71,7 +71,7 @@ impl ServiceChild<FieldServiceConfiguration> for FieldWriterService {
         }
     }
 
-    async fn stop(&self) -> NodeResult<()> {
+    async fn stop(&self) -> InternalResult<()> {
         info!("Stopping Text Service");
         self.writer.write().unwrap().commit().unwrap();
         Ok(())
@@ -79,7 +79,7 @@ impl ServiceChild<FieldServiceConfiguration> for FieldWriterService {
 }
 
 impl WriterChild for FieldWriterService {
-    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+    fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let resource_id = resource.resource.as_ref().unwrap();
 
         let uuid_field = self.schema.uuid;
@@ -95,7 +95,7 @@ impl WriterChild for FieldWriterService {
         }
         Ok(())
     }
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.write().unwrap().delete_term(uuid_term);
@@ -192,7 +192,11 @@ impl FieldWriterService {
                 let facet = Facet::from(label.as_str());
                 subdoc.add_facet(self.schema.facets, facet);
             }
-            self.writer.write().unwrap().add_document(subdoc.clone());
+            self.writer
+                .write()
+                .unwrap()
+                .add_document(subdoc.clone())
+                .unwrap();
         }
     }
 }

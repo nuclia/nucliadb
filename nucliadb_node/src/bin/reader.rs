@@ -20,6 +20,7 @@
 use std::time::Instant;
 
 use nucliadb_node::config::Configuration;
+use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_protos::node_reader_server::NodeReaderServer;
 use tonic::transport::Server;
@@ -40,19 +41,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start_bootstrap = Instant::now();
 
-    let node_reader_service = NodeReaderService::new();
+    let mut node_reader_service = NodeReaderService::new();
 
     std::fs::create_dir_all(Configuration::shards_path())?;
     if !Configuration::lazy_loading() {
         node_reader_service.load_shards().await?;
     }
 
+    let node_reader_service = NodeReaderGRPCDriver::from(node_reader_service);
     let reader_task = tokio::spawn(async move {
         let addr = Configuration::reader_listen_address();
         info!("Reader listening for gRPC requests at: {:?}", addr);
         let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
         health_reporter
-            .set_serving::<NodeReaderServer<NodeReaderService>>()
+            .set_serving::<NodeReaderServer<NodeReaderGRPCDriver>>()
             .await;
 
         Server::builder()

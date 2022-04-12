@@ -17,9 +17,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub trait NodeError: std::fmt::Display + std::fmt::Debug + Send {
-    fn as_tonic_status(&self) -> tonic::Status {
-        tonic::Status::internal(self.to_string())
+pub trait InternalError: std::fmt::Display + std::fmt::Debug + Send {}
+pub(crate) type InternalResult<R> = Result<R, Box<dyn InternalError>>;
+
+pub enum ServiceError {
+    GenericErr(Box<dyn std::error::Error>),
+    NodeOpErr(Box<dyn InternalError>),
+    IOErr(std::io::Error),
+}
+impl From<Box<dyn std::error::Error>> for ServiceError {
+    fn from(error: Box<dyn std::error::Error>) -> Self {
+        ServiceError::GenericErr(error)
     }
 }
-pub type NodeResult<R> = Result<R, Box<dyn NodeError>>;
+impl From<Box<dyn InternalError>> for ServiceError {
+    fn from(error: Box<dyn InternalError>) -> Self {
+        ServiceError::NodeOpErr(error)
+    }
+}
+impl From<std::io::Error> for ServiceError {
+    fn from(error: std::io::Error) -> Self {
+        ServiceError::IOErr(error)
+    }
+}
+
+impl std::error::Error for ServiceError {}
+impl std::fmt::Debug for ServiceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServiceError::GenericErr(e) => write!(f, "{:?}", e),
+            ServiceError::NodeOpErr(e) => write!(f, "{:?}", e),
+            ServiceError::IOErr(e) => write!(f, "{:?}", e),
+        }
+    }
+}
+impl std::fmt::Display for ServiceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServiceError::GenericErr(e) => write!(f, "{}", e),
+            ServiceError::NodeOpErr(e) => write!(f, "{}", e),
+            ServiceError::IOErr(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+pub type ServiceResult<V> = Result<V, ServiceError>;

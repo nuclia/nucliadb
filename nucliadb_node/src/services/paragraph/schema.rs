@@ -18,7 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
-use tantivy::schema::{Cardinality, FacetOptions, Field, IntOptions, Schema, STORED, STRING, TEXT};
+use tantivy::schema::{
+    Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
+};
 
 #[derive(Debug, Clone)]
 pub struct ParagraphSchema {
@@ -47,16 +49,16 @@ impl ParagraphSchema {
     pub fn new() -> Self {
         tracing::info!("creating paragraph schema");
         let mut sb = Schema::builder();
-        let num_options: IntOptions = IntOptions::default()
+        let num_options: NumericOptions = NumericOptions::default()
             .set_stored()
             .set_fast(Cardinality::SingleValue);
 
-        let date_options = IntOptions::default()
+        let date_options = NumericOptions::default()
             .set_indexed()
             .set_stored()
             .set_fast(Cardinality::SingleValue);
 
-        let facet_options = FacetOptions::default().set_indexed().set_stored();
+        let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_text_field("uuid", STRING | STORED);
         let paragraph = sb.add_text_field("paragraph", STRING | STORED);
