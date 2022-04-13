@@ -460,7 +460,7 @@ mod tests {
     use std::time::SystemTime;
 
     use nucliadb_protos::{Faceted, Filter, OrderBy, Resource, ResourceId, Timestamps};
-    use prost_wkt_types::Timestamp;
+    use prost_types::Timestamp;
     use tempdir::TempDir;
 
     use super::*;

@@ -272,7 +272,7 @@ mod tests {
     use std::time::SystemTime;
 
     use nucliadb_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId};
-    use prost_wkt_types::Timestamp;
+    use prost_types::Timestamp;
     use tantivy::collector::{Count, TopDocs};
     use tantivy::query::{AllQuery, TermQuery};
     use tempdir::TempDir;

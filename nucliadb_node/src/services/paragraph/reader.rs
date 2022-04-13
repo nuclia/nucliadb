@@ -258,7 +258,7 @@ mod tests {
     use nucliadb_protos::{
         Faceted, Filter, IndexParagraph, IndexParagraphs, OrderBy, Resource, ResourceId, Timestamps,
     };
-    use prost_wkt_types::Timestamp;
+    use prost_types::Timestamp;
     use tantivy::collector::Count;
     use tantivy::query::AllQuery;
     use tempdir::TempDir;

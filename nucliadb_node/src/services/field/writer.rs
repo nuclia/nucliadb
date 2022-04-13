@@ -206,7 +206,7 @@ mod tests {
     use std::collections::HashMap;
     use std::time::SystemTime;
 
-    use prost_wkt_types::Timestamp;
+    use prost_types::Timestamp;
     use tantivy::collector::{Count, TopDocs};
     use tantivy::query::{AllQuery, TermQuery};
     use tempdir::TempDir;
