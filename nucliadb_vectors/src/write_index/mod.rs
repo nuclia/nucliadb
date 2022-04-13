@@ -20,10 +20,11 @@
 #[cfg(test)]
 #[allow(unused)]
 pub mod test_utils;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::sync::RwLock;
 
+use crate::graph_arena::LockArena;
 use crate::graph_disk::{Disk, LockDisk};
 use crate::graph_elems::{EdgeId, NodeId};
 use crate::graph_index::Index;
@@ -52,6 +53,34 @@ pub struct WriteIndexLayer {
 }
 
 impl WriteIndexLayer {
+    fn assert_invariant(&self, arena: &LockArena) {
+        // LAYER CONSISTENCY
+        // edges are not repetead
+        // in-edge/out-edge consistency
+        // No deleted nodes nor deleted edges appear
+        let mut edge_register = HashSet::new();
+        for (source, knowledge) in &self.node_record {
+            for (destination, edge_out) in &knowledge.out_edges {
+                // (source) ==[edge_out]==> (destination)
+                let dest_knowledge = self.node_record.get(destination).unwrap();
+                let equivalent = dest_knowledge.in_edges.get(source).unwrap();
+                assert!(edge_register.insert(edge_out));
+                assert_eq!(*edge_out, *equivalent);
+                assert_ne!(*source, *destination);
+                assert!(arena.has_edge(*edge_out));
+            }
+            for (destination, edge_in) in &knowledge.in_edges {
+                // (source) ==[edge_out]==> (destination)
+                let (source, destination) = (destination, source);
+                let edge_out = edge_in;
+                let dest_knowledge = self.node_record.get(destination).unwrap();
+                let equivalent = dest_knowledge.in_edges.get(source).unwrap();
+                assert_eq!(*edge_out, *equivalent);
+                assert_ne!(*source, *destination);
+                assert!(arena.has_edge(*edge_out));
+            }
+        }
+    }
     fn disk_connect(&mut self, source: NodeId, destination: NodeId, edge: EdgeId) {
         if !self.node_record.contains_key(&destination) {
             self.add_node(destination);
@@ -258,7 +287,7 @@ impl WriteIndex {
             self.layers[i].disk_add(node);
         }
     }
-    pub fn add_connexion(
+    pub fn disk_add_connexion(
         &mut self,
         layer: usize,
         source: NodeId,
@@ -266,6 +295,21 @@ impl WriteIndex {
         edge: EdgeId,
     ) {
         self.layers[layer].disk_connect(source, destination, edge);
+    }
+
+    pub fn invariant_assertion(&self, arena: &LockArena) {
+        // HNSW CONSISTENCY
+        // for each node i, i <- layer[0..=top_layer[i]]
+        for (node, top_layer) in &self.top_layer {
+            arena.has_node(*node);
+            for layer in &self.layers[..=*top_layer] {
+                assert!(layer.has_total_node(*node));
+            }
+        }
+        // LAYER CONSISTENCY
+        for layer in &self.layers {
+            layer.assert_invariant(arena);
+        }
     }
 }
 
@@ -282,11 +326,17 @@ impl Index for LockWriter {
         self.index.write().unwrap().disk_add_node(node, top_layer)
     }
 
-    fn add_connexion(&self, layer: usize, source: NodeId, destination: NodeId, edge: EdgeId) {
+    fn add_connexion_from_disk(
+        &self,
+        layer: usize,
+        source: NodeId,
+        destination: NodeId,
+        edge: EdgeId,
+    ) {
         self.index
             .write()
             .unwrap()
-            .add_connexion(layer, source, destination, edge)
+            .disk_add_connexion(layer, source, destination, edge)
     }
 }
 
@@ -346,5 +396,8 @@ impl LockWriter {
     }
     pub fn max_layers(&self) -> usize {
         self.index.read().unwrap().max_layers()
+    }
+    pub fn invariant_assertion(&self, arena: &LockArena) {
+        self.index.read().unwrap().invariant_assertion(arena);
     }
 }

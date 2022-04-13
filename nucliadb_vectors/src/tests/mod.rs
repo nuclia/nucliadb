@@ -80,7 +80,6 @@ fn insert_delete_all() {
     assert_eq!(writer.no_vectors(), 0);
 }
 
-
 fn _concurrency_test() {
     fn reader_process(reader: Reader, lock: Arc<Mutex<()>>) {
         loop {
@@ -88,7 +87,7 @@ fn _concurrency_test() {
             let no_results = 10;
             let l = lock.lock().unwrap();
             let result = reader.search(query, vec![], no_results);
-            println!("READ {result:?}");
+            println!("READ {}", result.len());
             std::mem::drop(l);
         }
     }
