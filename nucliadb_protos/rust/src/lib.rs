@@ -26,7 +26,6 @@ mod nodewriter;
 mod resources;
 mod utils;
 
-#[macro_use]
 extern crate serde;
 
 // writer should not serialized to rust as its only ingest and brings conflict

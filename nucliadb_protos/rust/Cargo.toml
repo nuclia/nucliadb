@@ -12,14 +12,11 @@ homepage = "https://nuclia.com/"
 documentation = "https://nuclia.com"
 
 [build-dependencies]
-tonic-build = "0.6"
-prost-build = "0.9"
-prost-wkt-build = "0.3"
+tonic-build = "0.7.0"
+prost-build = "0.10"
 
 [dependencies]
-tonic = "0.6"
-prost-types = "0.9"
-prost-wkt = "0.3"
-prost-wkt-types = "0.3"
-prost = { version = "0.9"}
+tonic = "0.7"
+prost-types = "0.10"
+prost = { version = "0.10"}
 serde = { version = "1.0", features = ["derive"] }

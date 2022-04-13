@@ -27,18 +27,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=nucliadb_protos/nodereader.proto");
 
     let mut prost_config = prost_build::Config::default();
-    prost_config.protoc_arg("--experimental_allow_proto3_optional");
 
-    tonic_build::configure()
-        .type_attribute(
-            ".",
-            "#[derive(Serialize, Deserialize)]\n#[serde(rename_all = \"camelCase\")]",
-        )
-        .extern_path(".google.protobuf.Timestamp", "::prost_wkt_types::Timestamp")
-        .format(true)
-        .out_dir("src/")
-        .compile_with_config(
-            prost_config,
+    prost_config
+        .out_dir(&"src/")
+        .compile_protos(
             &[
                 "nucliadb_protos/utils.proto",
                 "nucliadb_protos/knowledgebox.proto",
@@ -49,6 +41,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "nucliadb_protos/nodereader.proto",
             ],
             &["../../"],
-        )?;
+        )
+        .unwrap();
+
+    tonic_build::configure()
+        .build_server(true)
+        .out_dir("src")  // you can change the generated code's location
+        .compile(
+            &[
+                "nucliadb_protos/nodewriter.proto",
+                "nucliadb_protos/nodereader.proto",
+            ],
+            &["../../"],        ).unwrap();
+
     Ok(())
 }

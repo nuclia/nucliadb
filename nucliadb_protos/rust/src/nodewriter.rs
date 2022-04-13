@@ -1,20 +1,16 @@
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OpStatus {
-    #[prost(enumeration = "op_status::Status", tag = "1")]
+    #[prost(enumeration="op_status::Status", tag="1")]
     pub status: i32,
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub detail: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "3")]
+    #[prost(uint64, tag="3")]
     pub count: u64,
-    #[prost(string, tag = "4")]
+    #[prost(string, tag="4")]
     pub shard_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `OpStatus`.
 pub mod op_status {
-    #[derive(Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Status {
@@ -23,85 +19,71 @@ pub mod op_status {
         Error = 2,
     }
 }
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetRelationsRequest {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub resource: ::core::option::Option<super::noderesources::ResourceId>,
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub shard_id: ::prost::alloc::string::String,
 }
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelVectorFieldRequest {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub resource: ::core::option::Option<super::noderesources::ResourceId>,
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub field: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub shard_id: ::prost::alloc::string::String,
 }
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetVectorFieldRequest {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub resource: ::core::option::Option<super::noderesources::ResourceId>,
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub field: ::prost::alloc::string::String,
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag="3")]
     pub vectors: ::prost::alloc::vec::Vec<set_vector_field_request::VectorObject>,
-    #[prost(string, tag = "4")]
+    #[prost(string, tag="4")]
     pub shard_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `SetVectorFieldRequest`.
 pub mod set_vector_field_request {
-    #[derive(Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct VectorObject {
-        #[prost(int32, tag = "1")]
+        #[prost(int32, tag="1")]
         pub sentence: i32,
-        #[prost(bytes = "vec", tag = "2")]
+        #[prost(bytes="vec", tag="2")]
         pub item: ::prost::alloc::vec::Vec<u8>,
     }
 }
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DelRelationsRequest {
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub resource: ::core::option::Option<super::noderesources::ResourceId>,
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub shard_id: ::prost::alloc::string::String,
 }
 // Implemented at nucliadb_object_storage
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexMessage {
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub node: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub shard: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "3")]
+    #[prost(uint64, tag="3")]
     pub txid: u64,
-    #[prost(string, tag = "4")]
+    #[prost(string, tag="4")]
     pub resource: ::prost::alloc::string::String,
-    #[prost(enumeration = "index_message::TypeMessage", tag = "5")]
+    #[prost(enumeration="index_message::TypeMessage", tag="5")]
     pub typemessage: i32,
 }
 /// Nested message and enum types in `IndexMessage`.
 pub mod index_message {
-    #[derive(Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum TypeMessage {
@@ -109,14 +91,12 @@ pub mod index_message {
         Deletion = 1,
     }
 }
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Counter {
-    #[prost(uint64, tag = "1")]
+    #[prost(uint64, tag="1")]
     pub resources: u64,
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod node_writer_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
@@ -125,7 +105,7 @@ pub mod node_writer_client {
         inner: tonic::client::Grpc<T>,
     }
     impl NodeWriterClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -138,8 +118,8 @@ pub mod node_writer_client {
     impl<T> NodeWriterClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -158,20 +138,23 @@ pub mod node_writer_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             NodeWriterClient::new(InterceptedService::new(inner, interceptor))
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
@@ -179,71 +162,107 @@ pub mod node_writer_client {
         pub async fn get_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardId>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardId>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/GetShard");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/GetShard",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn new_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardCreated>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardCreated>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/NewShard");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/NewShard",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn delete_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardId>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardId>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/DeleteShard");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/DeleteShard",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn list_shards(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardIds>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardIds>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/ListShards");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/ListShards",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn gc(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::super::noderesources::EmptyResponse>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::EmptyResponse>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/GC");
             self.inner.unary(request.into_request(), path, codec).await
@@ -252,95 +271,122 @@ pub mod node_writer_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::Resource>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/SetResource");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/SetResource",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn remove_resource(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ResourceId>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/RemoveResource");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/RemoveResource",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Graph"]
+        /// Graph
         pub async fn set_relations(
             &mut self,
             request: impl tonic::IntoRequest<super::SetRelationsRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/SetRelations");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/SetRelations",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Set relations on a resource"]
+        /// Set relations on a resource
         pub async fn del_relations(
             &mut self,
             request: impl tonic::IntoRequest<super::DelRelationsRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/DelRelations");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/DelRelations",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Vectors"]
+        /// Vectors
         pub async fn set_vectors_field(
             &mut self,
             request: impl tonic::IntoRequest<super::SetVectorFieldRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/SetVectorsField");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/SetVectorsField",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
         pub async fn del_vectors_field(
             &mut self,
             request: impl tonic::IntoRequest<super::DelVectorFieldRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path =
-                http::uri::PathAndQuery::from_static("/nodewriter.NodeWriter/DelVectorsField");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/DelVectorsField",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod node_sidecar_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
@@ -349,7 +395,7 @@ pub mod node_sidecar_client {
         inner: tonic::client::Grpc<T>,
     }
     impl NodeSidecarClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -362,8 +408,8 @@ pub mod node_sidecar_client {
     impl<T> NodeSidecarClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -382,20 +428,23 @@ pub mod node_sidecar_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             NodeSidecarClient::new(InterceptedService::new(inner, interceptor))
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
@@ -404,45 +453,65 @@ pub mod node_sidecar_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::Counter>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/nodewriter.NodeSidecar/GetCount");
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeSidecar/GetCount",
+            );
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod node_writer_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with NodeWriterServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with NodeWriterServer.
     #[async_trait]
     pub trait NodeWriter: Send + Sync + 'static {
         async fn get_shard(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardId>, tonic::Status>;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardId>,
+                tonic::Status,
+            >;
         async fn new_shard(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardCreated>, tonic::Status>;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardCreated>,
+                tonic::Status,
+            >;
         async fn delete_shard(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardId>, tonic::Status>;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardId>,
+                tonic::Status,
+            >;
         async fn list_shards(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
-        ) -> Result<tonic::Response<super::super::noderesources::ShardIds>, tonic::Status>;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::ShardIds>,
+                tonic::Status,
+            >;
         async fn gc(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
-        ) -> Result<tonic::Response<super::super::noderesources::EmptyResponse>, tonic::Status>;
+        ) -> Result<
+                tonic::Response<super::super::noderesources::EmptyResponse>,
+                tonic::Status,
+            >;
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,
@@ -451,17 +520,17 @@ pub mod node_writer_server {
             &self,
             request: tonic::Request<super::super::noderesources::ResourceId>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        #[doc = " Graph"]
+        /// Graph
         async fn set_relations(
             &self,
             request: tonic::Request<super::SetRelationsRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        #[doc = " Set relations on a resource"]
+        /// Set relations on a resource
         async fn del_relations(
             &self,
             request: tonic::Request<super::DelRelationsRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
-        #[doc = " Vectors"]
+        /// Vectors
         async fn set_vectors_field(
             &self,
             request: tonic::Request<super::SetVectorFieldRequest>,
@@ -480,7 +549,9 @@ pub mod node_writer_server {
     struct _Inner<T>(Arc<T>);
     impl<T: NodeWriter> NodeWriterServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -488,7 +559,10 @@ pub mod node_writer_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -502,9 +576,12 @@ pub mod node_writer_server {
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -513,12 +590,15 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/GetShard" => {
                     #[allow(non_camel_case_types)]
                     struct GetShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::ShardId>
-                        for GetShardSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for GetShardSvc<T> {
                         type Response = super::super::noderesources::ShardId;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::super::noderesources::ShardId>,
@@ -535,10 +615,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = GetShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -547,15 +628,21 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/NewShard" => {
                     #[allow(non_camel_case_types)]
                     struct NewShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::EmptyQuery>
-                        for NewShardSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::EmptyQuery,
+                    > for NewShardSvc<T> {
                         type Response = super::super::noderesources::ShardCreated;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::EmptyQuery>,
+                            request: tonic::Request<
+                                super::super::noderesources::EmptyQuery,
+                            >,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).new_shard(request).await };
@@ -569,10 +656,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = NewShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -581,18 +669,23 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/DeleteShard" => {
                     #[allow(non_camel_case_types)]
                     struct DeleteShardSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::ShardId>
-                        for DeleteShardSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for DeleteShardSvc<T> {
                         type Response = super::super::noderesources::ShardId;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::super::noderesources::ShardId>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).delete_shard(request).await };
+                            let fut = async move {
+                                (*inner).delete_shard(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -603,10 +696,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = DeleteShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -615,15 +709,21 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/ListShards" => {
                     #[allow(non_camel_case_types)]
                     struct ListShardsSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::EmptyQuery>
-                        for ListShardsSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::EmptyQuery,
+                    > for ListShardsSvc<T> {
                         type Response = super::super::noderesources::ShardIds;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::EmptyQuery>,
+                            request: tonic::Request<
+                                super::super::noderesources::EmptyQuery,
+                            >,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).list_shards(request).await };
@@ -637,10 +737,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = ListShardsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -649,12 +750,15 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/GC" => {
                     #[allow(non_camel_case_types)]
                     struct GCSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::ShardId>
-                        for GCSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for GCSvc<T> {
                         type Response = super::super::noderesources::EmptyResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::super::noderesources::ShardId>,
@@ -671,10 +775,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = GCSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -683,18 +788,25 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/SetResource" => {
                     #[allow(non_camel_case_types)]
                     struct SetResourceSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::Resource>
-                        for SetResourceSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::Resource>
+                    for SetResourceSvc<T> {
                         type Response = super::OpStatus;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::Resource>,
+                            request: tonic::Request<
+                                super::super::noderesources::Resource,
+                            >,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).set_resource(request).await };
+                            let fut = async move {
+                                (*inner).set_resource(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -705,10 +817,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = SetResourceSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -717,18 +830,26 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/RemoveResource" => {
                     #[allow(non_camel_case_types)]
                     struct RemoveResourceSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter>
-                        tonic::server::UnaryService<super::super::noderesources::ResourceId>
-                        for RemoveResourceSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::ResourceId,
+                    > for RemoveResourceSvc<T> {
                         type Response = super::OpStatus;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::ResourceId>,
+                            request: tonic::Request<
+                                super::super::noderesources::ResourceId,
+                            >,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).remove_resource(request).await };
+                            let fut = async move {
+                                (*inner).remove_resource(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -739,10 +860,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = RemoveResourceSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -751,15 +873,23 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/SetRelations" => {
                     #[allow(non_camel_case_types)]
                     struct SetRelationsSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter> tonic::server::UnaryService<super::SetRelationsRequest> for SetRelationsSvc<T> {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::SetRelationsRequest>
+                    for SetRelationsSvc<T> {
                         type Response = super::OpStatus;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::SetRelationsRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).set_relations(request).await };
+                            let fut = async move {
+                                (*inner).set_relations(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -770,10 +900,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = SetRelationsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -782,15 +913,23 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/DelRelations" => {
                     #[allow(non_camel_case_types)]
                     struct DelRelationsSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter> tonic::server::UnaryService<super::DelRelationsRequest> for DelRelationsSvc<T> {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::DelRelationsRequest>
+                    for DelRelationsSvc<T> {
                         type Response = super::OpStatus;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::DelRelationsRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).del_relations(request).await };
+                            let fut = async move {
+                                (*inner).del_relations(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -801,10 +940,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = DelRelationsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -813,17 +953,23 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/SetVectorsField" => {
                     #[allow(non_camel_case_types)]
                     struct SetVectorsFieldSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter> tonic::server::UnaryService<super::SetVectorFieldRequest>
-                        for SetVectorsFieldSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::SetVectorFieldRequest>
+                    for SetVectorsFieldSvc<T> {
                         type Response = super::OpStatus;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::SetVectorFieldRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).set_vectors_field(request).await };
+                            let fut = async move {
+                                (*inner).set_vectors_field(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -834,10 +980,11 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = SetVectorsFieldSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -846,17 +993,23 @@ pub mod node_writer_server {
                 "/nodewriter.NodeWriter/DelVectorsField" => {
                     #[allow(non_camel_case_types)]
                     struct DelVectorsFieldSvc<T: NodeWriter>(pub Arc<T>);
-                    impl<T: NodeWriter> tonic::server::UnaryService<super::DelVectorFieldRequest>
-                        for DelVectorsFieldSvc<T>
-                    {
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::DelVectorFieldRequest>
+                    for DelVectorsFieldSvc<T> {
                         type Response = super::OpStatus;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::DelVectorFieldRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).del_vectors_field(request).await };
+                            let fut = async move {
+                                (*inner).del_vectors_field(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -867,23 +1020,28 @@ pub mod node_writer_server {
                         let inner = inner.0;
                         let method = DelVectorsFieldSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -911,11 +1069,11 @@ pub mod node_writer_server {
         const NAME: &'static str = "nodewriter.NodeWriter";
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod node_sidecar_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with NodeSidecarServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with NodeSidecarServer.
     #[async_trait]
     pub trait NodeSidecar: Send + Sync + 'static {
         async fn get_count(
@@ -932,7 +1090,9 @@ pub mod node_sidecar_server {
     struct _Inner<T>(Arc<T>);
     impl<T: NodeSidecar> NodeSidecarServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -940,7 +1100,10 @@ pub mod node_sidecar_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -954,9 +1117,12 @@ pub mod node_sidecar_server {
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -965,12 +1131,15 @@ pub mod node_sidecar_server {
                 "/nodewriter.NodeSidecar/GetCount" => {
                     #[allow(non_camel_case_types)]
                     struct GetCountSvc<T: NodeSidecar>(pub Arc<T>);
-                    impl<T: NodeSidecar>
-                        tonic::server::UnaryService<super::super::noderesources::ShardId>
-                        for GetCountSvc<T>
-                    {
+                    impl<
+                        T: NodeSidecar,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for GetCountSvc<T> {
                         type Response = super::Counter;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::super::noderesources::ShardId>,
@@ -987,23 +1156,28 @@ pub mod node_sidecar_server {
                         let inner = inner.0;
                         let method = GetCountSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }

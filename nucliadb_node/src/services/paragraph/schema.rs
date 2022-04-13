@@ -40,7 +40,7 @@ pub struct ParagraphSchema {
     pub index: Field,
 }
 
-pub(super) fn timestamp_to_datetime_utc(timestamp: &prost_wkt_types::Timestamp) -> DateTime<Utc> {
+pub(super) fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
     let naive = NaiveDateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32);
     DateTime::from_utc(naive, tantivy::chrono::Utc)
 }
