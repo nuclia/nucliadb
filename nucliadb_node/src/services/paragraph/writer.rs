@@ -62,7 +62,8 @@ impl ServiceChild<ParagraphServiceConfiguration> for ParagraphWriterService {
         info!("Starting Paragraph Service");
         match ParagraphWriterService::open(config).await {
             Ok(service) => Ok(service),
-            Err(_e) => {
+            Err(e) => {
+                warn!("Open was unsuccessful: {}", e);
                 warn!("Paragraph Service does not exists. Creating a new one.");
                 match ParagraphWriterService::new(config).await {
                     Ok(service) => Ok(service),
