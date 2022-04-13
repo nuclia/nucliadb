@@ -4,7 +4,7 @@ CHANGELOG
 0.0.22 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Processed audit log
 
 
 0.0.21 (2022-04-07)

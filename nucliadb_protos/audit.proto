@@ -12,6 +12,7 @@ message AuditRequest {
     STARTED = 4;
     STOPPED = 5;
     SEARCH = 6;
+    PROCESSED = 7;
   }
   AuditType type = 1;
   string kbid = 2;

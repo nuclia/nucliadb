@@ -29,6 +29,7 @@ class AuditRequest(google.protobuf.message.Message):
         STARTED = AuditRequest.AuditType.V(4)
         STOPPED = AuditRequest.AuditType.V(5)
         SEARCH = AuditRequest.AuditType.V(6)
+        PROCESSED = AuditRequest.AuditType.V(7)
 
     VISITED = AuditRequest.AuditType.V(0)
     MODIFIED = AuditRequest.AuditType.V(1)
@@ -37,6 +38,7 @@ class AuditRequest(google.protobuf.message.Message):
     STARTED = AuditRequest.AuditType.V(4)
     STOPPED = AuditRequest.AuditType.V(5)
     SEARCH = AuditRequest.AuditType.V(6)
+    PROCESSED = AuditRequest.AuditType.V(7)
 
     TYPE_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
