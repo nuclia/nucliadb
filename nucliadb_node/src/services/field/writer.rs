@@ -59,8 +59,7 @@ impl ServiceChild<FieldServiceConfiguration> for FieldWriterService {
         match FieldWriterService::open(config).await {
             Ok(service) => Ok(service),
             Err(e) => {
-                warn!("Open was unsuccessful: {}", e);
-                warn!("Text Service does not exists. Creating a new one.");
+                warn!("Field Service Open failed {}. Creating a new one.", {e});
                 match FieldWriterService::new(config).await {
                     Ok(service) => Ok(service),
                     Err(e) => {

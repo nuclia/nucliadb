@@ -63,8 +63,7 @@ impl ServiceChild<ParagraphServiceConfiguration> for ParagraphWriterService {
         match ParagraphWriterService::open(config).await {
             Ok(service) => Ok(service),
             Err(e) => {
-                warn!("Open was unsuccessful: {}", e);
-                warn!("Paragraph Service does not exists. Creating a new one.");
+                warn!("Paragraph Service Open failed {}. Creating a new one.", {e});
                 match ParagraphWriterService::new(config).await {
                     Ok(service) => Ok(service),
                     Err(e) => {
@@ -255,7 +254,7 @@ impl ParagraphWriterService {
                     subdoc.add_facet(self.schema.facets, Facet::from(label.as_str()));
                 }
 
-                info!(
+                debug!(
                     "Adding paragraph for {} with labels as {:?} [{} - {}]: {} ({})",
                     field, labels, start_pos, end_pos, text, paragraph_id
                 );

@@ -262,28 +262,28 @@ fn convert_member(member: ArtilleryMember, self_listen_addr: SocketAddr) -> Memb
 fn log_artillery_event(node_id: String, artillery_member_event: ArtilleryMemberEvent) {
     match artillery_member_event {
         ArtilleryMemberEvent::Joined(artillery_member) => {
-            info!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), "Joined.");
-            println!("{} {} Joined.", node_id, artillery_member.node_id(),);
+            debug!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), "Joined.");
+            debug!("{} {} Joined.", node_id, artillery_member.node_id(),);
         }
         ArtilleryMemberEvent::WentUp(artillery_member) => {
             info!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), "Went up.");
-            println!("{} {} Went up.", node_id, artillery_member.node_id(),);
+            debug!("{} {} Went up.", node_id, artillery_member.node_id(),);
         }
         ArtilleryMemberEvent::SuspectedDown(artillery_member) => {
             warn!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), "Suspected down.");
-            println!("{} {} Suspected down.", node_id, artillery_member.node_id(),);
+            debug!("{} {} Suspected down.", node_id, artillery_member.node_id(),);
         }
         ArtilleryMemberEvent::WentDown(artillery_member) => {
             error!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), "Went down.");
-            println!("{} {} Went down.", node_id, artillery_member.node_id(),);
+            debug!("{} {} Went down.", node_id, artillery_member.node_id(),);
         }
         ArtilleryMemberEvent::Left(artillery_member) => {
             info!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), "Left.");
-            println!("{} {} Left.", node_id, artillery_member.node_id(),);
+            debug!("{} {} Left.", node_id, artillery_member.node_id(),);
         }
         ArtilleryMemberEvent::Payload(artillery_member, message) => {
             info!(host_key=?artillery_member.node_id(), remote_host=?artillery_member.remote_host(), message=?message, "Payload.");
-            println!("{} {} Payload.", node_id, artillery_member.node_id(),);
+            debug!("{} {} Payload.", node_id, artillery_member.node_id(),);
         }
     };
 }
