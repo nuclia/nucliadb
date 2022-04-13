@@ -23,5 +23,11 @@ use crate::graph_elems::*;
 pub trait Index {
     fn is_cached(&self, node: NodeId) -> bool;
     fn add_node_from_disk(&self, node: NodeId, top_layer: usize);
-    fn add_connexion(&self, layer: usize, source: NodeId, destination: NodeId, edge: EdgeId);
+    fn add_connexion_from_disk(
+        &self,
+        layer: usize,
+        source: NodeId,
+        destination: NodeId,
+        edge: EdgeId,
+    );
 }

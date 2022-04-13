@@ -49,7 +49,6 @@ impl<'a> Query for LayerInsertQuery<'a> {
     type Output = LayerInsertValue;
 
     fn run(&mut self) -> Self::Output {
-        println!("LAYER {}", self.layer);
         let LayerSearchValue { neighbours } = LayerSearchQuery {
             elem: self.arena.get_node(self.new_element).vector,
             layer: self.layer,

@@ -13,6 +13,8 @@ data:
 {{- if .Values.debug }}
   DEBUG: "True"
   RUST_LOG: "nucliadb_node=DEBUG,nucliadb_swim=DEBUG"
+{{- else }}
+  RUST_LOG: "nucliadb_node=WARN,nucliadb_swim=WARN"
 {{- end }}
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
   SENTRY_URL: {{ .Values.running.sentry_url }}
