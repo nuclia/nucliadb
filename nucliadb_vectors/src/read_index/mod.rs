@@ -136,7 +136,13 @@ impl Index for LockReader {
         self.index.write().unwrap().add_node(node, top_layer)
     }
 
-    fn add_connexion_from_disk(&self, layer: usize, source: NodeId, destination: NodeId, edge: EdgeId) {
+    fn add_connexion_from_disk(
+        &self,
+        layer: usize,
+        source: NodeId,
+        destination: NodeId,
+        edge: EdgeId,
+    ) {
         self.index
             .write()
             .unwrap()
