@@ -143,6 +143,9 @@ impl Arena {
     pub fn has_node(&self, node: NodeId) -> bool {
         self.nodes.contains_key(&node)
     }
+    pub fn has_edge(&self, edge: EdgeId) -> bool {
+        self.edges.contains_key(&edge)
+    }
     pub fn is_empty(&self) -> bool {
         self.no_nodes() == 0
     }
@@ -207,6 +210,9 @@ impl LockArena {
     }
     pub fn has_node(&self, node: NodeId) -> bool {
         self.arena.read().unwrap().has_node(node)
+    }
+    pub fn has_edge(&self, edge: EdgeId) -> bool {
+        self.arena.read().unwrap().has_edge(edge)
     }
     pub fn is_empty(&self) -> bool {
         self.arena.read().unwrap().is_empty()

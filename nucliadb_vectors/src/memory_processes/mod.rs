@@ -39,12 +39,12 @@ pub fn load_node_in_writer(
         for (layer_id, (out_edges, in_edges)) in disk_node.neighbours.into_iter().enumerate() {
             for edge in out_edges {
                 if arena.load_edge_from_disk(edge.my_id, edge.edge) {
-                    index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                    index.add_connexion_from_disk(layer_id, edge.from, edge.goes_to, edge.my_id);
                 }
             }
             for edge in in_edges {
                 if arena.load_edge_from_disk(edge.my_id, edge.edge) {
-                    index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                    index.add_connexion_from_disk(layer_id, edge.from, edge.goes_to, edge.my_id);
                 }
             }
         }
@@ -65,13 +65,14 @@ pub fn load_node_in_reader(
         for (layer_id, (out_edges, _)) in disk_node.neighbours.into_iter().enumerate() {
             for edge in out_edges {
                 arena.load_edge_from_disk(edge.my_id, edge.edge);
-                index.add_connexion(layer_id, edge.from, edge.goes_to, edge.my_id);
+                index.add_connexion_from_disk(layer_id, edge.from, edge.goes_to, edge.my_id);
             }
         }
     }
 }
 
 pub fn dump_index_into_disk(index: &LockWriter, arena: &LockArena, disk: &LockDisk) {
+    index.invariant_assertion(arena);
     for (node, top_layer) in index.top_layers() {
         if index.is_cached(node) {
             let mut disk_node = DiskNode {
