@@ -70,7 +70,7 @@ async def download_extract_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{group_field}}/{{nested_value}}",
+    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{group_field}}/{{nested_value}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
     name="Download extracted binary file from nested",
