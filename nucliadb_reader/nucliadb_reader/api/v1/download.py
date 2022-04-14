@@ -44,7 +44,7 @@ class DownloadType(Enum):
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field}}",
+    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",
     tags=["Resource fields"],
     status_code=200,
     name="Download extracted binary file",
