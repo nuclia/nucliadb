@@ -11,7 +11,7 @@ name = "nucliadb_node_binding"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.15.1", features = ["extension-module"] }
+pyo3 = { version = "0.16.4", features = ["extension-module"] }
 pyo3-asyncio = {version = "0.15.0", features = ["tokio-runtime"] }
 nucliadb_node = { path = "../../nucliadb_node" }
 nucliadb_protos = { path = "../../nucliadb_protos/rust" }
