@@ -352,7 +352,16 @@ class GCSStorageField(StorageField):
         async with self.storage.session.get(url, headers=headers) as api_resp:
             if api_resp.status == 200:
                 data = await api_resp.json()
-                return data.get("metadata", {})
+                metadata = data.get("metadata")
+                if metadata is None:
+                    metadata = {}
+                if metadata.get("SIZE") is None:
+                    metadata["SIZE"] = data.get("size")
+                if metadata.get("CONTENT_TYPE") is None:
+                    metadata["CONTENT_TYPE"] = data.get("contentType")
+                if metadata.get("FILENAME") is None:
+                    metadata["FILENAME"] = key.split("/")[-1]
+                return metadata
             else:
                 return None
 

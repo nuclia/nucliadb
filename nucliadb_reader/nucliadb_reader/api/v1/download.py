@@ -184,6 +184,7 @@ async def download_api(sf: StorageField, headers: Headers):
             )
         status_code = 206
         logger.debug(f"Range request: {range_request}")
+        extra_headers["Content-Length"] = f"{end - start}"
         extra_headers["Content-Range"] = f"bytes {start}-{end - 1}/{file_size}"
         download_headers["Range"] = range_request
 
