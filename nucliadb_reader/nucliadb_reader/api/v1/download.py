@@ -44,7 +44,7 @@ class DownloadType(Enum):
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field}}",
+    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",
     tags=["Resource fields"],
     status_code=200,
     name="Download extracted binary file",
@@ -63,35 +63,6 @@ async def download_extract_file(
 
     pb_field_type = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
     field_type_letter = KB_REVERSE_REVERSE[pb_field_type]
-
-    sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, download_field)
-
-    return await download_api(sf, request.headers)
-
-
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{group_field}}/{{nested_value}}",  # noqa
-    tags=["Resource fields"],
-    status_code=200,
-    name="Download extracted binary file from nested",
-)
-@requires_one([NucliaDBRoles.READER])
-@version(1)
-async def download_extract_nested_file(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_type: FieldTypeName,
-    field_id: str,
-    group_field: str,
-    nested_value: str,
-) -> Response:
-    storage = await get_storage()
-
-    pb_field_type = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
-    field_type_letter = KB_REVERSE_REVERSE[pb_field_type]
-
-    download_field = f"{group_field}/{nested_value}"
 
     sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, download_field)
 
