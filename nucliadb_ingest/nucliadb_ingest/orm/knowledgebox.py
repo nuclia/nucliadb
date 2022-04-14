@@ -317,7 +317,19 @@ class KnowledgeBox:
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
-        # Delete KB Storage
+        """
+        Deletes all kb parts
+
+        It takes care of signaling the nodes related to this kb that they
+        need to delete the kb shards and also deletes the related storage
+        buckets.
+
+        As non-empty buckets cannot be deleted, they are scheduled to be
+        deleted instead. Actually, this empties the bucket asynchronouysly
+        but it doesn't delete it. To do it, we save a marker using the
+        KB_TO_DELETE_STORAGE key, so theb purge cronshjon will keep trying
+        to delete once the emptying have been completed.
+        """
         storage = await get_storage()
         exists = await storage.schedule_delete_kb(kbid)
         if exists is False:

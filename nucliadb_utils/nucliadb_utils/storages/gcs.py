@@ -565,10 +565,13 @@ class GCSStorage(Storage):
         headers = await self.get_access_headers()
         url = f"{self.object_base_url}/{bucket_name}"
         deleted = False
+        conflict = False
         async with self.session.delete(url, headers=headers) as resp:
             if resp.status == 200:
                 deleted = True
-        return deleted
+            if resp.status == 409:
+                conflict = True
+        return deleted, conflict
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
         if self.session is None:
