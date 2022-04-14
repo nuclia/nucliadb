@@ -45,6 +45,7 @@ from nucliadb_utils.utilities import get_ingest
     name="List Knowledge Boxes",
     response_model=KnowledgeBoxList,
     tags=["Knowledge Boxes"],
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
