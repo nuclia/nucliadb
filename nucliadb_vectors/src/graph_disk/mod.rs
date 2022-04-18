@@ -124,8 +124,8 @@ impl Disk {
     pub fn get_label_id(&self, label: &String) -> Option<LabelId> {
         self.label_inverse.get(label)
     }
-    pub fn get_node(&self, node: NodeId) -> DiskNode {
-        self.node_db.get(&node).unwrap()
+    pub fn get_node(&self, node: NodeId) -> Option<DiskNode> {
+        self.node_db.get(&node)
     }
     pub fn get_label(&self, label: LabelId) -> Label {
         self.label_db.get(&label).unwrap()
@@ -253,7 +253,7 @@ impl LockDisk {
     pub fn get_label_id(&self, label: &String) -> Option<LabelId> {
         self.disk.read().unwrap().get_label_id(label)
     }
-    pub fn get_node(&self, node: NodeId) -> DiskNode {
+    pub fn get_node(&self, node: NodeId) -> Option<DiskNode> {
         self.disk.read().unwrap().get_node(node)
     }
     pub fn get_label(&self, label: LabelId) -> Label {

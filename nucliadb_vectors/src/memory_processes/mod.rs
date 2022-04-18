@@ -32,7 +32,7 @@ pub fn load_node_in_writer(
     disk: &LockDisk,
 ) {
     if !index.is_cached(node_id) {
-        let disk_node = disk.get_node(node_id);
+        let disk_node = disk.get_node(node_id).unwrap();
         let top_layer = disk_node.neighbours.len() - 1;
         arena.load_node_from_disk(node_id, disk_node.node);
         index.add_node_from_disk(node_id, top_layer);
@@ -49,23 +49,28 @@ pub fn load_node_in_writer(
     }
 }
 
+#[must_use]
 pub fn load_node_in_reader(
     node_id: NodeId,
     index: &LockReader,
     arena: &LockArena,
     disk: &LockDisk,
-) {
-    if !index.is_cached(node_id) {
-        let disk_node = disk.get_node(node_id);
-        let top_layer = disk_node.neighbours.len() - 1;
-        arena.load_node_from_disk(node_id, disk_node.node);
-        index.add_node_from_disk(node_id, top_layer);
-        for (layer_id, (out_edges, _)) in disk_node.neighbours.into_iter().enumerate() {
-            for edge in out_edges {
-                arena.load_edge_from_disk(edge.my_id, edge.edge);
-                index.add_connexion_from_disk(layer_id, edge.from, edge.goes_to, edge.my_id);
+) -> bool {
+    match disk.get_node(node_id) {
+        Some(disk_node) if !index.is_cached(node_id) => {
+            let top_layer = disk_node.neighbours.len() - 1;
+            arena.load_node_from_disk(node_id, disk_node.node);
+            index.add_node_from_disk(node_id, top_layer);
+            for (layer_id, (out_edges, _)) in disk_node.neighbours.into_iter().enumerate() {
+                for edge in out_edges {
+                    arena.load_edge_from_disk(edge.my_id, edge.edge);
+                    index.add_connexion_from_disk(layer_id, edge.from, edge.goes_to, edge.my_id);
+                }
             }
+            true
         }
+        Some(_) => true,
+        None => false,
     }
 }
 

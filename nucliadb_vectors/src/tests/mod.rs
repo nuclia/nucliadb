@@ -81,18 +81,18 @@ fn insert_delete_all() {
 }
 
 fn _concurrency_test() {
-    fn reader_process(reader: Reader, lock: Arc<Mutex<()>>) {
+    fn reader_process(reader: Reader, _: Arc<Mutex<()>>) {
         loop {
             let query = vec![rand::random::<f32>(); 8];
             let no_results = 10;
-            let l = lock.lock().unwrap();
+            // let l = lock.lock().unwrap();
             let result = reader.search(query, vec![], no_results);
             println!("READ {}", result.len());
-            std::mem::drop(l);
+            // std::mem::drop(l);
         }
     }
 
-    fn writer_process(mut writer: Writer, lock: Arc<Mutex<()>>) {
+    fn writer_process(mut writer: Writer, _: Arc<Mutex<()>>) {
         let mut current_key = 0;
         let mut labels = vec![];
         for i in 0..50 {
@@ -106,20 +106,20 @@ fn _concurrency_test() {
                 if rand::random::<usize>() % 2 == 0 {
                     delete.push(key.clone());
                 }
-                let l = lock.lock().unwrap();
+                // let l = lock.lock().unwrap();
                 writer.insert(key.clone(), vec, labels.clone());
                 writer.flush();
                 println!("INSERT {key}");
-                std::mem::drop(l);
+                // std::mem::drop(l);
 
                 current_key += 1;
             }
             for delete in delete {
-                let l = lock.lock().unwrap();
+                // let l = lock.lock().unwrap();
                 writer.delete_vector(delete.clone());
                 writer.flush();
                 println!("DELETE {delete}");
-                std::mem::drop(l);
+                // std::mem::drop(l);
             }
         }
     }
