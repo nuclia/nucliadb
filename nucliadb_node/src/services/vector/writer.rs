@@ -60,21 +60,23 @@ impl ServiceChild<VectorServiceConfiguration> for VectorWriterService {
 
 impl WriterChild for VectorWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
+        info!("Delete resource in vector starts");
         self.index
             .write()
             .unwrap()
             .delete_document(resource_id.shard_id.clone());
         self.index.write().unwrap().flush();
+        info!("Delete resource in vector ends");
         Ok(())
     }
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
+        info!("Set resource in vector starts");
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
                 for index in paragraph.paragraphs.values() {
                     let mut labels = resource.labels.clone();
                     labels.append(&mut index.labels.clone());
                     for (key, sentence) in index.sentences.iter() {
-                        debug!("Sentence al canto! {}", sentence.vector.len());
                         self.index.write().unwrap().insert(
                             key.clone(),
                             sentence.vector.clone(),
@@ -82,10 +84,10 @@ impl WriterChild for VectorWriterService {
                         );
                     }
                 }
+                self.index.write().unwrap().flush();
             }
-            self.index.write().unwrap().flush();
         }
-
+        info!("Set resource in vector ends");
         Ok(())
     }
 }
