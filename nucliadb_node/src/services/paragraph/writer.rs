@@ -27,7 +27,7 @@ use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{IndexParagraphs, Resource, ResourceId};
 use regex::Regex;
 use tantivy::schema::*;
-use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order, TantivyError};
+use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
@@ -220,16 +220,6 @@ impl ParagraphWriterService {
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
                 let labels = &p.labels;
-
-                if end_pos as usize > text_info.text.len() {
-                    let err = format!(
-                        "Paragraph end position {} is greater than text len.",
-                        end_pos
-                    );
-                    error!("{}", err);
-                    return Err(TantivyError::InvalidArgument(err));
-                }
-
                 let text = REGEX.replace_all(&text_info.text, " ");
                 let chars: Vec<char> = text.chars().collect();
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
