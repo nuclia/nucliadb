@@ -47,26 +47,29 @@ impl<'a> Query for SearchQuery<'a> {
 
     fn run(&mut self) -> Self::Output {
         if let Some((ep, ep_layer)) = self.index.get_entry_point() {
-            load_node_in_reader(ep, self.index, self.arena, self.disk);
-            let mut down_step = LayerSearchQuery {
-                layer: ep_layer,
-                k_neighbours: 1,
-                elem: self.elem.clone(),
-                entry_points: vec![ep],
-                index: self.index,
-                arena: self.arena,
-                disk: self.disk,
-            };
-            while down_step.layer != 0 {
-                let result = down_step.run();
-                down_step.entry_points[0] = result.neighbours[0].0;
-                down_step.layer -= 1;
-            }
-            let mut final_search = down_step;
-            final_search.k_neighbours = self.k_neighbours;
-            let layer_result = final_search.run();
-            SearchValue {
-                neighbours: layer_result.neighbours,
+            if load_node_in_reader(ep, self.index, self.arena, self.disk) {
+                let mut down_step = LayerSearchQuery {
+                    layer: ep_layer,
+                    k_neighbours: 1,
+                    elem: self.elem.clone(),
+                    entry_points: vec![ep],
+                    index: self.index,
+                    arena: self.arena,
+                    disk: self.disk,
+                };
+                while down_step.layer != 0 {
+                    let result = down_step.run();
+                    down_step.entry_points[0] = result.neighbours[0].0;
+                    down_step.layer -= 1;
+                }
+                let mut final_search = down_step;
+                final_search.k_neighbours = self.k_neighbours;
+                let layer_result = final_search.run();
+                SearchValue {
+                    neighbours: layer_result.neighbours,
+                }
+            } else {
+                SearchValue::default()
             }
         } else {
             SearchValue::default()

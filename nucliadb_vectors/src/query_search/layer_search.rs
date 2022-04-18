@@ -50,11 +50,13 @@ impl<'a> Query for LayerSearchQuery<'a> {
         let mut candidates = BinaryHeap::new();
         let mut visited = HashSet::new();
         for entry_point in self.entry_points.iter().cloned() {
-            load_node_in_reader(entry_point, self.index, self.arena, self.disk);
-            let distance = Distance::cosine(&self.elem, &self.arena.get_node(entry_point).vector);
-            candidates.push(InverseElem(entry_point, distance));
-            results.push(StandardElem(entry_point, distance));
-            visited.insert(entry_point);
+            if load_node_in_reader(entry_point, self.index, self.arena, self.disk) {
+                let distance =
+                    Distance::cosine(&self.elem, &self.arena.get_node(entry_point).vector);
+                candidates.push(InverseElem(entry_point, distance));
+                results.push(StandardElem(entry_point, distance));
+                visited.insert(entry_point);
+            }
         }
         loop {
             match (candidates.pop(), results.peek().cloned()) {
@@ -62,8 +64,8 @@ impl<'a> Query for LayerSearchQuery<'a> {
                 (Some(InverseElem(_, cd)), Some(StandardElem(_, rd))) if cd > rd => break,
                 (Some(InverseElem(candidate, _)), _) => {
                     for (_, node) in self.index.get_edges(self.layer, candidate) {
-                        if !visited.contains(&node) {
-                            load_node_in_reader(node, self.index, self.arena, self.disk);
+                        let loaded = load_node_in_reader(node, self.index, self.arena, self.disk);
+                        if !visited.contains(&node) && loaded {
                             visited.insert(node);
                             let distance =
                                 Distance::cosine(&self.elem, &self.arena.get_node(node).vector);
