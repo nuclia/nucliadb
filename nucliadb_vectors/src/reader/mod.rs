@@ -28,7 +28,9 @@ use crate::graph_disk::*;
 use crate::graph_elems::HNSWParams;
 use crate::read_index::*;
 use crate::utils;
+use crate::utils::SystemLock;
 pub struct Reader {
+    lock: SystemLock,
     index: LockReader,
     arena: LockArena,
     disk: LockDisk,
@@ -49,6 +51,7 @@ impl Reader {
         let arena = Arena::from_disk(&disk);
         let index = ReadIndex::new(&disk);
         Reader {
+            lock: SystemLock::new(path),
             disk: disk.into(),
             arena: arena.into(),
             index: index.into(),
@@ -67,7 +70,7 @@ impl Reader {
         use crate::query_find_labels::FindLabelsQuery;
         use crate::query_post_search::{PostSearchQuery, PostSearchValue};
         use crate::query_search::{SearchQuery, SearchValue};
-
+        self.lock.lock_exclusive();
         self.reload();
         let is_filtered_search = !labels.is_empty();
         let label_analysis = FindLabelsQuery {
@@ -100,6 +103,7 @@ impl Reader {
             self.arena.reload(&self.disk);
             self.index.reload(&self.disk);
         }
+        self.lock.unlock();
         result
     }
     pub fn reload(&self) {

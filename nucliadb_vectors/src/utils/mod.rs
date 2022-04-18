@@ -19,6 +19,10 @@
 //
 
 use std::cmp::Ordering;
+use std::fs::File;
+use std::path::PathBuf;
+
+use fs2::FileExt;
 
 use crate::graph_arena::LockArena;
 use crate::graph_disk::LockDisk;
@@ -98,6 +102,35 @@ impl<D> From<InverseElem<D>> for StandardElem<D> {
     }
 }
 
+pub struct SystemLock {
+    file: File,
+}
+
+impl SystemLock {
+    pub fn new(path: &str) -> SystemLock {
+        let file = format!("{}/lock.txt", path);
+        let location = PathBuf::from(file);
+        SystemLock {
+            file: File::create(location.as_path()).unwrap(),
+        }
+    }
+    pub fn lock_shared(&self) {
+        self.file.lock_shared().unwrap();
+    }
+    pub fn lock_exclusive(&self) {
+        self.file.lock_exclusive().unwrap();
+    }
+    pub fn unlock(&self) {
+        self.file.unlock().unwrap();
+    }
+}
+
+pub fn internal_reload_policy(arena: &LockArena, disk: &LockDisk) -> bool {
+    let in_disk = disk.no_nodes();
+    let in_arena = arena.no_nodes();
+    (in_arena as f64 / in_disk as f64) * 100f64 >= 30f64
+}
+
 #[cfg(test)]
 mod test_utils {
     use std::collections::{BinaryHeap, LinkedList};
@@ -127,10 +160,4 @@ mod test_utils {
         }
         assert_eq!(inverse, standard);
     }
-}
-
-pub fn internal_reload_policy(arena: &LockArena, disk: &LockDisk) -> bool {
-    let in_disk = disk.no_nodes();
-    let in_arena = arena.no_nodes();
-    (in_arena as f64 / in_disk as f64) * 100f64 >= 30f64
 }

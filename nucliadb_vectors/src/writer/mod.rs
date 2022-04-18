@@ -30,8 +30,10 @@ pub use crate::graph_elems::NodeId;
 use crate::query::Query;
 use crate::query_delete::DeleteQuery;
 use crate::query_insert::InsertQuery;
+use crate::utils::SystemLock;
 use crate::write_index::*;
 pub struct Writer {
+    lock: SystemLock,
     index: LockWriter,
     arena: LockArena,
     disk: LockDisk,
@@ -54,6 +56,7 @@ impl Writer {
         let index = WriteIndex::with_params(&disk, params.no_layers);
         Writer {
             params,
+            lock: SystemLock::new(path),
             disk: disk.into(),
             arena: arena.into(),
             index: index.into(),
@@ -93,10 +96,12 @@ impl Writer {
     }
     pub fn flush(&mut self) {
         use crate::memory_processes::dump_index_into_disk;
+        self.lock.lock_exclusive();
         dump_index_into_disk(&self.index, &self.arena, &self.disk);
         self.arena.dump_into_disk(&self.disk);
         self.arena.reload(&self.disk);
         self.index.reload(&self.disk);
+        self.lock.lock_shared();
     }
     pub fn no_vectors(&self) -> usize {
         self.disk.no_nodes()
