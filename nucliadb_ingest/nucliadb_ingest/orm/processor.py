@@ -247,12 +247,19 @@ class Processor:
             else:
                 uuid = message.uuid
             resource = await kb.get(uuid)
-        if resource is None:
+        if resource is None and message.txseqid == 0:
+            # Its new and its not a secondary message
             resource = await kb.add_resource(uuid, message.slug, message.basic)
-        else:
-            # Already exist
+        elif resource is not None:
+            # Already exists
             if message.HasField("basic") or message.slug != "":
                 await resource.set_basic(message.basic, slug=message.slug)
+        elif resource is None and message.txseqid > 0:
+            # Does not exist and secondary message
+            logger.info(
+                f"Secondary message for resource {message.uuid} and resource does not exist, ignoring"
+            )
+            return None
 
         if message.origin and resource:
             await resource.set_origin(message.origin)
