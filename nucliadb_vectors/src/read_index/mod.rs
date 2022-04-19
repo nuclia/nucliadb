@@ -84,13 +84,16 @@ impl ReadIndex {
     pub fn has_node(&self, layer: usize, node: NodeId) -> bool {
         self.layers[layer].node_record.contains_key(&node)
     }
-    pub fn get_edges(&self, layer: usize, node: NodeId) -> Vec<(EdgeId, NodeId)> {
+    pub fn get_edge(&self, layer: usize, node: NodeId, edge: usize) -> (EdgeId, NodeId) {
+        self.layers[layer].node_record.get(&node).unwrap().out_edges[edge]
+    }
+    pub fn no_edges(&self, layer: usize, node: NodeId) -> usize {
         self.layers[layer]
             .node_record
             .get(&node)
             .unwrap()
             .out_edges
-            .clone()
+            .len()
     }
     pub fn get_entry_point(&self) -> Option<(NodeId, usize)> {
         self.entry_point
@@ -154,8 +157,11 @@ impl LockReader {
     pub fn reload(&self, disk: &LockDisk) {
         self.index.write().unwrap().reload(disk)
     }
-    pub fn get_edges(&self, layer: usize, node: NodeId) -> Vec<(EdgeId, NodeId)> {
-        self.index.read().unwrap().get_edges(layer, node)
+    pub fn get_edge(&self, layer: usize, node: NodeId, edge: usize) -> (EdgeId, NodeId) {
+        self.index.read().unwrap().get_edge(layer, node, edge)
+    }
+    pub fn no_edges(&self, layer: usize, node: NodeId) -> usize {
+        self.index.read().unwrap().no_edges(layer, node)
     }
     pub fn get_entry_point(&self) -> Option<(NodeId, usize)> {
         self.index.read().unwrap().get_entry_point()

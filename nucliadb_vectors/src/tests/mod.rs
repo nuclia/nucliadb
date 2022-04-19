@@ -66,6 +66,50 @@ fn simple_flow() {
 }
 
 #[test]
+fn accuracy_test() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
+    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut labels = vec![];
+    for i in 0..50 {
+        labels.push(format!("LABEL_{}", i));
+    }
+    for i in 0..100 {
+        let key = format!("KEY_{}", i);
+        let vec: Vec<_> = vec![rand::random::<f32>; 8]
+            .into_iter()
+            .map(|f| f())
+            .collect();
+        writer.insert(key, vec, labels.clone());
+    }
+    writer.flush();
+    reader.reload();
+    std::mem::drop(writer);
+    reader.reload();
+    let query: Vec<_> = vec![rand::random::<f32>; 8]
+        .into_iter()
+        .map(|f| f())
+        .collect();
+    println!("QUERY 0: {:?}", query);
+    let no_results = 10;
+    let result_0 = reader.search(query, labels[..20].to_vec(), no_results);
+    let mut result_0: Vec<_> = result_0.into_iter().map(|(k, _)| k).collect();
+    result_0.sort();
+    let query = vec![rand::random::<f32>; 8]
+        .into_iter()
+        .map(|f| f())
+        .collect();
+    println!("QUERY 1: {:?}", query);
+    let no_results = 10;
+    let result_1 = reader.search(query, labels[..20].to_vec(), no_results);
+    let mut result_1: Vec<_> = result_1.into_iter().map(|(k, _)| k).collect();
+    result_1.sort();
+    println!("RESULT0: {:?}", result_0);
+    println!("RESULT1: {:?}", result_1);
+    assert_ne!(result_0, result_1)
+}
+
+#[test]
 fn insert_delete_all() {
     let temp_dir = tempfile::tempdir().unwrap();
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
@@ -85,7 +129,7 @@ fn insert_delete_all() {
 fn concurrency_test() {
     fn reader_process(reader: Reader, _: Arc<Mutex<()>>) {
         let mut index = 1;
-        loop {
+        for _ in 1..10000 {
             let query = vec![rand::random::<f32>(); 8];
             let no_results = 10;
             // let l = lock.lock().unwrap();
@@ -105,7 +149,7 @@ fn concurrency_test() {
         for i in 0..50 {
             labels.push(format!("LABEL_{}", i));
         }
-        loop {
+        for _ in 1..10000 {
             let mut delete = vec![];
             for _ in 0..100 {
                 let key = format!("KEY_{}", current_key);

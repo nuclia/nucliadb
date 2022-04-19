@@ -63,7 +63,8 @@ impl<'a> Query for LayerSearchQuery<'a> {
                 (None, _) => break,
                 (Some(InverseElem(_, cd)), Some(StandardElem(_, rd))) if cd > rd => break,
                 (Some(InverseElem(candidate, _)), _) => {
-                    for (_, node) in self.index.get_edges(self.layer, candidate) {
+                    for edge in 0..self.index.no_edges(self.layer, candidate) {
+                        let (_, node) = self.index.get_edge(self.layer, candidate, edge);
                         let loaded = load_node_in_reader(node, self.index, self.arena, self.disk);
                         if !visited.contains(&node) && loaded {
                             visited.insert(node);
