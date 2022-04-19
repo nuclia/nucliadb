@@ -266,5 +266,5 @@ async def reindex_resource(request: Request, kbid: str, rid: str):
     resource = IndexResource()
     resource.kbid = kbid
     resource.rid = rid
-    await ingest.Index(resource)  # type: ignore
+    await ingest.ReIndex(resource)  # type: ignore
     return Response(status_code=200)
