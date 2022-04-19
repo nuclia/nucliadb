@@ -129,12 +129,12 @@ class Worker:
         logger.info(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
+        storage = await get_storage()
         async with self.lock:
             try:
                 pb = IndexMessage()
                 pb.ParseFromString(msg.data)
                 if pb.typemessage == IndexMessage.TypeMessage.CREATION:
-                    storage = await get_storage()
                     brain: Resource = await storage.get_indexing(pb)
                     status = await self.writer.set_resource(brain)
                     del brain
