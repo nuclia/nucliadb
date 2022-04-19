@@ -220,7 +220,7 @@ class Resource:
         origin = await self.get_origin()
         basic = await self.get_basic()
         if basic is not None:
-            await brain.set_global_tags(basic, origin)
+            brain.set_global_tags(basic, origin)
         fields = await self.get_fields()
         for ((type_id, field_id), field) in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
