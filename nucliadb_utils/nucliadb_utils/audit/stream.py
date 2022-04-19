@@ -132,6 +132,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.userid = message.audit.user
         auditrequest.rid = message.uuid
         auditrequest.origin = message.audit.origin
+        auditrequest.type = AuditRequest.MODIFIED
         auditrequest.time.CopyFrom(message.audit.when)
 
         await self.send(auditrequest)
@@ -143,6 +144,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.userid = user
         auditrequest.rid = uuid
         auditrequest.kbid = kbid
+        auditrequest.type = AuditRequest.VISITED
         auditrequest.time.FromDatetime(datetime.now())
 
         await self.send(auditrequest)
@@ -164,6 +166,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.search.CopyFrom(search)
         auditrequest.timeit = timeit
         auditrequest.resources = resources
+        auditrequest.type = AuditRequest.SEARCH
         auditrequest.time.FromDatetime(datetime.now())
 
         await self.send(auditrequest)
