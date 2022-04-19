@@ -80,14 +80,21 @@ fn insert_delete_all() {
     assert_eq!(writer.no_vectors(), 0);
 }
 
-fn _concurrency_test() {
+//#[test]
+#[allow(unused)]
+fn concurrency_test() {
     fn reader_process(reader: Reader, _: Arc<Mutex<()>>) {
+        let mut index = 1;
         loop {
             let query = vec![rand::random::<f32>(); 8];
             let no_results = 10;
             // let l = lock.lock().unwrap();
             let result = reader.search(query, vec![], no_results);
             println!("READ {}", result.len());
+            if index % 100 == 0 {
+                reader.reload();
+            }
+            index += 1;
             // std::mem::drop(l);
         }
     }

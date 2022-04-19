@@ -32,7 +32,6 @@ pub struct Arena {
     fresh_label_id: LabelId,
     nodes: HashMap<NodeId, Node>,
     edges: HashMap<EdgeId, Edge>,
-    deleted_nodes: Vec<NodeId>,
     deleted_edges: Vec<EdgeId>,
     deleted_labels: Vec<LabelId>,
 }
@@ -54,7 +53,6 @@ impl Arena {
             fresh_label_id: disk.get_fresh_label(),
             fresh_node_id: disk.get_fresh_node(),
             fresh_edge_id: disk.get_fresh_edge(),
-            deleted_nodes: disk.get_deleted_nodes(),
             deleted_edges: disk.get_deleted_edges(),
             ..Arena::default()
         }
@@ -64,7 +62,6 @@ impl Arena {
         self.fresh_label_id = disk.get_fresh_label();
         self.fresh_node_id = disk.get_fresh_node();
         self.fresh_edge_id = disk.get_fresh_edge();
-        self.deleted_nodes = disk.get_deleted_nodes();
         self.deleted_edges = disk.get_deleted_edges();
         self.nodes = HashMap::with_capacity(self.nodes.capacity());
         self.edges = HashMap::with_capacity(self.edges.capacity());
@@ -74,7 +71,6 @@ impl Arena {
         disk.log_fresh_node(self.fresh_node_id);
         disk.log_fresh_edge(self.fresh_edge_id);
         disk.log_deleted_labels(&self.deleted_labels);
-        disk.log_deleted_nodes(&self.deleted_nodes);
         disk.log_deleted_edges(&self.deleted_edges);
     }
 
@@ -82,17 +78,9 @@ impl Arena {
         self.version_number
     }
     pub fn insert_node(&mut self, node: Node) -> NodeId {
-        match self.deleted_nodes.pop() {
-            Some(id) => {
-                self.nodes.insert(id, node);
-                id
-            }
-            None => {
-                let index = self.fresh_node_id.fresh();
-                self.nodes.insert(index, node);
-                index
-            }
-        }
+        let index = self.fresh_node_id.fresh();
+        self.nodes.insert(index, node);
+        index
     }
     pub fn insert_edge(&mut self, edge: Edge) -> EdgeId {
         match self.deleted_edges.pop() {
@@ -130,7 +118,6 @@ impl Arena {
         }
     }
     pub fn delete_node(&mut self, node_id: NodeId) {
-        self.deleted_nodes.push(node_id);
         self.nodes.remove(&node_id);
     }
     pub fn delete_edge(&mut self, edge_id: EdgeId) {

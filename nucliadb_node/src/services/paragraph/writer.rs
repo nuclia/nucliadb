@@ -98,12 +98,10 @@ impl WriterChild for ParagraphWriterService {
             modified = true;
         }
 
-        if !resource.paragraphs_to_delete.is_empty() {
-            for paragraph_id in &resource.paragraphs_to_delete {
-                let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
-                self.writer.write().unwrap().delete_term(uuid_term);
-                modified = true;
-            }
+        for paragraph_id in &resource.paragraphs_to_delete {
+            let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
+            self.writer.write().unwrap().delete_term(uuid_term);
+            modified = true;
         }
 
         match self.writer.write().unwrap().commit() {

@@ -25,9 +25,14 @@ use tracing::*;
 
 use crate::graph_arena::*;
 use crate::graph_disk::*;
-use crate::graph_elems::HNSWParams;
+use crate::graph_elems::{GraphVector, HNSWParams};
+use crate::query::Query;
+use crate::query_find_labels::FindLabelsQuery;
+use crate::query_post_search::{PostSearchQuery, PostSearchValue};
+use crate::query_search::{SearchQuery, SearchValue};
 use crate::read_index::*;
 use crate::utils;
+
 pub struct Reader {
     index: LockReader,
     arena: LockArena,
@@ -62,13 +67,6 @@ impl Reader {
         labels: Vec<String>,
         no_results: usize,
     ) -> Vec<(String, f32)> {
-        use crate::graph_elems::GraphVector;
-        use crate::query::Query;
-        use crate::query_find_labels::FindLabelsQuery;
-        use crate::query_post_search::{PostSearchQuery, PostSearchValue};
-        use crate::query_search::{SearchQuery, SearchValue};
-
-        self.reload();
         let is_filtered_search = !labels.is_empty();
         let label_analysis = FindLabelsQuery {
             labels,
