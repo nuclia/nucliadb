@@ -20,6 +20,7 @@
 
 use std::collections::HashSet;
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -149,10 +150,14 @@ impl From<GraphVector> for Vec<f32> {
 }
 impl Distance for GraphVector {
     fn cosine(i: &Self, j: &Self) -> f32 {
-        let mut dot_ij = 0.0;
-        for index in 0..i.value.len() {
-            dot_ij += i.value[index] * j.value[index];
-        }
+        let x = &i.value;
+        let y = &j.value;
+        let dot_ij: f32 = x
+            .par_iter()
+            .enumerate()
+            .map(|(index, v)| y[index] * (*v))
+            .sum();
+
         dot_ij / (i.power_sqrt * j.power_sqrt)
     }
 }
