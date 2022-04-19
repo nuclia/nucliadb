@@ -146,10 +146,6 @@ impl Disk {
         let bytes = self.log.get(&LogField::FreshLabel).unwrap();
         bincode::deserialize(&bytes).unwrap()
     }
-    pub fn get_deleted_nodes(&self) -> Vec<NodeId> {
-        let bytes = self.log.get(&LogField::DeletedNodes).unwrap();
-        bincode::deserialize(&bytes).unwrap()
-    }
     pub fn get_deleted_edges(&self) -> Vec<EdgeId> {
         let bytes = self.log.get(&LogField::DeletedEdges).unwrap();
         bincode::deserialize(&bytes).unwrap()
@@ -198,11 +194,6 @@ impl Disk {
     pub fn log_fresh_label(&mut self, label: LabelId) {
         let bytes = bincode::serialize(&label).unwrap();
         self.log.atomic_insert(&LogField::FreshLabel, &bytes);
-    }
-    #[allow(clippy::ptr_arg)]
-    pub fn log_deleted_nodes(&mut self, nodes: &Vec<NodeId>) {
-        let bytes = bincode::serialize(nodes).unwrap();
-        self.log.atomic_insert(&LogField::DeletedNodes, &bytes);
     }
     #[allow(clippy::ptr_arg)]
     pub fn log_deleted_edges(&mut self, edges: &Vec<EdgeId>) {
@@ -271,9 +262,6 @@ impl LockDisk {
     pub fn get_fresh_label(&self) -> LabelId {
         self.disk.read().unwrap().get_fresh_label()
     }
-    pub fn get_deleted_nodes(&self) -> Vec<NodeId> {
-        self.disk.read().unwrap().get_deleted_nodes()
-    }
     pub fn get_deleted_edges(&self) -> Vec<EdgeId> {
         self.disk.read().unwrap().get_deleted_edges()
     }
@@ -308,10 +296,6 @@ impl LockDisk {
     }
     pub fn log_fresh_label(&self, label: LabelId) {
         self.disk.write().unwrap().log_fresh_label(label)
-    }
-    #[allow(clippy::ptr_arg)]
-    pub fn log_deleted_nodes(&self, nodes: &Vec<NodeId>) {
-        self.disk.write().unwrap().log_deleted_nodes(nodes)
     }
     #[allow(clippy::ptr_arg)]
     pub fn log_deleted_edges(&self, edges: &Vec<EdgeId>) {
