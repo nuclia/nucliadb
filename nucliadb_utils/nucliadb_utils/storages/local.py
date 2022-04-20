@@ -207,7 +207,7 @@ class LocalStorage(Storage):
     field_klass = LocalStorageField
 
     def __init__(self, local_testing_files: str):
-        self.local_testing_files = local_testing_files
+        self.local_testing_files = local_testing_files.rstrip("/")
         self.bucket_format = "ndb_{kbid}"
         self.source = CloudFile.LOCAL
 

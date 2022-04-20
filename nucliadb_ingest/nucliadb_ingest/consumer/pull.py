@@ -65,7 +65,7 @@ class PullWorker:
         nats_creds: Optional[str] = None,
         nats_servers: Optional[List[str]] = [],
         creds: Optional[str] = None,
-        txn_subscriber: bool = True,
+        local_subscriber: bool = False,
     ):
         self.driver = driver
         self.partition = partition
@@ -76,7 +76,8 @@ class PullWorker:
         self.nuclia_id = nuclia_id
         self.nuclia_proxy_cluster_url = nuclia_proxy_cluster_url
         self.nuclia_proxy_public_url = nuclia_proxy_public_url
-        self.txn_subscriber = txn_subscriber
+        self.local_subscriber = local_subscriber
+        self.nats_subscriber = not local_subscriber
         self.creds = creds
         self.cache = cache
         self.nats_creds = nats_creds
@@ -114,7 +115,7 @@ class PullWorker:
 
         await self.processor.initialize()
 
-        if self.txn_subscriber:
+        if self.nats_subscriber:
             options = {
                 "error_cb": self.error_cb,
                 "closed_cb": self.closed_cb,
@@ -159,11 +160,12 @@ class PullWorker:
             except nats.errors.ConnectionClosedError:
                 pass
         self.subscriptions = []
-        try:
-            await self.nc.drain()
-        except nats.errors.ConnectionClosedError:
-            pass
-        await self.nc.close()
+        if self.nats_subscriber is False:
+            try:
+                await self.nc.drain()
+            except nats.errors.ConnectionClosedError:
+                pass
+            await self.nc.close()
 
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject

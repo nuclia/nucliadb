@@ -19,12 +19,14 @@
 #
 from typing import Callable
 
+import os
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import FieldType
 
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
+import nucliadb_ingest.tests.fixtures
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_reader.api.v1.router import KB_PREFIX
 
@@ -50,7 +52,9 @@ async def test_resource_download_extracted_file(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",
         )
         assert resp.status_code == 200
-        open(THUMBNAIL.uri, "rb").read() == resp.content
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
+
+        open(filename, "rb").read() == resp.content
 
 
 @pytest.mark.asyncio
@@ -75,7 +79,9 @@ async def test_resource_download_field_file(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/{field_id}/download/field",
         )
         assert resp.status_code == 200
-        open(TEST_CLOUDFILE.uri, "rb").read() == resp.content
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"
+
+        open(filename, "rb").read() == resp.content
 
 
 @pytest.mark.asyncio
@@ -93,7 +99,9 @@ async def test_resource_download_field_layout(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/layout/{field_id}/download/field/{download_field}",
         )
         assert resp.status_code == 200
-        open(TEST_CLOUDFILE.uri, "rb").read() == resp.content
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"
+
+        open(filename, "rb").read() == resp.content
 
 
 @pytest.mark.asyncio
@@ -116,4 +124,5 @@ async def test_resource_download_field_conversation(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
         )
         assert resp.status_code == 200
-        open(THUMBNAIL.uri, "rb").read() == resp.content
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
+        open(filename, "rb").read() == resp.content

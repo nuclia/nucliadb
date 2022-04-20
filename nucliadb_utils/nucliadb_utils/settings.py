@@ -104,6 +104,7 @@ class IndexingSettings(BaseSettings):
     index_jetstream_stream: Optional[str] = "node"
     index_jetstream_servers: List[str] = []
     index_jetstream_auth: Optional[str] = None
+    index_local: bool = False
 
 
 indexing_settings = IndexingSettings()
