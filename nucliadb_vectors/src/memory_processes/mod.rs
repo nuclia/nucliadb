@@ -50,13 +50,16 @@ pub fn load_node_in_writer(
 
 #[must_use]
 pub fn load_node_in_reader(node_id: NodeId, index: &LockReader, disk: &LockDisk) -> bool {
-    match disk.get_node(node_id) {
-        Some(disk_node) if !index.is_cached(node_id) => {
-            index.add_node_from_disk(node_id, disk_node);
-            true
+    if !index.is_cached(node_id) {
+        match disk.get_node(node_id) {
+            Some(disk_node) => {
+                index.add_node_from_disk(node_id, disk_node);
+                true
+            }
+            None => false,
         }
-        Some(_) => true,
-        None => false,
+    } else {
+        true
     }
 }
 

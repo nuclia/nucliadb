@@ -54,6 +54,7 @@ where
         env_builder.map_size(MAP_SIZE);
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
+            env_builder.flag(Flags::MdbNoSync);
         }
         let env = unwrapping!(env_builder.open(path));
         let db = match env.open_database(Some(db)) {
