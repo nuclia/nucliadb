@@ -129,7 +129,7 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_reade
         ):
             count += 1
 
-        txn.abort()
+        await txn.abort()
         if count == amount:
             break
         print(f"got {count}, retrying")

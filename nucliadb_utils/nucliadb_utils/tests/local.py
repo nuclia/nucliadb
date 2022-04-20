@@ -17,15 +17,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Optional
+import tempfile
 
-from pydantic import BaseSettings
+import pytest
 
-
-class Settings(BaseSettings):
-    dm_enabled: bool = True
-    dm_redis_host: Optional[str] = None
-    dm_redis_port: Optional[int] = None
+from nucliadb_utils.storages.local import LocalStorage
+from nucliadb_utils.store import MAIN
 
 
-settings = Settings()
+@pytest.fixture(scope="function")
+async def local_storage(gcs):
+    folder = tempfile.TemporaryDirectory()
+    storage = LocalStorage(local_testing_files=folder.name)
+
+    MAIN["storage"] = storage
+    await storage.initialize()
+    yield storage
+    await storage.finalize()
+    folder.cleanup()
+    if "storage" in MAIN:
+        del MAIN["storage"]

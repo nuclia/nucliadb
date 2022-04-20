@@ -15,7 +15,7 @@
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
 </p>
-<h3 align="center">NLP Database</h3>
+<h3 align="center">Searchable database for unstructured data</h3>
 
 <h4 align="center">
   <a href="docs/getting-started/quickstart">Quickstart</a> |
@@ -24,24 +24,24 @@
   <a href="https://discord.gg/W6RKm2Vnhq">Chat</a>
 </h4>
 
-### Check out our [blog post](https://nuclia.com/blog/first-release/) to grasp what we have been doing for the last months.
+### Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
 
-NucliaDB is a distributed search engine built from the ground up to offer high accuracy and semantic search on unstructured data. By mere mortals for mere mortals, NucliaDB's architecture is as simple as possible to be scalable and deliver what a NLP Database requires.
+NucliaDB is a distributed search engine built from the ground up to offer high accuracy and semantic search on unstructured data. By mere mortals for mere mortals, NucliaDB's architecture is as simple as possible to be scalable and deliver what an NLP Database requires
 
 NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index big datasets and provide multi-teanant suport.
 
 # Features
 
-- Store original data, extracted and understanding data on object and blob storage
-- Index fields, paragraphs, semantic sentences on index storage
+- Store original data, extracting and understanding data on object and blob storage
+- Index fields, paragraphs, and semantic sentences on index storage
 - Cloud extraction and understanding with Nuclia Understanding API™
 - Cloud connection to train ML models with Nuclia Learning API™
 - Container security based with Reader, Manager, Writer Roles
 - Resources with multiple fields and metadata
 - Text/HTML/Markdown plain fields support
-- File fields support with direct upload and TUS upload
-- Link fields support
-- Conversation fields support
+- File field support with direct upload and TUS upload
+- Link field support
+- Conversation field support
 - Blocks/Layout field support
 - Eventual consistency transactions based on Nats.io
 - Distributed source of truth with TiKV and Redis support
@@ -121,7 +121,7 @@ curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
 
 ### How is NucliaDB different from traditional search engines like Elasticsearch or Solr?
 
-The core difference and advantage of NucliaDB is its architecture that is built from the ground up for cloud and unstructured data. Its vector index plus standard keyword and fuzzy search provide an API to use all extracted and learned information from Nuclia Understanding API and provide super NLP powers to any application with low code and peace of mind.
+The core difference and advantage of NucliaDB is its architecture built from the ground up for cloud and unstructured data. Its vector index plus standard keyword and fuzzy search provide an API to use all extracted and learned information from Nuclia, understanding API and provide super NLP powers to any application with low code and peace of mind.
 
 ### What license does NucliaDB use?
 
@@ -129,7 +129,7 @@ NucliaDB is open-source under the GNU Affero General Public License Version 3 - 
 
 ### What is Nuclia's business model?
 
-Our business model relies on our Nuclia Learning API and Nuclia Understanding API. We also offer NucliaDB as a Service at our multi cloud provider infrastructure: [https://nuclia.cloud](https://nuclia.cloud).
+Our business model relies on our Nuclia Learning API and Nuclia Understanding API. We also offer NucliaDB as a service at our multi-cloud provider infrastructure: [https://nuclia.cloud](https://nuclia.cloud).
 
 # 🤝 Contribute and spread the word
 

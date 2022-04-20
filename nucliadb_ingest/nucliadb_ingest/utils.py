@@ -19,9 +19,14 @@
 #
 from typing import Optional
 
+from grpc import aio  # type: ignore
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
+from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 try:
     from nucliadb_ingest.maindb.redis import RedisDriver
@@ -36,6 +41,14 @@ try:
     TIKV = True
 except ImportError:
     TIKV = False
+
+
+try:
+    from nucliadb_ingest.maindb.local import LocalDriver
+
+    FILES = True
+except ImportError:
+    FILES = False
 
 
 async def get_driver() -> Driver:
@@ -55,9 +68,41 @@ async def get_driver() -> Driver:
     ):
         tikv_driver = TiKVDriver(settings.driver_tikv_url)
         MAIN["driver"] = tikv_driver
+    elif (
+        settings.driver == "local"
+        and FILES
+        and "local" not in MAIN
+        and settings.driver_local_url is not None
+    ):
+        local_driver = LocalDriver(settings.driver_local_url)
+        MAIN["driver"] = local_driver
     driver: Optional[Driver] = MAIN.get("driver")
     if driver is not None and not driver.initialized:
         await driver.initialize()
     elif driver is None:
         raise AttributeError()
     return driver
+
+
+async def start_ingest():
+    if nucliadb_settings.nucliadb_ingest is not None:
+        set_utility(
+            Utility.CHANNEL, aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
+        )
+        set_utility(Utility.INGEST, WriterStub(get_utility(Utility.CHANNEL)))
+    else:
+        from nucliadb_ingest.service.writer import WriterServicer
+
+        service = WriterServicer()
+        await service.initialize()
+        set_utility(Utility.INGEST, service)
+
+
+async def stop_ingest():
+    if get_utility(Utility.CHANNEL):
+        await get_utility(Utility.CHANNEL).close()
+        clean_utility(Utility.CHANNEL)
+        clean_utility(Utility.INGEST)
+    if get_utility(Utility.INGEST):
+        util = get_utility(Utility.INGEST)
+        await util.finalize()

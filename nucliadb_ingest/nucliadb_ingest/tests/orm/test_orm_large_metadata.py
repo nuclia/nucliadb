@@ -87,8 +87,9 @@ async def test_create_resource_orm_large_metadata_file(
     with open(filename, "wb") as testfile:
         testfile.write(real.SerializeToString())
     cf1 = CloudFile(
-        uri=filename,
+        uri="largemetadata.pb",
         source=CloudFile.Source.LOCAL,
+        bucket_name="/orm/assets",
         size=getsize(filename),
         content_type="application/octet-stream",
         filename="largemetadata.pb",

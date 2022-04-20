@@ -27,6 +27,21 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import logger
 
 
+class LocalTransactionUtility:
+    async def commit(self, writer: BrokerMessage, partition: int) -> int:
+        from nucliadb_utils.utilities import get_ingest
+
+        ingest = get_ingest()
+        await ingest.ProcessMessage(writer)  # type: ignore
+        return 0
+
+    async def finalize(self):
+        pass
+
+    async def initialize(self):
+        pass
+
+
 class TransactionUtility:
 
     nc: Optional[Client] = None
@@ -52,7 +67,7 @@ class TransactionUtility:
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS: {}".format(e))
+        logger.error("There was an error connecting to NATS transaction: {}".format(e))
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")

@@ -68,11 +68,13 @@ class Processor:
 
     async def initialize(self):
         await self.driver.initialize()
-        await self.cache.initialize()
+        if self.cache is not None:
+            await self.cache.initialize()
 
     async def finalize(self):
         await self.driver.finalize()
-        await self.cache.finalize()
+        if self.cache is not None:
+            await self.cache.finalize()
 
     async def process(
         self,

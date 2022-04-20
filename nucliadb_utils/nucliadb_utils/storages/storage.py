@@ -167,7 +167,7 @@ class Storage:
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.LOCAL:
             local_storage = get_local_storage()
-            iterator = local_storage.download(file)
+            iterator = local_storage.download(file.bucket_name, file.uri)
             new_cf = await self.uploaditerator(iterator, destination, file)
         else:
             raise InvalidCloudFile()
@@ -302,7 +302,7 @@ class Storage:
                     result.write(data)
         elif cf.source == CloudFile.LOCAL:
             local_storage = get_local_storage()
-            async for data in local_storage.download(cf):
+            async for data in local_storage.download(cf.bucket_name, cf.uri):
                 if data is not None:
                     result.write(data)
 
@@ -323,7 +323,7 @@ class Storage:
                     yield data
         elif cf.source == CloudFile.LOCAL:
             local_storage = get_local_storage()
-            async for data in local_storage.download(cf):
+            async for data in local_storage.download(cf.bucket_name, cf.uri):
                 if data is not None:
                     yield data
 

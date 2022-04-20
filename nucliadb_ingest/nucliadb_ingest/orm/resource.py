@@ -424,6 +424,16 @@ class Resource:
                 basic_modified = True
             await field_link.set_link_extracted_data(link_extracted_data)
 
+            if self.basic.icon == "":
+                self.basic.icon = "application/stf-link"
+                basic_modified = True
+            if self.basic.title == "" and link_extracted_data.title != "":
+                self.basic.title = link_extracted_data.title
+                basic_modified = True
+            if self.basic.summary == "" and link_extracted_data.description != "":
+                self.basic.summary = link_extracted_data.description
+                basic_modified = True
+
         for file_extracted_data in message.file_extracted_data:
             field_file: File = await self.get_field(
                 file_extracted_data.field,

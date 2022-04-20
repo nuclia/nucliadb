@@ -37,7 +37,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
 
 from nucliadb_writer import logger
-from nucliadb_writer.tus.dm import RedisFileDataManager
+from nucliadb_writer.tus.dm import FileDataMangaer
 from nucliadb_writer.tus.exceptions import (
     CloudFileNotFound,
     HTTPBadRequest,
@@ -156,7 +156,7 @@ class GCloudFileStorageManager(FileStorageManager):
     chunk_size = CHUNK_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
-    async def start(self, dm: RedisFileDataManager, path: str, kbid: str):
+    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
         """Init an upload.
 
         _uload_file_id : temporal url to image beeing uploaded
@@ -234,7 +234,7 @@ class GCloudFileStorageManager(FileStorageManager):
         else:
             raise AttributeError("No valid uri")
 
-    async def _append(self, dm: RedisFileDataManager, data, offset):
+    async def _append(self, dm: FileDataMangaer, data, offset):
         if self.storage.session is None:
             raise AttributeError()
         if dm.size:
@@ -262,7 +262,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 logger.error(text)
             return call
 
-    async def append(self, dm: RedisFileDataManager, iterable, offset) -> int:
+    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
         count = 0
 
         async for chunk in iterable:
@@ -292,7 +292,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 break
         return count
 
-    async def finish(self, dm: RedisFileDataManager):
+    async def finish(self, dm: FileDataMangaer):
         path = dm.get("path")
         await dm.finish()
         return path

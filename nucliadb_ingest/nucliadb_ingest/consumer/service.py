@@ -92,6 +92,7 @@ class ConsumerService:
             if nats_stream
             else transaction_settings.transaction_jetstream_stream
         )
+        self.local_subscriber = transaction_settings.transaction_local
         self.onprem = onprem if onprem is not None else nuclia_settings.onprem
         self.pull_workers_task = {}
         self.pull_workers = {}
@@ -126,6 +127,7 @@ class ConsumerService:
                 onprem=self.onprem,
                 nats_creds=self.nats_auth,
                 nats_servers=self.nats_url,
+                local_subscriber=self.local_subscriber,
             )
             self.pull_workers_task[partition] = asyncio.create_task(
                 self.pull_workers[partition].loop()

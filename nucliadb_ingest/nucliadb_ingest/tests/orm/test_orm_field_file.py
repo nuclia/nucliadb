@@ -42,8 +42,9 @@ async def test_create_resource_orm_field_file(
     filename = f"{dirname(__file__)}/assets/file.png"
 
     cf1 = CloudFile(
-        uri=filename,
+        uri="file.png",
         source=CloudFile.Source.LOCAL,
+        bucket_name="/orm/assets",
         size=getsize(filename),
         content_type="image/png",
         filename="file.png",

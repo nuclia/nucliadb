@@ -43,6 +43,8 @@ class StorageSettings(BaseSettings):
     s3_region_name: Optional[str] = None
     s3_bucket: Optional[str] = None
 
+    local_files: Optional[str] = None
+
 
 storage_settings = StorageSettings()
 
@@ -77,7 +79,7 @@ nuclia_settings = NucliaSettings()
 
 
 class NucliaDBSettings(BaseSettings):
-    nucliadb_ingest: str = "ingest.nucliadb.svc.cluster.local:4242"
+    nucliadb_ingest: Optional[str] = "ingest.nucliadb.svc.cluster.local:4242"
 
 
 nucliadb_settings = NucliaDBSettings()
@@ -89,6 +91,7 @@ class TransactionSettings(BaseSettings):
     transaction_jetstream_target: Optional[str] = "ndb.consumer.{partition}"
     transaction_jetstream_group: Optional[str] = "nucliadb-{partition}"
     transaction_jetstream_stream: Optional[str] = "nucliadb"
+    transaction_local: bool = False
 
 
 transaction_settings = TransactionSettings()
@@ -101,6 +104,7 @@ class IndexingSettings(BaseSettings):
     index_jetstream_stream: Optional[str] = "node"
     index_jetstream_servers: List[str] = []
     index_jetstream_auth: Optional[str] = None
+    index_local: bool = False
 
 
 indexing_settings = IndexingSettings()

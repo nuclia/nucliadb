@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     cache_pubsub_nats_url: List[str] = ["localhost:4222"]
     cache_pubsub_nats_auth: Optional[str] = None
     cache_pubsub_driver: str = "nats"  # redis | nats
+    cache_enabled: bool = True
 
 
 settings = Settings()

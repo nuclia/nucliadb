@@ -95,6 +95,19 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         set_utility(Utility.STORAGE, gcsutil)
         await gcsutil.initialize()
 
+    elif (
+        storage_settings.file_backend == "local"
+        and Utility.STORAGE not in MAIN
+        and storage_settings.local_files
+    ):
+        from nucliadb_utils.storages.local import LocalStorage
+
+        localutil = LocalStorage(
+            local_testing_files=storage_settings.local_files,
+        )
+        set_utility(Utility.STORAGE, localutil)
+        await localutil.initialize()
+
     if MAIN.get(Utility.STORAGE) is None:
         raise AttributeError()
 
@@ -123,7 +136,7 @@ def get_nuclia_storage() -> NucliaStorage:
 
 async def get_cache() -> Optional[Cache]:
     util = get_utility(Utility.CACHE)
-    if util is None:
+    if util is None and cache_settings.cache_enabled:
         driver = Cache()
         set_utility(Utility.CACHE, driver)
     cache = get_utility(Utility.CACHE)

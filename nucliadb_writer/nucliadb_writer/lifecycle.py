@@ -20,25 +20,16 @@
 import logging
 import sys
 
-from grpc import aio  # type: ignore
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-
+from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
-    nucliadb_settings,
     running_settings,
     storage_settings,
     transaction_settings,
 )
-from nucliadb_utils.transaction import TransactionUtility
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    get_transaction,
-    get_utility,
-    set_utility,
-)
+from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
+from nucliadb_utils.utilities import Utility, get_transaction, set_utility
 from nucliadb_writer import logger
 from nucliadb_writer.processing import ProcessingEngine
 from nucliadb_writer.tus import finalize as storage_finalize
@@ -47,10 +38,7 @@ from nucliadb_writer.utilities import get_processing
 
 
 async def initialize():
-    set_utility(
-        Utility.CHANNEL, aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
-    )
-    set_utility(Utility.INGEST, WriterStub(get_utility(Utility.CHANNEL)))
+    await start_ingest()
     processing_engine = ProcessingEngine(
         nuclia_service_account=nuclia_settings.nuclia_service_account,
         nuclia_zone=nuclia_settings.nuclia_zone,
@@ -70,12 +58,15 @@ async def initialize():
             seed=nuclia_settings.nuclia_hash_seed,
         ),
     )
-    transaction_utility = TransactionUtility(
-        nats_creds=transaction_settings.transaction_jetstream_auth,
-        nats_servers=transaction_settings.transaction_jetstream_servers,
-        nats_target=transaction_settings.transaction_jetstream_target,
-    )
-    await transaction_utility.initialize()
+    if transaction_settings.transaction_local:
+        transaction_utility = LocalTransactionUtility()
+    else:
+        transaction_utility = TransactionUtility(
+            nats_creds=transaction_settings.transaction_jetstream_auth,
+            nats_servers=transaction_settings.transaction_jetstream_servers,
+            nats_target=transaction_settings.transaction_jetstream_target,
+        )
+        await transaction_utility.initialize()
     set_utility(Utility.TRANSACTION, transaction_utility)
     await storage_initialize()
 
@@ -94,10 +85,7 @@ async def finalize():
     if transaction is not None:
         await transaction.finalize()
 
-    if get_utility(Utility.CHANNEL):
-        await get_utility(Utility.CHANNEL).close()
-        clean_utility(Utility.CHANNEL)
-        clean_utility(Utility.INGEST)
+    await stop_ingest()
     processing = get_processing()
     if processing is not None:
         await processing.finalize()

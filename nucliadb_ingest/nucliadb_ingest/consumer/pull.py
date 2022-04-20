@@ -65,6 +65,7 @@ class PullWorker:
         nats_creds: Optional[str] = None,
         nats_servers: Optional[List[str]] = [],
         creds: Optional[str] = None,
+        local_subscriber: bool = False,
     ):
         self.driver = driver
         self.partition = partition
@@ -75,6 +76,8 @@ class PullWorker:
         self.nuclia_id = nuclia_id
         self.nuclia_proxy_cluster_url = nuclia_proxy_cluster_url
         self.nuclia_proxy_public_url = nuclia_proxy_public_url
+        self.local_subscriber = local_subscriber
+        self.nats_subscriber = not local_subscriber
         self.creds = creds
         self.cache = cache
         self.nats_creds = nats_creds
@@ -103,7 +106,9 @@ class PullWorker:
         )
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS: {}".format(e))
+        logger.error(
+            "There was an error connecting to NATS consumer ingest: {}".format(e)
+        )
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
@@ -112,42 +117,43 @@ class PullWorker:
 
         await self.processor.initialize()
 
-        options = {
-            "error_cb": self.error_cb,
-            "closed_cb": self.closed_cb,
-            "reconnected_cb": self.reconnected_cb,
-        }
+        if self.nats_subscriber:
+            options = {
+                "error_cb": self.error_cb,
+                "closed_cb": self.closed_cb,
+                "reconnected_cb": self.reconnected_cb,
+            }
 
-        if self.nats_creds is not None:
-            options["user_credentials"] = self.nats_creds
+            if self.nats_creds is not None:
+                options["user_credentials"] = self.nats_creds
 
-        if len(self.nats_servers) > 0:
-            options["servers"] = self.nats_servers
+            if len(self.nats_servers) > 0:
+                options["servers"] = self.nats_servers
 
-        try:
-            self.nc = await nats.connect(**options)
-        except Exception:
-            pass
+            try:
+                self.nc = await nats.connect(**options)
+            except Exception:
+                pass
 
-        self.js = self.nc.jetstream()
+            self.js = self.nc.jetstream()
 
-        res = await self.js.subscribe(
-            subject=self.target.format(partition=self.partition),
-            queue=self.group.format(partition=self.partition),
-            stream=self.stream,
-            flow_control=True,
-            cb=self.subscription_worker,
-            config=nats.js.api.ConsumerConfig(
-                ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_deliver=1,
-                ack_wait=self.ack_wait,
-                idle_heartbeat=5,
-            ),
-        )
-        self.subscriptions.append(res)
-        logger.info(
-            f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream}"
-        )
+            res = await self.js.subscribe(
+                subject=self.target.format(partition=self.partition),
+                queue=self.group.format(partition=self.partition),
+                stream=self.stream,
+                flow_control=True,
+                cb=self.subscription_worker,
+                config=nats.js.api.ConsumerConfig(
+                    ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                    max_deliver=1,
+                    ack_wait=self.ack_wait,
+                    idle_heartbeat=5,
+                ),
+            )
+            self.subscriptions.append(res)
+            logger.info(
+                f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream}"
+            )
 
     async def finalize(self):
         for subscription in self.subscriptions:
@@ -156,11 +162,12 @@ class PullWorker:
             except nats.errors.ConnectionClosedError:
                 pass
         self.subscriptions = []
-        try:
-            await self.nc.drain()
-        except nats.errors.ConnectionClosedError:
-            pass
-        await self.nc.close()
+        if self.nats_subscriber:
+            try:
+                await self.nc.drain()
+            except nats.errors.ConnectionClosedError:
+                pass
+            await self.nc.close()
 
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
@@ -285,14 +292,16 @@ class PullWorker:
                                     pb.ParseFromString(
                                         base64.b64decode(data["payload"])
                                     )
-                                    await transaction_utility.commit(
-                                        writer=pb, partition=self.partition
-                                    )
-                                    # await self.processor.process(
-                                    #     pb,
-                                    #     pb.txseqid,
-                                    #     partition=self.partition,
-                                    # )
+                                    if self.txn_subscriber:
+                                        await transaction_utility.commit(
+                                            writer=pb, partition=self.partition
+                                        )
+                                    else:
+                                        await self.processor.process(
+                                            pb,
+                                            pb.txseqid,
+                                            partition=self.partition,
+                                        )
                                 except Exception as e:
                                     if SENTRY:
                                         capture_exception(e)

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     driver: str = "redis"  # redis | tikv
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
+    driver_local_url: Optional[str] = None
 
     partitions: List[str] = ["1"]
 
