@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from clandestined import Cluster  # type: ignore
 
@@ -37,9 +37,13 @@ NODES: Dict[str, Node] = {}
 class ClusterObject:
     date: datetime
     cluster: Optional[Cluster] = None
+    local_node: Any
 
     def __init__(self):
         self.date = datetime.now()
+
+    def get_local_node(self):
+        return self.local_node
 
     def find_nodes(self, kbid: str):
         if self.cluster is not None:

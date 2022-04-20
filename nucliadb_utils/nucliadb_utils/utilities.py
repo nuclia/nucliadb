@@ -142,7 +142,7 @@ def get_nuclia_storage() -> NucliaStorage:
 
 async def get_cache() -> Optional[Cache]:
     util = get_utility(Utility.CACHE)
-    if util is None:
+    if util is None and cache_settings.cache_enabled:
         driver = Cache()
         set_utility(Utility.CACHE, driver)
     cache = get_utility(Utility.CACHE)

@@ -61,7 +61,7 @@ class TransactionUtility:
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS: {}".format(e))
+        logger.error("There was an error connecting to NATS transaction: {}".format(e))
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")

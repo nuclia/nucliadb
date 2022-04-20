@@ -32,7 +32,7 @@ from nucliadb_ingest.sentry import SENTRY, set_sentry
 from nucliadb_ingest.service import start_grpc
 from nucliadb_ingest.settings import settings
 from nucliadb_ingest.swim import start_swim
-from nucliadb_utils.indexing import IndexingUtility
+from nucliadb_utils.indexing import IndexingUtility, LocalIndexingUtility
 from nucliadb_utils.settings import (
     indexing_settings,
     running_settings,
@@ -64,12 +64,15 @@ async def start_transaction_utility():
 
 
 async def start_indexing_utility():
-    indexing_utility = IndexingUtility(
-        nats_creds=indexing_settings.index_jetstream_auth,
-        nats_servers=indexing_settings.index_jetstream_servers,
-        nats_target=indexing_settings.index_jetstream_target,
-    )
-    await indexing_utility.initialize()
+    if indexing_settings.index_local:
+        indexing_utility = LocalIndexingUtility()
+    else:
+        indexing_utility = IndexingUtility(
+            nats_creds=indexing_settings.index_jetstream_auth,
+            nats_servers=indexing_settings.index_jetstream_servers,
+            nats_target=indexing_settings.index_jetstream_target,
+        )
+        await indexing_utility.initialize()
     set_utility(Utility.INDEXING, indexing_utility)
 
 

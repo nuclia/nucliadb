@@ -27,6 +27,13 @@ from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
 from nucliadb_utils import logger
 
 
+class LocalIndexingUtility:
+    async def index(self, writer: IndexMessage, node: str) -> int:
+        from nucliadb_ingest.orm import NODE_CLUSTER
+
+        return await NODE_CLUSTER.local_node.set_resource(writer)
+
+
 class IndexingUtility:
 
     nc: Optional[Client] = None
@@ -53,7 +60,7 @@ class IndexingUtility:
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS: {}".format(e))
+        logger.error("There was an error connecting to NATS indexing: {}".format(e))
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")

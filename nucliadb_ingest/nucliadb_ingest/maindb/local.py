@@ -66,9 +66,12 @@ class LocalTransaction(Transaction):
     async def remove(self, key: str):
         os.remove(key)
 
-    async def read(self, key: str):
-        async with aiofiles.open(self.compute_path(key), "rb") as resp:
-            return await resp.read()
+    async def read(self, key: str) -> Optional[bytes]:
+        try:
+            async with aiofiles.open(self.compute_path(key), "rb") as resp:
+                return await resp.read()
+        except FileNotFoundError:
+            return None
 
     async def commit(
         self,
@@ -130,7 +133,8 @@ class LocalTransaction(Transaction):
 
         else:
             obj = await self.read(key)
-            self.visited_keys[key] = obj
+            if obj is not None:
+                self.visited_keys[key] = obj
             return obj
 
     async def set(self, key: str, value: bytes):

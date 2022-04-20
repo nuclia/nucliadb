@@ -17,16 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
 from typing import Callable
 
-import os
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import FieldType
 
+import nucliadb_ingest.tests.fixtures
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
-import nucliadb_ingest.tests.fixtures
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_reader.api.v1.router import KB_PREFIX
 
@@ -79,7 +79,7 @@ async def test_resource_download_field_file(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/{field_id}/download/field",
         )
         assert resp.status_code == 200
-        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 
         open(filename, "rb").read() == resp.content
 
@@ -99,7 +99,7 @@ async def test_resource_download_field_layout(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/layout/{field_id}/download/field/{download_field}",
         )
         assert resp.status_code == 200
-        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 
         open(filename, "rb").read() == resp.content
 
@@ -124,5 +124,5 @@ async def test_resource_download_field_conversation(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
         )
         assert resp.status_code == 200
-        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
+        filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa
         open(filename, "rb").read() == resp.content
