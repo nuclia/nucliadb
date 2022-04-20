@@ -167,7 +167,6 @@ impl LockArena {
     pub fn dump_into_disk(&self, disk: &LockDisk) {
         self.arena.write().unwrap().dump_into_disk(disk)
     }
-
     pub fn get_version_number(&self) -> usize {
         self.arena.read().unwrap().get_version_number()
     }

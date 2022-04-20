@@ -21,7 +21,6 @@
 use crate::graph_arena::*;
 use crate::graph_disk::*;
 use crate::graph_elems::*;
-use crate::graph_index::*;
 use crate::read_index::LockReader;
 use crate::write_index::LockWriter;
 
@@ -50,23 +49,10 @@ pub fn load_node_in_writer(
 }
 
 #[must_use]
-pub fn load_node_in_reader(
-    node_id: NodeId,
-    index: &LockReader,
-    arena: &LockArena,
-    disk: &LockDisk,
-) -> bool {
+pub fn load_node_in_reader(node_id: NodeId, index: &LockReader, disk: &LockDisk) -> bool {
     match disk.get_node(node_id) {
         Some(disk_node) if !index.is_cached(node_id) => {
-            let top_layer = disk_node.neighbours.len() - 1;
-            arena.load_node_from_disk(node_id, disk_node.node);
-            index.add_node_from_disk(node_id, top_layer);
-            for (layer_id, (out_edges, _)) in disk_node.neighbours.into_iter().enumerate() {
-                for edge in out_edges {
-                    arena.load_edge_from_disk(edge.my_id, edge.edge);
-                    index.add_connexion_from_disk(layer_id, edge.from, edge.goes_to, edge.my_id);
-                }
-            }
+            index.add_node_from_disk(node_id, disk_node);
             true
         }
         Some(_) => true,

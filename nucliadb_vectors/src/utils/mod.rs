@@ -129,7 +129,7 @@ mod test_utils {
     }
 }
 
-pub fn internal_reload_policy(arena: &LockArena, disk: &LockDisk) -> bool {
+pub fn _internal_reload_policy(arena: &LockArena, disk: &LockDisk) -> bool {
     let in_disk = disk.no_nodes();
     let in_arena = arena.no_nodes();
     (in_arena as f64 / in_disk as f64) * 100f64 >= 30f64

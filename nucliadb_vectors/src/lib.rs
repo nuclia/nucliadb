@@ -21,7 +21,6 @@
 mod graph_arena;
 mod graph_disk;
 mod graph_elems;
-mod graph_index;
 mod heuristics;
 mod memory_processes;
 mod query;

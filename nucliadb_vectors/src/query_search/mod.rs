@@ -22,7 +22,6 @@ pub(crate) mod layer_search;
 
 use layer_search::*;
 
-use crate::graph_arena::*;
 use crate::graph_disk::*;
 use crate::graph_elems::*;
 use crate::memory_processes::load_node_in_reader;
@@ -38,7 +37,6 @@ pub struct SearchQuery<'a> {
     pub elem: GraphVector,
     pub k_neighbours: usize,
     pub index: &'a LockReader,
-    pub arena: &'a LockArena,
     pub disk: &'a LockDisk,
 }
 
@@ -47,14 +45,13 @@ impl<'a> Query for SearchQuery<'a> {
 
     fn run(&mut self) -> Self::Output {
         if let Some((ep, ep_layer)) = self.index.get_entry_point() {
-            if load_node_in_reader(ep, self.index, self.arena, self.disk) {
+            if load_node_in_reader(ep, self.index, self.disk) {
                 let mut down_step = LayerSearchQuery {
                     layer: ep_layer,
                     k_neighbours: 1,
                     elem: self.elem.clone(),
                     entry_points: vec![ep],
                     index: self.index,
-                    arena: self.arena,
                     disk: self.disk,
                 };
                 while down_step.layer != 0 {
