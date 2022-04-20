@@ -48,11 +48,13 @@ from nucliadb_ingest.orm.exceptions import (
     NodeError,
     ShardNotFound,
 )
+from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.orm.node import KB_SHARDS, Node
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG, Resource
 from nucliadb_ingest.orm.shard import Shard
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
+from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
@@ -161,6 +163,9 @@ class KnowledgeBox:
         if uuid is None or uuid == "":
             uuid = str(uuid4())
 
+        if slug == "":
+            slug = uuid
+
         await txn.set(
             KB_SLUGS.format(
                 slug=slug,
@@ -187,7 +192,10 @@ class KnowledgeBox:
         # locate a node with renderzvouz
         if failed is False:
             try:
-                await Node.create_shard_by_kbid(txn, uuid)
+                if indexing_settings.index_local:
+                    await LocalNode.create_shard_by_kbid(txn, uuid)
+                else:
+                    await Node.create_shard_by_kbid(txn, uuid)
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e
@@ -347,12 +355,18 @@ class KnowledgeBox:
         shards_obj = Shards()
         shards_obj.ParseFromString(payload)
 
-        await Node.load_active_nodes()
+        if not indexing_settings.index_local:
+            await Node.load_active_nodes()
 
         for shard in shards_obj.shards:
             # Delete the shard on nodes
             for replica in shard.replicas:
-                node = await Node.get(replica.node)
+                if indexing_settings.index_local:
+                    node: Optional[Union[LocalNode, Node]] = await LocalNode.get(
+                        replica.node
+                    )
+                else:
+                    node = await Node.get(replica.node)
                 if node is None:
                     await txn.abort()
                     raise NodeError(f"No node {replica.node} available")

@@ -35,6 +35,12 @@ class LocalTransactionUtility:
         await ingest.ProcessMessage(writer)  # type: ignore
         return 0
 
+    async def finalize(self):
+        pass
+
+    async def initialize(self):
+        pass
+
 
 class TransactionUtility:
 

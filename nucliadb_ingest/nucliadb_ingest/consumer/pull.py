@@ -162,7 +162,7 @@ class PullWorker:
             except nats.errors.ConnectionClosedError:
                 pass
         self.subscriptions = []
-        if self.nats_subscriber is False:
+        if self.nats_subscriber:
             try:
                 await self.nc.drain()
             except nats.errors.ConnectionClosedError:

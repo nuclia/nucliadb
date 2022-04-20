@@ -15,7 +15,7 @@
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
 </p>
-<h3 align="center">NLP Database</h3>
+<h3 align="center">Searchable database for unstructured data</h3>
 
 <h4 align="center">
   <a href="docs/getting-started/quickstart">Quickstart</a> |

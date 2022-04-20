@@ -1,9 +1,10 @@
 import logging
 import argparse
 from nucliadb_ingest.orm import NODE_CLUSTER
-from nucliadb.local_node import LocalNode
+from nucliadb_ingest.orm.local_node import LocalNode
 
 import uvicorn
+import os
 
 logger = logging.getLogger("nucliadb")
 
@@ -48,6 +49,7 @@ def arg_parse():
 def run():
     from nucliadb_ingest.settings import settings as ingest_settings
     from nucliadb_search.settings import settings as search_settings
+    from nucliadb_writer.settings import settings as writer_settings
     from nucliadb_utils.settings import (
         running_settings,
         http_settings,
@@ -73,13 +75,18 @@ def run():
     nuclia_settings.zone_key = nucliadb_args.key
     nuclia_settings.onprem = True
     nuclia_settings.nuclia_zone = nucliadb_args.zone
+    nuclia_settings.nuclia_proxy_public_url = 
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"
     indexing_settings.index_local = True
     cache_settings.cache_enabled = False
+    writer_settings.dm_enabled = False
 
-    local_node = LocalNode(nucliadb_args.node)
+    os.environ["VECTORS_DIMENSION"] = "768"
+    os.environ["DATA_PATH"] = nucliadb_args.node
+
+    local_node = LocalNode()
     NODE_CLUSTER.local_node = local_node
 
     uvicorn.run(

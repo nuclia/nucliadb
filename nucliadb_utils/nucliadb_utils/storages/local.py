@@ -97,7 +97,7 @@ class LocalStorageField(StorageField):
         path = self.storage.get_bucket_path(bucket)
 
         async with aiofiles.open(self.get_file_path(path, key), "rb") as resp:
-            await resp.truncate(start)
+            await resp.seek(start)
             count = 0
             data = await resp.read(CHUNK_SIZE)
             while data is not None and count < end:

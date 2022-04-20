@@ -31,7 +31,7 @@ from aiobotocore.session import AioSession  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb_writer import logger
-from nucliadb_writer.tus.dm import RedisFileDataManager
+from nucliadb_writer.tus.dm import FileDataMangaer
 from nucliadb_writer.tus.exceptions import CloudFileAccessError, CloudFileNotFound
 from nucliadb_writer.tus.storage import BlobStore, FileStorageManager
 
@@ -48,7 +48,7 @@ class S3FileStorageManager(FileStorageManager):
     chunk_size = CHUNK_SIZE
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _abort_multipart(self, dm: RedisFileDataManager):
+    async def _abort_multipart(self, dm: FileDataMangaer):
         try:
             mpu = dm.get("mpu")
             upload_file_id = dm.get("upload_file_id")
@@ -58,7 +58,7 @@ class S3FileStorageManager(FileStorageManager):
         except Exception:
             logger.warn("Could not abort multipart upload", exc_info=True)
 
-    async def start(self, dm: RedisFileDataManager, path: str, kbid: str):
+    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
         bucket = await self.storage.get_bucket_name(kbid)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         if dm.get("mpu") is not None:
@@ -79,7 +79,7 @@ class S3FileStorageManager(FileStorageManager):
             Bucket=bucket, Key=path
         )
 
-    async def append(self, dm: RedisFileDataManager, iterable, offset) -> int:
+    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
         size = 0
         async for chunk in iterable:
             # It seems that starlette stream() finishes with an emtpy chunk of data
@@ -95,7 +95,7 @@ class S3FileStorageManager(FileStorageManager):
         return size
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _upload_part(self, dm: RedisFileDataManager, data):
+    async def _upload_part(self, dm: FileDataMangaer, data):
         return await self.storage._s3aioclient.upload_part(
             Bucket=dm.get("bucket"),
             Key=dm.get("path"),
@@ -104,13 +104,13 @@ class S3FileStorageManager(FileStorageManager):
             Body=data,
         )
 
-    async def finish(self, dm: RedisFileDataManager):
+    async def finish(self, dm: FileDataMangaer):
         if dm.get("mpu") is not None:
             await self._complete_multipart_upload(dm)
         await dm.finish()
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
-    async def _complete_multipart_upload(self, dm: RedisFileDataManager):
+    async def _complete_multipart_upload(self, dm: FileDataMangaer):
 
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.

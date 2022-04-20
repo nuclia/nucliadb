@@ -22,6 +22,7 @@ import sys
 from collections import Counter
 
 from nucliadb_ingest.utils import get_driver  # type: ignore
+from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_search import logger
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
@@ -36,9 +37,7 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
     start_audit_utility,
-    start_ingest,
     stop_audit_utility,
-    stop_ingest,
 )
 
 

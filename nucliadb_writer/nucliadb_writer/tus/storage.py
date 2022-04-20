@@ -25,7 +25,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from starlette.responses import StreamingResponse
 
 from nucliadb_writer import logger
-from nucliadb_writer.tus.dm import RedisFileDataManager
+from nucliadb_writer.tus.dm import FileDataMangaer
 from nucliadb_writer.tus.exceptions import HTTPRangeNotSatisfiable
 
 
@@ -68,13 +68,13 @@ class FileStorageManager:
     ) -> AsyncIterator[bytes]:
         raise NotImplementedError()
 
-    async def start(self, dm: RedisFileDataManager, path: str, kbid: str):
+    async def start(self, dm: FileDataMangaer, path: str, kbid: str):
         raise NotImplementedError()
 
-    async def append(self, dm: RedisFileDataManager, iterable, offset) -> int:
+    async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
         raise NotImplementedError()
 
-    async def finish(self, dm: RedisFileDataManager):
+    async def finish(self, dm: FileDataMangaer):
         raise NotImplementedError()
 
     async def get_file_metadata(self, uri: str, kbid: str):

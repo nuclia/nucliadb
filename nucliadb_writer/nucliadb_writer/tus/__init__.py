@@ -21,9 +21,10 @@ from typing import Any, Dict
 
 from nucliadb_utils.settings import storage_settings
 from nucliadb_writer.settings import settings as writer_settings
-from nucliadb_writer.tus.dm import RedisFileDataManager
+from nucliadb_writer.tus.dm import FileDataMangaer, RedisFileDataManager
 from nucliadb_writer.tus.exceptions import ManagerNotAvailable
 from nucliadb_writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
+from nucliadb_writer.tus.local import LocalBlobStore, LocalFileStorageManager
 from nucliadb_writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb_writer.tus.storage import FileStorageManager
 
@@ -69,6 +70,16 @@ async def initialize():
 
         DRIVER["StorageManager"] = S3FileStorageManager(storage_backend)
 
+    if storage_settings.file_backend == "local":
+
+        storage_backend = LocalBlobStore(storage_settings.local_files)
+
+        DRIVER["StorageBackend"] = storage_backend
+
+        await storage_backend.initialize()
+
+        DRIVER["StorageManager"] = LocalFileStorageManager(storage_backend)
+
 
 async def finalize():
 
@@ -78,10 +89,13 @@ async def finalize():
         DRIVER["StorageManagerKlass"] = None
 
 
-def get_dm() -> RedisFileDataManager:
-    dm_driver = RedisFileDataManager(
-        f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
-    )
+def get_dm() -> FileDataMangaer:  # type: ignore
+    if writer_settings.dm_enabled:
+        dm_driver: FileDataMangaer = RedisFileDataManager(
+            f"redis://{writer_settings.dm_redis_host}:{writer_settings.dm_redis_port}"
+        )
+    else:
+        dm_driver = FileDataMangaer()
 
     if dm_driver is None:
         raise AttributeError("DM Not configured")

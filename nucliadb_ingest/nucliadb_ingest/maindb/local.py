@@ -57,10 +57,14 @@ class LocalTransaction(Transaction):
         self.open = False
 
     def compute_path(self, key: str):
-        return f"{self.url}/{key}"
+        return f"{self.url}{key}"
 
     async def save(self, key: str, value: bytes):
-        async with aiofiles.open(self.compute_path(key), "wb+") as resp:
+        key = self.compute_path(key)
+        folder = os.path.dirname(key)
+        if not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+        async with aiofiles.open(key, "wb+") as resp:
             await resp.write(value)
 
     async def remove(self, key: str):
@@ -71,6 +75,8 @@ class LocalTransaction(Transaction):
             async with aiofiles.open(self.compute_path(key), "rb") as resp:
                 return await resp.read()
         except FileNotFoundError:
+            return None
+        except IsADirectoryError:
             return None
 
     async def commit(
@@ -192,7 +198,7 @@ class LocalDriver(Driver):
     url = None
 
     def __init__(self, url: str):
-        self.url = url.rstrip("/")
+        self.url = os.path.abspath(url.rstrip("/"))
 
     async def initialize(self):
         if self.initialized is False and os.path.exists(self.url) is False:

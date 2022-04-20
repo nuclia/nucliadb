@@ -106,14 +106,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def finalize(self):
         await self.proc.finalize()
 
-    async def GetKnowledgeBox(self, request: KnowledgeBoxID, context) -> KnowledgeBox:  # type: ignore
+    async def GetKnowledgeBox(self, request: KnowledgeBoxID, context=None) -> KnowledgeBox:  # type: ignore
         response: KnowledgeBox = await self.proc.get_kb(
             slug=request.slug, uuid=request.uuid
         )
         return response
 
     async def NewKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxNew, context
+        self, request: KnowledgeBoxNew, context=None
     ) -> NewKnowledgeBoxResponse:
         try:
             kbid = await self.proc.create_kb(
@@ -127,7 +127,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
     async def UpdateKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxUpdate, context
+        self, request: KnowledgeBoxUpdate, context=None
     ) -> UpdateKnowledgeBoxResponse:
         try:
             kbid = await self.proc.update_kb(request.uuid, request.slug, request.config)
@@ -143,7 +143,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         )
 
     async def DeleteKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxID, context
+        self, request: KnowledgeBoxID, context=None
     ) -> DeleteKnowledgeBoxResponse:
         try:
             await self.proc.delete_kb(request.uuid, request.slug)
@@ -153,25 +153,25 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
 
     async def ListKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxPrefix, context
+        self, request: KnowledgeBoxPrefix, context=None
     ) -> AsyncIterator[KnowledgeBoxID]:  # type: ignore
         async for slug in self.proc.list_kb(request.prefix):
             uuid = await self.proc.get_kb_uuid(slug)
             yield KnowledgeBoxID(uuid=uuid, slug=slug)
 
     async def GCKnowledgeBox(  # type: ignore
-        self, request: KnowledgeBoxID, context
+        self, request: KnowledgeBoxID, context=None
     ) -> GCKnowledgeBoxResponse:
         response = GCKnowledgeBoxResponse()
         return response
 
     async def ProcessMessage(  # type: ignore
-        self, request_stream: AsyncIterator[BrokerMessage], context
+        self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         async for message in request_stream:
             await self.proc.process(message)
 
-    async def SetLabels(self, request: SetLabelsRequest, context) -> OpStatusWriter:  # type: ignore
+    async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
@@ -191,7 +191,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
 
-    async def DelLabels(self, request: DelLabelsRequest, context) -> OpStatusWriter:  # type: ignore
+    async def DelLabels(self, request: DelLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
@@ -212,7 +212,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
         return response
 
-    async def GetLabels(self, request: GetLabelsRequest, context) -> GetLabelsResponse:  # type: ignore
+    async def GetLabels(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         labels: Optional[Labels] = None
@@ -230,7 +230,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def GetLabelSet(  # type: ignore
-        self, request: GetLabelSetRequest, context
+        self, request: GetLabelSetRequest, context=None
     ) -> GetLabelSetResponse:
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
@@ -245,7 +245,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def GetEntities(  # type: ignore
-        self, request: GetEntitiesRequest, context
+        self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
@@ -260,7 +260,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def GetEntitiesGroup(  # type: ignore
-        self, request: GetEntitiesGroupRequest, context
+        self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
@@ -274,7 +274,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = GetEntitiesGroupResponse.Status.NOTFOUND
         return response
 
-    async def SetEntities(self, request: SetEntitiesRequest, context) -> OpStatusWriter:  # type: ignore
+    async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
@@ -286,7 +286,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
 
-    async def DelEntities(self, request: DelEntitiesRequest, context) -> OpStatusWriter:  # type: ignore
+    async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
@@ -307,7 +307,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def GetWidget(  # type: ignore
-        self, request: GetWidgetRequest, context
+        self, request: GetWidgetRequest, context=None
     ) -> GetWidgetResponse:
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
@@ -322,7 +322,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def GetWidgets(  # type: ignore
-        self, request: GetWidgetsRequest, context
+        self, request: GetWidgetsRequest, context=None
     ) -> GetWidgetsResponse:
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
@@ -336,7 +336,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = GetWidgetsResponse.Status.NOTFOUND
         return response
 
-    async def SetWidgets(self, request: SetWidgetsRequest, context) -> OpStatusWriter:  # type: ignore
+    async def SetWidgets(self, request: SetWidgetsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
@@ -348,7 +348,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
 
-    async def DelWidgets(self, request: DetWidgetsRequest, context) -> OpStatusWriter:  # type: ignore
+    async def DelWidgets(self, request: DetWidgetsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
@@ -369,7 +369,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def Status(  # type: ignore
-        self, request: WriterStatusRequest, context
+        self, request: WriterStatusRequest, context=None
     ) -> WriterStatusResponse:
         logger.info("Status Call")
         response = WriterStatusResponse()
@@ -387,7 +387,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def ListMembers(  # type: ignore
-        self, request: ListMembersRequest, context
+        self, request: ListMembersRequest, context=None
     ) -> ListMembersResponse:
         response = ListMembersResponse()
         for nodeid, node in NODES.items():
@@ -401,7 +401,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def ResourceFieldExists(  # type: ignore
-        self, request: ResourceFieldId, context
+        self, request: ResourceFieldId, context=None
     ) -> ResourceFieldExistsResponse:
         response = ResourceFieldExistsResponse()
         response.found = False
@@ -442,7 +442,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         await txn.abort()
         return response
 
-    async def Index(self, request: IndexResource, context) -> IndexStatus:  # type: ignore
+    async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
         storage = await get_storage()
         cache = await get_cache()
@@ -458,7 +458,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = IndexStatus()
         return response
 
-    async def ReIndex(self, request: IndexResource, context) -> IndexStatus:  # type: ignore
+    async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
         storage = await get_storage()
         cache = await get_cache()

@@ -106,9 +106,14 @@ class ProcessingEngine:
             self.nuclia_proxy_cluster_url = None
 
         self.onprem = onprem
-        self.nuclia_upload_url = (
-            f"{self.nuclia_proxy_cluster_url}/api/v1/processing/upload"
-        )
+        if self.onprem:
+            self.nuclia_upload_url = (
+                f"{self.nuclia_proxy_public_url}/api/v1/processing/upload"
+            )
+        else:
+            self.nuclia_upload_url = (
+                f"{self.nuclia_proxy_cluster_url}/api/v1/processing/upload"
+            )
         self.nuclia_internal_push = (
             f"{self.nuclia_proxy_cluster_url}/api/internal/processing/push"
         )

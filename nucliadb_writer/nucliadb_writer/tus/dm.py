@@ -31,22 +31,21 @@ class NoRedisConfigured(Exception):
     pass
 
 
-class RedisFileDataManager(object):
+DATA: Dict[str, Any] = {}
 
+
+class FileDataMangaer:
     _data: Optional[Dict[str, Any]] = None
     _loaded = False
     key = None
     _ttl = 60 * 50 * 5  # 5 minutes should be plenty of time between activity
-
-    def __init__(self, redis_url: str):
-        self.redis = aioredis.from_url(redis_url)
 
     async def load(self, key):
 
         # preload data
         self.key = key
         if self._data is None:
-            data = await self.redis.get(self.key)
+            data = DATA.get(self.key)
             if not data:
                 self._data = {}
             else:
@@ -76,7 +75,7 @@ class RedisFileDataManager(object):
             raise Exception("Not initialized")
         self._data["last_activity"] = time.time()
         value = orjson.dumps(self._data)
-        await self.redis.set(self.key, value, ex=self._ttl)
+        DATA[self.key] = value
 
     async def update(self, **kwargs):
         self._data.update(kwargs)
@@ -88,7 +87,8 @@ class RedisFileDataManager(object):
         if self.key is None:
             raise Exception("Not initialized")
         # and clear the cache key
-        await self.redis.delete(self.key)
+        if self.key in DATA:
+            del DATA[self.key]
 
     @property
     def metadata(self):
@@ -114,3 +114,33 @@ class RedisFileDataManager(object):
         if self._data is None:
             return default
         return self._data.get(name, default)
+
+
+class RedisFileDataManager(FileDataMangaer):
+    def __init__(self, redis_url: str):
+        self.redis = aioredis.from_url(redis_url)
+
+    async def load(self, key):
+
+        # preload data
+        self.key = key
+        if self._data is None:
+            data = await self.redis.get(self.key)
+            if not data:
+                self._data = {}
+            else:
+                self._data = orjson.loads(data)
+                self._loaded = True
+
+    async def save(self):
+        if self.key is None:
+            raise Exception("Not initialized")
+        self._data["last_activity"] = time.time()
+        value = orjson.dumps(self._data)
+        await self.redis.set(self.key, value, ex=self._ttl)
+
+    async def _delete_key(self):
+        if self.key is None:
+            raise Exception("Not initialized")
+        # and clear the cache key
+        await self.redis.delete(self.key)

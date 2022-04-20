@@ -19,31 +19,42 @@
 #
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 from uuid import uuid4
 
-from nucliadb_protos.noderesources_pb2 import EmptyQuery
+from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
-from nucliadb_protos.noderesources_pb2 import ShardCreated, ShardId
+from nucliadb_protos.noderesources_pb2 import ShardCreated, ShardId, ShardIds
+from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm import NODE_CLUSTER
-from nucliadb.local_shard import LocalShard
+from nucliadb_ingest.orm.local_shard import LocalShard
 from nucliadb_utils.keys import KB_SHARDS
-import nucliadb_node_binding  # type: ignore
+
+try:
+    from nucliadb_node_binding import NodeReader  # type: ignore
+    from nucliadb_node_binding import NodeWriter  # type: ignore
+except ImportError:
+    NodeWriter = None
+    NodeReader = None
 
 
 class LocalNode:
-    writer: nucliadb_node_binding.NodeWriter
-    reader: nucliadb_node_binding.NodeReader
+    writer: NodeWriter
+    reader: NodeReader
 
-    def __init__(self, folder: str):
-        self.folder = folder
-        self.writer = nucliadb_node_binding.NodeWriter.new()
-        self.reader = nucliadb_node_binding.NodeReader.new()
+    def __init__(self):
+        self.writer = NodeWriter.new()
+        self.reader = NodeReader.new()
+        self.address = "local"
+
+    @classmethod
+    async def get(cls, _) -> LocalNode:
+        return NODE_CLUSTER.get_local_node()
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> LocalShard:
@@ -77,37 +88,62 @@ class LocalNode:
             kb_shards = PBShards()
             kb_shards.ParseFromString(kb_shards_bytes)
             shard: PBShard = kb_shards.shards[kb_shards.actual]
-            return LocalShard(sharduuid=shard.shard, shard=shard)
+            node = NODE_CLUSTER.get_local_node()
+            return LocalShard(sharduuid=shard.shard, shard=shard, node=node)
         else:
             return None
 
     async def get_shard(self, id: str) -> ShardId:
         req = ShardId(id=id)
         resp = await self.writer.get_shard(req)  # type: ignore
-        return resp
+        pb_bytes = bytes(resp)
+        shard_id = ShardId()
+        shard_id.ParseFromString(pb_bytes)
+
+        return shard_id
 
     async def get_reader_shard(self, id: str) -> NodeResourcesShard:
         req = ShardId(id=id)
         resp = await self.reader.get_shard(req)  # type: ignore
-        return resp
+        pb_bytes = bytes(resp)
+        shard = NodeResourcesShard()
+        shard.ParseFromString(pb_bytes)
+
+        return shard
 
     async def new_shard(self) -> ShardCreated:
-        req = EmptyQuery()
-        resp = await self.writer.new_shard(req)  # type: ignore
-        return resp
+        resp = await self.writer.new_shard()  # type: ignore
+        pb_bytes = bytes(resp)
+        shard_created = ShardCreated()
+        shard_created.ParseFromString(pb_bytes)
+        return shard_created
 
-    async def delete_shard(self, id: str) -> int:
+    async def delete_shard(self, id: str) -> str:
         req = ShardId(id=id)
-        resp = await self.writer.delete_shard(req, timeout=5)  # type: ignore
-        return resp.id
+        resp = await self.writer.delete_shard(req)  # type: ignore
+        pb_bytes = bytes(resp)
+        shard_id = ShardId()
+        shard_id.ParseFromString(pb_bytes)
 
-    async def list_shards(self) -> List[str]:
-        req = EmptyQuery()
-        resp = await self.writer.list_shards(req)  # type: ignore
-        return resp.shards
+        return shard_id.id
 
-    async def add_resource(self, req):
-        await self.writer.add_resource(req)
+    async def list_shards(self) -> ShardIds:
+        resp = await self.writer.list_shards()  # type: ignore
+        pb_bytes = bytes(resp)
+        shards_ids = ShardIds()
+        shards_ids.ParseFromString(pb_bytes)
+        return shards_ids
 
-    async def delete_resource(self, req):
-        await self.writer.delete_resource(req)
+    async def add_resource(self, req: Resource) -> OpStatus:
+        resp = await self.writer.set_resource(req)
+        pb_bytes = bytes(resp)
+        op_status = OpStatus()
+        op_status.ParseFromString(pb_bytes)
+        return op_status
+
+    async def delete_resource(self, req: ResourceID) -> OpStatus:
+        resp = await self.writer.remove_resource(req)
+        pb_bytes = bytes(resp)
+        op_status = OpStatus()
+        op_status.ParseFromString(pb_bytes)
+        return op_status

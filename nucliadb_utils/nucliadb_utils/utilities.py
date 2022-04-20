@@ -5,7 +5,6 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from grpc import aio
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_utils.audit.audit import AuditStorage
@@ -18,12 +17,7 @@ from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.settings import (
-    audit_settings,
-    nuclia_settings,
-    nucliadb_settings,
-    storage_settings,
-)
+from nucliadb_utils.settings import audit_settings, nuclia_settings, storage_settings
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.transaction import TransactionUtility
@@ -226,27 +220,3 @@ async def stop_audit_utility():
     if audit_utility:
         await audit_utility.finalize()
         clean_utility(Utility.AUDIT)
-
-
-async def start_ingest():
-    if nucliadb_settings.nucliadb_ingest is not None:
-        set_utility(
-            Utility.CHANNEL, aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
-        )
-        set_utility(Utility.INGEST, WriterStub(get_utility(Utility.CHANNEL)))
-    else:
-        from nucliadb_ingest.service.writer import WriterServicer
-
-        service = WriterServicer()
-        await service.initialize()
-        set_utility(Utility.INGEST, service)
-
-
-async def stop_ingest():
-    if get_utility(Utility.CHANNEL):
-        await get_utility(Utility.CHANNEL).close()
-        clean_utility(Utility.CHANNEL)
-        clean_utility(Utility.INGEST)
-    if get_utility(Utility.INGEST):
-        util = await get_utility(Utility.INGEST)
-        await util.finalize()

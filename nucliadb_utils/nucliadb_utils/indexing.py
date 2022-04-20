@@ -27,13 +27,6 @@ from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
 from nucliadb_utils import logger
 
 
-class LocalIndexingUtility:
-    async def index(self, writer: IndexMessage, node: str) -> int:
-        from nucliadb_ingest.orm import NODE_CLUSTER
-
-        return await NODE_CLUSTER.local_node.set_resource(writer)
-
-
 class IndexingUtility:
 
     nc: Optional[Client] = None

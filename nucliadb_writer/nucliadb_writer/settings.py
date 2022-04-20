@@ -23,7 +23,7 @@ from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-
+    dm_enabled: bool = True
     dm_redis_host: Optional[str] = None
     dm_redis_port: Optional[int] = None
 

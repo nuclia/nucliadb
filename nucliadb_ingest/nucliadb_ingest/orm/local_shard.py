@@ -18,14 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
-from lru import LRU  # type: ignore
+
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 if TYPE_CHECKING:
-    from nucliadb.local_node import LocalNode
+    from nucliadb_ingest.orm.local_node import LocalNode
 
 
 class LocalShard:
@@ -35,18 +36,11 @@ class LocalShard:
         self.node = node
 
     async def delete_resource(self, uuid: str, txid: int):
-
-        indexing = get_indexing()
-
-        for shardreplica in self.shard.replicas:
-            indexpb: IndexMessage = IndexMessage()
-            indexpb.node = shardreplica.node
-            indexpb.shard = shardreplica.shard.id
-            indexpb.txid = txid
-            indexpb.resource = uuid
-            indexpb.typemessage = IndexMessage.TypeMessage.DELETION
-            await indexing.index(indexpb, shardreplica.node)
+        req = ResourceID()
+        req.uuid = uuid
+        req.shard_id = self.sharduuid
+        self.node.delete_resource(req)
 
     async def add_resource(self, resource: PBBrainResource, txid: int) -> int:
-
-        return await self.node.add_resource(resource)
+        res = await self.node.add_resource(resource)
+        return res.count
