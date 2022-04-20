@@ -21,16 +21,13 @@ import logging
 import sys
 from collections import Counter
 
-from grpc import aio  # type: ignore
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-
 from nucliadb_ingest.utils import get_driver  # type: ignore
 from nucliadb_search import logger
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
 from nucliadb_search.swim import start_swim
 from nucliadb_search.utilities import get_swim
-from nucliadb_utils.settings import nuclia_settings, nucliadb_settings, running_settings
+from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -39,16 +36,15 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
     start_audit_utility,
+    start_ingest,
     stop_audit_utility,
+    stop_ingest,
 )
 
 
 async def initialize() -> None:
     set_utility(Utility.COUNTER, Counter())
-    set_utility(
-        Utility.CHANNEL, aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
-    )
-    set_utility(Utility.INGEST, WriterStub(get_utility(Utility.CHANNEL)))
+    await start_ingest()
     set_utility(
         Utility.PREDICT,
         PredictEngine(nuclia_settings.predict_url, nuclia_settings.zone_key),
@@ -75,10 +71,7 @@ async def initialize() -> None:
 
 
 async def finalize() -> None:
-    if get_utility(Utility.CHANNEL):
-        await get_utility(Utility.CHANNEL).close()
-        clean_utility(Utility.CHANNEL)
-        clean_utility(Utility.INGEST)
+    await stop_ingest()
     if get_utility(Utility.PARTITION):
         clean_utility(Utility.PARTITION)
     if get_utility(Utility.PREDICT):

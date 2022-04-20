@@ -28,9 +28,6 @@ setup(
     ],
     url="https://nuclia.com",
     license="BSD",
-    setup_requires=[
-        "pytest-runner",
-    ],
     zip_safe=True,
     include_package_data=True,
     packages=find_packages(),

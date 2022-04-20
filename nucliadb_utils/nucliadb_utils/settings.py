@@ -79,7 +79,7 @@ nuclia_settings = NucliaSettings()
 
 
 class NucliaDBSettings(BaseSettings):
-    nucliadb_ingest: str = "ingest.nucliadb.svc.cluster.local:4242"
+    nucliadb_ingest: Optional[str] = "ingest.nucliadb.svc.cluster.local:4242"
 
 
 nucliadb_settings = NucliaDBSettings()
@@ -91,6 +91,7 @@ class TransactionSettings(BaseSettings):
     transaction_jetstream_target: Optional[str] = "ndb.consumer.{partition}"
     transaction_jetstream_group: Optional[str] = "nucliadb-{partition}"
     transaction_jetstream_stream: Optional[str] = "nucliadb"
+    transaction_local: bool = False
 
 
 transaction_settings = TransactionSettings()

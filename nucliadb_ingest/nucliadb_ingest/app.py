@@ -38,7 +38,7 @@ from nucliadb_utils.settings import (
     running_settings,
     transaction_settings,
 )
-from nucliadb_utils.transaction import TransactionUtility
+from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -51,12 +51,15 @@ from nucliadb_utils.utilities import (
 
 
 async def start_transaction_utility():
-    transaction_utility = TransactionUtility(
-        nats_creds=transaction_settings.transaction_jetstream_auth,
-        nats_servers=transaction_settings.transaction_jetstream_servers,
-        nats_target=transaction_settings.transaction_jetstream_target,
-    )
-    await transaction_utility.initialize()
+    if transaction_settings.transaction_local:
+        transaction_utility = LocalTransactionUtility()
+    else:
+        transaction_utility = TransactionUtility(
+            nats_creds=transaction_settings.transaction_jetstream_auth,
+            nats_servers=transaction_settings.transaction_jetstream_servers,
+            nats_target=transaction_settings.transaction_jetstream_target,
+        )
+        await transaction_utility.initialize()
     set_utility(Utility.TRANSACTION, transaction_utility)
 
 

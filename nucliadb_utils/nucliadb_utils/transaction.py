@@ -25,6 +25,14 @@ from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
+from nucliadb_utils.utilities import get_ingest
+
+
+class LocalTransactionUtility:
+    async def commit(self, writer: BrokerMessage, partition: int) -> int:
+        ingest = get_ingest()
+        await ingest.ProcessMessage(writer)  # type: ignore
+        return 0
 
 
 class TransactionUtility:
