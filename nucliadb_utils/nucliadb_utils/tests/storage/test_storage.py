@@ -20,6 +20,7 @@
 import pytest
 
 from nucliadb_utils.storages.gcs import GCSStorage
+from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import Storage
 
@@ -32,6 +33,11 @@ async def test_s3_driver(s3_storage: S3Storage):
 @pytest.mark.asyncio
 async def test_gcs_driver(gcs_storage: GCSStorage):
     await storage_test(gcs_storage)
+
+
+@pytest.mark.asyncio
+async def test_local_driver(local_storage: LocalStorage):
+    await storage_test(local_storage)
 
 
 async def storage_test(storage: Storage):

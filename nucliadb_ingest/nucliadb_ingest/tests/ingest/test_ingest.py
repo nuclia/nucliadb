@@ -62,8 +62,9 @@ async def test_ingest_messages_autocommit(
     )
     filename = f"{dirname(__file__)}/assets/file.png"
     cf1 = CloudFile(
-        uri=filename,
+        uri="file.png",
         source=CloudFile.Source.LOCAL,
+        bucket_name="/ingest/assets",
         size=getsize(filename),
         content_type="image/png",
         filename="file.png",

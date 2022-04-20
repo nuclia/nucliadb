@@ -43,6 +43,8 @@ class StorageSettings(BaseSettings):
     s3_region_name: Optional[str] = None
     s3_bucket: Optional[str] = None
 
+    local_files: Optional[str] = None
+
 
 storage_settings = StorageSettings()
 

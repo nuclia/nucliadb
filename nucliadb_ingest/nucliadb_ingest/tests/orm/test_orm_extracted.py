@@ -78,8 +78,9 @@ async def test_create_resource_orm_extracted_file(
 
     filename = f"{dirname(__file__)}/assets/text.pb"
     cf1 = CloudFile(
-        uri=filename,
+        uri="text.pb",
         source=CloudFile.Source.LOCAL,
+        bucket_name="/orm/assets",
         size=getsize(filename),
         content_type="application/octet-stream",
         filename="text.pb",

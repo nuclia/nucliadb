@@ -24,7 +24,7 @@
   <a href="https://discord.gg/W6RKm2Vnhq">Chat</a>
 </h4>
 
-### Check out our [blog post](https://nuclia.com/blog/first-release/) to grasp what we have been doing for the last months.
+### Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
 
 NucliaDB is a distributed search engine built from the ground up to offer high accuracy and semantic search on unstructured data. By mere mortals for mere mortals, NucliaDB's architecture is as simple as possible to be scalable and deliver what a NLP Database requires.
 

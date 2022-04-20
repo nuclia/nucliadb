@@ -73,9 +73,10 @@ async def test_create_resource_orm_vector_file(
 
     filename = f"{dirname(__file__)}/assets/vectors.pb"
     cf1 = CloudFile(
-        uri=filename,
+        uri="vectors.pb",
         source=CloudFile.Source.LOCAL,
         size=getsize(filename),
+        bucket_name="/orm/assets",
         content_type="application/octet-stream",
         filename="vectors.pb",
     )

@@ -38,6 +38,14 @@ except ImportError:
     TIKV = False
 
 
+try:
+    from nucliadb_ingest.maindb.local import LocalDriver
+
+    FILES = True
+except ImportError:
+    FILES = False
+
+
 async def get_driver() -> Driver:
     if (
         settings.driver == "redis"
@@ -55,6 +63,14 @@ async def get_driver() -> Driver:
     ):
         tikv_driver = TiKVDriver(settings.driver_tikv_url)
         MAIN["driver"] = tikv_driver
+    elif (
+        settings.driver == "local"
+        and FILES
+        and "local" not in MAIN
+        and settings.driver_local_url is not None
+    ):
+        local_driver = LocalDriver(settings.driver_local_url)
+        MAIN["driver"] = local_driver
     driver: Optional[Driver] = MAIN.get("driver")
     if driver is not None and not driver.initialized:
         await driver.initialize()
