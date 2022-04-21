@@ -58,7 +58,6 @@ class NucliaSettings(BaseSettings):
     predict_url: str = "https://nuclia.cloud/api/v1/predict/"
 
     nuclia_zone: Optional[str] = "dev"
-    zone_key: Optional[str] = ""
     nuclia_id: Optional[str] = ""
     onprem: bool = True
 

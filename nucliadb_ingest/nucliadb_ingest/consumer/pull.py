@@ -264,6 +264,9 @@ class PullWorker:
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
+                    import pdb
+
+                    pdb.set_trace()
                     async with session.get(
                         url,
                         headers=headers,

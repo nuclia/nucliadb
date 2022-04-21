@@ -37,9 +37,8 @@ data:
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
 {{- end }}
-{{- if not .Values.nuclia.onprem }}
+{{- if .Values.nuclia.onprem }}
   NUCLIA_SERVICE_ACCOUNT: {{ .Values.nuclia.nuclia_service_account }}
-  ZONE_KEY: {{ .Values.nuclia.zone_key }}
 {{- end }}
   NUCLIA_PROXY_PUBLIC_URL: {{ .Values.nuclia.nuclia_proxy_public_url }}
   NUCLIA_PROXY_CLUSTER_URL: {{ .Values.nuclia.nuclia_proxy_cluster_url }}

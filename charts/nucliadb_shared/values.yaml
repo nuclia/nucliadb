@@ -41,7 +41,6 @@ nuclia:
   nuclia_proxy_cluster_url: http://nucliadb_proxy.processing.svc.cluster.local/api
   predict_url: XX
   nuclia_zone: XX
-  zone_key: XX
   nuclia_id: XX
   onprem: XX
   nuclia_jwt_key: XX

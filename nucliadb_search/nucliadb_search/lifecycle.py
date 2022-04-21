@@ -46,7 +46,9 @@ async def initialize() -> None:
     await start_ingest()
     set_utility(
         Utility.PREDICT,
-        PredictEngine(nuclia_settings.predict_url, nuclia_settings.zone_key),
+        PredictEngine(
+            nuclia_settings.predict_url, nuclia_settings.nuclia_service_account
+        ),
     )
     driver = await get_driver()
     cache = await get_cache()

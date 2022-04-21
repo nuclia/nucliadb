@@ -37,7 +37,6 @@ config:
     nuclia_proxy_public_url: XX
     predict_url: XX
     nuclia_zone: XX
-    zone_key: XX
     nuclia_id: XX
     onprem: XX
     nuclia_jwt_key: XX

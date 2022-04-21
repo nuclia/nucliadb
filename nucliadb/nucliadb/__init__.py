@@ -72,10 +72,9 @@ def run():
     http_settings.cors_origins = ["*"]
     storage_settings.file_backend = "local"
     storage_settings.local_files = nucliadb_args.blob
-    nuclia_settings.zone_key = nucliadb_args.key
+    nuclia_settings.nuclia_service_account = nucliadb_args.key
     nuclia_settings.onprem = True
     nuclia_settings.nuclia_zone = nucliadb_args.zone
-    nuclia_settings.nuclia_proxy_public_url = 
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"
