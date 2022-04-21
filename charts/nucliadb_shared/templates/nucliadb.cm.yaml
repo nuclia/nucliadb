@@ -40,11 +40,9 @@ data:
 {{- if .Values.nuclia.onprem }}
   NUCLIA_SERVICE_ACCOUNT: {{ .Values.nuclia.nuclia_service_account }}
 {{- end }}
-  NUCLIA_PROXY_PUBLIC_URL: {{ .Values.nuclia.nuclia_proxy_public_url }}
-  NUCLIA_PROXY_CLUSTER_URL: {{ .Values.nuclia.nuclia_proxy_cluster_url }}
-  PREDICT_URL: {{ .Values.nuclia.predict_url }}
+  NUCLIA_PUBLIC_URL: {{ .Values.nuclia.nuclia_public_url }}
+  NUCLIA_CLUSTER_URL: {{ .Values.nuclia.nuclia_cluster_url }}
   NUCLIA_ZONE: {{ .Values.nuclia.nuclia_zone }}
-  NUCLIA_ID: {{ .Values.nuclia.nuclia_id }}
 {{- if .Values.nuclia.onprem }}
   ONPREM: "True"
 {{- else }}

@@ -83,8 +83,8 @@ class ProcessingEngine:
         self,
         nuclia_service_account: Optional[str] = None,
         nuclia_zone: Optional[str] = None,
-        nuclia_proxy_public_url: Optional[str] = None,
-        nuclia_proxy_cluster_url: Optional[str] = None,
+        nuclia_public_url: Optional[str] = None,
+        nuclia_cluster_url: Optional[str] = None,
         onprem: Optional[bool] = False,
         nuclia_jwt_key: Optional[str] = None,
         days_to_keep: int = 3,
@@ -93,33 +93,31 @@ class ProcessingEngine:
     ):
         self.nuclia_service_account = nuclia_service_account
         self.nuclia_zone = nuclia_zone
-        if nuclia_proxy_public_url is not None:
-            self.nuclia_proxy_public_url: Optional[
-                str
-            ] = nuclia_proxy_public_url.format(zone=nuclia_zone)
+        if nuclia_public_url is not None:
+            self.nuclia_public_url: Optional[str] = nuclia_public_url.format(
+                zone=nuclia_zone
+            )
         else:
-            self.nuclia_proxy_public_url = None
+            self.nuclia_public_url = None
 
-        if nuclia_proxy_cluster_url is not None:
-            self.nuclia_proxy_cluster_url: Optional[str] = nuclia_proxy_cluster_url
+        if nuclia_cluster_url is not None:
+            self.nuclia_cluster_url: Optional[str] = nuclia_cluster_url
         else:
-            self.nuclia_proxy_cluster_url = None
+            self.nuclia_cluster_url = None
 
         self.onprem = onprem
         if self.onprem:
             self.nuclia_upload_url = (
-                f"{self.nuclia_proxy_public_url}/api/v1/processing/upload"
+                f"{self.nuclia_public_url}/api/v1/processing/upload"
             )
         else:
             self.nuclia_upload_url = (
-                f"{self.nuclia_proxy_cluster_url}/api/v1/processing/upload"
+                f"{self.nuclia_cluster_url}/api/v1/processing/upload"
             )
         self.nuclia_internal_push = (
-            f"{self.nuclia_proxy_cluster_url}/api/internal/processing/push"
+            f"{self.nuclia_cluster_url}/api/internal/processing/push"
         )
-        self.nuclia_external_push = (
-            f"{self.nuclia_proxy_public_url}/api/v1/processing/push"
-        )
+        self.nuclia_external_push = f"{self.nuclia_public_url}/api/v1/processing/push"
 
         self.nuclia_jwt_key = nuclia_jwt_key
         self.days_to_keep = days_to_keep

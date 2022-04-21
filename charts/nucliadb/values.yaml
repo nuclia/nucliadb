@@ -33,11 +33,9 @@ config:
 
   nuclia:
     nuclia_service_account: XX
-    nuclia_proxy_cluster_url: XX
-    nuclia_proxy_public_url: XX
-    predict_url: XX
+    nuclia_cluster_url: XX
+    nuclia_public_url: XX
     nuclia_zone: XX
-    nuclia_id: XX
     onprem: XX
     nuclia_jwt_key: XX
     nuclia_hash_seed: 42

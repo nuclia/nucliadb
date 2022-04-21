@@ -51,14 +51,12 @@ storage_settings = StorageSettings()
 
 class NucliaSettings(BaseSettings):
     nuclia_service_account: Optional[str] = None
-    nuclia_proxy_public_url: Optional[str] = "https://{zone}.nuclia.cloud"
-    nuclia_proxy_cluster_url: Optional[
+    nuclia_public_url: Optional[str] = "https://{zone}.nuclia.cloud"
+    nuclia_cluster_url: Optional[
         str
-    ] = "http://nucliadb_proxy.processing,svc.cluster.local:8080"
-    predict_url: str = "https://nuclia.cloud/api/v1/predict/"
+    ] = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
 
     nuclia_zone: Optional[str] = "dev"
-    nuclia_id: Optional[str] = ""
     onprem: bool = True
 
     nuclia_jwt_key: Optional[str] = None

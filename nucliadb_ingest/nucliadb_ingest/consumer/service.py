@@ -42,9 +42,8 @@ class ConsumerService:
         pull_time: Optional[float] = None,
         zone: Optional[str] = None,
         creds: Optional[str] = None,
-        nuclia_proxy_cluster_url: Optional[str] = None,
-        nuclia_proxy_public_url: Optional[str] = None,
-        nuclia_id: Optional[str] = None,
+        nuclia_cluster_url: Optional[str] = None,
+        nuclia_public_url: Optional[str] = None,
         nats_url: Optional[str] = None,
         nats_auth: Optional[str] = None,
         nats_target: Optional[str] = None,
@@ -57,19 +56,17 @@ class ConsumerService:
 
         self.zone = zone if zone else nuclia_settings.nuclia_zone
         self.nuclia_creds = creds if creds else nuclia_settings.nuclia_service_account
-        self.nuclia_proxy_cluster_url = (
-            nuclia_proxy_cluster_url
-            if nuclia_proxy_cluster_url
-            else nuclia_settings.nuclia_proxy_cluster_url
+        self.nuclia_cluster_url = (
+            nuclia_cluster_url
+            if nuclia_cluster_url
+            else nuclia_settings.nuclia_cluster_url
         )
 
-        self.nuclia_proxy_public_url = (
-            nuclia_proxy_public_url
-            if nuclia_proxy_public_url
-            else nuclia_settings.nuclia_proxy_public_url
+        self.nuclia_public_url = (
+            nuclia_public_url
+            if nuclia_public_url
+            else nuclia_settings.nuclia_public_url
         )
-
-        self.nuclia_id = nuclia_id if nuclia_id else nuclia_settings.nuclia_id
 
         self.nats_auth = (
             nats_auth if nats_auth else transaction_settings.transaction_jetstream_auth
@@ -118,9 +115,8 @@ class ConsumerService:
                 cache=self.cache,
                 audit=self.audit,
                 creds=self.nuclia_creds,
-                nuclia_proxy_cluster_url=self.nuclia_proxy_cluster_url,
-                nuclia_proxy_public_url=self.nuclia_proxy_public_url,
-                nuclia_id=self.nuclia_id,
+                nuclia_cluster_url=self.nuclia_cluster_url,
+                nuclia_public_url=self.nuclia_public_url,
                 target=self.nats_target,
                 group=self.nats_group,
                 stream=self.nats_stream,

@@ -40,6 +40,15 @@ def arg_parse():
         help="Node data folder",
     )
 
+    parser.add_argument(
+        "-n",
+        "--node",
+        dest="node",
+        help="Node data folder",
+    )
+
+    parser.add_argument("-h", "--host", dest="host", help="Overwride host API")
+
     parser.add_argument("-z", "--zone", dest="zone", help="Understanding API Zone")
 
     args = parser.parse_args()
@@ -75,6 +84,8 @@ def run():
     nuclia_settings.nuclia_service_account = nucliadb_args.key
     nuclia_settings.onprem = True
     nuclia_settings.nuclia_zone = nucliadb_args.zone
+    if nucliadb_args.host:
+        nuclia_settings.nuclia_public_url = nucliadb_args.host
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"
