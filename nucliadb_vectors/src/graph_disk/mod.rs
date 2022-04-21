@@ -35,7 +35,7 @@ const DB_LOG: &str = "LOG";
 const DB_NODE_INVERSE: &str = "NODE_INVERSE";
 const DB_LABEL_INVERSE: &str = "LABEL_INVERSE";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DiskNode {
     pub node: Node,
     // neighbours[i].0 = out edges for node in layer i
@@ -43,7 +43,13 @@ pub struct DiskNode {
     pub neighbours: Vec<(Vec<DiskEdge>, Vec<DiskEdge>)>,
 }
 
-#[derive(Serialize, Deserialize)]
+impl DiskNode {
+    pub fn get_layer_out(&self, layer: usize) -> &Vec<DiskEdge> {
+        &self.neighbours[layer].0
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DiskEdge {
     pub my_id: EdgeId,
     pub edge: Edge,

@@ -22,50 +22,19 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::RwLock;
 
-use crate::graph_disk::{Disk, LockDisk};
-use crate::graph_elems::{EdgeId, NodeId};
-use crate::graph_index::Index;
-
-#[derive(Default, Clone, Debug)]
-pub struct ReadNodeKnowledge {
-    out_edges: Vec<(EdgeId, NodeId)>,
-}
-
-#[derive(Default, Clone, Debug)]
-pub struct ReadIndexLayer {
-    node_record: HashMap<NodeId, ReadNodeKnowledge>,
-}
-
-impl ReadIndexLayer {
-    fn disk_add(&mut self, node: NodeId) {
-        self.node_record.insert(node, ReadNodeKnowledge::default());
-    }
-    fn disk_connect(&mut self, source: NodeId, destination: NodeId, edge: EdgeId) {
-        self.node_record
-            .get_mut(&source)
-            .unwrap()
-            .out_edges
-            .push((edge, destination));
-    }
-    fn new() -> ReadIndexLayer {
-        ReadIndexLayer::default()
-    }
-}
+use crate::graph_disk::{Disk, DiskEdge, DiskNode, LockDisk};
+use crate::graph_elems::{Distance, GraphVector, LabelId, NodeId};
 
 pub struct ReadIndex {
+    version_number: usize,
     entry_point: Option<(NodeId, usize)>,
-    layers: Vec<ReadIndexLayer>,
+    nodes: HashMap<NodeId, DiskNode>,
 }
 
 impl Debug for ReadIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut debug_data = f.debug_struct("ReadIndex");
         debug_data.field("entry_point", &self.entry_point);
-        debug_data.field("no_layers", &self.layers.len());
-        for (i, layer) in self.layers.iter().enumerate() {
-            let layer_id = format!("layer_{}", i);
-            debug_data.field(layer_id.as_str(), &layer.node_record.len());
-        }
         debug_data.finish()
     }
 }
@@ -73,49 +42,44 @@ impl Debug for ReadIndex {
 impl ReadIndex {
     pub fn new(disk: &Disk) -> ReadIndex {
         ReadIndex {
+            version_number: disk.get_version_number(),
             entry_point: disk.get_entry_point(),
-            layers: vec![ReadIndexLayer::new(); 70],
+            nodes: HashMap::new(),
         }
     }
+    pub fn get_version_number(&self) -> usize {
+        self.version_number
+    }
+    pub fn distance_to(&self, i: &GraphVector, j: NodeId) -> f32 {
+        let j = &self.nodes.get(&j).unwrap().node.vector;
+        Distance::cosine(i, j)
+    }
+    pub fn has_labels(&self, node: NodeId, labels: &[LabelId]) -> bool {
+        let node = &self.nodes.get(&node).unwrap().node;
+        labels.iter().all(|l| node.labels.contains(l))
+    }
+    pub fn get_node_key(&self, node: NodeId) -> String {
+        self.nodes.get(&node).unwrap().node.key.clone()
+    }
     pub fn reload(&mut self, disk: &LockDisk) {
+        self.version_number = disk.get_version_number();
         self.entry_point = disk.get_entry_point();
-        self.layers = vec![ReadIndexLayer::new(); 70];
+        self.nodes.clear();
     }
-    pub fn has_node(&self, layer: usize, node: NodeId) -> bool {
-        self.layers[layer].node_record.contains_key(&node)
-    }
-    pub fn get_edge(&self, layer: usize, node: NodeId, edge: usize) -> (EdgeId, NodeId) {
-        self.layers[layer].node_record.get(&node).unwrap().out_edges[edge]
+    pub fn get_edge(&self, layer: usize, node: NodeId, edge: usize) -> DiskEdge {
+        self.nodes.get(&node).unwrap().get_layer_out(layer)[edge].clone()
     }
     pub fn no_edges(&self, layer: usize, node: NodeId) -> usize {
-        self.layers[layer]
-            .node_record
-            .get(&node)
-            .unwrap()
-            .out_edges
-            .len()
+        self.nodes.get(&node).unwrap().get_layer_out(layer).len()
     }
     pub fn get_entry_point(&self) -> Option<(NodeId, usize)> {
         self.entry_point
     }
     pub fn is_cached(&self, node: NodeId) -> bool {
-        self.has_node(0, node)
+        self.nodes.contains_key(&node)
     }
-
-    pub fn add_node(&mut self, node: NodeId, top_layer: usize) {
-        for i in 0..=top_layer {
-            self.layers[i].disk_add(node);
-        }
-    }
-
-    pub fn add_connexion(
-        &mut self,
-        layer: usize,
-        source: NodeId,
-        destination: NodeId,
-        edge: EdgeId,
-    ) {
-        self.layers[layer].disk_connect(source, destination, edge);
+    pub fn add_node(&mut self, id: NodeId, node: DiskNode) {
+        self.nodes.insert(id, node);
     }
 }
 
@@ -130,34 +94,30 @@ impl From<ReadIndex> for LockReader {
         }
     }
 }
-impl Index for LockReader {
-    fn is_cached(&self, node: NodeId) -> bool {
-        self.index.read().unwrap().is_cached(node)
-    }
-
-    fn add_node_from_disk(&self, node: NodeId, top_layer: usize) {
-        self.index.write().unwrap().add_node(node, top_layer)
-    }
-
-    fn add_connexion_from_disk(
-        &self,
-        layer: usize,
-        source: NodeId,
-        destination: NodeId,
-        edge: EdgeId,
-    ) {
-        self.index
-            .write()
-            .unwrap()
-            .add_connexion(layer, source, destination, edge)
-    }
-}
 
 impl LockReader {
+    pub fn get_version_number(&self) -> usize {
+        self.index.read().unwrap().get_version_number()
+    }
+    pub fn has_labels(&self, node: NodeId, labels: &[LabelId]) -> bool {
+        self.index.read().unwrap().has_labels(node, labels)
+    }
+    pub fn get_node_key(&self, node: NodeId) -> String {
+        self.index.read().unwrap().get_node_key(node)
+    }
+    pub fn distance_to(&self, i: &GraphVector, j: NodeId) -> f32 {
+        self.index.read().unwrap().distance_to(i, j)
+    }
+    pub fn is_cached(&self, node: NodeId) -> bool {
+        self.index.read().unwrap().is_cached(node)
+    }
+    pub fn add_node_from_disk(&self, id: NodeId, node: DiskNode) {
+        self.index.write().unwrap().add_node(id, node);
+    }
     pub fn reload(&self, disk: &LockDisk) {
         self.index.write().unwrap().reload(disk)
     }
-    pub fn get_edge(&self, layer: usize, node: NodeId, edge: usize) -> (EdgeId, NodeId) {
+    pub fn get_edge(&self, layer: usize, node: NodeId, edge: usize) -> DiskEdge {
         self.index.read().unwrap().get_edge(layer, node, edge)
     }
     pub fn no_edges(&self, layer: usize, node: NodeId) -> usize {

@@ -18,9 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::graph_arena::LockArena;
 use crate::graph_elems::*;
 use crate::query::Query;
+use crate::read_index::*;
 
 #[derive(Clone, Default)]
 pub struct PostSearchValue {
@@ -30,7 +30,7 @@ pub struct PostSearchValue {
 pub struct PostSearchQuery<'a> {
     pub pre_filter: Vec<(NodeId, f32)>,
     pub with_filter: Vec<LabelId>,
-    pub arena: &'a LockArena,
+    pub index: &'a LockReader,
 }
 
 impl<'a> Query for PostSearchQuery<'a> {
@@ -39,10 +39,9 @@ impl<'a> Query for PostSearchQuery<'a> {
     fn run(&mut self) -> Self::Output {
         let mut result = PostSearchValue::default();
         for (node_id, dist) in &self.pre_filter {
-            let node = self.arena.get_node(*node_id);
-            let passes = self.with_filter.iter().all(|l| node.labels.contains(l));
-            if passes {
-                result.filtered.push((node.key.clone(), *dist));
+            if self.index.has_labels(*node_id, &self.with_filter) {
+                let node_key = self.index.get_node_key(*node_id);
+                result.filtered.push((node_key, *dist));
             }
         }
         result

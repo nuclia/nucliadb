@@ -33,7 +33,7 @@ fn simple_flow() {
         labels.push(format!("LABEL_{}", i));
     }
     let mut delete = vec![];
-    for i in 0..100 {
+    for i in 0..50 {
         let key = format!("KEY_{}", i);
         let vec = vec![rand::random::<f32>(); 8];
         if rand::random::<usize>() % 2 == 0 {
@@ -76,29 +76,20 @@ fn accuracy_test() {
     }
     for i in 0..100 {
         let key = format!("KEY_{}", i);
-        let vec: Vec<_> = vec![rand::random::<f32>; 8]
-            .into_iter()
-            .map(|f| f())
-            .collect();
+        let vec = create_query();
         writer.insert(key, vec, labels.clone());
     }
     writer.flush();
     reader.reload();
     std::mem::drop(writer);
     reader.reload();
-    let query: Vec<_> = vec![rand::random::<f32>; 8]
-        .into_iter()
-        .map(|f| f())
-        .collect();
+    let query = create_query();
     println!("QUERY 0: {:?}", query);
     let no_results = 10;
     let result_0 = reader.search(query, labels[..20].to_vec(), no_results);
     let mut result_0: Vec<_> = result_0.into_iter().map(|(k, _)| k).collect();
     result_0.sort();
-    let query = vec![rand::random::<f32>; 8]
-        .into_iter()
-        .map(|f| f())
-        .collect();
+    let query = create_query();
     println!("QUERY 1: {:?}", query);
     let no_results = 10;
     let result_1 = reader.search(query, labels[..20].to_vec(), no_results);
@@ -115,7 +106,7 @@ fn insert_delete_all() {
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
     for i in 0..50 {
         let key = format!("KEY_{}", i);
-        let vec = vec![rand::random::<f32>(); 8];
+        let vec = create_query();
         writer.insert(key, vec, vec![]);
     }
     writer.flush();
@@ -124,22 +115,58 @@ fn insert_delete_all() {
     assert_eq!(writer.no_vectors(), 0);
 }
 
+fn create_query() -> Vec<f32> {
+    vec![rand::random::<f32>; 8]
+        .into_iter()
+        .map(|f| f())
+        .collect()
+}
+
+//#[test]
+#[allow(unused)]
+fn stress_test() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
+    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut labels = vec![];
+    for i in 0..50 {
+        labels.push(format!("LABEL_{}", i));
+    }
+    for current_key in 0..1000 {
+        let key = format!("KEY_{}", current_key);
+        let vec = create_query();
+        writer.insert(key.clone(), vec, labels.clone());
+        println!("INSERT {key}");
+    }
+    writer.flush();
+    reader.reload();
+    for index in 0..1000 {
+        let query = create_query();
+        let no_results = 10;
+        let result = reader.search(query, vec![], no_results);
+        let result: Vec<_> = result.into_iter().map(|(k, _)| k).collect();
+        println!("READ {:?}", result);
+        if index % 100 == 0 {
+            reader.reload();
+        }
+    }
+}
+
 //#[test]
 #[allow(unused)]
 fn concurrency_test() {
     fn reader_process(reader: Reader, _: Arc<Mutex<()>>) {
         let mut index = 1;
-        for _ in 1..10000 {
-            let query = vec![rand::random::<f32>(); 8];
+        loop {
+            let query = create_query();
             let no_results = 10;
-            // let l = lock.lock().unwrap();
             let result = reader.search(query, vec![], no_results);
-            println!("READ {}", result.len());
+            let result: Vec<_> = result.into_iter().map(|(k, _)| k).collect();
+            println!("READ {:?}", result);
             if index % 100 == 0 {
                 reader.reload();
             }
             index += 1;
-            // std::mem::drop(l);
         }
     }
 
@@ -149,21 +176,22 @@ fn concurrency_test() {
         for i in 0..50 {
             labels.push(format!("LABEL_{}", i));
         }
-        for _ in 1..10000 {
+        loop {
             let mut delete = vec![];
-            for _ in 0..100 {
+            for _ in 0..1000 {
                 let key = format!("KEY_{}", current_key);
-                let vec = vec![rand::random::<f32>(); 8];
+                let vec = create_query();
                 if rand::random::<usize>() % 2 == 0 {
                     delete.push(key.clone());
                 }
-                // let l = lock.lock().unwrap();
                 writer.insert(key.clone(), vec, labels.clone());
                 writer.flush();
                 println!("INSERT {key}");
-                // std::mem::drop(l);
 
                 current_key += 1;
+            }
+            if writer.no_vectors() >= 1000 {
+                break;
             }
             for delete in delete {
                 // let l = lock.lock().unwrap();

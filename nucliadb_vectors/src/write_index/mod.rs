@@ -25,9 +25,8 @@ use std::fmt::{Debug, Formatter};
 use std::sync::RwLock;
 
 use crate::graph_arena::LockArena;
-use crate::graph_disk::{Disk, LockDisk};
+use crate::graph_disk::*;
 use crate::graph_elems::{EdgeId, NodeId};
-use crate::graph_index::Index;
 
 #[derive(Clone, Default, Debug)]
 pub struct WriteNodeKnowledge {
@@ -317,16 +316,24 @@ impl WriteIndex {
 pub struct LockWriter {
     index: RwLock<WriteIndex>,
 }
-impl Index for LockWriter {
-    fn is_cached(&self, node: NodeId) -> bool {
+impl From<WriteIndex> for LockWriter {
+    fn from(index: WriteIndex) -> Self {
+        LockWriter {
+            index: RwLock::new(index),
+        }
+    }
+}
+
+impl LockWriter {
+    pub fn is_cached(&self, node: NodeId) -> bool {
         self.index.read().unwrap().is_cached(node)
     }
 
-    fn add_node_from_disk(&self, node: NodeId, top_layer: usize) {
+    pub fn add_node_from_disk(&self, node: NodeId, top_layer: usize) {
         self.index.write().unwrap().disk_add_node(node, top_layer)
     }
 
-    fn add_connexion_from_disk(
+    pub fn add_connexion_from_disk(
         &self,
         layer: usize,
         source: NodeId,
@@ -338,17 +345,6 @@ impl Index for LockWriter {
             .unwrap()
             .disk_add_connexion(layer, source, destination, edge)
     }
-}
-
-impl From<WriteIndex> for LockWriter {
-    fn from(index: WriteIndex) -> Self {
-        LockWriter {
-            index: RwLock::new(index),
-        }
-    }
-}
-
-impl LockWriter {
     pub fn add_node(&self, node: NodeId, top_layer: usize) {
         self.index.write().unwrap().add_node(top_layer, node)
     }

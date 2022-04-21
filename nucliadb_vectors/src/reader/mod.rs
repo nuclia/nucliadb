@@ -23,7 +23,6 @@ use std::path::Path;
 
 use tracing::*;
 
-use crate::graph_arena::*;
 use crate::graph_disk::*;
 use crate::graph_elems::{GraphVector, HNSWParams};
 use crate::query::Query;
@@ -31,13 +30,11 @@ use crate::query_find_labels::FindLabelsQuery;
 use crate::query_post_search::{PostSearchQuery, PostSearchValue};
 use crate::query_search::{SearchQuery, SearchValue};
 use crate::read_index::*;
-use crate::utils;
 
 pub struct Reader {
     index: LockReader,
-    arena: LockArena,
-    disk: LockDisk,
     params: HNSWParams,
+    disk: LockDisk,
 }
 
 impl Debug for Reader {
@@ -51,11 +48,9 @@ impl Debug for Reader {
 impl Reader {
     pub fn new(path: &str) -> Reader {
         let disk = Disk::start(Path::new(path));
-        let arena = Arena::from_disk(&disk);
         let index = ReadIndex::new(&disk);
         Reader {
             disk: disk.into(),
-            arena: arena.into(),
             index: index.into(),
             params: HNSWParams::default(),
         }
@@ -81,7 +76,6 @@ impl Reader {
                 elem: GraphVector::from(elem),
                 k_neighbours: self.params.k_neighbours,
                 index: &self.index,
-                arena: &self.arena,
                 disk: &self.disk,
             }
             .run();
@@ -89,22 +83,17 @@ impl Reader {
             let PostSearchValue { filtered } = PostSearchQuery {
                 pre_filter: neighbours,
                 with_filter: label_analysis.found,
-                arena: &self.arena,
+                index: &self.index,
             }
             .run();
             filtered
         };
-        if utils::internal_reload_policy(&self.arena, &self.disk) {
-            self.arena.reload(&self.disk);
-            self.index.reload(&self.disk);
-        }
         result
     }
     pub fn reload(&self) {
-        let current_version = self.arena.get_version_number();
+        let current_version = self.index.get_version_number();
         let disk_version = self.disk.get_version_number();
         if current_version != disk_version {
-            self.arena.reload(&self.disk);
             self.index.reload(&self.disk);
         }
     }

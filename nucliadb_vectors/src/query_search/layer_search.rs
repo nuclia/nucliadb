@@ -20,7 +20,6 @@
 
 use std::collections::{BinaryHeap, HashSet};
 
-use crate::graph_arena::*;
 use crate::graph_disk::*;
 use crate::graph_elems::*;
 use crate::memory_processes::load_node_in_reader;
@@ -39,7 +38,6 @@ pub struct LayerSearchQuery<'a> {
     pub k_neighbours: usize,
     pub entry_points: Vec<NodeId>,
     pub index: &'a LockReader,
-    pub arena: &'a LockArena,
     pub disk: &'a LockDisk,
 }
 
@@ -50,9 +48,8 @@ impl<'a> Query for LayerSearchQuery<'a> {
         let mut candidates = BinaryHeap::new();
         let mut visited = HashSet::new();
         for entry_point in self.entry_points.iter().cloned() {
-            if load_node_in_reader(entry_point, self.index, self.arena, self.disk) {
-                let distance =
-                    Distance::cosine(&self.elem, &self.arena.get_node(entry_point).vector);
+            if load_node_in_reader(entry_point, self.index, self.disk) {
+                let distance = self.index.distance_to(&self.elem, entry_point);
                 candidates.push(InverseElem(entry_point, distance));
                 results.push(StandardElem(entry_point, distance));
                 visited.insert(entry_point);
@@ -63,13 +60,13 @@ impl<'a> Query for LayerSearchQuery<'a> {
                 (None, _) => break,
                 (Some(InverseElem(_, cd)), Some(StandardElem(_, rd))) if cd > rd => break,
                 (Some(InverseElem(candidate, _)), _) => {
-                    for edge in 0..self.index.no_edges(self.layer, candidate) {
-                        let (_, node) = self.index.get_edge(self.layer, candidate, edge);
-                        let loaded = load_node_in_reader(node, self.index, self.arena, self.disk);
+                    for edge_index in 0..self.index.no_edges(self.layer, candidate) {
+                        let edge = self.index.get_edge(self.layer, candidate, edge_index);
+                        let node = edge.goes_to;
+                        let loaded = load_node_in_reader(node, self.index, self.disk);
                         if !visited.contains(&node) && loaded {
                             visited.insert(node);
-                            let distance =
-                                Distance::cosine(&self.elem, &self.arena.get_node(node).vector);
+                            let distance = self.index.distance_to(&self.elem, node);
                             candidates.push(InverseElem(node, distance));
                             results.push(StandardElem(node, distance));
                         }
