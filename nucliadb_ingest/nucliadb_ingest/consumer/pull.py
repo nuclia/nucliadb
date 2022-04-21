@@ -53,9 +53,8 @@ class PullWorker:
         storage: Storage,
         pull_time: int,
         zone: str,
-        nuclia_proxy_cluster_url: str,
-        nuclia_proxy_public_url: str,
-        nuclia_id: str,
+        nuclia_cluster_url: str,
+        nuclia_public_url: str,
         cache: Cache,
         audit: AuditStorage,
         target: str,
@@ -73,9 +72,8 @@ class PullWorker:
         self.pull_time = pull_time
         self.audit = audit
         self.zone = zone
-        self.nuclia_id = nuclia_id
-        self.nuclia_proxy_cluster_url = nuclia_proxy_cluster_url
-        self.nuclia_proxy_public_url = nuclia_proxy_public_url
+        self.nuclia_cluster_url = nuclia_cluster_url
+        self.nuclia_public_url = nuclia_public_url
         self.local_subscriber = local_subscriber
         self.nats_subscriber = not local_subscriber
         self.creds = creds
@@ -249,17 +247,15 @@ class PullWorker:
 
         if self.onprem:
             url = (
-                self.nuclia_proxy_public_url.format(zone=self.zone)
+                self.nuclia_public_url.format(zone=self.zone)
                 + "/api/v1/processing/pull?partition="
                 + self.partition
             )
         else:
             url = (
-                self.nuclia_proxy_cluster_url
+                self.nuclia_cluster_url
                 + "/api/internal/processing/pull?partition="
                 + self.partition
-                + "&nucliadb="
-                + self.nuclia_id
             )
         async with aiohttp.ClientSession() as session:
             while True:

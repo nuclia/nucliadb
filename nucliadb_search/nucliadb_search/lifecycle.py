@@ -47,7 +47,9 @@ async def initialize() -> None:
     set_utility(
         Utility.PREDICT,
         PredictEngine(
-            nuclia_settings.predict_url, nuclia_settings.nuclia_service_account
+            nuclia_settings.nuclia_cluster_url,
+            nuclia_settings.nuclia_public_url,
+            nuclia_settings.nuclia_service_account,
         ),
     )
     driver = await get_driver()

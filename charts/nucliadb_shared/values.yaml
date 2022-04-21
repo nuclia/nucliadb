@@ -37,11 +37,9 @@ storage:
 
 nuclia:
   nuclia_service_account: XX
-  nuclia_proxy_public_url: https://{zone}.nuclia.cloud/api/v1
-  nuclia_proxy_cluster_url: http://nucliadb_proxy.processing.svc.cluster.local/api
-  predict_url: XX
+  nuclia_public_url: https://{zone}.nuclia.cloud
+  nuclia_cluster_url: http://nucliadb_proxy.processing.svc.cluster.local
   nuclia_zone: XX
-  nuclia_id: XX
   onprem: XX
   nuclia_jwt_key: XX
   nuclia_hash_seed: 42

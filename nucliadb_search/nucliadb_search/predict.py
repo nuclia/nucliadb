@@ -19,11 +19,19 @@
 #
 from typing import List, Optional
 
+BASE_PREDICT = "/api/v1/predict"
+
 
 class PredictEngine:
-    def __init__(self, predict_url: str, zone_key: Optional[str] = None):
+    def __init__(
+        self,
+        cluster_url: Optional[str] = None,
+        public_url: Optional[str] = None,
+        zone_key: Optional[str] = None,
+    ):
         self.zone_key = zone_key
-        self.predict_url = predict_url
+        self.cluster_url = cluster_url
+        self.public_url = public_url
 
     async def convert_sentence_to_vector(
         self, kbid: str, token: Optional[str] = None

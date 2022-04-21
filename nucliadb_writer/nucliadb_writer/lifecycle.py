@@ -44,8 +44,8 @@ async def initialize():
         nuclia_zone=nuclia_settings.nuclia_zone,
         onprem=nuclia_settings.onprem,
         nuclia_jwt_key=nuclia_settings.nuclia_jwt_key,
-        nuclia_proxy_cluster_url=nuclia_settings.nuclia_proxy_cluster_url,
-        nuclia_proxy_public_url=nuclia_settings.nuclia_proxy_public_url,
+        nuclia_cluster_url=nuclia_settings.nuclia_cluster_url,
+        nuclia_public_url=nuclia_settings.nuclia_public_url,
         driver=storage_settings.file_backend,
         dummy=nuclia_settings.dummy_processing,
     )
