@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import traceback
+import uuid
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -169,7 +170,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         async for message in request_stream:
-            await self.proc.process(message)
+            await self.proc.process(message, 0)
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
@@ -476,7 +477,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
         if shard is not None:
-            count = await shard.add_resource(brain.brain, 0)
+            count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
             if count > settings.max_node_fields:
                 shard = await Node.create_shard_by_kbid(txn, request.kbid)
         response = IndexStatus()

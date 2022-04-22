@@ -25,7 +25,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n nucliadb_protos/nodewriter.proto\x12\nnodewriter\x1a#nucliadb_protos/noderesources.proto\"\x92\x01\n\x08OpStatus\x12+\n\x06status\x18\x01 \x01(\x0e\x32\x1b.nodewriter.OpStatus.Status\x12\x0e\n\x06\x64\x65tail\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x04\x12\x10\n\x08shard_id\x18\x04 \x01(\t\"(\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07WARNING\x10\x01\x12\t\n\x05\x45RROR\x10\x02\"x\n\x13SetRelationsRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\"\n\trelations\x18\x02 \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"e\n\x15\x44\x65lVectorFieldRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"\xd6\x01\n\x15SetVectorFieldRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12?\n\x07vectors\x18\x03 \x03(\x0b\x32..nodewriter.SetVectorFieldRequest.VectorObject\x12\x10\n\x08shard_id\x18\x04 \x01(\t\x1a.\n\x0cVectorObject\x12\x10\n\x08sentence\x18\x01 \x01(\x05\x12\x0c\n\x04item\x18\x02 \x01(\x0c\"x\n\x13\x44\x65lRelationsRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\"\n\trelations\x18\x02 \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"\xb1\x01\n\x0cIndexMessage\x12\x0c\n\x04node\x18\x01 \x01(\t\x12\r\n\x05shard\x18\x02 \x01(\t\x12\x0c\n\x04txid\x18\x03 \x01(\x04\x12\x10\n\x08resource\x18\x04 \x01(\t\x12\x39\n\x0btypemessage\x18\x05 \x01(\x0e\x32$.nodewriter.IndexMessage.TypeMessage\")\n\x0bTypeMessage\x12\x0c\n\x08\x43REATION\x10\x00\x12\x0c\n\x08\x44\x45LETION\x10\x01\"\x1c\n\x07\x43ounter\x12\x11\n\tresources\x18\x01 \x01(\x04\x32\x86\x06\n\nNodeWriter\x12<\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x44\n\x08NewShard\x12\x19.noderesources.EmptyQuery\x1a\x1b.noderesources.ShardCreated\"\x00\x12?\n\x0b\x44\x65leteShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x42\n\nListShards\x12\x19.noderesources.EmptyQuery\x1a\x17.noderesources.ShardIds\"\x00\x12<\n\x02GC\x12\x16.noderesources.ShardId\x1a\x1c.noderesources.EmptyResponse\"\x00\x12>\n\x0bSetResource\x12\x17.noderesources.Resource\x1a\x14.nodewriter.OpStatus\"\x00\x12\x43\n\x0eRemoveResource\x12\x19.noderesources.ResourceID\x1a\x14.nodewriter.OpStatus\"\x00\x12G\n\x0cSetRelations\x12\x1f.nodewriter.SetRelationsRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12G\n\x0c\x44\x65lRelations\x12\x1f.nodewriter.DelRelationsRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12L\n\x0fSetVectorsField\x12!.nodewriter.SetVectorFieldRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12L\n\x0f\x44\x65lVectorsField\x12!.nodewriter.DelVectorFieldRequest\x1a\x14.nodewriter.OpStatus\"\x00\x32H\n\x0bNodeSidecar\x12\x39\n\x08GetCount\x12\x16.noderesources.ShardId\x1a\x13.nodewriter.Counter\"\x00P\x00\x62\x06proto3'
+  serialized_pb=b'\n nucliadb_protos/nodewriter.proto\x12\nnodewriter\x1a#nucliadb_protos/noderesources.proto\"\x92\x01\n\x08OpStatus\x12+\n\x06status\x18\x01 \x01(\x0e\x32\x1b.nodewriter.OpStatus.Status\x12\x0e\n\x06\x64\x65tail\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x04\x12\x10\n\x08shard_id\x18\x04 \x01(\t\"(\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07WARNING\x10\x01\x12\t\n\x05\x45RROR\x10\x02\"x\n\x13SetRelationsRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\"\n\trelations\x18\x02 \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"e\n\x15\x44\x65lVectorFieldRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"\xd6\x01\n\x15SetVectorFieldRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12?\n\x07vectors\x18\x03 \x03(\x0b\x32..nodewriter.SetVectorFieldRequest.VectorObject\x12\x10\n\x08shard_id\x18\x04 \x01(\t\x1a.\n\x0cVectorObject\x12\x10\n\x08sentence\x18\x01 \x01(\x05\x12\x0c\n\x04item\x18\x02 \x01(\x0c\"x\n\x13\x44\x65lRelationsRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\"\n\trelations\x18\x02 \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"\xc5\x01\n\x0cIndexMessage\x12\x0c\n\x04node\x18\x01 \x01(\t\x12\r\n\x05shard\x18\x02 \x01(\t\x12\x0c\n\x04txid\x18\x03 \x01(\x04\x12\x10\n\x08resource\x18\x04 \x01(\t\x12\x39\n\x0btypemessage\x18\x05 \x01(\x0e\x32$.nodewriter.IndexMessage.TypeMessage\x12\x12\n\nreindex_id\x18\x06 \x01(\t\")\n\x0bTypeMessage\x12\x0c\n\x08\x43REATION\x10\x00\x12\x0c\n\x08\x44\x45LETION\x10\x01\"\x1c\n\x07\x43ounter\x12\x11\n\tresources\x18\x01 \x01(\x04\x32\x86\x06\n\nNodeWriter\x12<\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x44\n\x08NewShard\x12\x19.noderesources.EmptyQuery\x1a\x1b.noderesources.ShardCreated\"\x00\x12?\n\x0b\x44\x65leteShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x42\n\nListShards\x12\x19.noderesources.EmptyQuery\x1a\x17.noderesources.ShardIds\"\x00\x12<\n\x02GC\x12\x16.noderesources.ShardId\x1a\x1c.noderesources.EmptyResponse\"\x00\x12>\n\x0bSetResource\x12\x17.noderesources.Resource\x1a\x14.nodewriter.OpStatus\"\x00\x12\x43\n\x0eRemoveResource\x12\x19.noderesources.ResourceID\x1a\x14.nodewriter.OpStatus\"\x00\x12G\n\x0cSetRelations\x12\x1f.nodewriter.SetRelationsRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12G\n\x0c\x44\x65lRelations\x12\x1f.nodewriter.DelRelationsRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12L\n\x0fSetVectorsField\x12!.nodewriter.SetVectorFieldRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12L\n\x0f\x44\x65lVectorsField\x12!.nodewriter.DelVectorFieldRequest\x1a\x14.nodewriter.OpStatus\"\x00\x32H\n\x0bNodeSidecar\x12\x39\n\x08GetCount\x12\x16.noderesources.ShardId\x1a\x13.nodewriter.Counter\"\x00P\x00\x62\x06proto3'
   ,
   dependencies=[nucliadb__protos_dot_noderesources__pb2.DESCRIPTOR,],
   public_dependencies=[nucliadb__protos_dot_noderesources__pb2.DESCRIPTOR,])
@@ -82,8 +82,8 @@ _INDEXMESSAGE_TYPEMESSAGE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=935,
-  serialized_end=976,
+  serialized_start=955,
+  serialized_end=996,
 )
 _sym_db.RegisterEnumDescriptor(_INDEXMESSAGE_TYPEMESSAGE)
 
@@ -414,6 +414,13 @@ _INDEXMESSAGE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='reindex_id', full_name='nodewriter.IndexMessage.reindex_id', index=5,
+      number=6, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -428,7 +435,7 @@ _INDEXMESSAGE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=799,
-  serialized_end=976,
+  serialized_end=996,
 )
 
 
@@ -459,8 +466,8 @@ _COUNTER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=978,
-  serialized_end=1006,
+  serialized_start=998,
+  serialized_end=1026,
 )
 
 _OPSTATUS.fields_by_name['status'].enum_type = _OPSTATUS_STATUS
@@ -550,8 +557,8 @@ _NODEWRITER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1009,
-  serialized_end=1783,
+  serialized_start=1029,
+  serialized_end=1803,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetShard',
@@ -676,8 +683,8 @@ _NODESIDECAR = _descriptor.ServiceDescriptor(
   index=1,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1785,
-  serialized_end=1857,
+  serialized_start=1805,
+  serialized_end=1877,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetCount',

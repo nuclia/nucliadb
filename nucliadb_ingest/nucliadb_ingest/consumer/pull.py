@@ -260,13 +260,15 @@ class PullWorker:
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
-                    import pdb
-
-                    pdb.set_trace()
                     async with session.get(
                         url,
                         headers=headers,
                     ) as resp:
+
+                        if resp.status != 200:
+                            text = await resp.text()
+                            logger.exception(f"Wrong status {resp.status}:{text}")
+                            continue
 
                         try:
                             data = await resp.json()

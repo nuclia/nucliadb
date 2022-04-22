@@ -84,12 +84,12 @@ async def main():
             txn = await driver.begin()
             key_to_purge = KB_TO_DELETE.format(kbid=kbid)
             await txn.delete(key_to_purge)
-            await txn.txn.commit()
+            await txn.commit()
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             capture_exception(exc)
             logger.info(f"  X Error while deleting key {key_to_purge}")
-            await txn.txn.abort()
+            await txn.abort()
 
     logger.info("END PURGING KB")
 
@@ -130,9 +130,9 @@ async def main():
             except Exception as exc:
                 capture_exception(exc)
                 logger.info(f"  X Error while deleting key {key}")
-                await txn.txn.abort()
+                await txn.abort()
             else:
-                await txn.txn.commit()
+                await txn.commit(resource=False)
 
     await storage.finalize()
 

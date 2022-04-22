@@ -61,6 +61,7 @@ message IndexMessage {
         DELETION = 1;
     }
     TypeMessage typemessage = 5;
+    string reindex_id = 6;
 }
 
 
