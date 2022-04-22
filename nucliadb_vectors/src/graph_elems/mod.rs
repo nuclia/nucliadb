@@ -50,13 +50,10 @@ pub trait Distance {
 #[derive(
     Copy, Clone, PartialOrd, PartialEq, Ord, Eq, Hash, Debug, Default, Serialize, Deserialize,
 )]
-pub struct NodeId(u128);
+pub struct NodeId(usize);
 impl NodeId {
     pub fn new() -> NodeId {
         NodeId(0)
-    }
-    pub fn null() -> NodeId {
-        NodeId(u128::MAX)
     }
     pub fn fresh(&mut self) -> NodeId {
         let prev = *self;
