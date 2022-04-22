@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import traceback
-from typing import AsyncIterator, Optional
 import uuid
+from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeleteKnowledgeBoxResponse,
