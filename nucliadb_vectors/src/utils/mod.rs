@@ -108,10 +108,11 @@ mod test_utils {
     fn test_utils__right_order() {
         let mut inverse_heap = BinaryHeap::new();
         let mut standard_heap = BinaryHeap::new();
+        let mut id = NodeId::new();
         let len = 10;
         for i in 0..len {
-            inverse_heap.push(InverseElem(NodeId::null(), i as f32));
-            standard_heap.push(StandardElem(NodeId::null(), i as f32));
+            inverse_heap.push(InverseElem(id.fresh(), i as f32));
+            standard_heap.push(StandardElem(id.fresh(), i as f32));
         }
         let mut inverse = LinkedList::new();
         let mut standard = LinkedList::new();

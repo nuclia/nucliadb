@@ -64,7 +64,7 @@ mod test_heuristic_simple {
         for _ in 0..100 {
             let v = rand::random::<f32>();
             solution.push(v);
-            candidates.push((NodeId::null(), v));
+            candidates.push((NodeId::new(), v));
         }
         solution.sort_by(|a, b| {
             if *a > *b {
