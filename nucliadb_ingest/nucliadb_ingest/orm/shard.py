@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import annotations
+from typing import Optional
 
 from lru import LRU  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
@@ -48,7 +49,9 @@ class Shard:
             indexpb.typemessage = IndexMessage.TypeMessage.DELETION
             await indexing.index(indexpb, shardreplica.node)
 
-    async def add_resource(self, resource: PBBrainResource, txid: int) -> int:
+    async def add_resource(
+        self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
+    ) -> int:
 
         storage = await get_storage()
         indexing = get_indexing()
@@ -57,9 +60,14 @@ class Shard:
 
         for shardreplica in self.shard.replicas:
             resource.shard_id = shard = shardreplica.shard.id
-            indexpb: IndexMessage = await storage.indexing(
-                resource, shardreplica.node, shard, txid
-            )
+            if reindex_id is not None:
+                indexpb: IndexMessage = await storage.reindexing(
+                    resource, shardreplica.node, shard, txid
+                )
+            else:
+                indexpb: IndexMessage = await storage.indexing(
+                    resource, shardreplica.node, shard, txid
+                )
             await indexing.index(indexpb, shardreplica.node)
 
             try:

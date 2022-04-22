@@ -66,8 +66,12 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     requestpb.config.enabled_insights.extend(item.enabled_insights)
 
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
+    if item.slug != "":
+        slug = item.slug
+    else:
+        slug = kbobj.uuid  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=item.slug)
+        return KnowledgeBoxObj(uuid=kbobj.uuid, slug=slug)
     elif kbobj.status == KnowledgeBoxResponseStatus.CONFLICT:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:

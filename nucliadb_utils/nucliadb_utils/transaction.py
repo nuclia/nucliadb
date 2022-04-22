@@ -32,7 +32,11 @@ class LocalTransactionUtility:
         from nucliadb_utils.utilities import get_ingest
 
         ingest = get_ingest()
-        await ingest.ProcessMessage(writer)  # type: ignore
+
+        async def iterator(writer):
+            yield writer
+
+        await ingest.ProcessMessage(iterator(writer))  # type: ignore
         return 0
 
     async def finalize(self):

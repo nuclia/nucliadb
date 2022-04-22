@@ -124,10 +124,31 @@ class Storage:
         response.typemessage = IndexMessage.TypeMessage.CREATION
         return response
 
+    async def reindexing(
+        self, message: BrainResource, node: str, shard: str, reindex_id: str
+    ) -> IndexMessage:
+        if self.indexing_bucket is None:
+            raise AttributeError()
+        key = INDEXING.format(node=node, shard=shard, txid=reindex_id)
+        await self.uploadbytes(self.indexing_bucket, key, message.SerializeToString())
+        response = IndexMessage()
+        response.node = node
+        response.shard = shard
+        response.reindex_id = reindex_id
+        response.typemessage = IndexMessage.TypeMessage.CREATION
+        return response
+
     async def get_indexing(self, payload: IndexMessage) -> BrainResource:
         if self.indexing_bucket is None:
             raise AttributeError()
-        key = INDEXING.format(node=payload.node, shard=payload.shard, txid=payload.txid)
+        if payload.txid == 0:
+            key = INDEXING.format(
+                node=payload.node, shard=payload.shard, txid=payload.reindex_id
+            )
+        else:
+            key = INDEXING.format(
+                node=payload.node, shard=payload.shard, txid=payload.txid
+            )
         bytes_buffer = await self.downloadbytes(self.indexing_bucket, key)
         if bytes_buffer.getbuffer().nbytes == 0:
             raise KeyError()

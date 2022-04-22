@@ -53,7 +53,11 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     ingest = get_ingest()
     response = KnowledgeBoxList()
     async for kb_id in ingest.ListKnowledgeBox(KnowledgeBoxPrefix(prefix=prefix)):  # type: ignore
-        response.kbs.append(KnowledgeBoxObjSummary(slug=kb_id.slug, uuid=kb_id.uuid))
+        if kb_id.slug != "":
+            slug = None
+        else:
+            slug = kb_id.slug
+        response.kbs.append(KnowledgeBoxObjSummary(slug=slug, uuid=kb_id.uuid))
     return response
 
 

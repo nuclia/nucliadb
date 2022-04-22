@@ -68,6 +68,7 @@ class LocalTransaction(Transaction):
             await resp.write(value)
 
     async def remove(self, key: str):
+        key = self.compute_path(key)
         os.remove(key)
 
     async def read(self, key: str) -> Optional[bytes]:

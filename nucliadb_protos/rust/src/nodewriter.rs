@@ -81,6 +81,8 @@ pub struct IndexMessage {
     pub resource: ::prost::alloc::string::String,
     #[prost(enumeration="index_message::TypeMessage", tag="5")]
     pub typemessage: i32,
+    #[prost(string, tag="6")]
+    pub reindex_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `IndexMessage`.
 pub mod index_message {

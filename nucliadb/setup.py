@@ -32,5 +32,10 @@ setup(
     include_package_data=True,
     packages=find_packages(),
     install_requires=requirements,
-    entry_points={"console_scripts": ["nucliadb = nucliadb:run"]},
+    entry_points={
+        "console_scripts": [
+            "nucliadb = nucliadb:run",
+            "nucliadb_purge = nucliadb:purge",
+        ]
+    },
 )
