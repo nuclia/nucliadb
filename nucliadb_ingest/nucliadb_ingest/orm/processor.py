@@ -172,9 +172,9 @@ class Processor:
 
             if resource and resource.modified:
                 shard_id = await kb.get_resource_shard_id(uuid)
-                shard = None
+                shard: Optional[Shard] = None
                 if shard_id is not None:
-                    shard: Optional[Shard] = await kb.get_resource_shard(shard_id)
+                    shard = await kb.get_resource_shard(shard_id)
 
                 if shard is None:
                     # Its a new resource
