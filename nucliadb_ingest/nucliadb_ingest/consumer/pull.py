@@ -136,7 +136,7 @@ class PullWorker:
 
                 last_seqid = await self.processor.driver.last_seqid(self.partition)
                 if last_seqid is None:
-                    last_seqid = 0
+                    last_seqid = 1
 
                 res = await self.js.subscribe(
                     subject=self.target.format(partition=self.partition),

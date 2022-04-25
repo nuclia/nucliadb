@@ -396,10 +396,7 @@ class KnowledgeBox:
                 await txn.delete(key)
             await txn.commit(resource=False)
 
-    async def get_resource_shard(self, uuid: str) -> Optional[Shard]:
-        shard_id = await self.get_resource_shard_id(uuid)
-        if shard_id is None:
-            return None
+    async def get_resource_shard(self, shard_id: str) -> Optional[Shard]:
 
         key = KB_SHARDS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
