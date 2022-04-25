@@ -85,7 +85,7 @@ class PullWorker:
         self.stream = stream
         self.onprem = onprem
         self.idle_heartbeat = 5 * 1_000_000_000
-        self.ack_wait = 60
+        self.ack_wait = 10.0
         self.nc = None
         self.js = None
 
@@ -104,9 +104,7 @@ class PullWorker:
         )
 
     async def error_cb(self, e):
-        logger.error(
-            "There was an error connecting to NATS consumer ingest: {}".format(e)
-        )
+        logger.error("There was an error on consumer ingest worker: {}".format(e))
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
@@ -133,25 +131,33 @@ class PullWorker:
             except Exception:
                 pass
 
-            self.js = self.nc.jetstream()
+            if self.nc is not None:
+                self.js = self.nc.jetstream()
 
-            res = await self.js.subscribe(
-                subject=self.target.format(partition=self.partition),
-                queue=self.group.format(partition=self.partition),
-                stream=self.stream,
-                flow_control=True,
-                cb=self.subscription_worker,
-                config=nats.js.api.ConsumerConfig(
-                    ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                    max_deliver=1,
-                    ack_wait=self.ack_wait,
-                    idle_heartbeat=5,
-                ),
-            )
-            self.subscriptions.append(res)
-            logger.info(
-                f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream}"
-            )
+                last_seqid = await self.processor.driver.last_seqid(self.partition)
+                if last_seqid is None:
+                    last_seqid = 0
+
+                res = await self.js.subscribe(
+                    subject=self.target.format(partition=self.partition),
+                    queue=self.group.format(partition=self.partition),
+                    stream=self.stream,
+                    flow_control=True,
+                    cb=self.subscription_worker,
+                    config=nats.js.api.ConsumerConfig(
+                        deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
+                        opt_start_seq=last_seqid,
+                        ack_policy=nats.js.api.AckPolicy.EXPLICIT,
+                        max_ack_pending=1,
+                        max_deliver=10000,
+                        ack_wait=self.ack_wait,
+                        idle_heartbeat=5.0,
+                    ),
+                )
+                self.subscriptions.append(res)
+                logger.info(
+                    f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream}"
+                )
 
     async def finalize(self):
         for subscription in self.subscriptions:
@@ -171,7 +177,7 @@ class PullWorker:
         subject = msg.subject
         reply = msg.reply
         seqid = int(msg.reply.split(".")[5])
-        logger.info(
+        logger.debug(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
         message_source = "<msg source not set>"
@@ -184,15 +190,28 @@ class PullWorker:
                     message_source = "processing"
                 else:
                     message_source = "writer"
-                await self.processor.process(pb, seqid, self.partition)
-                message_type_name = pb.MessageType.Name(pb.type)
+                if pb.HasField("audit"):
+                    time = pb.audit.when.ToDatetime().isoformat()
+                else:
+                    time = ""
 
-                logger.info(
-                    f"Successfully processed {message_type_name} message from {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, nucliadb seqid: {seqid}, partition: {self.partition}"
+                logger.debug(
+                    f"Received {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} at {time}"
                 )
-                await self.cache.delete(
-                    KB_COUNTER_CACHE.format(kbid=pb.kbid), invalidate=True
-                )
+                processed = await self.processor.process(pb, seqid, self.partition)
+
+                if processed:
+                    message_type_name = pb.MessageType.Name(pb.type)
+                    logger.info(
+                        f"Successfully processed {message_type_name} message from {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, nucliadb seqid: {seqid}, partition: {self.partition} as {time}"
+                    )
+                    await self.cache.delete(
+                        KB_COUNTER_CACHE.format(kbid=pb.kbid), invalidate=True
+                    )
+                else:
+                    logger.error(
+                        f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition})"
+                    )
             except DeadletteredError as e:
                 # Messages that have been sent to deadletter at some point
                 # We don't want to process it again so it's ack'd

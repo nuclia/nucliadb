@@ -81,10 +81,15 @@ class Processor:
         message: BrokerMessage,
         seqid: int,
         partition: Optional[str] = None,
-    ):
+    ) -> bool:
         partition = partition if self.partition is None else self.partition
         if partition is None:
             raise AttributeError()
+
+        # check seqid > last txid on partition
+        last_seq = await self.driver.last_seqid(partition)
+        if last_seq is not None and seqid <= last_seq:
+            return False
 
         if message.type == BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition)
@@ -97,6 +102,7 @@ class Processor:
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
         await self.audit.report(message)
+        return True
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:
         if message.uuid is None:
@@ -110,18 +116,22 @@ class Processor:
         kb = KnowledgeBox(txn, self.storage, self.cache, message.kbid)
 
         uuid = await self.get_resource_uuid(kb, message)
-        shard: Optional[Shard] = await kb.get_resource_shard(uuid)
-        if shard is None:
-            raise AttributeError("Shard not available")
-        await shard.delete_resource(message.uuid, seqid)
-        try:
-            await kb.delete_resource(message.uuid)
-        except Exception as exc:
-            await txn.abort()
-            await self.notify_abort(
-                partition, seqid, message.multiid, message.kbid, message.uuid
-            )
-            raise exc
+        shard_id = await kb.get_resource_shard_id(uuid)
+        if shard_id is None:
+            logger.warn(f"Resource {uuid} does not exist")
+        else:
+            shard: Optional[Shard] = await kb.get_resource_shard(shard_id)
+            if shard is None:
+                raise AttributeError("Shard not available")
+            await shard.delete_resource(message.uuid, seqid)
+            try:
+                await kb.delete_resource(message.uuid)
+            except Exception as exc:
+                await txn.abort()
+                await self.notify_abort(
+                    partition, seqid, message.multiid, message.kbid, message.uuid
+                )
+                raise exc
         if txn.open:
             await txn.commit(partition, seqid)
         await self.notify_commit(
@@ -137,6 +147,11 @@ class Processor:
 
         txn = await self.driver.begin()
         kbid = messages[0].kbid
+        if not await KnowledgeBox.exist_kb(txn, kbid):
+            logger.warn(f"KB {kbid} is deleted: skiping txn")
+            await txn.commit(partition, seqid)
+            return
+
         multi = messages[0].multiid
         kb = KnowledgeBox(txn, self.storage, self.cache, kbid)
         uuid = await self.get_resource_uuid(kb, messages[0])
@@ -149,9 +164,6 @@ class Processor:
                 if resource is not None:
                     assert resource.uuid == message.uuid
 
-                if message.txseqid > 0:
-                    origin_txn = message.txseqid
-
                 resource = await self.apply_resource(message, kb, resource)
 
             if resource:
@@ -159,7 +171,8 @@ class Processor:
                 await resource.compute_global_tags(resource.indexer)
 
             if resource and resource.modified:
-                shard: Optional[Shard] = await kb.get_resource_shard(uuid)
+                shard_id = await kb.get_resource_shard_id(uuid)
+                shard: Optional[Shard] = await kb.get_resource_shard(shard_id)
                 if shard is None:
                     # Its a new resource
                     # Check if we have enough resource to create a new shard
@@ -169,14 +182,14 @@ class Processor:
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
-                    count = await shard.add_resource(resource.indexer.brain, origin_txn)
+                    count = await shard.add_resource(resource.indexer.brain, seqid)
                     if count > settings.max_node_fields:
                         shard = await Node.create_shard_by_kbid(txn, kbid)
 
                 else:
                     raise AttributeError("Shard is not available")
 
-                await txn.commit(partition, origin_txn)
+                await txn.commit(partition, seqid)
 
                 # Slug may have conflicts as its not partitioned properly. We make it as short as possible
                 txn = await self.driver.begin()
