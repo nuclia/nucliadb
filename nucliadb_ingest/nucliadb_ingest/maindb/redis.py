@@ -37,13 +37,16 @@ except ImportError:
 
 
 class RedisTransaction(Transaction):
-    modified_keys: Dict[str, bytes] = {}
-    visited_keys: Dict[str, bytes] = {}
-    deleted_keys: List[str] = []
+    modified_keys: Dict[str, bytes]
+    visited_keys: Dict[str, bytes]
+    deleted_keys: List[str]
 
     def __init__(self, redis: Any, driver: Driver):
         self.redis = redis
         self.driver = driver
+        self.modified_keys = {}
+        self.visited_keys = {}
+        self.deleted_keys = []
         self.open = True
 
     def clean(self):
@@ -64,6 +67,8 @@ class RedisTransaction(Transaction):
         if len(self.modified_keys) == 0 and len(self.deleted_keys) == 0:
             self.clean()
             return
+
+        print(f"Commit {len(self.modified_keys)}")
 
         not_to_check = []
         async with self.redis.pipeline(transaction=True) as pipe:
@@ -125,6 +130,7 @@ class RedisTransaction(Transaction):
             return obj
 
     async def set(self, key: str, value: bytes):
+        print(f" SET {key} - {len(self.modified_keys)}")
         if key in self.deleted_keys:
             self.deleted_keys.remove(key)
 
