@@ -68,8 +68,6 @@ class RedisTransaction(Transaction):
             self.clean()
             return
 
-        print(f"Commit {len(self.modified_keys)}")
-
         not_to_check = []
         async with self.redis.pipeline(transaction=True) as pipe:
             count = 0
@@ -130,7 +128,6 @@ class RedisTransaction(Transaction):
             return obj
 
     async def set(self, key: str, value: bytes):
-        print(f" SET {key} - {len(self.modified_keys)}")
         if key in self.deleted_keys:
             self.deleted_keys.remove(key)
 
