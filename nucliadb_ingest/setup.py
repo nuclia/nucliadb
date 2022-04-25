@@ -41,6 +41,8 @@ setup(
         "console_scripts": [
             "ndb_ingest = nucliadb_ingest.app:run",
             "ndb_purge = nucliadb_ingest.purge:run",
+            "ndb_entities = nucliadb_ingest.entities:run",
+            "ndb_curator = nucliadb_ingest.curator:run",
         ]
     },
 )

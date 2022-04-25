@@ -77,7 +77,7 @@ swim:
 
 audit:
   driver: basic
-  audit_jetstream_target: "audit.{partition}"
+  audit_jetstream_target: "audit.{partition}.{type}"
   audit_jetstream_servers:
     - nats1
   audit_jetstream_auth:

@@ -97,6 +97,7 @@ transaction_settings = TransactionSettings()
 class IndexingSettings(BaseSettings):
 
     index_jetstream_target: Optional[str] = "node.{node}"
+    entities_jetstream_target: Optional[str] = "entities"
     index_jetstream_group: Optional[str] = "node-{node}"
     index_jetstream_stream: Optional[str] = "node"
     index_jetstream_servers: List[str] = []
@@ -109,10 +110,11 @@ indexing_settings = IndexingSettings()
 
 class AuditSettings(BaseSettings):
     audit_driver: str = "basic"
-    audit_jetstream_target: Optional[str] = "audit.{partition}"
+    audit_jetstream_target: Optional[str] = "audit.{partition}.{type}"
     audit_jetstream_servers: List[str] = []
     audit_jetstream_auth: Optional[str] = None
     audit_partitions: int = 3
+    audit_stream: str = "audit"
     audit_hash_seed: int = 1234
 
 

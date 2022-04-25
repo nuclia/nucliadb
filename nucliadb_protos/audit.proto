@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 import "nucliadb_protos/nodereader.proto";
+import "nucliadb_protos/resources.proto";
 
 message AuditRequest {
   enum AuditType {
@@ -28,4 +29,5 @@ message AuditRequest {
   string rid = 10;
   string task = 11;
   int32 resources = 12;
+  repeated resources.FieldID field_metadata = 13;
 }

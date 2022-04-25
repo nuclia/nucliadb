@@ -69,6 +69,7 @@ async def start_indexing_utility():
             nats_creds=indexing_settings.index_jetstream_auth,
             nats_servers=indexing_settings.index_jetstream_servers,
             nats_target=indexing_settings.index_jetstream_target,
+            nats_entities=indexing_settings.entities_jetstream_target,
         )
         await indexing_utility.initialize()
         set_utility(Utility.INDEXING, indexing_utility)
