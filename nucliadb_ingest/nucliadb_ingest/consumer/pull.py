@@ -293,7 +293,7 @@ class PullWorker:
                                     pb.ParseFromString(
                                         base64.b64decode(data["payload"])
                                     )
-                                    if self.txn_subscriber:
+                                    if self.nats_subscriber:
                                         await transaction_utility.commit(
                                             writer=pb, partition=self.partition
                                         )
