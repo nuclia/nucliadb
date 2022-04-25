@@ -28,7 +28,8 @@ spec:
     metadata:
       name: ingest
       annotations:
-        sidecar.istio.io/inject: "false"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.swim }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},{{.Values.serving.swim }}"
       labels:
         app: ingest
         app.kubernetes.io/name: ingest
