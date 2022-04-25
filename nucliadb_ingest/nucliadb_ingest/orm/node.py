@@ -285,7 +285,7 @@ class Node:
 
     async def delete_shard(self, id: str) -> int:
         req = ShardId(id=id)
-        resp = await self.writer.DeleteShard(req, timeout=5)  # type: ignore
+        resp = await self.writer.DeleteShard(req)  # type: ignore
         return resp.id
 
     async def list_shards(self) -> List[str]:
