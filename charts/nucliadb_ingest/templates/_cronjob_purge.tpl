@@ -44,7 +44,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: "{{ .cronname }}"
-            image: "{{ .Values.image }}"
+            image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
             envFrom:
             - configMapRef:
                 name: nucliadb-config

@@ -50,7 +50,7 @@ spec:
 {{- end }}
       containers:
       - name: sidecar
-        image: {{ .Values.image_sidecar }}
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image_sidecar }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
           exec:
@@ -83,7 +83,7 @@ spec:
       - name: writer
         securityContext:
           privileged: true
-        image: {{ .Values.image }}
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
           exec:
@@ -115,7 +115,7 @@ spec:
       - name: reader
         securityContext:
           privileged: true
-        image: {{ .Values.image }}
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
           exec:

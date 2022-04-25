@@ -7,6 +7,7 @@ replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
 imagePullPolicy: IfNotPresent
+containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 resources: {}
 #  limits:
