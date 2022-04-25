@@ -25,6 +25,8 @@ mod graph_disk;
 mod graph_elems;
 mod heuristics;
 mod memory_processes;
+#[allow(unused)]
+mod memory_system;
 mod query;
 mod query_delete;
 mod query_find_labels;
