@@ -290,18 +290,19 @@ class KnowledgeBox:
         if payload is not None:
             entitiesgroup.group.ParseFromString(payload)
 
-    async def get_entitiesgroup_inner(
-        self, group: str, entitiesgroup: GetEntitiesGroupResponse
-    ):
+    async def get_entitiesgroup_inner(self, group: str):
         entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
         payload = await self.txn.get(entities_key)
         return payload
 
     async def set_entities(self, group: str, entities: EntitiesGroup):
         payload = await self.get_entitiesgroup_inner(group)
-        eg = EntitiesGroup()
-        eg.ParseFromString(payload)
-        eg.MergeFrom(entities)
+        if payload is None:
+            eg = entities
+        else:
+            eg = EntitiesGroup()
+            eg.ParseFromString(payload)
+            eg.MergeFrom(entities)
         entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
         await self.txn.set(entities_key, eg.SerializeToString())
 
