@@ -36,6 +36,18 @@ pub struct Timestamps {
     pub to_created: ::core::option::Option<::prost_types::Timestamp>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FacetResult {
+    #[prost(string, tag="1")]
+    pub tag: ::prost::alloc::string::String,
+    #[prost(int32, tag="2")]
+    pub total: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FacetResults {
+    #[prost(message, repeated, tag="1")]
+    pub facetresults: ::prost::alloc::vec::Vec<FacetResult>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentSearchRequest {
     #[prost(string, tag="1")]
     pub id: ::prost::alloc::string::String,
@@ -86,43 +98,47 @@ pub struct ParagraphSearchRequest {
     pub reload: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DocumentResult {
+    #[prost(string, tag="1")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(uint64, tag="2")]
+    pub score: u64,
+    #[prost(float, tag="3")]
+    pub score_bm25: f32,
+    #[prost(string, tag="4")]
+    pub field: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentSearchResponse {
     #[prost(int32, tag="1")]
     pub total: i32,
     #[prost(message, repeated, tag="2")]
-    pub results: ::prost::alloc::vec::Vec<document_search_response::Result>,
+    pub results: ::prost::alloc::vec::Vec<DocumentResult>,
     #[prost(map="string, message", tag="3")]
-    pub facets: ::std::collections::HashMap<::prost::alloc::string::String, document_search_response::FacetResults>,
+    pub facets: ::std::collections::HashMap<::prost::alloc::string::String, FacetResults>,
     #[prost(int32, tag="4")]
     pub page_number: i32,
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
 }
-/// Nested message and enum types in `DocumentSearchResponse`.
-pub mod document_search_response {
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct Result {
-        #[prost(string, tag="1")]
-        pub uuid: ::prost::alloc::string::String,
-        #[prost(uint64, tag="2")]
-        pub score: u64,
-        #[prost(float, tag="3")]
-        pub score_bm25: f32,
-        #[prost(string, tag="4")]
-        pub field: ::prost::alloc::string::String,
-    }
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct FacetResult {
-        #[prost(string, tag="1")]
-        pub tag: ::prost::alloc::string::String,
-        #[prost(int32, tag="2")]
-        pub total: i32,
-    }
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct FacetResults {
-        #[prost(message, repeated, tag="1")]
-        pub facetresults: ::prost::alloc::vec::Vec<FacetResult>,
-    }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ParagraphResult {
+    #[prost(string, tag="1")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(float, tag="2")]
+    pub score: f32,
+    #[prost(string, tag="3")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint64, tag="4")]
+    pub start: u64,
+    #[prost(uint64, tag="5")]
+    pub end: u64,
+    #[prost(string, tag="6")]
+    pub paragraph: ::prost::alloc::string::String,
+    #[prost(string, tag="7")]
+    pub split: ::prost::alloc::string::String,
+    #[prost(uint64, tag="8")]
+    pub index: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
@@ -130,50 +146,16 @@ pub struct ParagraphSearchResponse {
     pub total: i32,
     /// 
     #[prost(message, repeated, tag="2")]
-    pub results: ::prost::alloc::vec::Vec<paragraph_search_response::Result>,
+    pub results: ::prost::alloc::vec::Vec<ParagraphResult>,
     /// For each field what facets are.
     #[prost(map="string, message", tag="3")]
-    pub facets: ::std::collections::HashMap<::prost::alloc::string::String, paragraph_search_response::FacetResults>,
+    pub facets: ::std::collections::HashMap<::prost::alloc::string::String, FacetResults>,
     /// What page is the answer.
     #[prost(int32, tag="4")]
     pub page_number: i32,
     /// How many results are in this page.
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
-}
-/// Nested message and enum types in `ParagraphSearchResponse`.
-pub mod paragraph_search_response {
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct Result {
-        #[prost(string, tag="1")]
-        pub uuid: ::prost::alloc::string::String,
-        #[prost(float, tag="2")]
-        pub score: f32,
-        #[prost(string, tag="3")]
-        pub field: ::prost::alloc::string::String,
-        #[prost(uint64, tag="4")]
-        pub start: u64,
-        #[prost(uint64, tag="5")]
-        pub end: u64,
-        #[prost(string, tag="6")]
-        pub paragraph: ::prost::alloc::string::String,
-        #[prost(string, tag="7")]
-        pub split: ::prost::alloc::string::String,
-        #[prost(uint64, tag="8")]
-        pub index: u64,
-    }
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct FacetResult {
-        #[prost(string, tag="1")]
-        pub tag: ::prost::alloc::string::String,
-        #[prost(int32, tag="2")]
-        pub total: i32,
-    }
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct FacetResults {
-        #[prost(message, repeated, tag="1")]
-        pub facetresults: ::prost::alloc::vec::Vec<FacetResult>,
-    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSearchRequest {
@@ -257,29 +239,7 @@ pub struct SuggestResponse {
     #[prost(int32, tag="1")]
     pub total: i32,
     #[prost(message, repeated, tag="2")]
-    pub results: ::prost::alloc::vec::Vec<suggest_response::Result>,
-}
-/// Nested message and enum types in `SuggestResponse`.
-pub mod suggest_response {
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct Result {
-        #[prost(string, tag="1")]
-        pub uuid: ::prost::alloc::string::String,
-        #[prost(float, tag="2")]
-        pub score: f32,
-        #[prost(string, tag="3")]
-        pub field: ::prost::alloc::string::String,
-        #[prost(uint64, tag="4")]
-        pub start: u64,
-        #[prost(uint64, tag="5")]
-        pub end: u64,
-        #[prost(string, tag="6")]
-        pub paragraph: ::prost::alloc::string::String,
-        #[prost(string, tag="7")]
-        pub split: ::prost::alloc::string::String,
-        #[prost(uint64, tag="8")]
-        pub index: u64,
-    }
+    pub results: ::prost::alloc::vec::Vec<ParagraphResult>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {

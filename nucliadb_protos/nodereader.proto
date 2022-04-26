@@ -31,6 +31,15 @@ message Timestamps {
     google.protobuf.Timestamp to_created = 4;
 }
 
+message FacetResult {
+    string tag = 1;
+    int32 total = 2;
+}
+message FacetResults {
+    repeated FacetResult facetresults = 1;
+}
+
+
 message DocumentSearchRequest {
     string id = 1;
     string body = 2;
@@ -75,24 +84,19 @@ message ParagraphSearchRequest {
 
 }
 
+message DocumentResult {
+    string uuid = 1;
+    uint64 score = 2;
+    float score_bm25 = 3;
+    string field = 4;
+}
+
 message DocumentSearchResponse {
     int32 total = 1;
 
-    message Result {
-        string uuid = 1;
-        uint64 score = 2;
-        float score_bm25 = 3;
-        string field = 4;
-    }
-    repeated Result results = 2;
 
-    message FacetResult {
-        string tag = 1;
-        int32 total = 2;
-    }
-    message FacetResults {
-        repeated FacetResult facetresults = 1;
-    }
+    repeated DocumentResult results = 2;
+
     map<string, FacetResults> facets = 3;
     
     int32 page_number = 4;
@@ -100,31 +104,23 @@ message DocumentSearchResponse {
 }
 
 
+message ParagraphResult {
+    string uuid = 1;
+    float score = 2;
+    string field = 3;
+    uint64 start = 4;
+    uint64 end = 5;
+    string paragraph = 6;
+    string split = 7;
+    uint64 index = 8;
+}
+
 message ParagraphSearchResponse {
 
     int32 total = 1;
 
-    message Result {
-        string uuid = 1;
-        float score = 2;
-        string field = 3;
-        uint64 start = 4;
-        uint64 end = 5;
-        string paragraph = 6;
-        string split = 7;
-        uint64 index = 8;
-    }
-
     // 
-    repeated Result results = 2;
-
-    message FacetResult {
-        string tag = 1;
-        int32 total = 2;
-    }
-    message FacetResults {
-        repeated FacetResult facetresults = 1;
-    }
+    repeated ParagraphResult results = 2;
 
     // For each field what facets are.
     map<string, FacetResults> facets = 3;
@@ -207,18 +203,7 @@ message SuggestResponse {
 
     int32 total = 1;
 
-    message Result {
-        string uuid = 1;
-        float score = 2;
-        string field = 3;
-        uint64 start = 4;
-        uint64 end = 5;
-        string paragraph = 6;
-        string split = 7;
-        uint64 index = 8;
-    }
-
-    repeated Result results = 2;
+    repeated ParagraphResult results = 2;
 
 }
 

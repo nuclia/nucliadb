@@ -226,8 +226,8 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
     result.kbid = shards.kbid
     result.actual = shards.actual
     for shard_object in shards.shards:
-        shard_object = ShardObject.from_message(shard_object)
-        result.shards.append(shard_object)
+        shard_object_py: ShardObject = ShardObject.from_message(shard_object)
+        result.shards.append(shard_object_py)
     return result
 
 

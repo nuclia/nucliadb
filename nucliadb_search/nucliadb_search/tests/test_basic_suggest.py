@@ -21,16 +21,10 @@ from typing import Callable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentSearchRequest,
-    ParagraphSearchRequest,
-    SuggestRequest,
-    VectorSearchRequest,
-)
+from nucliadb_protos.nodereader_pb2 import SuggestRequest
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb_ingest.orm import NODES
-from nucliadb_ingest.tests.vectors import Q
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_search.api.models import SearchClientType
@@ -100,10 +94,7 @@ async def test_search_resource_all(
                 assert shard_reader.sentences == 3
 
                 prequest = SuggestRequest()
-                prequest.id = shard.id
                 prequest.body = "Ramon"
-                prequest.result_per_page = 10
-                prequest.reload = True
 
                 suggest = await node_obj.reader.Suggest(prequest)  # type: ignore
                 assert suggest.total == 1

@@ -20,7 +20,9 @@
 use std::collections::HashMap;
 
 use nucliadb_protos::order_by::OrderType;
-use nucliadb_protos::{paragraph_search_response, OrderBy, ParagraphSearchResponse};
+use nucliadb_protos::{
+    FacetResult, FacetResults, OrderBy, ParagraphResult, ParagraphSearchResponse,
+};
 use tantivy::collector::FacetCounts;
 use tantivy::schema::Value;
 use tantivy::DocAddress;
@@ -44,7 +46,7 @@ pub struct SearchResponse<'a> {
 impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchResponse) -> Self {
         let total = response.top_docs.len();
-        let mut results: Vec<paragraph_search_response::Result> = Vec::with_capacity(total);
+        let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
         let searcher = response.text_service.reader.searcher();
 
         let default_split = Value::Str("".to_string());
@@ -87,7 +89,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
 
-                    let result = paragraph_search_response::Result {
+                    let result = ParagraphResult {
                         uuid,
                         score,
                         field,
@@ -117,7 +119,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
                 .facets_count
                 .top_k(facet.as_str(), 50)
                 .iter()
-                .map(|(facet, count)| paragraph_search_response::FacetResult {
+                .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
                     total: *count as i32,
                 })
@@ -125,7 +127,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
 
             facet_map.insert(
                 facet,
-                paragraph_search_response::FacetResults {
+                FacetResults {
                     facetresults: count,
                 },
             );

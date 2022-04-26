@@ -25,7 +25,7 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.nodereader_pb2 import SearchResponse
+from nucliadb_protos.nodereader_pb2 import SuggestResponse
 from nucliadb_protos.writer_pb2 import ShardObject
 from sentry_sdk import capture_exception
 
@@ -129,7 +129,7 @@ async def suggest_knowledgebox(
         )
 
     try:
-        results: Optional[List[SearchResponse]] = await asyncio.wait_for(  # type: ignore
+        results: Optional[List[SuggestResponse]] = await asyncio.wait_for(  # type: ignore
             asyncio.gather(*ops, return_exceptions=True),  # type: ignore
             timeout=settings.search_timeout,
         )
