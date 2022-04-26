@@ -50,6 +50,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
         let searcher = response.text_service.reader.searcher();
 
         let default_split = Value::Str("".to_string());
+        info!("Result search: {:?}", response.top_docs.len());
         for (score, doc_address) in response.top_docs {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {

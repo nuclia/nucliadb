@@ -96,7 +96,7 @@ class Paragraph(BaseModel):
 
 class Paragraphs(BaseModel):
     results: List[Paragraph] = []
-    facets: FacetsResult
+    facets: Optional[FacetsResult] = None
 
 
 class ResourceResult(BaseModel):

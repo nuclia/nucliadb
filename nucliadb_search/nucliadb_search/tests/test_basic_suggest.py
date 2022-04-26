@@ -42,7 +42,7 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
 
 
 @pytest.mark.asyncio
-async def test_search_resource_all(
+async def test_suggest_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:
     kbid = test_search_resource
@@ -52,7 +52,7 @@ async def test_search_resource_all(
             f"/{KB_PREFIX}/{kbid}/suggest?query=own+text",
         )
         assert resp.status_code == 200
-        assert len(resp.json()["paragraphs"]) == 1
+        assert len(resp.json()["paragraphs"]["results"]) == 1
 
     async with search_api(roles=[NucliaDBRoles.READER], root=True) as client:
         resp = await client.get(
@@ -94,6 +94,7 @@ async def test_search_resource_all(
                 assert shard_reader.sentences == 3
 
                 prequest = SuggestRequest()
+                prequest.shard = replica.shard.id
                 prequest.body = "Ramon"
 
                 suggest = await node_obj.reader.Suggest(prequest)  # type: ignore

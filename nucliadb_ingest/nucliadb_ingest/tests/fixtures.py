@@ -71,7 +71,7 @@ images.settings["nucliadb_node_reader"] = {
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG",
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_swim=ERROR,nucliadb_cluster=ERROR",
     },
     "options": {
         "command": [
@@ -92,7 +92,7 @@ images.settings["nucliadb_node_writer"] = {
         "SWIM_ADDR": "0.0.0.0:4444",
         "SWIM_TIMEOUT": "10",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG",
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_swim=ERROR,nucliadb_cluster=ERROR",
     },
     "options": {
         "command": [

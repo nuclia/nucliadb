@@ -19,4 +19,5 @@
 #
 from . import knowledgebox  # noqa
 from . import resource  # noqa
+from . import suggest  # noqa
 from .router import api  # noqa

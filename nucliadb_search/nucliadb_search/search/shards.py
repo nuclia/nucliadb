@@ -49,5 +49,5 @@ def query_paragraph_shard(
 
 
 def suggest_shard(node: Node, shard: str, query: SuggestRequest) -> SuggestResponse:
-    query.id = shard
+    query.shard = shard
     return node.reader.Suggest(query)

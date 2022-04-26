@@ -83,14 +83,9 @@ async def suggest_query_to_pb(
 ) -> SuggestRequest:
 
     request = SuggestRequest()
-    request.reload = False
     if SuggestOptions.PARAGRAPH in features:
         request.body = query
         request.filter.tags.extend(filters)
-        request.faceted.tags.extend(faceted)
-        request.page_number = 0
-        request.result_per_page = 10
-        request.fields.extend(fields)
     return request
 
 
