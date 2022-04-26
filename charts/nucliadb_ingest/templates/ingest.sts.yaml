@@ -28,7 +28,7 @@ spec:
     metadata:
       name: ingest
       annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.swim }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.swim }},{{.Values.serving.monitoring }},{{.Values.serving.metrics }}"
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},{{.Values.serving.swim }}"
       labels:
         app: ingest
@@ -69,7 +69,8 @@ spec:
         - configMapRef:
             name: {{ .Release.Name }}-config
         ports:
-        - containerPort: {{ .Values.serving.grpc }}
+        - name: grpc-ingest
+          containerPort: {{ .Values.serving.grpc }}
         - containerPort: {{ .Values.serving.monitor }}
         - containerPort: {{ .Values.serving.metrics }}
         - name: swim
