@@ -145,6 +145,8 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         key=writer.files[field].file.uri,
     )
     assert len(data.read()) == 30472
+    await asyncio.sleep(1)
+
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
         resp = await client.post(
@@ -200,6 +202,8 @@ async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
         key=writer.files[field].file.uri,
     )
     assert len(data.read()) == 30472
+    await asyncio.sleep(1)
+
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
         with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
