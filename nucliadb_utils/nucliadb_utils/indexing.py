@@ -37,13 +37,11 @@ class IndexingUtility:
         nats_creds: str,
         nats_servers: List[str],
         nats_target: str,
-        entities_target: str,
         dummy: bool = False,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
         self.nats_target = nats_target
-        self.entities_target = entities_target
         self.dummy = dummy
         self._calls: List[Tuple[str, IndexMessage]] = []
 

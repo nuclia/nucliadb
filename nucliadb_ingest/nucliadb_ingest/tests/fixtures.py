@@ -468,7 +468,6 @@ async def fake_node(indexing_utility_ingest):
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
         nats_target=indexing_settings.index_jetstream_target,
-        nats_entities=indexing_settings.entities_jetstream_target,
         dummy=True,
     )
     set_utility(Utility.INDEXING, indexing_utility)
