@@ -60,12 +60,13 @@ spec:
             - name: nats-creds
               readOnly: true
               mountPath: /appsecrets
+{{- end }}
           volumes:
+{{- if .Values.nats.secretName }}
           - name: nats-creds
             secret:
               secretName: {{ .Values.nats.secretName }}
 {{- end }}
-          volumes:
           - name: cache-volume
             emptyDir: {}
 {{ end }}
