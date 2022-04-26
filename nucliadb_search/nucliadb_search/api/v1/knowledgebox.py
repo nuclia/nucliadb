@@ -28,7 +28,8 @@ from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.noderesources_pb2 import Shard
-from nucliadb_protos.writer_pb2 import ShardObject
+from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
+from nucliadb_protos.writer_pb2 import Shards
 from sentry_sdk import capture_exception
 
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE
@@ -39,8 +40,10 @@ from nucliadb_search import logger
 from nucliadb_search.api.models import (
     KnowledgeboxCounters,
     KnowledgeboxSearchResults,
+    KnowledgeboxShards,
     SearchClientType,
     SearchOptions,
+    ShardObject,
     SortOption,
 )
 from nucliadb_search.api.v1.router import KB_PREFIX, api
@@ -102,7 +105,7 @@ async def search_knowledgebox(
     timeit = time()
 
     try:
-        shard_groups: List[ShardObject] = await nodemanager.get_shards_by_kbid(kbid)
+        shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,
@@ -202,6 +205,33 @@ async def search_knowledgebox(
 
 
 @api.get(
+    f"/{KB_PREFIX}/{{kbid}}/shards",
+    status_code=200,
+    description="Show shards from a knowledgebox",
+    response_model=KnowledgeboxShards,
+    tags=["Knowledge Boxes"],
+)
+@requires(NucliaDBRoles.MANAGER)
+@version(1)
+async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
+    nodemanager = get_nodes()
+    try:
+        shards: Shards = await nodemanager.get_shards_by_kbid_inner(kbid)
+    except ShardsNotFound:
+        raise HTTPException(
+            status_code=404,
+            detail="The knowledgebox or its shards configuration is missing",
+        )
+    result = KnowledgeboxShards()
+    result.kbid = shards.kbid
+    result.actual = shards.actual
+    for shard_object in shards.shards:
+        shard_object_py: ShardObject = ShardObject.from_message(shard_object)
+        result.shards.append(shard_object_py)
+    return result
+
+
+@api.get(
     f"/{KB_PREFIX}/{{kbid}}/counters",
     status_code=200,
     description="Summary of amount of different things inside a knowledgebox",
@@ -223,7 +253,7 @@ async def knowledgebox_counters(request: Request, kbid: str) -> KnowledgeboxCoun
     nodemanager = get_nodes()
 
     try:
-        shard_groups: List[ShardObject] = await nodemanager.get_shards_by_kbid(kbid)
+        shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
     except ShardsNotFound:
         raise HTTPException(
             status_code=404,

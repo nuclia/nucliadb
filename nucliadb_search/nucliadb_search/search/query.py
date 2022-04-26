@@ -20,9 +20,13 @@
 from datetime import datetime
 from typing import List, Optional
 
-from nucliadb_protos.nodereader_pb2 import ParagraphSearchRequest, SearchRequest
+from nucliadb_protos.nodereader_pb2 import (
+    ParagraphSearchRequest,
+    SearchRequest,
+    SuggestRequest,
+)
 
-from nucliadb_search.api.models import SearchOptions, Sort
+from nucliadb_search.api.models import SearchOptions, Sort, SuggestOptions
 from nucliadb_search.utilities import get_predict
 
 
@@ -63,6 +67,25 @@ async def global_query_to_pb(
 
     if SearchOptions.RELATIONS in features:
         pass
+    return request
+
+
+async def suggest_query_to_pb(
+    features: List[SuggestOptions],
+    query: str,
+    filters: List[str],
+    faceted: List[str],
+    range_creation_start: Optional[datetime] = None,
+    range_creation_end: Optional[datetime] = None,
+    range_modification_start: Optional[datetime] = None,
+    range_modification_end: Optional[datetime] = None,
+    fields: List[str] = [],
+) -> SuggestRequest:
+
+    request = SuggestRequest()
+    if SuggestOptions.PARAGRAPH in features:
+        request.body = query
+        request.filter.tags.extend(filters)
     return request
 
 

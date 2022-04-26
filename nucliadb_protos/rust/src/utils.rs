@@ -72,8 +72,8 @@ pub struct Vector {
     pub start_paragraph: i32,
     #[prost(int32, tag="4")]
     pub end_paragraph: i32,
-    #[prost(bytes="vec", tag="5")]
-    pub vector: ::prost::alloc::vec::Vec<u8>,
+    #[prost(float, repeated, tag="5")]
+    pub vector: ::prost::alloc::vec::Vec<f32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Vectors {

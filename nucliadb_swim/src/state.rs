@@ -247,7 +247,7 @@ impl ArtilleryEpidemic {
         }
 
         let encoded = serde_json::to_string(&message).unwrap();
-        println!("{} SENDS TO {} : {}", self.host_id, request.target, encoded);
+        debug!("{} SENDS TO {} : {}", self.host_id, request.target, encoded);
 
         assert!(encoded.len() < self.config.network_mtu);
 
@@ -284,7 +284,7 @@ impl ArtilleryEpidemic {
 
     fn enqueue_random_ping(&mut self) {
         if let Some(member) = self.members.next_random_member() {
-            println!("Random ping to {:?}", member);
+            debug!("Random ping to {:?}", member);
             self.request_tx
                 .send(ArtilleryClusterRequest::React(TargetedRequest {
                     request: Request::Heartbeat(Some(member.node_id())),
@@ -350,7 +350,7 @@ impl ArtilleryEpidemic {
         match message {
             AddSeed(addr) => self.seed_queue.push(addr),
             Respond(src_addr, message) => {
-                println!("{} RECV FROM {} {:?}", self.host_id, src_addr, message);
+                debug!("{} RECV FROM {} {:?}", self.host_id, src_addr, message);
                 self.respond_to_message(src_addr, message)
             }
             React(request) => {

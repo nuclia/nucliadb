@@ -105,9 +105,6 @@ class StreamAuditStorage(AuditStorage):
             except Exception:
                 logger.exception("Could not send audit", stack_info=True)
 
-    def message_to_str(self, message: BrokerMessage) -> str:
-        return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
-
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
 
@@ -118,7 +115,8 @@ class StreamAuditStorage(AuditStorage):
         partition = self.get_partition(message.kbid)
 
         res = await self.js.publish(
-            self.nats_target.format(partition=partition), message.SerializeToString()
+            self.nats_target.format(partition=partition, type=message.type),
+            message.SerializeToString(),
         )
         logger.debug(
             f"Pushed message to audit.  kb: {message.kbid}, resource: {message.rid}, partition: {partition}"
@@ -134,6 +132,9 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.origin = message.audit.origin
         auditrequest.type = AuditRequest.MODIFIED
         auditrequest.time.CopyFrom(message.audit.when)
+
+        for field in message.field_metadata:
+            auditrequest.field_metadata.append(field.field)
 
         await self.send(auditrequest)
 

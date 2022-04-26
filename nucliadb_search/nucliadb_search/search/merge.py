@@ -23,12 +23,14 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchResponse,
     ParagraphSearchResponse,
     SearchResponse,
+    SuggestResponse,
 )
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search.api.models import (
     KnowledgeboxSearchResults,
+    KnowledgeboxSuggestResults,
     Paragraph,
     Paragraphs,
     ResourceResult,
@@ -84,6 +86,31 @@ async def merge_documents_results(
             resources.append(resource.rid)
 
     return Resources(facets=facets, results=resource_list)
+
+
+async def merge_suggest_paragraph_results(
+    suggest_responses: List[SuggestResponse],
+    kbid: str,
+):
+
+    raw_paragraph_list: List[Paragraph] = []
+    for suggest_response in suggest_responses:
+        for result in suggest_response.results:
+            _, field_type, field = result.field.split("/")
+            text = await get_text_paragraph(result, kbid)
+            labels = await get_labels_paragraph(result, kbid)
+            raw_paragraph_list.append(
+                Paragraph(
+                    score=result.score,
+                    rid=result.uuid,
+                    field_type=field_type,
+                    field=field,
+                    text=text,
+                    labels=labels,
+                )
+            )
+
+    return Paragraphs(results=raw_paragraph_list)
 
 
 async def merge_paragraph_results(
@@ -181,4 +208,17 @@ async def merge_paragraphs_results(
     api_results.paragraphs = await merge_paragraph_results(
         paragraphs, resources, kbid, count, page
     )
+    return api_results
+
+
+async def merge_suggest_results(
+    results: List[SuggestResponse],
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+) -> KnowledgeboxSuggestResults:
+
+    api_results = KnowledgeboxSuggestResults()
+
+    api_results.paragraphs = await merge_suggest_paragraph_results(results, kbid)
     return api_results

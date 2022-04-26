@@ -45,7 +45,7 @@ message Vector {
     int32 end = 2;
     int32 start_paragraph = 3;
     int32 end_paragraph = 4;
-    bytes vector = 5;
+    repeated float vector = 5;
 }
 
 message Vectors {

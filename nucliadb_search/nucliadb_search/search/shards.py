@@ -22,6 +22,8 @@ from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchResponse,
     SearchRequest,
     SearchResponse,
+    SuggestRequest,
+    SuggestResponse,
 )
 from nucliadb_protos.noderesources_pb2 import Shard, ShardId
 
@@ -44,3 +46,8 @@ def query_paragraph_shard(
 ) -> ParagraphSearchResponse:
     query.id = shard
     return node.reader.ParagraphSearch(query)
+
+
+def suggest_shard(node: Node, shard: str, query: SuggestRequest) -> SuggestResponse:
+    query.shard = shard
+    return node.reader.Suggest(query)
