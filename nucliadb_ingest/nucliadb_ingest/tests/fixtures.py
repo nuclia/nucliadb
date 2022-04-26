@@ -23,14 +23,12 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from io import BytesIO
 from os.path import dirname, getsize
 from typing import List
 
 import aioredis
 import docker  # type: ignore
 import nats
-import numpy as np
 import pytest
 from grpc import aio, insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
@@ -703,10 +701,7 @@ def broker_resource(knowledgebox):
     v1.end = 19
     v1.start_paragraph = 0
     v1.end_paragraph = 45
-    nda_bytes = BytesIO()
-    np.save(nda_bytes, np.array(V1), allow_pickle=False)
-    nda_bytes.seek(0)
-    v1.vector = nda_bytes.read()
+    v1.vector.extend(V1)
     ev.vectors.vectors.vectors.append(v1)
 
     v2 = rpb.Vector()
@@ -714,10 +709,7 @@ def broker_resource(knowledgebox):
     v2.end = 45
     v2.start_paragraph = 0
     v2.end_paragraph = 45
-    nda_bytes = BytesIO()
-    np.save(nda_bytes, np.array(V2), allow_pickle=False)
-    nda_bytes.seek(0)
-    v2.vector = nda_bytes.read()
+    v2.vector.extend(V2)
     ev.vectors.vectors.vectors.append(v2)
 
     v3 = rpb.Vector()
@@ -725,10 +717,7 @@ def broker_resource(knowledgebox):
     v3.end = 65
     v3.start_paragraph = 47
     v3.end_paragraph = 64
-    nda_bytes = BytesIO()
-    np.save(nda_bytes, np.array(V3), allow_pickle=False)
-    nda_bytes.seek(0)
-    v3.vector = nda_bytes.read()
+    v3.vector.extend(V3)
     ev.vectors.vectors.vectors.append(v3)
 
     message1.field_vectors.append(ev)
