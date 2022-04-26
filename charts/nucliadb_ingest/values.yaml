@@ -29,7 +29,7 @@ serving:
 # Value of ports to where this component connects to
 services:
   # This must match the redis or tikv driver on nucliadb_shared
-  maindb: 6379 | 2379
+  maindb: 6379  # redis = 6379 | tikv = 2379
   nats: 4222
 
 running:
