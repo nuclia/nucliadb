@@ -191,6 +191,37 @@ message SearchRequest {
 
 }
 
+message SuggestRequest {
+    string shard = 1;
+
+    string body = 2;
+
+    Filter filter = 3;
+
+    Timestamps timestamps = 4;
+}
+
+
+
+message SuggestResponse {
+
+    int32 total = 1;
+
+    message Result {
+        string uuid = 1;
+        float score = 2;
+        string field = 3;
+        uint64 start = 4;
+        uint64 end = 5;
+        string paragraph = 6;
+        string split = 7;
+        uint64 index = 8;
+    }
+
+    repeated Result results = 2;
+
+}
+
 message SearchResponse {
     DocumentSearchResponse document = 1;
     ParagraphSearchResponse paragraph = 2;
@@ -209,4 +240,5 @@ service NodeReader {
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
 
     rpc Search(SearchRequest) returns (SearchResponse) {}
+    rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
 }

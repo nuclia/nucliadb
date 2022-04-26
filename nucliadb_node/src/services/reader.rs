@@ -24,7 +24,8 @@ use std::time::SystemTime;
 // use crate::services::vector::config::VectorServiceConfiguration;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    ResourceId, SearchRequest, SearchResponse, VectorSearchRequest, VectorSearchResponse,
+    ResourceId, SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
+    VectorSearchRequest, VectorSearchResponse,
 };
 use tantivy::Document;
 use tokio::{task, try_join};
@@ -143,6 +144,28 @@ impl ShardReaderService {
             Ok(document) => Ok(document),
             Err(e) => Err(Box::new(e)),
         }
+    }
+
+    pub async fn suggest(&self, search_request: SuggestRequest) -> InternalResult<SuggestResponse> {
+        let paragraph_request = ParagraphSearchRequest {
+            body: search_request.body.clone(),
+            filter: search_request.filter.clone(),
+            page_number: 0,
+            result_per_page: 10,
+            timestamps: search_request.timestamps.clone(),
+            reload: false,
+        };
+
+        let paragraph_reader_service = self.paragraph_reader_service.clone();
+        let paragraph_task =
+            task::spawn_blocking(move || paragraph_reader_service.search(&paragraph_request));
+        info!("{}:{}", line!(), file!());
+
+        let rparagraph = try_join!(paragraph_task).unwrap();
+        info!("{}:{}", line!(), file!());
+        Ok(SuggestResponse {
+            paragraph: Some(rparagraph?),
+        })
     }
 
     pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {

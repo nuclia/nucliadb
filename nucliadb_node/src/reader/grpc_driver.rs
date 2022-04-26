@@ -23,8 +23,8 @@ use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, EmptyQuery, ParagraphSearchRequest,
     ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, Shard as ShardPB, ShardId, ShardList, VectorSearchRequest,
-    VectorSearchResponse,
+    SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest, SuggestResponse,
+    VectorSearchRequest, VectorSearchResponse,
 };
 use opentelemetry::global;
 use tracing::{instrument, Span, *};
@@ -147,6 +147,35 @@ impl NodeReader for NodeReaderGRPCDriver {
             }
             Some(Err(e)) => {
                 info!("Document search ended incorrectly");
+                Err(tonic::Status::internal(e.to_string()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+
+    async fn suggest(
+        &self,
+        request: tonic::Request<SuggestRequest>,
+    ) -> Result<tonic::Response<SuggestResponse>, tonic::Status> {
+        info!("Suggest starts");
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        let suggest_request = request.into_inner();
+        let shard_id = ShardId {
+            id: suggest_request.shard.clone(),
+        };
+        let mut writer = self.0.write().await;
+        match writer.suggest(&shard_id, suggest_request).await {
+            Some(Ok(response)) => {
+                info!("Suggest ended correctly");
+                Ok(tonic::Response::new(response))
+            }
+            Some(Err(e)) => {
+                info!("Suggest ended incorrectly");
                 Err(tonic::Status::internal(e.to_string()))
             }
             None => {

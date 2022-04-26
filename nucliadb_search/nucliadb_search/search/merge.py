@@ -23,12 +23,14 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchResponse,
     ParagraphSearchResponse,
     SearchResponse,
+    SuggestResponse,
 )
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search.api.models import (
     KnowledgeboxSearchResults,
+    KnowledgeboxSuggestResults,
     Paragraph,
     Paragraphs,
     ResourceResult,
@@ -176,6 +178,27 @@ async def merge_paragraphs_results(
         paragraphs.append(result)
 
     api_results = ResourceSearchResults()
+
+    resources: List[str] = list()
+    api_results.paragraphs = await merge_paragraph_results(
+        paragraphs, resources, kbid, count, page
+    )
+    return api_results
+
+
+async def merge_suggest_results(
+    results: List[SuggestResponse],
+    count: int,
+    page: int,
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+) -> KnowledgeboxSuggestResults:
+    paragraphs = []
+    for result in results:
+        paragraphs.append(result.results)
+
+    api_results = KnowledgeboxSuggestResults()
 
     resources: List[str] = list()
     api_results.paragraphs = await merge_paragraph_results(

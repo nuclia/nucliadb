@@ -35,7 +35,7 @@ class NodesManager:
         self.driver = driver
         self.cache = cache
 
-    async def get_shards_by_kbid(self, kbid: str) -> List[ShardObject]:
+    async def get_shards_by_kbid_inner(self, kbid: str) -> PBShards:
         key = KB_SHARDS.format(kbid=kbid)
         txn = await self.driver.begin()
         payload = await txn.get(key)
@@ -47,7 +47,11 @@ class NodesManager:
 
         pb = PBShards()
         pb.ParseFromString(payload)
-        return [x for x in pb.shards]
+        return pb
+
+    async def get_shards_by_kbid(self, kbid: str) -> List[ShardObject]:
+        shards = await self.get_shards_by_kbid_inner(kbid)
+        return [x for x in shards.shards]
 
     def choose_node(self, shard: ShardObject) -> Tuple[Node, Optional[str]]:
         nodes = [x for x in range(len(shard.replicas))]

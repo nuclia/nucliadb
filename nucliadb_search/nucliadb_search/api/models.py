@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Type, TypeVar, Union
 
+from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import OrderBy
+from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
 from nucliadb_models.resource import Resource
@@ -29,6 +32,8 @@ if TYPE_CHECKING:
     SortValue = OrderBy.OrderType.V
 else:
     SortValue = int
+
+_T = TypeVar("_T")
 
 
 class NucliaDBRoles(str, Enum):
@@ -42,6 +47,12 @@ class SearchOptions(str, Enum):
     DOCUMENT = "document"
     RELATIONS = "relations"
     VECTOR = "vector"
+
+
+class SuggestOptions(str, Enum):
+    PARAGRAPH = "paragraph"
+    ENTITIES = "entities"
+    INTENT = "intent"
 
 
 class SearchClientType(str, Enum):
@@ -124,6 +135,10 @@ class KnowledgeboxSearchResults(BaseModel):
     relations: Optional[Relations] = None
 
 
+class KnowledgeboxSuggestResults(BaseModel):
+    paragraphs: Optional[Paragraphs] = None
+
+
 class KnowledgeboxCounters(BaseModel):
     resources: int
     paragraphs: int
@@ -140,3 +155,54 @@ class KnowledgeBoxCount(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
+
+
+class DocumentServiceEnum(int, Enum):
+    DOCUMENT_V0: Literal[0]
+
+
+class ParagraphServiceEnum(int, Enum):
+    PARAGRAPH_V0: Literal[0]
+
+
+class VectorServiceEnum(int, Enum):
+    VECTOR_V0: Literal[0]
+
+
+class RelationServiceEnum(int, Enum):
+    RELATION_V0: Literal[0]
+
+
+class ShardCreated(BaseModel):
+    id: str
+    document_service: DocumentServiceEnum
+    paragraph_service: ParagraphServiceEnum
+    vector_service: VectorServiceEnum
+    relation_service: RelationServiceEnum
+
+
+class ShardReplica(BaseModel):
+    node: str
+    shard: ShardCreated
+
+
+class ShardObject(BaseModel):
+    shard: str
+    replicas: List[ShardReplica]
+    timestamp: datetime
+
+    @classmethod
+    def from_message(cls: Type[_T], message: PBShardObject) -> _T:
+        return cls(
+            **MessageToDict(
+                message,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
+
+
+class KnowledgeboxShards(BaseModel):
+    kbid: str
+    actual: int
+    shards: List[ShardObject]

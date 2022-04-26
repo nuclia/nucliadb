@@ -242,6 +242,46 @@ pub struct SearchRequest {
     pub reload: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SuggestRequest {
+    #[prost(string, tag="1")]
+    pub shard: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub body: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="3")]
+    pub filter: ::core::option::Option<Filter>,
+    #[prost(message, optional, tag="4")]
+    pub timestamps: ::core::option::Option<Timestamps>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SuggestResponse {
+    #[prost(int32, tag="1")]
+    pub total: i32,
+    #[prost(message, repeated, tag="2")]
+    pub results: ::prost::alloc::vec::Vec<suggest_response::Result>,
+}
+/// Nested message and enum types in `SuggestResponse`.
+pub mod suggest_response {
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct Result {
+        #[prost(string, tag="1")]
+        pub uuid: ::prost::alloc::string::String,
+        #[prost(float, tag="2")]
+        pub score: f32,
+        #[prost(string, tag="3")]
+        pub field: ::prost::alloc::string::String,
+        #[prost(uint64, tag="4")]
+        pub start: u64,
+        #[prost(uint64, tag="5")]
+        pub end: u64,
+        #[prost(string, tag="6")]
+        pub paragraph: ::prost::alloc::string::String,
+        #[prost(string, tag="7")]
+        pub split: ::prost::alloc::string::String,
+        #[prost(uint64, tag="8")]
+        pub index: u64,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {
     #[prost(message, optional, tag="1")]
     pub document: ::core::option::Option<DocumentSearchResponse>,
@@ -449,6 +489,25 @@ pub mod node_reader_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn suggest(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SuggestRequest>,
+        ) -> Result<tonic::Response<super::SuggestResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/Suggest",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -489,6 +548,10 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::SearchRequest>,
         ) -> Result<tonic::Response<super::SearchResponse>, tonic::Status>;
+        async fn suggest(
+            &self,
+            request: tonic::Request<super::SuggestRequest>,
+        ) -> Result<tonic::Response<super::SuggestResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct NodeReaderServer<T: NodeReader> {
@@ -801,6 +864,44 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = SearchSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/Suggest" => {
+                    #[allow(non_camel_case_types)]
+                    struct SuggestSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::UnaryService<super::SuggestRequest>
+                    for SuggestSvc<T> {
+                        type Response = super::SuggestResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SuggestRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).suggest(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = SuggestSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

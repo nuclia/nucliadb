@@ -18,37 +18,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import annotations
+
 import asyncio
-from functools import lru_cache
 import logging
+import os
 import sys
 import time
-from typing import Dict, Generator, List, Optional
+from functools import lru_cache
+from typing import Dict, Generator, List, Optional, Tuple
+
+import aiofiles
 import nats
 from nats import errors
-import os
+from nats.aio.client import Client, Msg
+from nats.aio.subscription import Subscription
+from nats.js.client import JetStreamContext
+from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup
+from nucliadb_protos.resources_pb2 import FieldComputedMetadata, FieldID
+from nucliadb_protos.writer_pb2 import GetEntitiesResponse
+from sentry_sdk import capture_exception
+
 from nucliadb_ingest.fields.base import FIELD_METADATA
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.orm.resource import KB_REVERSE_REVERSE
-from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup
-from nucliadb_protos.resources_pb2 import FieldComputedMetadata, FieldID
-from nucliadb_protos.writer_pb2 import GetEntitiesResponse
-from nucliadb_utils.storages.storage import Storage, StorageField
-from nucliadb_utils.utilities import get_cache, get_storage
-
-from sentry_sdk import capture_exception
-from nucliadb_protos.audit_pb2 import AuditRequest
-from nats.aio.client import Msg
-from nats.aio.subscription import Subscription
 from nucliadb_ingest.sentry import SENTRY, set_sentry
 from nucliadb_ingest.utils import get_driver
-from nucliadb_utils.settings import running_settings
-from nucliadb_utils.settings import audit_settings
-from nats.aio.client import Client
-from nats.js.client import JetStreamContext
-import aiofiles
-from lru import LRU
+from nucliadb_utils.settings import audit_settings, running_settings
+from nucliadb_utils.storages.storage import Storage, StorageField
+from nucliadb_utils.utilities import get_cache, get_storage
 
 CACHE_FOLDER = "/cache/{worker}"
 CURATOR_ID = "/internal/curator/{worker}"
@@ -84,11 +83,14 @@ class Entities:
                 if ner not in self.data.groups[ner_type].entities:
                     self.data.groups[ner_type].entities[ner].value = ner
 
-    def items(self) -> Generator[str, EntitiesGroup]:
+    def items(
+        self,
+    ) -> Generator[Tuple[Optional[str], Optional[EntitiesGroup]], None, None]:
         if self.data is None:
-            return None, None
-        for key, value in self.data.groups:
-            yield key, value
+            yield None, None
+        else:
+            for key, value in self.data.groups.items():
+                yield key, value
 
 
 class Consumer:
@@ -111,7 +113,7 @@ class Consumer:
             worker=self.partition
         )
         self.dead_time = time.time() + ttl
-        self.kbs_touch = []
+        self.kbs_touch: List[str] = []
         self.lock = asyncio.Lock()
         self.js = js
         os.makedirs(self.cache, exist_ok=True)
@@ -197,8 +199,7 @@ class Consumer:
                         pb.kbid, pb.rid, field
                     )
 
-                    for resource_entity in resource_entities:
-                        kb_entities.merge(resource_entity)
+                    kb_entities.merge(resource_entities)
 
                 self.kbs_touch.append(pb.kbid)
                 await kb_entities.save()

@@ -25,8 +25,8 @@ use std::path::Path;
 
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, VectorSearchRequest,
-    VectorSearchResponse,
+    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest,
+    SuggestResponse, VectorSearchRequest, VectorSearchResponse,
 };
 use tracing::*;
 
@@ -114,6 +114,17 @@ impl NodeReaderService {
             shards.push(elem);
         }
         ShardList { shards }
+    }
+    pub async fn suggest(
+        &mut self,
+        shard_id: &ShardId,
+        request: SuggestRequest,
+    ) -> Option<ServiceResult<SuggestResponse>> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            Some(shard.suggest(request).await.map_err(|e| e.into()))
+        } else {
+            None
+        }
     }
     pub async fn search(
         &mut self,

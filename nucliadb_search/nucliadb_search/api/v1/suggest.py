@@ -19,7 +19,6 @@
 #
 import asyncio
 from datetime import datetime
-from time import time
 from typing import List, Optional
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -27,33 +26,27 @@ from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import SearchResponse
-from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject
 from sentry_sdk import capture_exception
 
-from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
+from nucliadb_models.serialize import ResourceProperties
 from nucliadb_search import logger
 from nucliadb_search.api.models import (
-    KnowledgeboxCounters,
-    KnowledgeboxSearchResults,
+    KnowledgeboxSuggestResults,
     SearchClientType,
-    SearchOptions,
-    SortOption,
+    SuggestOptions,
 )
 from nucliadb_search.api.v1.router import KB_PREFIX, api
 from nucliadb_search.search.fetch import abort_transaction  # type: ignore
-from nucliadb_search.search.merge import merge_results
-from nucliadb_search.search.query import global_query_to_pb
-from nucliadb_search.search.shards import get_shard, query_shard
+from nucliadb_search.search.merge import merge_suggest_results
+from nucliadb_search.search.query import suggest_query_to_pb
+from nucliadb_search.search.shards import suggest_shard
 from nucliadb_search.settings import settings
-from nucliadb_search.utilities import get_counter, get_driver, get_nodes
+from nucliadb_search.utilities import get_counter, get_nodes
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.exceptions import ShardsNotFound
-from nucliadb_utils.utilities import get_audit, get_cache
 
 
 @api.get(
@@ -65,7 +58,7 @@ from nucliadb_utils.utilities import get_audit, get_cache
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def search_knowledgebox(
+async def suggest_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
@@ -77,25 +70,21 @@ async def search_knowledgebox(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    features: List[SearchOptions] = [
+    features: List[SuggestOptions] = [
         SuggestOptions.PARAGRAPH,
         SuggestOptions.ENTITIES,
-        SuggestOptions.VECTOR,
-        SuggestOptions.RELATIONS,
+        SuggestOptions.INTENT,
     ],
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     x_ndb_client: SearchClientType = Header(SearchClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
+) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
-    audit = get_audit()
-    timeit = time()
 
     try:
         shard_groups: List[ShardObject] = await nodemanager.get_shards_by_kbid(kbid)
@@ -174,18 +163,9 @@ async def search_knowledgebox(
         kbid=kbid,
         show=show,
         field_type_filter=field_type_filter,
-        extracted=extracted,
     )
     await abort_transaction()
 
     get_counter()[f"{kbid}_-_suggest_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
-    await audit.suggest(
-        kbid,
-        x_nucliadb_user,
-        x_forwarded_for,
-        pb_query,
-        timeit - time(),
-        len(search_results.resources),
-    )
     return search_results
