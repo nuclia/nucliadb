@@ -25,7 +25,7 @@ use std::time::SystemTime;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
     ResourceId, SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
-    VectorSearchRequest, VectorSearchResponse,
+    VectorSearchRequest, VectorSearchResponse, suggest_response, paragraph_search_response, 
 };
 use tantivy::Document;
 use tokio::{task, try_join};
@@ -147,6 +147,7 @@ impl ShardReaderService {
     }
 
     pub async fn suggest(&self, search_request: SuggestRequest) -> InternalResult<SuggestResponse> {
+
         let paragraph_request = ParagraphSearchRequest {
             body: search_request.body.clone(),
             filter: search_request.filter.clone(),
@@ -154,6 +155,11 @@ impl ShardReaderService {
             result_per_page: 10,
             timestamps: search_request.timestamps.clone(),
             reload: false,
+            id: String::default(),
+            uuid: String::default(),
+            fields: Vec::default(),
+            order: None,
+            faceted: None
         };
 
         let paragraph_reader_service = self.paragraph_reader_service.clone();
@@ -161,10 +167,23 @@ impl ShardReaderService {
             task::spawn_blocking(move || paragraph_reader_service.search(&paragraph_request));
         info!("{}:{}", line!(), file!());
 
-        let rparagraph = try_join!(paragraph_task).unwrap();
+        let rparagraph = paragraph_task.await.unwrap()?;
+        let into_suggest = |r: paragraph_search_response::Result| {
+            suggest_response::Result {
+                uuid: r.uuid,
+                score: r.score,
+                field: r.field,
+                start: r.start,
+                end: r.end,
+                paragraph: r.paragraph,
+                split: r.split,
+                index: r.index,
+            }
+        };
         info!("{}:{}", line!(), file!());
         Ok(SuggestResponse {
-            paragraph: Some(rparagraph?),
+            total: rparagraph.total,
+            results: rparagraph.results.into_iter().map(into_suggest).collect(),
         })
     }
 
