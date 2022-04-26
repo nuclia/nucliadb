@@ -56,7 +56,6 @@ spec:
             - mountPath: /cache
               name: cache-volume
 {{- if .Values.nats.secretName }}
-            volumeMounts:
             - name: nats-creds
               readOnly: true
               mountPath: /appsecrets
