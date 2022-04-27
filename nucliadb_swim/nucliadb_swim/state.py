@@ -285,7 +285,11 @@ class ArtilleryEpidemic:
 
         socket = state.transport.get_extra_info("socket")
         state.transport.close()
-        socket.close()
+        try:
+            socket.close()
+        except TypeError:
+            # UVLoop fails
+            pass
         state.exit = True
 
     async def process_request(self, request: TargetedRequest) -> None:
