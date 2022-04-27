@@ -28,7 +28,7 @@ spec:
     metadata:
       name: ingest
       annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.swim }},{{.Values.serving.monitoring }},{{.Values.serving.metrics }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.swim }},{{.Values.serving.monitor }},{{.Values.serving.metrics }}"
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},{{.Values.serving.swim }}"
       labels:
         app: ingest
