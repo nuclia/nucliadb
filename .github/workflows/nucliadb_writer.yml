@@ -105,7 +105,7 @@ jobs:
           extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION
 
       - name: Cache extracted docs
-        uses: actions/cache@v3.0.1
+        uses: actions/cache@v3.0.2
         with:
           path: /tmp/openapi
           key: openapi-${{ env.COMPONENT }}
@@ -196,7 +196,7 @@ jobs:
 
     steps:
       - name: Cache extracted docs
-        uses: actions/cache@v3.0.1
+        uses: actions/cache@v3.0.2
         with:
           path: /tmp/openapi
           key: openapi-${{ env.COMPONENT }}
