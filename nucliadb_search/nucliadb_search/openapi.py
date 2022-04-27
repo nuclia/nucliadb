@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import datetime
 import json
 import sys
 
@@ -25,11 +26,10 @@ from fastapi.openapi.utils import get_openapi
 from starlette.routing import Mount
 
 from nucliadb_reader import API_PREFIX
-import datetime
 
 
 def is_versioned_route(route):
-    return isinstance(route, Mount) and route.path.startswith(f'/{API_PREFIX}/v')
+    return isinstance(route, Mount) and route.path.startswith(f"/{API_PREFIX}/v")
 
 
 def extract_openapi(application, version, commit_id):
@@ -54,7 +54,7 @@ def extract_openapi(application, version, commit_id):
     document["x-metadata"] = {
         "nucliadb_search": {
             "commit": commit_id,
-            "last_updated": datetime.datetime.utcnow().isoformat()
+            "last_updated": datetime.datetime.utcnow().isoformat(),
         }
     }
     return document
@@ -67,4 +67,7 @@ def command_extract_openapi():
     api_version = sys.argv[2]
     commit_id = sys.argv[3]
 
-    json.dump(extract_openapi(application, api_version, commit_id), open(openapi_json_path, "w"))
+    json.dump(
+        extract_openapi(application, api_version, commit_id),
+        open(openapi_json_path, "w"),
+    )
