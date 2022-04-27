@@ -1,3 +1,22 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -33,6 +52,23 @@ impl Default for HNSWParams {
             ef_construction: 100,
             k_neighbours: 10,
         }
+    }
+}
+impl HNSWParams {
+    pub const fn no_layers() -> usize {
+        4
+    }
+    pub const fn m_max() -> usize {
+        16
+    }
+    pub const fn m() -> usize {
+        16
+    }
+    pub const fn ef_construction() -> usize {
+        100
+    }
+    pub const fn k_neighbours() -> usize {
+        10
     }
 }
 
@@ -289,6 +325,11 @@ impl ByteRpr for Vector {
 pub struct GraphLayer {
     cnx: HashMap<NodeID, Vec<Edge>>,
 }
+impl Default for GraphLayer {
+    fn default() -> Self {
+        GraphLayer::new()
+    }
+}
 impl ByteRpr for GraphLayer {
     fn serialize(&self) -> Vec<u8> {
         let mut serialized = vec![];
@@ -322,6 +363,33 @@ impl ByteRpr for GraphLayer {
             segment_start = edges_end;
         }
         GraphLayer { cnx }
+    }
+}
+impl std::ops::Index<(NodeID, usize)> for GraphLayer {
+    type Output = Edge;
+    fn index(&self, (node, edge): (NodeID, usize)) -> &Self::Output {
+        self.cnx.get(&node).map(|v| &v[edge]).unwrap()
+    }
+}
+
+impl GraphLayer {
+    pub fn new() -> GraphLayer {
+        GraphLayer {
+            cnx: HashMap::new(),
+        }
+    }
+    pub fn add_node(&mut self, node: NodeID) {
+        self.cnx.insert(node, vec![]);
+    }
+    pub fn add_edge(&mut self, node: NodeID, edge: Edge) {
+        let edges = self.cnx.entry(node).or_insert(vec![]);
+        edges.push(edge);
+    }
+    pub fn get_edge(&self, node: NodeID, id: usize) -> Option<Edge> {
+        self.cnx.get(&node).map(|v| v[id])
+    }
+    pub fn no_edges(&self, node: NodeID) -> Option<usize> {
+        self.cnx.get(&node).map(|v| v.len())
     }
 }
 
