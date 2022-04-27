@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import OrderBy
@@ -157,20 +156,20 @@ class KnowledgeBoxCount(BaseModel):
     sentences: int
 
 
-class DocumentServiceEnum(int, Enum):
-    DOCUMENT_V0: Literal[0]
+class DocumentServiceEnum(str, Enum):
+    DOCUMENT_V0 = "DOCUMENT_V0"
 
 
-class ParagraphServiceEnum(int, Enum):
-    PARAGRAPH_V0: Literal[0]
+class ParagraphServiceEnum(str, Enum):
+    PARAGRAPH_V0 = "PARAGRAPH_V0"
 
 
-class VectorServiceEnum(int, Enum):
-    VECTOR_V0: Literal[0]
+class VectorServiceEnum(str, Enum):
+    VECTOR_V0 = "VECTOR_V0"
 
 
-class RelationServiceEnum(int, Enum):
-    RELATION_V0: Literal[0]
+class RelationServiceEnum(str, Enum):
+    RELATION_V0 = "RELATION_V0"
 
 
 class ShardCreated(BaseModel):
@@ -189,7 +188,6 @@ class ShardReplica(BaseModel):
 class ShardObject(BaseModel):
     shard: str
     replicas: List[ShardReplica]
-    timestamp: datetime
 
     @classmethod
     def from_message(cls: Type[_T], message: PBShardObject) -> _T:
