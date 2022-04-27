@@ -66,6 +66,10 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.SearchRequest,
         nucliadb_protos.nodereader_pb2.SearchResponse] = ...
 
+    Suggest: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodereader_pb2.SuggestRequest,
+        nucliadb_protos.nodereader_pb2.SuggestResponse] = ...
+
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
     """Implemented at nucliadb_object_storage
@@ -112,6 +116,12 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.SearchRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.SearchResponse: ...
+
+    @abc.abstractmethod
+    def Suggest(self,
+        request: nucliadb_protos.nodereader_pb2.SuggestRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.SuggestResponse: ...
 
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

@@ -57,7 +57,7 @@ class Vector(BaseModel):
     end: Optional[int]
     start_paragraph: Optional[int]
     end_paragraph: Optional[int]
-    vector: Optional[str]
+    vector: Optional[List[float]]
 
 
 class Vectors(BaseModel):

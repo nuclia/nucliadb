@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import datetime
 import json
 import sys
 
@@ -27,16 +28,17 @@ from starlette.routing import Mount
 from nucliadb_writer import API_PREFIX
 
 
-def extract_openapi(app, version):
-    app = [
-        a.app
-        for a in app.routes
-        if a.path.startswith(f"/{API_PREFIX}/v{version}")
-        and isinstance(a, Mount)
-        and a.app.version == version
-    ][0]
+def is_versioned_route(route):
+    return isinstance(route, Mount) and route.path.startswith(f"/{API_PREFIX}/v")
 
-    return get_openapi(
+
+def extract_openapi(application, version, commit_id):
+    app = [
+        route.app
+        for route in application.routes
+        if is_versioned_route(route) and route.app.version == version
+    ][0]
+    document = get_openapi(
         title=app.title,
         version=app.version,
         openapi_version=app.openapi_version,
@@ -49,10 +51,23 @@ def extract_openapi(app, version):
         servers=app.servers,
     )
 
+    document["x-metadata"] = {
+        "nucliadb_writer": {
+            "commit": commit_id,
+            "last_updated": datetime.datetime.utcnow().isoformat(),
+        }
+    }
+    return document
+
 
 def command_extract_openapi():
     from nucliadb_writer.app import application
 
     openapi_json_path = sys.argv[1]
-    version = "1"
-    json.dump(extract_openapi(application, version), open(openapi_json_path, "w"))
+    api_version = sys.argv[2]
+    commit_id = sys.argv[3]
+
+    json.dump(
+        extract_openapi(application, api_version, commit_id),
+        open(openapi_json_path, "w"),
+    )

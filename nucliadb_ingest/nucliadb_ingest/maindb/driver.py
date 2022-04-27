@@ -62,6 +62,16 @@ class Transaction:
 class Driver:
     initialized = False
 
+    async def last_seqid(self, worker: str) -> Optional[int]:
+        txn = await self.begin()
+        key = TXNID.format(worker=worker)
+        last_seq = await txn.get(key)
+        await txn.abort()
+        if last_seq is None:
+            return None
+        else:
+            return int(last_seq)
+
     async def initialize(self):
         raise NotImplementedError()
 

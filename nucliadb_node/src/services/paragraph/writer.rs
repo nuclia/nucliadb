@@ -242,7 +242,7 @@ impl ParagraphWriterService {
                     subdoc.add_facet(self.schema.facets, Facet::from(label.as_str()));
                 }
 
-                debug!(
+                info!(
                     "Adding paragraph for {} with labels as {:?} [{} - {}]: {} ({})",
                     field, labels, start_pos, end_pos, text, paragraph_id
                 );

@@ -23,9 +23,9 @@ use std::panic;
 
 use async_std::fs;
 use async_trait::async_trait;
-use document_search_response::Result as DSResult;
 use nucliadb_protos::{
-    document_search_response, DocumentSearchRequest, DocumentSearchResponse, OrderBy, ResourceId,
+    DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults,
+    OrderBy, ResourceId,
 };
 use tantivy::collector::{Count, FacetCollector, FacetCounts, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, QueryParser, TermQuery};
@@ -233,7 +233,7 @@ impl FieldReaderService {
                         .unwrap()
                         .to_path_string();
 
-                    let result = DSResult {
+                    let result = DocumentResult {
                         uuid,
                         field,
                         score,
@@ -255,7 +255,7 @@ impl FieldReaderService {
                 .facets_count
                 .top_k("/t", 50)
                 .iter()
-                .map(|(facet, count)| document_search_response::FacetResult {
+                .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
                     total: *count as i32,
                 })
@@ -263,7 +263,7 @@ impl FieldReaderService {
 
             facets.insert(
                 facet,
-                document_search_response::FacetResults {
+                FacetResults {
                     facetresults: count,
                 },
             );
@@ -307,7 +307,7 @@ impl FieldReaderService {
                         .unwrap()
                         .to_path_string();
 
-                    let result = DSResult {
+                    let result = DocumentResult {
                         uuid,
                         field,
                         score_bm25: score,
@@ -329,7 +329,7 @@ impl FieldReaderService {
                 .facets_count
                 .top_k("/t", 50)
                 .iter()
-                .map(|(facet, count)| document_search_response::FacetResult {
+                .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
                     total: *count as i32,
                 })
@@ -337,7 +337,7 @@ impl FieldReaderService {
 
             facets.insert(
                 facet,
-                document_search_response::FacetResults {
+                FacetResults {
                     facetresults: count,
                 },
             );

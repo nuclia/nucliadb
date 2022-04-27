@@ -15,7 +15,7 @@ spec:
     chart: "{{ .Chart.Name }}"
   clusterIP: None
   ports:
-  - name: grpc
+  - name: grpc-ingest
     port: {{ .Values.serving.grpc }}
     protocol: TCP
     appProtocol: grpc

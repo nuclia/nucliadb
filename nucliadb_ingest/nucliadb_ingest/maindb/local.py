@@ -39,13 +39,16 @@ except ImportError:
 
 
 class LocalTransaction(Transaction):
-    modified_keys: Dict[str, bytes] = {}
-    visited_keys: Dict[str, bytes] = {}
-    deleted_keys: List[str] = []
+    modified_keys: Dict[str, bytes]
+    visited_keys: Dict[str, bytes]
+    deleted_keys: List[str]
 
     def __init__(self, url: str):
         self.url = url
         self.open = True
+        self.modified_keys = {}
+        self.visited_keys = {}
+        self.deleted_keys = []
 
     def clean(self):
         self.modified_keys.clear()

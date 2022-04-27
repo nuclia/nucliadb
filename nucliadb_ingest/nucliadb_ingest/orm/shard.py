@@ -64,7 +64,7 @@ class Shard:
             resource.shard_id = shard = shardreplica.shard.id
             if reindex_id is not None:
                 indexpb = await storage.reindexing(
-                    resource, shardreplica.node, shard, str(txid)
+                    resource, shardreplica.node, shard, reindex_id
                 )
             else:
                 indexpb = await storage.indexing(

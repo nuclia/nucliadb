@@ -1,10 +1,16 @@
 CHANGELOG
 =========
 
-0.0.23 (unreleased)
+0.0.24 (unreleased)
 -------------------
 
 - Nothing changed yet.
+
+
+0.0.23 (2022-04-26)
+-------------------
+
+- Breaking change: Vectors are now a list of floats
 
 
 0.0.22 (2022-04-13)

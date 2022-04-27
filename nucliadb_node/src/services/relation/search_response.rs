@@ -21,8 +21,8 @@ use std::collections::HashMap;
 
 use nucliadb_protos::order_by::OrderType;
 use nucliadb_protos::{
-    document_search_response, paragraph_search_response, DocumentSearchResponse, OrderBy,
-    ParagraphSearchResponse,
+    DocumentSearchResponse, OrderBy, FacetResult, FacetResults
+    ParagraphResult, ParagraphSearchResponse, DocumentResult
 };
 use tantivy::collector::FacetCounts;
 use tantivy::DocAddress;
@@ -78,7 +78,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let result = paragraph_search_response::Result {
+                    let result = ParagraphResult {
                         uuid,
                         start_pos,
                         end_pos,
@@ -104,7 +104,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
                 .facets_count
                 .top_k(facet.as_str(), 50)
                 .iter()
-                .map(|(facet, count)| paragraph_search_response::FacetResult {
+                .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
                     total: *count as i32,
                 })
@@ -112,7 +112,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
 
             facet_map.insert(
                 facet,
-                paragraph_search_response::FacetResults {
+                FacetResults {
                     facetresults: count,
                 },
             );
@@ -145,7 +145,7 @@ impl<'a> From<SearchResponse<'a>> for DocumentSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let result = document_search_response::Result { uuid };
+                    let result = DocumentResult { uuid };
 
                     results.push(result);
                 }
@@ -166,7 +166,7 @@ impl<'a> From<SearchResponse<'a>> for DocumentSearchResponse {
             .facets_count
             .top_k("/t", 50)
             .iter()
-            .map(|(facet, count)| document_search_response::FacetResult {
+            .map(|(facet, count)| FacetResult {
                 tag: facet.to_string(),
                 total: *count as i32,
             })
@@ -177,16 +177,16 @@ impl<'a> From<SearchResponse<'a>> for DocumentSearchResponse {
             .facets_count
             .top_k("/l", 50)
             .iter()
-            .map(|(facet, count)| document_search_response::FacetResult {
+            .map(|(facet, count)| FacetResult {
                 tag: facet.to_string(),
                 total: *count as i32,
             })
             .collect();
 
-        let facet_tags = document_search_response::FacetResults {
+        let facet_tags = FacetResults {
             facetresults: tag_count,
         };
-        let facet_labels = document_search_response::FacetResults {
+        let facet_labels = FacetResults {
             facetresults: label_count,
         };
 

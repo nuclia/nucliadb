@@ -467,7 +467,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
         resobj = ResourceORM(txn, storage, kbobj, request.rid)
         brain = await resobj.generate_index_message()
-        shard: Optional[Shard] = await kbobj.get_resource_shard(request.rid)
+        shard_id = await kbobj.get_resource_shard_id(request.rid)
+        shard: Optional[Shard] = None
+        if shard_id is not None:
+            shard = await kbobj.get_resource_shard(shard_id)
         if shard is None:
             # Its a new resource
             # Check if we have enough resource to create a new shard

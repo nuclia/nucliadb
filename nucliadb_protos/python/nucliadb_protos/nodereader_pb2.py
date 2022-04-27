@@ -28,7 +28,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n nucliadb_protos/nodereader.proto\x12\nnodereader\x1a#nucliadb_protos/noderesources.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnucliadb_protos/utils.proto\"\x16\n\x06\x46ilter\x12\x0c\n\x04tags\x18\x01 \x03(\t\"\x17\n\x07\x46\x61\x63\x65ted\x12\x0c\n\x04tags\x18\x01 \x03(\t\"e\n\x07OrderBy\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12+\n\x04type\x18\x02 \x01(\x0e\x32\x1d.nodereader.OrderBy.OrderType\"\x1e\n\tOrderType\x12\x08\n\x04\x44\x45SC\x10\x00\x12\x07\n\x03\x41SC\x10\x01\"\xd2\x01\n\nTimestamps\x12\x31\n\rfrom_modified\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0bto_modified\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x66rom_created\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nto_created\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x99\x02\n\x15\x44ocumentSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\n \x01(\x08\"\xa8\x02\n\x16ParagraphSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\"\n\x06\x66ilter\x18\x05 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x07 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x08 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\n \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x0b \x01(\x05\x12*\n\ntimestamps\x18\x0c \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\r \x01(\x08\"\xfc\x03\n\x16\x44ocumentSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12:\n\x07results\x18\x02 \x03(\x0b\x32).nodereader.DocumentSearchResponse.Result\x12>\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32..nodereader.DocumentSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aH\n\x06Result\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x04\x12\x12\n\nscore_bm25\x18\x03 \x01(\x02\x12\r\n\x05\x66ield\x18\x04 \x01(\t\x1a)\n\x0b\x46\x61\x63\x65tResult\x12\x0b\n\x03tag\x18\x01 \x01(\t\x12\r\n\x05total\x18\x02 \x01(\x05\x1aT\n\x0c\x46\x61\x63\x65tResults\x12\x44\n\x0c\x66\x61\x63\x65tresults\x18\x01 \x03(\x0b\x32..nodereader.DocumentSearchResponse.FacetResult\x1a^\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12>\n\x05value\x18\x02 \x01(\x0b\x32/.nodereader.DocumentSearchResponse.FacetResults:\x02\x38\x01\"\xbb\x04\n\x17ParagraphSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12;\n\x07results\x18\x02 \x03(\x0b\x32*.nodereader.ParagraphSearchResponse.Result\x12?\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32/.nodereader.ParagraphSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1a\x81\x01\n\x06Result\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x02\x12\r\n\x05\x66ield\x18\x03 \x01(\t\x12\r\n\x05start\x18\x04 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x05 \x01(\x04\x12\x11\n\tparagraph\x18\x06 \x01(\t\x12\r\n\x05split\x18\x07 \x01(\t\x12\r\n\x05index\x18\x08 \x01(\x04\x1a)\n\x0b\x46\x61\x63\x65tResult\x12\x0b\n\x03tag\x18\x01 \x01(\t\x12\r\n\x05total\x18\x02 \x01(\x05\x1aU\n\x0c\x46\x61\x63\x65tResults\x12\x45\n\x0c\x66\x61\x63\x65tresults\x18\x01 \x03(\x0b\x32/.nodereader.ParagraphSearchResponse.FacetResult\x1a_\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12?\n\x05value\x18\x02 \x01(\x0b\x32\x30.nodereader.ParagraphSearchResponse.FacetResults:\x02\x38\x01\"O\n\x13VectorSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06vector\x18\x02 \x03(\x02\x12\x0c\n\x04tags\x18\x03 \x03(\t\x12\x0e\n\x06reload\x18\r \x01(\x08\"&\n\x18\x44ocumentVectorIdentifier\x12\n\n\x02id\x18\x01 \x01(\t\"U\n\x0e\x44ocumentScored\x12\x34\n\x06\x64oc_id\x18\x01 \x01(\x0b\x32$.nodereader.DocumentVectorIdentifier\x12\r\n\x05score\x18\x02 \x01(\x02\"E\n\x14VectorSearchResponse\x12-\n\tdocuments\x18\x01 \x03(\x0b\x32\x1a.nodereader.DocumentScored\"\x17\n\x15RelationSearchRequest\"\x18\n\x16RelationSearchResponse\"\xa4\x02\n\rSearchRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0e\n\x06\x66ields\x18\x02 \x03(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06vector\x18\n \x03(\x02\x12\x0e\n\x06reload\x18\x0b \x01(\x08\"\xb0\x01\n\x0eSearchResponse\x12\x34\n\x08\x64ocument\x18\x01 \x01(\x0b\x32\".nodereader.DocumentSearchResponse\x12\x36\n\tparagraph\x18\x02 \x01(\x0b\x32#.nodereader.ParagraphSearchResponse\x12\x30\n\x06vector\x18\x03 \x01(\x0b\x32 .nodereader.VectorSearchResponse2\xb8\x04\n\nNodeReader\x12:\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x14.noderesources.Shard\"\x00\x12\x42\n\tGetShards\x12\x19.noderesources.EmptyQuery\x1a\x18.noderesources.ShardList\"\x00\x12Y\n\x0e\x44ocumentSearch\x12!.nodereader.DocumentSearchRequest\x1a\".nodereader.DocumentSearchResponse\"\x00\x12\\\n\x0fParagraphSearch\x12\".nodereader.ParagraphSearchRequest\x1a#.nodereader.ParagraphSearchResponse\"\x00\x12S\n\x0cVectorSearch\x12\x1f.nodereader.VectorSearchRequest\x1a .nodereader.VectorSearchResponse\"\x00\x12Y\n\x0eRelationSearch\x12!.nodereader.RelationSearchRequest\x1a\".nodereader.RelationSearchResponse\"\x00\x12\x41\n\x06Search\x12\x19.nodereader.SearchRequest\x1a\x1a.nodereader.SearchResponse\"\x00P\x00P\x02\x62\x06proto3'
+  serialized_pb=b'\n nucliadb_protos/nodereader.proto\x12\nnodereader\x1a#nucliadb_protos/noderesources.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnucliadb_protos/utils.proto\"\x16\n\x06\x46ilter\x12\x0c\n\x04tags\x18\x01 \x03(\t\"\x17\n\x07\x46\x61\x63\x65ted\x12\x0c\n\x04tags\x18\x01 \x03(\t\"e\n\x07OrderBy\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12+\n\x04type\x18\x02 \x01(\x0e\x32\x1d.nodereader.OrderBy.OrderType\"\x1e\n\tOrderType\x12\x08\n\x04\x44\x45SC\x10\x00\x12\x07\n\x03\x41SC\x10\x01\"\xd2\x01\n\nTimestamps\x12\x31\n\rfrom_modified\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0bto_modified\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x66rom_created\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nto_created\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\")\n\x0b\x46\x61\x63\x65tResult\x12\x0b\n\x03tag\x18\x01 \x01(\t\x12\r\n\x05total\x18\x02 \x01(\x05\"=\n\x0c\x46\x61\x63\x65tResults\x12-\n\x0c\x66\x61\x63\x65tresults\x18\x01 \x03(\x0b\x32\x17.nodereader.FacetResult\"\x99\x02\n\x15\x44ocumentSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\n \x01(\x08\"\xa8\x02\n\x16ParagraphSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\"\n\x06\x66ilter\x18\x05 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x07 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x08 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\n \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x0b \x01(\x05\x12*\n\ntimestamps\x18\x0c \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\r \x01(\x08\"P\n\x0e\x44ocumentResult\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x04\x12\x12\n\nscore_bm25\x18\x03 \x01(\x02\x12\r\n\x05\x66ield\x18\x04 \x01(\t\"\x8b\x02\n\x16\x44ocumentSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12+\n\x07results\x18\x02 \x03(\x0b\x32\x1a.nodereader.DocumentResult\x12>\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32..nodereader.DocumentSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aG\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.nodereader.FacetResults:\x02\x38\x01\"\x8a\x01\n\x0fParagraphResult\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x02\x12\r\n\x05\x66ield\x18\x03 \x01(\t\x12\r\n\x05start\x18\x04 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x05 \x01(\x04\x12\x11\n\tparagraph\x18\x06 \x01(\t\x12\r\n\x05split\x18\x07 \x01(\t\x12\r\n\x05index\x18\x08 \x01(\x04\"\x8e\x02\n\x17ParagraphSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12,\n\x07results\x18\x02 \x03(\x0b\x32\x1b.nodereader.ParagraphResult\x12?\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32/.nodereader.ParagraphSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aG\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.nodereader.FacetResults:\x02\x38\x01\"O\n\x13VectorSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06vector\x18\x02 \x03(\x02\x12\x0c\n\x04tags\x18\x03 \x03(\t\x12\x0e\n\x06reload\x18\r \x01(\x08\"&\n\x18\x44ocumentVectorIdentifier\x12\n\n\x02id\x18\x01 \x01(\t\"U\n\x0e\x44ocumentScored\x12\x34\n\x06\x64oc_id\x18\x01 \x01(\x0b\x32$.nodereader.DocumentVectorIdentifier\x12\r\n\x05score\x18\x02 \x01(\x02\"E\n\x14VectorSearchResponse\x12-\n\tdocuments\x18\x01 \x03(\x0b\x32\x1a.nodereader.DocumentScored\"\x17\n\x15RelationSearchRequest\"\x18\n\x16RelationSearchResponse\"\xa4\x02\n\rSearchRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0e\n\x06\x66ields\x18\x02 \x03(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06vector\x18\n \x03(\x02\x12\x0e\n\x06reload\x18\x0b \x01(\x08\"}\n\x0eSuggestRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\"\n\x06\x66ilter\x18\x03 \x01(\x0b\x32\x12.nodereader.Filter\x12*\n\ntimestamps\x18\x04 \x01(\x0b\x32\x16.nodereader.Timestamps\"N\n\x0fSuggestResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12,\n\x07results\x18\x02 \x03(\x0b\x32\x1b.nodereader.ParagraphResult\"\xb0\x01\n\x0eSearchResponse\x12\x34\n\x08\x64ocument\x18\x01 \x01(\x0b\x32\".nodereader.DocumentSearchResponse\x12\x36\n\tparagraph\x18\x02 \x01(\x0b\x32#.nodereader.ParagraphSearchResponse\x12\x30\n\x06vector\x18\x03 \x01(\x0b\x32 .nodereader.VectorSearchResponse2\xfe\x04\n\nNodeReader\x12:\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x14.noderesources.Shard\"\x00\x12\x42\n\tGetShards\x12\x19.noderesources.EmptyQuery\x1a\x18.noderesources.ShardList\"\x00\x12Y\n\x0e\x44ocumentSearch\x12!.nodereader.DocumentSearchRequest\x1a\".nodereader.DocumentSearchResponse\"\x00\x12\\\n\x0fParagraphSearch\x12\".nodereader.ParagraphSearchRequest\x1a#.nodereader.ParagraphSearchResponse\"\x00\x12S\n\x0cVectorSearch\x12\x1f.nodereader.VectorSearchRequest\x1a .nodereader.VectorSearchResponse\"\x00\x12Y\n\x0eRelationSearch\x12!.nodereader.RelationSearchRequest\x1a\".nodereader.RelationSearchResponse\"\x00\x12\x41\n\x06Search\x12\x19.nodereader.SearchRequest\x1a\x1a.nodereader.SearchResponse\"\x00\x12\x44\n\x07Suggest\x12\x1a.nodereader.SuggestRequest\x1a\x1b.nodereader.SuggestResponse\"\x00P\x00P\x02\x62\x06proto3'
   ,
   dependencies=[nucliadb__protos_dot_noderesources__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,nucliadb__protos_dot_utils__pb2.DESCRIPTOR,],
   public_dependencies=[nucliadb__protos_dot_noderesources__pb2.DESCRIPTOR,nucliadb__protos_dot_utils__pb2.DESCRIPTOR,])
@@ -218,6 +218,77 @@ _TIMESTAMPS = _descriptor.Descriptor(
 )
 
 
+_FACETRESULT = _descriptor.Descriptor(
+  name='FacetResult',
+  full_name='nodereader.FacetResult',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='tag', full_name='nodereader.FacetResult.tag', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='total', full_name='nodereader.FacetResult.total', index=1,
+      number=2, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=512,
+  serialized_end=553,
+)
+
+
+_FACETRESULTS = _descriptor.Descriptor(
+  name='FacetResults',
+  full_name='nodereader.FacetResults',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='facetresults', full_name='nodereader.FacetResults.facetresults', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=555,
+  serialized_end=616,
+)
+
+
 _DOCUMENTSEARCHREQUEST = _descriptor.Descriptor(
   name='DocumentSearchRequest',
   full_name='nodereader.DocumentSearchRequest',
@@ -308,8 +379,8 @@ _DOCUMENTSEARCHREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=513,
-  serialized_end=794,
+  serialized_start=619,
+  serialized_end=900,
 )
 
 
@@ -410,42 +481,42 @@ _PARAGRAPHSEARCHREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=797,
-  serialized_end=1093,
+  serialized_start=903,
+  serialized_end=1199,
 )
 
 
-_DOCUMENTSEARCHRESPONSE_RESULT = _descriptor.Descriptor(
-  name='Result',
-  full_name='nodereader.DocumentSearchResponse.Result',
+_DOCUMENTRESULT = _descriptor.Descriptor(
+  name='DocumentResult',
+  full_name='nodereader.DocumentResult',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='uuid', full_name='nodereader.DocumentSearchResponse.Result.uuid', index=0,
+      name='uuid', full_name='nodereader.DocumentResult.uuid', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='score', full_name='nodereader.DocumentSearchResponse.Result.score', index=1,
+      name='score', full_name='nodereader.DocumentResult.score', index=1,
       number=2, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='score_bm25', full_name='nodereader.DocumentSearchResponse.Result.score_bm25', index=2,
+      name='score_bm25', full_name='nodereader.DocumentResult.score_bm25', index=2,
       number=3, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='field', full_name='nodereader.DocumentSearchResponse.Result.field', index=3,
+      name='field', full_name='nodereader.DocumentResult.field', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -463,78 +534,10 @@ _DOCUMENTSEARCHRESPONSE_RESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1307,
-  serialized_end=1379,
+  serialized_start=1201,
+  serialized_end=1281,
 )
 
-_DOCUMENTSEARCHRESPONSE_FACETRESULT = _descriptor.Descriptor(
-  name='FacetResult',
-  full_name='nodereader.DocumentSearchResponse.FacetResult',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='tag', full_name='nodereader.DocumentSearchResponse.FacetResult.tag', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='total', full_name='nodereader.DocumentSearchResponse.FacetResult.total', index=1,
-      number=2, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1381,
-  serialized_end=1422,
-)
-
-_DOCUMENTSEARCHRESPONSE_FACETRESULTS = _descriptor.Descriptor(
-  name='FacetResults',
-  full_name='nodereader.DocumentSearchResponse.FacetResults',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='facetresults', full_name='nodereader.DocumentSearchResponse.FacetResults.facetresults', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1424,
-  serialized_end=1508,
-)
 
 _DOCUMENTSEARCHRESPONSE_FACETSENTRY = _descriptor.Descriptor(
   name='FacetsEntry',
@@ -570,8 +573,8 @@ _DOCUMENTSEARCHRESPONSE_FACETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1510,
-  serialized_end=1604,
+  serialized_start=1480,
+  serialized_end=1551,
 )
 
 _DOCUMENTSEARCHRESPONSE = _descriptor.Descriptor(
@@ -620,7 +623,7 @@ _DOCUMENTSEARCHRESPONSE = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_DOCUMENTSEARCHRESPONSE_RESULT, _DOCUMENTSEARCHRESPONSE_FACETRESULT, _DOCUMENTSEARCHRESPONSE_FACETRESULTS, _DOCUMENTSEARCHRESPONSE_FACETSENTRY, ],
+  nested_types=[_DOCUMENTSEARCHRESPONSE_FACETSENTRY, ],
   enum_types=[
   ],
   serialized_options=None,
@@ -629,70 +632,70 @@ _DOCUMENTSEARCHRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1096,
-  serialized_end=1604,
+  serialized_start=1284,
+  serialized_end=1551,
 )
 
 
-_PARAGRAPHSEARCHRESPONSE_RESULT = _descriptor.Descriptor(
-  name='Result',
-  full_name='nodereader.ParagraphSearchResponse.Result',
+_PARAGRAPHRESULT = _descriptor.Descriptor(
+  name='ParagraphResult',
+  full_name='nodereader.ParagraphResult',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='uuid', full_name='nodereader.ParagraphSearchResponse.Result.uuid', index=0,
+      name='uuid', full_name='nodereader.ParagraphResult.uuid', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='score', full_name='nodereader.ParagraphSearchResponse.Result.score', index=1,
+      name='score', full_name='nodereader.ParagraphResult.score', index=1,
       number=2, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='field', full_name='nodereader.ParagraphSearchResponse.Result.field', index=2,
+      name='field', full_name='nodereader.ParagraphResult.field', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='start', full_name='nodereader.ParagraphSearchResponse.Result.start', index=3,
+      name='start', full_name='nodereader.ParagraphResult.start', index=3,
       number=4, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='end', full_name='nodereader.ParagraphSearchResponse.Result.end', index=4,
+      name='end', full_name='nodereader.ParagraphResult.end', index=4,
       number=5, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='paragraph', full_name='nodereader.ParagraphSearchResponse.Result.paragraph', index=5,
+      name='paragraph', full_name='nodereader.ParagraphResult.paragraph', index=5,
       number=6, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='split', full_name='nodereader.ParagraphSearchResponse.Result.split', index=6,
+      name='split', full_name='nodereader.ParagraphResult.split', index=6,
       number=7, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='index', full_name='nodereader.ParagraphSearchResponse.Result.index', index=7,
+      name='index', full_name='nodereader.ParagraphResult.index', index=7,
       number=8, type=4, cpp_type=4, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -710,78 +713,10 @@ _PARAGRAPHSEARCHRESPONSE_RESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1822,
-  serialized_end=1951,
+  serialized_start=1554,
+  serialized_end=1692,
 )
 
-_PARAGRAPHSEARCHRESPONSE_FACETRESULT = _descriptor.Descriptor(
-  name='FacetResult',
-  full_name='nodereader.ParagraphSearchResponse.FacetResult',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='tag', full_name='nodereader.ParagraphSearchResponse.FacetResult.tag', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='total', full_name='nodereader.ParagraphSearchResponse.FacetResult.total', index=1,
-      number=2, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1381,
-  serialized_end=1422,
-)
-
-_PARAGRAPHSEARCHRESPONSE_FACETRESULTS = _descriptor.Descriptor(
-  name='FacetResults',
-  full_name='nodereader.ParagraphSearchResponse.FacetResults',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='facetresults', full_name='nodereader.ParagraphSearchResponse.FacetResults.facetresults', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1996,
-  serialized_end=2081,
-)
 
 _PARAGRAPHSEARCHRESPONSE_FACETSENTRY = _descriptor.Descriptor(
   name='FacetsEntry',
@@ -817,8 +752,8 @@ _PARAGRAPHSEARCHRESPONSE_FACETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2083,
-  serialized_end=2178,
+  serialized_start=1480,
+  serialized_end=1551,
 )
 
 _PARAGRAPHSEARCHRESPONSE = _descriptor.Descriptor(
@@ -867,7 +802,7 @@ _PARAGRAPHSEARCHRESPONSE = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_PARAGRAPHSEARCHRESPONSE_RESULT, _PARAGRAPHSEARCHRESPONSE_FACETRESULT, _PARAGRAPHSEARCHRESPONSE_FACETRESULTS, _PARAGRAPHSEARCHRESPONSE_FACETSENTRY, ],
+  nested_types=[_PARAGRAPHSEARCHRESPONSE_FACETSENTRY, ],
   enum_types=[
   ],
   serialized_options=None,
@@ -876,8 +811,8 @@ _PARAGRAPHSEARCHRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1607,
-  serialized_end=2178,
+  serialized_start=1695,
+  serialized_end=1965,
 )
 
 
@@ -929,8 +864,8 @@ _VECTORSEARCHREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2180,
-  serialized_end=2259,
+  serialized_start=1967,
+  serialized_end=2046,
 )
 
 
@@ -961,8 +896,8 @@ _DOCUMENTVECTORIDENTIFIER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2261,
-  serialized_end=2299,
+  serialized_start=2048,
+  serialized_end=2086,
 )
 
 
@@ -1000,8 +935,8 @@ _DOCUMENTSCORED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2301,
-  serialized_end=2386,
+  serialized_start=2088,
+  serialized_end=2173,
 )
 
 
@@ -1032,8 +967,8 @@ _VECTORSEARCHRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2388,
-  serialized_end=2457,
+  serialized_start=2175,
+  serialized_end=2244,
 )
 
 
@@ -1057,8 +992,8 @@ _RELATIONSEARCHREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2459,
-  serialized_end=2482,
+  serialized_start=2246,
+  serialized_end=2269,
 )
 
 
@@ -1082,8 +1017,8 @@ _RELATIONSEARCHRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2484,
-  serialized_end=2508,
+  serialized_start=2271,
+  serialized_end=2295,
 )
 
 
@@ -1184,8 +1119,100 @@ _SEARCHREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2511,
-  serialized_end=2803,
+  serialized_start=2298,
+  serialized_end=2590,
+)
+
+
+_SUGGESTREQUEST = _descriptor.Descriptor(
+  name='SuggestRequest',
+  full_name='nodereader.SuggestRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='shard', full_name='nodereader.SuggestRequest.shard', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='body', full_name='nodereader.SuggestRequest.body', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='filter', full_name='nodereader.SuggestRequest.filter', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='timestamps', full_name='nodereader.SuggestRequest.timestamps', index=3,
+      number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2592,
+  serialized_end=2717,
+)
+
+
+_SUGGESTRESPONSE = _descriptor.Descriptor(
+  name='SuggestResponse',
+  full_name='nodereader.SuggestResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='total', full_name='nodereader.SuggestResponse.total', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='results', full_name='nodereader.SuggestResponse.results', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2719,
+  serialized_end=2797,
 )
 
 
@@ -1230,8 +1257,8 @@ _SEARCHRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2806,
-  serialized_end=2982,
+  serialized_start=2800,
+  serialized_end=2976,
 )
 
 _ORDERBY.fields_by_name['type'].enum_type = _ORDERBY_ORDERTYPE
@@ -1240,6 +1267,7 @@ _TIMESTAMPS.fields_by_name['from_modified'].message_type = google_dot_protobuf_d
 _TIMESTAMPS.fields_by_name['to_modified'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _TIMESTAMPS.fields_by_name['from_created'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _TIMESTAMPS.fields_by_name['to_created'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
+_FACETRESULTS.fields_by_name['facetresults'].message_type = _FACETRESULT
 _DOCUMENTSEARCHREQUEST.fields_by_name['filter'].message_type = _FILTER
 _DOCUMENTSEARCHREQUEST.fields_by_name['order'].message_type = _ORDERBY
 _DOCUMENTSEARCHREQUEST.fields_by_name['faceted'].message_type = _FACETED
@@ -1248,21 +1276,13 @@ _PARAGRAPHSEARCHREQUEST.fields_by_name['filter'].message_type = _FILTER
 _PARAGRAPHSEARCHREQUEST.fields_by_name['order'].message_type = _ORDERBY
 _PARAGRAPHSEARCHREQUEST.fields_by_name['faceted'].message_type = _FACETED
 _PARAGRAPHSEARCHREQUEST.fields_by_name['timestamps'].message_type = _TIMESTAMPS
-_DOCUMENTSEARCHRESPONSE_RESULT.containing_type = _DOCUMENTSEARCHRESPONSE
-_DOCUMENTSEARCHRESPONSE_FACETRESULT.containing_type = _DOCUMENTSEARCHRESPONSE
-_DOCUMENTSEARCHRESPONSE_FACETRESULTS.fields_by_name['facetresults'].message_type = _DOCUMENTSEARCHRESPONSE_FACETRESULT
-_DOCUMENTSEARCHRESPONSE_FACETRESULTS.containing_type = _DOCUMENTSEARCHRESPONSE
-_DOCUMENTSEARCHRESPONSE_FACETSENTRY.fields_by_name['value'].message_type = _DOCUMENTSEARCHRESPONSE_FACETRESULTS
+_DOCUMENTSEARCHRESPONSE_FACETSENTRY.fields_by_name['value'].message_type = _FACETRESULTS
 _DOCUMENTSEARCHRESPONSE_FACETSENTRY.containing_type = _DOCUMENTSEARCHRESPONSE
-_DOCUMENTSEARCHRESPONSE.fields_by_name['results'].message_type = _DOCUMENTSEARCHRESPONSE_RESULT
+_DOCUMENTSEARCHRESPONSE.fields_by_name['results'].message_type = _DOCUMENTRESULT
 _DOCUMENTSEARCHRESPONSE.fields_by_name['facets'].message_type = _DOCUMENTSEARCHRESPONSE_FACETSENTRY
-_PARAGRAPHSEARCHRESPONSE_RESULT.containing_type = _PARAGRAPHSEARCHRESPONSE
-_PARAGRAPHSEARCHRESPONSE_FACETRESULT.containing_type = _PARAGRAPHSEARCHRESPONSE
-_PARAGRAPHSEARCHRESPONSE_FACETRESULTS.fields_by_name['facetresults'].message_type = _PARAGRAPHSEARCHRESPONSE_FACETRESULT
-_PARAGRAPHSEARCHRESPONSE_FACETRESULTS.containing_type = _PARAGRAPHSEARCHRESPONSE
-_PARAGRAPHSEARCHRESPONSE_FACETSENTRY.fields_by_name['value'].message_type = _PARAGRAPHSEARCHRESPONSE_FACETRESULTS
+_PARAGRAPHSEARCHRESPONSE_FACETSENTRY.fields_by_name['value'].message_type = _FACETRESULTS
 _PARAGRAPHSEARCHRESPONSE_FACETSENTRY.containing_type = _PARAGRAPHSEARCHRESPONSE
-_PARAGRAPHSEARCHRESPONSE.fields_by_name['results'].message_type = _PARAGRAPHSEARCHRESPONSE_RESULT
+_PARAGRAPHSEARCHRESPONSE.fields_by_name['results'].message_type = _PARAGRAPHRESULT
 _PARAGRAPHSEARCHRESPONSE.fields_by_name['facets'].message_type = _PARAGRAPHSEARCHRESPONSE_FACETSENTRY
 _DOCUMENTSCORED.fields_by_name['doc_id'].message_type = _DOCUMENTVECTORIDENTIFIER
 _VECTORSEARCHRESPONSE.fields_by_name['documents'].message_type = _DOCUMENTSCORED
@@ -1270,6 +1290,9 @@ _SEARCHREQUEST.fields_by_name['filter'].message_type = _FILTER
 _SEARCHREQUEST.fields_by_name['order'].message_type = _ORDERBY
 _SEARCHREQUEST.fields_by_name['faceted'].message_type = _FACETED
 _SEARCHREQUEST.fields_by_name['timestamps'].message_type = _TIMESTAMPS
+_SUGGESTREQUEST.fields_by_name['filter'].message_type = _FILTER
+_SUGGESTREQUEST.fields_by_name['timestamps'].message_type = _TIMESTAMPS
+_SUGGESTRESPONSE.fields_by_name['results'].message_type = _PARAGRAPHRESULT
 _SEARCHRESPONSE.fields_by_name['document'].message_type = _DOCUMENTSEARCHRESPONSE
 _SEARCHRESPONSE.fields_by_name['paragraph'].message_type = _PARAGRAPHSEARCHRESPONSE
 _SEARCHRESPONSE.fields_by_name['vector'].message_type = _VECTORSEARCHRESPONSE
@@ -1277,9 +1300,13 @@ DESCRIPTOR.message_types_by_name['Filter'] = _FILTER
 DESCRIPTOR.message_types_by_name['Faceted'] = _FACETED
 DESCRIPTOR.message_types_by_name['OrderBy'] = _ORDERBY
 DESCRIPTOR.message_types_by_name['Timestamps'] = _TIMESTAMPS
+DESCRIPTOR.message_types_by_name['FacetResult'] = _FACETRESULT
+DESCRIPTOR.message_types_by_name['FacetResults'] = _FACETRESULTS
 DESCRIPTOR.message_types_by_name['DocumentSearchRequest'] = _DOCUMENTSEARCHREQUEST
 DESCRIPTOR.message_types_by_name['ParagraphSearchRequest'] = _PARAGRAPHSEARCHREQUEST
+DESCRIPTOR.message_types_by_name['DocumentResult'] = _DOCUMENTRESULT
 DESCRIPTOR.message_types_by_name['DocumentSearchResponse'] = _DOCUMENTSEARCHRESPONSE
+DESCRIPTOR.message_types_by_name['ParagraphResult'] = _PARAGRAPHRESULT
 DESCRIPTOR.message_types_by_name['ParagraphSearchResponse'] = _PARAGRAPHSEARCHRESPONSE
 DESCRIPTOR.message_types_by_name['VectorSearchRequest'] = _VECTORSEARCHREQUEST
 DESCRIPTOR.message_types_by_name['DocumentVectorIdentifier'] = _DOCUMENTVECTORIDENTIFIER
@@ -1288,6 +1315,8 @@ DESCRIPTOR.message_types_by_name['VectorSearchResponse'] = _VECTORSEARCHRESPONSE
 DESCRIPTOR.message_types_by_name['RelationSearchRequest'] = _RELATIONSEARCHREQUEST
 DESCRIPTOR.message_types_by_name['RelationSearchResponse'] = _RELATIONSEARCHRESPONSE
 DESCRIPTOR.message_types_by_name['SearchRequest'] = _SEARCHREQUEST
+DESCRIPTOR.message_types_by_name['SuggestRequest'] = _SUGGESTREQUEST
+DESCRIPTOR.message_types_by_name['SuggestResponse'] = _SUGGESTRESPONSE
 DESCRIPTOR.message_types_by_name['SearchResponse'] = _SEARCHRESPONSE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -1319,6 +1348,20 @@ Timestamps = _reflection.GeneratedProtocolMessageType('Timestamps', (_message.Me
   })
 _sym_db.RegisterMessage(Timestamps)
 
+FacetResult = _reflection.GeneratedProtocolMessageType('FacetResult', (_message.Message,), {
+  'DESCRIPTOR' : _FACETRESULT,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.FacetResult)
+  })
+_sym_db.RegisterMessage(FacetResult)
+
+FacetResults = _reflection.GeneratedProtocolMessageType('FacetResults', (_message.Message,), {
+  'DESCRIPTOR' : _FACETRESULTS,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.FacetResults)
+  })
+_sym_db.RegisterMessage(FacetResults)
+
 DocumentSearchRequest = _reflection.GeneratedProtocolMessageType('DocumentSearchRequest', (_message.Message,), {
   'DESCRIPTOR' : _DOCUMENTSEARCHREQUEST,
   '__module__' : 'nucliadb_protos.nodereader_pb2'
@@ -1333,28 +1376,14 @@ ParagraphSearchRequest = _reflection.GeneratedProtocolMessageType('ParagraphSear
   })
 _sym_db.RegisterMessage(ParagraphSearchRequest)
 
+DocumentResult = _reflection.GeneratedProtocolMessageType('DocumentResult', (_message.Message,), {
+  'DESCRIPTOR' : _DOCUMENTRESULT,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.DocumentResult)
+  })
+_sym_db.RegisterMessage(DocumentResult)
+
 DocumentSearchResponse = _reflection.GeneratedProtocolMessageType('DocumentSearchResponse', (_message.Message,), {
-
-  'Result' : _reflection.GeneratedProtocolMessageType('Result', (_message.Message,), {
-    'DESCRIPTOR' : _DOCUMENTSEARCHRESPONSE_RESULT,
-    '__module__' : 'nucliadb_protos.nodereader_pb2'
-    # @@protoc_insertion_point(class_scope:nodereader.DocumentSearchResponse.Result)
-    })
-  ,
-
-  'FacetResult' : _reflection.GeneratedProtocolMessageType('FacetResult', (_message.Message,), {
-    'DESCRIPTOR' : _DOCUMENTSEARCHRESPONSE_FACETRESULT,
-    '__module__' : 'nucliadb_protos.nodereader_pb2'
-    # @@protoc_insertion_point(class_scope:nodereader.DocumentSearchResponse.FacetResult)
-    })
-  ,
-
-  'FacetResults' : _reflection.GeneratedProtocolMessageType('FacetResults', (_message.Message,), {
-    'DESCRIPTOR' : _DOCUMENTSEARCHRESPONSE_FACETRESULTS,
-    '__module__' : 'nucliadb_protos.nodereader_pb2'
-    # @@protoc_insertion_point(class_scope:nodereader.DocumentSearchResponse.FacetResults)
-    })
-  ,
 
   'FacetsEntry' : _reflection.GeneratedProtocolMessageType('FacetsEntry', (_message.Message,), {
     'DESCRIPTOR' : _DOCUMENTSEARCHRESPONSE_FACETSENTRY,
@@ -1367,33 +1396,16 @@ DocumentSearchResponse = _reflection.GeneratedProtocolMessageType('DocumentSearc
   # @@protoc_insertion_point(class_scope:nodereader.DocumentSearchResponse)
   })
 _sym_db.RegisterMessage(DocumentSearchResponse)
-_sym_db.RegisterMessage(DocumentSearchResponse.Result)
-_sym_db.RegisterMessage(DocumentSearchResponse.FacetResult)
-_sym_db.RegisterMessage(DocumentSearchResponse.FacetResults)
 _sym_db.RegisterMessage(DocumentSearchResponse.FacetsEntry)
 
+ParagraphResult = _reflection.GeneratedProtocolMessageType('ParagraphResult', (_message.Message,), {
+  'DESCRIPTOR' : _PARAGRAPHRESULT,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.ParagraphResult)
+  })
+_sym_db.RegisterMessage(ParagraphResult)
+
 ParagraphSearchResponse = _reflection.GeneratedProtocolMessageType('ParagraphSearchResponse', (_message.Message,), {
-
-  'Result' : _reflection.GeneratedProtocolMessageType('Result', (_message.Message,), {
-    'DESCRIPTOR' : _PARAGRAPHSEARCHRESPONSE_RESULT,
-    '__module__' : 'nucliadb_protos.nodereader_pb2'
-    # @@protoc_insertion_point(class_scope:nodereader.ParagraphSearchResponse.Result)
-    })
-  ,
-
-  'FacetResult' : _reflection.GeneratedProtocolMessageType('FacetResult', (_message.Message,), {
-    'DESCRIPTOR' : _PARAGRAPHSEARCHRESPONSE_FACETRESULT,
-    '__module__' : 'nucliadb_protos.nodereader_pb2'
-    # @@protoc_insertion_point(class_scope:nodereader.ParagraphSearchResponse.FacetResult)
-    })
-  ,
-
-  'FacetResults' : _reflection.GeneratedProtocolMessageType('FacetResults', (_message.Message,), {
-    'DESCRIPTOR' : _PARAGRAPHSEARCHRESPONSE_FACETRESULTS,
-    '__module__' : 'nucliadb_protos.nodereader_pb2'
-    # @@protoc_insertion_point(class_scope:nodereader.ParagraphSearchResponse.FacetResults)
-    })
-  ,
 
   'FacetsEntry' : _reflection.GeneratedProtocolMessageType('FacetsEntry', (_message.Message,), {
     'DESCRIPTOR' : _PARAGRAPHSEARCHRESPONSE_FACETSENTRY,
@@ -1406,9 +1418,6 @@ ParagraphSearchResponse = _reflection.GeneratedProtocolMessageType('ParagraphSea
   # @@protoc_insertion_point(class_scope:nodereader.ParagraphSearchResponse)
   })
 _sym_db.RegisterMessage(ParagraphSearchResponse)
-_sym_db.RegisterMessage(ParagraphSearchResponse.Result)
-_sym_db.RegisterMessage(ParagraphSearchResponse.FacetResult)
-_sym_db.RegisterMessage(ParagraphSearchResponse.FacetResults)
 _sym_db.RegisterMessage(ParagraphSearchResponse.FacetsEntry)
 
 VectorSearchRequest = _reflection.GeneratedProtocolMessageType('VectorSearchRequest', (_message.Message,), {
@@ -1460,6 +1469,20 @@ SearchRequest = _reflection.GeneratedProtocolMessageType('SearchRequest', (_mess
   })
 _sym_db.RegisterMessage(SearchRequest)
 
+SuggestRequest = _reflection.GeneratedProtocolMessageType('SuggestRequest', (_message.Message,), {
+  'DESCRIPTOR' : _SUGGESTREQUEST,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.SuggestRequest)
+  })
+_sym_db.RegisterMessage(SuggestRequest)
+
+SuggestResponse = _reflection.GeneratedProtocolMessageType('SuggestResponse', (_message.Message,), {
+  'DESCRIPTOR' : _SUGGESTRESPONSE,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.SuggestResponse)
+  })
+_sym_db.RegisterMessage(SuggestResponse)
+
 SearchResponse = _reflection.GeneratedProtocolMessageType('SearchResponse', (_message.Message,), {
   'DESCRIPTOR' : _SEARCHRESPONSE,
   '__module__' : 'nucliadb_protos.nodereader_pb2'
@@ -1478,8 +1501,8 @@ _NODEREADER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=2985,
-  serialized_end=3553,
+  serialized_start=2979,
+  serialized_end=3617,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetShard',
@@ -1548,6 +1571,16 @@ _NODEREADER = _descriptor.ServiceDescriptor(
     containing_service=None,
     input_type=_SEARCHREQUEST,
     output_type=_SEARCHRESPONSE,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='Suggest',
+    full_name='nodereader.NodeReader.Suggest',
+    index=7,
+    containing_service=None,
+    input_type=_SUGGESTREQUEST,
+    output_type=_SUGGESTRESPONSE,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

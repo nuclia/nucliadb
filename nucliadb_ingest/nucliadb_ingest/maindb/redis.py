@@ -37,13 +37,16 @@ except ImportError:
 
 
 class RedisTransaction(Transaction):
-    modified_keys: Dict[str, bytes] = {}
-    visited_keys: Dict[str, bytes] = {}
-    deleted_keys: List[str] = []
+    modified_keys: Dict[str, bytes]
+    visited_keys: Dict[str, bytes]
+    deleted_keys: List[str]
 
     def __init__(self, redis: Any, driver: Driver):
         self.redis = redis
         self.driver = driver
+        self.modified_keys = {}
+        self.visited_keys = {}
+        self.deleted_keys = []
         self.open = True
 
     def clean(self):

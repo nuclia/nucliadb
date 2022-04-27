@@ -18,10 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from copy import deepcopy
-from io import BytesIO
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
-import numpy as np
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
@@ -123,25 +121,21 @@ class ResourceBrain:
             # For each split of this field
 
             for vector in vectors.vectors:
-                buffer = BytesIO(vector.vector)
-                buffer.seek(0)
                 self.brain.paragraphs[field_key].paragraphs[
                     f"{self.rid}/{field_key}/{subfield}/{vector.start_paragraph}-{vector.end_paragraph}"
                 ].sentences[
                     f"{self.rid}/{field_key}/{subfield}/{vector.start}-{vector.end}"
                 ].vector.extend(
-                    list(np.load(buffer, allow_pickle=False))
+                    vector.vector
                 )
 
         for vector in vo.vectors.vectors:
-            buffer = BytesIO(vector.vector)
-            buffer.seek(0)
             self.brain.paragraphs[field_key].paragraphs[
                 f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
             ].sentences[
                 f"{self.rid}/{field_key}/{vector.start}-{vector.end}"
             ].vector.extend(
-                list(np.load(buffer, allow_pickle=False))
+                vector.vector
             )
 
         for split, sentences in replace_splits.items():

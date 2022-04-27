@@ -40,6 +40,9 @@ env:
   CARGO_TERM_COLOR: always
   API_VERSION: 1
   COMPONENT: nucliadb-node
+  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  IMAGE_NAME_NODE: node
+  IMAGE_NAME_NODE_SIDECAR: node_sidecar
 
 jobs:
   pre-checks-python:
@@ -198,15 +201,17 @@ jobs:
     needs: tests-rust
     if: github.event_name == 'push'
 
-    env:
-      HASH: $(git rev-parse --short "$GITHUB_SHA")
-      BRANCH: ${GITHUB_REF##*/}
-      PROJECT_ID: ${{ secrets.PROJECT_ID }}
-      IMAGE_NAME: eu.gcr.io/${{ secrets.PROJECT_ID }}/node
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          BRANCH=${GITHUB_REF##*/}
+          echo "::set-output name=short_sha::$HASH"
+          echo "::set-output name=branch::$BRANCH"
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
@@ -222,18 +227,18 @@ jobs:
       # Build docker image
       - name: Image
         run: |-
-          docker build -t $IMAGE_NAME:$GITHUB_SHA . -f Dockerfile.node
+          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.node
       - name: Tag
         run: |-
-          docker tag $IMAGE_NAME:$GITHUB_SHA $IMAGE_NAME:latest
+          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.branch }}
       - name: Push sha
         if: github.event_name == 'push'
         run: |-
-          docker push $IMAGE_NAME:$GITHUB_SHA
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }}
       - name: Push latest
         if: github.event_name == 'push'
         run: |-
-          docker push $IMAGE_NAME:latest
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.branch }}
 
   build-python:
     name: Build image and push
@@ -241,15 +246,17 @@ jobs:
     needs: tests-python
     if: github.event_name == 'push'
 
-    env:
-      HASH: $(git rev-parse --short "$GITHUB_SHA")
-      BRANCH: ${GITHUB_REF##*/}
-      PROJECT_ID: ${{ secrets.PROJECT_ID }}
-      IMAGE_NAME: eu.gcr.io/${{ secrets.PROJECT_ID }}/node_sidecar
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          BRANCH=${GITHUB_REF##*/}
+          echo "::set-output name=short_sha::$HASH"
+          echo "::set-output name=branch::$BRANCH"
 
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0
@@ -265,18 +272,18 @@ jobs:
       # Build docker image
       - name: Image
         run: |-
-          docker build -t $IMAGE_NAME:$GITHUB_SHA . -f Dockerfile.node_sidecar
+          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.node_sidecar
       - name: Tag
         run: |-
-          docker tag $IMAGE_NAME:$GITHUB_SHA $IMAGE_NAME:latest
+          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.branch }}
       - name: Push sha
         if: github.event_name == 'push'
         run: |-
-          docker push $IMAGE_NAME:$GITHUB_SHA
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }}
       - name: Push latest
         if: github.event_name == 'push'
         run: |-
-          docker push $IMAGE_NAME:latest
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.branch }}
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
@@ -284,21 +291,24 @@ jobs:
     needs: [build-rust, build-python]
     if: github.event_name == 'push'
 
-    env:
-      IMAGE_NAME_NODE: eu.gcr.io/${{ secrets.PROJECT_ID }}/node
-      IMAGE_NAME_NODE_SIDECAR: eu.gcr.io/${{ secrets.PROJECT_ID }}/node_sidecar
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          echo "::set-output name=short_sha::$HASH"
+
       - name: Set helm package image
         id: version_step
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME_NODE:$GITHUB_SHA#" ./charts/nucliadb_node/values.yaml
-          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#$IMAGE_NAME_NODE_SIDECAR:$GITHUB_SHA#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
+          sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
           VERSION=`cat nucliadb_node/VERSION`
-          VERSION_SHA=$VERSION+$(echo $GITHUB_SHA | cut -c1-6)
+          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_node/Chart.yaml
           echo "::set-output name=version_number::$VERSION_SHA"
 

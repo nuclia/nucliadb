@@ -20,7 +20,7 @@
 from contextvars import ContextVar
 from typing import Dict, List, Optional
 
-from nucliadb_protos.nodereader_pb2 import ParagraphSearchResponse
+from nucliadb_protos.nodereader_pb2 import ParagraphResult
 
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -87,7 +87,7 @@ async def fetch_resources(
     return result
 
 
-async def get_text_paragraph(result: ParagraphSearchResponse.Result, kbid: str) -> str:
+async def get_text_paragraph(result: ParagraphResult, kbid: str) -> str:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
@@ -116,9 +116,7 @@ async def get_text_paragraph(result: ParagraphSearchResponse.Result, kbid: str) 
     return splitted_text
 
 
-async def get_labels_paragraph(
-    result: ParagraphSearchResponse.Result, kbid: str
-) -> List[str]:
+async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
@@ -146,13 +144,15 @@ async def get_labels_paragraph(
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     field_metadata = await field_obj.get_field_metadata()
     if field_metadata:
+        paragraph = None
         if result.split not in (None, ""):
             metadata = field_metadata.split_metadata[result.split]
             paragraph = metadata.paragraphs[result.index]
-        else:
+        elif len(field_metadata.metadata.paragraphs) > result.index:
             paragraph = field_metadata.metadata.paragraphs[result.index]
 
-        for classification in paragraph.classifications:
-            labels.append(f"{classification.labelset}/{classification.label}")
+        if paragraph is not None:
+            for classification in paragraph.classifications:
+                labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels

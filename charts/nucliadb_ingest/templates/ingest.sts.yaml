@@ -28,7 +28,8 @@ spec:
     metadata:
       name: ingest
       annotations:
-        sidecar.istio.io/inject: "false"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.swim }},{{.Values.serving.monitor }},{{.Values.serving.metrics }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},{{.Values.serving.swim }}"
       labels:
         app: ingest
         app.kubernetes.io/name: ingest
@@ -50,7 +51,7 @@ spec:
       - name: ingest
         securityContext:
           privileged: true
-        image: {{ .Values.image }}
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         readinessProbe:
           exec:
@@ -68,7 +69,8 @@ spec:
         - configMapRef:
             name: {{ .Release.Name }}-config
         ports:
-        - containerPort: {{ .Values.serving.grpc }}
+        - name: grpc-ingest
+          containerPort: {{ .Values.serving.grpc }}
         - containerPort: {{ .Values.serving.monitor }}
         - containerPort: {{ .Values.serving.metrics }}
         - name: swim

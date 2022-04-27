@@ -84,7 +84,7 @@ async def main():
             txn = await driver.begin()
             key_to_purge = KB_TO_DELETE.format(kbid=kbid)
             await txn.delete(key_to_purge)
-            await txn.commit()
+            await txn.commit(resource=False)
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             capture_exception(exc)

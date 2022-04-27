@@ -38,7 +38,7 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
       - name: search
-        image: {{ .Values.image }}
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         securityContext:
           privileged: true
         imagePullPolicy: {{ .Values.imagePullPolicy }}
