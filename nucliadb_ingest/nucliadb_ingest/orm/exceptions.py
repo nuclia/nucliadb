@@ -21,6 +21,10 @@ class NodeClusterNotFound(Exception):
     pass
 
 
+class NodeClusterSmall(Exception):
+    pass
+
+
 class KnowledgeBoxConflict(Exception):
     pass
 

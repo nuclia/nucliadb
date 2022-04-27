@@ -103,11 +103,10 @@ jobs:
           mkdir -p /tmp/openapi
           extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION
 
-      - name: Cache extracted docs
-        uses: actions/cache@v3.0.1
+      - uses: actions/upload-artifact@v2
         with:
-          path: /tmp/openapi
-          key: openapi-${{ env.COMPONENT }}
+          name: openapi-${{ env.COMPONENT }}-${{ env.GITHUB_SHA }}
+          path: /tmp/openapi/${{ env.COMPONENT }}.json
 
   # Job to build the docker and push it to registry
   build:
@@ -208,11 +207,10 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
-      - name: Cache extracted docs
-        uses: actions/cache@v3.0.1
+      - uses: actions/download-artifact@v2
         with:
-          path: /tmp/openapi
-          key: openapi-${{ env.COMPONENT }}
+          name: openapi-${{ env.COMPONENT }}-${{ env.GITHUB_SHA }}
+          path: /tmp/openapi/${{ env.COMPONENT }}.json
 
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0

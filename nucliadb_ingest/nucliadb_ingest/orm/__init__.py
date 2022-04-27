@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from clandestined import Cluster  # type: ignore
 
-from nucliadb_ingest.orm.exceptions import NodeClusterNotFound
+from nucliadb_ingest.orm.exceptions import NodeClusterNotFound, NodeClusterSmall
 from nucliadb_ingest.settings import settings
 from nucliadb_utils.settings import nuclia_settings
 
@@ -47,7 +47,9 @@ class ClusterObject:
 
     def find_nodes(self, kbid: str):
         if self.cluster is not None:
-            return self.cluster.find_nodes(kbid)
+            nodes = self.cluster.find_nodes(kbid)
+            if len(nodes) != len(set(nodes)):
+                raise NodeClusterSmall()
         else:
             raise NodeClusterNotFound()
 
