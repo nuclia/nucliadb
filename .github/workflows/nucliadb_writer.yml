@@ -102,7 +102,6 @@ jobs:
         id: env-vars
         run: |-
           HASH=`git rev-parse --short HEAD`
-          BRANCH=${GITHUB_REF##*/}
           echo "::set-output name=short_sha::$HASH"
 
       - name: Extract docs
