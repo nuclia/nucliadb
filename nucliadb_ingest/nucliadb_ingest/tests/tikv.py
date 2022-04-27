@@ -105,12 +105,12 @@ class TiKVd(object):
             if self.proc is None:
                 print(
                     "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
-                    % self.port
+                    % self.pd_port
                 )
             else:
                 print(
                     "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
-                    % self.port
+                    % self.pd_port
                 )
         return self.proc
 
@@ -137,7 +137,7 @@ class TiKVd(object):
             if self.debug:
                 print(
                     "[\033[0;31mDEBUG\033[0;0m] Server listening on port {port} finished running already with exit {ret}".format(  # noqa
-                        port=self.port, ret=self.proc.returncode
+                        port=self.pd_port, ret=self.proc.returncode
                     )
                 )
         elif self.proc2.returncode is not None:
@@ -187,7 +187,7 @@ def tikvd():
         return
 
     if not os.path.isfile("tikv-server"):
-        version = "v5.3.0"
+        version = "v5.3.1"
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"
@@ -203,7 +203,7 @@ def tikvd():
         os.chmod("tikv-server", 755)
 
     if not os.path.isfile("pd-server"):
-        version = "v5.3.0"
+        version = "v5.3.1"
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"

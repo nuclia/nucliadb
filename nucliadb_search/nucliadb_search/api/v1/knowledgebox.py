@@ -209,6 +209,7 @@ async def search_knowledgebox(
     status_code=200,
     description="Show shards from a knowledgebox",
     response_model=KnowledgeboxShards,
+    include_in_schema=False,
     tags=["Knowledge Boxes"],
 )
 @requires(NucliaDBRoles.MANAGER)
