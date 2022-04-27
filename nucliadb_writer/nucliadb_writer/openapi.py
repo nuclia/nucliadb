@@ -25,7 +25,7 @@ import sys
 from fastapi.openapi.utils import get_openapi
 from starlette.routing import Mount
 
-from nucliadb_reader import API_PREFIX
+from nucliadb_writer import API_PREFIX
 
 
 def is_versioned_route(route):
