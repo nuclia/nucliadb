@@ -33,3 +33,5 @@ data:
   INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}
+
+  TOTAL_REPLICAS: {{ .Values.replicaCount }}
