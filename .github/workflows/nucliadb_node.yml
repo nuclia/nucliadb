@@ -281,7 +281,7 @@ jobs:
   deploy:
     name: Deploy Helm chart and trigger internal CI
     runs-on: ubuntu-latest
-    needs: build-python
+    needs: [build-rust, build-python]
     if: github.event_name == 'push'
 
     steps:
