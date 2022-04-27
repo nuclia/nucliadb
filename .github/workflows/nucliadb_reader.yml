@@ -28,7 +28,6 @@ on:
 env:
   API_VERSION: 1
   COMPONENT: nucliadb-reader
-  HASH: $(git rev-parse --short "$GITHUB_SHA")
   BRANCH: ${GITHUB_REF##*/}
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: reader
@@ -44,6 +43,9 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
+
+      - name: Add HASH to GITHUB_ENV
+        run: echo "HASH=`git rev-parse --short ${GITHUB_SHA}`" >> $GITHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v3.1.0
@@ -116,7 +118,7 @@ jobs:
   build:
     name: Build image and push
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [pre-checks, tests]
     if: github.event_name == 'push'
 
     steps:

@@ -43,10 +43,16 @@ env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
-  HASH: $(git rev-parse --short "$GITHUB_SHA")
   BRANCH: ${GITHUB_REF##*/}
 
 jobs:
+  initial-setup:
+    name: Setup Build environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add HASH to GITHUB_ENV
+        run: echo "HASH=`git rev-parse --short ${GITHUB_SHA}`" >> $GITHUB_ENV
+
   pre-checks-python:
     runs-on: ubuntu-latest
     strategy:
@@ -200,7 +206,7 @@ jobs:
   build-rust:
     name: Build image and push
     runs-on: ubuntu-latest
-    needs: tests-rust
+    needs: [initial-setup, tests-rust]
     if: github.event_name == 'push'
 
     steps:
@@ -237,7 +243,7 @@ jobs:
   build-python:
     name: Build image and push
     runs-on: ubuntu-latest
-    needs: tests-python
+    needs: [initial-setup, tests-python]
     if: github.event_name == 'push'
 
     steps:
