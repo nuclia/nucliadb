@@ -32,7 +32,6 @@ on:
       - "nucliadb_cluster/nucliadb_cluster/**"
 
 env:
-  BRANCH: ${GITHUB_REF##*/}
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME: ingest
 
@@ -119,10 +118,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Calculate short sha
-        id: short-sha
+        id: env-vars
         run: |-
           HASH=`git rev-parse --short HEAD`
+          BRANCH=${GITHUB_REF##*/}
           echo "::set-output name=short_sha::$HASH"
+          echo "::set-output name=branch::$BRANCH"
 
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0
@@ -138,18 +139,18 @@ jobs:
       # Build docker image
       - name: Image
         run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.short-sha.outputs.short_sha }} . -f Dockerfile.ingest
+          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.ingest
       - name: Tag
         run: |-
-          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.short-sha.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:$BRANCH
+          docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
       - name: Push sha
         if: github.event_name == 'push'
         run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.short-sha.outputs.short_sha }}
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}
       - name: Push latest
         if: github.event_name == 'push'
         run: |-
-          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:$BRANCH
+          docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
@@ -162,7 +163,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Calculate short sha
-        id: short-sha
+        id: env-vars
         run: |-
           HASH=`git rev-parse --short HEAD`
           echo "::set-output name=short_sha::$HASH"
@@ -170,10 +171,10 @@ jobs:
       - name: Set helm package image
         id: version_step
         run: |-
-          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.short-sha.outputs.short_sha }}#" ./charts/nucliadb_ingest/values.yaml
+          sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_ingest/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_ingest/values.yaml
           VERSION=`cat nucliadb_ingest/VERSION`
-          VERSION_SHA=$VERSION+${{ steps.short-sha.outputs.short_sha }}
+          VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_ingest/Chart.yaml
           echo "::set-output name=version_number::$VERSION_SHA"
 
