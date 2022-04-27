@@ -103,7 +103,7 @@ jobs:
       - name: Extract docs
         run: |
           mkdir -p /tmp/openapi
-          extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION ${{ env.GITHUB_SHA }}
+          extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION $GITHUB_SHA
 
       - uses: actions/upload-artifact@v2
         with:
