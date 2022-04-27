@@ -305,7 +305,7 @@ async def main():
         await consumer.initialize()
         consumers.append(consumer)
 
-    await asyncio.gather([consumer.loop() for consumer in consumers])
+    await asyncio.gather(*[consumer.loop() for consumer in consumers])
 
     for consumer in consumers:
         await consumer.finalize()
