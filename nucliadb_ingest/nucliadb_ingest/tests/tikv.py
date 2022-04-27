@@ -58,6 +58,33 @@ class TiKVd(object):
     def start(self):
 
         self.tmpfolder = tempfile.TemporaryDirectory()
+
+        cmd = [
+            f"{self.path}/{self.tikv_bin_name}",
+            f"--pd-endpoints={self.host}:{self.pd_port}",
+            f"--addr={self.host}:{self.port}",
+            f"--data-dir={self.tmpfolder.name}/tikv1",
+            f"--log-file={self.tmpfolder.name}/tikv1.log",
+        ]
+
+        if self.debug:
+            self.proc2 = subprocess.Popen(cmd)
+        else:
+            self.proc2 = subprocess.Popen(
+                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+        if self.debug:
+            if self.proc2 is None:
+                print(
+                    "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
+                    % self.port
+                )
+            else:
+                print(
+                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
+                    % self.port
+                )
         cmd = [
             f"{self.path}/{self.pd_bin_name}",
             "--name=pd",
@@ -76,32 +103,6 @@ class TiKVd(object):
 
         if self.debug:
             if self.proc is None:
-                print(
-                    "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
-                    % self.port
-                )
-            else:
-                print(
-                    "[\033[0;33mDEBUG\033[0;0m] Server listening on port %d started."
-                    % self.port
-                )
-        cmd = [
-            f"{self.path}/{self.tikv_bin_name}",
-            f"--pd-endpoints={self.host}:{self.pd_port}",
-            f"--addr={self.host}:{self.port}",
-            f"--data-dir={self.tmpfolder.name}/tikv1",
-            f"--log-file={self.tmpfolder.name}/tikv1.log",
-        ]
-
-        if self.debug:
-            self.proc2 = subprocess.Popen(cmd)
-        else:
-            self.proc2 = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-
-        if self.debug:
-            if self.proc2 is None:
                 print(
                     "[\031[0;33mDEBUG\033[0;0m] Failed to start server listening on port %d started."
                     % self.port
