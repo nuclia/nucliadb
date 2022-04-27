@@ -61,7 +61,7 @@ def extract_openapi(application, version, commit_id):
 
 
 def command_extract_openapi():
-    from nucliadb_reader.app import application
+    from nucliadb_writer.app import application
 
     openapi_json_path = sys.argv[1]
     api_version = sys.argv[2]
