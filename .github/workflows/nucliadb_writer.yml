@@ -123,7 +123,9 @@ jobs:
 
       - name: Calculate short sha
         id: short-sha
-        run: echo "::set-output name=short_sha::$(git rev-parse --short HEAD)"
+        run: |-
+          HASH = `git rev-parse --short HEAD`
+          echo "::set-output name=short_sha::$HASH"
 
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0
@@ -164,7 +166,9 @@ jobs:
 
       - name: Calculate short sha
         id: short-sha
-        run: echo "::set-output name=short_sha::$(git rev-parse --short HEAD)"
+        run: |-
+          HASH = `git rev-parse --short HEAD`
+          echo "::set-output name=short_sha::$HASH"
 
       - name: Set helm package image
         id: version_step
