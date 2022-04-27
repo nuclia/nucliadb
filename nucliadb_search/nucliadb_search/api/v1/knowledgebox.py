@@ -222,9 +222,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
             status_code=404,
             detail="The knowledgebox or its shards configuration is missing",
         )
-    result = KnowledgeboxShards()
-    result.kbid = shards.kbid
-    result.actual = shards.actual
+    result = KnowledgeboxShards(kbid=shards.kbid, actual=shards.actual, shards=[])
     for shard_object in shards.shards:
         shard_object_py: ShardObject = ShardObject.from_message(shard_object)
         result.shards.append(shard_object_py)
