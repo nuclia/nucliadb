@@ -144,13 +144,15 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     field_metadata = await field_obj.get_field_metadata()
     if field_metadata:
+        paragraph = None
         if result.split not in (None, ""):
             metadata = field_metadata.split_metadata[result.split]
             paragraph = metadata.paragraphs[result.index]
-        else:
+        elif len(field_metadata.metadata.paragraphs) > result.index:
             paragraph = field_metadata.metadata.paragraphs[result.index]
 
-        for classification in paragraph.classifications:
-            labels.append(f"{classification.labelset}/{classification.label}")
+        if paragraph is not None:
+            for classification in paragraph.classifications:
+                labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels
