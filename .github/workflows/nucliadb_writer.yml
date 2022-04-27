@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/nucliadb_writer.yml"
       - "charts/nucliadb_writer/**"
+      - "nucliadb_ingest/**"
       - "nucliadb_writer/**"
       - "nucliadb_utils/**"
       - "nucliadb_models/**"
@@ -17,6 +18,7 @@ on:
     paths:
       - ".github/workflows/nucliadb_writer.yml"
       - "charts/nucliadb_writer/**"
+      - "nucliadb_ingest/**"
       - "nucliadb_writer/**"
       - "nucliadb_utils/**"
       - "nucliadb_models/**"
@@ -105,8 +107,8 @@ jobs:
 
       - uses: actions/upload-artifact@v2
         with:
-          name: openapi-${{ env.COMPONENT }}-${{ env.GITHUB_SHA }}
-          path: /tmp/openapi/${{ env.COMPONENT }}.json
+          name: openapi-${{ env.COMPONENT }}-${GITHUB_SHA}
+          path: /tmp/openapi/
 
   # Job to build the docker and push it to registry
   build:
@@ -209,8 +211,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v2
         with:
-          name: openapi-${{ env.COMPONENT }}-${{ env.GITHUB_SHA }}
-          path: /tmp/openapi/${{ env.COMPONENT }}.json
+          name: openapi-${{ env.COMPONENT }}-${GITHUB_SHA}
+          path: /tmp/openapi/
 
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0

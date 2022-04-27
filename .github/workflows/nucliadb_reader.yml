@@ -107,7 +107,7 @@ jobs:
 
       - uses: actions/upload-artifact@v2
         with:
-          name: openapi-${{ env.COMPONENT }}-${{ env.GITHUB_SHA }}
+          name: openapi-${{ env.COMPONENT }}-${GITHUB_SHA}
           path: /tmp/openapi/${{ env.COMPONENT }}.json
 
   build:
@@ -210,8 +210,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v2
         with:
-          name: openapi-${{ env.COMPONENT }}-${{ env.GITHUB_SHA }}
-          path: /tmp/openapi/${{ env.COMPONENT }}.json
+          name: openapi-${{ env.COMPONENT }}-${GITHUB_SHA}
+          path: /tmp/openapi/
 
       # Setup gcloud CLI
       - uses: google-github-actions/auth@v0
