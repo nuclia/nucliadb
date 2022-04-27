@@ -100,10 +100,17 @@ jobs:
         with:
           file: ./coverage.xml
 
+      - name: Calculate short sha
+        id: env-vars
+        run: |-
+          HASH=`git rev-parse --short HEAD`
+          BRANCH=${GITHUB_REF##*/}
+          echo "::set-output name=short_sha::$HASH"
+
       - name: Extract docs
         run: |
           mkdir -p /tmp/openapi
-          extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION
+          extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION ${{ steps.env-vars.outputs.short_sha }}
 
       - uses: actions/upload-artifact@v2
         with:
