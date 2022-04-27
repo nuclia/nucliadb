@@ -40,7 +40,7 @@ env:
   CARGO_TERM_COLOR: always
   API_VERSION: 1
   COMPONENT: nucliadb-node
-  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.GCP_PROJECT_ID }}
+  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
   IMAGE_NAME_NODE: node
   IMAGE_NAME_NODE_SIDECAR: node_sidecar
   HASH: $(git rev-parse --short "$GITHUB_SHA")
