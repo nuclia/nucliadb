@@ -130,6 +130,9 @@ class Consumer:
         target = audit_settings.audit_jetstream_target.format(
             partition=self.partition, type=AuditRequest.MODIFIED
         )
+        logger.info(
+            f"Consumer: {self.partition} Start at {last_curator_seq} on {target}"
+        )
 
         self.subscription = await self.js.subscribe(
             subject=target,
@@ -152,33 +155,46 @@ class Consumer:
 
     async def loop(self):
         seq = None
+        logger.info(f"Consumer: {self.partition} Loop {self.partition} running")
+
         try:
             while time.time() < self.dead_time:
+                logger.info(f"Still {self.dead_time - time.time()} seconds left")
                 msg = await self.subscription.next_msg(timeout=0.5)
                 seq = await self.subscription_worker(msg)
+            logger.info("Consumer: {self.partition} Time if off")
         except errors.TimeoutError:
             pass
 
         if seq is not None:
+            logger.info("Consumer: {self.partition} Write last entity")
             last_curator_key = CURATOR_ID.format(worker=self.partition)
             txn = await self.driver.begin()
             await txn.set(last_curator_key, f"{seq}".encode())
             await txn.commit(resource=False)
 
         kbs = set(self.kbs_touch)
+
         if len(kbs) > 0:
+            logger.info(f"Consumer: {self.partition} Touch {len(kbs)}")
             cache = await get_cache()
             self.proc = Processor(driver=self.driver, storage=self.storage, cache=cache)
             await self.proc.initialize()
 
             for kbid in kbs:
+                logger.info(f"Consumer: {self.partition} commiting  {kbid}")
+
                 entities = await self.get_knowledgebox_entities(kbid)
                 txn = await self.driver.begin()
                 kbobj = await self.proc.get_kb_obj(txn, kbid)
                 if kbobj is not None:
                     for group, entities in entities.items():
+                        logger.info(
+                            f"Consumer: {self.partition} commiting  {kbid} - {group}"
+                        )
                         await kbobj.set_entities(group, entities)
                 await txn.commit(resource=False)
+                logger.info(f"Consumer: {self.partition} commited  {kbid}")
 
     async def subscription_worker(self, msg: Msg) -> int:
         subject = msg.subject
