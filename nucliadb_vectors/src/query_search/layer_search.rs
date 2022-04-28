@@ -67,7 +67,6 @@ impl<'a> Query for LayerSearchQuery<'a> {
                         if !visited.contains(&node) && loaded {
                             visited.insert(node);
                             let distance = self.index.distance_to(&self.elem, node);
-                            println!("{:?} : {}", node, distance);
                             candidates.push(StandardElem(node, distance));
                             results.push(StandardElem(node, distance));
                         }
