@@ -353,7 +353,7 @@ impl FixedByteLen for Edge {
     fn segment_len() -> usize {
         let node_id_len = NodeID::segment_len();
         let f32_len = f32::segment_len();
-        (2*node_id_len) + f32_len
+        (2 * node_id_len) + f32_len
     }
 }
 
@@ -524,7 +524,9 @@ mod graph_layer_test_serialization {
             dist: 1.2,
         };
         let grap = GraphLayer {
-            cnx: [(node_0, vec![edge]), (node_1, vec![edge])].into_iter().collect()
+            cnx: [(node_0, vec![edge]), (node_1, vec![edge])]
+                .into_iter()
+                .collect(),
         };
         let tested = GraphLayer::deserialize(&grap.serialize());
         assert_eq!(grap.no_edges(node_0), tested.no_edges(node_0));
@@ -535,8 +537,7 @@ mod graph_layer_test_serialization {
 }
 
 impl<T> ByteRpr for Vec<T>
-where
-    T: ByteRpr + FixedByteLen,
+where T: ByteRpr + FixedByteLen
 {
     fn serialize(&self) -> Vec<u8> {
         let mut result = vec![];
@@ -564,7 +565,7 @@ mod vec_test_serialization {
     use super::*;
     #[test]
     fn serialize() {
-        let vector: Vec<u64> = vec![12;7];
+        let vector: Vec<u64> = vec![12; 7];
         let tested: Vec<u64> = Vec::deserialize(&vector.serialize());
         assert_eq!(tested, vector);
     }
