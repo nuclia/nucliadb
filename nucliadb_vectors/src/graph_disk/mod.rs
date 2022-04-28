@@ -49,7 +49,7 @@ impl DiskNode {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DiskEdge {
     pub my_id: EdgeId,
     pub edge: Edge,

@@ -46,6 +46,9 @@ impl<'a> Query for InsertQuery<'a> {
     type Output = ();
 
     fn run(&mut self) -> Self::Output {
+        if self.disk.get_node_id(&self.key).is_some() {
+            return;
+        }
         let mut labels = HashSet::new();
         for label_value in std::mem::take(&mut self.labels) {
             match self.disk.get_label_id(&label_value) {

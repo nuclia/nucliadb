@@ -31,16 +31,19 @@ pub fn select_neighbours_heuristic(
     let mut w = BinaryHeap::new();
     let mut w_d = BinaryHeap::new();
     for (node, dist) in candidates {
-        w.push(InverseElem(node, dist));
+        w.push(StandardElem(node, dist));
     }
     while !w.is_empty() && r.len() < k_neighbours {
-        let e = StandardElem::from(w.pop().unwrap());
+        let e = w.pop().unwrap();
         match r.peek().cloned() {
-            Some(nearest) if e < StandardElem::from(nearest) => {
-                r.push(InverseElem::from(e));
+            Some(nearest) if e > nearest => {
+                r.push(e);
+            }
+            None => {
+                r.push(e);
             }
             _ => {
-                w_d.push(InverseElem::from(e));
+                w_d.push(e);
             }
         }
     }
@@ -48,7 +51,7 @@ pub fn select_neighbours_heuristic(
         r.push(w_d.pop().unwrap());
     }
     let mut result = Vec::new();
-    while let Some(InverseElem(n, d)) = r.pop() {
+    while let Some(StandardElem(n, d)) = r.pop() {
         result.push((n, d));
     }
     result
@@ -67,9 +70,9 @@ mod test_heuristic_simple {
             candidates.push((NodeId::new(), v));
         }
         solution.sort_by(|a, b| {
-            if *a > *b {
+            if *b > *a {
                 std::cmp::Ordering::Greater
-            } else if *a < *b {
+            } else if *b < *a {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Equal
