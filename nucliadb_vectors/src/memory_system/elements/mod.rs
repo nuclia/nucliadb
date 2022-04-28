@@ -140,6 +140,20 @@ impl<T> ID<T> {
     }
 }
 
+#[cfg(test)]
+mod id_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let id_0 = NodeID {
+            uuid: 0,
+            of_type: PhantomData,
+        };
+        assert_eq!(id_0.serialize().len(), NodeID::segment_len());
+        assert_eq!(NodeID::deserialize(&id_0.serialize()), id_0);
+    }
+}
+
 pub struct IDGenerator<T> {
     fresh: ID<T>,
 }
@@ -162,6 +176,7 @@ impl<T> IDGenerator<T> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EntryPoint {
     pub node: NodeID,
     pub layer: u64,
@@ -196,6 +211,25 @@ impl FixedByteLen for EntryPoint {
     }
 }
 
+#[cfg(test)]
+mod entry_point_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let id_0 = NodeID {
+            uuid: 0,
+            of_type: PhantomData,
+        };
+        let ep = EntryPoint {
+            node: id_0,
+            layer: 0,
+        };
+        assert_eq!(NodeID::deserialize(&id_0.serialize()), id_0);
+        assert_eq!(ep.serialize().len(), EntryPoint::segment_len());
+        assert_eq!(ep, EntryPoint::deserialize(&ep.serialize()));
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSegment {
     pub start: u64,
@@ -227,7 +261,22 @@ impl FixedByteLen for FileSegment {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[cfg(test)]
+mod file_segment_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let id_0 = NodeID {
+            uuid: 0,
+            of_type: PhantomData,
+        };
+        let fs = FileSegment { start: 0, end: 0 };
+        assert_eq!(fs.serialize().len(), FileSegment::segment_len());
+        assert_eq!(FileSegment::deserialize(&fs.serialize()), fs);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Node {
     pub key: FileSegment,
     pub vector: FileSegment,
@@ -252,11 +301,25 @@ impl ByteRpr for Node {
 }
 impl FixedByteLen for Node {
     fn segment_len() -> usize {
-        2 * u64::segment_len()
+        2 * FileSegment::segment_len()
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[cfg(test)]
+mod node_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let node = Node {
+            key: FileSegment { start: 0, end: 0 },
+            vector: FileSegment { start: 2, end: 2 },
+        };
+        assert_eq!(node.serialize().len(), Node::segment_len());
+        assert_eq!(Node::deserialize(&node.serialize()), node);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Edge {
     pub from: NodeID,
     pub to: NodeID,
@@ -290,7 +353,28 @@ impl FixedByteLen for Edge {
     fn segment_len() -> usize {
         let node_id_len = NodeID::segment_len();
         let f32_len = f32::segment_len();
-        node_id_len + f32_len
+        (2*node_id_len) + f32_len
+    }
+}
+
+#[cfg(test)]
+mod edge_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let edge = Edge {
+            from: NodeID {
+                uuid: 0,
+                of_type: PhantomData,
+            },
+            to: NodeID {
+                uuid: 1,
+                of_type: PhantomData,
+            },
+            dist: 1.2,
+        };
+        assert_eq!(edge.serialize().len(), Edge::segment_len());
+        assert_eq!(Edge::deserialize(&edge.serialize()), edge);
     }
 }
 
@@ -319,6 +403,16 @@ impl ByteRpr for Vector {
         Vector {
             raw: Vec::deserialize(bytes),
         }
+    }
+}
+
+#[cfg(test)]
+mod vector_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let vector = Vector { raw: vec![2.0; 3] };
+        assert_eq!(Vector::deserialize(&vector.serialize()), vector);
     }
 }
 
@@ -411,8 +505,38 @@ impl ByteRpr for Vec<u8> {
     }
 }
 
+#[cfg(test)]
+mod graph_layer_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let node_0 = NodeID {
+            uuid: 0,
+            of_type: PhantomData,
+        };
+        let node_1 = NodeID {
+            uuid: 1,
+            of_type: PhantomData,
+        };
+        let edge = Edge {
+            from: node_0,
+            to: node_1,
+            dist: 1.2,
+        };
+        let grap = GraphLayer {
+            cnx: [(node_0, vec![edge]), (node_1, vec![edge])].into_iter().collect()
+        };
+        let tested = GraphLayer::deserialize(&grap.serialize());
+        assert_eq!(grap.no_edges(node_0), tested.no_edges(node_0));
+        assert_eq!(grap.no_edges(node_1), tested.no_edges(node_1));
+        assert_eq!(grap[(node_0, 0)], grap[(node_0, 0)]);
+        assert_eq!(grap[(node_1, 0)], grap[(node_1, 0)]);
+    }
+}
+
 impl<T> ByteRpr for Vec<T>
-where T: ByteRpr + FixedByteLen
+where
+    T: ByteRpr + FixedByteLen,
 {
     fn serialize(&self) -> Vec<u8> {
         let mut result = vec![];
@@ -432,6 +556,17 @@ where T: ByteRpr + FixedByteLen
             end = start + segment_len;
         }
         deserealized
+    }
+}
+
+#[cfg(test)]
+mod vec_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let vector: Vec<u64> = vec![12;7];
+        let tested: Vec<u64> = Vec::deserialize(&vector.serialize());
+        assert_eq!(tested, vector);
     }
 }
 
@@ -465,6 +600,17 @@ where
             end = start + segment_len;
         }
         deserealized
+    }
+}
+
+#[cfg(test)]
+mod hashmap_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let map: HashMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
+        let tested: HashMap<u64, u64> = HashMap::deserialize(&map.serialize());
+        assert_eq!(tested, map);
     }
 }
 
