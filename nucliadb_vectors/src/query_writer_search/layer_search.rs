@@ -53,22 +53,22 @@ impl<'a> Query for LayerSearchQuery<'a> {
         for entry_point in self.entry_points.iter().cloned() {
             load_node_in_writer(entry_point, self.index, self.arena, self.disk);
             let distance = Distance::cosine(&self.elem, &self.arena.get_node(entry_point).vector);
-            candidates.push(InverseElem(entry_point, distance));
+            candidates.push(StandardElem(entry_point, distance));
             results.push(StandardElem(entry_point, distance));
             visited.insert(entry_point);
         }
         loop {
             match (candidates.pop(), results.peek().cloned()) {
                 (None, _) => break,
-                (Some(InverseElem(_, cd)), Some(StandardElem(_, rd))) if cd > rd => break,
-                (Some(InverseElem(candidate, _)), _) => {
+                (Some(StandardElem(_, cd)), Some(StandardElem(_, rd))) if cd > rd => break,
+                (Some(StandardElem(candidate, _)), _) => {
                     for (node, _) in self.index.out_edges(self.layer, candidate) {
                         if !visited.contains(&node) {
                             load_node_in_writer(node, self.index, self.arena, self.disk);
                             visited.insert(node);
                             let distance =
                                 Distance::cosine(&self.elem, &self.arena.get_node(node).vector);
-                            candidates.push(InverseElem(node, distance));
+                            candidates.push(StandardElem(node, distance));
                             results.push(StandardElem(node, distance));
                         }
                     }
@@ -76,14 +76,11 @@ impl<'a> Query for LayerSearchQuery<'a> {
             }
         }
         let mut neighbours = Vec::with_capacity(self.k_neighbours);
-        while results.len() > self.k_neighbours {
-            results.pop();
-        }
-        while !results.is_empty() {
+        while neighbours.len() != self.k_neighbours && !results.is_empty() {
             let StandardElem(node, dist) = results.pop().unwrap();
             neighbours.push((node, dist));
         }
-        neighbours.reverse();
+        // neighbours.reverse();
         LayerSearchValue { neighbours }
     }
 }
