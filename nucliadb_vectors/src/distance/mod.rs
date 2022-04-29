@@ -1,7 +1,44 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
+
+
+
+
+/*
+    WARNING:
+    The code in this module was not developed by Nuclia, it can be found in the following repository:
+    https://github.com/qdrant/qdrant/tree/master/lib/segment/src/spaces
+    Copied in the 29th of April 2022 
+*/
+
+
 mod cosine_distance;
-mod simple_avx;
-mod simple_neon;
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 mod simple_sse;
+
+#[cfg(target_arch = "x86_64")]
+mod simple_avx;
+
+#[cfg(target_arch = "aarch64")]
+mod simple_neon;
 
 pub use crate::distance::cosine_distance::cosine_distance;
 
