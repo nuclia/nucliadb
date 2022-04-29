@@ -207,7 +207,7 @@ fn concurrency_test() {
     let writer = Writer::new(temp_dir.path().to_str().unwrap());
     let reader = Reader::new(temp_dir.path().to_str().unwrap());
     let reader_lock = lock.clone();
-    let writer_lock = lock.clone();
+    let writer_lock = lock;
     let rp = std::thread::spawn(move || reader_process(reader, reader_lock));
     let wp = std::thread::spawn(move || writer_process(writer, writer_lock));
     rp.join().unwrap();

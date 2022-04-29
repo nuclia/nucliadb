@@ -90,6 +90,7 @@ impl LMBDStorage {
         let path = format!("{}/{}", key, label);
         self.label_db.atomic_insert(&path, &());
     }
+    #[allow(clippy::ptr_arg)]
     pub fn remove_vector(&mut self, vector: &String) {
         self.node_db.atomic_delete(vector);
         self.label_db.rmv_with_prefix(vector);
@@ -118,6 +119,7 @@ impl LockLMDB {
     pub fn all_nodes_in(&self, prefix: &String) -> Vec<(String, Node)> {
         self.disk.read().unwrap().all_nodes_in(prefix)
     }
+    #[allow(clippy::ptr_arg)]
     pub fn get_node(&self, node: &String) -> Option<Node> {
         self.disk.read().unwrap().get_node(node)
     }
@@ -130,6 +132,7 @@ impl LockLMDB {
     pub fn add_label(&mut self, key: String, label: String) {
         self.disk.write().unwrap().add_label(key, label)
     }
+    #[allow(clippy::ptr_arg)]
     pub fn remove_vector(&self, vector: &String) {
         self.disk.write().unwrap().remove_vector(vector)
     }
