@@ -23,9 +23,9 @@
 
 /*
     WARNING:
-    The code in this module was not developed by Nuclia, it can be found in the following repository:
-    https://github.com/qdrant/qdrant/tree/master/lib/segment/src/spaces
-    Copied in the 29th of April 2022 
+    The code in this module was not developed by Bosutech XXI S.L.
+    It was derived the 29th of April 2022 from the following Apache licensed project:
+    https://github.com/qdrant/qdrant
 */
 
 
