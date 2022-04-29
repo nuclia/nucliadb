@@ -79,7 +79,6 @@ impl<'a> Query for LayerSearchQuery<'a> {
             let StandardElem(node, dist) = results.pop().unwrap();
             neighbours.push((node, dist));
         }
-        // neighbours.reverse();
         LayerSearchValue { neighbours }
     }
 }
