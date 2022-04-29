@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#[allow(unused)]
+mod distance;
 mod graph_arena;
 mod graph_disk;
 mod graph_elems;
