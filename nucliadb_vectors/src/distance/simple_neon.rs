@@ -2,7 +2,7 @@
 use std::arch::aarch64::*;
 
 #[cfg(target_feature = "neon")]
-pub(crate) unsafe fn cosine_preprocess_neon(vector: &Vec<f32>) -> Vec<f32> {
+pub(crate) unsafe fn cosine_preprocess_neon(vector: &[f32]) -> Vec<f32> {
     let n = vector.len();
     let m = n - (n % 16);
     let mut ptr: *const f32 = vector.as_ptr();
@@ -37,7 +37,7 @@ pub(crate) unsafe fn cosine_preprocess_neon(vector: &Vec<f32>) -> Vec<f32> {
 }
 
 #[cfg(target_feature = "neon")]
-pub(crate) unsafe fn dot_similarity_neon(v1: &Vec<f32>, v2: &Vec<f32>) -> f32 {
+pub unsafe fn dot_similarity_neon(v1: &[f32], v2: &[f32]) -> f32 {
     let n = v1.len();
     let m = n - (n % 16);
     let mut ptr1: *const f32 = v1.as_ptr();

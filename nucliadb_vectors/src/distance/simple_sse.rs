@@ -12,7 +12,7 @@ unsafe fn hsum128_ps_sse(x: __m128) -> f32 {
 }
 
 #[target_feature(enable = "sse")]
-pub unsafe fn cosine_preprocess_sse(vector: &Vec<f32>) -> Vec<f32> {
+pub unsafe fn cosine_preprocess_sse(vector: &[f32]) -> Vec<f32> {
     let n = vector.len();
     let m = n - (n % 16);
     let mut ptr: *const f32 = vector.as_ptr();
@@ -51,7 +51,7 @@ pub unsafe fn cosine_preprocess_sse(vector: &Vec<f32>) -> Vec<f32> {
 }
 
 #[target_feature(enable = "sse")]
-pub(crate) unsafe fn dot_similarity_sse(v1: &Vec<f32>, v2: &Vec<f32>) -> f32 {
+pub unsafe fn dot_similarity_sse(v1: &[f32], v2: &[f32]) -> f32 {
     let n = v1.len();
     let m = n - (n % 16);
     let mut ptr1: *const f32 = v1.as_ptr();

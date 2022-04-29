@@ -13,13 +13,13 @@ const MIN_DIM_SIZE_AVX: usize = 32;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64"))]
 const MIN_DIM_SIZE_SIMD: usize = 16;
 
-pub fn cosine_distance(a: &Vec<f32>, b: &Vec<f32>) -> f32 {
+pub fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
     let a = cosine_preprocess(a).unwrap();
     let b = cosine_preprocess(b).unwrap();
     cosine_similarity(&a, &b)
 }
 
-pub fn cosine_preprocess(vector: &Vec<f32>) -> Option<Vec<f32>> {
+pub fn cosine_preprocess(vector: &[f32]) -> Option<Vec<f32>> {
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx")
@@ -47,13 +47,13 @@ pub fn cosine_preprocess(vector: &Vec<f32>) -> Option<Vec<f32>> {
     Some(default_cosine_preprocess(vector))
 }
 
-pub fn default_cosine_preprocess(vector: &Vec<f32>) -> Vec<f32> {
+pub fn default_cosine_preprocess(vector: &[f32]) -> Vec<f32> {
     let mut length: f32 = vector.iter().map(|x| x * x).sum();
     length = length.sqrt();
     vector.iter().map(|x| x / length).collect()
 }
 
-pub fn cosine_similarity(v1: &Vec<f32>, v2: &Vec<f32>) -> f32 {
+pub fn cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx")
@@ -81,6 +81,6 @@ pub fn cosine_similarity(v1: &Vec<f32>, v2: &Vec<f32>) -> f32 {
     default_dot_similarity(v1, v2)
 }
 
-pub fn default_dot_similarity(v1: &Vec<f32>, v2: &Vec<f32>) -> f32 {
+pub fn default_dot_similarity(v1: &[f32], v2: &[f32]) -> f32 {
     v1.iter().zip(v2).map(|(a, b)| a * b).sum()
 }
