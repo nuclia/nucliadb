@@ -123,11 +123,11 @@ where
 }
 
 #[cfg(test)]
-mod test_internals_database {
+mod test {
     use super::*;
     const DUMMY_DB: &str = "DUMMY";
     #[test]
-    fn test_internals_database_read_write() {
+    fn read_write() {
         let dir = tempfile::tempdir().unwrap();
         let mut database = InternalDB::new(dir.path(), DUMMY_DB);
         database.atomic_insert(&0u64, &0u64);
@@ -137,7 +137,7 @@ mod test_internals_database {
         assert_eq!(database.get(&0u64), None);
     }
     #[test]
-    fn test_prefix() {
+    fn prefix() {
         let dir = tempfile::tempdir().unwrap();
         let mut database: InternalDB<String, u64> = InternalDB::new(dir.path(), DUMMY_DB);
         database.atomic_insert(&"K_1".to_string(), &0);

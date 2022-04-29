@@ -20,19 +20,20 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use fs2::FileExt;
 use memmap2::{Mmap, MmapMut};
 use rayon::prelude::*;
 
-use crate::memory_system::elements::{
-    ByteRpr, FileSegment, FixedByteLen, GraphLayer, HNSWParams, Vector,
-};
+use crate::memory_system::elements::{ByteRpr, FileSegment, FixedByteLen, GraphLayer, Vector};
 
 const STORAGE: &str = "STORAGE.nuclia";
-const LOCK: &str = "LOCK.nuclia";
+const STORAGE_LOCK: &str = "STORAGE_LOCK.nuclia";
 const STACK: &str = "STACK.nuclia";
-const STORAGE_BACKUP: &str = "STORAGE_BCK.nuclia";
+const PICTURE: &str = "PICTURE.nuclia";
+const PICTURE_LOCK: &str = "PICTURE_LOCK.nuclia";
 
 pub trait SegmentReader {
     fn read_all(&self) -> &[u8];
@@ -45,9 +46,49 @@ pub trait SegmentWriter {
     fn truncate(&mut self, bytes: &[u8]);
 }
 
-struct CapturedItem {
+struct Tunel {
+    is_on: Arc<AtomicBool>,
+    reload: Arc<AtomicBool>,
     path_storage: PathBuf,
     path_picture: PathBuf,
+    picture_lock: File,
+    storage_lock: File,
+}
+impl Tunel {
+    pub fn start(path: &Path) -> (Arc<AtomicBool>, Arc<AtomicBool>) {
+        let on_off = Arc::new(AtomicBool::new(true));
+        let reload = Arc::new(AtomicBool::new(true));
+        let tunel = Tunel {
+            reload: reload.clone(),
+            is_on: on_off.clone(),
+            path_storage: path.join(STORAGE),
+            path_picture: path.join(PICTURE),
+            storage_lock: File::open(path.join(STORAGE_LOCK)).unwrap(),
+            picture_lock: File::open(path.join(PICTURE_LOCK)).unwrap(),
+        };
+        std::thread::spawn(move || tunel.work());
+        (reload, on_off)
+    }
+
+    fn work(self) {
+        let sleep_time = std::time::Duration::from_secs(10);
+        while self.is_on.load(Ordering::SeqCst) {
+            self.storage_lock.lock_exclusive().unwrap();
+            self.picture_lock.lock_exclusive().unwrap();
+            std::fs::copy(&self.path_storage, &self.path_picture).unwrap();
+            self.storage_lock.unlock().unwrap();
+            self.picture_lock.unlock().unwrap();
+            self.reload.store(true, Ordering::SeqCst);
+            std::thread::sleep(sleep_time);
+        }
+    }
+}
+
+struct CapturedItem {
+    reload_flag: Arc<AtomicBool>,
+    tunel_switch: Arc<AtomicBool>,
+    path_picture: PathBuf,
+    picture_lock: File,
     picture: Mmap,
 }
 impl CapturedItem {
@@ -57,22 +98,37 @@ impl CapturedItem {
             let sleep_time = std::time::Duration::from_millis(10);
             std::thread::sleep(sleep_time);
         }
-        let path_storage = path.join(STORAGE);
-        let path_picture = path.join(STORAGE_BACKUP);
-        File::create(&path_picture).unwrap();
-        std::fs::copy(&path_storage, &path_picture).unwrap();
+        let reload = Arc::new(AtomicBool::new(false));
+        let path_picture = path.join(PICTURE);
+        let path_lock = path.join(PICTURE_LOCK);
+        let _picture = File::create(&path_picture).unwrap();
+        let picture_lock = File::create(&path_lock).unwrap();
         let picture = File::open(&path_picture).unwrap();
         let picture = unsafe { Mmap::map(&picture).unwrap() };
+        let (reload_flag, tunel_switch) = Tunel::start(path);
         CapturedItem {
-            path_storage,
+            reload_flag,
+            tunel_switch,
             path_picture,
+            picture_lock,
             picture,
         }
     }
-    pub fn reload(&mut self) {
-        std::fs::copy(&self.path_storage, &self.path_picture).unwrap();
-        let backup = File::open(&self.path_picture).unwrap();
-        self.picture = unsafe { Mmap::map(&backup).unwrap() };
+    pub fn reload(&mut self) -> bool {
+        let reloaded = self.reload_flag.swap(false, Ordering::SeqCst);
+        if reloaded {
+            self.picture_lock.lock_exclusive().unwrap();
+            let picture = File::open(&self.path_picture).unwrap();
+            self.picture = unsafe { Mmap::map(&picture).unwrap() };
+            self.picture_lock.unlock().unwrap();
+        }
+        reloaded
+    }
+}
+
+impl Drop for CapturedItem {
+    fn drop(&mut self) {
+        self.tunel_switch.store(false, Ordering::SeqCst);
     }
 }
 
@@ -93,13 +149,6 @@ impl DeletedStack {
     pub fn new(path: &Path) -> DeletedStack {
         std::fs::create_dir_all(&path).unwrap();
         let path = path.to_path_buf();
-        let path_lock = path.join(LOCK);
-        let lock = OpenOptions::new()
-            .read(true)
-            .append(true)
-            .create(true)
-            .open(&path_lock)
-            .unwrap();
         DeletedStack {
             stack: path.join(STACK),
         }
@@ -193,7 +242,7 @@ impl StorageItem {
     pub fn new(path: &Path) -> StorageItem {
         std::fs::create_dir_all(&path).unwrap();
         let path_storage = path.join(STORAGE);
-        let path_lock = path.join(LOCK);
+        let path_lock = path.join(STORAGE_LOCK);
         let path_stack = path.join(STACK);
         let storage = OpenOptions::new()
             .read(true)
@@ -286,12 +335,13 @@ mod captured_item_tests {
     pub fn captured_item_usage() {
         let mut dir = tempfile::tempdir().unwrap();
         let mut file = File::create(&dir.path().join(STORAGE)).unwrap();
+        let lock = File::create(&dir.path().join(STORAGE_LOCK)).unwrap();
         let mut captured = CapturedItem::new(dir.path());
         assert!(captured.read_all().is_empty());
         file.write_all(b"Some bytes").unwrap();
         file.flush().unwrap();
         assert!(captured.read_all().is_empty());
-        captured.reload();
+        while !captured.reload() {}
         assert_eq!(captured.read_all(), b"Some bytes");
     }
 }
