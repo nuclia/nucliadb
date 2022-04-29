@@ -50,7 +50,7 @@ pub trait Distance {
 #[derive(
     Copy, Clone, PartialOrd, PartialEq, Ord, Eq, Hash, Debug, Default, Serialize, Deserialize,
 )]
-pub struct NodeId(usize);
+pub struct NodeId(pub usize);
 impl NodeId {
     pub fn new() -> NodeId {
         NodeId(0)
