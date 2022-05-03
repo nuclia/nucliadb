@@ -20,55 +20,46 @@
 
 pub(crate) mod layer_search;
 
-use layer_search::*;
-
-use crate::graph_disk::*;
-use crate::graph_elems::*;
-use crate::memory_processes::load_node_in_reader;
+use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::read_index::*;
+use crate::index::*;
+use layer_search::*;
 
 #[derive(Default, Clone)]
 pub struct SearchValue {
-    pub neighbours: Vec<(NodeId, f32)>,
+    pub neighbours: Vec<(Node, f32)>,
 }
 
 pub struct SearchQuery<'a> {
-    pub elem: GraphVector,
+    pub elem: Vector,
     pub k_neighbours: usize,
-    pub index: &'a LockReader,
-    pub disk: &'a LockDisk,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for SearchQuery<'a> {
     type Output = SearchValue;
 
     fn run(&mut self) -> Self::Output {
-        if let Some((ep, ep_layer)) = self.index.get_entry_point() {
-            if load_node_in_reader(ep, self.index, self.disk) {
-                let mut down_step = LayerSearchQuery {
-                    layer: ep_layer,
-                    k_neighbours: 1,
-                    elem: self.elem.clone(),
-                    entry_points: vec![ep],
-                    index: self.index,
-                    disk: self.disk,
-                };
-                while down_step.layer != 0 {
-                    let result = down_step.run();
-                    if result.neighbours.is_empty() {
-                        down_step.entry_points[0] = result.neighbours[0].0;
-                    }
-                    down_step.layer -= 1;
+        if let Some(entry_point) = self.index.get_entry_point() {
+            let mut down_step = LayerSearchQuery {
+                layer: entry_point.layer as usize,
+                k_neighbours: 1,
+                elem: &self.elem,
+                entry_points: vec![entry_point.node],
+                index: self.index,
+            };
+            while down_step.layer != 0 {
+                let result = down_step.run();
+                if result.neighbours.is_empty() {
+                    down_step.entry_points[0] = result.neighbours[0].0;
                 }
-                let mut final_search = down_step;
-                final_search.k_neighbours = self.k_neighbours;
-                let layer_result = final_search.run();
-                SearchValue {
-                    neighbours: layer_result.neighbours,
-                }
-            } else {
-                SearchValue::default()
+                down_step.layer -= 1;
+            }
+            let mut final_search = down_step;
+            final_search.k_neighbours = self.k_neighbours;
+            let layer_result = final_search.run();
+            SearchValue {
+                neighbours: layer_result.neighbours,
             }
         } else {
             SearchValue::default()

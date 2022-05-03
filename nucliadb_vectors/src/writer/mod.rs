@@ -23,19 +23,13 @@ pub mod test_utils;
 use std::fmt::Debug;
 use std::path::Path;
 
-use crate::graph_arena::*;
-use crate::graph_disk::*;
-use crate::graph_elems::HNSWParams;
-pub use crate::graph_elems::NodeId;
+use crate::index::*;
+use crate::memory_system::elements::*;
 use crate::query::Query;
 use crate::query_delete::DeleteQuery;
 use crate::query_insert::InsertQuery;
-use crate::write_index::*;
 pub struct Writer {
-    index: LockWriter,
-    arena: LockArena,
-    disk: LockDisk,
-    params: HNSWParams,
+    index: LockIndex,
 }
 
 impl Debug for Writer {
@@ -48,15 +42,8 @@ impl Debug for Writer {
 
 impl Writer {
     pub fn new(path: &str) -> Writer {
-        let params = HNSWParams::default();
-        let disk = Disk::start(Path::new(path));
-        let arena = Arena::from_disk(&disk);
-        let index = WriteIndex::with_params(&disk, params.no_layers);
         Writer {
-            params,
-            disk: disk.into(),
-            arena: arena.into(),
-            index: index.into(),
+            index: Index::writer(Path::new(path)).into(),
         }
     }
     pub fn insert(&mut self, key: String, element: Vec<f32>, labels: Vec<String>) {
@@ -64,44 +51,32 @@ impl Writer {
             key,
             element,
             labels,
-            m: self.params.m,
-            m_max: self.params.m_max,
-            ef_construction: self.params.ef_construction,
+            m: hnsw_params::m(),
+            m_max: hnsw_params::m_max(),
+            ef_construction: hnsw_params::ef_construction(),
             index: &self.index,
-            arena: &self.arena,
-            disk: &self.disk,
         }
         .run();
     }
     pub fn delete_document(&mut self, doc: String) {
-        let keys = self.disk.all_nodes_in(&doc);
-        for key in keys {
+        for key in self.index.get_prefixed(&doc) {
             self.delete_vector(key)
         }
     }
     pub fn delete_vector(&mut self, key: String) {
         DeleteQuery {
             delete: key,
-            m: self.params.m,
-            m_max: self.params.m_max,
-            ef_construction: self.params.ef_construction,
+            m: hnsw_params::m(),
+            m_max: hnsw_params::m_max(),
+            ef_construction: hnsw_params::ef_construction(),
             index: &self.index,
-            arena: &self.arena,
-            disk: &self.disk,
         }
         .run();
     }
-    pub fn flush(&mut self) {
-        use crate::memory_processes::dump_index_into_disk;
-        dump_index_into_disk(&self.index, &self.arena, &self.disk);
-        self.arena.dump_into_disk(&self.disk);
-        self.arena.reload(&self.disk);
-        self.index.reload(&self.disk);
+    pub fn commit(&mut self) {
+        self.index.commit()
     }
     pub fn no_vectors(&self) -> usize {
-        self.disk.no_nodes()
-    }
-    pub fn no_labels(&self) -> usize {
-        self.disk.no_labels()
+        self.index.no_nodes() as usize
     }
 }

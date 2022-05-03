@@ -20,24 +20,23 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+//use std::sync::atomic::{AtomicBool, Ordering};
+//use std::sync::Arc;
 
 use fs2::FileExt;
 use memmap2::{Mmap, MmapMut};
-use rayon::prelude::*;
 
-use crate::memory_system::elements::{ByteRpr, FileSegment, FixedByteLen, GraphLayer, Vector};
+use crate::memory_system::elements::{ByteRpr, FileSegment, FixedByteLen};
 
+const NUCLIA_STAMP: &str = "STAMP.nuclia";
 const STORAGE: &str = "STORAGE.nuclia";
 const STORAGE_LOCK: &str = "STORAGE_LOCK.nuclia";
 const STACK: &str = "STACK.nuclia";
-const PICTURE: &str = "PICTURE.nuclia";
-const PICTURE_LOCK: &str = "PICTURE_LOCK.nuclia";
 
 pub trait SegmentReader {
     fn read_all(&self) -> &[u8];
     fn read(&self, segment: FileSegment) -> Option<&[u8]>;
+    fn is_empty(&self) -> bool;
 }
 
 pub trait SegmentWriter {
@@ -46,110 +45,14 @@ pub trait SegmentWriter {
     fn truncate(&mut self, bytes: &[u8]);
 }
 
-struct Tunel {
-    is_on: Arc<AtomicBool>,
-    reload: Arc<AtomicBool>,
-    path_storage: PathBuf,
-    path_picture: PathBuf,
-    picture_lock: File,
-    storage_lock: File,
-}
-impl Tunel {
-    pub fn start(path: &Path) -> (Arc<AtomicBool>, Arc<AtomicBool>) {
-        let on_off = Arc::new(AtomicBool::new(true));
-        let reload = Arc::new(AtomicBool::new(true));
-        let tunel = Tunel {
-            reload: reload.clone(),
-            is_on: on_off.clone(),
-            path_storage: path.join(STORAGE),
-            path_picture: path.join(PICTURE),
-            storage_lock: File::open(path.join(STORAGE_LOCK)).unwrap(),
-            picture_lock: File::open(path.join(PICTURE_LOCK)).unwrap(),
-        };
-        std::thread::spawn(move || tunel.work());
-        (reload, on_off)
-    }
-
-    fn work(self) {
-        let sleep_time = std::time::Duration::from_secs(10);
-        while self.is_on.load(Ordering::SeqCst) {
-            self.storage_lock.lock_exclusive().unwrap();
-            self.picture_lock.lock_exclusive().unwrap();
-            std::fs::copy(&self.path_storage, &self.path_picture).unwrap();
-            self.storage_lock.unlock().unwrap();
-            self.picture_lock.unlock().unwrap();
-            self.reload.store(true, Ordering::SeqCst);
-            std::thread::sleep(sleep_time);
-        }
-    }
-}
-
-struct CapturedItem {
-    reload_flag: Arc<AtomicBool>,
-    tunel_switch: Arc<AtomicBool>,
-    path_picture: PathBuf,
-    picture_lock: File,
-    picture: Mmap,
-}
-impl CapturedItem {
-    pub fn new(path: &Path) -> CapturedItem {
-        use std::time::Duration;
-        while !path.exists() {
-            let sleep_time = std::time::Duration::from_millis(10);
-            std::thread::sleep(sleep_time);
-        }
-        let reload = Arc::new(AtomicBool::new(false));
-        let path_picture = path.join(PICTURE);
-        let path_lock = path.join(PICTURE_LOCK);
-        let _picture = File::create(&path_picture).unwrap();
-        let picture_lock = File::create(&path_lock).unwrap();
-        let picture = File::open(&path_picture).unwrap();
-        let picture = unsafe { Mmap::map(&picture).unwrap() };
-        let (reload_flag, tunel_switch) = Tunel::start(path);
-        CapturedItem {
-            reload_flag,
-            tunel_switch,
-            path_picture,
-            picture_lock,
-            picture,
-        }
-    }
-    pub fn reload(&mut self) -> bool {
-        let reloaded = self.reload_flag.swap(false, Ordering::SeqCst);
-        if reloaded {
-            self.picture_lock.lock_exclusive().unwrap();
-            let picture = File::open(&self.path_picture).unwrap();
-            self.picture = unsafe { Mmap::map(&picture).unwrap() };
-            self.picture_lock.unlock().unwrap();
-        }
-        reloaded
-    }
-}
-
-impl Drop for CapturedItem {
-    fn drop(&mut self) {
-        self.tunel_switch.store(false, Ordering::SeqCst);
-    }
-}
-
-impl SegmentReader for CapturedItem {
-    fn read_all(&self) -> &[u8] {
-        &self.picture[..]
-    }
-    fn read(&self, segment: FileSegment) -> Option<&[u8]> {
-        let range = (segment.start as usize)..(segment.end as usize);
-        self.picture.get(range)
-    }
-}
-
-struct DeletedStack {
+struct DiskStack {
     stack: PathBuf,
 }
-impl DeletedStack {
-    pub fn new(path: &Path) -> DeletedStack {
+impl DiskStack {
+    pub fn new(path: &Path) -> DiskStack {
         std::fs::create_dir_all(&path).unwrap();
         let path = path.to_path_buf();
-        DeletedStack {
+        DiskStack {
             stack: path.join(STACK),
         }
     }
@@ -184,7 +87,7 @@ impl DeletedStack {
         }
     }
     pub fn clear(&self) {
-        let mut stack = OpenOptions::new()
+        let stack = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -194,15 +97,14 @@ impl DeletedStack {
     }
 }
 
-struct StorageItem {
-    path_lock: PathBuf,
+pub struct Storage {
     path_storage: PathBuf,
     lock: File,
-    deleted: DeletedStack,
+    deleted: DiskStack,
     storage: Mmap,
 }
 
-impl SegmentReader for StorageItem {
+impl SegmentReader for Storage {
     fn read_all(&self) -> &[u8] {
         &self.storage[..]
     }
@@ -210,9 +112,12 @@ impl SegmentReader for StorageItem {
         let range = (segment.start as usize)..(segment.end as usize);
         self.storage.get(range)
     }
+    fn is_empty(&self) -> bool {
+        self.storage.is_empty()
+    }
 }
 
-impl SegmentWriter for StorageItem {
+impl SegmentWriter for Storage {
     fn delete_segment(&mut self, segment: FileSegment) {
         self.deleted.push(segment);
     }
@@ -234,13 +139,14 @@ impl SegmentWriter for StorageItem {
         file.set_len(bytes.len() as u64).unwrap();
         self.storage = unsafe { Mmap::map(&file).unwrap() };
         self.deleted.clear();
-        self.lock.unlock();
+        self.lock.unlock().unwrap();
     }
 }
 
-impl StorageItem {
-    pub fn new(path: &Path) -> StorageItem {
+impl Storage {
+    pub fn create(path: &Path) -> Storage {
         std::fs::create_dir_all(&path).unwrap();
+        let nuclia_stamp = path.join(NUCLIA_STAMP);
         let path_storage = path.join(STORAGE);
         let path_lock = path.join(STORAGE_LOCK);
         let path_stack = path.join(STACK);
@@ -257,19 +163,47 @@ impl StorageItem {
             .open(&path_lock)
             .unwrap();
         let storage = unsafe { Mmap::map(&storage).unwrap() };
-        let deleted = DeletedStack::new(path_stack.as_path());
-        StorageItem {
-            path_lock,
+        let deleted = DiskStack::new(path_stack.as_path());
+        File::create(&nuclia_stamp).unwrap();
+        Storage {
             path_storage,
             lock,
             deleted,
             storage,
         }
     }
+    pub fn open(path: &Path) -> Storage {
+        let sleep = std::time::Duration::from_millis(10);
+        let stamp = path.join(NUCLIA_STAMP);
+        while !stamp.exists() {
+            std::thread::sleep(sleep);
+        }
+        let nuclia_stamp = path.join(NUCLIA_STAMP);
+        let path_storage = path.join(STORAGE);
+        let path_lock = path.join(STORAGE_LOCK);
+        let path_stack = path.join(STACK);
+        let storage = OpenOptions::new().read(true).open(&path_storage).unwrap();
+        let lock = OpenOptions::new().read(true).open(&path_lock).unwrap();
+        let storage = unsafe { Mmap::map(&storage).unwrap() };
+        let deleted = DiskStack::new(path_stack.as_path());
+        File::create(&nuclia_stamp).unwrap();
+        Storage {
+            path_storage,
+            lock,
+            deleted,
+            storage,
+        }
+    }
+    pub fn reload(&mut self) {
+        self.lock.lock_exclusive().unwrap();
+        let file = File::open(&self.path_storage).unwrap();
+        self.storage = unsafe { Mmap::map(&file).unwrap() };
+        self.lock.unlock().unwrap();
+    }
     fn update_segment(&mut self, segment: FileSegment, bytes: &[u8]) -> FileSegment {
         self.lock.lock_exclusive().unwrap();
         let range = (segment.start as usize)..(segment.end as usize);
-        let mut file = OpenOptions::new()
+        let file = OpenOptions::new()
             .read(true)
             .append(true)
             .open(&self.path_storage)
@@ -280,7 +214,7 @@ impl StorageItem {
             mmap_mut.flush_range(range.start, range.len()).unwrap();
             self.storage = unsafe { Mmap::map(&file).unwrap() };
         }
-        self.lock.unlock();
+        self.lock.unlock().unwrap();
         segment
     }
     fn append(&mut self, bytes: &[u8]) -> FileSegment {
@@ -291,14 +225,14 @@ impl StorageItem {
             .open(&self.path_storage)
             .unwrap();
         let metadata = file.metadata().unwrap();
-        let mut segment = FileSegment {
+        let segment = FileSegment {
             start: metadata.len(),
             end: metadata.len() + (bytes.len() as u64),
         };
         file.write_all(bytes).unwrap();
         file.flush().unwrap();
         self.storage = unsafe { Mmap::map(&file).unwrap() };
-        self.lock.unlock();
+        self.lock.unlock().unwrap();
         segment
     }
 }
@@ -309,7 +243,7 @@ mod deleted_stack_tests {
     #[test]
     pub fn deleted_buffers_usage() {
         let dir = tempfile::tempdir().unwrap();
-        let mut deleted_buffer = DeletedStack::new(dir.path());
+        let deleted_buffer = DiskStack::new(dir.path());
         let fs_0 = FileSegment { start: 0, end: 0 };
         let fs_1 = FileSegment { start: 1, end: 1 };
         let fs_2 = FileSegment { start: 2, end: 2 };
@@ -329,24 +263,6 @@ mod deleted_stack_tests {
 }
 
 #[cfg(test)]
-mod captured_item_tests {
-    use super::*;
-    #[test]
-    pub fn captured_item_usage() {
-        let mut dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(&dir.path().join(STORAGE)).unwrap();
-        let lock = File::create(&dir.path().join(STORAGE_LOCK)).unwrap();
-        let mut captured = CapturedItem::new(dir.path());
-        assert!(captured.read_all().is_empty());
-        file.write_all(b"Some bytes").unwrap();
-        file.flush().unwrap();
-        assert!(captured.read_all().is_empty());
-        while !captured.reload() {}
-        assert_eq!(captured.read_all(), b"Some bytes");
-    }
-}
-
-#[cfg(test)]
 mod storage_item_tests {
     use super::*;
     #[test]
@@ -356,15 +272,23 @@ mod storage_item_tests {
         let msg_2 = b"message 2";
         let msg_3 = b"message 3";
         let msg_empty = b"this sentence is false";
-        let mut dir = tempfile::tempdir().unwrap();
-        let mut segment = StorageItem::new(dir.path());
-        assert!(segment.read_all().is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        let mut segment = Storage::create(dir.path());
+        let mut segment_r = Storage::open(dir.path());
+        assert!(segment.is_empty());
         let fs_0 = segment.insert(msg_0);
         let fs_1 = segment.insert(msg_1);
         let fs_2 = segment.insert(msg_2);
         assert_eq!(segment.read(fs_0), Some(msg_0.as_ref()));
         assert_eq!(segment.read(fs_1), Some(msg_1.as_ref()));
         assert_eq!(segment.read(fs_2), Some(msg_2.as_ref()));
+        assert_eq!(segment_r.read(fs_0), None);
+        assert_eq!(segment_r.read(fs_1), None);
+        assert_eq!(segment_r.read(fs_2), None);
+        segment_r.reload();
+        assert_eq!(segment_r.read(fs_0), Some(msg_0.as_ref()));
+        assert_eq!(segment_r.read(fs_1), Some(msg_1.as_ref()));
+        assert_eq!(segment_r.read(fs_2), Some(msg_2.as_ref()));
         segment.delete_segment(fs_2);
         let fs_3 = segment.insert(msg_3);
         assert_eq!(fs_3, fs_2);

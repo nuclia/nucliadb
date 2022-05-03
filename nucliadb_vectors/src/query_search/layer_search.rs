@@ -18,27 +18,23 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::{BinaryHeap, HashSet};
-
-use crate::graph_disk::*;
-use crate::graph_elems::*;
-use crate::memory_processes::load_node_in_reader;
+use crate::memory_system::elements::*;
 use crate::query::*;
-use crate::read_index::*;
+use crate::index::*;
 use crate::utils::*;
+use std::collections::{BinaryHeap, HashSet};
 
 #[derive(Clone, Default)]
 pub struct LayerSearchValue {
-    pub neighbours: Vec<(NodeId, f32)>,
+    pub neighbours: Vec<(Node, f32)>,
 }
 
 pub struct LayerSearchQuery<'a> {
     pub layer: usize,
-    pub elem: GraphVector,
+    pub elem: &'a Vector,
     pub k_neighbours: usize,
-    pub entry_points: Vec<NodeId>,
-    pub index: &'a LockReader,
-    pub disk: &'a LockDisk,
+    pub entry_points: Vec<Node>,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for LayerSearchQuery<'a> {
@@ -48,25 +44,20 @@ impl<'a> Query for LayerSearchQuery<'a> {
         let mut candidates = BinaryHeap::new();
         let mut visited = HashSet::new();
         for entry_point in self.entry_points.iter().cloned() {
-            if load_node_in_reader(entry_point, self.index, self.disk) {
-                let distance = self.index.distance_to(&self.elem, entry_point);
-                candidates.push(StandardElem(entry_point, distance));
-                results.push(StandardElem(entry_point, distance));
-                visited.insert(entry_point);
-            }
+            let distance = self.index.semi_mapped_distance(self.elem, entry_point);
+            candidates.push(StandardElem(entry_point, distance));
+            results.push(StandardElem(entry_point, distance));
+            visited.insert(entry_point);
         }
         loop {
             match (candidates.pop(), results.peek().cloned()) {
                 (None, _) => break,
                 (Some(StandardElem(_, cd)), Some(StandardElem(_, rd))) if cd > rd => break,
                 (Some(StandardElem(candidate, _)), _) => {
-                    for edge_index in 0..self.index.no_edges(self.layer, candidate) {
-                        let edge = self.index.get_edge(self.layer, candidate, edge_index);
-                        let node = edge.goes_to;
-                        let loaded = load_node_in_reader(node, self.index, self.disk);
-                        if !visited.contains(&node) && loaded {
+                    for (node, _) in self.index.out_edges(self.layer, candidate) {
+                        if !visited.contains(&node) {
                             visited.insert(node);
-                            let distance = self.index.distance_to(&self.elem, node);
+                            let distance = self.index.semi_mapped_distance(self.elem, node);
                             candidates.push(StandardElem(node, distance));
                             results.push(StandardElem(node, distance));
                         }

@@ -20,29 +20,26 @@
 
 use std::collections::HashSet;
 
-use crate::graph_arena::*;
-use crate::graph_disk::*;
-use crate::graph_elems::*;
 use crate::heuristics::heuristic_paper::select_neighbours_heuristic;
-use crate::memory_processes::load_node_in_writer;
+use crate::index::LockIndex;
+use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::query_writer_search::layer_search::{LayerSearchQuery, LayerSearchValue};
-use crate::write_index::*;
+use crate::query_search::layer_search::{LayerSearchQuery, LayerSearchValue};
+
 #[derive(Clone, Default)]
 pub struct LayerInsertValue {
-    pub neighbours: Vec<NodeId>,
+    pub neighbours: Vec<Node>,
 }
 
 pub struct LayerInsertQuery<'a> {
     pub layer: usize,
-    pub new_element: NodeId,
-    pub entry_points: Vec<NodeId>,
+    pub new_element: Node,
+    pub entry_points: Vec<Node>,
     pub m: usize,
     pub m_max: usize,
     pub ef_construction: usize,
-    pub index: &'a LockWriter,
-    pub arena: &'a LockArena,
-    pub disk: &'a LockDisk,
+    pub vector: &'a Vector,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for LayerInsertQuery<'a> {
@@ -50,44 +47,37 @@ impl<'a> Query for LayerInsertQuery<'a> {
 
     fn run(&mut self) -> Self::Output {
         let LayerSearchValue { neighbours } = LayerSearchQuery {
-            elem: self.arena.get_node(self.new_element).vector,
+            elem: self.vector,
             layer: self.layer,
             k_neighbours: self.ef_construction,
             entry_points: self.entry_points.clone(),
             index: self.index,
-            arena: self.arena,
-            disk: self.disk,
         }
         .run();
-        self.index.add_node(self.new_element, self.layer);
         let mut need_repair = HashSet::new();
         let mut query_value = LayerInsertValue::default();
         let neighbours = select_neighbours_heuristic(self.m, neighbours);
-        for (node_id, dist) in neighbours {
-            load_node_in_writer(node_id, self.index, self.arena, self.disk);
-            let edge_id = self.arena.insert_edge(Edge { dist });
-            self.index
-                .connect(self.layer, self.new_element, node_id, edge_id);
-            let edge_id = self.arena.insert_edge(Edge { dist });
-            self.index
-                .connect(self.layer, node_id, self.new_element, edge_id);
-            if self.index.out_edges(self.layer, node_id).len() > self.m_max {
-                need_repair.insert(node_id);
+        for (goes_to, dist) in neighbours {
+            let edge = Edge { from: self.new_element, to: goes_to, dist};
+            self.index.connect(self.layer, edge);
+            let edge = Edge { from: goes_to, to: self.new_element, dist};
+            self.index.connect(self.layer, edge);
+            if self.index.out_edges(self.layer, goes_to).len() > self.m_max {
+                need_repair.insert(goes_to);
             }
-            query_value.neighbours.push(node_id);
+            query_value.neighbours.push(goes_to);
         }
         for source in need_repair {
             let edges = self.index.out_edges(self.layer, source);
             let mut candidates = Vec::with_capacity(edges.len());
-            for (destination, edge_id) in edges {
-                candidates.push((destination, self.arena.get_edge(edge_id).dist));
-                self.arena.delete_edge(edge_id);
+            for (destination, edge) in edges {
+                candidates.push((destination, edge.dist));
                 self.index.disconnect(self.layer, source, destination);
             }
             for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
                 if destination != source {
-                    let edge_id = self.arena.insert_edge(Edge { dist });
-                    self.index.connect(self.layer, source, destination, edge_id);
+                    let edge = Edge { from: source, to: destination, dist};
+                    self.index.connect(self.layer, edge);
                 }
             }
         }

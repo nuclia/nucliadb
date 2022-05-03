@@ -17,8 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::memory_system::mmap_driver::*;
 use std::collections::HashMap;
-use std::marker::PhantomData;
+
+pub const VECTORS_DIR: &str = "vectors";
+pub const KEYS_DIR: &str = "keys";
 
 pub trait ByteRpr {
     fn serialize(&self) -> Vec<u8>;
@@ -87,20 +90,12 @@ impl FixedByteLen for EntryPoint {
         node_id_len + layer_len
     }
 }
-
-#[cfg(test)]
-mod entry_point_test_serialization {
-    use super::*;
-    #[test]
-    fn serialize() {
-        let id_0 = node_test_serialization::test_nodes(1).pop().unwrap();
-        let ep = EntryPoint {
-            node: id_0,
-            layer: 0,
-        };
-        assert_eq!(Node::deserialize(&id_0.serialize()), id_0);
-        assert_eq!(ep.serialize().len(), EntryPoint::segment_len());
-        assert_eq!(ep, EntryPoint::deserialize(&ep.serialize()));
+impl From<(Node, usize)> for EntryPoint {
+    fn from((node, layer): (Node, usize)) -> EntryPoint {
+        EntryPoint {
+            node,
+            layer: layer as u64,
+        }
     }
 }
 
@@ -135,18 +130,6 @@ impl FixedByteLen for FileSegment {
     }
 }
 
-#[cfg(test)]
-mod file_segment_test_serialization {
-    use super::*;
-    #[test]
-    fn serialize() {
-        let id_0 = node_test_serialization::test_nodes(1).pop().unwrap();
-        let fs = FileSegment { start: 0, end: 0 };
-        assert_eq!(fs.serialize().len(), FileSegment::segment_len());
-        assert_eq!(FileSegment::deserialize(&fs.serialize()), fs);
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Node {
     pub key: FileSegment,
@@ -173,29 +156,6 @@ impl ByteRpr for Node {
 impl FixedByteLen for Node {
     fn segment_len() -> usize {
         2 * FileSegment::segment_len()
-    }
-}
-
-#[cfg(test)]
-mod node_test_serialization {
-    use super::*;
-    pub fn test_nodes(len: usize) -> Vec<Node> {
-        let mut nodes = vec![];
-        for i in 0..len {
-            let i = i as u64;
-            let node = Node {
-                key: FileSegment { start: i, end: i },
-                vector: FileSegment { start: i, end: i },
-            };
-            nodes.push(node);
-        }
-        nodes
-    }
-    #[test]
-    fn serialize() {
-        let node = test_nodes(1).pop().unwrap();
-        assert_eq!(node.serialize().len(), Node::segment_len());
-        assert_eq!(Node::deserialize(&node.serialize()), node);
     }
 }
 
@@ -237,26 +197,9 @@ impl FixedByteLen for Edge {
     }
 }
 
-#[cfg(test)]
-mod edge_test_serialization {
-    use super::*;
-    #[test]
-    fn serialize() {
-        let nodes = node_test_serialization::test_nodes(2);
-        let edge = Edge {
-            from: nodes[0],
-            to: nodes[1],
-            dist: 1.2,
-        };
-        assert_eq!(edge.serialize().len(), Edge::segment_len());
-        assert_eq!(Edge::deserialize(&edge.serialize()), edge);
-    }
-}
-
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub struct Vector {
-    raw: Vec<f32>,
-    sqrt_pwr: f32,
+    pub raw: Vec<f32>,
 }
 
 impl From<Vec<f32>> for Vector {
@@ -264,8 +207,7 @@ impl From<Vec<f32>> for Vector {
         while raw.len() < hnsw_params::vector_length() {
             raw.push(0.0);
         }
-        let sqrt_pwr = f32::sqrt(raw.iter().cloned().fold(0.0, |p, c| p + (c * c)));
-        Vector { raw, sqrt_pwr }
+        Vector { raw }
     }
 }
 
@@ -277,43 +219,47 @@ impl From<Vector> for Vec<f32> {
 
 impl ByteRpr for Vector {
     fn serialize(&self) -> Vec<u8> {
-        let mut result = self.raw.serialize();
-        result.append(&mut self.sqrt_pwr.serialize());
-        result
+        self.raw.serialize()
     }
     fn deserialize(bytes: &[u8]) -> Self {
         let raw_start = 0;
         let raw_end = raw_start + (hnsw_params::vector_length() * f32::segment_len());
-        let sqrt_pwr_start = raw_end;
-        let sqrt_pwr_end = sqrt_pwr_start + f32::segment_len();
         Vector {
             raw: Vec::deserialize(&bytes[raw_start..raw_end]),
-            sqrt_pwr: f32::deserialize(&bytes[sqrt_pwr_start..sqrt_pwr_end]),
         }
     }
 }
 impl FixedByteLen for Vector {
     fn segment_len() -> usize {
-        let raw_len = hnsw_params::vector_length() * f32::segment_len();
-        let sqrt_prw_len = f32::segment_len();
-        raw_len + sqrt_prw_len
+        hnsw_params::vector_length() * f32::segment_len()
     }
 }
 
-#[cfg(test)]
-mod vector_test_serialization {
-    use super::*;
-    #[test]
-    fn serialize() {
-        let vector = Vector::from(vec![2.0; 3]);
-        assert_eq!(Vector::deserialize(&vector.serialize()), vector);
-        assert_eq!(vector.serialize().len(), Vector::segment_len());
+pub fn semi_mapped_consine_similarity(x: &[f32], y: Node, storage: &Storage) -> f32 {
+    let f32_len = f32::segment_len() as u64;
+    let mut sum = 0.;
+    let mut dem_x = 0.;
+    let mut dem_y = 0.;
+    let mut y_cursor = y.vector.start;
+    for x_value in x.iter().take(hnsw_params::vector_length()) {
+        let y_i = FileSegment {
+            start: y_cursor,
+            end: y_cursor + f32_len,
+        };
+        let y_value = storage.read(y_i).map(f32::deserialize).unwrap();
+        sum += x_value * y_value;
+        dem_x += x_value * x_value;
+        dem_y += y_value * y_value;
+        y_cursor = y_i.end;
     }
+    sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))
 }
 
+#[derive(Clone)]
 pub struct GraphLayer {
-    cnx: HashMap<Node, Vec<Edge>>,
+    pub cnx: HashMap<Node, HashMap<Node, Edge>>,
 }
+
 impl Default for GraphLayer {
     fn default() -> Self {
         GraphLayer::new()
@@ -324,40 +270,37 @@ impl ByteRpr for GraphLayer {
         let mut serialized = vec![];
         for (k, v) in &self.cnx {
             let mut serialized_key = k.serialize();
-            let mut no_elems = (v.len() as u64).serialize();
-            let mut connexions = v.serialize();
+            let mut serialized_value = v.serialize();
+            let mut len = (serialized_value.len() as u64).serialize();
             serialized.append(&mut serialized_key);
-            serialized.append(&mut no_elems);
-            serialized.append(&mut connexions);
+            serialized.append(&mut len);
+            serialized.append(&mut serialized_value);
         }
         serialized
     }
     fn deserialize(bytes: &[u8]) -> Self {
         let mut cnx = HashMap::new();
-        let key_len = Node::segment_len();
-        let value_len = Edge::segment_len();
-        let len_len = u64::segment_len();
         let mut segment_start = 0;
         while segment_start < bytes.len() {
             let key_start = segment_start;
-            let key_end = key_start + key_len;
+            let key_end = key_start + Node::segment_len();
+            let len_start = key_end;
+            let len_end = len_start + u64::segment_len();
             let key = Node::deserialize(&bytes[key_start..key_end]);
-            let no_elems_start = key_end;
-            let no_elems_end = no_elems_start + len_len;
-            let no_elems = u64::deserialize(&bytes[no_elems_start..no_elems_end]) as usize;
-            let edges_start = no_elems_end;
-            let edges_end = edges_start + (no_elems * value_len);
-            let edges = Vec::deserialize(&bytes[edges_start..edges_end]);
+            let hash_block = u64::deserialize(&bytes[len_start..len_end]) as usize;
+            let edges_start = len_end;
+            let edges_end = edges_start + hash_block;
+            let edges = HashMap::deserialize(&bytes[edges_start..edges_end]);
             cnx.insert(key, edges);
             segment_start = edges_end;
         }
         GraphLayer { cnx }
     }
 }
-impl std::ops::Index<(Node, usize)> for GraphLayer {
+impl std::ops::Index<(Node, Node)> for GraphLayer {
     type Output = Edge;
-    fn index(&self, (node, edge): (Node, usize)) -> &Self::Output {
-        self.cnx.get(&node).map(|v| &v[edge]).unwrap()
+    fn index(&self, (from, to): (Node, Node)) -> &Self::Output {
+        &self.cnx[&from][&to]
     }
 }
 
@@ -367,51 +310,84 @@ impl GraphLayer {
             cnx: HashMap::new(),
         }
     }
+    pub fn has_node(&self, node: Node) -> bool {
+        self.cnx.contains_key(&node)
+    }
     pub fn add_node(&mut self, node: Node) {
-        self.cnx.insert(node, vec![]);
+        self.cnx.insert(node, HashMap::new());
     }
     pub fn add_edge(&mut self, node: Node, edge: Edge) {
-        let edges = self.cnx.entry(node).or_insert(vec![]);
-        edges.push(edge);
+        let edges = self.cnx.entry(node).or_insert_with(HashMap::new);
+        edges.insert(edge.to, edge);
     }
-    pub fn get_edge(&self, node: Node, id: usize) -> Option<Edge> {
-        self.cnx.get(&node).map(|v| v[id])
+    pub fn remove_node(&mut self, node: Node) {
+        self.cnx.remove(&node);
     }
+    pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
+        self.cnx[&from].clone()
+    }
+    #[cfg(test)]
     pub fn no_edges(&self, node: Node) -> Option<usize> {
         self.cnx.get(&node).map(|v| v.len())
     }
+    pub fn no_nodes(&self) -> usize {
+        self.cnx.len()
+    }
+    pub fn remove_edge(&mut self, from: Node, to: Node) {
+        let edges = self.cnx.get_mut(&from).unwrap();
+        edges.remove(&to);
+    }
+    pub fn some_edge(&self) -> Option<Node> {
+        self.cnx.keys().next().cloned()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.cnx.len() == 0
+    }
 }
 
-#[cfg(test)]
-mod graph_layer_test_serialization {
-    use super::*;
-    pub fn test_layer() -> (Vec<Node>, GraphLayer) {
-        let nodes = node_test_serialization::test_nodes(2);
-        let edge = Edge {
-            from: nodes[0],
-            to: nodes[1],
-            dist: 1.2,
-        };
-        let graph = GraphLayer {
-            cnx: [(nodes[0], vec![edge]), (nodes[1], vec![edge])]
-                .into_iter()
-                .collect(),
-        };
-        (nodes, graph)
+pub struct GraphLog {
+    pub version_number: u128,
+    pub entry_point: Option<EntryPoint>,
+}
+
+impl<T> ByteRpr for Option<T>
+where
+    T: ByteRpr + FixedByteLen,
+{
+    fn serialize(&self) -> Vec<u8> {
+        let mut buff = vec![0];
+        match self {
+            Some(e) => {
+                buff[0] = 1;
+                buff.append(&mut e.serialize());
+            }
+            None => {
+                buff.append(&mut vec![0; T::segment_len()]);
+            }
+        }
+        buff
     }
-    #[test]
-    fn serialize() {
-        let (nodes, graph) = test_layer();
-        let tested = GraphLayer::deserialize(&graph.serialize());
-        assert_eq!(graph.no_edges(nodes[0]), tested.no_edges(nodes[0]));
-        assert_eq!(graph.no_edges(nodes[1]), tested.no_edges(nodes[1]));
-        assert_eq!(graph[(nodes[0], 0)], graph[(nodes[0], 0)]);
-        assert_eq!(graph[(nodes[1], 0)], graph[(nodes[1], 0)]);
+    fn deserialize(bytes: &[u8]) -> Self {
+        match bytes[0] {
+            1 => Some(T::deserialize(&bytes[1..])),
+            0 => None,
+            _ => panic!("Invalid byte pattern"),
+        }
+    }
+}
+
+impl<T> FixedByteLen for Option<T>
+where
+    T: ByteRpr + FixedByteLen,
+{
+    fn segment_len() -> usize {
+        T::segment_len() + 1
     }
 }
 
 impl<T> ByteRpr for Vec<T>
-where T: ByteRpr + FixedByteLen
+where
+    T: ByteRpr + FixedByteLen,
 {
     fn serialize(&self) -> Vec<u8> {
         let mut result = vec![];
@@ -434,17 +410,6 @@ where T: ByteRpr + FixedByteLen
     }
 }
 
-#[cfg(test)]
-mod vec_test_serialization {
-    use super::*;
-    #[test]
-    fn serialize() {
-        let vector: Vec<u64> = vec![12; 7];
-        let tested: Vec<u64> = Vec::deserialize(&vector.serialize());
-        assert_eq!(tested, vector);
-    }
-}
-
 impl<K, V> ByteRpr for std::collections::HashMap<K, V>
 where
     K: std::hash::Hash + Eq + ByteRpr + FixedByteLen,
@@ -460,7 +425,7 @@ where
     }
     fn deserialize(bytes: &[u8]) -> Self {
         let segment_len = K::segment_len() + V::segment_len();
-        let mut deserealized = std::collections::HashMap::new();
+        let mut deserealized = HashMap::new();
         let mut start = 0;
         let mut end = segment_len;
         while start < bytes.len() {
@@ -475,17 +440,6 @@ where
             end = start + segment_len;
         }
         deserealized
-    }
-}
-
-#[cfg(test)]
-mod hashmap_test_serialization {
-    use super::*;
-    #[test]
-    fn serialize() {
-        let map: HashMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
-        let tested: HashMap<u64, u64> = HashMap::deserialize(&map.serialize());
-        assert_eq!(tested, map);
     }
 }
 
@@ -563,5 +517,161 @@ impl ByteRpr for Vec<u8> {
     }
     fn deserialize(bytes: &[u8]) -> Self {
         bytes.to_vec()
+    }
+}
+
+#[cfg(test)]
+mod graph_layer_test_serialization {
+    use super::*;
+    pub fn test_layer(len: usize) -> (Vec<Node>, Vec<GraphLayer>) {
+        let mut layers = Vec::with_capacity(len);
+        let nodes = node_test_serialization::test_nodes(2);
+        for _ in 0..len {
+            let edge = Edge {
+                from: nodes[0],
+                to: nodes[1],
+                dist: 1.2,
+            };
+            let mut layer = GraphLayer {
+                cnx: HashMap::new(),
+            };
+            layer.add_node(nodes[0]);
+            layer.add_node(nodes[1]);
+            layer.add_edge(nodes[0], edge);
+            layers.push(layer);
+        }
+        (nodes, layers)
+    }
+    #[test]
+    fn serialize() {
+        let (nodes, mut graph) = test_layer(1);
+        let graph = graph.pop().unwrap();
+        let tested = GraphLayer::deserialize(&graph.serialize());
+        assert_eq!(graph.no_edges(nodes[0]), tested.no_edges(nodes[0]));
+        assert_eq!(graph.no_edges(nodes[1]), tested.no_edges(nodes[1]));
+        assert_eq!(graph[(nodes[0], nodes[1])], tested[(nodes[0], nodes[1])]);
+    }
+}
+
+#[cfg(test)]
+mod file_segment_test_serialization {
+    use super::*;
+    pub fn test_segments(len: usize) -> Vec<FileSegment> {
+        let mut segments = Vec::with_capacity(len);
+        for i in 0..len {
+            segments.push(FileSegment {
+                start: i as u64,
+                end: i as u64,
+            });
+        }
+        segments
+    }
+    #[test]
+    fn serialize() {
+        let fs = test_segments(1);
+        assert_eq!(fs[0].serialize().len(), FileSegment::segment_len());
+        assert_eq!(FileSegment::deserialize(&fs[0].serialize()), fs[0]);
+    }
+}
+
+#[cfg(test)]
+mod option_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let elem = Some(0u64);
+        let none_elem: Option<u64> = None;
+        assert_eq!(Option::deserialize(&elem.serialize()), Some(0u64));
+        assert_eq!(Option::deserialize(&none_elem.serialize()), none_elem);
+        assert_eq!(elem.serialize().len(), Option::<u64>::segment_len());
+        assert_eq!(none_elem.serialize().len(), Option::<u64>::segment_len());
+    }
+}
+
+#[cfg(test)]
+mod entry_point_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let id_0 = node_test_serialization::test_nodes(1).pop().unwrap();
+        let ep = EntryPoint {
+            node: id_0,
+            layer: 0,
+        };
+        assert_eq!(Node::deserialize(&id_0.serialize()), id_0);
+        assert_eq!(ep.serialize().len(), EntryPoint::segment_len());
+        assert_eq!(ep, EntryPoint::deserialize(&ep.serialize()));
+    }
+}
+
+#[cfg(test)]
+mod node_test_serialization {
+    use super::*;
+    pub fn test_nodes(len: usize) -> Vec<Node> {
+        let mut nodes = vec![];
+        for i in 0..len {
+            let i = i as u64;
+            let node = Node {
+                key: FileSegment { start: i, end: i },
+                vector: FileSegment { start: i, end: i },
+            };
+            nodes.push(node);
+        }
+        nodes
+    }
+    #[test]
+    fn serialize() {
+        let node = test_nodes(1).pop().unwrap();
+        assert_eq!(node.serialize().len(), Node::segment_len());
+        assert_eq!(Node::deserialize(&node.serialize()), node);
+    }
+}
+
+#[cfg(test)]
+mod edge_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let nodes = node_test_serialization::test_nodes(2);
+        let edge = Edge {
+            from: nodes[0],
+            to: nodes[1],
+            dist: 1.2,
+        };
+        assert_eq!(edge.serialize().len(), Edge::segment_len());
+        assert_eq!(Edge::deserialize(&edge.serialize()), edge);
+    }
+}
+
+#[cfg(test)]
+mod vector_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let vector = Vector::from(vec![2.0; 3]);
+        assert_eq!(Vector::deserialize(&vector.serialize()), vector);
+        assert_eq!(vector.serialize().len(), Vector::segment_len());
+    }
+}
+
+#[cfg(test)]
+mod vec_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let vector: Vec<u64> = vec![12; 7];
+        let tested: Vec<u64> = Vec::deserialize(&vector.serialize());
+        assert_eq!(tested, vector);
+    }
+}
+
+#[cfg(test)]
+mod hashmap_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let map: HashMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
+        let tested: HashMap<u64, u64> = HashMap::deserialize(&map.serialize());
+        assert_eq!(tested, map);
     }
 }

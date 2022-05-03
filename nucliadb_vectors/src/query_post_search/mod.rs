@@ -18,32 +18,31 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::graph_elems::*;
+use crate::index::*;
+use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::read_index::*;
-
+use rayon::prelude::*;
 #[derive(Clone, Default)]
 pub struct PostSearchValue {
     pub filtered: Vec<(String, f32)>,
 }
 
 pub struct PostSearchQuery<'a> {
-    pub pre_filter: Vec<(NodeId, f32)>,
-    pub with_filter: Vec<LabelId>,
-    pub index: &'a LockReader,
+    pub pre_filter: Vec<(Node, f32)>,
+    pub with_filter: Vec<String>,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for PostSearchQuery<'a> {
     type Output = PostSearchValue;
 
     fn run(&mut self) -> Self::Output {
-        let mut result = PostSearchValue::default();
-        for (node_id, dist) in &self.pre_filter {
-            if self.index.has_labels(*node_id, &self.with_filter) {
-                let node_key = self.index.get_node_key(*node_id);
-                result.filtered.push((node_key, *dist));
-            }
-        }
-        result
+        let filtered = self
+            .pre_filter
+            .par_iter()
+            .filter(|(node, _)| self.index.has_labels(*node, &self.with_filter))
+            .map(|(node, dist)| (self.index.get_node_key(*node), *dist))
+            .collect();
+        PostSearchValue { filtered }
     }
 }

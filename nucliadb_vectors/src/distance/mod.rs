@@ -18,16 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-
-
-
-/*
-    WARNING:
-    The code in this module was not developed by Bosutech XXI S.L.
-    It was derived the 29th of April 2022 from the following Apache licensed project:
-    https://github.com/qdrant/qdrant
-*/
-
+// WARNING:
+// The code in this module was not developed by Bosutech XXI S.L.
+// It was derived the 29th of April 2022 from the following Apache licensed project:
+// https://github.com/qdrant/qdrant
 
 mod cosine_distance;
 
@@ -49,7 +43,7 @@ mod tests {
 
     #[test]
     fn test_cosine_distance() {
-        fn power_sqrt(v: &Vec<f32>) -> f32 {
+        fn power_sqrt(v: &[f32]) -> f32 {
             f32::sqrt(v.iter().cloned().fold(0.0, |acc, x| acc + (x * x)))
         }
 

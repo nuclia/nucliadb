@@ -18,27 +18,18 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#[allow(unused)]
-mod distance;
-mod graph_arena;
-mod graph_disk;
-mod graph_elems;
+//#[allow(unused)]
+//mod distance;
 mod heuristics;
-mod memory_processes;
-#[allow(unused)]
 mod memory_system;
 mod query;
 mod query_delete;
-mod query_find_labels;
 mod query_insert;
 mod query_post_search;
 mod query_search;
-mod query_writer_search;
-mod read_index;
+mod index;
 pub mod reader;
+mod utils;
+pub mod writer;
 #[cfg(test)]
 mod tests;
-mod trace_utils;
-mod utils;
-mod write_index;
-pub mod writer;
