@@ -24,6 +24,7 @@ from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchResponse,
     SearchResponse,
     SuggestResponse,
+    VectorSearchResponse,
 )
 
 from nucliadb_models.common import FieldTypeName
@@ -36,11 +37,14 @@ from nucliadb_search.api.models import (
     ResourceResult,
     Resources,
     ResourceSearchResults,
+    Sentence,
+    Sentences,
 )
 from nucliadb_search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_text_paragraph,
+    get_text_sentence,
 )
 
 
@@ -113,6 +117,50 @@ async def merge_suggest_paragraph_results(
     return Paragraphs(results=raw_paragraph_list)
 
 
+async def merge_vectors_results(
+    vectors: List[VectorSearchResponse],
+    resources: List[str],
+    kbid: str,
+    count: int,
+    page: int,
+):
+    results: List[Sentence] = []
+    facets: Dict[str, Any] = {}
+    for vector in vectors:
+        for document in vector.documents:
+            count = document.doc_id.id.count("/")
+            if count == 3:
+                rid, field_type, field, position = document.doc_id.id.split("/")
+                subfield = None
+            elif count == 4:
+                rid, field_type, field, subfield, position = document.doc_id.id.split(
+                    "/"
+                )
+            start, end = position.split("-")
+            text = await get_text_sentence(
+                rid, field_type, field, kbid, int(start), int(end), subfield
+            )
+            # labels = await get_labels_paragraph(result, kbid)
+            results.append(
+                Sentence(
+                    score=document.score,
+                    rid=rid,
+                    field_type=field_type,
+                    field=field,
+                    text=text,
+                    # labels=labels,
+                )
+            )
+
+    results.sort(key=lambda x: x.score)
+
+    for paragraph in results:
+        if paragraph.rid not in resources:
+            resources.append(paragraph.rid)
+
+    return Sentences(results=results, facets=facets)
+
+
 async def merge_paragraph_results(
     paragraphs: List[ParagraphSearchResponse],
     resources: List[str],
@@ -168,10 +216,12 @@ async def merge_results(
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
+    vectors = []
 
     for result in results:
         paragraphs.append(result.paragraph)
         documents.append(result.document)
+        vectors.append(result.vector)
 
     api_results = KnowledgeboxSearchResults()
 
@@ -179,8 +229,13 @@ async def merge_results(
     api_results.fulltext = await merge_documents_results(
         documents, resources, count, page
     )
+
     api_results.paragraphs = await merge_paragraph_results(
         paragraphs, resources, kbid, count, page
+    )
+
+    api_results.sentences = await merge_vectors_results(
+        vectors, resources, kbid, count, page
     )
 
     api_results.resources = await fetch_resources(

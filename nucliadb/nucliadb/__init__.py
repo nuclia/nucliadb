@@ -16,31 +16,17 @@ def arg_parse():
     parser = argparse.ArgumentParser(description="Process some integers.")
 
     parser.add_argument(
-        "-p",
-        "--maindb",
-        dest="maindb",
-        help="MainDB data folder",
+        "-p", "--maindb", dest="maindb", help="MainDB data folder", required=True
     )
 
     parser.add_argument(
-        "-b",
-        "--blobstorage",
-        dest="blob",
-        help="Blob data folder",
+        "-b", "--blobstorage", dest="blob", help="Blob data folder", required=True
     )
 
-    parser.add_argument(
-        "-k",
-        "--key",
-        dest="key",
-        help="Understanding API Key",
-    )
+    parser.add_argument("-k", "--key", dest="key", help="Understanding API Key")
 
     parser.add_argument(
-        "-n",
-        "--node",
-        dest="node",
-        help="Node data folder",
+        "-n", "--node", dest="node", help="Node data folder", required=True
     )
 
     parser.add_argument("-u", "--host", dest="host", help="Overwride host API")

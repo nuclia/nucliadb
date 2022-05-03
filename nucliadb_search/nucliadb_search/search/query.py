@@ -31,6 +31,7 @@ from nucliadb_search.utilities import get_predict
 
 
 async def global_query_to_pb(
+    kbid: str,
     features: List[SearchOptions],
     query: str,
     filters: List[str],
@@ -63,10 +64,11 @@ async def global_query_to_pb(
         request.fields.extend(fields)
 
     if SearchOptions.VECTOR in features:
-        request.vector.extend(await predict.convert_sentence_to_vector(query))
+        request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
 
     if SearchOptions.RELATIONS in features:
         pass
+
     return request
 
 
