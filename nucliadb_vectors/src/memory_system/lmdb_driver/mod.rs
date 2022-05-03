@@ -18,10 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::memory_system::elements::*;
+use std::path::Path;
+
 use heed::types::{ByteSlice, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions, RoTxn, RwTxn};
-use std::path::Path;
+
+use crate::memory_system::elements::*;
 
 const LMDB_ENV: &str = "ENV";
 const DB_NODES: &str = "NODES";

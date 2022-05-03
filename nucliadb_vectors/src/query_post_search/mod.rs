@@ -18,10 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use rayon::prelude::*;
+
 use crate::index::*;
 use crate::memory_system::elements::*;
 use crate::query::Query;
-use rayon::prelude::*;
 #[derive(Clone, Default)]
 pub struct PostSearchValue {
     pub filtered: Vec<(String, f32)>,

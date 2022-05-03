@@ -18,13 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::memory_system::elements::*;
-use crate::memory_system::lmdb_driver::LMBDStorage;
-use crate::memory_system::mmap_driver::*;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::path::Path;
 use std::sync::RwLock;
+
+use crate::memory_system::elements::*;
+use crate::memory_system::lmdb_driver::LMBDStorage;
+use crate::memory_system::mmap_driver::*;
 
 pub struct Index {
     key_storage: Storage,
@@ -51,6 +52,31 @@ impl Index {
         let lmdb_driver = LMBDStorage::open(path);
         let ro_txn = lmdb_driver.ro_txn();
         let log = lmdb_driver.get_log(&ro_txn);
+        let layers_in = vec![];
+        let mut layers_out = vec![];
+        for i in 0..hnsw_params::no_layers() {
+            let layer_out = lmdb_driver.get_layer_out(&ro_txn, i as u64).unwrap();
+            layers_out.push(layer_out);
+        }
+        let removed = vec![];
+        ro_txn.abort().unwrap();
+        Index {
+            key_storage,
+            vector_storage,
+            lmdb_driver,
+            layers_out,
+            layers_in,
+            removed,
+            time_stamp: log.version_number,
+            entry_point: log.entry_point,
+        }
+    }
+    pub fn writer(path: &Path) -> Index {
+        let key_storage = Storage::create(&path.join(KEYS_DIR));
+        let vector_storage = Storage::create(&path.join(VECTORS_DIR));
+        let lmdb_driver = LMBDStorage::create(path);
+        let ro_txn = lmdb_driver.ro_txn();
+        let log = lmdb_driver.get_log(&ro_txn);
         let mut layers_out = vec![];
         let mut layers_in = vec![];
         for i in 0..hnsw_params::no_layers() {
@@ -68,17 +94,9 @@ impl Index {
             layers_out,
             layers_in,
             removed,
-            time_stamp: log.version_number,
+            time_stamp: log.version_number + 1,
             entry_point: log.entry_point,
         }
-    }
-    pub fn writer(path: &Path) -> Index {
-        Storage::create(&path.join(KEYS_DIR));
-        Storage::create(&path.join(VECTORS_DIR));
-        LMBDStorage::create(path);
-        let mut index = Index::reader(path);
-        index.time_stamp += 1;
-        index
     }
     pub fn semi_mapped_distance(&self, i: &Vector, j: Node) -> f32 {
         semi_mapped_consine_similarity(&i.raw, j, &self.vector_storage)
@@ -94,7 +112,7 @@ impl Index {
     }
     pub fn has_node(&self, key: &str) -> bool {
         let txn = self.lmdb_driver.ro_txn();
-        let exist = self.lmdb_driver.get_node( &txn, key).is_some();
+        let exist = self.lmdb_driver.get_node(&txn, key).is_some();
         txn.abort().unwrap();
         exist
     }
@@ -111,12 +129,9 @@ impl Index {
         let log = self.lmdb_driver.get_log(&txn);
         if self.time_stamp != log.version_number {
             self.layers_out.clear();
-            self.layers_in.clear();
             for i in 0..hnsw_params::no_layers() {
                 let layer_out = self.lmdb_driver.get_layer_out(&txn, i as u64).unwrap();
-                let layer_in = self.lmdb_driver.get_layer_in(&txn, i as u64).unwrap();
                 self.layers_out.push(layer_out);
-                self.layers_in.push(layer_in);
             }
             self.time_stamp = log.version_number;
             self.entry_point = log.entry_point;
@@ -134,17 +149,22 @@ impl Index {
         for i in 0..hnsw_params::no_layers() {
             let layer_out = self.layers_out[i].clone();
             let layer_in = self.layers_in[i].clone();
-            self.lmdb_driver.insert_layer_out(&mut rw_txn, i as u64, layer_out);
-            self.lmdb_driver.insert_layer_in(&mut rw_txn, i as u64, layer_in);
+            self.lmdb_driver
+                .insert_layer_out(&mut rw_txn, i as u64, layer_out);
+            self.lmdb_driver
+                .insert_layer_in(&mut rw_txn, i as u64, layer_in);
         }
         for deleted in &deleted {
             let key = self.get_node_key(*deleted);
             self.lmdb_driver.remove_vector(&mut rw_txn, &key);
         }
         self.lmdb_driver.insert_log(&mut rw_txn, log);
-        self.lmdb_driver.marked_deleted(&mut rw_txn, self.time_stamp, deleted);
+        self.lmdb_driver
+            .marked_deleted(&mut rw_txn, self.time_stamp, deleted);
         if self.time_stamp >= 2 {
-            let del = self.lmdb_driver.clear_deleted(&mut rw_txn, self.time_stamp -2);
+            let del = self
+                .lmdb_driver
+                .clear_deleted(&mut rw_txn, self.time_stamp - 2);
             for node in del {
                 self.vector_storage.delete_segment(node.vector);
                 self.key_storage.delete_segment(node.key);
@@ -219,9 +239,8 @@ impl Index {
             None => {
                 self.entry_point = Some(ep);
             }
-            _ => ()
+            _ => (),
         }
-        
     }
     pub fn erase(&mut self, x: Node) {
         let mut max_layer = 0;
@@ -280,7 +299,7 @@ impl LockIndex {
         self.index.read().unwrap().get_entry_point()
     }
     pub fn get_node(&self, key: &str) -> Option<Node> {
-       self.index.read().unwrap().get_node(key)
+        self.index.read().unwrap().get_node(key)
     }
     pub fn get_prefixed(&self, prefix: &str) -> Vec<String> {
         self.index.read().unwrap().get_prefixed(prefix)

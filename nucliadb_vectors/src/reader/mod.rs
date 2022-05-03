@@ -22,11 +22,12 @@ use std::fmt::Debug;
 use std::path::Path;
 
 use tracing::*;
+
+use crate::index::*;
 use crate::memory_system::elements::*;
 use crate::query::Query;
 use crate::query_post_search::{PostSearchQuery, PostSearchValue};
 use crate::query_search::{SearchQuery, SearchValue};
-use crate::index::*;
 
 pub struct Reader {
     index: LockIndex,

@@ -58,9 +58,17 @@ impl<'a> Query for LayerInsertQuery<'a> {
         let mut query_value = LayerInsertValue::default();
         let neighbours = select_neighbours_heuristic(self.m, neighbours);
         for (goes_to, dist) in neighbours {
-            let edge = Edge { from: self.new_element, to: goes_to, dist};
+            let edge = Edge {
+                from: self.new_element,
+                to: goes_to,
+                dist,
+            };
             self.index.connect(self.layer, edge);
-            let edge = Edge { from: goes_to, to: self.new_element, dist};
+            let edge = Edge {
+                from: goes_to,
+                to: self.new_element,
+                dist,
+            };
             self.index.connect(self.layer, edge);
             if self.index.out_edges(self.layer, goes_to).len() > self.m_max {
                 need_repair.insert(goes_to);
@@ -76,7 +84,11 @@ impl<'a> Query for LayerInsertQuery<'a> {
             }
             for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
                 if destination != source {
-                    let edge = Edge { from: source, to: destination, dist};
+                    let edge = Edge {
+                        from: source,
+                        to: destination,
+                        dist,
+                    };
                     self.index.connect(self.layer, edge);
                 }
             }

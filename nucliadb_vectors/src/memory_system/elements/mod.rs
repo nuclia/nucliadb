@@ -17,8 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::memory_system::mmap_driver::*;
 use std::collections::HashMap;
+
+use crate::memory_system::mmap_driver::*;
 
 pub const VECTORS_DIR: &str = "vectors";
 pub const KEYS_DIR: &str = "keys";
@@ -351,8 +352,7 @@ pub struct GraphLog {
 }
 
 impl<T> ByteRpr for Option<T>
-where
-    T: ByteRpr + FixedByteLen,
+where T: ByteRpr + FixedByteLen
 {
     fn serialize(&self) -> Vec<u8> {
         let mut buff = vec![0];
@@ -377,8 +377,7 @@ where
 }
 
 impl<T> FixedByteLen for Option<T>
-where
-    T: ByteRpr + FixedByteLen,
+where T: ByteRpr + FixedByteLen
 {
     fn segment_len() -> usize {
         T::segment_len() + 1
@@ -386,8 +385,7 @@ where
 }
 
 impl<T> ByteRpr for Vec<T>
-where
-    T: ByteRpr + FixedByteLen,
+where T: ByteRpr + FixedByteLen
 {
     fn serialize(&self) -> Vec<u8> {
         let mut result = vec![];

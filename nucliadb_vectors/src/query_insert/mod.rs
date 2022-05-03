@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub use layer_insert::*;
+
 use crate::index::*;
 use crate::memory_system::elements::*;
 use crate::query::Query;
 use crate::query_search::layer_search::*;
-pub use layer_insert::*;
 pub(crate) mod layer_insert;
 
 pub struct InsertQuery<'a> {

@@ -18,12 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-
-use crate::memory_system::elements::*;
 use crate::heuristics::heuristic_paper::select_neighbours_heuristic;
+use crate::index::LockIndex;
+use crate::memory_system::elements::*;
 use crate::query::Query;
 use crate::query_search::layer_search::{LayerSearchQuery, LayerSearchValue};
-use crate::index::LockIndex;
 
 pub struct LayerDeleteQuery<'a> {
     pub layer: usize,
@@ -32,7 +31,7 @@ pub struct LayerDeleteQuery<'a> {
     pub m: usize,
     pub ef_construction: usize,
     pub vector: &'a Vector,
-    pub index: &'a LockIndex
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for LayerDeleteQuery<'a> {
@@ -69,7 +68,11 @@ impl<'a> Query for LayerDeleteQuery<'a> {
                 }
                 for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
                     if destination != source && destination != self.delete {
-                        let edge = Edge {from: source, to: destination, dist};
+                        let edge = Edge {
+                            from: source,
+                            to: destination,
+                            dist,
+                        };
                         self.index.connect(self.layer, edge);
                     }
                 }

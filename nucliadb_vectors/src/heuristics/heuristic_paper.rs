@@ -59,7 +59,7 @@ pub fn select_neighbours_heuristic(
 
 #[cfg(test)]
 mod test_heuristic_simple {
-    use crate::memory_system::elements::{Node, FileSegment};
+    use crate::memory_system::elements::{FileSegment, Node};
     #[test]
     fn test_heuristic_simple_search() {
         let mut solution = Vec::with_capacity(100);

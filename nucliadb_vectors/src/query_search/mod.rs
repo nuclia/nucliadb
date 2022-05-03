@@ -20,10 +20,11 @@
 
 pub(crate) mod layer_search;
 
+use layer_search::*;
+
+use crate::index::*;
 use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::index::*;
-use layer_search::*;
 
 #[derive(Default, Clone)]
 pub struct SearchValue {

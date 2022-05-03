@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::{BinaryHeap, HashSet};
+
+use crate::index::*;
 use crate::memory_system::elements::*;
 use crate::query::*;
-use crate::index::*;
 use crate::utils::*;
-use std::collections::{BinaryHeap, HashSet};
 
 #[derive(Clone, Default)]
 pub struct LayerSearchValue {

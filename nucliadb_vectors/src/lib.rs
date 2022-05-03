@@ -19,17 +19,17 @@
 //
 
 //#[allow(unused)]
-//mod distance;
+// mod distance;
 mod heuristics;
+mod index;
 mod memory_system;
 mod query;
 mod query_delete;
 mod query_insert;
 mod query_post_search;
 mod query_search;
-mod index;
 pub mod reader;
-mod utils;
-pub mod writer;
 #[cfg(test)]
 mod tests;
+mod utils;
+pub mod writer;

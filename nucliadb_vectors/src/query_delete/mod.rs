@@ -19,10 +19,11 @@
 //
 
 pub(crate) mod layer_delete;
+use layer_delete::LayerDeleteQuery;
+
 use crate::index::LockIndex;
 use crate::memory_system::elements::*;
 use crate::query::Query;
-use layer_delete::LayerDeleteQuery;
 pub struct DeleteQuery<'a> {
     pub delete: String,
     pub m_max: usize,
