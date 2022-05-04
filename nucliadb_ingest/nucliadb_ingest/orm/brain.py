@@ -120,20 +120,20 @@ class ResourceBrain:
         for subfield, vectors in vo.split_vectors.items():
             # For each split of this field
 
-            for vector in vectors.vectors:
+            for index, vector in enumerate(vectors.vectors):
                 self.brain.paragraphs[field_key].paragraphs[
                     f"{self.rid}/{field_key}/{subfield}/{vector.start_paragraph}-{vector.end_paragraph}"
                 ].sentences[
-                    f"{self.rid}/{field_key}/{subfield}/{vector.start}-{vector.end}"
+                    f"{self.rid}/{field_key}/{subfield}/{index}/{vector.start}-{vector.end}"
                 ].vector.extend(
                     vector.vector
                 )
 
-        for vector in vo.vectors.vectors:
+        for index, vector in enumerate(vo.vectors.vectors):
             self.brain.paragraphs[field_key].paragraphs[
                 f"{self.rid}/{field_key}/{vector.start_paragraph}-{vector.end_paragraph}"
             ].sentences[
-                f"{self.rid}/{field_key}/{vector.start}-{vector.end}"
+                f"{self.rid}/{field_key}/{index}/{vector.start}-{vector.end}"
             ].vector.extend(
                 vector.vector
             )

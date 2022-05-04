@@ -55,6 +55,9 @@ class NucliaSettings(BaseSettings):
     nuclia_cluster_url: Optional[
         str
     ] = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
+    nuclia_inner_predict_url: Optional[
+        str
+    ] = "http://predict.learning.svc.cluster.local:8080"
 
     nuclia_zone: Optional[str] = "dev"
     onprem: bool = True

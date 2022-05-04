@@ -264,12 +264,10 @@ class ProcessingEngine:
 
         if self.onprem is False:
             # Upload the payload
-            headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
             item.partition = partition
             resp = await self.session.post(
                 url=f"{self.nuclia_internal_push}",
                 json=item.dict(),
-                headers=headers,
             )
             if resp.status == 200:
                 data = await resp.json()
@@ -277,10 +275,12 @@ class ProcessingEngine:
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         else:
+            headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
             # Upload the payload
             resp = await self.session.post(
                 url=self.nuclia_external_push + "?partition=" + str(partition),
                 json=item.dict(),
+                headers=headers,
             )
             if resp.status == 200:
                 data = await resp.json()

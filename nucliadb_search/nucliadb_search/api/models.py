@@ -77,6 +77,9 @@ class Sentence(BaseModel):
     score: float
     rid: str
     text: str
+    field_type: str
+    field: str
+    labels: List[str] = []
 
 
 class Sentences(BaseModel):

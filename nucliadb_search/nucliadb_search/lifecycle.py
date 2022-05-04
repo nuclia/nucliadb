@@ -44,14 +44,16 @@ from nucliadb_utils.utilities import (
 async def initialize() -> None:
     set_utility(Utility.COUNTER, Counter())
     await start_ingest()
-    set_utility(
-        Utility.PREDICT,
-        PredictEngine(
-            nuclia_settings.nuclia_cluster_url,
-            nuclia_settings.nuclia_public_url,
-            nuclia_settings.nuclia_service_account,
-        ),
+    predict_util = PredictEngine(
+        nuclia_settings.nuclia_inner_predict_url,
+        nuclia_settings.nuclia_public_url,
+        nuclia_settings.nuclia_service_account,
+        nuclia_settings.nuclia_zone,
+        nuclia_settings.onprem,
+        nuclia_settings.dummy_processing,
     )
+    await predict_util.initialize()
+    set_utility(Utility.PREDICT, predict_util)
     driver = await get_driver()
     cache = await get_cache()
     set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))

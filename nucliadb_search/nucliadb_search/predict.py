@@ -19,7 +19,18 @@
 #
 from typing import List, Optional
 
-BASE_PREDICT = "/api/v1/predict"
+import aiohttp
+
+from nucliadb_ingest.tests.vectors import Q
+
+
+class SendToPredictError(Exception):
+    pass
+
+
+PUBLIC_PREDICT = "/api/v1/predict"
+PRIVATE_PREDICT = "/api/internal/predict"
+SENTENCE = "/sentence"
 
 
 class PredictEngine:
@@ -27,14 +38,50 @@ class PredictEngine:
         self,
         cluster_url: Optional[str] = None,
         public_url: Optional[str] = None,
-        zone_key: Optional[str] = None,
+        nuclia_service_account: Optional[str] = None,
+        zone: Optional[str] = None,
+        onprem: bool = False,
+        dummy: bool = False,
     ):
-        self.zone_key = zone_key
+        self.nuclia_service_account = nuclia_service_account
         self.cluster_url = cluster_url
         self.public_url = public_url
+        self.zone = zone
+        self.onprem = onprem
+        self.dummy = dummy
+        self.calls: List[str] = []
 
-    async def convert_sentence_to_vector(
-        self, kbid: str, token: Optional[str] = None
-    ) -> List[float]:
+    async def initialize(self):
+        self.session = aiohttp.ClientSession()
+
+    async def finalize(self):
+        await self.session.close()
+
+    async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         # If token is offered
-        return []
+        if self.dummy:
+            self.calls.append(sentence)
+            return Q
+
+        if self.onprem is False:
+            # Upload the payload
+            resp = await self.session.get(
+                url=f"{self.cluster_url}{PRIVATE_PREDICT}{SENTENCE}?text={sentence}",
+                headers={"X-STF-KBID": kbid},
+            )
+            if resp.status == 200:
+                data = await resp.json()
+            else:
+                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        else:
+            # Upload the payload
+            headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
+            resp = await self.session.get(
+                url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
+                headers=headers,
+            )
+            if resp.status == 200:
+                data = await resp.json()
+            else:
+                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        return data["data"]

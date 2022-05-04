@@ -280,13 +280,16 @@ class Field:
             for key in payload.vectors.deleted_splits:
                 if key in actual_payload.split_vectors:
                     replace_splits[key] = [
-                        f"{x.start}-{x.end}"
-                        for x in actual_payload.split_vectors[key].vectors
+                        f"{index}/{x.start}-{x.end}"
+                        for index, x in enumerate(
+                            actual_payload.split_vectors[key].vectors
+                        )
                     ]
                     del actual_payload.split_vectors[key]
             if len(payload.vectors.vectors.vectors) > 0:
                 replace_field = [
-                    f"{x.start}-{x.end}" for x in actual_payload.vectors.vectors
+                    f"{index}/{x.start}-{x.end}"
+                    for index, x in enumerate(actual_payload.vectors.vectors)
                 ]
                 actual_payload.vectors.CopyFrom(payload.vectors.vectors)
             await self.storage.upload_pb(sf, actual_payload)
