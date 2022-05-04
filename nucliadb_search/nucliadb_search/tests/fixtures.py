@@ -43,10 +43,10 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     from nucliadb_search.settings import settings as search_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
+        nuclia_settings,
         nucliadb_settings,
         running_settings,
         storage_settings,
-        nuclia_settings,
     )
     from nucliadb_utils.storages.settings import settings as extended_storage_settings
 

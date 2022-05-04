@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import aiohttp
+
 from nucliadb_ingest.tests.vectors import Q
 
 
@@ -48,7 +49,7 @@ class PredictEngine:
         self.zone = zone
         self.onprem = onprem
         self.dummy = dummy
-        self.calls: List[Dict[str, Any]] = []
+        self.calls: List[str] = []
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
