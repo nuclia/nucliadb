@@ -41,8 +41,9 @@ impl<'a> Query for PostSearchQuery<'a> {
         let filtered = self
             .pre_filter
             .par_iter()
-            .filter(|(node, _)| self.index.has_labels(*node, &self.with_filter))
-            .map(|(node, dist)| (self.index.get_node_key(*node), *dist))
+            .map(|(node, dist)| (self.index.has_labels(*node, &self.with_filter), *dist))
+            .filter(|(opt, _)| opt.is_some())
+            .map(|(opt, dist)| (opt.unwrap(), dist))
             .collect();
         PostSearchValue { filtered }
     }

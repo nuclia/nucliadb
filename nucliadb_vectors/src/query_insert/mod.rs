@@ -43,9 +43,17 @@ impl<'a> Query for InsertQuery<'a> {
         if self.index.has_node(&self.key) {
             return;
         }
-        for label_value in std::mem::take(&mut self.labels) {
-            self.index.add_label(self.key.clone(), label_value);
-        }
+        let label_adder = {
+            let labels = std::mem::take(&mut self.labels);
+            let label_adder = self.index.clone();
+            let key_adder = self.key.clone();
+            std::thread::spawn(move || {
+                for label_value in labels {
+                    label_adder.add_label(key_adder.clone(), label_value);
+                }
+            })
+        };
+
         let key = self.key.clone();
         let vector = Vector::from(self.element.clone());
         match self.index.get_entry_point() {
@@ -92,5 +100,6 @@ impl<'a> Query for InsertQuery<'a> {
                 self.index.set_entry_point((node, node_level).into());
             }
         }
+        label_adder.join().unwrap();
     }
 }

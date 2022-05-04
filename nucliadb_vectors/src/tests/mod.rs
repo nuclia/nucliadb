@@ -133,9 +133,11 @@ fn create_query() -> Vec<f32> {
 //#[test]
 #[allow(unused)]
 fn stress_test() {
+    use std::time::{Duration, SystemTime};
     let temp_dir = tempfile::tempdir().unwrap();
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
     let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut total = Duration::from_secs(0);
     let mut labels = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
@@ -143,21 +145,32 @@ fn stress_test() {
     for current_key in 0..1000 {
         let key = format!("KEY_{}", current_key);
         let vec = create_query();
-        writer.insert(key.clone(), vec, labels.clone());
+        let query_labels = labels.clone();
+        let timer = SystemTime::now();
+        writer.insert(key.clone(), vec, query_labels);
+        total += timer.elapsed().unwrap();
         println!("INSERT {key}");
     }
+    let timer = SystemTime::now();
     writer.commit();
     reader.reload();
+    total += timer.elapsed().unwrap();
     for index in 0..1000 {
         let query = create_query();
         let no_results = 10;
-        let result = reader.search(query, vec![], no_results);
+        let query_labels = labels.clone();
+        let timer = SystemTime::now();
+        let result = reader.search(query, query_labels, no_results);
+        total += timer.elapsed().unwrap();
         let result: Vec<_> = result.into_iter().map(|(k, _)| k).collect();
         println!("READ {:?}", result);
         if index % 100 == 0 {
+            let timer = SystemTime::now();
             reader.reload();
+            total += timer.elapsed().unwrap();
         }
     }
+    println!("Took: {}", total.as_secs());
 }
 
 //#[test]

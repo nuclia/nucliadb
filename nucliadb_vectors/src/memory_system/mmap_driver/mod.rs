@@ -62,7 +62,7 @@ impl DiskStack {
             .create(true)
             .open(&self.stack)
             .unwrap();
-        stack.write_all(&segment.serialize()).unwrap();
+        stack.write_all(&segment.as_byte_rpr()).unwrap();
         stack.flush().unwrap();
     }
     pub fn pop(&self) -> Option<FileSegment> {
@@ -78,7 +78,7 @@ impl DiskStack {
                 stack.read_exact(&mut buffer).unwrap();
                 stack.set_len(new_len).unwrap();
                 stack.rewind().unwrap();
-                Some(FileSegment::deserialize(&buffer))
+                Some(FileSegment::from_byte_rpr(&buffer))
             }
             Err(_) => {
                 stack.rewind().unwrap();

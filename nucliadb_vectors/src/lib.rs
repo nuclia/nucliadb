@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-//#[allow(unused)]
-// mod distance;
+#[allow(unused)]
+mod distance;
 mod heuristics;
 mod index;
 mod memory_system;

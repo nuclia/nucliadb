@@ -21,7 +21,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::path::Path;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use crate::memory_system::elements::*;
 use crate::memory_system::lmdb_driver::LMBDStorage;
@@ -98,17 +98,21 @@ impl Index {
             entry_point: log.entry_point,
         }
     }
-    pub fn semi_mapped_distance(&self, i: &Vector, j: Node) -> f32 {
-        semi_mapped_consine_similarity(&i.raw, j, &self.vector_storage)
+    pub fn semi_mapped_distance(&self, x: &Vector, y: Node) -> f32 {
+        semi_mapped_consine_similarity(&x.raw, y, &self.vector_storage)
     }
-    pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
+    pub fn has_labels(&self, node: Node, labels: &[String]) -> Option<String> {
         let txn = self.lmdb_driver.ro_txn();
-        let key = String::deserialize(self.key_storage.read(node.key).unwrap());
+        let key = String::from_byte_rpr(self.key_storage.read(node.key).unwrap());
         let all = labels
             .iter()
             .all(|label| self.lmdb_driver.has_label(&txn, &key, label));
         txn.abort().unwrap();
-        all
+        if all {
+            Some(key)
+        } else {
+            None
+        }
     }
     pub fn has_node(&self, key: &str) -> bool {
         let txn = self.lmdb_driver.ro_txn();
@@ -117,10 +121,10 @@ impl Index {
         exist
     }
     pub fn get_node_key(&self, node: Node) -> String {
-        String::deserialize(self.key_storage.read(node.key).unwrap())
+        String::from_byte_rpr(self.key_storage.read(node.key).unwrap())
     }
     pub fn get_node_vector(&self, node: Node) -> Vector {
-        Vector::deserialize(self.vector_storage.read(node.vector).unwrap())
+        Vector::from_byte_rpr(self.vector_storage.read(node.vector).unwrap())
     }
     pub fn reload(&mut self) {
         let txn = self.lmdb_driver.ro_txn();
@@ -181,8 +185,8 @@ impl Index {
     pub fn add_node(&mut self, key: String, vector: Vector, layer: usize) -> Node {
         let mut txn = self.lmdb_driver.rw_txn();
         let node = Node {
-            key: self.key_storage.insert(&key.serialize()),
-            vector: self.vector_storage.insert(&vector.serialize()),
+            key: self.key_storage.insert(&key.as_byte_rpr()),
+            vector: self.vector_storage.insert(&vector.as_byte_rpr()),
         };
         self.lmdb_driver.add_node(&mut txn, key, node);
         txn.commit().unwrap();
@@ -261,24 +265,21 @@ impl Index {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LockIndex {
-    index: RwLock<Index>,
+    index: Arc<RwLock<Index>>,
 }
 impl From<Index> for LockIndex {
     fn from(index: Index) -> Self {
         LockIndex {
-            index: RwLock::new(index),
+            index: Arc::new(RwLock::new(index)),
         }
     }
 }
 
 impl LockIndex {
-    pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
+    pub fn has_labels(&self, node: Node, labels: &[String]) -> Option<String> {
         self.index.read().unwrap().has_labels(node, labels)
-    }
-    pub fn get_node_key(&self, node: Node) -> String {
-        self.index.read().unwrap().get_node_key(node)
     }
     pub fn get_node_vector(&self, node: Node) -> Vector {
         self.index.read().unwrap().get_node_vector(node)

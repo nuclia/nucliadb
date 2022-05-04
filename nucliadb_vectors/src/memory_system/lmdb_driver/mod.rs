@@ -35,31 +35,6 @@ const DB_DELETED: &str = "DELETED";
 const STAMP: &str = "stamp.nuclia";
 const MAP_SIZE: usize = 1048576 * 100000;
 const MAX_DBS: u32 = 3000;
-#[derive(Copy, Clone)]
-pub enum LogField {
-    VersionNumber = 0,
-    EntryPoint,
-}
-
-impl ByteRpr for LogField {
-    fn serialize(&self) -> Vec<u8> {
-        vec![*self as u8]
-    }
-    fn deserialize(bytes: &[u8]) -> Self {
-        use LogField::*;
-        match bytes[0] {
-            0 => VersionNumber,
-            1 => EntryPoint,
-            _ => panic!("Unknown LogField: {bytes:?}"),
-        }
-    }
-}
-
-impl FixedByteLen for LogField {
-    fn segment_len() -> usize {
-        1
-    }
-}
 
 pub struct LMBDStorage {
     env: Env,
@@ -153,7 +128,7 @@ impl LMBDStorage {
     }
     pub fn get_node(&self, txn: &RoTxn<'_>, vector: &str) -> Option<Node> {
         let v = self.node_db.get(txn, vector).unwrap();
-        v.map(Node::deserialize)
+        v.map(Node::from_byte_rpr)
     }
     pub fn has_label(&self, txn: &RoTxn<'_>, key: &str, label: &str) -> bool {
         let path = format!("{}/{}", key, label);
@@ -161,7 +136,7 @@ impl LMBDStorage {
         exist.is_some()
     }
     pub fn add_node(&self, txn: &mut RwTxn<'_, '_>, key: String, node: Node) {
-        let node = node.serialize();
+        let node = node.as_byte_rpr();
         self.node_db.put(txn, key.as_str(), &node).unwrap();
     }
     pub fn add_label(&self, txn: &mut RwTxn<'_, '_>, key: String, label: String) {
@@ -185,71 +160,71 @@ impl LMBDStorage {
     }
     pub fn insert_layer_out(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: GraphLayer) {
         self.layer_out_db
-            .put(txn, &id.serialize(), &layer.serialize())
+            .put(txn, &id.as_byte_rpr(), &layer.as_byte_rpr())
             .unwrap();
     }
     pub fn insert_layer_in(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: GraphLayer) {
         self.layer_in_db
-            .put(txn, &id.serialize(), &layer.serialize())
+            .put(txn, &id.as_byte_rpr(), &layer.as_byte_rpr())
             .unwrap();
     }
     pub fn get_layer_out(&self, txn: &RoTxn<'_>, layer: u64) -> Option<GraphLayer> {
         self.layer_out_db
-            .get(txn, &layer.serialize())
+            .get(txn, &layer.as_byte_rpr())
             .unwrap()
-            .map(GraphLayer::deserialize)
+            .map(GraphLayer::from_byte_rpr)
     }
     pub fn get_layer_in(&self, txn: &RoTxn<'_>, layer: u64) -> Option<GraphLayer> {
         self.layer_in_db
-            .get(txn, &layer.serialize())
+            .get(txn, &layer.as_byte_rpr())
             .unwrap()
-            .map(GraphLayer::deserialize)
+            .map(GraphLayer::from_byte_rpr)
     }
     pub fn insert_log(&self, txn: &mut RwTxn<'_, '_>, log: GraphLog) {
         self.log
             .put(
                 txn,
-                &LogField::EntryPoint.serialize(),
-                &log.entry_point.serialize(),
+                &LogField::EntryPoint.as_byte_rpr(),
+                &log.entry_point.as_byte_rpr(),
             )
             .unwrap();
         self.log
             .put(
                 txn,
-                &LogField::VersionNumber.serialize(),
-                &log.version_number.serialize(),
+                &LogField::VersionNumber.as_byte_rpr(),
+                &log.version_number.as_byte_rpr(),
             )
             .unwrap();
     }
     pub fn marked_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128, rmv: Vec<Node>) {
         self.deleted_log
-            .put(txn, &time_stamp.serialize(), &rmv.serialize())
+            .put(txn, &time_stamp.as_byte_rpr(), &rmv.as_byte_rpr())
             .unwrap();
     }
     pub fn clear_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128) -> Vec<Node> {
         let delete = self
             .deleted_log
-            .get(txn, &time_stamp.serialize())
+            .get(txn, &time_stamp.as_byte_rpr())
             .unwrap()
-            .map(Vec::deserialize)
+            .map(Vec::from_byte_rpr)
             .unwrap_or_default();
         self.deleted_log
-            .delete(txn, &time_stamp.serialize())
+            .delete(txn, &time_stamp.as_byte_rpr())
             .unwrap();
         delete
     }
     pub fn get_log(&self, txn: &RoTxn<'_>) -> GraphLog {
         let version_number = self
             .log
-            .get(txn, &LogField::VersionNumber.serialize())
+            .get(txn, &LogField::VersionNumber.as_byte_rpr())
             .unwrap()
-            .map(u128::deserialize)
+            .map(u128::from_byte_rpr)
             .unwrap();
         let entry_point = self
             .log
-            .get(txn, &LogField::EntryPoint.serialize())
+            .get(txn, &LogField::EntryPoint.as_byte_rpr())
             .unwrap()
-            .map(Option::deserialize)
+            .map(Option::from_byte_rpr)
             .unwrap();
         GraphLog {
             version_number,

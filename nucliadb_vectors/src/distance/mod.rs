@@ -36,6 +36,14 @@ mod simple_neon;
 
 pub use crate::distance::cosine_distance::cosine_distance;
 
+pub fn cosine_distance_from_u8(a: &[f32], b: &[u8]) -> f32 {
+    let (prefix, slice_f32, suffix) = unsafe { b.align_to::<f32>() };
+    assert_eq!(slice_f32.len(), a.len());
+    assert!(prefix.is_empty());
+    assert!(suffix.is_empty());
+    cosine_distance(a, slice_f32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
