@@ -20,6 +20,7 @@
 from typing import Any, Dict, List, Optional
 
 import aiohttp
+from nucliadb_ingest.tests.vectors import Q
 
 
 class SendToPredictError(Exception):
@@ -59,7 +60,7 @@ class PredictEngine:
         # If token is offered
         if self.dummy:
             self.calls.append(sentence)
-            return [0] * 768
+            return Q
 
         if self.onprem is False:
             # Upload the payload

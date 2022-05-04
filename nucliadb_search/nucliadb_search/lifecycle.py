@@ -50,6 +50,7 @@ async def initialize() -> None:
         nuclia_settings.nuclia_service_account,
         nuclia_settings.nuclia_zone,
         nuclia_settings.onprem,
+        nuclia_settings.dummy_processing,
     )
     await predict_util.initialize()
     set_utility(Utility.PREDICT, predict_util)

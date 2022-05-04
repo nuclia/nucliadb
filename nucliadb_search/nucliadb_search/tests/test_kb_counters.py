@@ -93,6 +93,7 @@ async def test_kb_accounting(
             resp = await client.get(
                 f"/{KB_PREFIX}/{kbid}/search?query=own+text",
             )
+            assert resp.status_code == 200
 
     # web searches
     async with search_api(
@@ -103,6 +104,7 @@ async def test_kb_accounting(
             resp = await client.get(
                 f"/{KB_PREFIX}/{kbid}/search?query=own+text",
             )
+            assert resp.status_code == 200
 
     # widget searches
     async with search_api(
@@ -113,6 +115,7 @@ async def test_kb_accounting(
             resp = await client.get(
                 f"/{KB_PREFIX}/{kbid}/search?query=own+text",
             )
+            assert resp.status_code == 200
 
     async with search_api(root=True) as client:
         resp = await client.get(

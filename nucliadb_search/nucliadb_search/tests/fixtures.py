@@ -46,6 +46,7 @@ def test_settings_search(gcs, redis, node):  # type: ignore
         nucliadb_settings,
         running_settings,
         storage_settings,
+        nuclia_settings,
     )
     from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
@@ -69,6 +70,8 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     search_settings.swim_binding_port = 4440
     search_settings.swim_enabled = True
     ingest_settings.swim_enabled = False
+
+    nuclia_settings.dummy_processing = True
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
