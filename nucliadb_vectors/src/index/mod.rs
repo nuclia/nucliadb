@@ -104,18 +104,14 @@ impl Index {
     pub fn semi_mapped_distance(&self, x: &Vector, y: Node) -> f32 {
         semi_mapped_consine_similarity(&x.raw, y, &self.vector_storage)
     }
-    pub fn has_labels(&self, node: Node, labels: &[String]) -> Option<String> {
+    pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
         let txn = self.lmdb_driver.ro_txn();
         let key = String::from_byte_rpr(self.key_storage.read(node.key).unwrap());
         let all = labels
             .iter()
             .all(|label| self.lmdb_driver.has_label(&txn, &key, label));
         txn.abort().unwrap();
-        if all {
-            Some(key)
-        } else {
-            None
-        }
+        all
     }
     pub fn has_node(&self, key: &str) -> bool {
         let txn = self.lmdb_driver.ro_txn();
@@ -170,15 +166,15 @@ impl Index {
         self.lmdb_driver.insert_log(&mut rw_txn, log);
         self.lmdb_driver
             .marked_deleted(&mut rw_txn, self.time_stamp, deleted);
-        // if self.time_stamp >= 2 {
-        //     let del = self
-        //         .lmdb_driver
-        //         .clear_deleted(&mut rw_txn, self.time_stamp - 2);
-        //     for node in del {
-        //         self.vector_storage.delete_segment(node.vector);
-        //         self.key_storage.delete_segment(node.key);
-        //     }
-        // }
+        rw_txn.commit().unwrap();
+    }
+    pub fn run_garbage_collection(&mut self) {
+        let mut rw_txn = self.lmdb_driver.rw_txn();
+        let deleted = self.lmdb_driver.clear_deleted(&mut rw_txn);
+        for node in deleted {
+            self.vector_storage.delete_segment(node.vector);
+            self.key_storage.delete_segment(node.key);
+        }
         rw_txn.commit().unwrap();
     }
     pub fn no_nodes(&self) -> usize {
@@ -311,11 +307,14 @@ impl From<Index> for LockIndex {
 }
 
 impl LockIndex {
-    pub fn has_labels(&self, node: Node, labels: &[String]) -> Option<String> {
+    pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
         self.index.read().unwrap().has_labels(node, labels)
     }
     pub fn get_node_vector(&self, node: Node) -> Vector {
         self.index.read().unwrap().get_node_vector(node)
+    }
+    pub fn get_node_key(&self, node: Node) -> String {
+        self.index.read().unwrap().get_node_key(node)
     }
     pub fn semi_mapped_distance(&self, i: &Vector, j: Node) -> f32 {
         self.index.read().unwrap().semi_mapped_distance(i, j)
@@ -370,6 +369,9 @@ impl LockIndex {
     }
     pub fn commit(&mut self) {
         self.index.write().unwrap().commit()
+    }
+    pub fn run_garbage_collection(&mut self) {
+        self.index.write().unwrap().run_garbage_collection()
     }
     pub fn stats(&self) -> Stats {
         self.index.read().unwrap().stats()

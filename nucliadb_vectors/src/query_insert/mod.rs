@@ -81,6 +81,7 @@ impl<'a> Query for InsertQuery<'a> {
                     k_neighbours: 1,
                     entry_points: vec![ep],
                     index: self.index,
+                    with_filter: &vec![],
                 }
                 .run();
                 ep = neighbours.pop().unwrap().0;

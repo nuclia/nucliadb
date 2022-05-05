@@ -35,6 +35,7 @@ pub struct SearchQuery<'a> {
     pub elem: Vector,
     pub k_neighbours: usize,
     pub index: &'a LockIndex,
+    pub with_filter: &'a Vec<String>,
 }
 
 impl<'a> Query for SearchQuery<'a> {
@@ -48,6 +49,7 @@ impl<'a> Query for SearchQuery<'a> {
                 elem: &self.elem,
                 entry_points: vec![entry_point.node],
                 index: self.index,
+                with_filter: self.with_filter,
             };
             while down_step.layer != 0 {
                 let result = down_step.run();
