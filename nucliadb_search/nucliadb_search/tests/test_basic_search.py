@@ -124,6 +124,6 @@ async def test_search_resource_all(
 
                 vectors = await node_obj.reader.VectorSearch(vrequest)  # type: ignore
 
-                assert vectors.documents[2].score < vectors.documents[1].score
-                assert vectors.documents[2].score < vectors.documents[0].score
+                assert vectors.documents[2].score > vectors.documents[1].score
+                assert vectors.documents[2].score > vectors.documents[0].score
     await txn.abort()
