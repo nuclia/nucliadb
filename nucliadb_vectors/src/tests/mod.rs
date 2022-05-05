@@ -122,7 +122,7 @@ fn single_graph() {
     reader.reload();
     assert_eq!(reader.no_vectors(), 1);
     let result = reader.search(vec, vec![], 1);
-    assert_eq!(result[0].1, 1.0);
+    assert!(result[0].1 >= 0.9);
 }
 
 fn create_query() -> Vec<f32> {
