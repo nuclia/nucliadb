@@ -39,7 +39,7 @@ class LocalFileStorageManager(FileStorageManager):
 
     def metadata_key(self, uri: Optional[str] = None):
         if uri is not None:
-            return f"{uri}'.metadata'"
+            return f"{uri}.metadata"
         raise AttributeError("No URI and no Field")
 
     def get_file_path(self, bucket: str, key: str):

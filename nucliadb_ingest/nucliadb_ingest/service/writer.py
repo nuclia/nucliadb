@@ -72,10 +72,10 @@ from nucliadb_ingest.orm import NODES
 from nucliadb_ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
-from nucliadb_ingest.orm.node import Node
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.orm.resource import Resource as ResourceORM
 from nucliadb_ingest.orm.shard import Shard
+from nucliadb_ingest.orm.utils import get_node_klass
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
 from nucliadb_ingest.utils import get_driver
@@ -170,7 +170,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         async for message in request_stream:
-            await self.proc.process(message, 0)
+            await self.proc.process(message, -1, 0)
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
@@ -471,17 +471,18 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         shard: Optional[Shard] = None
         if shard_id is not None:
             shard = await kbobj.get_resource_shard(shard_id)
+        node_klass = get_node_klass()
         if shard is None:
             # Its a new resource
             # Check if we have enough resource to create a new shard
-            shard = await Node.actual_shard(txn, request.kbid)
+            shard = await node_klass.actual_shard(txn, request.kbid)
             if shard is None:
-                shard = await Node.create_shard_by_kbid(txn, request.kbid)
+                shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
             await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
         if shard is not None:
             count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
             if count > settings.max_node_fields:
-                shard = await Node.create_shard_by_kbid(txn, request.kbid)
+                shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
         response = IndexStatus()
         return response

@@ -29,6 +29,7 @@ from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import InvalidCloudFile
 from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
@@ -106,7 +107,8 @@ class Storage:
         self, message: BrokerMessage, seq: int, seqid: int, partition: str
     ):
         if self.deadletter_bucket is None:
-            raise AttributeError()
+            logger.error("No Deadletter Bucket defined will not store the error")
+            return
         key = DEADLETTER.format(seqid=seqid, seq=seq, partition=partition)
         await self.uploadbytes(self.deadletter_bucket, key, message.SerializeToString())
 

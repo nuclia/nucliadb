@@ -39,9 +39,9 @@ class LocalStorageField(StorageField):
 
     def metadata_key(self, uri: Optional[str] = None):
         if uri is None and self.field is not None:
-            return f"{self.field.uri}'.metadata'"
+            return f"{self.field.uri}.metadata"
         elif uri is not None:
-            return f"{uri}'.metadata'"
+            return f"{uri}.metadata"
         raise AttributeError("No URI and no Field")
 
     async def move(
@@ -143,6 +143,9 @@ class LocalStorageField(StorageField):
         metadata = json.dumps(
             {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
         )
+
+        path_to_create = os.path.dirname(metadata_init_url)
+        os.makedirs(path_to_create, exist_ok=True)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(json.dumps(metadata))
 
@@ -268,6 +271,9 @@ class LocalStorage(Storage):
     ):
         path = self.get_bucket_path(bucket_name)
         key_path = f"{path}/{key}"
+        if not os.path.exists(key_path):
+            return
+
         async with aiofiles.open(key_path, mode="rb") as f:
             while True:
                 body = await f.read(CHUNK_SIZE)

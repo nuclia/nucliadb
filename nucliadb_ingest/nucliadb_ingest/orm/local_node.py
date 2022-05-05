@@ -135,7 +135,7 @@ class LocalNode:
         return shards_ids
 
     async def add_resource(self, req: Resource) -> OpStatus:
-        resp = await self.writer.set_resource(req)
+        resp = await self.writer.set_resource(req.SerializeToString())
         pb_bytes = bytes(resp)
         op_status = OpStatus()
         op_status.ParseFromString(pb_bytes)

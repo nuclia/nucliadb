@@ -61,3 +61,4 @@ key3
 *.tgz
 .DS_Store
 regional-user.creds
+tmp/nucliadb

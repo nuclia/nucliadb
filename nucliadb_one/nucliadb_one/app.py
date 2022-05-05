@@ -19,7 +19,6 @@
 #
 import prometheus_client  # type: ignore
 from fastapi import FastAPI, Request
-from fastapi_versioning import VersionedFastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.propagate import set_global_textmap
@@ -38,6 +37,7 @@ from nucliadb_reader.sentry import set_sentry
 from nucliadb_search.api.v1.router import api as api_search_v1
 from nucliadb_search.utilities import get_counter
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 from nucliadb_writer.api.v1.router import api as api_writer_v1
 
@@ -87,7 +87,9 @@ application = VersionedFastAPI(
     base_app,
     version_format="{major}",
     prefix_format=f"/{API_PREFIX}/v{{major}}",
-    **fastapi_settings,
+    default_version=(1, 0),
+    enable_latest=False,
+    kwargs=fastapi_settings,
 )
 
 
@@ -111,6 +113,7 @@ async def accounting(request: Request) -> JSONResponse:
 application.add_route("/", homepage)
 application.add_route("/metrics", metrics)
 application.add_route("/accounting", accounting)
+
 
 # Enable forwarding of B3 headers to responses and external requests
 # to both inner applications
