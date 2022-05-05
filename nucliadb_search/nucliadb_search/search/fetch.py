@@ -92,6 +92,7 @@ async def get_text_sentence(
     field_type: str,
     field: str,
     kbid: str,
+    index: int,
     start: int,
     end: int,
     split: Optional[str] = None,
@@ -123,53 +124,54 @@ async def get_text_sentence(
     return splitted_text
 
 
-# async def get_labels_sentence(
-#     rid: str,
-#     field_type: str,
-#     field: str,
-#     kbid: str,
-#     start: int,
-#     end: int,
-#     split: Optional[str] = None,
-# ) -> List[str]:
-#     resouce_cache = get_resource_cache()
-#     if rid not in resouce_cache:
-#         transaction = await get_transaction()
-#         storage = await get_storage()
-#         cache = await get_cache()
-#         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-#         orm_resource: Optional[ResourceORM] = await kb.get(rid)
-#         if orm_resource is not None:
-#             resouce_cache[rid] = orm_resource
-#     else:
-#         orm_resource = resouce_cache.get(rid)
+async def get_labels_sentence(
+    rid: str,
+    field_type: str,
+    field: str,
+    kbid: str,
+    index: int,
+    start: int,
+    end: int,
+    split: Optional[str] = None,
+) -> List[str]:
+    resouce_cache = get_resource_cache()
+    if rid not in resouce_cache:
+        transaction = await get_transaction()
+        storage = await get_storage()
+        cache = await get_cache()
+        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+        orm_resource: Optional[ResourceORM] = await kb.get(rid)
+        if orm_resource is not None:
+            resouce_cache[rid] = orm_resource
+    else:
+        orm_resource = resouce_cache.get(rid)
 
-#     if orm_resource is None:
-#         logger.error(f"{rid} does not exist on DB")
-#         return []
+    if orm_resource is None:
+        logger.error(f"{rid} does not exist on DB")
+        return []
 
-#     labels: List[str] = []
-#     basic = await orm_resource.get_basic()
-#     if basic is not None:
-#         for classification in basic.usermetadata.classifications:
-#             labels.append(f"{classification.labelset}/{classification.label}")
+    labels: List[str] = []
+    basic = await orm_resource.get_basic()
+    if basic is not None:
+        for classification in basic.usermetadata.classifications:
+            labels.append(f"{classification.labelset}/{classification.label}")
 
-#     field_type_int = KB_REVERSE[field_type]
-#     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-#     field_metadata = await field_obj.get_field_metadata()
-#     if field_metadata:
-#         paragraph = None
-#         if split not in (None, ""):
-#             metadata = field_metadata.split_metadata[split]
-#             paragraph = metadata.paragraphs[result.index]
-#         elif len(field_metadata.metadata.paragraphs) > result.index:
-#             paragraph = field_metadata.metadata.paragraphs[result.index]
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_metadata = await field_obj.get_field_metadata()
+    if field_metadata:
+        paragraph = None
+        if split not in (None, ""):
+            metadata = field_metadata.split_metadata[split]
+            paragraph = metadata.paragraphs[index]
+        elif len(field_metadata.metadata.paragraphs) > index:
+            paragraph = field_metadata.metadata.paragraphs[index]
 
-#         if paragraph is not None:
-#             for classification in paragraph.classifications:
-#                 labels.append(f"{classification.labelset}/{classification.label}")
+        if paragraph is not None:
+            for classification in paragraph.classifications:
+                labels.append(f"{classification.labelset}/{classification.label}")
 
-#     return labels
+    return labels
 
 
 async def get_text_paragraph(result: ParagraphResult, kbid: str) -> str:

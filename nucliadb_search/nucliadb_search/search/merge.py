@@ -43,6 +43,7 @@ from nucliadb_search.api.models import (
 from nucliadb_search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
+    get_labels_sentence,
     get_text_paragraph,
     get_text_sentence,
 )
@@ -129,18 +130,28 @@ async def merge_vectors_results(
     for vector in vectors:
         for document in vector.documents:
             count = document.doc_id.id.count("/")
-            if count == 3:
-                rid, field_type, field, position = document.doc_id.id.split("/")
+            if count == 4:
+                rid, field_type, field, index, position = document.doc_id.id.split("/")
                 subfield = None
-            elif count == 4:
-                rid, field_type, field, subfield, position = document.doc_id.id.split(
-                    "/"
-                )
+            elif count == 5:
+                (
+                    rid,
+                    field_type,
+                    field,
+                    subfield,
+                    index,
+                    position,
+                ) = document.doc_id.id.split("/")
             start, end = position.split("-")
+            start_int = int(start)
+            end_int = int(end)
+            index_int = int(index)
             text = await get_text_sentence(
-                rid, field_type, field, kbid, int(start), int(end), subfield
+                rid, field_type, field, kbid, index_int, start_int, end_int, subfield
             )
-            # labels = await get_labels_paragraph(result, kbid)
+            labels = await get_labels_sentence(
+                rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+            )
             results.append(
                 Sentence(
                     score=document.score,
@@ -148,7 +159,7 @@ async def merge_vectors_results(
                     field_type=field_type,
                     field=field,
                     text=text,
-                    # labels=labels,
+                    labels=labels,
                 )
             )
 
