@@ -15,8 +15,8 @@ pub trait Distance {
 }
 
 pub mod hnsw_params {
-    pub const fn no_layers() -> usize {
-        4
+    pub fn level_factor() -> f64 {
+        1.0 / (m() as f64).ln()
     }
     pub const fn m_max() -> usize {
         16
@@ -30,15 +30,13 @@ pub mod hnsw_params {
     pub const fn k_neighbours() -> usize {
         10
     }
-    pub const fn vector_length() -> usize {
-        178
-    }
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum LogField {
     VersionNumber = 0,
     EntryPoint,
+    MaxLayer,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -81,10 +79,7 @@ pub struct Vector {
 }
 
 impl From<Vec<f32>> for Vector {
-    fn from(mut raw: Vec<f32>) -> Self {
-        while raw.len() < hnsw_params::vector_length() {
-            raw.push(0.0);
-        }
+    fn from(raw: Vec<f32>) -> Self {
         Vector { raw }
     }
 }
@@ -157,5 +152,6 @@ impl GraphLayer {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GraphLog {
     pub version_number: u128,
+    pub max_layer: u64,
     pub entry_point: Option<EntryPoint>,
 }

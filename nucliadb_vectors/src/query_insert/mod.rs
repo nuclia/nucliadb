@@ -25,6 +25,16 @@ use crate::memory_system::elements::*;
 use crate::query::Query;
 use crate::query_search::layer_search::*;
 pub(crate) mod layer_insert;
+use rand::distributions::Uniform;
+use rand::{thread_rng, Rng};
+
+fn get_random_layer() -> usize {
+    let mut rng = thread_rng();
+    let distribution = Uniform::new(0.0, 1.0);
+    let sample: f64 = rng.sample(distribution);
+    let picked_level = -sample.ln() * hnsw_params::level_factor();
+    picked_level.round() as usize
+}
 
 pub struct InsertQuery<'a> {
     pub key: String,
@@ -58,7 +68,7 @@ impl<'a> Query for InsertQuery<'a> {
         let vector = Vector::from(self.element.clone());
         match self.index.get_entry_point() {
             None => {
-                let top_level = rand::random::<usize>() % hnsw_params::no_layers();
+                let top_level = get_random_layer();
                 let node = self.index.add_node(self.key.clone(), vector, top_level);
                 self.index.set_entry_point((node, top_level).into())
             }
@@ -74,7 +84,7 @@ impl<'a> Query for InsertQuery<'a> {
                 }
                 .run();
                 ep = neighbours.pop().unwrap().0;
-                let node_level = rand::random::<usize>() % hnsw_params::no_layers();
+                let node_level = get_random_layer();
                 let node = self.index.add_node(key, vector.clone(), node_level);
                 let mut current_layer = std::cmp::min(ep_level, node_level);
                 let mut entry_points = vec![ep];

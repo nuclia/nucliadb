@@ -8,8 +8,8 @@ pub fn semi_mapped_consine_similarity(x: &[f32], y: Node, storage: &Storage) -> 
     let mut sum = 0.;
     let mut dem_x = 0.;
     let mut dem_y = 0.;
-    let mut y_cursor = y.vector.start;
-    for x_value in x.iter().take(hnsw_params::vector_length()) {
+    let mut y_cursor = y.vector.start + (u64::segment_len() as u64);
+    for x_value in x.iter() {
         let y_i = FileSegment {
             start: y_cursor,
             end: y_cursor + f32_len,
@@ -36,6 +36,7 @@ impl ByteRpr for LogField {
         match bytes[0] {
             0 => VersionNumber,
             1 => EntryPoint,
+            2 => MaxLayer,
             _ => panic!("Unknown LogField: {bytes:?}"),
         }
     }
@@ -157,19 +158,22 @@ impl FixedByteLen for Edge {
 
 impl ByteRpr for Vector {
     fn as_byte_rpr(&self) -> Vec<u8> {
-        self.raw.as_byte_rpr()
+        let mut result = vec![];
+        let len = self.raw.len() as u64;
+        let body = &self.raw;
+        result.append(&mut len.as_byte_rpr());
+        result.append(&mut body.as_byte_rpr());
+        result
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let raw_start = 0;
-        let raw_end = raw_start + (hnsw_params::vector_length() * f32::segment_len());
+        let len_start = 0;
+        let len_end = len_start + u64::segment_len();
+        let len = u64::from_byte_rpr(&bytes[len_start..len_end]) as usize;
+        let raw_start = len_end;
+        let raw_end = raw_start + (len * f32::segment_len());
         Vector {
             raw: Vec::from_byte_rpr(&bytes[raw_start..raw_end]),
         }
-    }
-}
-impl FixedByteLen for Vector {
-    fn segment_len() -> usize {
-        hnsw_params::vector_length() * f32::segment_len()
     }
 }
 
@@ -447,8 +451,9 @@ mod vector_test_serialization {
     #[test]
     fn serialize() {
         let vector = Vector::from(vec![2.0; 3]);
-        assert_eq!(Vector::from_byte_rpr(&vector.as_byte_rpr()), vector);
-        assert_eq!(vector.as_byte_rpr().len(), Vector::segment_len());
+        let serialized = Vector::from_byte_rpr(&vector.as_byte_rpr());
+        assert_eq!(serialized.raw.len(), vector.raw.len());
+        assert_eq!(serialized, vector);
     }
 }
 

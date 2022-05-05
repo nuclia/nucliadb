@@ -79,4 +79,7 @@ impl Writer {
     pub fn no_vectors(&self) -> usize {
         self.index.no_nodes() as usize
     }
+    pub fn stats(&self) -> Stats {
+        self.index.stats()
+    }
 }

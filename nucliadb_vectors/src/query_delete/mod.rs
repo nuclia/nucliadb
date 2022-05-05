@@ -22,7 +22,6 @@ pub(crate) mod layer_delete;
 use layer_delete::LayerDeleteQuery;
 
 use crate::index::LockIndex;
-use crate::memory_system::elements::*;
 use crate::query::Query;
 pub struct DeleteQuery<'a> {
     pub delete: String,
@@ -38,7 +37,7 @@ impl<'a> Query for DeleteQuery<'a> {
     fn run(&mut self) -> Self::Output {
         if let Some(delete) = self.index.get_node(&self.delete) {
             let vector = self.index.get_node_vector(delete);
-            for current_layer in (0..hnsw_params::no_layers()).rev() {
+            for current_layer in (0..self.index.max_layer()).rev() {
                 LayerDeleteQuery {
                     delete,
                     layer: current_layer,

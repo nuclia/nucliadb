@@ -20,6 +20,7 @@
 
 use std::path::Path;
 
+use heed::flags::Flags;
 use heed::types::{ByteSlice, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions, RoTxn, RwTxn};
 
@@ -60,6 +61,9 @@ impl LMBDStorage {
             let mut env_builder = EnvOpenOptions::new();
             env_builder.max_dbs(MAX_DBS);
             env_builder.map_size(MAP_SIZE);
+            unsafe {
+                env_builder.flag(Flags::MdbNoLock);
+            }
             let env = env_builder.open(&env_path).unwrap();
             let label_db = env.create_database(Some(DB_LABELS)).unwrap();
             let node_db = env.create_database(Some(DB_NODES)).unwrap();
@@ -77,12 +81,9 @@ impl LMBDStorage {
                 log,
             };
             let mut w_txn = lmdb.rw_txn();
-            for i in 0..hnsw_params::no_layers() {
-                lmdb.insert_layer_out(&mut w_txn, i as u64, GraphLayer::new());
-                lmdb.insert_layer_in(&mut w_txn, i as u64, GraphLayer::new());
-            }
             let log = GraphLog {
                 version_number: 0,
+                max_layer: 0,
                 entry_point: None,
             };
             lmdb.insert_log(&mut w_txn, log);
@@ -101,6 +102,9 @@ impl LMBDStorage {
             std::thread::sleep(sleep_time);
         }
         let mut env_builder = EnvOpenOptions::new();
+        unsafe {
+            env_builder.flag(Flags::MdbNoLock);
+        }
         env_builder.max_dbs(MAX_DBS);
         env_builder.map_size(MAP_SIZE);
         let env = env_builder.open(&env_path).unwrap();
@@ -191,6 +195,13 @@ impl LMBDStorage {
         self.log
             .put(
                 txn,
+                &LogField::MaxLayer.as_byte_rpr(),
+                &log.max_layer.as_byte_rpr(),
+            )
+            .unwrap();
+        self.log
+            .put(
+                txn,
                 &LogField::VersionNumber.as_byte_rpr(),
                 &log.version_number.as_byte_rpr(),
             )
@@ -201,7 +212,7 @@ impl LMBDStorage {
             .put(txn, &time_stamp.as_byte_rpr(), &rmv.as_byte_rpr())
             .unwrap();
     }
-    pub fn clear_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128) -> Vec<Node> {
+    pub fn _clear_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128) -> Vec<Node> {
         let delete = self
             .deleted_log
             .get(txn, &time_stamp.as_byte_rpr())
@@ -220,6 +231,12 @@ impl LMBDStorage {
             .unwrap()
             .map(u128::from_byte_rpr)
             .unwrap();
+        let max_layer = self
+            .log
+            .get(txn, &LogField::MaxLayer.as_byte_rpr())
+            .unwrap()
+            .map(u64::from_byte_rpr)
+            .unwrap();
         let entry_point = self
             .log
             .get(txn, &LogField::EntryPoint.as_byte_rpr())
@@ -228,6 +245,7 @@ impl LMBDStorage {
             .unwrap();
         GraphLog {
             version_number,
+            max_layer,
             entry_point,
         }
     }

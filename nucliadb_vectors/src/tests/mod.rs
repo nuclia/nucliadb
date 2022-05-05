@@ -115,16 +115,18 @@ fn single_graph() {
     let reader = Reader::new(temp_dir.path().to_str().unwrap());
     let key = "KEY_0".to_string();
     let vec = create_query();
-    writer.insert(key, vec, vec![]);
+    writer.insert(key.clone(), vec.clone(), vec![]);
     writer.commit();
     assert_eq!(writer.no_vectors(), 1);
     assert_eq!(reader.no_vectors(), 0);
     reader.reload();
     assert_eq!(reader.no_vectors(), 1);
+    let result = reader.search(vec, vec![], 1);
+    assert_eq!(result[0].1, 1.0);
 }
 
 fn create_query() -> Vec<f32> {
-    vec![rand::random::<f32>; 8]
+    vec![rand::random::<f32>; 178]
         .into_iter()
         .map(|f| f())
         .collect()
@@ -157,12 +159,11 @@ fn stress_test() {
     total += timer.elapsed().unwrap();
     for index in 0..1000 {
         let query = create_query();
-        let no_results = 10;
+        let no_results = 5;
         let query_labels = labels.clone();
         let timer = SystemTime::now();
         let result = reader.search(query, query_labels, no_results);
         total += timer.elapsed().unwrap();
-        let result: Vec<_> = result.into_iter().map(|(k, _)| k).collect();
         println!("READ {:?}", result);
         if index % 100 == 0 {
             let timer = SystemTime::now();
@@ -171,6 +172,8 @@ fn stress_test() {
         }
     }
     println!("Took: {}", total.as_secs());
+    println!("Reader: {:?}", reader.stats());
+    println!("Writer: {:?}", writer.stats());
 }
 
 //#[test]
@@ -183,9 +186,8 @@ fn concurrency_test() {
             let no_results = 5;
             let result = reader.search(query, vec![], no_results);
             println!("READ {:?}", result);
-            if index % 100 == 0 {
-                reader.reload();
-            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            reader.reload();
             index += 1;
         }
     }
@@ -198,7 +200,7 @@ fn concurrency_test() {
         }
         loop {
             let mut delete = vec![];
-            for _ in 0..1000 {
+            for _ in 0..50 {
                 let key = format!("KEY_{}", current_key);
                 let vec = create_query();
                 if rand::random::<usize>() % 2 == 0 {
@@ -210,15 +212,10 @@ fn concurrency_test() {
 
                 current_key += 1;
             }
-            if writer.no_vectors() >= 1000 {
-                break;
-            }
             for delete in delete {
-                // let l = lock.lock().unwrap();
                 writer.delete_vector(delete.clone());
                 writer.commit();
                 println!("DELETE {delete}");
-                // std::mem::drop(l);
             }
         }
     }
