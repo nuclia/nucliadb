@@ -20,13 +20,13 @@
 
 use std::collections::BinaryHeap;
 
-use crate::graph_elems::*;
+use crate::memory_system::elements::Node;
 use crate::utils::*;
 
 pub fn select_neighbours_heuristic(
     k_neighbours: usize,
-    candidates: Vec<(NodeId, f32)>,
-) -> Vec<(NodeId, f32)> {
+    candidates: Vec<(Node, f32)>,
+) -> Vec<(Node, f32)> {
     let mut r = BinaryHeap::new();
     let mut w = BinaryHeap::new();
     let mut w_d = BinaryHeap::new();
@@ -59,15 +59,19 @@ pub fn select_neighbours_heuristic(
 
 #[cfg(test)]
 mod test_heuristic_simple {
-    use crate::graph_elems::NodeId;
+    use crate::memory_system::elements::{FileSegment, Node};
     #[test]
     fn test_heuristic_simple_search() {
         let mut solution = Vec::with_capacity(100);
         let mut candidates = Vec::with_capacity(100);
+        let node = Node {
+            vector: FileSegment { start: 0, end: 0 },
+            key: FileSegment { start: 0, end: 0 },
+        };
         for _ in 0..100 {
             let v = rand::random::<f32>();
             solution.push(v);
-            candidates.push((NodeId::new(), v));
+            candidates.push((node, v));
         }
         solution.sort_by(|a, b| {
             if *b > *a {

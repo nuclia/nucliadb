@@ -18,67 +18,62 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::graph_arena::LockArena;
-use crate::graph_disk::LockDisk;
-use crate::graph_elems::*;
 use crate::heuristics::heuristic_paper::select_neighbours_heuristic;
-use crate::memory_processes::load_node_in_writer;
+use crate::index::LockIndex;
+use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::query_writer_search::layer_search::{LayerSearchQuery, LayerSearchValue};
-use crate::write_index::LockWriter;
+use crate::query_search::layer_search::{LayerSearchQuery, LayerSearchValue};
 
 pub struct LayerDeleteQuery<'a> {
     pub layer: usize,
-    pub delete: NodeId,
+    pub delete: Node,
     pub m_max: usize,
     pub m: usize,
     pub ef_construction: usize,
-    pub index: &'a LockWriter,
-    pub arena: &'a LockArena,
-    pub disk: &'a LockDisk,
+    pub vector: &'a Vector,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for LayerDeleteQuery<'a> {
     type Output = ();
 
     fn run(&mut self) -> Self::Output {
+        if !self.index.is_node_at(self.layer, self.delete) {
+            return;
+        }
         let in_edges = self.index.in_edges(self.layer, self.delete);
         let out_edges = self.index.out_edges(self.layer, self.delete);
-        for (node, edge) in out_edges {
-            load_node_in_writer(node, self.index, self.arena, self.disk);
+        for (node, _) in out_edges {
             self.index.disconnect(self.layer, self.delete, node);
-            self.arena.delete_edge(edge);
         }
         let mut reaching = Vec::with_capacity(in_edges.len());
-        for (node, edge) in in_edges {
-            load_node_in_writer(node, self.index, self.arena, self.disk);
+        for (node, _) in in_edges {
             self.index.disconnect(self.layer, node, self.delete);
-            self.arena.delete_edge(edge);
             reaching.push(node);
         }
-
         for source in reaching {
             if self.index.out_edges(self.layer, source).len() < self.m {
                 let LayerSearchValue { neighbours } = LayerSearchQuery {
                     layer: self.layer,
-                    elem: self.arena.get_node(source).vector,
+                    elem: self.vector,
                     k_neighbours: self.ef_construction,
                     entry_points: vec![source],
                     index: self.index,
-                    arena: self.arena,
-                    disk: self.disk,
                 }
                 .run();
                 let mut candidates = neighbours;
-                for (destination, edge_id) in self.index.out_edges(self.layer, source) {
-                    candidates.push((destination, self.arena.get_edge(edge_id).dist));
-                    self.arena.delete_edge(edge_id);
+                for (destination, edge) in self.index.out_edges(self.layer, source) {
+                    candidates.push((destination, edge.dist));
                     self.index.disconnect(self.layer, source, destination);
                 }
                 for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
                     if destination != source && destination != self.delete {
-                        let edge_id = self.arena.insert_edge(Edge { dist });
-                        self.index.connect(self.layer, source, destination, edge_id);
+                        let edge = Edge {
+                            from: source,
+                            to: destination,
+                            dist,
+                        };
+                        self.index.connect(self.layer, edge);
                     }
                 }
             }

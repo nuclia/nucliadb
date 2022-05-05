@@ -53,7 +53,7 @@ impl ServiceChild<VectorServiceConfiguration> for VectorWriterService {
 
     async fn stop(&self) -> InternalResult<()> {
         info!("Stopping vector writer Service");
-        self.index.write().unwrap().flush();
+        self.index.write().unwrap().commit();
         Ok(())
     }
 }
@@ -65,7 +65,7 @@ impl WriterChild for VectorWriterService {
             .write()
             .unwrap()
             .delete_document(resource_id.shard_id.clone());
-        self.index.write().unwrap().flush();
+        self.index.write().unwrap().commit();
         info!("Delete resource in vector ends");
         Ok(())
     }
@@ -84,7 +84,7 @@ impl WriterChild for VectorWriterService {
                         );
                     }
                 }
-                self.index.write().unwrap().flush();
+                self.index.write().unwrap().commit();
             }
         }
         info!("Set resource in vector ends");
@@ -161,7 +161,6 @@ mod tests {
         assert!(res.is_ok());
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        assert_eq!(writer.index.read().unwrap().no_labels(), 4);
         writer.stop().await.unwrap();
     }
 }

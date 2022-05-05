@@ -17,30 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-
-pub use function_name::named;
-
-macro_rules! entry {
-    () => {
-        log::trace!("Entering {}/{}", file!(), function_name!());
-    };
-}
-
-macro_rules! exit {
-    () => {
-        log::trace!("Exiting {}/{}/{}", file!(), function_name!(), line!());
-    };
-    ($e:expr) => {{
-        log::trace!("Exiting {}/{}/{}", file!(), function_name!(), line!());
-        $e
-    }};
-}
-
-macro_rules! unwrapping {
-    ($e:expr) => {{
-        log::trace!("Unwrapping at {}/{}/{}", file!(), function_name!(), line!());
-        $e.unwrap()
-    }};
-}
-
-pub(crate) use {entry, exit, unwrapping};
+pub mod elements;
+pub mod lmdb_driver;
+pub mod mmap_driver;

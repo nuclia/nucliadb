@@ -20,23 +20,16 @@
 
 #[allow(unused)]
 mod distance;
-mod graph_arena;
-mod graph_disk;
-mod graph_elems;
 mod heuristics;
-mod memory_processes;
+mod index;
+mod memory_system;
 mod query;
 mod query_delete;
-mod query_find_labels;
 mod query_insert;
 mod query_post_search;
 mod query_search;
-mod query_writer_search;
-mod read_index;
 pub mod reader;
 #[cfg(test)]
 mod tests;
-mod trace_utils;
 mod utils;
-mod write_index;
 pub mod writer;

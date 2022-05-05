@@ -23,18 +23,14 @@ use std::path::Path;
 
 use tracing::*;
 
-use crate::graph_disk::*;
-use crate::graph_elems::{GraphVector, HNSWParams};
+use crate::index::*;
+use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::query_find_labels::FindLabelsQuery;
 use crate::query_post_search::{PostSearchQuery, PostSearchValue};
 use crate::query_search::{SearchQuery, SearchValue};
-use crate::read_index::*;
 
 pub struct Reader {
-    index: LockReader,
-    params: HNSWParams,
-    disk: LockDisk,
+    index: LockIndex,
 }
 
 impl Debug for Reader {
@@ -47,61 +43,41 @@ impl Debug for Reader {
 
 impl Reader {
     pub fn new(path: &str) -> Reader {
-        let disk = Disk::start(Path::new(path));
-        let index = ReadIndex::new(&disk);
         Reader {
-            disk: disk.into(),
-            index: index.into(),
-            params: HNSWParams::default(),
+            index: Index::reader(Path::new(path)).into(),
         }
     }
-
     pub fn search(
         &self,
         elem: Vec<f32>,
         labels: Vec<String>,
         no_results: usize,
     ) -> Vec<(String, f32)> {
-        let is_filtered_search = !labels.is_empty();
-        let label_analysis = FindLabelsQuery {
-            labels,
-            disk: &self.disk,
+        let SearchValue { neighbours } = SearchQuery {
+            elem: Vector::from(elem),
+            k_neighbours: hnsw_params::k_neighbours(),
+            index: &self.index,
         }
         .run();
-
-        let result = if is_filtered_search && label_analysis.min_reached < no_results {
-            Vec::with_capacity(0)
-        } else {
-            let SearchValue { neighbours } = SearchQuery {
-                elem: GraphVector::from(elem),
-                k_neighbours: self.params.k_neighbours,
-                index: &self.index,
-                disk: &self.disk,
-            }
-            .run();
-            debug!("Neighbours {}", neighbours.len());
-            let PostSearchValue { filtered } = PostSearchQuery {
-                pre_filter: neighbours,
-                with_filter: label_analysis.found,
-                index: &self.index,
-            }
-            .run();
-            filtered
-        };
-        result
+        debug!("Neighbours {}", neighbours.len());
+        let PostSearchValue { mut filtered } = PostSearchQuery {
+            pre_filter: neighbours,
+            with_filter: labels,
+            index: &self.index,
+        }
+        .run();
+        while filtered.len() > no_results {
+            filtered.pop();
+        }
+        filtered
     }
     pub fn reload(&self) {
-        let current_version = self.index.get_version_number();
-        let disk_version = self.disk.get_version_number();
-        if current_version != disk_version {
-            self.index.reload(&self.disk);
-        }
-    }
-
-    pub fn no_neighbours(&self) -> usize {
-        self.params.k_neighbours
+        self.index.reload();
     }
     pub fn no_vectors(&self) -> usize {
-        self.disk.no_nodes()
+        self.index.no_nodes() as usize
+    }
+    pub fn stats(&self) -> Stats {
+        self.index.stats()
     }
 }

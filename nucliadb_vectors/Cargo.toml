@@ -18,5 +18,7 @@ libm = "0.2.2"
 rand = "0.8.4"
 tracing = "0.1.29"
 rayon = "1.5.2"
+memmap2 = "0.5.3"
+fs2 = "0.4.3"
 [dev-dependencies]
 env_logger = "0.9.0"

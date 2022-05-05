@@ -19,60 +19,37 @@
 //
 
 pub(crate) mod layer_delete;
-
 use layer_delete::LayerDeleteQuery;
 
-use crate::graph_arena::LockArena;
-use crate::graph_disk::LockDisk;
-use crate::memory_processes::load_node_in_writer;
+use crate::index::LockIndex;
 use crate::query::Query;
-use crate::write_index::LockWriter;
 pub struct DeleteQuery<'a> {
     pub delete: String,
     pub m_max: usize,
     pub m: usize,
     pub ef_construction: usize,
-    pub index: &'a LockWriter,
-    pub arena: &'a LockArena,
-    pub disk: &'a LockDisk,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for DeleteQuery<'a> {
     type Output = ();
 
     fn run(&mut self) -> Self::Output {
-        if let Some(delete_id) = self.disk.get_node_id(&self.delete) {
-            load_node_in_writer(delete_id, self.index, self.arena, self.disk);
-            let mut current_layer = self.index.get_top_layer(delete_id);
-            loop {
-                let mut query = LayerDeleteQuery {
-                    delete: delete_id,
+        if let Some(delete) = self.index.get_node(&self.delete) {
+            let vector = self.index.get_node_vector(delete);
+            for current_layer in (0..self.index.max_layer()).rev() {
+                LayerDeleteQuery {
+                    delete,
                     layer: current_layer,
                     m_max: self.m_max,
                     m: self.m,
                     ef_construction: self.ef_construction,
                     index: self.index,
-                    arena: self.arena,
-                    disk: self.disk,
-                };
-
-                query.run();
-                if current_layer == 0 {
-                    break;
-                } else {
-                    current_layer -= 1;
+                    vector: &vector,
                 }
+                .run();
             }
-            let labels = self.arena.get_node(delete_id).labels;
-            for label in labels {
-                let remain = self.disk.remove_label(label);
-                if remain == 0 {
-                    self.arena.delete_label(label);
-                }
-            }
-            self.index.erase(delete_id);
-            self.arena.delete_node(delete_id);
-            self.disk.remove_vector(&self.delete);
+            self.index.erase(delete);
         }
     }
 }

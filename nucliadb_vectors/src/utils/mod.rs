@@ -20,49 +20,10 @@
 
 use std::cmp::Ordering;
 
-use crate::graph_arena::LockArena;
-use crate::graph_disk::LockDisk;
-use crate::graph_elems::NodeId;
+use crate::memory_system::elements::Node;
 
 #[derive(Clone, Copy)]
-pub struct InverseElem<D>(pub NodeId, pub D);
-impl<D> Eq for InverseElem<D> where D: PartialOrd + PartialEq {}
-impl<D> Ord for InverseElem<D>
-where D: PartialEq + PartialOrd
-{
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-impl<D> PartialEq for InverseElem<D>
-where D: PartialEq
-{
-    fn eq(&self, other: &Self) -> bool {
-        (self.1 == other.1) && (self.0 == other.0)
-    }
-}
-
-impl<D> PartialOrd for InverseElem<D>
-where D: PartialOrd
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.1 > other.1 {
-            Some(Ordering::Less)
-        } else if self.1 < other.1 {
-            Some(Ordering::Greater)
-        } else {
-            Some(Ordering::Equal)
-        }
-    }
-}
-impl<D> From<StandardElem<D>> for InverseElem<D> {
-    fn from(StandardElem(n, d): StandardElem<D>) -> Self {
-        InverseElem(n, d)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct StandardElem<D>(pub NodeId, pub D);
+pub struct StandardElem<D>(pub Node, pub D);
 impl<D> Eq for StandardElem<D> where D: PartialOrd + PartialEq {}
 impl<D> Ord for StandardElem<D>
 where D: PartialEq + PartialOrd
@@ -90,48 +51,4 @@ where D: PartialOrd
             Some(Ordering::Equal)
         }
     }
-}
-
-impl<D> From<InverseElem<D>> for StandardElem<D> {
-    fn from(InverseElem(n, d): InverseElem<D>) -> Self {
-        StandardElem(n, d)
-    }
-}
-
-#[cfg(test)]
-mod test_utils {
-    use std::collections::{BinaryHeap, LinkedList};
-
-    use super::*;
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_utils__right_order() {
-        let mut inverse_heap = BinaryHeap::new();
-        let mut standard_heap = BinaryHeap::new();
-        let mut id = NodeId::new();
-        let len = 10;
-        for i in 0..len {
-            inverse_heap.push(InverseElem(id.fresh(), i as f32));
-            standard_heap.push(StandardElem(id.fresh(), i as f32));
-        }
-        let mut inverse = LinkedList::new();
-        let mut standard = LinkedList::new();
-        loop {
-            match (inverse_heap.pop(), standard_heap.pop()) {
-                (None, None) => break,
-                (Some(InverseElem(_, d_i)), Some(StandardElem(_, d_s))) => {
-                    inverse.push_back(d_i);
-                    standard.push_front(d_s);
-                }
-                _ => unreachable!(),
-            }
-        }
-        assert_eq!(inverse, standard);
-    }
-}
-
-pub fn _internal_reload_policy(arena: &LockArena, disk: &LockDisk) -> bool {
-    let in_disk = disk.no_nodes();
-    let in_arena = arena.no_nodes();
-    (in_arena as f64 / in_disk as f64) * 100f64 >= 30f64
 }

@@ -18,17 +18,23 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
-
 pub use layer_insert::*;
 
-use crate::graph_arena::*;
-use crate::graph_disk::*;
-use crate::graph_elems::*;
+use crate::index::*;
+use crate::memory_system::elements::*;
 use crate::query::Query;
-use crate::query_writer_search::*;
-use crate::write_index::*;
+use crate::query_search::layer_search::*;
 pub(crate) mod layer_insert;
+use rand::distributions::Uniform;
+use rand::{thread_rng, Rng};
+
+fn get_random_layer() -> usize {
+    let mut rng = thread_rng();
+    let distribution = Uniform::new(0.0, 1.0);
+    let sample: f64 = rng.sample(distribution);
+    let picked_level = -sample.ln() * hnsw_params::level_factor();
+    picked_level.round() as usize
+}
 
 pub struct InsertQuery<'a> {
     pub key: String,
@@ -37,77 +43,57 @@ pub struct InsertQuery<'a> {
     pub m: usize,
     pub m_max: usize,
     pub ef_construction: usize,
-    pub index: &'a LockWriter,
-    pub arena: &'a LockArena,
-    pub disk: &'a LockDisk,
+    pub index: &'a LockIndex,
 }
 
 impl<'a> Query for InsertQuery<'a> {
     type Output = ();
 
     fn run(&mut self) -> Self::Output {
-        if self.disk.get_node_id(&self.key).is_some() {
+        if self.index.has_node(&self.key) {
             return;
         }
-        let mut labels = HashSet::new();
-        for label_value in std::mem::take(&mut self.labels) {
-            match self.disk.get_label_id(&label_value) {
-                Some(label_id) => {
-                    self.disk.grow_label(label_id);
-                    labels.insert(label_id);
+        let label_adder = {
+            let labels = std::mem::take(&mut self.labels);
+            let label_adder = self.index.clone();
+            let key_adder = self.key.clone();
+            std::thread::spawn(move || {
+                for label_value in labels {
+                    label_adder.add_label(key_adder.clone(), label_value);
                 }
-                None => {
-                    let label = Label::new(self.arena.free_label(), label_value);
-                    self.disk.add_label(&label);
-                    labels.insert(label.my_id);
-                }
-            }
-        }
-        let node = Node {
-            labels,
-            key: self.key.clone(),
-            vector: GraphVector::from(self.element.clone()),
+            })
         };
-        let new_element = self.arena.insert_node(node);
-        self.disk.log_node_id(&self.key, new_element);
+
+        let key = self.key.clone();
+        let vector = Vector::from(self.element.clone());
         match self.index.get_entry_point() {
             None => {
-                let top_level = rand::random::<usize>() % self.index.max_layers();
-                self.index.set_top_layer(new_element, top_level);
-                for i in 0..=top_level {
-                    self.index
-                        .replace_layer(i, WriteIndexLayer::with_ep(new_element));
-                }
-                self.index.set_entry_point(new_element, top_level);
+                let top_level = get_random_layer();
+                let node = self.index.add_node(self.key.clone(), vector, top_level);
+                self.index.set_entry_point((node, top_level).into())
             }
-            Some((mut ep, ep_level)) => {
-                let new_element_level = rand::random::<usize>() % self.index.max_layers();
-                self.index.set_top_layer(new_element, new_element_level);
-                for i in (ep_level + 1)..=new_element_level {
-                    let layer = WriteIndexLayer::with_ep(new_element);
-                    self.index.replace_layer(i, layer);
-                }
+            Some(entry_point) => {
+                let mut ep = entry_point.node;
+                let ep_level = entry_point.layer as usize;
                 let LayerSearchValue { mut neighbours } = LayerSearchQuery {
-                    elem: self.arena.get_node(new_element).vector,
+                    elem: &vector,
                     layer: ep_level,
                     k_neighbours: 1,
                     entry_points: vec![ep],
                     index: self.index,
-                    arena: self.arena,
-                    disk: self.disk,
                 }
                 .run();
                 ep = neighbours.pop().unwrap().0;
-
-                let mut current_layer = std::cmp::min(ep_level, new_element_level);
+                let node_level = get_random_layer();
+                let node = self.index.add_node(key, vector.clone(), node_level);
+                let mut current_layer = std::cmp::min(ep_level, node_level);
                 let mut entry_points = vec![ep];
                 loop {
                     let LayerInsertValue { neighbours } = LayerInsertQuery {
+                        vector: &vector,
                         index: self.index,
-                        arena: self.arena,
-                        disk: self.disk,
                         entry_points,
-                        new_element,
+                        new_element: node,
                         layer: current_layer,
                         m: self.m,
                         m_max: self.m_max,
@@ -121,10 +107,9 @@ impl<'a> Query for InsertQuery<'a> {
                         entry_points = neighbours
                     }
                 }
-                if new_element_level > ep_level {
-                    self.index.set_entry_point(new_element, new_element_level);
-                }
+                self.index.set_entry_point((node, node_level).into());
             }
         }
+        label_adder.join().unwrap();
     }
 }
