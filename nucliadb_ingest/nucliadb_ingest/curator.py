@@ -66,13 +66,19 @@ class Entities:
     async def save(self):
         if self.data is None:
             raise AttributeError("No data")
-        async with aiofiles.open(f"{self.cache}/{self.kbid}", "wb+") as f:
+        filename = f"{self.cache}/{self.kbid}"
+        path = os.path.dirname(filename)
+        os.makedirs(path, exist_ok=True)
+        async with aiofiles.open(filename, "wb+") as f:
             await f.write(self.data.SerializeToString())
 
     async def load(self):
-        async with aiofiles.open(f"{self.cache}/{self.kbid}", "rb+") as f:
-            self.data = GetEntitiesResponse()
-            self.data.kb = self.kbid
+        filename = f"{self.cache}/{self.kbid}"
+        self.data = GetEntitiesResponse()
+        self.data.kb = self.kbid
+        if not os.path.exists(filename):
+            return None
+        async with aiofiles.open(filename, "rb+") as f:
             self.data.ParseFromString(await f.read())
 
     def merge(self, resource_ners: List[Dict[str, str]]):
