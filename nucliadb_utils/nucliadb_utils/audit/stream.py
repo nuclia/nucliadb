@@ -54,7 +54,7 @@ class StreamAuditStorage(AuditStorage):
         self.queue = asyncio.Queue()
 
     def get_partition(self, kbid: str):
-        return (mmh3.hash(kbid, self.seed, signed=False) % self.partitions) + 1
+        return mmh3.hash(kbid, self.seed, signed=False) % self.partitions
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
