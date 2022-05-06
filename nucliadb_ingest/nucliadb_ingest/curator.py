@@ -247,6 +247,7 @@ class Consumer:
         sf: StorageField = self.storage.file_extracted(
             kbid, rid, type_char, field.field, FIELD_METADATA
         )
+        logger.info(f"Resource {kbid} - {rid} {type_char} {field.field}")
         payload = await self.storage.download_pb(sf, FieldComputedMetadata)
 
         entities = []
