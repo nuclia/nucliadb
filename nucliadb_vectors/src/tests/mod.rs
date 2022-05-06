@@ -207,16 +207,15 @@ fn concurrency_test() {
                     delete.push(key.clone());
                 }
                 writer.insert(key.clone(), vec, labels.clone());
-                writer.commit();
                 println!("INSERT {key}");
 
                 current_key += 1;
             }
             for delete in delete {
                 writer.delete_vector(delete.clone());
-                writer.commit();
                 println!("DELETE {delete}");
             }
+            writer.commit();
         }
     }
     let lock = Arc::new(Mutex::new(()));
