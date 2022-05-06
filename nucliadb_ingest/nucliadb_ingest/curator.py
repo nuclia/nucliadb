@@ -24,11 +24,11 @@ import logging
 import os
 import sys
 import time
-from functools import lru_cache
 from typing import Dict, Generator, List, Optional, Tuple
 
 import aiofiles
 import nats
+from lru import LRU  # type: ignore
 from nats import errors
 from nats.aio.client import Client, Msg
 from nats.aio.subscription import Subscription
@@ -51,6 +51,8 @@ from nucliadb_utils.utilities import get_cache, get_storage
 
 CACHE_FOLDER = "/cache/{worker}"
 CURATOR_ID = "/internal/curator/{worker}"
+
+CACHE = LRU(200)
 
 logger = logging.getLogger("nucliadb_ingest")
 
@@ -254,11 +256,12 @@ class Consumer:
             entities.append(split_metadata.ner)
         return entities
 
-    @lru_cache(maxsize=200)
     async def get_knowledgebox_entities(self, kbid: str) -> Entities:
-        entities_pb = Entities(self.cache, kbid)
-        await entities_pb.load()
-        return entities_pb
+        if kbid not in CACHE:
+            entities_pb = Entities(self.cache, kbid)
+            await entities_pb.load()
+            CACHE[kbid] = entities_pb
+        return CACHE[kbid]
 
 
 class Nats:
