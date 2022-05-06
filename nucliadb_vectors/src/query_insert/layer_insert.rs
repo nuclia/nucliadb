@@ -52,6 +52,7 @@ impl<'a> Query for LayerInsertQuery<'a> {
             k_neighbours: self.ef_construction,
             entry_points: self.entry_points.clone(),
             index: self.index,
+            with_filter: &vec![],
         }
         .run();
         let mut need_repair = HashSet::new();

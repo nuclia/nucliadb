@@ -57,6 +57,7 @@ impl Reader {
             elem: Vector::from(elem),
             k_neighbours: hnsw_params::k_neighbours(),
             index: &self.index,
+            with_filter: &labels,
         }
         .run();
         debug!("Neighbours {}", neighbours.len());
@@ -66,9 +67,7 @@ impl Reader {
             index: &self.index,
         }
         .run();
-        while filtered.len() > no_results {
-            filtered.pop();
-        }
+        filtered.truncate(no_results);
         filtered
     }
     pub fn reload(&self) {

@@ -44,7 +44,7 @@ use crate::services::vector::reader::VectorReaderService;
 use crate::stats::StatsData;
 
 const RELOAD_PERIOD: u128 = 5000;
-const FIXED_VECTORS_RESULTS: usize = 1;
+const FIXED_VECTORS_RESULTS: usize = 10;
 #[derive(Debug)]
 pub struct ShardReaderService {
     pub id: String,

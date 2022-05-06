@@ -38,12 +38,10 @@ impl<'a> Query for PostSearchQuery<'a> {
     type Output = PostSearchValue;
 
     fn run(&mut self) -> Self::Output {
-        let filtered = self
-            .pre_filter
-            .par_iter()
-            .map(|(node, dist)| (self.index.has_labels(*node, &self.with_filter), *dist))
-            .filter(|(opt, _)| opt.is_some())
-            .map(|(opt, dist)| (opt.unwrap(), dist))
+        let pre_filter = std::mem::take(&mut self.pre_filter);
+        let filtered = pre_filter
+            .into_par_iter()
+            .map(|(node, dist)| (self.index.get_node_key(node), dist))
             .collect();
         PostSearchValue { filtered }
     }

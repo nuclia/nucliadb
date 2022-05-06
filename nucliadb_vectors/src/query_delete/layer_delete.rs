@@ -59,6 +59,7 @@ impl<'a> Query for LayerDeleteQuery<'a> {
                     k_neighbours: self.ef_construction,
                     entry_points: vec![source],
                     index: self.index,
+                    with_filter: &vec![],
                 }
                 .run();
                 let mut candidates = neighbours;

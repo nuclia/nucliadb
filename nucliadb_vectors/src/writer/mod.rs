@@ -76,6 +76,9 @@ impl Writer {
     pub fn commit(&mut self) {
         self.index.commit()
     }
+    pub fn run_garbage_collection(&mut self) {
+        self.index.run_garbage_collection()
+    }
     pub fn no_vectors(&self) -> usize {
         self.index.no_nodes() as usize
     }

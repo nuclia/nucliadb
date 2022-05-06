@@ -212,17 +212,19 @@ impl LMBDStorage {
             .put(txn, &time_stamp.as_byte_rpr(), &rmv.as_byte_rpr())
             .unwrap();
     }
-    pub fn _clear_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128) -> Vec<Node> {
+    pub fn clear_deleted(&self, txn: &mut RwTxn<'_, '_>) -> Vec<Node> {
         let delete = self
             .deleted_log
-            .get(txn, &time_stamp.as_byte_rpr())
+            .get_greater_than(txn, &0u128.as_byte_rpr())
             .unwrap()
-            .map(Vec::from_byte_rpr)
-            .unwrap_or_default();
-        self.deleted_log
-            .delete(txn, &time_stamp.as_byte_rpr())
-            .unwrap();
-        delete
+            .map(|(node, v)| (u128::from_byte_rpr(node), Vec::from_byte_rpr(v)));
+        match delete {
+            Some((stamp, deleted)) => {
+                self.deleted_log.delete(txn, &stamp.as_byte_rpr()).unwrap();
+                deleted
+            }
+            None => vec![],
+        }
     }
     pub fn get_log(&self, txn: &RoTxn<'_>) -> GraphLog {
         let version_number = self
