@@ -75,7 +75,7 @@ class Entities:
     async def load(self):
         filename = f"{self.cache}/{self.kbid}"
         self.data = GetEntitiesResponse()
-        self.data.kb = self.kbid
+        self.data.kb.uuid = self.kbid
         if not os.path.exists(filename):
             return None
         async with aiofiles.open(filename, "rb+") as f:
