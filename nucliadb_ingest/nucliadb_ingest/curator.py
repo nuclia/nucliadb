@@ -251,6 +251,8 @@ class Consumer:
         payload = await self.storage.download_pb(sf, FieldComputedMetadata)
 
         entities = []
+        if payload is None:
+            return entities
 
         entities.append(payload.metadata.ner)
         for split_metadata in payload.split_metadata.values():
