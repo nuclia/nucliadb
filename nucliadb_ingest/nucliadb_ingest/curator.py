@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
 import os
@@ -34,7 +35,7 @@ from nats.aio.client import Client, Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from nucliadb_protos.audit_pb2 import AuditRequest
-from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup
+from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, KnowledgeBoxID
 from nucliadb_protos.resources_pb2 import FieldComputedMetadata, FieldID
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 from sentry_sdk import capture_exception
@@ -45,6 +46,7 @@ from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.orm.resource import KB_REVERSE_REVERSE
 from nucliadb_ingest.sentry import SENTRY, set_sentry
 from nucliadb_ingest.utils import get_driver
+from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.settings import audit_settings, running_settings
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import get_cache, get_storage
@@ -112,6 +114,7 @@ class Consumer:
         driver: Driver,
         storage: Storage,
         js: JetStreamContext,
+        dryrun: bool = False,
         ttl: int = 30 * 60,
     ):
         self.partition = partition
@@ -124,6 +127,7 @@ class Consumer:
         self.kbs_touch: List[str] = []
         self.lock = asyncio.Lock()
         self.js = js
+        self.dryrun = dryrun
         os.makedirs(self.cache, exist_ok=True)
 
     async def initialize(self):
@@ -174,7 +178,7 @@ class Consumer:
         except errors.TimeoutError:
             pass
 
-        if seq is not None:
+        if seq is not None and self.dryrun is False:
             logger.info("Consumer: {self.partition} Write last entity")
             last_curator_key = CURATOR_ID.format(worker=self.partition)
             txn = await self.driver.begin()
@@ -186,7 +190,10 @@ class Consumer:
         if len(kbs) > 0:
             logger.info(f"Consumer: {self.partition} Touch {len(kbs)}")
             cache = await get_cache()
-            self.proc = Processor(driver=self.driver, storage=self.storage, cache=cache)
+            audit = BasicAuditStorage()
+            self.proc = Processor(
+                driver=self.driver, storage=self.storage, cache=cache, audit=audit
+            )
             await self.proc.initialize()
 
             for kbid in kbs:
@@ -194,7 +201,9 @@ class Consumer:
 
                 entities = await self.get_knowledgebox_entities(kbid)
                 txn = await self.driver.begin()
-                kbobj = await self.proc.get_kb_obj(txn, kbid)
+                kbid_obj = KnowledgeBoxID()
+                kbid_obj.uuid = kbid
+                kbobj = await self.proc.get_kb_obj(txn, kbid_obj)
                 if kbobj is not None:
                     for group, entities in entities.items():
                         logger.info(
@@ -222,6 +231,13 @@ class Consumer:
                     resource_entities = await self.get_resource_entities(
                         pb.kbid, pb.rid, field
                     )
+                    if (
+                        pb.kbid == "40a37203-7972-4c2f-9de7-25feaf5790aa"
+                        and resource_entities is not None
+                    ):
+                        import pdb
+
+                        pdb.set_trace()
 
                     kb_entities.merge(resource_entities)
 
@@ -250,7 +266,7 @@ class Consumer:
         logger.info(f"Resource {kbid} - {rid} {type_char} {field.field}")
         payload = await self.storage.download_pb(sf, FieldComputedMetadata)
 
-        entities = []
+        entities: List[Dict[str, str]] = []
         if payload is None:
             return entities
 
@@ -320,7 +336,7 @@ class Nats:
             pass
 
 
-async def main():
+async def main(arguments):
     consumers: List[Consumer] = []
     driver = await get_driver()
     storage = await get_storage()
@@ -329,7 +345,7 @@ async def main():
     nc = Nats()
     await nc.initialize()
     for partition in range(audit_settings.audit_partitions):
-        consumer = Consumer(partition, driver, storage, nc.js)
+        consumer = Consumer(partition, driver, storage, nc.js, arguments.dryrun)
         await consumer.initialize()
         consumers.append(consumer)
 
@@ -340,6 +356,13 @@ async def main():
     await nc.finalize()
 
     logger.info("END CURATOR KB")
+
+
+def parse():
+    parser = argparse.ArgumentParser(description="Curator")
+    parser.add_argument("--dryrun", help="DryRun", action="store_true")
+
+    return parser.parse_args()
 
 
 def run() -> int:
@@ -355,5 +378,5 @@ def run() -> int:
         format="[%(asctime)s.%(msecs)02d] [%(levelname)s] - %(name)s - %(message)s",
         stream=sys.stderr,
     )
-
-    return asyncio.run(main())
+    options = parse()
+    return asyncio.run(main(options))

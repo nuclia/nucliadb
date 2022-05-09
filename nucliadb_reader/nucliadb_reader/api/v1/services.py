@@ -62,7 +62,11 @@ async def get_entities(request: Request, kbid: str) -> KnowledgeBoxEntities:
     if kbobj.status == GetEntitiesResponse.Status.OK:
         response = KnowledgeBoxEntities(uuid=kbid)
         for key, group in kbobj.groups.items():
-            response.groups[key] = EntitiesGroup(**MessageToDict(group))
+            group_dict = MessageToDict(group)
+            if "" in group_dict["entities"]:
+                del group_dict["entities"][""]
+            response.groups[key] = EntitiesGroup(**group_dict)
+
         return response
     elif kbobj.status == GetEntitiesResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
