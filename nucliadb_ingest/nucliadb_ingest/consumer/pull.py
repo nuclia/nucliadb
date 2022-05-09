@@ -186,7 +186,7 @@ class PullWorker:
             try:
                 pb = BrokerMessage()
                 pb.ParseFromString(msg.data)
-                if pb.txseqid > 0:
+                if pb.processing_id == "":
                     message_source = "processing"
                 else:
                     message_source = "writer"

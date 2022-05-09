@@ -74,18 +74,22 @@ class UpdateResourcePayload(BaseModel):
 class ResourceCreated(BaseModel):
     uuid: str
     seqid: Optional[int] = None
+    processingid: Optional[str] = None
 
 
 class ResourceUpdated(BaseModel):
     seqid: Optional[int] = None
+    processingid: Optional[str] = None
 
 
 class ResourceFieldAdded(BaseModel):
     seqid: Optional[int] = None
+    processingid: Optional[str] = None
 
 
 class ResourceDeleted(BaseModel):
     seqid: Optional[int] = None
+    processingid: Optional[str] = None
 
 
 ComminResourcePayload = Union[CreateResourcePayload, UpdateResourcePayload]

@@ -26,7 +26,6 @@ from fastapi_versioning import version  # type: ignore
 from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
 from starlette.requests import Request
 
-from nucliadb_ingest.maindb.driver import TXNID  # type: ignore
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.resource import NucliaDBRoles
@@ -50,6 +49,7 @@ from nucliadb_writer.api.v1.router import (
     RESOURCES_PREFIX,
     api,
 )
+from nucliadb_writer.exceptions import LimitsExceededError
 from nucliadb_writer.processing import PushPayload, Source
 from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.basic import (
@@ -120,12 +120,16 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    # Create processing message
-    txseqid = await transaction.commit(writer, partition)
-    toprocess.txseqid = txseqid
-    seqid = await processing.send_to_process(toprocess, partition)
+    try:
+        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceCreated(seqid=seqid, uuid=uuid)
+    # Create processing message
+    writer.processing_id = processing_id
+    await transaction.commit(writer, partition)
+
+    return ResourceCreated(seqid=seqid, processingid=processing_id, uuid=uuid)
 
 
 @api.patch(
@@ -173,12 +177,16 @@ async def modify_resource(
 
     set_status_modify(writer.basic, item)
 
-    # Create processing message
-    txseqid = await transaction.commit(writer, partition)
-    toprocess.txseqid = txseqid
-    seqid = await processing.send_to_process(toprocess, partition)
+    try:
+        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceUpdated(seqid=seqid)
+    # Create processing message
+    writer.processing_id = processing_id
+    await transaction.commit(writer, partition)
+
+    return ResourceUpdated(seqid=seqid, processingid=processing_id)
 
 
 @api.post(
@@ -212,18 +220,19 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
     if resource is None:
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
+    if txn.open:
+        await txn.abort()
+
     await extract_fields(resource=resource, toprocess=toprocess)
 
     # Send current resource to reprocess.
 
-    txseqid = await txn.get(TXNID.format(worker=partition))
-    await txn.abort()
+    try:
+        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=412, detail=str(exc))
 
-    if txseqid is not None:
-        toprocess.txseqid = int(txseqid.decode())
-    seqid = await processing.send_to_process(toprocess, partition)
-
-    return ResourceUpdated(seqid=seqid)
+    return ResourceUpdated(seqid=seqid, processingid=processing_id)
 
 
 @api.delete(

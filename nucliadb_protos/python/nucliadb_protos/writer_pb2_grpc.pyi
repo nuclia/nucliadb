@@ -105,102 +105,102 @@ class WriterStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBox] = ...
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBox]
 
     NewKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse] = ...
+        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse]
 
     DeleteKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse] = ...
+        nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse]
 
     UpdateKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
-        nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse] = ...
+        nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse]
 
     ListKnowledgeBox: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxPrefix,
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID]
 
     GCKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse] = ...
+        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse]
 
     ResourceFieldExists: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.ResourceFieldId,
-        nucliadb_protos.writer_pb2.ResourceFieldExistsResponse] = ...
+        nucliadb_protos.writer_pb2.ResourceFieldExistsResponse]
 
     ProcessMessage: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.BrokerMessage,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     GetLabels: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetLabelsRequest,
-        nucliadb_protos.writer_pb2.GetLabelsResponse] = ...
+        nucliadb_protos.writer_pb2.GetLabelsResponse]
     """Labels"""
 
     GetLabelSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetLabelSetRequest,
-        nucliadb_protos.writer_pb2.GetLabelSetResponse] = ...
+        nucliadb_protos.writer_pb2.GetLabelSetResponse]
 
     SetLabels: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     DelLabels: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     GetEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetEntitiesRequest,
-        nucliadb_protos.writer_pb2.GetEntitiesResponse] = ...
+        nucliadb_protos.writer_pb2.GetEntitiesResponse]
     """Entities"""
 
     GetEntitiesGroup: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetEntitiesGroupRequest,
-        nucliadb_protos.writer_pb2.GetEntitiesGroupResponse] = ...
+        nucliadb_protos.writer_pb2.GetEntitiesGroupResponse]
 
     SetEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetEntitiesRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     DelEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelEntitiesRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     GetWidget: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetWidgetRequest,
-        nucliadb_protos.writer_pb2.GetWidgetResponse] = ...
+        nucliadb_protos.writer_pb2.GetWidgetResponse]
     """Widgets"""
 
     GetWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetWidgetsRequest,
-        nucliadb_protos.writer_pb2.GetWidgetsResponse] = ...
+        nucliadb_protos.writer_pb2.GetWidgetsResponse]
 
     SetWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetWidgetsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     DelWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DetWidgetsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter] = ...
+        nucliadb_protos.writer_pb2.OpStatusWriter]
 
     Status: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.WriterStatusRequest,
-        nucliadb_protos.writer_pb2.WriterStatusResponse] = ...
+        nucliadb_protos.writer_pb2.WriterStatusResponse]
 
     ListMembers: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.ListMembersRequest,
-        nucliadb_protos.writer_pb2.ListMembersResponse] = ...
+        nucliadb_protos.writer_pb2.ListMembersResponse]
 
     Index: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
-        nucliadb_protos.writer_pb2.IndexStatus] = ...
+        nucliadb_protos.writer_pb2.IndexStatus]
 
     ReIndex: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
-        nucliadb_protos.writer_pb2.IndexStatus] = ...
+        nucliadb_protos.writer_pb2.IndexStatus]
 
 
 class WriterServicer(metaclass=abc.ABCMeta):
@@ -248,7 +248,7 @@ class WriterServicer(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def ProcessMessage(self,
-        request: typing.Iterator[nucliadb_protos.writer_pb2.BrokerMessage],
+        request_iterator: typing.Iterator[nucliadb_protos.writer_pb2.BrokerMessage],
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
 

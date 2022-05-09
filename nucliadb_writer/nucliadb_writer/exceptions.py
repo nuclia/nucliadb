@@ -21,6 +21,10 @@ class SendToProcessError(Exception):
     pass
 
 
+class LimitsExceededError(Exception):
+    pass
+
+
 class ConflictError(Exception):
     pass
 

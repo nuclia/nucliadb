@@ -83,7 +83,7 @@ message BrokerMessage {
 
     // File extracted extra info
     repeated resources.FileExtractedData file_extracted_data = 19;
-    
+
     // Field Extracted/Computed information
     repeated resources.ExtractedTextWrapper extracted_text = 20;
 
@@ -103,6 +103,7 @@ message BrokerMessage {
     int64 txseqid = 30;
 
     repeated Error errors = 31;
+    string processing_id = 32;
 }
 
 message WriterStatusResponse {
@@ -276,11 +277,11 @@ message Notification {
 message Member {
     /// Member ID.　A string of the UUID.
     string id = 1;
-  
+
     /// Cluster listen address. string of IP and port number.
     /// E.g. 127.0.0.1:5000
     string listen_address = 2;
-  
+
     /// If true, it means self.
     bool is_self = 3;
 

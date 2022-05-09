@@ -23,8 +23,9 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
+from fastapi import HTTPException
 from fastapi.params import Header
 from fastapi.requests import Request
 from fastapi.responses import Response
@@ -52,6 +53,7 @@ from nucliadb_writer.api.models import CreateResourcePayload
 from nucliadb_writer.exceptions import (
     ConflictError,
     IngestNotAvailable,
+    LimitsExceededError,
     ResourceNotFound,
 )
 from nucliadb_writer.processing import PushPayload, Source
@@ -377,26 +379,30 @@ async def patch(
             if isinstance(item_payload, str):
                 item_payload = item_payload.encode()
             creation_payload = pickle.loads(base64.b64decode(item_payload))
-        seq = await store_file_on_nuclia_db(
-            size=dm.get("size"),
-            content_type=dm.get("metadata", {}).get("content_type"),
-            override_resource_title=dm.get("metadata", {}).get(
-                "implies_resource_creation", False
-            ),
-            filename=dm.get("metadata", {}).get("filename"),
-            password=dm.get("metadata", {}).get("password"),
-            language=dm.get("metadata", {}).get("language"),
-            md5=dm.get("metadata", {}).get("md5"),
-            source=storage_manager.storage.source,
-            field=field,
-            rid=rid,
-            kbid=kbid,
-            path=path,
-            request=request,
-            bucket=await storage_manager.storage.get_bucket_name(kbid),
-            item=creation_payload,
-        )
-        headers["NDB-Seq"] = f"{seq}"
+        try:
+            seqid, processing_id = await store_file_on_nuclia_db(
+                size=dm.get("size"),
+                content_type=dm.get("metadata", {}).get("content_type"),
+                override_resource_title=dm.get("metadata", {}).get(
+                    "implies_resource_creation", False
+                ),
+                filename=dm.get("metadata", {}).get("filename"),
+                password=dm.get("metadata", {}).get("password"),
+                language=dm.get("metadata", {}).get("language"),
+                md5=dm.get("metadata", {}).get("md5"),
+                source=storage_manager.storage.source,
+                field=field,
+                rid=rid,
+                kbid=kbid,
+                path=path,
+                request=request,
+                bucket=await storage_manager.storage.get_bucket_name(kbid),
+                item=creation_payload,
+            )
+        except LimitsExceededError as exc:
+            raise HTTPException(status_code=412, detail=str(exc))
+
+        headers["NDB-Seq"] = f"{seqid}"
     else:
         await dm.save()
 
@@ -505,25 +511,28 @@ async def upload(
         dm, generate_buffer(storage_manager=storage_manager, request=request), 0
     )
     await storage_manager.finish(dm)
-    seq = await store_file_on_nuclia_db(
-        size=size,
-        kbid=kbid,
-        content_type=content_type,
-        override_resource_title=implies_resource_creation,
-        filename=filename,
-        password=x_password[0] if x_password and len(x_password) else None,
-        language=x_language[0] if x_language and len(x_language) else None,
-        md5=x_md5[0] if x_md5 and len(x_md5) else None,
-        field=valid_field,
-        source=storage_manager.storage.source,
-        rid=rid,
-        path=path,
-        request=request,
-        bucket=await storage_manager.storage.get_bucket_name(kbid),
-    )
+    try:
+        seqid, processing_id = await store_file_on_nuclia_db(
+            size=size,
+            kbid=kbid,
+            content_type=content_type,
+            override_resource_title=implies_resource_creation,
+            filename=filename,
+            password=x_password[0] if x_password and len(x_password) else None,
+            language=x_language[0] if x_language and len(x_language) else None,
+            md5=x_md5[0] if x_md5 and len(x_md5) else None,
+            field=valid_field,
+            source=storage_manager.storage.source,
+            rid=rid,
+            path=path,
+            request=request,
+            bucket=await storage_manager.storage.get_bucket_name(kbid),
+        )
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=412, detail=str(exc))
 
     headers = {}
-    headers["NDB-Seq"] = f"{seq}"
+    headers["NDB-Seq"] = f"{seqid}"
     headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}"
     headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}/field/{valid_field}"
 
@@ -587,7 +596,7 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
-):
+) -> Tuple[int, str]:
     # File is on NucliaDB Storage at path
 
     partitioning = get_partitioning()
@@ -655,8 +664,13 @@ async def store_file_on_nuclia_db(
         file_field, storage=storage
     )
 
-    txseqid = await transaction.commit(writer, partition)
-    # Do a process payload to send to process
-    toprocess.txseqid = txseqid
-    seqid = await processing.send_to_process(toprocess, partition)
-    return seqid
+    try:
+        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=412, detail=str(exc))
+
+    # Create processing message
+    writer.processing_id = processing_id
+    await transaction.commit(writer, partition)
+
+    return seqid, processing_id

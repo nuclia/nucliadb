@@ -21,7 +21,7 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import aiohttp
 import jwt
@@ -32,7 +32,7 @@ from pydantic import BaseModel
 import nucliadb_models as models
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_writer import logger
-from nucliadb_writer.exceptions import SendToProcessError
+from nucliadb_writer.exceptions import LimitsExceededError, SendToProcessError
 
 if TYPE_CHECKING:
     SourceValue = CloudFile.Source.V
@@ -257,10 +257,12 @@ class ProcessingEngine:
 
         return jwt
 
-    async def send_to_process(self, item: PushPayload, partition: int) -> str:
+    async def send_to_process(
+        self, item: PushPayload, partition: int
+    ) -> Tuple[int, str]:
         if self.dummy:
             self.calls.append(item.dict())
-            return "1"
+            return 1, "1"
 
         if self.onprem is False:
             # Upload the payload
@@ -271,7 +273,11 @@ class ProcessingEngine:
             )
             if resp.status == 200:
                 data = await resp.json()
+                processing_id = data.get("processing_id")
                 seqid = data.get("seqid")
+
+            if resp.status == 412:
+                raise LimitsExceededError(data["detail"])
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         else:
@@ -284,10 +290,11 @@ class ProcessingEngine:
             )
             if resp.status == 200:
                 data = await resp.json()
+                processing_id = data.get("processing_id")
                 seqid = data.get("seqid")
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         logger.info(
-            f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, ingest seqid: {seqid}, partition: {partition}"
+            f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, ingest seqid: {seqid}, partition: {partition}"
         )
-        return seqid
+        return seqid, processing_id

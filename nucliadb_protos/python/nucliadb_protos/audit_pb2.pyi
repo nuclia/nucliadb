@@ -13,33 +13,34 @@ import nucliadb_protos.resources_pb2
 import typing
 import typing_extensions
 
-DESCRIPTOR: google.protobuf.descriptor.FileDescriptor = ...
+DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class AuditRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class _AuditType:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _AuditTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[AuditRequest._AuditType.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        VISITED: AuditRequest._AuditType.ValueType  # 0
+        MODIFIED: AuditRequest._AuditType.ValueType  # 1
+        DELETED: AuditRequest._AuditType.ValueType  # 2
+        NEW: AuditRequest._AuditType.ValueType  # 3
+        STARTED: AuditRequest._AuditType.ValueType  # 4
+        STOPPED: AuditRequest._AuditType.ValueType  # 5
+        SEARCH: AuditRequest._AuditType.ValueType  # 6
+        PROCESSED: AuditRequest._AuditType.ValueType  # 7
     class AuditType(_AuditType, metaclass=_AuditTypeEnumTypeWrapper):
         pass
-    class _AuditType:
-        V = typing.NewType('V', builtins.int)
-    class _AuditTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_AuditType.V], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor = ...
-        VISITED = AuditRequest.AuditType.V(0)
-        MODIFIED = AuditRequest.AuditType.V(1)
-        DELETED = AuditRequest.AuditType.V(2)
-        NEW = AuditRequest.AuditType.V(3)
-        STARTED = AuditRequest.AuditType.V(4)
-        STOPPED = AuditRequest.AuditType.V(5)
-        SEARCH = AuditRequest.AuditType.V(6)
-        PROCESSED = AuditRequest.AuditType.V(7)
 
-    VISITED = AuditRequest.AuditType.V(0)
-    MODIFIED = AuditRequest.AuditType.V(1)
-    DELETED = AuditRequest.AuditType.V(2)
-    NEW = AuditRequest.AuditType.V(3)
-    STARTED = AuditRequest.AuditType.V(4)
-    STOPPED = AuditRequest.AuditType.V(5)
-    SEARCH = AuditRequest.AuditType.V(6)
-    PROCESSED = AuditRequest.AuditType.V(7)
+    VISITED: AuditRequest.AuditType.ValueType  # 0
+    MODIFIED: AuditRequest.AuditType.ValueType  # 1
+    DELETED: AuditRequest.AuditType.ValueType  # 2
+    NEW: AuditRequest.AuditType.ValueType  # 3
+    STARTED: AuditRequest.AuditType.ValueType  # 4
+    STOPPED: AuditRequest.AuditType.ValueType  # 5
+    SEARCH: AuditRequest.AuditType.ValueType  # 6
+    PROCESSED: AuditRequest.AuditType.ValueType  # 7
 
     TYPE_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
@@ -53,36 +54,36 @@ class AuditRequest(google.protobuf.message.Message):
     TASK_FIELD_NUMBER: builtins.int
     RESOURCES_FIELD_NUMBER: builtins.int
     FIELD_METADATA_FIELD_NUMBER: builtins.int
-    type: global___AuditRequest.AuditType.V = ...
-    kbid: typing.Text = ...
-    userid: typing.Text = ...
+    type: global___AuditRequest.AuditType.ValueType
+    kbid: typing.Text
+    userid: typing.Text
     @property
     def time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     @property
     def search(self) -> nucliadb_protos.nodereader_pb2.SearchRequest: ...
-    timeit: builtins.float = ...
-    origin: typing.Text = ...
-    rid: typing.Text = ...
-    task: typing.Text = ...
-    resources: builtins.int = ...
+    timeit: builtins.float
+    origin: typing.Text
+    rid: typing.Text
+    task: typing.Text
+    resources: builtins.int
     @property
     def field_metadata(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldID]: ...
     def __init__(self,
         *,
-        type : global___AuditRequest.AuditType.V = ...,
-        kbid : typing.Text = ...,
-        userid : typing.Text = ...,
-        time : typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
-        fields : typing.Optional[typing.Iterable[typing.Text]] = ...,
-        search : typing.Optional[nucliadb_protos.nodereader_pb2.SearchRequest] = ...,
-        timeit : builtins.float = ...,
-        origin : typing.Text = ...,
-        rid : typing.Text = ...,
-        task : typing.Text = ...,
-        resources : builtins.int = ...,
-        field_metadata : typing.Optional[typing.Iterable[nucliadb_protos.resources_pb2.FieldID]] = ...,
+        type: global___AuditRequest.AuditType.ValueType = ...,
+        kbid: typing.Text = ...,
+        userid: typing.Text = ...,
+        time: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+        fields: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        search: typing.Optional[nucliadb_protos.nodereader_pb2.SearchRequest] = ...,
+        timeit: builtins.float = ...,
+        origin: typing.Text = ...,
+        rid: typing.Text = ...,
+        task: typing.Text = ...,
+        resources: builtins.int = ...,
+        field_metadata: typing.Optional[typing.Iterable[nucliadb_protos.resources_pb2.FieldID]] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["search",b"search","time",b"time"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["field_metadata",b"field_metadata","fields",b"fields","kbid",b"kbid","origin",b"origin","resources",b"resources","rid",b"rid","search",b"search","task",b"task","time",b"time","timeit",b"timeit","type",b"type","userid",b"userid"]) -> None: ...

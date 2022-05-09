@@ -113,6 +113,8 @@ pub struct BrokerMessage {
     pub txseqid: i64,
     #[prost(message, repeated, tag="31")]
     pub errors: ::prost::alloc::vec::Vec<Error>,
+    #[prost(string, tag="32")]
+    pub processing_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
