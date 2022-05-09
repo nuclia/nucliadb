@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncIterator, Optional, Tuple, Union
+from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
 from uuid import uuid4
 
 from grpc.aio import AioRpcError  # type: ignore
@@ -50,7 +50,11 @@ from nucliadb_ingest.orm.exceptions import (
 )
 from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.orm.node import KB_SHARDS, Node
-from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG, Resource
+from nucliadb_ingest.orm.resource import (
+    KB_RESOURCE_SLUG,
+    KB_RESOURCE_SLUG_BASE,
+    Resource,
+)
 from nucliadb_ingest.orm.shard import Shard
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -505,3 +509,10 @@ class KnowledgeBox:
         return Resource(
             storage=self.storage, txn=self.txn, kb=self, uuid=uuid, basic=basic
         )
+
+    async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
+        base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
+        async for key in self.txn.keys(match=base, count=-1):
+            uuid = await self.get_resource_uuid_by_slug(key.split("/")[-1])
+            if uuid is not None:
+                yield Resource(self.txn, self.storage, self, uuid)

@@ -116,6 +116,9 @@ async def get_text_sentence(
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
+    start = start - 1
+    if start < 0:
+        start = 0
     if split not in (None, ""):
         text = extracted_text.split_text[split]
         splitted_text = text[start:end]

@@ -432,14 +432,16 @@ class GCSStorage(Storage):
         loop = asyncio.get_event_loop()
         self.session = aiohttp.ClientSession(loop=loop)
         try:
-            await self.create_bucket(self.deadletter_bucket)
+            if self.deadletter_bucket not in ("", None):
+                await self.create_bucket(self.deadletter_bucket)
         except Exception:
             logger.exception(
                 f"Could not create bucket {self.deadletter_bucket}", exc_info=True
             )
 
         try:
-            await self.create_bucket(self.indexing_bucket)
+            if self.indexing_bucket not in ("", None):
+                await self.create_bucket(self.indexing_bucket)
         except Exception:
             logger.exception(
                 f"Could not create bucket {self.indexing_bucket}", exc_info=True
@@ -485,6 +487,7 @@ class GCSStorage(Storage):
     async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
         if self.session is None:
             raise AttributeError()
+
         headers = await self.get_access_headers()
 
         url = f"{self.object_base_url}/{bucket_name}?project={self._project}"
