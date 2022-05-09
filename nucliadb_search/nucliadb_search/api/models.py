@@ -59,6 +59,7 @@ class SearchClientType(str, Enum):
     WIDGET = "widget"
     WEB = "web"
     DASHBOARD = "dashboard"
+    DESKTOP = "desktop"
 
 
 class Sort(int, Enum):
