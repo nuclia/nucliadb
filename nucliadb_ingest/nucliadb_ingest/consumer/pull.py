@@ -322,7 +322,7 @@ class PullWorker:
                                             pb,
                                             0,  # Fake sequence id as in local mode there's no transactions
                                             partition=self.partition,
-                                            transaction_check=False
+                                            transaction_check=False,
                                         )
                                 except Exception as e:
                                     if SENTRY:

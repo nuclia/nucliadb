@@ -81,7 +81,7 @@ class Processor:
         message: BrokerMessage,
         seqid: int,
         partition: Optional[str] = None,
-        transaction_check: bool = True
+        transaction_check: bool = True,
     ) -> bool:
         partition = partition if self.partition is None else self.partition
         if partition is None:
