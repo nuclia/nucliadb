@@ -17,25 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# Copyright (C) 2021 Bosutech XXI S.L.
-#
-# nucliadb is offered under the AGPL v3.0 and as commercial software.
-# For commercial licensing, contact us at info@nuclia.com.
-#
-# AGPL:
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 # We need to pull from jetstream key partition
 
 import asyncio
@@ -44,7 +25,7 @@ from typing import List
 import nats
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
-from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
+from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from sentry_sdk import capture_exception
 
@@ -75,9 +56,13 @@ class Worker:
         self.subscriptions = []
         self.ack_wait = 5
         self.lock = asyncio.Lock()
+        self.event = asyncio.Event()
         self.node = node
+        self.gc_task = None
 
     async def finalize(self):
+        if self.gc_task:
+            self.gc_task.cancel()
         for subscription in self.subscriptions:
             try:
                 await subscription.drain()
@@ -103,7 +88,7 @@ class Worker:
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
-
+        self.event.clear()
         options = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
@@ -121,6 +106,23 @@ class Worker:
         logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
         self.js = self.nc.jetstream()
         await self.subscribe()
+        self.gc_task = asyncio.create_task(self.garbage())
+
+    async def garbage(self):
+        while True:
+            await self.event.wait()
+            await asyncio.sleep(10)
+            if self.event.is_set():
+                async with self.lock:
+                    try:
+                        shards: ShardIds = await self.writer.shards()
+                        for shard in shards.ids:
+                            await self.writer.garbage_collector(shard)
+                    except Exception:
+                        logger.exception(
+                            f"Could not garbage {shard.id}", stack_info=True
+                        )
+                await asyncio.sleep(24 * 3660)
 
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
@@ -130,6 +132,7 @@ class Worker:
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
         storage = await get_storage()
+        self.event.clear()
         async with self.lock:
             try:
                 pb = IndexMessage()
@@ -155,6 +158,7 @@ class Worker:
                 )
                 raise e
         await msg.ack()
+        self.event.set()
         await storage.delete_indexing(pb)
 
     async def subscribe(self):
