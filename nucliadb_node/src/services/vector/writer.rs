@@ -90,6 +90,9 @@ impl WriterChild for VectorWriterService {
         info!("Set resource in vector ends");
         Ok(())
     }
+    fn garbage_collection(&mut self) {
+        self.index.write().unwrap().run_garbage_collection()
+    }
 }
 
 impl VectorWriterService {

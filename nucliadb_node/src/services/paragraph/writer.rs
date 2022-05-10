@@ -131,6 +131,8 @@ impl WriterChild for ParagraphWriterService {
             }
         }
     }
+
+    fn garbage_collection(&mut self) {}
 }
 
 impl ParagraphWriterService {

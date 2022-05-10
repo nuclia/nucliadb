@@ -110,6 +110,7 @@ impl WriterChild for FieldWriterService {
             }
         }
     }
+    fn garbage_collection(&mut self) {}
 }
 
 impl FieldWriterService {

@@ -38,6 +38,7 @@ pub trait ServiceChild<C: ServiceConfiguration>: Sized {
 pub trait WriterChild {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()>;
+    fn garbage_collection(&mut self);
 }
 
 pub trait ReaderChild {
