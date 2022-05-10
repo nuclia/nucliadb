@@ -226,6 +226,7 @@ message Metadata {
         PROCESSED = 1;
         ERROR = 2;
         BLOCKED = 3;
+        EXPIRED = 4;
     }
     Status status = 5;
 }
