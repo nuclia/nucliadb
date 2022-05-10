@@ -670,7 +670,7 @@ async def store_file_on_nuclia_db(
         raise HTTPException(status_code=412, detail=str(exc))
 
     writer.processing_id = processing_id
-    writer.source = writer.MessageSource.WRITER
+    writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return seqid, processing_id

@@ -722,6 +722,7 @@ def broker_resource(knowledgebox):
 
     message1.field_vectors.append(ev)
     message1.processing_id = "xxxxx"
+    message1.source = BrokerMessage.MessageSource.WRITER
     return message1
 
 
