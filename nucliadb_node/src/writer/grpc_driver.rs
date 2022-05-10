@@ -364,7 +364,6 @@ mod tests {
 
             request_ids.push(response.get_ref().id.clone());
         }
-
         let response = client
             .list_shards(Request::new(EmptyQuery {}))
             .await

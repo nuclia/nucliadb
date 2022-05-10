@@ -46,6 +46,7 @@ impl<'a> Query for LayerInsertQuery<'a> {
     type Output = LayerInsertValue;
 
     fn run(&mut self) -> Self::Output {
+        self.m_max *= if self.layer == 0 { 2 } else { 1 };
         let LayerSearchValue { neighbours } = LayerSearchQuery {
             elem: self.vector,
             layer: self.layer,
@@ -57,24 +58,23 @@ impl<'a> Query for LayerInsertQuery<'a> {
         .run();
         let mut need_repair = HashSet::new();
         let mut query_value = LayerInsertValue::default();
-        let neighbours = select_neighbours_heuristic(self.m, neighbours);
-        for (goes_to, dist) in neighbours {
-            let edge = Edge {
+        for (neighbour, dist) in neighbours {
+            let new_to_neighbour = Edge {
                 from: self.new_element,
-                to: goes_to,
+                to: neighbour,
                 dist,
             };
-            self.index.connect(self.layer, edge);
-            let edge = Edge {
-                from: goes_to,
+            let neighbour_to_new = Edge {
+                from: neighbour,
                 to: self.new_element,
                 dist,
             };
-            self.index.connect(self.layer, edge);
-            if self.index.out_edges(self.layer, goes_to).len() > self.m_max {
-                need_repair.insert(goes_to);
+            self.index.connect(self.layer, new_to_neighbour);
+            self.index.connect(self.layer, neighbour_to_new);
+            if self.index.out_edges(self.layer, neighbour).len() > self.m_max {
+                need_repair.insert(neighbour);
             }
-            query_value.neighbours.push(goes_to);
+            query_value.neighbours.push(neighbour);
         }
         for source in need_repair {
             let edges = self.index.out_edges(self.layer, source);
@@ -84,14 +84,12 @@ impl<'a> Query for LayerInsertQuery<'a> {
                 self.index.disconnect(self.layer, source, destination);
             }
             for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
-                if destination != source {
-                    let edge = Edge {
-                        from: source,
-                        to: destination,
-                        dist,
-                    };
-                    self.index.connect(self.layer, edge);
-                }
+                let edge = Edge {
+                    from: source,
+                    to: destination,
+                    dist,
+                };
+                self.index.connect(self.layer, edge);
             }
         }
         query_value

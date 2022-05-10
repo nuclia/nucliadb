@@ -101,7 +101,7 @@ impl Index {
             entry_point: log.entry_point,
         }
     }
-    pub fn semi_mapped_distance(&self, x: &Vector, y: Node) -> f32 {
+    pub fn semi_mapped_similarity(&self, x: &Vector, y: Node) -> f32 {
         semi_mapped_consine_similarity(&x.raw, y, &self.vector_storage)
     }
     pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
@@ -195,17 +195,15 @@ impl Index {
         };
         self.lmdb_driver.add_node(&mut txn, key, node);
         txn.commit().unwrap();
-        for i in self.max_layer..=layer {
+        self.max_layer = std::cmp::max(self.max_layer, layer + 1);
+        while self.layers_out.len() < self.max_layer {
             self.layers_out.push(GraphLayer::new());
             self.layers_in.push(GraphLayer::new());
+        }
+        for i in 0..=layer {
             self.layers_out[i].add_node(node);
             self.layers_in[i].add_node(node);
         }
-        for i in 0..self.max_layer {
-            self.layers_out[i].add_node(node);
-            self.layers_in[i].add_node(node);
-        }
-        self.max_layer = std::cmp::max(self.max_layer, layer + 1);
         node
     }
     pub fn get_node(&self, key: &str) -> Option<Node> {
@@ -224,19 +222,19 @@ impl Index {
         let in_edge = Edge {
             from: out_edge.to,
             to: out_edge.from,
-            ..out_edge
+            dist: out_edge.dist,
         };
         self.layers_out[layer].add_edge(out_edge.from, out_edge);
         self.layers_in[layer].add_edge(in_edge.from, in_edge);
+    }
+    pub fn disconnect(&mut self, layer: usize, source: Node, destination: Node) {
+        self.layers_out[layer].remove_edge(source, destination);
+        self.layers_in[layer].remove_edge(destination, source);
     }
     pub fn add_label(&mut self, key: String, label: String) {
         let mut txn = self.lmdb_driver.rw_txn();
         self.lmdb_driver.add_label(&mut txn, key, label);
         txn.commit().unwrap();
-    }
-    pub fn disconnect(&mut self, layer: usize, source: Node, destination: Node) {
-        self.layers_out[layer].remove_edge(source, destination);
-        self.layers_in[layer].remove_edge(destination, source);
     }
     pub fn out_edges(&self, layer: usize, node: Node) -> HashMap<Node, Edge> {
         self.layers_out[layer].get_edges(node)
@@ -249,7 +247,7 @@ impl Index {
     }
     pub fn set_entry_point(&mut self, ep: EntryPoint) {
         match self.entry_point {
-            Some(crnt) if crnt.layer < ep.layer => {
+            Some(crnt) if crnt.layer <= ep.layer => {
                 self.entry_point = Some(ep);
             }
             None => {
@@ -280,6 +278,7 @@ impl Index {
             nodes_per_out_layer: self.layers_out.iter().map(|l| l.no_nodes()).collect(),
             nodes_per_in_layer: self.layers_in.iter().map(|l| l.no_nodes()).collect(),
             nodes_in_total: self.no_nodes() as usize,
+            entry_point: self.entry_point,
         }
     }
     pub fn max_layer(&self) -> usize {
@@ -292,6 +291,7 @@ pub struct Stats {
     pub nodes_per_out_layer: Vec<usize>,
     pub nodes_per_in_layer: Vec<usize>,
     pub nodes_in_total: usize,
+    pub entry_point: Option<EntryPoint>,
 }
 
 #[derive(Debug, Clone)]
@@ -316,8 +316,8 @@ impl LockIndex {
     pub fn get_node_key(&self, node: Node) -> String {
         self.index.read().unwrap().get_node_key(node)
     }
-    pub fn semi_mapped_distance(&self, i: &Vector, j: Node) -> f32 {
-        self.index.read().unwrap().semi_mapped_distance(i, j)
+    pub fn semi_mapped_similarity(&self, i: &Vector, j: Node) -> f32 {
+        self.index.read().unwrap().semi_mapped_similarity(i, j)
     }
     pub fn reload(&self) {
         self.index.write().unwrap().reload()

@@ -18,43 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::BinaryHeap;
-
 use crate::memory_system::elements::Node;
-use crate::utils::*;
+use crate::utils::StandardElem;
 
 pub fn select_neighbours_heuristic(
     k_neighbours: usize,
-    candidates: Vec<(Node, f32)>,
+    mut candidates: Vec<(Node, f32)>,
 ) -> Vec<(Node, f32)> {
-    let mut r = BinaryHeap::new();
-    let mut w = BinaryHeap::new();
-    let mut w_d = BinaryHeap::new();
-    for (node, dist) in candidates {
-        w.push(StandardElem(node, dist));
-    }
-    while !w.is_empty() && r.len() < k_neighbours {
-        let e = w.pop().unwrap();
-        match r.peek().cloned() {
-            Some(nearest) if e > nearest => {
-                r.push(e);
-            }
-            None => {
-                r.push(e);
-            }
-            _ => {
-                w_d.push(e);
-            }
-        }
-    }
-    while !w_d.is_empty() && r.len() < k_neighbours {
-        r.push(w_d.pop().unwrap());
-    }
-    let mut result = Vec::new();
-    while let Some(StandardElem(n, d)) = r.pop() {
-        result.push((n, d));
-    }
-    result
+    candidates.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(StandardElem(*n, *d)));
+    candidates.truncate(k_neighbours);
+    candidates
 }
 
 #[cfg(test)]
@@ -73,15 +46,7 @@ mod test_heuristic_simple {
             solution.push(v);
             candidates.push((node, v));
         }
-        solution.sort_by(|a, b| {
-            if *b > *a {
-                std::cmp::Ordering::Greater
-            } else if *b < *a {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Equal
-            }
-        });
+        solution.sort_by(|a, b| b.partial_cmp(a).unwrap());
         solution.resize(50, 0.0);
         let result = super::select_neighbours_heuristic(50, candidates);
         let result: Vec<_> = result.iter().map(|(_, d)| *d).collect();

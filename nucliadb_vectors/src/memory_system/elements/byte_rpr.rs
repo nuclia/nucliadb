@@ -509,6 +509,7 @@ mod graph_layer_test_serialization {
         assert_eq!(graph.no_edges(nodes[0]), tested.no_edges(nodes[0]));
         assert_eq!(graph.no_edges(nodes[1]), tested.no_edges(nodes[1]));
         assert_eq!(graph[(nodes[0], nodes[1])], tested[(nodes[0], nodes[1])]);
+        assert_eq!(graph.cnx, tested.cnx);
     }
 }
 

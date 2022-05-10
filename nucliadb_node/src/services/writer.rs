@@ -151,7 +151,6 @@ impl ShardWriterService {
         rvector?;
         Ok(())
     }
-
     pub async fn set_vector_field(
         &self,
         _resource: &SetVectorFieldRequest,

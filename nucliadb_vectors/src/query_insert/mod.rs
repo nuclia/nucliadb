@@ -108,7 +108,7 @@ impl<'a> Query for InsertQuery<'a> {
                         entry_points = neighbours
                     }
                 }
-                self.index.set_entry_point((node, node_level).into());
+                self.index.set_entry_point((node, node_level).into())
             }
         }
         label_adder.join().unwrap();

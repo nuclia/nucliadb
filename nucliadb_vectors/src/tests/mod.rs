@@ -154,6 +154,7 @@ fn stress_test() {
         println!("INSERT {key}");
     }
     let timer = SystemTime::now();
+    let stats = writer.stats();
     writer.commit();
     reader.reload();
     total += timer.elapsed().unwrap();
