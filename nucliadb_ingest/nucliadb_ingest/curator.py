@@ -231,13 +231,6 @@ class Consumer:
                     resource_entities = await self.get_resource_entities(
                         pb.kbid, pb.rid, field
                     )
-                    if (
-                        pb.kbid == "40a37203-7972-4c2f-9de7-25feaf5790aa"
-                        and resource_entities is not None
-                    ):
-                        import pdb
-
-                        pdb.set_trace()
 
                     kb_entities.merge(resource_entities)
 
