@@ -166,4 +166,14 @@ impl ShardWriterService {
     pub fn count(&self) -> usize {
         self.field_writer_service.read().unwrap().count()
     }
+
+    pub async fn gc(&self) -> InternalResult<()> {
+        let vector_writer_service = self.vector_writer_service.clone();
+        let vector_task = tokio::task::spawn_blocking(move || {
+            let mut writer = vector_writer_service.write().unwrap();
+            writer.garbage_collection();
+        });
+        try_join!(vector_task).unwrap();
+        Ok(())
+    }
 }

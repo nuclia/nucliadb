@@ -72,6 +72,7 @@ async def search_knowledgebox(
     sort: SortOption = SortOption.CREATED,
     page_number: int = 0,
     page_size: int = 20,
+    max_score: float = 0.85,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
@@ -182,6 +183,7 @@ async def search_knowledgebox(
         show=show,
         field_type_filter=field_type_filter,
         extracted=extracted,
+        max_score=max_score,
     )
     await abort_transaction()
 

@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     nodes_load_ingest: bool = False
 
-    search_timeout: float = 3.0
+    search_timeout: float = 10.0
 
 
 settings = Settings()

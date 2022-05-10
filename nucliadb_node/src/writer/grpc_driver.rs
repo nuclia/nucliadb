@@ -286,8 +286,22 @@ impl NodeWriter for NodeWriterGRPCDriver {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
 
-        let _vector_request = request.into_inner();
-        todo!()
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.gc(&shard_id).await {
+            Some(Ok(_)) => {
+                let resp = EmptyResponse {};
+                Ok(tonic::Response::new(resp))
+            }
+            Some(Err(_)) => {
+                let resp = EmptyResponse {};
+                Ok(tonic::Response::new(resp))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
     }
 }
 
