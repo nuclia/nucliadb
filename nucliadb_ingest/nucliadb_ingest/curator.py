@@ -138,6 +138,8 @@ class Consumer:
         await txn.abort()
         if last_curator_seq is None:
             last_curator_seq = 1
+        else:
+            last_curator_seq = int(last_curator_seq)
 
         target = audit_settings.audit_jetstream_target.format(
             partition=self.partition, type=AuditRequest.MODIFIED
