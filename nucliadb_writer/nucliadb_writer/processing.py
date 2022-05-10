@@ -51,7 +51,6 @@ class PushPayload(BaseModel):
     slug: Optional[str] = None
     kbid: str
     source: Optional[Source] = None
-    txseqid: Optional[int] = None
 
     genericfield: Dict[str, models.Text] = {}
 

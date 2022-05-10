@@ -158,7 +158,7 @@ message ExtractedTextWrapper {
 message ExtractedVectorsWrapper {
     oneof file_or_data {
         utils.VectorObject vectors = 1;
-        CloudFile file = 2;    
+        CloudFile file = 2;
     }
     FieldID field = 3;
 }
@@ -225,6 +225,7 @@ message Metadata {
         PENDING = 0;
         PROCESSED = 1;
         ERROR = 2;
+        BLOCKED = 3;
     }
     Status status = 5;
 }
@@ -338,7 +339,7 @@ message FieldLargeMetadata {
 message LargeComputedMetadata {
     FieldLargeMetadata metadata = 1;
     map<string, FieldLargeMetadata> split_metadata = 2;
-    repeated string deleted_splits = 3;    
+    repeated string deleted_splits = 3;
 }
 
 message LargeComputedMetadataWrapper {

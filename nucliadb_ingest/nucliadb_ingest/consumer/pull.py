@@ -317,10 +317,12 @@ class PullWorker:
                                             writer=pb, partition=self.partition
                                         )
                                     else:
+                                        # No nats defined == monolitic nucliadb
                                         await self.processor.process(
                                             pb,
-                                            pb.txseqid,
+                                            0,  # Fake sequence id as in local mode there's no transactions
                                             partition=self.partition,
+                                            transaction_check=False
                                         )
                                 except Exception as e:
                                     if SENTRY:

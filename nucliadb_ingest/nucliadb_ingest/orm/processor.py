@@ -81,15 +81,19 @@ class Processor:
         message: BrokerMessage,
         seqid: int,
         partition: Optional[str] = None,
+        transaction_check: bool = True
     ) -> bool:
         partition = partition if self.partition is None else self.partition
         if partition is None:
             raise AttributeError()
 
-        # check seqid > last txid on partition
-        last_seq = await self.driver.last_seqid(partition)
-        if last_seq is not None and seqid <= last_seq:
-            return False
+        # When running in transactional mode, we need to check that
+        # that the current message doesn't violate the sequence order for the
+        # current partition
+        if transaction_check:
+            last_seqid = await self.driver.last_seqid(partition)
+            if last_seqid is not None and seqid <= last_seqid:
+                return False
 
         if message.type == BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition)
@@ -260,16 +264,19 @@ class Processor:
         resource: Optional[Resource] = None,
     ):
         if resource is None:
+            # Make sure we load the resource in case it already exusts on db
             if message.uuid is None and message.slug:
                 uuid = await kb.get_resource_uuid_by_slug()
             else:
                 uuid = message.uuid
             resource = await kb.get(uuid)
+
         if resource is None and message.processing_id != "":
             # It's a new resource, and we're processing the "fast" message from writer
             resource = await kb.add_resource(uuid, message.slug, message.basic)
         elif resource is not None:
-            # Already exists
+            # It's an update of an existing resource, can come either from writer or
+            # from processing
             if message.HasField("basic") or message.slug != "":
                 await resource.set_basic(message.basic, slug=message.slug)
         elif resource is None and message.processing_id == "":

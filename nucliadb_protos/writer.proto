@@ -100,6 +100,7 @@ message BrokerMessage {
     float pre_processing_time = 28;
     google.protobuf.Timestamp done_time = 29;
 
+    // Not needed anymore
     int64 txseqid = 30;
 
     repeated Error errors = 31;
