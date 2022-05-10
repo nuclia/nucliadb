@@ -98,6 +98,7 @@ def broker_simple_resource(knowledgebox, number):
     message1.basic.created.FromDatetime(datetime.utcnow())
     message1.basic.modified.FromDatetime(datetime.utcnow())
     message1.processing_id = "xxxxx"
+    message1.source = BrokerMessage.MessageSource.WRITER
 
     return message1
 

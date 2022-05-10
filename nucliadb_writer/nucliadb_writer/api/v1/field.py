@@ -96,8 +96,8 @@ async def finish_field_put(
 
     seqid, processing_id = await processing.send_to_process(toprocess, partition)
 
-    # Create processing message
     writer.processing_id = processing_id
+    writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return seqid, processing_id
@@ -344,8 +344,8 @@ async def append_messages_to_conversation_field(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    # Create processing message
     writer.processing_id = processing_id
+    writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
@@ -393,8 +393,8 @@ async def append_blocks_to_layout_field(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    # Create processing message
     writer.processing_id = processing_id
+    writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return ResourceFieldAdded(seqid=seqid, processingid=processing_id)

@@ -125,8 +125,8 @@ async def create_resource(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    # Create processing message
     writer.processing_id = processing_id
+    writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return ResourceCreated(seqid=seqid, processingid=processing_id, uuid=uuid)
@@ -182,8 +182,8 @@ async def modify_resource(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    # Create processing message
     writer.processing_id = processing_id
+    writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return ResourceUpdated(seqid=seqid, processingid=processing_id)

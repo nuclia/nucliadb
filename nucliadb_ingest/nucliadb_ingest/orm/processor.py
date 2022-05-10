@@ -271,15 +271,15 @@ class Processor:
                 uuid = message.uuid
             resource = await kb.get(uuid)
 
-        if resource is None and message.processing_id != "":
-            # It's a new resource, and we're processing the "fast" message from writer
+        if resource is None and message.source is message.MessageSource.WRITER:
+            # It's a new resource
             resource = await kb.add_resource(uuid, message.slug, message.basic)
         elif resource is not None:
             # It's an update of an existing resource, can come either from writer or
             # from processing
             if message.HasField("basic") or message.slug != "":
                 await resource.set_basic(message.basic, slug=message.slug)
-        elif resource is None and message.processing_id == "":
+        elif resource is None and message.source is message.MessageSource.PROCESSOR:
             # It's a new resource, and somehow we received the message coming from processing before
             # the "fast" one, this shouldn't happen
             logger.info(

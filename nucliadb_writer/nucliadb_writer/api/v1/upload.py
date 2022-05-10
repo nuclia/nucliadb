@@ -669,8 +669,8 @@ async def store_file_on_nuclia_db(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    # Create processing message
     writer.processing_id = processing_id
+    writer.source = writer.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
     return seqid, processing_id

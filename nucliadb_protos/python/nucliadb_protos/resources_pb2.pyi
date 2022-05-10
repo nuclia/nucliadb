@@ -806,12 +806,14 @@ class Metadata(google.protobuf.message.Message):
         PENDING: Metadata._Status.ValueType  # 0
         PROCESSED: Metadata._Status.ValueType  # 1
         ERROR: Metadata._Status.ValueType  # 2
+        BLOCKED: Metadata._Status.ValueType  # 3
     class Status(_Status, metaclass=_StatusEnumTypeWrapper):
         pass
 
     PENDING: Metadata.Status.ValueType  # 0
     PROCESSED: Metadata.Status.ValueType  # 1
     ERROR: Metadata.Status.ValueType  # 2
+    BLOCKED: Metadata.Status.ValueType  # 3
 
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor

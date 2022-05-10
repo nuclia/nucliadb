@@ -48,6 +48,11 @@ message BrokerMessage {
         DELETE = 4;
     }
 
+    enum MessageSource {
+        WRITER = 0;
+        PROCESSOR = 1;
+    }
+
     MessageType type = 6;
     string multiid = 7;
 
@@ -105,6 +110,8 @@ message BrokerMessage {
 
     repeated Error errors = 31;
     string processing_id = 32;
+    MessageSource source = 33;
+    int32 expiration = 34;
 }
 
 message WriterStatusResponse {

@@ -272,7 +272,7 @@ class ProcessingEngine:
             )
             if resp.status == 200:
                 data = await resp.json()
-                processing_id = data.get("processing_id")
+                processing_id = data.get("processing_id", "")
                 seqid = data.get("seqid")
 
             if resp.status == 412:
@@ -289,7 +289,7 @@ class ProcessingEngine:
             )
             if resp.status == 200:
                 data = await resp.json()
-                processing_id = data.get("processing_id")
+                processing_id = data.get("processing_id", "")
                 seqid = data.get("seqid")
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")

@@ -356,6 +356,7 @@ pub mod metadata {
         Pending = 0,
         Processed = 1,
         Error = 2,
+        Blocked = 3,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
