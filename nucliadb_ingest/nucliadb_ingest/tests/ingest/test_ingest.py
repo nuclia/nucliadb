@@ -137,6 +137,7 @@ async def test_ingest_messages_autocommit(
     ev.vectors.vectors.vectors.append(v1)
     message1.field_vectors.append(ev)
 
+    message1.processing_id = "xxxxx"
     await processor.process(message=message1, seqid=1)
 
     index = get_indexing()
@@ -159,6 +160,7 @@ async def test_ingest_error_message(
     message0: BrokerMessage = BrokerMessage()
     message0.ParseFromString(data)
     message0.kbid = knowledgebox
+    message0.processing_id = "xxxxx"
     await processor.process(message=message0, seqid=1)
 
     filename = f"{dirname(__file__)}/assets/error.pb"
@@ -168,6 +170,7 @@ async def test_ingest_error_message(
     message1.ParseFromString(data)
     message1.kbid = knowledgebox
     message1.ClearField("field_vectors")
+    message1.processing_id = "xxxxx"
     await processor.process(message=message1, seqid=2)
 
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
