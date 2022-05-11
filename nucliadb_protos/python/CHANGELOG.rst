@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.0.24 (unreleased)
+0.0.24 (2022-05-11)
 -------------------
 
 - Message source and processing id added to broker message
