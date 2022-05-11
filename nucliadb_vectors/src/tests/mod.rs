@@ -177,7 +177,7 @@ fn stress_test() {
     println!("Writer: {:?}", writer.stats());
 }
 
-#[test]
+//#[test]
 #[allow(unused)]
 fn concurrency_test() {
     fn reader_process(reader: Reader, _: Arc<Mutex<()>>) {
@@ -199,7 +199,6 @@ fn concurrency_test() {
         for i in 0..50 {
             labels.push(format!("LABEL_{}", i));
         }
-        let mut iter = 0;
         loop {
             let mut delete = vec![];
             for _ in 0..50 {
@@ -218,7 +217,6 @@ fn concurrency_test() {
                 println!("DELETE {delete}");
             }
             writer.commit();
-            iter += 1;
         }
     }
     let lock = Arc::new(Mutex::new(()));
