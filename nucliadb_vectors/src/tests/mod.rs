@@ -164,6 +164,7 @@ fn stress_test() {
         let query_labels = labels.clone();
         let timer = SystemTime::now();
         let result = reader.search(query, query_labels, no_results);
+        assert!(result.len() == no_results);
         total += timer.elapsed().unwrap();
         println!("READ {:?}", result);
         if index % 100 == 0 {
