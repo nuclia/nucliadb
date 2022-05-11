@@ -89,18 +89,17 @@ def prepare_field_put(
 
 async def finish_field_put(
     writer: BrokerMessage, toprocess: PushPayload, partition: int
-) -> Tuple[int, str]:
+) -> int:
     # Create processing message
     transaction = get_transaction()
     processing = get_processing()
 
-    seqid, processing_id = await processing.send_to_process(toprocess, partition)
+    seqid = await processing.send_to_process(toprocess, partition)
 
-    writer.processing_id = processing_id
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
-    return seqid, processing_id
+    return seqid
 
 
 @api.put(
@@ -123,11 +122,11 @@ async def add_resource_field_text(
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_text_field(field_id, field_payload, writer, toprocess)
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -150,11 +149,11 @@ async def add_resource_field_link(
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_link_field(field_id, field_payload, writer, toprocess)
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -177,11 +176,11 @@ async def add_resource_field_keywordset(
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_keywordset_field(field_id, field_payload, writer, toprocess)
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -204,11 +203,11 @@ async def add_resource_field_datetime(
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_datetime_field(field_id, field_payload, writer, toprocess)
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -231,11 +230,11 @@ async def add_resource_field_layout(
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_layout_field(field_id, field_payload, writer, toprocess, kbid, rid)
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -260,11 +259,11 @@ async def add_resource_field_conversation(
         field_id, field_payload, writer, toprocess, kbid, rid
     )
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -294,11 +293,11 @@ async def add_resource_field_file(
         )
 
     try:
-        seqid, processing_id = await finish_field_put(writer, toprocess, partition)
+        seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -340,15 +339,14 @@ async def append_messages_to_conversation_field(
     await parse_conversation_field(field_id, field, writer, toprocess, kbid, rid)
 
     try:
-        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    writer.processing_id = processing_id
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.put(
@@ -389,15 +387,14 @@ async def append_blocks_to_layout_field(
     await parse_layout_field(field_id, field, writer, toprocess, kbid, rid)
 
     try:
-        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    writer.processing_id = processing_id
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
-    return ResourceFieldAdded(seqid=seqid, processingid=processing_id)
+    return ResourceFieldAdded(seqid=seqid)
 
 
 @api.delete(

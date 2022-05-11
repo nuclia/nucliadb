@@ -84,7 +84,6 @@ class ResourceUpdated(BaseModel):
 
 class ResourceFieldAdded(BaseModel):
     seqid: Optional[int] = None
-    processingid: Optional[str] = None
 
 
 class ResourceDeleted(BaseModel):

@@ -21,12 +21,13 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import aiohttp
 import jwt
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
+from opentelemetry import trace
 from pydantic import BaseModel
 
 import nucliadb_models as models
@@ -256,12 +257,15 @@ class ProcessingEngine:
 
         return jwt
 
-    async def send_to_process(
-        self, item: PushPayload, partition: int
-    ) -> Tuple[int, str]:
+    async def send_to_process(self, item: PushPayload, partition: int) -> int:
         if self.dummy:
             self.calls.append(item.dict())
-            return 1, "1"
+            return 1
+
+        span = trace.get_current_span().get_span_context()
+        hex_trace_id = hex(span.trace_id)[2:]
+        hex_span_id = hex(span.span_id)[2:]
+        trace_headers = {"x-ndb-trace-id": hex_trace_id, "x-ndb-span-id": hex_span_id}
 
         if self.onprem is False:
             # Upload the payload
@@ -269,10 +273,10 @@ class ProcessingEngine:
             resp = await self.session.post(
                 url=f"{self.nuclia_internal_push}",
                 json=item.dict(),
+                headers=trace_headers,
             )
             if resp.status == 200:
                 data = await resp.json()
-                processing_id = data.get("processing_id", "")
                 seqid = data.get("seqid")
 
             if resp.status == 412:
@@ -281,6 +285,7 @@ class ProcessingEngine:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         else:
             headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
+            headers.update(trace_headers)
             # Upload the payload
             resp = await self.session.post(
                 url=self.nuclia_external_push + "?partition=" + str(partition),
@@ -289,11 +294,10 @@ class ProcessingEngine:
             )
             if resp.status == 200:
                 data = await resp.json()
-                processing_id = data.get("processing_id", "")
                 seqid = data.get("seqid")
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         logger.info(
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, ingest seqid: {seqid}, partition: {partition}"
         )
-        return seqid, processing_id
+        return seqid

@@ -121,15 +121,14 @@ async def create_resource(
     set_status(writer.basic, item)
 
     try:
-        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    writer.processing_id = processing_id
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
-    return ResourceCreated(seqid=seqid, processingid=processing_id, uuid=uuid)
+    return ResourceCreated(seqid=seqid, uuid=uuid)
 
 
 @api.patch(
@@ -178,15 +177,14 @@ async def modify_resource(
     set_status_modify(writer.basic, item)
 
     try:
-        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    writer.processing_id = processing_id
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
-    return ResourceUpdated(seqid=seqid, processingid=processing_id)
+    return ResourceUpdated(seqid=seqid)
 
 
 @api.post(
@@ -228,11 +226,11 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
     # Send current resource to reprocess.
 
     try:
-        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    return ResourceUpdated(seqid=seqid, processingid=processing_id)
+    return ResourceUpdated(seqid=seqid)
 
 
 @api.delete(

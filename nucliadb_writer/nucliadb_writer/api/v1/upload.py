@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime
 from hashlib import md5
 from io import BytesIO
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from fastapi import HTTPException
 from fastapi.params import Header
@@ -380,7 +380,7 @@ async def patch(
                 item_payload = item_payload.encode()
             creation_payload = pickle.loads(base64.b64decode(item_payload))
         try:
-            seqid, processing_id = await store_file_on_nuclia_db(
+            seqid = await store_file_on_nuclia_db(
                 size=dm.get("size"),
                 content_type=dm.get("metadata", {}).get("content_type"),
                 override_resource_title=dm.get("metadata", {}).get(
@@ -512,7 +512,7 @@ async def upload(
     )
     await storage_manager.finish(dm)
     try:
-        seqid, processing_id = await store_file_on_nuclia_db(
+        seqid = await store_file_on_nuclia_db(
             size=size,
             kbid=kbid,
             content_type=content_type,
@@ -596,7 +596,7 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
-) -> Tuple[int, str]:
+) -> int:
     # File is on NucliaDB Storage at path
 
     partitioning = get_partitioning()
@@ -665,12 +665,11 @@ async def store_file_on_nuclia_db(
     )
 
     try:
-        seqid, processing_id = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=412, detail=str(exc))
 
-    writer.processing_id = processing_id
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
 
-    return seqid, processing_id
+    return seqid
