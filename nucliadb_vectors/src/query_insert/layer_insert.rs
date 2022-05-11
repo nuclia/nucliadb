@@ -46,7 +46,6 @@ impl<'a> Query for LayerInsertQuery<'a> {
     type Output = LayerInsertValue;
 
     fn run(&mut self) -> Self::Output {
-        self.m_max *= if self.layer == 0 { 2 } else { 1 };
         let LayerSearchValue { neighbours } = LayerSearchQuery {
             elem: self.vector,
             layer: self.layer,

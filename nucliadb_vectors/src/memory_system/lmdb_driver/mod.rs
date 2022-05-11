@@ -26,13 +26,13 @@ use heed::{Database, Env, EnvOpenOptions, RoTxn, RwTxn};
 
 use crate::memory_system::elements::*;
 
-const LMDB_ENV: &str = "ENV";
-const DB_NODES: &str = "NODES";
-const DB_LABELS: &str = "LABELS";
-const DB_LAYERS_OUT: &str = "LAYERS_OUT";
-const DB_LAYERS_IN: &str = "LAYERS_OUT";
-const DB_LOG: &str = "LOG";
-const DB_DELETED: &str = "DELETED";
+const LMDB_ENV: &str = "ENV_lmdb";
+const DB_NODES: &str = "NODES_lmdb";
+const DB_LABELS: &str = "LABELS_lmdb";
+const DB_LAYERS_OUT: &str = "LAYERS_OUT_ldmd";
+const DB_LAYERS_IN: &str = "LAYERS_IN_lmdb";
+const DB_LOG: &str = "LOG_lmdb";
+const DB_DELETED: &str = "DELETED_lmdb";
 const STAMP: &str = "stamp.nuclia";
 const MAP_SIZE: usize = 1048576 * 100000;
 const MAX_DBS: u32 = 3000;

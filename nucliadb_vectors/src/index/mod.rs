@@ -131,14 +131,14 @@ impl Index {
         self.key_storage.reload();
         let log = self.lmdb_driver.get_log(&txn);
         if self.time_stamp != log.version_number {
-            self.layers_out.clear();
+            self.time_stamp = log.version_number;
+            self.entry_point = log.entry_point;
+            self.max_layer = log.max_layer as usize;
+            self.layers_out = Vec::with_capacity(self.max_layer);
             for i in 0..log.max_layer {
                 let layer_out = self.lmdb_driver.get_layer_out(&txn, i).unwrap();
                 self.layers_out.push(layer_out);
             }
-            self.time_stamp = log.version_number;
-            self.entry_point = log.entry_point;
-            self.max_layer = log.max_layer as usize;
         }
         txn.abort().unwrap();
     }
