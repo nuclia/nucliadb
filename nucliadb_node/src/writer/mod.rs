@@ -180,4 +180,12 @@ impl NodeWriterService {
             .collect();
         ShardIds { ids }
     }
+
+    pub async fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
+        self.load_shard(shard_id).await;
+        match self.get_mut_shard(shard_id).await {
+            Some(shard) => Some(shard.gc().await.map_err(|e| e.into())),
+            None => None,
+        }
+    }
 }

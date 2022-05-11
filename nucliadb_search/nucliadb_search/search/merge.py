@@ -124,11 +124,14 @@ async def merge_vectors_results(
     kbid: str,
     count: int,
     page: int,
+    max_score: float = 0.85,
 ):
     results: List[Sentence] = []
     facets: Dict[str, Any] = {}
     for vector in vectors:
         for document in vector.documents:
+            if document.score < max_score:
+                continue
             count = document.doc_id.id.count("/")
             if count == 4:
                 rid, field_type, field, index, position = document.doc_id.id.split("/")
@@ -224,6 +227,7 @@ async def merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
+    max_score: float = 0.85,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
@@ -246,7 +250,7 @@ async def merge_results(
     )
 
     api_results.sentences = await merge_vectors_results(
-        vectors, resources, kbid, count, page
+        vectors, resources, kbid, count, page, max_score=max_score
     )
 
     api_results.resources = await fetch_resources(
