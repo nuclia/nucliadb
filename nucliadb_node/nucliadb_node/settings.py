@@ -31,5 +31,7 @@ class Settings(BaseSettings):
     reader_listen_address: str = "0.0.0.0:10001"
     sidecar_listen_address: str = "0.0.0.0:10002"
 
+    data_path: Optional[str] = None
+
 
 settings = Settings()

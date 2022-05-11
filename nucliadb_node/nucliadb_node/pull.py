@@ -20,7 +20,7 @@
 # We need to pull from jetstream key partition
 
 import asyncio
-from typing import List
+from typing import List, Optional
 
 import nats
 from nats.aio.client import Msg
@@ -33,6 +33,7 @@ from nucliadb_node import logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
 from nucliadb_node.writer import Writer
+from nucliadb_node.settings import settings
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import (
     Utility,
@@ -124,6 +125,21 @@ class Worker:
                         )
                 await asyncio.sleep(24 * 3660)
 
+    def store_seqid(self, seqid: int):
+        if settings.data_path is None:
+            raise Exception("We need a DATA_PATH env")
+        with open(f"{settings.data_path}/seqid", "w+") as seqfile:
+            seqfile.write(str(seqid))
+
+    def load_seqid(self) -> Optional[int]:
+        if settings.data_path is None:
+            raise Exception("We need a DATA_PATH env")
+        try:
+            with open(f"{settings.data_path}/seqid", "r") as seqfile:
+                return int(seqfile.read())
+        except FileNotFoundError:
+            return None
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -157,11 +173,17 @@ class Worker:
                     f"An error on subscription_worker. Check sentry for more details. {str(e)}"
                 )
                 raise e
+        self.store_seqid(seqid)
         await msg.ack()
         self.event.set()
         await storage.delete_indexing(pb)
 
     async def subscribe(self):
+
+        last_seqid = self.load_seqid()
+        logger.info(f"Last seqid {last_seqid}")
+        if last_seqid is None:
+            last_seqid = 1
 
         try:
             await self.js.stream_info(indexing_settings.index_jetstream_stream)
@@ -180,8 +202,11 @@ class Worker:
             flow_control=True,
             cb=self.subscription_worker,
             config=nats.js.api.ConsumerConfig(
+                deliver_policy=nats.js.api.DeliverPolicy.BY_START_SEQUENCE,
+                opt_start_seq=last_seqid,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
-                max_deliver=1,
+                max_deliver=10000,
+                max_ack_pending=1,
                 ack_wait=self.ack_wait,
                 idle_heartbeat=5,
             ),
