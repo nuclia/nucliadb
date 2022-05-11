@@ -22,7 +22,7 @@ from typing import Dict, List, Optional
 
 from nucliadb_ingest import logger
 from nucliadb_ingest.consumer.pull import PullWorker
-from nucliadb_ingest.maindb.driver import TXNID, Driver
+from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
 from nucliadb_ingest.utils import get_driver
 from nucliadb_utils.settings import nuclia_settings, transaction_settings
@@ -99,11 +99,6 @@ class ConsumerService:
         logger.info(
             f"Pulling from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
         )
-        init_tids: Dict[str, Optional[str]] = {}
-        txn = await self.driver.begin()
-        for partition in self.partitions:
-            init_tids[partition] = await txn.get(TXNID.format(worker=partition))
-        await txn.abort()
 
         for partition in self.partitions:
             self.pull_workers[partition] = PullWorker(

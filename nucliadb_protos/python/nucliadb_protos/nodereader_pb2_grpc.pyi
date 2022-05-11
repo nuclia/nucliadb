@@ -40,35 +40,35 @@ class NodeReaderStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.Shard] = ...
+        nucliadb_protos.noderesources_pb2.Shard]
 
     GetShards: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.EmptyQuery,
-        nucliadb_protos.noderesources_pb2.ShardList] = ...
+        nucliadb_protos.noderesources_pb2.ShardList]
 
     DocumentSearch: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.DocumentSearchRequest,
-        nucliadb_protos.nodereader_pb2.DocumentSearchResponse] = ...
+        nucliadb_protos.nodereader_pb2.DocumentSearchResponse]
 
     ParagraphSearch: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.ParagraphSearchRequest,
-        nucliadb_protos.nodereader_pb2.ParagraphSearchResponse] = ...
+        nucliadb_protos.nodereader_pb2.ParagraphSearchResponse]
 
     VectorSearch: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.VectorSearchRequest,
-        nucliadb_protos.nodereader_pb2.VectorSearchResponse] = ...
+        nucliadb_protos.nodereader_pb2.VectorSearchResponse]
 
     RelationSearch: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.RelationSearchRequest,
-        nucliadb_protos.nodereader_pb2.RelationSearchResponse] = ...
+        nucliadb_protos.nodereader_pb2.RelationSearchResponse]
 
     Search: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.SearchRequest,
-        nucliadb_protos.nodereader_pb2.SearchResponse] = ...
+        nucliadb_protos.nodereader_pb2.SearchResponse]
 
     Suggest: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.SuggestRequest,
-        nucliadb_protos.nodereader_pb2.SuggestResponse] = ...
+        nucliadb_protos.nodereader_pb2.SuggestResponse]
 
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):

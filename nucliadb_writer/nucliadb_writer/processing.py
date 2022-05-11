@@ -27,12 +27,13 @@ import aiohttp
 import jwt
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
+from opentelemetry import trace
 from pydantic import BaseModel
 
 import nucliadb_models as models
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_writer import logger
-from nucliadb_writer.exceptions import SendToProcessError
+from nucliadb_writer.exceptions import LimitsExceededError, SendToProcessError
 
 if TYPE_CHECKING:
     SourceValue = CloudFile.Source.V
@@ -51,7 +52,6 @@ class PushPayload(BaseModel):
     slug: Optional[str] = None
     kbid: str
     source: Optional[Source] = None
-    txseqid: Optional[int] = None
 
     genericfield: Dict[str, models.Text] = {}
 
@@ -257,10 +257,15 @@ class ProcessingEngine:
 
         return jwt
 
-    async def send_to_process(self, item: PushPayload, partition: int) -> str:
+    async def send_to_process(self, item: PushPayload, partition: int) -> int:
         if self.dummy:
             self.calls.append(item.dict())
-            return "1"
+            return 1
+
+        span = trace.get_current_span().get_span_context()
+        hex_trace_id = hex(span.trace_id)[2:]
+        hex_span_id = hex(span.span_id)[2:]
+        trace_headers = {"x-ndb-trace-id": hex_trace_id, "x-ndb-span-id": hex_span_id}
 
         if self.onprem is False:
             # Upload the payload
@@ -268,14 +273,19 @@ class ProcessingEngine:
             resp = await self.session.post(
                 url=f"{self.nuclia_internal_push}",
                 json=item.dict(),
+                headers=trace_headers,
             )
             if resp.status == 200:
                 data = await resp.json()
                 seqid = data.get("seqid")
+
+            if resp.status == 412:
+                raise LimitsExceededError(data["detail"])
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         else:
             headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
+            headers.update(trace_headers)
             # Upload the payload
             resp = await self.session.post(
                 url=self.nuclia_external_push + "?partition=" + str(partition),
@@ -288,6 +298,6 @@ class ProcessingEngine:
             else:
                 raise SendToProcessError(f"{resp.status}: {resp.content}")
         logger.info(
-            f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, ingest seqid: {seqid}, partition: {partition}"
+            f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, ingest seqid: {seqid}, partition: {partition}"
         )
         return seqid

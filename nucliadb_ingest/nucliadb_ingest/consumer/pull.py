@@ -186,9 +186,9 @@ class PullWorker:
             try:
                 pb = BrokerMessage()
                 pb.ParseFromString(msg.data)
-                if pb.txseqid > 0:
+                if pb.source == pb.MessageSource.PROCESSOR:
                     message_source = "processing"
-                else:
+                elif pb.source == pb.MessageSource.WRITER:
                     message_source = "writer"
                 if pb.HasField("audit"):
                     time = pb.audit.when.ToDatetime().isoformat()
@@ -312,15 +312,21 @@ class PullWorker:
                                     pb.ParseFromString(
                                         base64.b64decode(data["payload"])
                                     )
+                                    # Temporal setter until next version of processing where the source will be
+                                    # correctly set from the processor
+                                    pb.source = BrokerMessage.MessageSource.PROCESSOR
+
                                     if self.nats_subscriber:
                                         await transaction_utility.commit(
                                             writer=pb, partition=self.partition
                                         )
                                     else:
+                                        # No nats defined == monolitic nucliadb
                                         await self.processor.process(
                                             pb,
-                                            pb.txseqid,
+                                            0,  # Fake sequence id as in local mode there's no transactions
                                             partition=self.partition,
+                                            transaction_check=False,
                                         )
                                 except Exception as e:
                                     if SENTRY:

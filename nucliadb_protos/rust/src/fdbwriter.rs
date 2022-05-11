@@ -109,10 +109,15 @@ pub struct BrokerMessage {
     pub pre_processing_time: f32,
     #[prost(message, optional, tag="29")]
     pub done_time: ::core::option::Option<::prost_types::Timestamp>,
+    /// Not needed anymore
     #[prost(int64, tag="30")]
     pub txseqid: i64,
     #[prost(message, repeated, tag="31")]
     pub errors: ::prost::alloc::vec::Vec<Error>,
+    #[prost(string, tag="32")]
+    pub processing_id: ::prost::alloc::string::String,
+    #[prost(enumeration="broker_message::MessageSource", tag="33")]
+    pub source: i32,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
@@ -124,6 +129,12 @@ pub mod broker_message {
         Commit = 2,
         Rollback = 3,
         Delete = 4,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum MessageSource {
+        Writer = 0,
+        Processor = 1,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

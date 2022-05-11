@@ -398,7 +398,7 @@ class Resource:
         if errors:
             self.basic.metadata.status = PBMetadata.Status.ERROR
             basic_modified = True
-        elif errors is False and message.txseqid > 0:
+        elif errors is False and message.source is message.MessageSource.WRITER:
             self.basic.metadata.status = PBMetadata.Status.PROCESSED
             basic_modified = True
 

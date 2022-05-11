@@ -21,25 +21,25 @@ from nucliadb_protos.utils_pb2 import (
 )
 
 
-DESCRIPTOR: google.protobuf.descriptor.FileDescriptor = ...
+DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class TextInformation(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     TEXT_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
-    text: typing.Text = ...
+    text: typing.Text
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     def __init__(self,
         *,
-        text : typing.Text = ...,
-        labels : typing.Optional[typing.Iterable[typing.Text]] = ...,
+        text: typing.Text = ...,
+        labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["labels",b"labels","text",b"text"]) -> None: ...
 global___TextInformation = TextInformation
 
 class IndexMetadata(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     MODIFIED_FIELD_NUMBER: builtins.int
     CREATED_FIELD_NUMBER: builtins.int
     @property
@@ -52,182 +52,186 @@ class IndexMetadata(google.protobuf.message.Message):
         pass
     def __init__(self,
         *,
-        modified : typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
-        created : typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+        modified: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+        created: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["created",b"created","modified",b"modified"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["created",b"created","modified",b"modified"]) -> None: ...
 global___IndexMetadata = IndexMetadata
 
 class ShardId(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     ID_FIELD_NUMBER: builtins.int
-    id: typing.Text = ...
+    id: typing.Text
     def __init__(self,
         *,
-        id : typing.Text = ...,
+        id: typing.Text = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["id",b"id"]) -> None: ...
 global___ShardId = ShardId
 
 class ShardIds(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     IDS_FIELD_NUMBER: builtins.int
     @property
     def ids(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardId]: ...
     def __init__(self,
         *,
-        ids : typing.Optional[typing.Iterable[global___ShardId]] = ...,
+        ids: typing.Optional[typing.Iterable[global___ShardId]] = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["ids",b"ids"]) -> None: ...
 global___ShardIds = ShardIds
 
 class ShardCreated(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class _DocumentService:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _DocumentServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._DocumentService.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        DOCUMENT_V0: ShardCreated._DocumentService.ValueType  # 0
     class DocumentService(_DocumentService, metaclass=_DocumentServiceEnumTypeWrapper):
         pass
-    class _DocumentService:
-        V = typing.NewType('V', builtins.int)
-    class _DocumentServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_DocumentService.V], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor = ...
-        DOCUMENT_V0 = ShardCreated.DocumentService.V(0)
 
-    DOCUMENT_V0 = ShardCreated.DocumentService.V(0)
+    DOCUMENT_V0: ShardCreated.DocumentService.ValueType  # 0
 
+    class _ParagraphService:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _ParagraphServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._ParagraphService.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        PARAGRAPH_V0: ShardCreated._ParagraphService.ValueType  # 0
     class ParagraphService(_ParagraphService, metaclass=_ParagraphServiceEnumTypeWrapper):
         pass
-    class _ParagraphService:
-        V = typing.NewType('V', builtins.int)
-    class _ParagraphServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ParagraphService.V], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor = ...
-        PARAGRAPH_V0 = ShardCreated.ParagraphService.V(0)
 
-    PARAGRAPH_V0 = ShardCreated.ParagraphService.V(0)
+    PARAGRAPH_V0: ShardCreated.ParagraphService.ValueType  # 0
 
+    class _VectorService:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _VectorServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._VectorService.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        VECTOR_V0: ShardCreated._VectorService.ValueType  # 0
     class VectorService(_VectorService, metaclass=_VectorServiceEnumTypeWrapper):
         pass
-    class _VectorService:
-        V = typing.NewType('V', builtins.int)
-    class _VectorServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_VectorService.V], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor = ...
-        VECTOR_V0 = ShardCreated.VectorService.V(0)
 
-    VECTOR_V0 = ShardCreated.VectorService.V(0)
+    VECTOR_V0: ShardCreated.VectorService.ValueType  # 0
 
+    class _RelationService:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _RelationServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._RelationService.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        RELATION_V0: ShardCreated._RelationService.ValueType  # 0
     class RelationService(_RelationService, metaclass=_RelationServiceEnumTypeWrapper):
         pass
-    class _RelationService:
-        V = typing.NewType('V', builtins.int)
-    class _RelationServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RelationService.V], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor = ...
-        RELATION_V0 = ShardCreated.RelationService.V(0)
 
-    RELATION_V0 = ShardCreated.RelationService.V(0)
+    RELATION_V0: ShardCreated.RelationService.ValueType  # 0
 
     ID_FIELD_NUMBER: builtins.int
     DOCUMENT_SERVICE_FIELD_NUMBER: builtins.int
     PARAGRAPH_SERVICE_FIELD_NUMBER: builtins.int
     VECTOR_SERVICE_FIELD_NUMBER: builtins.int
     RELATION_SERVICE_FIELD_NUMBER: builtins.int
-    id: typing.Text = ...
-    document_service: global___ShardCreated.DocumentService.V = ...
-    paragraph_service: global___ShardCreated.ParagraphService.V = ...
-    vector_service: global___ShardCreated.VectorService.V = ...
-    relation_service: global___ShardCreated.RelationService.V = ...
+    id: typing.Text
+    document_service: global___ShardCreated.DocumentService.ValueType
+    paragraph_service: global___ShardCreated.ParagraphService.ValueType
+    vector_service: global___ShardCreated.VectorService.ValueType
+    relation_service: global___ShardCreated.RelationService.ValueType
     def __init__(self,
         *,
-        id : typing.Text = ...,
-        document_service : global___ShardCreated.DocumentService.V = ...,
-        paragraph_service : global___ShardCreated.ParagraphService.V = ...,
-        vector_service : global___ShardCreated.VectorService.V = ...,
-        relation_service : global___ShardCreated.RelationService.V = ...,
+        id: typing.Text = ...,
+        document_service: global___ShardCreated.DocumentService.ValueType = ...,
+        paragraph_service: global___ShardCreated.ParagraphService.ValueType = ...,
+        vector_service: global___ShardCreated.VectorService.ValueType = ...,
+        relation_service: global___ShardCreated.RelationService.ValueType = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["document_service",b"document_service","id",b"id","paragraph_service",b"paragraph_service","relation_service",b"relation_service","vector_service",b"vector_service"]) -> None: ...
 global___ShardCreated = ShardCreated
 
 class ResourceID(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     SHARD_ID_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
-    shard_id: typing.Text = ...
-    uuid: typing.Text = ...
+    shard_id: typing.Text
+    uuid: typing.Text
     def __init__(self,
         *,
-        shard_id : typing.Text = ...,
-        uuid : typing.Text = ...,
+        shard_id: typing.Text = ...,
+        uuid: typing.Text = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["shard_id",b"shard_id","uuid",b"uuid"]) -> None: ...
 global___ResourceID = ResourceID
 
 class Shard(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     SHARD_ID_FIELD_NUMBER: builtins.int
     RESOURCES_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     SENTENCES_FIELD_NUMBER: builtins.int
-    shard_id: typing.Text = ...
-    resources: builtins.int = ...
-    paragraphs: builtins.int = ...
-    sentences: builtins.int = ...
+    shard_id: typing.Text
+    resources: builtins.int
+    paragraphs: builtins.int
+    sentences: builtins.int
     def __init__(self,
         *,
-        shard_id : typing.Text = ...,
-        resources : builtins.int = ...,
-        paragraphs : builtins.int = ...,
-        sentences : builtins.int = ...,
+        shard_id: typing.Text = ...,
+        resources: builtins.int = ...,
+        paragraphs: builtins.int = ...,
+        sentences: builtins.int = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["paragraphs",b"paragraphs","resources",b"resources","sentences",b"sentences","shard_id",b"shard_id"]) -> None: ...
 global___Shard = Shard
 
 class ShardList(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     SHARDS_FIELD_NUMBER: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Shard]: ...
     def __init__(self,
         *,
-        shards : typing.Optional[typing.Iterable[global___Shard]] = ...,
+        shards: typing.Optional[typing.Iterable[global___Shard]] = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["shards",b"shards"]) -> None: ...
 global___ShardList = ShardList
 
 class EmptyResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     def __init__(self,
         ) -> None: ...
 global___EmptyResponse = EmptyResponse
 
 class EmptyQuery(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     def __init__(self,
         ) -> None: ...
 global___EmptyQuery = EmptyQuery
 
 class VectorSentence(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     VECTOR_FIELD_NUMBER: builtins.int
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
     def __init__(self,
         *,
-        vector : typing.Optional[typing.Iterable[builtins.float]] = ...,
+        vector: typing.Optional[typing.Iterable[builtins.float]] = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["vector",b"vector"]) -> None: ...
 global___VectorSentence = VectorSentence
 
 class IndexParagraph(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class SentencesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: typing.Text = ...
+        key: typing.Text
         @property
         def value(self) -> global___VectorSentence: ...
         def __init__(self,
             *,
-            key : typing.Text = ...,
-            value : typing.Optional[global___VectorSentence] = ...,
+            key: typing.Text = ...,
+            value: typing.Optional[global___VectorSentence] = ...,
             ) -> None: ...
         def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
@@ -239,10 +243,10 @@ class IndexParagraph(google.protobuf.message.Message):
     FIELD_FIELD_NUMBER: builtins.int
     SPLIT_FIELD_NUMBER: builtins.int
     INDEX_FIELD_NUMBER: builtins.int
-    start: builtins.int = ...
+    start: builtins.int
     """Start end position in field text"""
 
-    end: builtins.int = ...
+    end: builtins.int
     """Start end position in field text"""
 
     @property
@@ -253,37 +257,37 @@ class IndexParagraph(google.protobuf.message.Message):
     def sentences(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___VectorSentence]:
         """key is full id for vectors"""
         pass
-    field: typing.Text = ...
-    split: typing.Text = ...
+    field: typing.Text
+    split: typing.Text
     """split were it belongs"""
 
-    index: builtins.int = ...
+    index: builtins.int
     def __init__(self,
         *,
-        start : builtins.int = ...,
-        end : builtins.int = ...,
-        labels : typing.Optional[typing.Iterable[typing.Text]] = ...,
-        sentences : typing.Optional[typing.Mapping[typing.Text, global___VectorSentence]] = ...,
-        field : typing.Text = ...,
-        split : typing.Text = ...,
-        index : builtins.int = ...,
+        start: builtins.int = ...,
+        end: builtins.int = ...,
+        labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        sentences: typing.Optional[typing.Mapping[typing.Text, global___VectorSentence]] = ...,
+        field: typing.Text = ...,
+        split: typing.Text = ...,
+        index: builtins.int = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","labels",b"labels","sentences",b"sentences","split",b"split","start",b"start"]) -> None: ...
 global___IndexParagraph = IndexParagraph
 
 class IndexParagraphs(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class ParagraphsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: typing.Text = ...
+        key: typing.Text
         @property
         def value(self) -> global___IndexParagraph: ...
         def __init__(self,
             *,
-            key : typing.Text = ...,
-            value : typing.Optional[global___IndexParagraph] = ...,
+            key: typing.Text = ...,
+            value: typing.Optional[global___IndexParagraph] = ...,
             ) -> None: ...
         def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
@@ -295,57 +299,58 @@ class IndexParagraphs(google.protobuf.message.Message):
         pass
     def __init__(self,
         *,
-        paragraphs : typing.Optional[typing.Mapping[typing.Text, global___IndexParagraph]] = ...,
+        paragraphs: typing.Optional[typing.Mapping[typing.Text, global___IndexParagraph]] = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["paragraphs",b"paragraphs"]) -> None: ...
 global___IndexParagraphs = IndexParagraphs
 
 class Resource(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class _ResourceStatus:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _ResourceStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Resource._ResourceStatus.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        PROCESSED: Resource._ResourceStatus.ValueType  # 0
+        EMPTY: Resource._ResourceStatus.ValueType  # 1
+        ERROR: Resource._ResourceStatus.ValueType  # 2
+        DELETE: Resource._ResourceStatus.ValueType  # 3
+        PENDING: Resource._ResourceStatus.ValueType  # 4
     class ResourceStatus(_ResourceStatus, metaclass=_ResourceStatusEnumTypeWrapper):
         pass
-    class _ResourceStatus:
-        V = typing.NewType('V', builtins.int)
-    class _ResourceStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ResourceStatus.V], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor = ...
-        PROCESSED = Resource.ResourceStatus.V(0)
-        EMPTY = Resource.ResourceStatus.V(1)
-        ERROR = Resource.ResourceStatus.V(2)
-        DELETE = Resource.ResourceStatus.V(3)
-        PENDING = Resource.ResourceStatus.V(4)
 
-    PROCESSED = Resource.ResourceStatus.V(0)
-    EMPTY = Resource.ResourceStatus.V(1)
-    ERROR = Resource.ResourceStatus.V(2)
-    DELETE = Resource.ResourceStatus.V(3)
-    PENDING = Resource.ResourceStatus.V(4)
+    PROCESSED: Resource.ResourceStatus.ValueType  # 0
+    EMPTY: Resource.ResourceStatus.ValueType  # 1
+    ERROR: Resource.ResourceStatus.ValueType  # 2
+    DELETE: Resource.ResourceStatus.ValueType  # 3
+    PENDING: Resource.ResourceStatus.ValueType  # 4
 
     class TextsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: typing.Text = ...
+        key: typing.Text
         @property
         def value(self) -> global___TextInformation: ...
         def __init__(self,
             *,
-            key : typing.Text = ...,
-            value : typing.Optional[global___TextInformation] = ...,
+            key: typing.Text = ...,
+            value: typing.Optional[global___TextInformation] = ...,
             ) -> None: ...
         def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     class ParagraphsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor = ...
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: typing.Text = ...
+        key: typing.Text
         @property
         def value(self) -> global___IndexParagraphs: ...
         def __init__(self,
             *,
-            key : typing.Text = ...,
-            value : typing.Optional[global___IndexParagraphs] = ...,
+            key: typing.Text = ...,
+            value: typing.Optional[global___IndexParagraphs] = ...,
             ) -> None: ...
         def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
@@ -378,7 +383,7 @@ class Resource(google.protobuf.message.Message):
         Document labels allways serialized full
         """
         pass
-    status: global___Resource.ResourceStatus.V = ...
+    status: global___Resource.ResourceStatus.ValueType
     """Tantivy doc"""
 
     @property
@@ -397,20 +402,20 @@ class Resource(google.protobuf.message.Message):
         pass
     @property
     def relations_to_delete(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
-    shard_id: typing.Text = ...
+    shard_id: typing.Text
     def __init__(self,
         *,
-        resource : typing.Optional[global___ResourceID] = ...,
-        metadata : typing.Optional[global___IndexMetadata] = ...,
-        texts : typing.Optional[typing.Mapping[typing.Text, global___TextInformation]] = ...,
-        labels : typing.Optional[typing.Iterable[typing.Text]] = ...,
-        status : global___Resource.ResourceStatus.V = ...,
-        paragraphs : typing.Optional[typing.Mapping[typing.Text, global___IndexParagraphs]] = ...,
-        paragraphs_to_delete : typing.Optional[typing.Iterable[typing.Text]] = ...,
-        sentences_to_delete : typing.Optional[typing.Iterable[typing.Text]] = ...,
-        relations : typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
-        relations_to_delete : typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
-        shard_id : typing.Text = ...,
+        resource: typing.Optional[global___ResourceID] = ...,
+        metadata: typing.Optional[global___IndexMetadata] = ...,
+        texts: typing.Optional[typing.Mapping[typing.Text, global___TextInformation]] = ...,
+        labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        status: global___Resource.ResourceStatus.ValueType = ...,
+        paragraphs: typing.Optional[typing.Mapping[typing.Text, global___IndexParagraphs]] = ...,
+        paragraphs_to_delete: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        sentences_to_delete: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        relations: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
+        relations_to_delete: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
+        shard_id: typing.Text = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata","resource",b"resource"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["labels",b"labels","metadata",b"metadata","paragraphs",b"paragraphs","paragraphs_to_delete",b"paragraphs_to_delete","relations",b"relations","relations_to_delete",b"relations_to_delete","resource",b"resource","sentences_to_delete",b"sentences_to_delete","shard_id",b"shard_id","status",b"status","texts",b"texts"]) -> None: ...
