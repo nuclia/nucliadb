@@ -33,7 +33,6 @@ except ImportError:
 def set_sentry(
     sentry_url: str = None,
     environment: str = "local",
-    logging_integration: bool = False,
 ):
     if sentry_url:
         enabled_integrations: List[Any] = []
@@ -41,11 +40,10 @@ def set_sentry(
         sentry_exception = ExcepthookIntegration(always_run=True)
         enabled_integrations.append(sentry_exception)
 
-        if logging_integration:
-            sentry_logging = LoggingIntegration(
-                level=logging.CRITICAL, event_level=logging.CRITICAL
-            )
-            enabled_integrations.append(sentry_logging)
+        sentry_logging = LoggingIntegration(
+            level=logging.CRITICAL, event_level=logging.CRITICAL
+        )
+        enabled_integrations.append(sentry_logging)
 
         import pkg_resources  # type: ignore
 
