@@ -39,7 +39,7 @@ class LocalShard:
         req = ResourceID()
         req.uuid = uuid
         req.shard_id = self.sharduuid
-        self.node.delete_resource(req)
+        await self.node.delete_resource(req)
 
     async def add_resource(self, resource: PBBrainResource, txid: int) -> int:
         res = await self.node.add_resource(resource)

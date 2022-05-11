@@ -23,6 +23,8 @@ import asyncio
 from typing import List, Optional
 
 import nats
+from grpc import StatusCode
+from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
@@ -83,7 +85,7 @@ class Worker:
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS sidecar node: {}".format(e))
+        logger.info("There was an error on the worker: {}".format(e))
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
@@ -166,11 +168,22 @@ class Worker:
 
                 logger.info("Processed")
 
+            except AioRpcError as grpc_error:
+                if grpc_error.code == StatusCode.NOT_FOUND:
+                    logger.error(f"Shard does not exit {pb.shard}")
+                else:
+                    if SENTRY:
+                        capture_exception(grpc_error)
+                    logger.error(
+                        f"An error on subscription_worker. Check sentry for more details."
+                    )
+                    raise grpc_error
+
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
                 logger.error(
-                    f"An error on subscription_worker. Check sentry for more details. {str(e)}"
+                    f"An error on subscription_worker. Check sentry for more details."
                 )
                 raise e
         self.store_seqid(seqid)
