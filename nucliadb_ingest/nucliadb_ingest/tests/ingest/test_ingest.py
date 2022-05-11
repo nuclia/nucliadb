@@ -137,7 +137,6 @@ async def test_ingest_messages_autocommit(
     ev.vectors.vectors.vectors.append(v1)
     message1.field_vectors.append(ev)
 
-    message1.processing_id = "xxxxx"
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
@@ -161,7 +160,6 @@ async def test_ingest_error_message(
     message0: BrokerMessage = BrokerMessage()
     message0.ParseFromString(data)
     message0.kbid = knowledgebox
-    message0.processing_id = "xxxxx"
     message0.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message0, seqid=1)
 
@@ -172,7 +170,6 @@ async def test_ingest_error_message(
     message1.ParseFromString(data)
     message1.kbid = knowledgebox
     message1.ClearField("field_vectors")
-    message1.processing_id = "xxxxx"
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=2)
 
