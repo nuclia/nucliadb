@@ -807,6 +807,7 @@ class Metadata(google.protobuf.message.Message):
         PROCESSED: Metadata._Status.ValueType  # 1
         ERROR: Metadata._Status.ValueType  # 2
         BLOCKED: Metadata._Status.ValueType  # 3
+        EXPIRED: Metadata._Status.ValueType  # 4
     class Status(_Status, metaclass=_StatusEnumTypeWrapper):
         pass
 
@@ -814,6 +815,7 @@ class Metadata(google.protobuf.message.Message):
     PROCESSED: Metadata.Status.ValueType  # 1
     ERROR: Metadata.Status.ValueType  # 2
     BLOCKED: Metadata.Status.ValueType  # 3
+    EXPIRED: Metadata.Status.ValueType  # 4
 
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor

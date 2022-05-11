@@ -357,6 +357,7 @@ pub mod metadata {
         Processed = 1,
         Error = 2,
         Blocked = 3,
+        Expired = 4,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
