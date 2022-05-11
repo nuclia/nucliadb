@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import os
 from datetime import datetime
 
 import pytest
@@ -33,6 +34,7 @@ from nucliadb_utils.utilities import get_storage
 @pytest.mark.asyncio
 async def test_indexing(sidecar: App, shard: str):
     # Upload a payload
+    os.environ["DATA_PATH"] = "/tmp"
     pb = Resource()
     pb.resource.shard_id = shard
     pb.resource.uuid = "1"
