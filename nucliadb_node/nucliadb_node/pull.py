@@ -32,8 +32,8 @@ from sentry_sdk import capture_exception
 from nucliadb_node import logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
-from nucliadb_node.writer import Writer
 from nucliadb_node.settings import settings
+from nucliadb_node.writer import Writer
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import (
     Utility,
