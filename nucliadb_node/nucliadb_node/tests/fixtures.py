@@ -161,6 +161,7 @@ def node_single():
 @pytest.fixture(scope="function")
 async def sidecar(node_single, gcs_storage, natsd):
     settings.force_host_id = "node1"
+    settings.data_path = "/tmp"
     app = await main()
     # Create a shard
     yield app

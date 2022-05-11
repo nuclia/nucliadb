@@ -34,7 +34,7 @@ from nucliadb_utils.utilities import get_storage
 @pytest.mark.asyncio
 async def test_indexing(sidecar: App, shard: str):
     # Upload a payload
-    os.environ["DATA_PATH"] = "/tmp"
+
     pb = Resource()
     pb.resource.shard_id = shard
     pb.resource.uuid = "1"
