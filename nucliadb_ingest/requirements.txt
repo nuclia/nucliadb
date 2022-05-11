@@ -4,9 +4,9 @@ tikv-client>=0.0.3
 lru-dict==1.1.7
 backoff
 aiofiles
-protobuf==3.18.0
+protobuf==3.20.1
 nats-py[nkeys]==2.0.0
-types-protobuf==3.19.10
+types-protobuf==3.19.20
 grpcio>=1.41.0
 grpcio-health-checking>=1.41.0
 grpcio-channelz>=1.41.0
