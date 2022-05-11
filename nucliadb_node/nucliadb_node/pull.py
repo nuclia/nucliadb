@@ -57,7 +57,7 @@ class Worker:
         self.writer = writer
         self.reader = reader
         self.subscriptions = []
-        self.ack_wait = 5
+        self.ack_wait = 10 * 60
         self.lock = asyncio.Lock()
         self.event = asyncio.Event()
         self.node = node
