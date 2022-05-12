@@ -117,11 +117,16 @@ fn single_graph() {
     let vec = create_query();
     writer.insert(key.clone(), vec.clone(), vec![]);
     writer.commit();
+    writer.delete_vector(key.clone());
+    writer.commit();
+    writer.insert(key.clone(), vec.clone(), vec![]);
+    writer.commit();
     assert_eq!(writer.no_vectors(), 1);
     assert_eq!(reader.no_vectors(), 0);
     reader.reload();
     assert_eq!(reader.no_vectors(), 1);
-    let result = reader.search(vec, vec![], 1);
+    let result = reader.search(vec, vec![], 5);
+    assert_eq!(result.len(), 1);
     assert!(result[0].1 >= 0.9);
 }
 
@@ -164,7 +169,9 @@ fn stress_test() {
         let query_labels = labels.clone();
         let timer = SystemTime::now();
         let result = reader.search(query, query_labels, no_results);
+        let set: std::collections::HashSet<_> = result.iter().map(|(k, v)| k.clone()).collect();
         assert!(result.len() == no_results);
+        assert_eq!(result.len(), set.len());
         total += timer.elapsed().unwrap();
         println!("READ {:?}", result);
         if index % 100 == 0 {

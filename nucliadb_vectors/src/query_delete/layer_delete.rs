@@ -47,10 +47,14 @@ impl<'a> Query for LayerDeleteQuery<'a> {
             self.index.disconnect(self.layer, self.delete, node);
         }
         let mut reaching = Vec::with_capacity(in_edges.len());
-        for (node, _) in in_edges {
+        for (node, edge) in in_edges {
+            assert_eq!(node, edge.to);
+            assert_eq!(self.delete, edge.from);
             self.index.disconnect(self.layer, node, self.delete);
             reaching.push(node);
         }
+        assert!(self.index.in_edges(self.layer, self.delete).is_empty());
+        assert!(self.index.out_edges(self.layer, self.delete).is_empty());
         for source in reaching {
             if self.index.out_edges(self.layer, source).len() < self.m {
                 let LayerSearchValue { neighbours } = LayerSearchQuery {

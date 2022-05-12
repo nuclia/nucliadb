@@ -29,6 +29,7 @@ pub struct PostSearchValue {
 }
 
 pub struct PostSearchQuery<'a> {
+    pub up_to: usize,
     pub pre_filter: Vec<(Node, f32)>,
     pub with_filter: Vec<String>,
     pub index: &'a LockIndex,
@@ -39,10 +40,11 @@ impl<'a> Query for PostSearchQuery<'a> {
 
     fn run(&mut self) -> Self::Output {
         let pre_filter = std::mem::take(&mut self.pre_filter);
-        let filtered = pre_filter
+        let mut filtered: Vec<_> = pre_filter
             .into_par_iter()
             .map(|(node, dist)| (self.index.get_node_key(node), dist))
             .collect();
+        filtered.truncate(self.up_to);
         PostSearchValue { filtered }
     }
 }

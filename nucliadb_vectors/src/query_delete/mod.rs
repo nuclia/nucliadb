@@ -37,7 +37,7 @@ impl<'a> Query for DeleteQuery<'a> {
     fn run(&mut self) -> Self::Output {
         if let Some(delete) = self.index.get_node(&self.delete) {
             let vector = self.index.get_node_vector(delete);
-            for current_layer in (0..self.index.max_layer()).rev() {
+            for current_layer in (0..self.index.no_layers()).rev() {
                 LayerDeleteQuery {
                     delete,
                     layer: current_layer,
