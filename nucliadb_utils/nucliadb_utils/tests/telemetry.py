@@ -1,6 +1,17 @@
-from asyncio import DatagramProtocol
+import asyncio
 import contextlib
 import socket
+from asyncio import DatagramProtocol
+
+import nats
+import pytest
+from fastapi import FastAPI
+from httpx import AsyncClient
+from nats.aio.msg import Msg
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
+
 from nucliadb_utils.settings import telemetry_settings
 from nucliadb_utils.telemetry import (
     JetStreamContextTelemetry,
@@ -8,19 +19,6 @@ from nucliadb_utils.telemetry import (
     init_telemetry,
 )
 from nucliadb_utils.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
-from opentelemetry.propagate import inject
-
-
-import pytest
-from fastapi import FastAPI
-from httpx import AsyncClient
-import nats
-from nats.aio.msg import Msg
-import asyncio
-
 
 JAEGGER_MESSAGES = []
 

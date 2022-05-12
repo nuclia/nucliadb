@@ -18,18 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from collections import OrderedDict
-from functools import partial
 import math
 import traceback
+from collections import OrderedDict
 from concurrent import futures
-from contextvars import ContextVar
-from typing import Awaitable, Callable, List, MutableMapping, Optional
+from functools import partial
+from typing import Awaitable, Callable, Dict, List, MutableMapping, Optional
 
-from nats.js.client import JetStreamContext
-from nats.aio.msg import Msg
 import grpc
-from grpc import ClientCallDetails, StreamStreamClientInterceptor, StreamUnaryClientInterceptor, UnaryStreamClientInterceptor, UnaryUnaryClientInterceptor, aio  # type: ignore
+from grpc import ClientCallDetails, aio  # type: ignore
+from nats.aio.msg import Msg
+from nats.js.client import JetStreamContext
 from opentelemetry.context import (  # type: ignore
     _SUPPRESS_INSTRUMENTATION_KEY,
     Context,
@@ -44,7 +43,8 @@ from opentelemetry.exporter.jaeger.thrift.translate import Translate  # type: ig
 from opentelemetry.exporter.jaeger.thrift.translate import (  # type: ignore
     ThriftTranslator,
 )
-from opentelemetry.propagate import extract
+from opentelemetry.propagate import extract, inject
+from opentelemetry.propagators.textmap import Setter  # type: ignore
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
 from opentelemetry.sdk.resources import Resource  # type: ignore
 from opentelemetry.sdk.trace import TracerProvider  # type: ignore
@@ -55,7 +55,6 @@ from opentelemetry.sdk.trace.export import (  # type: ignore
 )
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
-from opentelemetry.propagate import inject
 from opentelemetry.trace import Tracer  # type: ignore
 from opentelemetry.trace.status import Status, StatusCode  # type: ignore
 from opentelemetry.util._time import _time_ns  # type: ignore
@@ -64,8 +63,6 @@ from thrift.transport import TTransport  # type: ignore
 
 from nucliadb_utils import logger
 from nucliadb_utils.settings import telemetry_settings
-from opentelemetry.propagators.textmap import Setter
-from opentelemetry.context import attach, detach
 
 UDP_PACKET_MAX_LENGTH = 65000
 
@@ -184,7 +181,13 @@ def start_span_client(
     set_status_on_exception=False,
 ):
 
-    service, meth = client_call_details.method.decode().lstrip("/").split("/", 1)
+    if isinstance(client_call_details.method, bytes):
+        service, meth = client_call_details.method.decode().lstrip("/").split("/", 1)
+        method_name = client_call_details.method.decode()
+    else:
+        service, meth = client_call_details.method.lstrip("/").split("/", 1)
+        method_name = client_call_details.method
+
     attributes = {
         SpanAttributes.RPC_SYSTEM: "grpc",
         SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value,
@@ -193,13 +196,14 @@ def start_span_client(
     }
 
     # add some attributes from the metadata
-    mutable_metadata = OrderedDict(client_call_details.metadata)
-    inject(mutable_metadata, setter=_carrier_setter)
-    for key, value in mutable_metadata.items():
-        client_call_details.metadata.add(key=key, value=value)
+    if client_call_details.metadata is not None:
+        mutable_metadata = OrderedDict(client_call_details.metadata)
+        inject(mutable_metadata, setter=_carrier_setter)
+        for key, value in mutable_metadata.items():
+            client_call_details.metadata.add(key=key, value=value)  # type: ignore
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=client_call_details.method.decode(),
+        name=method_name,
         kind=SpanKind.CLIENT,
         attributes=attributes,
         set_status_on_exception=set_status_on_exception,
@@ -778,7 +782,7 @@ class JetStreamContextTelemetry:
 
     async def publish(self, subject: str, body: bytes):
         tracer = self.tracer_provider.get_tracer(self.service_name)
-        headers = {}
+        headers: Dict[str, str] = {}
         inject(headers)
         with start_span_client_js(tracer, subject) as span:
             try:
@@ -791,24 +795,3 @@ class JetStreamContextTelemetry:
                 finish_span(span)
 
         return result
-
-
-class OpenTelemetryNats:
-    initialized: bool = False
-
-    def __init__(self, service_name: str, tracer_provider: TracerProvider):
-        self.service_name = service_name
-        self.tracer_provider = tracer_provider
-
-    def init_client(self, jetstream: JetStreamContext):
-        tracer = self.tracer_provider.get_tracer(self.service_name)
-        return JetStreamContextTelemetry(jetstream, tracer)
-
-    def init_server(self, concurrency: int = 4):
-        tracer = self.tracer_provider.get_tracer(self.service_name)
-        interceptors = [OpenTelemetryServerInterceptor(tracer=tracer)]
-        server = aio.server(
-            futures.ThreadPoolExecutor(max_workers=concurrency),
-            interceptors=interceptors,
-        )
-        return server

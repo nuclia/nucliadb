@@ -1,9 +1,9 @@
-from typing import Tuple
-from httpx import AsyncClient
-from nucliadb_utils.tests.telemetry import Greeter
-from nucliadb_utils.tests.telemetry import JAEGGER_MESSAGES
-import pytest
 import asyncio
+
+import pytest
+from httpx import AsyncClient
+
+from nucliadb_utils.tests.telemetry import JAEGGER_MESSAGES, Greeter
 
 
 @pytest.mark.asyncio
@@ -16,6 +16,7 @@ async def test_telemetry(http_service: AsyncClient, greeter: Greeter):
             "x-b3-sampled": "1",
         },
     )
+    assert resp.status_code == 200
     for i in range(10):
         if len(greeter.messages) == 0:
             await asyncio.sleep(1)
