@@ -36,7 +36,7 @@ pub mod hnsw_params {
 pub enum LogField {
     VersionNumber = 0,
     EntryPoint,
-    MaxLayer,
+    NoLayers,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -142,7 +142,7 @@ impl GraphLayer {
         let edges = self.cnx.get_mut(&from).unwrap();
         edges.remove(&to);
     }
-    pub fn some_edge(&self) -> Option<Node> {
+    pub fn some_node(&self) -> Option<Node> {
         self.cnx.keys().next().cloned()
     }
     pub fn is_empty(&self) -> bool {

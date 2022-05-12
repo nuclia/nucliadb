@@ -149,7 +149,8 @@ impl LMBDStorage {
     }
     pub fn remove_vector(&self, txn: &mut RwTxn<'_, '_>, vector: &str) {
         self.node_db.delete(txn, vector).unwrap();
-        let mut iter = self.label_db.prefix_iter_mut(txn, vector).unwrap();
+        let label_query = format!("{}/", vector);
+        let mut iter = self.label_db.prefix_iter_mut(txn, &label_query).unwrap();
         while iter.next().transpose().unwrap().is_some() {
             iter.del_current().unwrap();
         }
@@ -195,7 +196,7 @@ impl LMBDStorage {
         self.log
             .put(
                 txn,
-                &LogField::MaxLayer.as_byte_rpr(),
+                &LogField::NoLayers.as_byte_rpr(),
                 &log.max_layer.as_byte_rpr(),
             )
             .unwrap();
@@ -235,7 +236,7 @@ impl LMBDStorage {
             .unwrap();
         let max_layer = self
             .log
-            .get(txn, &LogField::MaxLayer.as_byte_rpr())
+            .get(txn, &LogField::NoLayers.as_byte_rpr())
             .unwrap()
             .map(u64::from_byte_rpr)
             .unwrap();

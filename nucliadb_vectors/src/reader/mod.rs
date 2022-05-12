@@ -61,13 +61,13 @@ impl Reader {
         }
         .run();
         debug!("Neighbours {}", neighbours.len());
-        let PostSearchValue { mut filtered } = PostSearchQuery {
+        let PostSearchValue { filtered } = PostSearchQuery {
+            up_to: no_results,
             pre_filter: neighbours,
             with_filter: labels,
             index: &self.index,
         }
         .run();
-        filtered.truncate(no_results);
         filtered
     }
     pub fn reload(&self) {

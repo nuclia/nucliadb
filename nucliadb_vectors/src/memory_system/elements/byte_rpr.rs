@@ -36,7 +36,7 @@ impl ByteRpr for LogField {
         match bytes[0] {
             0 => VersionNumber,
             1 => EntryPoint,
-            2 => MaxLayer,
+            2 => NoLayers,
             _ => panic!("Unknown LogField: {bytes:?}"),
         }
     }

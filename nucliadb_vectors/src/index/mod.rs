@@ -32,7 +32,7 @@ pub struct Index {
     vector_storage: Storage,
     lmdb_driver: LMBDStorage,
     time_stamp: u128,
-    max_layer: usize,
+    layers_len: usize,
     removed: Vec<Node>,
     entry_point: Option<EntryPoint>,
     layers_out: Vec<GraphLayer>,
@@ -69,7 +69,7 @@ impl Index {
             layers_in,
             removed,
             time_stamp: log.version_number,
-            max_layer: log.max_layer as usize,
+            layers_len: log.max_layer as usize,
             entry_point: log.entry_point,
         }
     }
@@ -97,7 +97,7 @@ impl Index {
             layers_in,
             removed,
             time_stamp: log.version_number + 1,
-            max_layer: log.max_layer as usize,
+            layers_len: log.max_layer as usize,
             entry_point: log.entry_point,
         }
     }
@@ -133,8 +133,8 @@ impl Index {
         if self.time_stamp != log.version_number {
             self.time_stamp = log.version_number;
             self.entry_point = log.entry_point;
-            self.max_layer = log.max_layer as usize;
-            self.layers_out = Vec::with_capacity(self.max_layer);
+            self.layers_len = log.max_layer as usize;
+            self.layers_out = Vec::with_capacity(self.layers_len);
             for i in 0..log.max_layer {
                 let layer_out = self.lmdb_driver.get_layer_out(&txn, i).unwrap();
                 self.layers_out.push(layer_out);
@@ -146,12 +146,12 @@ impl Index {
         let mut rw_txn = self.lmdb_driver.rw_txn();
         let log = GraphLog {
             entry_point: self.entry_point,
-            max_layer: self.max_layer as u64,
+            max_layer: self.layers_len as u64,
             version_number: self.time_stamp,
         };
         let deleted = std::mem::take(&mut self.removed);
         self.time_stamp += 1;
-        for i in 0..self.max_layer {
+        for i in 0..self.layers_len {
             let layer_out = self.layers_out[i].clone();
             let layer_in = self.layers_in[i].clone();
             self.lmdb_driver
@@ -195,8 +195,8 @@ impl Index {
         };
         self.lmdb_driver.add_node(&mut txn, key, node);
         txn.commit().unwrap();
-        self.max_layer = std::cmp::max(self.max_layer, layer + 1);
-        while self.layers_out.len() < self.max_layer {
+        self.layers_len = std::cmp::max(self.layers_len, layer + 1);
+        while self.layers_out.len() < self.layers_len {
             self.layers_out.push(GraphLayer::new());
             self.layers_in.push(GraphLayer::new());
         }
@@ -259,19 +259,33 @@ impl Index {
     pub fn erase(&mut self, x: Node) {
         let mut max_layer = 0;
         // Remove x from all layers and take max non empty layer
-        for layer in 0..self.max_layer {
+        for layer in 0..self.layers_len {
             self.layers_out[layer].remove_node(x);
             self.layers_in[layer].remove_node(x);
-            if self.layers_out[layer].is_empty() {
-                max_layer = std::cmp::max(max_layer, layer);
+            if !self.layers_out[layer].is_empty() {
+                max_layer = layer;
             }
         }
+
         // Entry point update
-        let new_entry = self.layers_out[max_layer].some_edge();
+        let new_entry = self.layers_out[max_layer].some_node();
         self.entry_point = new_entry.map(|node| EntryPoint {
             node,
             layer: max_layer as u64,
         });
+
+        self.layers_len = if self.entry_point.is_none() {
+            0
+        } else {
+            max_layer + 1
+        };
+        self.layers_out.truncate(self.layers_len);
+        self.layers_in.truncate(self.layers_len);
+        let id = String::from_byte_rpr(self.key_storage.read(x.key).unwrap());
+        let mut txn = self.lmdb_driver.rw_txn();
+        self.lmdb_driver.remove_vector(&mut txn, &id);
+        self.removed.push(x);
+        txn.commit().unwrap();
     }
     pub fn stats(&self) -> Stats {
         Stats {
@@ -281,8 +295,8 @@ impl Index {
             entry_point: self.entry_point,
         }
     }
-    pub fn max_layer(&self) -> usize {
-        self.max_layer
+    pub fn no_layers(&self) -> usize {
+        self.layers_len
     }
 }
 
@@ -376,7 +390,7 @@ impl LockIndex {
     pub fn stats(&self) -> Stats {
         self.index.read().unwrap().stats()
     }
-    pub fn max_layer(&self) -> usize {
-        self.index.read().unwrap().max_layer()
+    pub fn no_layers(&self) -> usize {
+        self.index.read().unwrap().no_layers()
     }
 }
