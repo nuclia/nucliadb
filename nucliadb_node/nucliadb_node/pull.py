@@ -121,6 +121,7 @@ class Worker:
                         shards: ShardIds = await self.writer.shards()
                         for shard in shards.ids:
                             await self.writer.garbage_collector(shard)
+                        logger.info(f"Garbaged {len(shards.ids)}")
                     except Exception:
                         logger.exception(
                             f"Could not garbage {shard.id}", stack_info=True
@@ -158,15 +159,18 @@ class Worker:
                 if pb.typemessage == IndexMessage.TypeMessage.CREATION:
                     brain: Resource = await storage.get_indexing(pb)
                     status = await self.writer.set_resource(brain)
+
+                    logger.info(
+                        f"Added {brain.resource.uuid} at {brain.resource.shard_id}"
+                    )
                     del brain
                 elif pb.typemessage == IndexMessage.TypeMessage.DELETION:
                     rid = ResourceID()
                     rid.shard_id = pb.shard
                     rid.uuid = pb.resource
                     status = await self.writer.delete_resource(rid)
+                    logger.info(f"Deleted {pb.resource}")
                 self.reader.update(pb.shard, status)
-
-                logger.info("Processed")
 
             except AioRpcError as grpc_error:
                 if grpc_error.code == StatusCode.NOT_FOUND:
