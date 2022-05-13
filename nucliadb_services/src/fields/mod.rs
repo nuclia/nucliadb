@@ -19,17 +19,27 @@
 //
 use crate::*;
 
+pub const MAX_VERSION: u32 = 0;
+
 pub type RFields = dyn RService<Request = DocumentSearchRequest, Response = DocumentSearchResponse>;
 pub type WFields = dyn WService;
 
-pub async fn create_reader_v0(
+pub async fn create_reader(
     config: &FieldServiceConfiguration,
+    version: u32,
 ) -> InternalResult<nucliadb_fields_tantivy::reader::FieldReaderService> {
-    nucliadb_fields_tantivy::reader::FieldReaderService::start(config).await
+    match version {
+        0 => nucliadb_fields_tantivy::reader::FieldReaderService::start(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
 }
 
-pub async fn create_writer_v0(
+pub async fn create_writer(
     config: &FieldServiceConfiguration,
+    version: u32,
 ) -> InternalResult<nucliadb_fields_tantivy::writer::FieldWriterService> {
-    nucliadb_fields_tantivy::writer::FieldWriterService::start(config).await
+    match version {
+        0 => nucliadb_fields_tantivy::writer::FieldWriterService::start(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
 }

@@ -33,6 +33,7 @@ use tracing::*;
 
 // use super::vector::service::VectorService;
 use crate::config::Configuration;
+use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
 
 const RELOAD_PERIOD: u128 = 5000;
@@ -72,6 +73,7 @@ impl ShardReaderService {
     /// Start the service
     pub async fn start(id: &str) -> InternalResult<ShardReaderService> {
         let shard_path = Configuration::shards_path_id(id);
+        let config = ShardConfig::new(id);
         match Path::new(&shard_path).exists() {
             true => info!("Loading shard with id {}", id),
             false => info!("Creating new shard with id {}", id),
@@ -90,9 +92,10 @@ impl ShardReaderService {
             path: format!("{}/vectors", shard_path),
         };
 
-        let field_reader_service = fields::create_reader_v0(&fsc).await?;
-        let paragraph_reader_service = paragraphs::create_reader_v0(&psc).await?;
-        let vector_reader_service = vectors::create_reader_v0(&vsc).await?;
+        let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
+        let paragraph_reader_service =
+            paragraphs::create_reader(&psc, config.version_paragraphs).await?;
+        let vector_reader_service = vectors::create_reader(&vsc, config.version_vectors).await?;
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),

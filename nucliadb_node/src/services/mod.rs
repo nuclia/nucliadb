@@ -21,8 +21,8 @@
 /// This module is for all services linked to node
 ///
 /// Services
+mod config;
 pub mod service;
-
 // Main services
 pub mod reader;
 pub mod writer;

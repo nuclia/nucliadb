@@ -19,17 +19,27 @@
 //
 use crate::*;
 
+pub const MAX_VERSION: u32 = 0;
+
 pub type RVectors = dyn RService<Request = VectorSearchRequest, Response = VectorSearchResponse>;
 pub type WVectors = dyn WService;
 
-pub async fn create_reader_v0(
+pub async fn create_reader(
     config: &VectorServiceConfiguration,
+    version: u32,
 ) -> InternalResult<nucliadb_vectors::service::VectorReaderService> {
-    nucliadb_vectors::service::VectorReaderService::start(config).await
+    match version {
+        0 => nucliadb_vectors::service::VectorReaderService::start(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
 }
 
-pub async fn create_writer_v0(
+pub async fn create_writer(
     config: &VectorServiceConfiguration,
+    version: u32,
 ) -> InternalResult<nucliadb_vectors::service::VectorWriterService> {
-    nucliadb_vectors::service::VectorWriterService::start(config).await
+    match version {
+        0 => nucliadb_vectors::service::VectorWriterService::start(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
 }

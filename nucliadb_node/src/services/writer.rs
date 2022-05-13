@@ -25,6 +25,7 @@ use nucliadb_services::*;
 use tracing::*;
 
 use crate::config::Configuration;
+use crate::services::config::ShardConfig;
 
 #[derive(Debug)]
 pub struct ShardWriterService {
@@ -60,10 +61,11 @@ impl ShardWriterService {
             no_results: None,
             path: format!("{}/vectors", shard_path),
         };
-
-        let field_writer_service = fields::create_writer_v0(&fsc).await?;
-        let paragraph_writer_service = paragraphs::create_writer_v0(&psc).await?;
-        let vector_writer_service = vectors::create_writer_v0(&vsc).await?;
+        let config = ShardConfig::new(id);
+        let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
+        let paragraph_writer_service =
+            paragraphs::create_writer(&psc, config.version_paragraphs).await?;
+        let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
 
         Ok(ShardWriterService {
             id: id.to_string(),

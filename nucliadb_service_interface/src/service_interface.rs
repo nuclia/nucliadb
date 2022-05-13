@@ -27,7 +27,9 @@ pub enum ServiceError {
     GenericErr(Box<dyn std::error::Error>),
     NodeOpErr(Box<dyn InternalError>),
     IOErr(std::io::Error),
+    InvalidShardVersion(u32),
 }
+
 impl From<Box<dyn std::error::Error>> for ServiceError {
     fn from(error: Box<dyn std::error::Error>) -> Self {
         ServiceError::GenericErr(error)
@@ -51,6 +53,7 @@ impl std::fmt::Debug for ServiceError {
             ServiceError::GenericErr(e) => write!(f, "{:?}", e),
             ServiceError::NodeOpErr(e) => write!(f, "{:?}", e),
             ServiceError::IOErr(e) => write!(f, "{:?}", e),
+            ServiceError::InvalidShardVersion(v) => write!(f, "Shard version not found {}", v),
         }
     }
 }
@@ -60,9 +63,12 @@ impl std::fmt::Display for ServiceError {
             ServiceError::GenericErr(e) => write!(f, "{}", e),
             ServiceError::NodeOpErr(e) => write!(f, "{}", e),
             ServiceError::IOErr(e) => write!(f, "{}", e),
+            ServiceError::InvalidShardVersion(v) => write!(f, "Shard version not found {}", v),
         }
     }
 }
+
+impl InternalError for String {}
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
