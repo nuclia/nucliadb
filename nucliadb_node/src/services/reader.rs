@@ -24,16 +24,16 @@ use std::time::SystemTime;
 // use crate::services::vector::config::VectorServiceConfiguration;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
-    VectorSearchRequest, VectorSearchResponse,
+    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, VectorSearchRequest,
+    VectorSearchResponse,
 };
+use nucliadb_services::*;
 use tokio::{task, try_join};
 use tracing::*;
-use crate::stats::StatsData;
 
 // use super::vector::service::VectorService;
 use crate::config::Configuration;
-use nucliadb_services::*;
+use crate::stats::StatsData;
 
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;

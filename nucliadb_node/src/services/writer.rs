@@ -18,10 +18,12 @@
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use nucliadb_services::*;
+
 use futures::try_join;
 use nucliadb_protos::{Resource, ResourceId, SetVectorFieldRequest};
+use nucliadb_services::*;
 use tracing::*;
+
 use crate::config::Configuration;
 
 #[derive(Debug)]

@@ -19,13 +19,13 @@
 //
 
 pub mod grpc_driver;
-use nucliadb_services::*;
 use std::collections::HashMap;
 use std::path::Path;
 
 use nucliadb_protos::{
     Resource, ResourceId, SetVectorFieldRequest, ShardCreated, ShardId, ShardIds,
 };
+use nucliadb_services::*;
 use tracing::*;
 use uuid::Uuid;
 

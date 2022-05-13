@@ -19,7 +19,6 @@
 //
 
 pub mod grpc_driver;
-use nucliadb_services::*;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -28,6 +27,7 @@ use nucliadb_protos::{
     SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest,
     SuggestResponse, VectorSearchRequest, VectorSearchResponse,
 };
+use nucliadb_services::*;
 use tracing::*;
 
 use crate::config::Configuration;
