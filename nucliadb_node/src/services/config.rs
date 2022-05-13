@@ -15,12 +15,11 @@
 // GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-use std::io::Write;
-use std::{fs, path};
+use std::path;
 
 use nucliadb_services::*;
 use serde::{Deserialize, Serialize};
-
+use tokio::fs;
 #[derive(Serialize, Deserialize)]
 pub struct ShardConfig {
     pub version_paragraphs: u32,
@@ -29,7 +28,8 @@ pub struct ShardConfig {
 }
 
 impl ShardConfig {
-    pub fn new(path: &str) -> ShardConfig {
+    pub async fn new(path: &str) -> ShardConfig {
+        fs::create_dir_all(path).await.unwrap();
         let json_file = path::Path::new(path).join("config.json");
         if !json_file.exists() {
             let config = ShardConfig {
@@ -37,11 +37,12 @@ impl ShardConfig {
                 version_fields: fields::MAX_VERSION,
                 version_vectors: vectors::MAX_VERSION,
             };
-            let mut file = fs::File::create(&json_file).unwrap();
-            write!(&mut file, "{}", serde_json::to_string(&json_file).unwrap()).unwrap();
+            let serialized = serde_json::to_string(&config).unwrap();
+            fs::File::create(&json_file).await.unwrap();
+            fs::write(&json_file, &serialized).await.unwrap();
             config
         } else {
-            let content = fs::read_to_string(&json_file).unwrap();
+            let content = fs::read_to_string(&json_file).await.unwrap();
             serde_json::from_str(&content).unwrap()
         }
     }

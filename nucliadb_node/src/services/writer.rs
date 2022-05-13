@@ -61,7 +61,7 @@ impl ShardWriterService {
             no_results: None,
             path: format!("{}/vectors", shard_path),
         };
-        let config = ShardConfig::new(id);
+        let config = ShardConfig::new(&shard_path).await;
         let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
         let paragraph_writer_service =
             paragraphs::create_writer(&psc, config.version_paragraphs).await?;

@@ -73,7 +73,6 @@ impl ShardReaderService {
     /// Start the service
     pub async fn start(id: &str) -> InternalResult<ShardReaderService> {
         let shard_path = Configuration::shards_path_id(id);
-        let config = ShardConfig::new(id);
         match Path::new(&shard_path).exists() {
             true => info!("Loading shard with id {}", id),
             false => info!("Creating new shard with id {}", id),
@@ -91,7 +90,7 @@ impl ShardReaderService {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
         };
-
+        let config = ShardConfig::new(&shard_path).await;
         let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
         let paragraph_reader_service =
             paragraphs::create_reader(&psc, config.version_paragraphs).await?;
