@@ -83,7 +83,7 @@ async def search_knowledgebox(
         SearchOptions.VECTOR,
         SearchOptions.RELATIONS,
     ],
-    reload: bool = Query(False),
+    reload: bool = Query(True),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
