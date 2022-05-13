@@ -61,7 +61,9 @@ class Shard:
         indexpb: IndexMessage
 
         for shardreplica in self.shard.replicas:
-            resource.shard_id = shard = shardreplica.shard.id
+            resource.shard_id = (
+                resource.resource.shard_id
+            ) = shard = shardreplica.shard.id
             if reindex_id is not None:
                 indexpb = await storage.reindexing(
                     resource, shardreplica.node, shard, reindex_id

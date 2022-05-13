@@ -57,6 +57,7 @@ from nucliadb_utils.utilities import get_audit
     status_code=200,
     description="Search on a knowledge box",
     response_model=KnowledgeboxSearchResults,
+    response_model_exclude_unset=True,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
@@ -84,6 +85,7 @@ async def search_knowledgebox(
         SearchOptions.RELATIONS,
     ],
     reload: bool = Query(True),
+    debug: bool = Query(False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -126,6 +128,7 @@ async def search_knowledgebox(
 
     incomplete_results = False
     ops = []
+    queried_shards = []
     for shard in shard_groups:
         try:
             node, shard_id = nodemanager.choose_node(shard)
@@ -136,6 +139,7 @@ async def search_knowledgebox(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(query_shard(node, shard_id, pb_query))
+                queried_shards.append((node.label, shard_id))
 
     if not ops:
         await abort_transaction()
@@ -197,4 +201,6 @@ async def search_knowledgebox(
         timeit - time(),
         len(search_results.resources),
     )
+    if debug:
+        search_results.shards = queried_shards
     return search_results

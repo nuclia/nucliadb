@@ -160,9 +160,7 @@ class Worker:
                     brain: Resource = await storage.get_indexing(pb)
                     status = await self.writer.set_resource(brain)
 
-                    logger.info(
-                        f"Added {brain.resource.uuid} at {brain.resource.shard_id}"
-                    )
+                    logger.info(f"Added {brain.resource.uuid} at {brain.shard_id}")
                     del brain
                 elif pb.typemessage == IndexMessage.TypeMessage.DELETION:
                     rid = ResourceID()

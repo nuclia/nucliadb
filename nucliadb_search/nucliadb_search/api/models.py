@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, List, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import OrderBy
@@ -136,6 +136,7 @@ class KnowledgeboxSearchResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     fulltext: Optional[Resources] = None
     relations: Optional[Relations] = None
+    shards: Optional[List[Tuple[str, str]]]
 
 
 class KnowledgeboxSuggestResults(BaseModel):
