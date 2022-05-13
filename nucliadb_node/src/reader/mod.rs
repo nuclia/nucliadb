@@ -19,7 +19,7 @@
 //
 
 pub mod grpc_driver;
-
+use nucliadb_services::*;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -31,7 +31,6 @@ use nucliadb_protos::{
 use tracing::*;
 
 use crate::config::Configuration;
-use crate::result::ServiceResult;
 use crate::services::reader::ShardReaderService;
 
 type ShardReaderDB = HashMap<String, ShardReaderService>;

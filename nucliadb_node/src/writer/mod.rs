@@ -19,7 +19,7 @@
 //
 
 pub mod grpc_driver;
-
+use nucliadb_services::*;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -30,7 +30,6 @@ use tracing::*;
 use uuid::Uuid;
 
 use crate::config::Configuration;
-use crate::result::ServiceResult;
 use crate::services::writer::ShardWriterService;
 
 type ShardWriterDB = HashMap<String, ShardWriterService>;

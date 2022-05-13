@@ -7,4 +7,5 @@ members = [
   "nucliadb_cluster/binding",
   "nucliadb_node",
   "nucliadb_node/binding",
+  "nucliadb_services",
 ]

@@ -18,17 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod heuristics;
-mod index;
-mod memory_system;
-mod query;
-mod query_delete;
-mod query_insert;
-mod query_post_search;
-mod query_search;
 pub mod reader;
-pub mod service;
-#[cfg(test)]
-mod tests;
-mod utils;
+mod schema;
+mod search_query;
 pub mod writer;

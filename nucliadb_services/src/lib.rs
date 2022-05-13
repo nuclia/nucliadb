@@ -17,18 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+pub mod fields;
+pub mod paragraphs;
+pub mod vectors;
+pub extern crate nucliadb_service_interface;
 
-mod heuristics;
-mod index;
-mod memory_system;
-mod query;
-mod query_delete;
-mod query_insert;
-mod query_post_search;
-mod query_search;
-pub mod reader;
-pub mod service;
-#[cfg(test)]
-mod tests;
-mod utils;
-pub mod writer;
+pub use nucliadb_protos::*;
+pub use nucliadb_service_interface::prelude::*;

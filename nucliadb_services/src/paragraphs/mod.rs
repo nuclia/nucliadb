@@ -17,18 +17,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::*;
 
-mod heuristics;
-mod index;
-mod memory_system;
-mod query;
-mod query_delete;
-mod query_insert;
-mod query_post_search;
-mod query_search;
-pub mod reader;
-pub mod service;
-#[cfg(test)]
-mod tests;
-mod utils;
-pub mod writer;
+pub type RParagraphs =
+    dyn RService<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>;
+pub type WParagraphs = dyn WService;
+
+pub async fn create_reader_v0(
+    config: &ParagraphServiceConfiguration,
+) -> InternalResult<nucliadb_paragraphs_tantivy::reader::ParagraphReaderService> {
+    nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::start(config).await
+}
+
+pub async fn create_writer_v0(
+    config: &ParagraphServiceConfiguration,
+) -> InternalResult<nucliadb_paragraphs_tantivy::writer::ParagraphWriterService> {
+    nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::start(config).await
+}

@@ -17,18 +17,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::service_interface::InternalError;
+pub struct ParagraphServiceConfiguration {
+    pub path: String,
+}
+#[derive(Debug)]
+pub struct ParagraphError {
+    pub msg: String,
+}
 
-mod heuristics;
-mod index;
-mod memory_system;
-mod query;
-mod query_delete;
-mod query_insert;
-mod query_post_search;
-mod query_search;
-pub mod reader;
-pub mod service;
-#[cfg(test)]
-mod tests;
-mod utils;
-pub mod writer;
+impl std::fmt::Display for ParagraphError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.msg)
+    }
+}
+
+impl InternalError for ParagraphError {}

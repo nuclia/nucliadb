@@ -17,18 +17,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::*;
 
-mod heuristics;
-mod index;
-mod memory_system;
-mod query;
-mod query_delete;
-mod query_insert;
-mod query_post_search;
-mod query_search;
-pub mod reader;
-pub mod service;
-#[cfg(test)]
-mod tests;
-mod utils;
-pub mod writer;
+pub type RFields = dyn RService<Request = DocumentSearchRequest, Response = DocumentSearchResponse>;
+pub type WFields = dyn WService;
+
+pub async fn create_reader_v0(
+    config: &FieldServiceConfiguration,
+) -> InternalResult<nucliadb_fields_tantivy::reader::FieldReaderService> {
+    nucliadb_fields_tantivy::reader::FieldReaderService::start(config).await
+}
+
+pub async fn create_writer_v0(
+    config: &FieldServiceConfiguration,
+) -> InternalResult<nucliadb_fields_tantivy::writer::FieldWriterService> {
+    nucliadb_fields_tantivy::writer::FieldWriterService::start(config).await
+}

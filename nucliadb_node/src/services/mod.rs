@@ -27,11 +27,3 @@ pub mod service;
 pub mod reader;
 pub mod writer;
 
-/// Text indexes
-pub mod field;
-
-/// Text indexes
-pub mod paragraph;
-
-/// Vector ingexes
-pub mod vector;

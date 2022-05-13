@@ -18,28 +18,19 @@
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-
+use nucliadb_services::*;
 use futures::try_join;
 use nucliadb_protos::{Resource, ResourceId, SetVectorFieldRequest};
 use tracing::*;
-
 use crate::config::Configuration;
-use crate::result::InternalResult;
-use crate::services::field::config::FieldServiceConfiguration;
-use crate::services::field::writer::FieldWriterService;
-use crate::services::paragraph::config::ParagraphServiceConfiguration;
-use crate::services::paragraph::writer::ParagraphWriterService;
-use crate::services::service::*;
-use crate::services::vector::config::VectorServiceConfiguration;
-use crate::services::vector::writer::VectorWriterService;
 
 #[derive(Debug)]
 pub struct ShardWriterService {
     pub id: String,
 
-    field_writer_service: Arc<RwLock<FieldWriterService>>,
-    paragraph_writer_service: Arc<RwLock<ParagraphWriterService>>,
-    vector_writer_service: Arc<RwLock<VectorWriterService>>,
+    field_writer_service: Arc<RwLock<fields::WFields>>,
+    paragraph_writer_service: Arc<RwLock<paragraphs::WParagraphs>>,
+    vector_writer_service: Arc<RwLock<vectors::WVectors>>,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -68,9 +59,9 @@ impl ShardWriterService {
             path: format!("{}/vectors", shard_path),
         };
 
-        let field_writer_service = FieldWriterService::start(&fsc).await?;
-        let paragraph_writer_service = ParagraphWriterService::start(&psc).await?;
-        let vector_writer_service = VectorWriterService::start(&vsc).await?;
+        let field_writer_service = fields::create_writer_v0(&fsc).await?;
+        let paragraph_writer_service = paragraphs::create_writer_v0(&psc).await?;
+        let vector_writer_service = vectors::create_writer_v0(&vsc).await?;
 
         Ok(ShardWriterService {
             id: id.to_string(),
