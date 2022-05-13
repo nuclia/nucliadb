@@ -23,13 +23,31 @@ pub const MAX_VERSION: u32 = 0;
 
 pub type RVectors = dyn RService<Request = VectorSearchRequest, Response = VectorSearchResponse>;
 pub type WVectors = dyn WService;
+pub async fn open_reader(
+    config: &VectorServiceConfiguration,
+    version: u32,
+) -> InternalResult<nucliadb_vectors::service::VectorReaderService> {
+    match version {
+        0 => nucliadb_vectors::service::VectorReaderService::open(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
+}
 
+pub async fn open_writer(
+    config: &VectorServiceConfiguration,
+    version: u32,
+) -> InternalResult<nucliadb_vectors::service::VectorWriterService> {
+    match version {
+        0 => nucliadb_vectors::service::VectorWriterService::open(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
+}
 pub async fn create_reader(
     config: &VectorServiceConfiguration,
     version: u32,
 ) -> InternalResult<nucliadb_vectors::service::VectorReaderService> {
     match version {
-        0 => nucliadb_vectors::service::VectorReaderService::start(config).await,
+        0 => nucliadb_vectors::service::VectorReaderService::new(config).await,
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
@@ -39,7 +57,7 @@ pub async fn create_writer(
     version: u32,
 ) -> InternalResult<nucliadb_vectors::service::VectorWriterService> {
     match version {
-        0 => nucliadb_vectors::service::VectorWriterService::start(config).await,
+        0 => nucliadb_vectors::service::VectorWriterService::new(config).await,
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }

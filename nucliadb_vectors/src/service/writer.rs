@@ -92,13 +92,31 @@ impl VectorWriterService {
     pub async fn start(config: &VectorServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            tokio::fs::create_dir_all(&path).await.unwrap();
+            Ok(VectorWriterService::new(config).await.unwrap())
+        } else {
+            Ok(VectorWriterService::open(config).await.unwrap())
         }
-        Ok(VectorWriterService::new(config))
     }
-    fn new(config: &VectorServiceConfiguration) -> VectorWriterService {
-        VectorWriterService {
-            index: RwLock::new(Writer::new(&config.path)),
+    pub async fn new(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+        let path = std::path::Path::new(&config.path);
+        if path.exists() {
+            Err(Box::new("Shard already created".to_string()))
+        } else {
+            tokio::fs::create_dir_all(&path).await.unwrap();
+
+            Ok(VectorWriterService {
+                index: RwLock::new(Writer::new(&config.path)),
+            })
+        }
+    }
+    pub async fn open(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+        let path = std::path::Path::new(&config.path);
+        if !path.exists() {
+            Err(Box::new("Shard does not exist".to_string()))
+        } else {
+            Ok(VectorWriterService {
+                index: RwLock::new(Writer::new(&config.path)),
+            })
         }
     }
 }

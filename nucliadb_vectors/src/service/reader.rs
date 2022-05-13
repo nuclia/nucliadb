@@ -86,15 +86,34 @@ impl VectorReaderService {
     pub async fn start(config: &VectorServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            tokio::fs::create_dir_all(&path).await.unwrap();
+            Ok(VectorReaderService::new(config).await.unwrap())
+        } else {
+            Ok(VectorReaderService::open(config).await.unwrap())
         }
-        Ok(VectorReaderService::new(config))
+    }
+    pub async fn new(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+        let path = std::path::Path::new(&config.path);
+        if path.exists() {
+            Err(Box::new("Shard already created".to_string()))
+        } else {
+            tokio::fs::create_dir_all(&path).await.unwrap();
+
+            Ok(VectorReaderService {
+                no_results: config.no_results.unwrap(),
+                index: Reader::new(&config.path),
+            })
+        }
     }
 
-    fn new(config: &VectorServiceConfiguration) -> VectorReaderService {
-        VectorReaderService {
-            no_results: config.no_results.unwrap(),
-            index: Reader::new(&config.path),
+    pub async fn open(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+        let path = std::path::Path::new(&config.path);
+        if !path.exists() {
+            Err(Box::new("Shard does not exist".to_string()))
+        } else {
+            Ok(VectorReaderService {
+                no_results: config.no_results.unwrap(),
+                index: Reader::new(&config.path),
+            })
         }
     }
 }
@@ -107,8 +126,7 @@ mod tests {
     use tempdir::TempDir;
 
     use super::*;
-    use crate::services::service::*;
-    use crate::services::vector::writer::VectorWriterService;
+    use crate::service::writer::VectorWriterService;
 
     #[tokio::test]
     async fn test_new_vector_reader() {

@@ -103,22 +103,6 @@ impl ReaderChild for ParagraphReaderService {
 }
 
 impl ParagraphReaderService {
-    pub async fn start(config: &ParagraphServiceConfiguration) -> InternalResult<Self> {
-        info!("Starting Paragraph Service");
-        match ParagraphReaderService::open(config).await {
-            Ok(service) => Ok(service),
-            Err(_e) => {
-                warn!("Paragraph Service does not exists. Creating a new one.");
-                match ParagraphReaderService::new(config).await {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("Error starting Paragraph service: {}", e);
-                        Err(Box::new(ParagraphError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
-    }
     pub fn find_one(&self, resource_id: &ResourceId) -> tantivy::Result<Option<Document>> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
@@ -152,7 +136,40 @@ impl ParagraphReaderService {
         Ok(docs)
     }
 
-    async fn new(
+    pub async fn start(config: &ParagraphServiceConfiguration) -> InternalResult<Self> {
+        info!("Starting Paragraph Service");
+        match ParagraphReaderService::open(config).await {
+            Ok(service) => Ok(service),
+            Err(_e) => {
+                warn!("Paragraph Service does not exists. Creating a new one.");
+                match ParagraphReaderService::new(config).await {
+                    Ok(service) => Ok(service),
+                    Err(e) => {
+                        error!("Error starting Paragraph service: {}", e);
+                        Err(Box::new(ParagraphError { msg: e.to_string() }))
+                    }
+                }
+            }
+        }
+    }
+    pub async fn new(
+        config: &ParagraphServiceConfiguration,
+    ) -> InternalResult<ParagraphReaderService> {
+        match ParagraphReaderService::new_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
+        }
+    }
+    pub async fn open(
+        config: &ParagraphServiceConfiguration,
+    ) -> InternalResult<ParagraphReaderService> {
+        match ParagraphReaderService::open_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
+        }
+    }
+
+    pub async fn new_inner(
         config: &ParagraphServiceConfiguration,
     ) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
@@ -187,7 +204,7 @@ impl ParagraphReaderService {
         })
     }
 
-    async fn open(
+    pub async fn open_inner(
         config: &ParagraphServiceConfiguration,
     ) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();

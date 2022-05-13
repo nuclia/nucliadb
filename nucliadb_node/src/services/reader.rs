@@ -108,6 +108,80 @@ impl ShardReaderService {
         })
     }
 
+    pub async fn open(id: &str) -> InternalResult<ShardReaderService> {
+        let shard_path = Configuration::shards_path_id(id);
+        match Path::new(&shard_path).exists() {
+            true => info!("Loading shard with id {}", id),
+            false => info!("Creating new shard with id {}", id),
+        }
+
+        let fsc = FieldServiceConfiguration {
+            path: format!("{}/text", shard_path),
+        };
+
+        let psc = ParagraphServiceConfiguration {
+            path: format!("{}/paragraph", shard_path),
+        };
+
+        let vsc = VectorServiceConfiguration {
+            no_results: Some(FIXED_VECTORS_RESULTS),
+            path: format!("{}/vectors", shard_path),
+        };
+        let config = ShardConfig::new(&shard_path).await;
+        let field_reader_service = fields::open_reader(&fsc, config.version_fields).await?;
+        let paragraph_reader_service =
+            paragraphs::open_reader(&psc, config.version_paragraphs).await?;
+        let vector_reader_service = vectors::open_reader(&vsc, config.version_vectors).await?;
+        Ok(ShardReaderService {
+            id: id.to_string(),
+            creation_time: RwLock::new(SystemTime::now()),
+            field_reader_service: Arc::new(field_reader_service),
+            paragraph_reader_service: Arc::new(paragraph_reader_service),
+            vector_reader_service: Arc::new(vector_reader_service),
+            document_service_version: 0,
+            paragraph_service_version: 0,
+            vector_service_version: 0,
+            relation_service_version: 0,
+        })
+    }
+
+    pub async fn create(id: &str) -> InternalResult<ShardReaderService> {
+        let shard_path = Configuration::shards_path_id(id);
+        match Path::new(&shard_path).exists() {
+            true => info!("Loading shard with id {}", id),
+            false => info!("Creating new shard with id {}", id),
+        }
+
+        let fsc = FieldServiceConfiguration {
+            path: format!("{}/text", shard_path),
+        };
+
+        let psc = ParagraphServiceConfiguration {
+            path: format!("{}/paragraph", shard_path),
+        };
+
+        let vsc = VectorServiceConfiguration {
+            no_results: Some(FIXED_VECTORS_RESULTS),
+            path: format!("{}/vectors", shard_path),
+        };
+        let config = ShardConfig::new(&shard_path).await;
+        let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
+        let paragraph_reader_service =
+            paragraphs::create_reader(&psc, config.version_paragraphs).await?;
+        let vector_reader_service = vectors::create_reader(&vsc, config.version_vectors).await?;
+        Ok(ShardReaderService {
+            id: id.to_string(),
+            creation_time: RwLock::new(SystemTime::now()),
+            field_reader_service: Arc::new(field_reader_service),
+            paragraph_reader_service: Arc::new(paragraph_reader_service),
+            vector_reader_service: Arc::new(vector_reader_service),
+            document_service_version: 0,
+            paragraph_service_version: 0,
+            vector_service_version: 0,
+            relation_service_version: 0,
+        })
+    }
+
     /// Stop the service
     pub async fn stop(&mut self) {
         info!("Stopping shard {}...", { &self.id });

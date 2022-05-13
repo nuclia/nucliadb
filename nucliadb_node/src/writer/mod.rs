@@ -66,8 +66,7 @@ impl NodeWriterService {
             let entry = entry?;
             let shard_id = String::from(entry.file_name().to_str().unwrap());
 
-            let shard: ShardWriterService =
-                ShardWriterService::start(&shard_id.to_string()).await?;
+            let shard: ShardWriterService = ShardWriterService::open(&shard_id.to_string()).await?;
             self.shards.insert(shard_id.clone(), shard);
             info!("Shard loaded: {:?}", shard_id);
         }
@@ -81,7 +80,7 @@ impl NodeWriterService {
             let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id.id);
-                let shard = ShardWriterService::start(&shard_id.id).await.unwrap();
+                let shard = ShardWriterService::open(&shard_id.id).await.unwrap();
                 info!("{}: Loaded shard", shard_id.id);
                 self.shards.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
@@ -99,7 +98,7 @@ impl NodeWriterService {
     }
     pub async fn new_shard(&mut self) -> ShardCreated {
         let new_id = Uuid::new_v4().to_string();
-        let new_shard = ShardWriterService::start(&new_id).await.unwrap();
+        let new_shard = ShardWriterService::new(&new_id).await.unwrap();
         let prev = self.shards.insert(new_id.clone(), new_shard);
         debug_assert!(prev.is_none());
         let new_shard = self.get_shard(&ShardId { id: new_id }).await.unwrap();

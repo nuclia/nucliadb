@@ -143,7 +143,23 @@ impl ParagraphWriterService {
         }
     }
 
-    async fn new(
+    pub async fn new(
+        config: &ParagraphServiceConfiguration,
+    ) -> InternalResult<ParagraphWriterService> {
+        match ParagraphWriterService::new_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
+        }
+    }
+    pub async fn open(
+        config: &ParagraphServiceConfiguration,
+    ) -> InternalResult<ParagraphWriterService> {
+        match ParagraphWriterService::open_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
+        }
+    }
+    pub async fn new_inner(
         config: &ParagraphServiceConfiguration,
     ) -> tantivy::Result<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::new();
@@ -171,7 +187,7 @@ impl ParagraphWriterService {
         })
     }
 
-    async fn open(
+    pub async fn open_inner(
         config: &ParagraphServiceConfiguration,
     ) -> tantivy::Result<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::new();

@@ -93,23 +93,6 @@ impl ReaderChild for FieldReaderService {
 }
 
 impl FieldReaderService {
-    pub async fn start(config: &FieldServiceConfiguration) -> InternalResult<Self> {
-        info!("Starting Text Service");
-        match FieldReaderService::open(config).await {
-            Ok(service) => Ok(service),
-            Err(_e) => {
-                warn!("Text Service does not exists. Creating a new one.");
-                match FieldReaderService::new(config).await {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("Error starting Text service: {}", e);
-                        Err(Box::new(FieldError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
-    }
-
     pub fn find_one(&self, resource_id: &ResourceId) -> tantivy::Result<Option<Document>> {
         let uuid_term = Term::from_field_text(self.schema.uuid, &resource_id.uuid);
         let uuid_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
@@ -145,7 +128,37 @@ impl FieldReaderService {
         Ok(docs)
     }
 
-    async fn new(config: &FieldServiceConfiguration) -> tantivy::Result<FieldReaderService> {
+    pub async fn start(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+        info!("Starting Text Service");
+        match FieldReaderService::open(config).await {
+            Ok(service) => Ok(service),
+            Err(_e) => {
+                warn!("Text Service does not exists. Creating a new one.");
+                match FieldReaderService::new(config).await {
+                    Ok(service) => Ok(service),
+                    Err(e) => {
+                        error!("Error starting Text service: {}", e);
+                        Err(Box::new(FieldError { msg: e.to_string() }))
+                    }
+                }
+            }
+        }
+    }
+    pub async fn new(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+        match FieldReaderService::new_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
+        }
+    }
+    pub async fn open(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+        match FieldReaderService::open_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
+        }
+    }
+    pub async fn new_inner(
+        config: &FieldServiceConfiguration,
+    ) -> tantivy::Result<FieldReaderService> {
         let field_schema = FieldSchema::new();
 
         fs::create_dir_all(&config.path).await?;
@@ -175,7 +188,9 @@ impl FieldReaderService {
         })
     }
 
-    async fn open(config: &FieldServiceConfiguration) -> tantivy::Result<FieldReaderService> {
+    pub async fn open_inner(
+        config: &FieldServiceConfiguration,
+    ) -> tantivy::Result<FieldReaderService> {
         let field_schema = FieldSchema::new();
         let index = Index::open_in_dir(&config.path)?;
 

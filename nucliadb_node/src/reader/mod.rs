@@ -68,8 +68,7 @@ impl NodeReaderService {
             let entry = entry?;
             let shard_id = String::from(entry.file_name().to_str().unwrap());
 
-            let shard: ShardReaderService =
-                ShardReaderService::start(&shard_id.to_string()).await?;
+            let shard: ShardReaderService = ShardReaderService::open(&shard_id.to_string()).await?;
             self.shards.insert(shard_id.clone(), shard);
             info!("Shard loaded: {:?}", shard_id);
         }
@@ -85,7 +84,7 @@ impl NodeReaderService {
             let in_disk = Path::new(&Configuration::shards_path_id(shard_id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id);
-                let shard = ShardReaderService::start(shard_id).await.unwrap();
+                let shard = ShardReaderService::open(shard_id).await.unwrap();
                 info!("{}: Loaded shard", shard_id);
                 self.shards.insert(shard_id.to_string(), shard);
                 info!("{}: Inserted on memory", shard_id);

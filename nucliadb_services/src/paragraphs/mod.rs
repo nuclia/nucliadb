@@ -25,12 +25,32 @@ pub type RParagraphs =
     dyn RService<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>;
 pub type WParagraphs = dyn WService;
 
+pub async fn open_reader(
+    config: &ParagraphServiceConfiguration,
+    version: u32,
+) -> InternalResult<nucliadb_paragraphs_tantivy::reader::ParagraphReaderService> {
+    match version {
+        0 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::open(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
+}
+
+pub async fn open_writer(
+    config: &ParagraphServiceConfiguration,
+    version: u32,
+) -> InternalResult<nucliadb_paragraphs_tantivy::writer::ParagraphWriterService> {
+    match version {
+        0 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::open(config).await,
+        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+    }
+}
+
 pub async fn create_reader(
     config: &ParagraphServiceConfiguration,
     version: u32,
 ) -> InternalResult<nucliadb_paragraphs_tantivy::reader::ParagraphReaderService> {
     match version {
-        0 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::start(config).await,
+        0 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::new(config).await,
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
@@ -40,7 +60,7 @@ pub async fn create_writer(
     version: u32,
 ) -> InternalResult<nucliadb_paragraphs_tantivy::writer::ParagraphWriterService> {
     match version {
-        0 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::start(config).await,
+        0 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::new(config).await,
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }

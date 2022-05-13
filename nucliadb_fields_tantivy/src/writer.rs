@@ -119,9 +119,22 @@ impl FieldWriterService {
         }
     }
 
-    async fn new(config: &FieldServiceConfiguration) -> tantivy::Result<FieldWriterService> {
+    pub async fn new(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+        match FieldWriterService::new_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
+        }
+    }
+    pub async fn open(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+        match FieldWriterService::open_inner(config).await {
+            Ok(service) => Ok(service),
+            Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
+        }
+    }
+    pub async fn new_inner(
+        config: &FieldServiceConfiguration,
+    ) -> tantivy::Result<FieldWriterService> {
         let field_schema = FieldSchema::new();
-
         fs::create_dir_all(&config.path).await?;
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         let settings = IndexSettings {
@@ -144,7 +157,9 @@ impl FieldWriterService {
         })
     }
 
-    async fn open(config: &FieldServiceConfiguration) -> tantivy::Result<FieldWriterService> {
+    pub async fn open_inner(
+        config: &FieldServiceConfiguration,
+    ) -> tantivy::Result<FieldWriterService> {
         let field_schema = FieldSchema::new();
 
         let index = Index::open_in_dir(&config.path)?;
