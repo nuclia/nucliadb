@@ -253,13 +253,10 @@ impl ShardReaderService {
             .as_millis();
         if trigger || elapsed >= RELOAD_PERIOD {
             *self.creation_time.write().unwrap() = SystemTime::now();
-            let field_reader_service = self.field_reader_service.clone();
-            let text_task = task::spawn_blocking(move || field_reader_service.reload());
-            let paragraph_reader_service = self.paragraph_reader_service.clone();
-            let paragraph_task = task::spawn_blocking(move || paragraph_reader_service.reload());
             let vector_reader_service = self.vector_reader_service.clone();
-            let vector_task = task::spawn_blocking(move || vector_reader_service.reload());
-            try_join!(vector_task, text_task, paragraph_task).unwrap();
+            task::spawn_blocking(move || vector_reader_service.reload())
+                .await
+                .unwrap()
         }
     }
 }
