@@ -1,1 +1,3 @@
-This crate is a currently a fork of quickwit-telemetry from Quickwit Inc.
+# NucliaDB Telemetry
+
+Open telemetry compatible plugin to propagate traceid on FastAPI, Nats and GRPC with Asyncio.

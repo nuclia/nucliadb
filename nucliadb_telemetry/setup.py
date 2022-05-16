@@ -19,11 +19,17 @@ def load_reqs(filename):
         ]
 
 
+def load_version():
+    with open("VERSION", "r") as f:
+        version = f.read().strip()
+    return version
+
+
 requirements = load_reqs("requirements.txt")
 
 setup(
     name="nucliadb_telemetry",
-    version="0.1.0",
+    version=load_version(),
     author="nucliadb Authors",
     author_email="nucliadb@nuclia.com",
     description="NucliaDB Telemetry Library Python process",
