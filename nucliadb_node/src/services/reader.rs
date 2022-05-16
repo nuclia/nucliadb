@@ -17,7 +17,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use std::time::SystemTime;
 
 // use crate::services::vector::config::Distance;
@@ -42,9 +42,9 @@ const FIXED_VECTORS_RESULTS: usize = 10;
 pub struct ShardReaderService {
     pub id: String,
     creation_time: RwLock<SystemTime>,
-    field_reader_service: Arc<fields::RFields>,
-    paragraph_reader_service: Arc<paragraphs::RParagraphs>,
-    vector_reader_service: Arc<vectors::RVectors>,
+    field_reader_service: fields::RFields,
+    paragraph_reader_service: paragraphs::RParagraphs,
+    vector_reader_service: vectors::RVectors,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -98,9 +98,9 @@ impl ShardReaderService {
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
-            field_reader_service: Arc::new(field_reader_service),
-            paragraph_reader_service: Arc::new(paragraph_reader_service),
-            vector_reader_service: Arc::new(vector_reader_service),
+            field_reader_service,
+            paragraph_reader_service,
+            vector_reader_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,
@@ -135,9 +135,9 @@ impl ShardReaderService {
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
-            field_reader_service: Arc::new(field_reader_service),
-            paragraph_reader_service: Arc::new(paragraph_reader_service),
-            vector_reader_service: Arc::new(vector_reader_service),
+            field_reader_service,
+            paragraph_reader_service,
+            vector_reader_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,
@@ -172,9 +172,9 @@ impl ShardReaderService {
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
-            field_reader_service: Arc::new(field_reader_service),
-            paragraph_reader_service: Arc::new(paragraph_reader_service),
-            vector_reader_service: Arc::new(vector_reader_service),
+            field_reader_service,
+            paragraph_reader_service,
+            vector_reader_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,

@@ -17,7 +17,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::sync::{Arc, RwLock};
 
 use futures::try_join;
 use nucliadb_protos::{Resource, ResourceId, SetVectorFieldRequest};
@@ -31,9 +30,9 @@ use crate::services::config::ShardConfig;
 pub struct ShardWriterService {
     pub id: String,
 
-    field_writer_service: Arc<RwLock<fields::WFields>>,
-    paragraph_writer_service: Arc<RwLock<paragraphs::WParagraphs>>,
-    vector_writer_service: Arc<RwLock<vectors::WVectors>>,
+    field_writer_service: fields::WFields,
+    paragraph_writer_service: paragraphs::WParagraphs,
+    vector_writer_service: vectors::WVectors,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -69,9 +68,9 @@ impl ShardWriterService {
 
         Ok(ShardWriterService {
             id: id.to_string(),
-            field_writer_service: Arc::new(RwLock::new(field_writer_service)),
-            paragraph_writer_service: Arc::new(RwLock::new(paragraph_writer_service)),
-            vector_writer_service: Arc::new(RwLock::new(vector_writer_service)),
+            field_writer_service,
+            paragraph_writer_service,
+            vector_writer_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,
@@ -104,10 +103,10 @@ impl ShardWriterService {
         let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
 
         Ok(ShardWriterService {
+            field_writer_service,
+            paragraph_writer_service,
+            vector_writer_service,
             id: id.to_string(),
-            field_writer_service: Arc::new(RwLock::new(field_writer_service)),
-            paragraph_writer_service: Arc::new(RwLock::new(paragraph_writer_service)),
-            vector_writer_service: Arc::new(RwLock::new(vector_writer_service)),
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,
@@ -141,9 +140,9 @@ impl ShardWriterService {
 
         Ok(ShardWriterService {
             id: id.to_string(),
-            field_writer_service: Arc::new(RwLock::new(field_writer_service)),
-            paragraph_writer_service: Arc::new(RwLock::new(paragraph_writer_service)),
-            vector_writer_service: Arc::new(RwLock::new(vector_writer_service)),
+            field_writer_service,
+            paragraph_writer_service,
+            vector_writer_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,

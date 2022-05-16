@@ -21,15 +21,19 @@ use crate::*;
 
 pub const MAX_VERSION: u32 = 0;
 
-pub type RFields = dyn RService<Request = DocumentSearchRequest, Response = DocumentSearchResponse>;
-pub type WFields = dyn WService;
+type RFieldsT = dyn RService<Request = DocumentSearchRequest, Response = DocumentSearchResponse>;
+type WFieldsT = dyn WService;
+pub type RFields = Arc<RFieldsT>;
+pub type WFields = Arc<RwLock<WFieldsT>>;
 
 pub async fn open_reader(
     config: &FieldServiceConfiguration,
     version: u32,
-) -> InternalResult<nucliadb_fields_tantivy::reader::FieldReaderService> {
+) -> InternalResult<RFields> {
     match version {
-        0 => nucliadb_fields_tantivy::reader::FieldReaderService::open(config).await,
+        0 => nucliadb_fields_tantivy::reader::FieldReaderService::open(config)
+            .await
+            .map(|v| Arc::new(v) as RFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
@@ -37,18 +41,22 @@ pub async fn open_reader(
 pub async fn open_writer(
     config: &FieldServiceConfiguration,
     version: u32,
-) -> InternalResult<nucliadb_fields_tantivy::writer::FieldWriterService> {
+) -> InternalResult<WFields> {
     match version {
-        0 => nucliadb_fields_tantivy::writer::FieldWriterService::open(config).await,
+        0 => nucliadb_fields_tantivy::writer::FieldWriterService::open(config)
+            .await
+            .map(|v| Arc::new(RwLock::new(v)) as WFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 pub async fn create_reader(
     config: &FieldServiceConfiguration,
     version: u32,
-) -> InternalResult<nucliadb_fields_tantivy::reader::FieldReaderService> {
+) -> InternalResult<RFields> {
     match version {
-        0 => nucliadb_fields_tantivy::reader::FieldReaderService::new(config).await,
+        0 => nucliadb_fields_tantivy::reader::FieldReaderService::new(config)
+            .await
+            .map(|v| Arc::new(v) as RFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
@@ -56,9 +64,11 @@ pub async fn create_reader(
 pub async fn create_writer(
     config: &FieldServiceConfiguration,
     version: u32,
-) -> InternalResult<nucliadb_fields_tantivy::writer::FieldWriterService> {
+) -> InternalResult<WFields> {
     match version {
-        0 => nucliadb_fields_tantivy::writer::FieldWriterService::new(config).await,
+        0 => nucliadb_fields_tantivy::writer::FieldWriterService::new(config)
+            .await
+            .map(|v| Arc::new(RwLock::new(v)) as WFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
