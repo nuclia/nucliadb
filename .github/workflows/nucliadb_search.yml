@@ -118,6 +118,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
+          flags: search
 
       - name: Extract docs
         run: |

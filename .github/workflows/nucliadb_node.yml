@@ -194,6 +194,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
+          flags: node-sidecar
 
   build-rust:
     name: Build image and push
