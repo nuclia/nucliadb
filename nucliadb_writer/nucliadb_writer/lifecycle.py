@@ -21,6 +21,7 @@ import logging
 import sys
 
 from nucliadb_ingest.utils import start_ingest, stop_ingest
+from nucliadb_telemetry.telemetry import get_telemetry
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -31,6 +32,7 @@ from nucliadb_utils.settings import (
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import Utility, get_transaction, set_utility
 from nucliadb_writer import logger
+from nucliadb_writer import SERVICE_NAME
 from nucliadb_writer.processing import ProcessingEngine
 from nucliadb_writer.tus import finalize as storage_finalize
 from nucliadb_writer.tus import initialize as storage_initialize
@@ -38,7 +40,7 @@ from nucliadb_writer.utilities import get_processing
 
 
 async def initialize():
-    await start_ingest()
+    await start_ingest(SERVICE_NAME)
     processing_engine = ProcessingEngine(
         nuclia_service_account=nuclia_settings.nuclia_service_account,
         nuclia_zone=nuclia_settings.nuclia_zone,
@@ -66,7 +68,7 @@ async def initialize():
             nats_servers=transaction_settings.transaction_jetstream_servers,
             nats_target=transaction_settings.transaction_jetstream_target,
         )
-        await transaction_utility.initialize()
+        await transaction_utility.initialize(SERVICE_NAME)
     set_utility(Utility.TRANSACTION, transaction_utility)
     await storage_initialize()
 

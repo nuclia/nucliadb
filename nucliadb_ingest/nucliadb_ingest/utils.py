@@ -24,9 +24,11 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
+from nucliadb_telemetry.telemetry import OpenTelemetryGRPC, get_telemetry
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+from nucliadb_telemetry.settings import telemetry_settings
 
 try:
     from nucliadb_ingest.maindb.redis import RedisDriver
@@ -84,13 +86,20 @@ async def get_driver() -> Driver:
     return driver
 
 
-async def start_ingest():
+async def start_ingest(service_name: Optional[str] = None):
     if nucliadb_settings.nucliadb_ingest is not None:
-        set_utility(
-            Utility.CHANNEL, aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
-        )
-        set_utility(Utility.INGEST, WriterStub(get_utility(Utility.CHANNEL)))
+        # Its distributed lets create a GRPC client
+        if telemetry_settings.jeager_enabled and service_name:
+            # We want Jaeger telemetry enabled
+            provider = get_telemetry(service_name)
+            otgrpc = OpenTelemetryGRPC(f"{service_name}_ingest", provider)
+            channel = otgrpc.init_client(nucliadb_settings.nucliadb_ingest)
+        else:
+            channel = aio.insecure_channel(nucliadb_settings.nucliadb_ingest)
+        set_utility(Utility.CHANNEL, channel)
+        set_utility(Utility.INGEST, WriterStub(channel))
     else:
+        # Its not distributed create a ingest
         from nucliadb_ingest.service.writer import WriterServicer
 
         service = WriterServicer()

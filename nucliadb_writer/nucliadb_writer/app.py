@@ -17,12 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_telemetry.telemetry import get_telemetry, init_telemetry
 import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi_versioning import VersionedFastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.instrumentation.aiohttp_client import (
+    AioHttpClientInstrumentor,
+)
+
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -32,10 +36,11 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse, PlainTextResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
+from nucliadb_telemetry.settings import telemetry_settings
 
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.settings import http_settings, running_settings
-from nucliadb_writer import API_PREFIX
+from nucliadb_writer import API_PREFIX, SERVICE_NAME
 from nucliadb_writer.api.v1.router import api as api_v1
 from nucliadb_writer.lifecycle import finalize, initialize
 from nucliadb_writer.sentry import set_sentry
@@ -114,6 +119,11 @@ application.add_route("/", homepage)
 application.add_route("/metrics", metrics)
 # Enable forwarding of B3 headers to responses and external requests
 # to both inner applications
+
+tracer_provider = None
+if telemetry_settings.jeager_enabled:
+    tracer_provider = get_telemetry(SERVICE_NAME)
+
 set_global_textmap(B3MultiFormat())
-FastAPIInstrumentor.instrument_app(application)
-HTTPXClientInstrumentor().instrument(skip_dep_check=True)
+FastAPIInstrumentor.instrument_app(application, tracer_provider=tracer_provider)
+AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)

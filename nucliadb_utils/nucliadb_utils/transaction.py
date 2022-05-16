@@ -23,6 +23,8 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_telemetry.telemetry import JetStreamContextTelemetry, get_telemetry
+from nucliadb_telemetry.settings import telemetry_settings
 
 from nucliadb_utils import logger
 
@@ -76,7 +78,7 @@ class TransactionUtility:
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
 
-    async def initialize(self):
+    async def initialize(self, service_name: Optional[str] = None):
 
         options = {
             "error_cb": self.error_cb,
@@ -93,6 +95,11 @@ class TransactionUtility:
         self.nc = await nats.connect(**options)
 
         self.js = self.nc.jetstream()
+        if telemetry_settings.jeager_enabled:
+            tracer_provider = get_telemetry()
+            self.js = JetStreamContextTelemetry(
+                self.js, f"{service_name}_transaction", tracer_provider
+            )
 
     async def finalize(self):
         if self.nc:

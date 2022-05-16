@@ -19,7 +19,8 @@
 #
 import logging
 
-logger = logging.getLogger("nucliadb_search")
+SERVICE_NAME = "nucliadb_search"
+logger = logging.getLogger(SERVICE_NAME)
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
     "[%(asctime)s] [%(levelname)s] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S.%z"

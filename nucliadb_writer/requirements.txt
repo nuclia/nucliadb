@@ -1,7 +1,7 @@
 starlette-prometheus
 uvicorn==0.16.0
 opentelemetry-instrumentation-fastapi
-opentelemetry-instrumentation-httpx
+opentelemetry-instrumentation-aiohttp-client
 opentelemetry-propagator-b3
 fastapi-versioning==0.10.0
 fastapi==0.75.0

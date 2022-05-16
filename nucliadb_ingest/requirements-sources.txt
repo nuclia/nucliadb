@@ -3,3 +3,4 @@
 -e ./nucliadb_swim
 -e ./nucliadb_cluster
 -e ./nucliadb_models
+-e ./nucliadb_telemetry
