@@ -1,26 +1,24 @@
-from collections import OrderedDict
-from contextlib import contextmanager
 import functools
+from collections import OrderedDict
+from concurrent import futures
+from contextlib import contextmanager
+from typing import Any, Awaitable, Callable, MutableMapping
+
 import grpc
 from grpc import ClientCallDetails, aio  # type: ignore
-from typing import Any, Awaitable, Callable, MutableMapping
-from nucliadb_telemetry.common import finish_span, set_span_exception
-from grpc.experimental import wrap_server_method_handler
-from opentelemetry.trace.status import Status, StatusCode  # type: ignore
-
+from grpc.experimental import wrap_server_method_handler  # type: ignore
+from opentelemetry.context import attach, detach
+from opentelemetry.propagate import extract, inject
+from opentelemetry.propagators.textmap import Setter  # type: ignore
+from opentelemetry.sdk.trace import Span  # type: ignore
+from opentelemetry.sdk.trace import TracerProvider  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
-from opentelemetry.trace import use_span  # type: ignore
-from opentelemetry.propagate import extract, inject
-from opentelemetry.context import attach, detach
-from opentelemetry.propagators.textmap import Setter  # type: ignore
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-from nucliadb_telemetry import logger
-from grpc.aio._typing import MetadataType, RequestType, ResponseType
-from opentelemetry.sdk.trace import Span  # type: ignore
+from opentelemetry.trace.status import Status, StatusCode  # type: ignore
 
-from concurrent import futures
+from nucliadb_telemetry import logger
+from nucliadb_telemetry.common import set_span_exception
 
 
 class _CarrierSetter(Setter):
@@ -83,7 +81,7 @@ def start_span_client(
     span = tracer.start_span(  # type: ignore
         name=method_name,
         kind=SpanKind.CLIENT,
-        attributes=attributes,
+        attributes=attributes,  # type: ignore
         set_status_on_exception=set_status_on_exception,
     )
     return span
@@ -134,10 +132,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         try:
             ip, port = context.peer().split(",")[0].split(":", 1)[1].rsplit(":", 1)
             attributes.update(
-                {
-                    SpanAttributes.NET_PEER_IP: ip,
-                    SpanAttributes.NET_PEER_PORT: port,
-                }
+                {SpanAttributes.NET_PEER_IP: ip, SpanAttributes.NET_PEER_PORT: port}
             )
 
             # other telemetry sources add this, so we will too

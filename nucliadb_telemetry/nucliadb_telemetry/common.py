@@ -1,8 +1,9 @@
 import traceback
 from typing import Optional
+
 from opentelemetry.context import detach
-from opentelemetry.trace.status import Status, StatusCode  # type: ignore
 from opentelemetry.sdk.trace import Span  # type: ignore
+from opentelemetry.trace.status import Status, StatusCode  # type: ignore
 
 
 def set_span_exception(span: Optional[Span], exception: Exception):

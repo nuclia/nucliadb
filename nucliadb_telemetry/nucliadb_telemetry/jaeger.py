@@ -1,21 +1,21 @@
 import asyncio
 import math
-from nucliadb_telemetry import logger
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore
-from opentelemetry.sdk.trace import Span  # type: ignore
 from typing import List
-from opentelemetry.sdk.trace.export import SpanExportResult
 
-from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore
+from opentelemetry.exporter.jaeger.thrift.gen.agent import Agent  # type: ignore
+from opentelemetry.exporter.jaeger.thrift.gen.jaeger import Collector  # type: ignore
 from opentelemetry.exporter.jaeger.thrift.translate import Translate  # type: ignore
 from opentelemetry.exporter.jaeger.thrift.translate import (  # type: ignore
     ThriftTranslator,
 )
-from opentelemetry.exporter.jaeger.thrift.gen.jaeger import Collector  # type: ignore
-from opentelemetry.exporter.jaeger.thrift.gen.agent import Agent  # type: ignore
-
+from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
+from opentelemetry.sdk.trace import Span  # type: ignore
+from opentelemetry.sdk.trace.export import SpanExportResult  # type: ignore
 from thrift.protocol import TCompactProtocol  # type: ignore
 from thrift.transport import TTransport  # type: ignore
+
+from nucliadb_telemetry import logger
 
 UDP_PACKET_MAX_LENGTH = 65000
 

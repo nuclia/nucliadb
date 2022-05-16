@@ -21,8 +21,7 @@ import logging
 import sys
 
 from nucliadb_ingest.utils import start_ingest, stop_ingest
-from nucliadb_reader import logger
-from nucliadb_reader import SERVICE_NAME
+from nucliadb_reader import SERVICE_NAME, logger
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
 

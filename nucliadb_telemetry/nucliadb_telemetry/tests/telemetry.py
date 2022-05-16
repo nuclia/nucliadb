@@ -1,33 +1,27 @@
-import asyncio
-import contextlib
-import socket
-from asyncio import DatagramProtocol
+import os
 
 import nats
 import pytest
+import requests
 from fastapi import FastAPI
 from httpx import AsyncClient
 from nats.aio.msg import Msg
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-
-from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
-from nucliadb_telemetry.utils import get_telemetry
-from nucliadb_telemetry.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
-import requests
-import os
+
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
+from nucliadb_telemetry.utils import get_telemetry
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
     "version": "1.33",
-    "options": {
-        "ports": {"6831/udp": None, "16686": None},
-    },
+    "options": {"ports": {"6831/udp": None, "16686": None}},
 }
 
 
@@ -91,7 +85,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
     async def subscription_worker(self, msg: Msg):
         tracer = self.tracer_provider.get_tracer("message_worker")
-        with tracer.start_as_current_span("message_worker_span") as span:
+        with tracer.start_as_current_span("message_worker_span") as _:
             self.messages.append(msg)
 
     async def initialize(self):
@@ -154,7 +148,7 @@ async def http_service(settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service
     @app.get("/")
     async def simple_api():
         tracer = tracer_provider.get_tracer(__name__)
-        with tracer.start_as_current_span("simple_api_work") as span:
+        with tracer.start_as_current_span("simple_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
             stub = helloworld_pb2_grpc.GreeterStub(channel)
             response = await stub.SayHello(helloworld_pb2.HelloRequest(name="you"))

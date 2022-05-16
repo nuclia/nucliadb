@@ -17,15 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_telemetry.telemetry import JetStreamContextTelemetry, get_telemetry
-from nucliadb_telemetry.settings import telemetry_settings
 
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
 
 
@@ -51,7 +52,7 @@ class LocalTransactionUtility:
 class TransactionUtility:
 
     nc: Optional[Client] = None
-    js: Optional[JetStreamContext] = None
+    js: Optional[Union[JetStreamContext, JetStreamContextTelemetry]] = None
 
     def __init__(
         self,
@@ -80,7 +81,7 @@ class TransactionUtility:
 
     async def initialize(self, service_name: Optional[str] = None):
 
-        options = {
+        options: Dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
             "reconnected_cb": self.reconnected_cb,
@@ -94,12 +95,14 @@ class TransactionUtility:
 
         self.nc = await nats.connect(**options)
 
-        self.js = self.nc.jetstream()
-        if telemetry_settings.jeager_enabled:
-            tracer_provider = get_telemetry()
+        jetstream = self.nc.jetstream()
+        if telemetry_settings.jeager_enabled and service_name and jetstream:
+            tracer_provider = get_telemetry(service_name)
             self.js = JetStreamContextTelemetry(
-                self.js, f"{service_name}_transaction", tracer_provider
+                jetstream, f"{service_name}_transaction", tracer_provider
             )
+        else:
+            self.js = jetstream
 
     async def finalize(self):
         if self.nc:

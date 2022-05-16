@@ -17,16 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_telemetry.telemetry import get_telemetry, init_telemetry
 import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi_versioning import VersionedFastAPI
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.aiohttp_client import (
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
     AioHttpClientInstrumentor,
 )
-
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -36,8 +34,9 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse, PlainTextResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
-from nucliadb_telemetry.settings import telemetry_settings
 
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.settings import http_settings, running_settings
 from nucliadb_writer import API_PREFIX, SERVICE_NAME

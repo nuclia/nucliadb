@@ -19,7 +19,6 @@
 #
 import logging
 
-
 SERVICE_NAME = "nucliadb_reader"
 logger = logging.getLogger(SERVICE_NAME)
 

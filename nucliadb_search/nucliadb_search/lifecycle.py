@@ -23,8 +23,7 @@ from collections import Counter
 
 from nucliadb_ingest.utils import get_driver  # type: ignore
 from nucliadb_ingest.utils import start_ingest, stop_ingest
-from nucliadb_search import logger
-from nucliadb_search import SERVICE_NAME
+from nucliadb_search import SERVICE_NAME, logger
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
 from nucliadb_search.swim import start_swim

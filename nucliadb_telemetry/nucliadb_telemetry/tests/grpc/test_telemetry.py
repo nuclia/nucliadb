@@ -3,8 +3,8 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_telemetry.tests.telemetry import Greeter
 from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.tests.telemetry import Greeter
 
 
 @pytest.mark.asyncio

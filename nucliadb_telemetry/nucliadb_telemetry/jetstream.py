@@ -1,17 +1,16 @@
 from functools import partial
 from typing import Dict
-from nats.aio.msg import Msg
-from nucliadb_telemetry.common import finish_span, set_span_exception
-from opentelemetry.trace import Tracer  # type: ignore
 
+from nats.aio.msg import Msg
 from nats.js.client import JetStreamContext
+from opentelemetry.context import attach
+from opentelemetry.propagate import extract, inject
+from opentelemetry.sdk.trace import TracerProvider  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
+from opentelemetry.trace import Tracer  # type: ignore
 
-from opentelemetry.propagate import extract, inject
-
-from opentelemetry.context import attach
+from nucliadb_telemetry.common import finish_span, set_span_exception
 
 
 def start_span_server_js(tracer: Tracer, msg: Msg):

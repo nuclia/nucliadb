@@ -1,9 +1,10 @@
+from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
+from opentelemetry.sdk.resources import Resource  # type: ignore
+from opentelemetry.sdk.trace import TracerProvider  # type: ignore
+
 from nucliadb_telemetry.batch_span import BatchSpanProcessor
 from nucliadb_telemetry.jaeger import JaegerExporterAsync
 from nucliadb_telemetry.settings import telemetry_settings
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
-from opentelemetry.sdk.resources import Resource  # type: ignore
 
 GLOBAL_PROVIDER = {}
 

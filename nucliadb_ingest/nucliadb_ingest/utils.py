@@ -24,11 +24,12 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
-from nucliadb_telemetry.telemetry import OpenTelemetryGRPC, get_telemetry
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
-from nucliadb_telemetry.settings import telemetry_settings
 
 try:
     from nucliadb_ingest.maindb.redis import RedisDriver

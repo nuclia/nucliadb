@@ -1,11 +1,5 @@
 import asyncio
 from typing import List, Optional
-from nucliadb_telemetry import logger
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor  # type: ignore
-from opentelemetry.sdk.trace.export import (  # type: ignore
-    SpanExporter,
-)
-from opentelemetry.util._time import _time_ns  # type: ignore
 
 from opentelemetry.context import (  # type: ignore
     _SUPPRESS_INSTRUMENTATION_KEY,
@@ -14,6 +8,11 @@ from opentelemetry.context import (  # type: ignore
     detach,
     set_value,
 )
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor  # type: ignore
+from opentelemetry.sdk.trace.export import SpanExporter  # type: ignore
+from opentelemetry.util._time import _time_ns  # type: ignore
+
+from nucliadb_telemetry import logger
 
 
 class _FlushRequest:
