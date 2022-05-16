@@ -27,6 +27,7 @@ mod query_insert;
 mod query_post_search;
 mod query_search;
 pub mod reader;
+pub mod service;
 #[cfg(test)]
 mod tests;
 mod utils;

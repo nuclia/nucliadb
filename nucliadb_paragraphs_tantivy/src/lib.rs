@@ -17,12 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-
-/// This module is for all services linked to node
-///
-/// Services
-mod config;
-pub mod service;
-// Main services
 pub mod reader;
+pub mod schema;
+pub mod search_query;
+pub mod search_response;
 pub mod writer;

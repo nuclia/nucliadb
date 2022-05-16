@@ -18,11 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-/// This module is for all services linked to node
-///
-/// Services
-mod config;
-pub mod service;
-// Main services
 pub mod reader;
+mod schema;
+mod search_query;
 pub mod writer;

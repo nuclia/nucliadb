@@ -17,12 +17,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::service_interface::InternalError;
 
-/// This module is for all services linked to node
-///
-/// Services
-mod config;
-pub mod service;
-// Main services
-pub mod reader;
-pub mod writer;
+#[derive(Clone)]
+pub struct VectorServiceConfiguration {
+    pub no_results: Option<usize>,
+    pub path: String,
+}
+
+#[derive(Debug)]
+pub struct VectorError {
+    pub msg: String,
+}
+
+impl std::fmt::Display for VectorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.msg)
+    }
+}
+
+impl InternalError for VectorError {}

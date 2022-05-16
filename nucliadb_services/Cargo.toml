@@ -1,0 +1,12 @@
+[package]
+name = "nucliadb_services"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nucliadb_service_interface = { path = "../nucliadb_service_interface" }
+nucliadb_fields_tantivy= { path = "../nucliadb_fields_tantivy" }
+nucliadb_paragraphs_tantivy= { path = "../nucliadb_paragraphs_tantivy" }
+nucliadb_vectors= { path = "../nucliadb_vectors" }

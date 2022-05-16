@@ -17,30 +17,23 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use std::time::SystemTime;
 
 // use crate::services::vector::config::Distance;
 // use crate::services::vector::config::VectorServiceConfiguration;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    ResourceId, SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
-    VectorSearchRequest, VectorSearchResponse,
+    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, VectorSearchRequest,
+    VectorSearchResponse,
 };
-use tantivy::Document;
+use nucliadb_services::*;
 use tokio::{task, try_join};
 use tracing::*;
 
 // use super::vector::service::VectorService;
 use crate::config::Configuration;
-use crate::result::InternalResult;
-use crate::services::field::config::FieldServiceConfiguration;
-use crate::services::field::reader::FieldReaderService;
-use crate::services::paragraph::config::ParagraphServiceConfiguration;
-use crate::services::paragraph::reader::ParagraphReaderService;
-use crate::services::service::{ReaderChild, ServiceChild};
-use crate::services::vector::config::VectorServiceConfiguration;
-use crate::services::vector::reader::VectorReaderService;
+use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
 
 const RELOAD_PERIOD: u128 = 5000;
@@ -49,9 +42,9 @@ const FIXED_VECTORS_RESULTS: usize = 10;
 pub struct ShardReaderService {
     pub id: String,
     creation_time: RwLock<SystemTime>,
-    field_reader_service: Arc<FieldReaderService>,
-    paragraph_reader_service: Arc<ParagraphReaderService>,
-    vector_reader_service: Arc<VectorReaderService>,
+    field_reader_service: fields::RFields,
+    paragraph_reader_service: paragraphs::RParagraphs,
+    vector_reader_service: vectors::RVectors,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -65,16 +58,16 @@ impl ShardReaderService {
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         let vector_reader_service = self.vector_reader_service.clone();
         tokio::task::spawn_blocking(move || StatsData {
-            resources: field_reader_service.num_resources(),
-            paragraphs: paragraph_reader_service.num_paragraphs(),
-            sentences: vector_reader_service.no_vectors(),
+            resources: field_reader_service.count(),
+            paragraphs: paragraph_reader_service.count(),
+            sentences: vector_reader_service.count(),
         })
         .await
         .unwrap()
     }
 
     pub fn get_resources(&self) -> usize {
-        self.field_reader_service.num_resources()
+        self.field_reader_service.count()
     }
 
     /// Start the service
@@ -97,19 +90,91 @@ impl ShardReaderService {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
         };
-
-        let field_reader_service = FieldReaderService::start(&fsc).await?;
-
-        let paragraph_reader_service = ParagraphReaderService::start(&psc).await?;
-
-        let vector_reader_service = VectorReaderService::start(&vsc).await?;
-
+        let config = ShardConfig::new(&shard_path).await;
+        let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
+        let paragraph_reader_service =
+            paragraphs::create_reader(&psc, config.version_paragraphs).await?;
+        let vector_reader_service = vectors::create_reader(&vsc, config.version_vectors).await?;
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
-            field_reader_service: Arc::new(field_reader_service),
-            paragraph_reader_service: Arc::new(paragraph_reader_service),
-            vector_reader_service: Arc::new(vector_reader_service),
+            field_reader_service,
+            paragraph_reader_service,
+            vector_reader_service,
+            document_service_version: 0,
+            paragraph_service_version: 0,
+            vector_service_version: 0,
+            relation_service_version: 0,
+        })
+    }
+
+    pub async fn open(id: &str) -> InternalResult<ShardReaderService> {
+        let shard_path = Configuration::shards_path_id(id);
+        match Path::new(&shard_path).exists() {
+            true => info!("Loading shard with id {}", id),
+            false => info!("Creating new shard with id {}", id),
+        }
+
+        let fsc = FieldServiceConfiguration {
+            path: format!("{}/text", shard_path),
+        };
+
+        let psc = ParagraphServiceConfiguration {
+            path: format!("{}/paragraph", shard_path),
+        };
+
+        let vsc = VectorServiceConfiguration {
+            no_results: Some(FIXED_VECTORS_RESULTS),
+            path: format!("{}/vectors", shard_path),
+        };
+        let config = ShardConfig::new(&shard_path).await;
+        let field_reader_service = fields::open_reader(&fsc, config.version_fields).await?;
+        let paragraph_reader_service =
+            paragraphs::open_reader(&psc, config.version_paragraphs).await?;
+        let vector_reader_service = vectors::open_reader(&vsc, config.version_vectors).await?;
+        Ok(ShardReaderService {
+            id: id.to_string(),
+            creation_time: RwLock::new(SystemTime::now()),
+            field_reader_service,
+            paragraph_reader_service,
+            vector_reader_service,
+            document_service_version: 0,
+            paragraph_service_version: 0,
+            vector_service_version: 0,
+            relation_service_version: 0,
+        })
+    }
+
+    pub async fn create(id: &str) -> InternalResult<ShardReaderService> {
+        let shard_path = Configuration::shards_path_id(id);
+        match Path::new(&shard_path).exists() {
+            true => info!("Loading shard with id {}", id),
+            false => info!("Creating new shard with id {}", id),
+        }
+
+        let fsc = FieldServiceConfiguration {
+            path: format!("{}/text", shard_path),
+        };
+
+        let psc = ParagraphServiceConfiguration {
+            path: format!("{}/paragraph", shard_path),
+        };
+
+        let vsc = VectorServiceConfiguration {
+            no_results: Some(FIXED_VECTORS_RESULTS),
+            path: format!("{}/vectors", shard_path),
+        };
+        let config = ShardConfig::new(&shard_path).await;
+        let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
+        let paragraph_reader_service =
+            paragraphs::create_reader(&psc, config.version_paragraphs).await?;
+        let vector_reader_service = vectors::create_reader(&vsc, config.version_vectors).await?;
+        Ok(ShardReaderService {
+            id: id.to_string(),
+            creation_time: RwLock::new(SystemTime::now()),
+            field_reader_service,
+            paragraph_reader_service,
+            vector_reader_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,
@@ -130,19 +195,6 @@ impl ShardReaderService {
 
         if let Err(e) = self.vector_reader_service.stop().await {
             error!("Error stopping the Vector service: {}", e);
-        }
-    }
-    pub async fn find_resource(
-        &self,
-        resource_id: ResourceId,
-    ) -> Result<Vec<Document>, Box<dyn std::error::Error>> {
-        let field_reader_service = self.field_reader_service.clone();
-        let result = task::spawn_blocking(move || field_reader_service.find_resource(&resource_id))
-            .await
-            .unwrap();
-        match result {
-            Ok(document) => Ok(document),
-            Err(e) => Err(Box::new(e)),
         }
     }
 
@@ -277,13 +329,10 @@ impl ShardReaderService {
             .as_millis();
         if trigger || elapsed >= RELOAD_PERIOD {
             *self.creation_time.write().unwrap() = SystemTime::now();
-            let field_reader_service = self.field_reader_service.clone();
-            let text_task = task::spawn_blocking(move || field_reader_service.reload());
-            let paragraph_reader_service = self.paragraph_reader_service.clone();
-            let paragraph_task = task::spawn_blocking(move || paragraph_reader_service.reload());
             let vector_reader_service = self.vector_reader_service.clone();
-            let vector_task = task::spawn_blocking(move || vector_reader_service.reload());
-            try_join!(vector_task, text_task, paragraph_task).unwrap();
+            task::spawn_blocking(move || vector_reader_service.reload())
+                .await
+                .unwrap()
         }
     }
 }

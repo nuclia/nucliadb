@@ -17,29 +17,22 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::Path;
-use std::sync::{Arc, RwLock};
 
 use futures::try_join;
 use nucliadb_protos::{Resource, ResourceId, SetVectorFieldRequest};
+use nucliadb_services::*;
 use tracing::*;
 
 use crate::config::Configuration;
-use crate::result::InternalResult;
-use crate::services::field::config::FieldServiceConfiguration;
-use crate::services::field::writer::FieldWriterService;
-use crate::services::paragraph::config::ParagraphServiceConfiguration;
-use crate::services::paragraph::writer::ParagraphWriterService;
-use crate::services::service::*;
-use crate::services::vector::config::VectorServiceConfiguration;
-use crate::services::vector::writer::VectorWriterService;
+use crate::services::config::ShardConfig;
 
 #[derive(Debug)]
 pub struct ShardWriterService {
     pub id: String,
 
-    field_writer_service: Arc<RwLock<FieldWriterService>>,
-    paragraph_writer_service: Arc<RwLock<ParagraphWriterService>>,
-    vector_writer_service: Arc<RwLock<VectorWriterService>>,
+    field_writer_service: fields::WFields,
+    paragraph_writer_service: paragraphs::WParagraphs,
+    vector_writer_service: vectors::WVectors,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -67,16 +60,89 @@ impl ShardWriterService {
             no_results: None,
             path: format!("{}/vectors", shard_path),
         };
-
-        let field_writer_service = FieldWriterService::start(&fsc).await?;
-        let paragraph_writer_service = ParagraphWriterService::start(&psc).await?;
-        let vector_writer_service = VectorWriterService::start(&vsc).await?;
+        let config = ShardConfig::new(&shard_path).await;
+        let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
+        let paragraph_writer_service =
+            paragraphs::create_writer(&psc, config.version_paragraphs).await?;
+        let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
 
         Ok(ShardWriterService {
             id: id.to_string(),
-            field_writer_service: Arc::new(RwLock::new(field_writer_service)),
-            paragraph_writer_service: Arc::new(RwLock::new(paragraph_writer_service)),
-            vector_writer_service: Arc::new(RwLock::new(vector_writer_service)),
+            field_writer_service,
+            paragraph_writer_service,
+            vector_writer_service,
+            document_service_version: 0,
+            paragraph_service_version: 0,
+            vector_service_version: 0,
+            relation_service_version: 0,
+        })
+    }
+    pub async fn new(id: &str) -> InternalResult<ShardWriterService> {
+        let shard_path = Configuration::shards_path_id(id);
+        match Path::new(&shard_path).exists() {
+            true => info!("Loading shard with id {}", id),
+            false => info!("Creating new shard with id {}", id),
+        }
+
+        let fsc = FieldServiceConfiguration {
+            path: format!("{}/text", shard_path),
+        };
+
+        let psc = ParagraphServiceConfiguration {
+            path: format!("{}/paragraph", shard_path),
+        };
+
+        let vsc = VectorServiceConfiguration {
+            no_results: None,
+            path: format!("{}/vectors", shard_path),
+        };
+        let config = ShardConfig::new(&shard_path).await;
+        let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
+        let paragraph_writer_service =
+            paragraphs::create_writer(&psc, config.version_paragraphs).await?;
+        let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
+
+        Ok(ShardWriterService {
+            field_writer_service,
+            paragraph_writer_service,
+            vector_writer_service,
+            id: id.to_string(),
+            document_service_version: 0,
+            paragraph_service_version: 0,
+            vector_service_version: 0,
+            relation_service_version: 0,
+        })
+    }
+    pub async fn open(id: &str) -> InternalResult<ShardWriterService> {
+        let shard_path = Configuration::shards_path_id(id);
+        match Path::new(&shard_path).exists() {
+            true => info!("Loading shard with id {}", id),
+            false => info!("Creating new shard with id {}", id),
+        }
+
+        let fsc = FieldServiceConfiguration {
+            path: format!("{}/text", shard_path),
+        };
+
+        let psc = ParagraphServiceConfiguration {
+            path: format!("{}/paragraph", shard_path),
+        };
+
+        let vsc = VectorServiceConfiguration {
+            no_results: None,
+            path: format!("{}/vectors", shard_path),
+        };
+        let config = ShardConfig::new(&shard_path).await;
+        let field_writer_service = fields::open_writer(&fsc, config.version_fields).await?;
+        let paragraph_writer_service =
+            paragraphs::open_writer(&psc, config.version_paragraphs).await?;
+        let vector_writer_service = vectors::open_writer(&vsc, config.version_vectors).await?;
+
+        Ok(ShardWriterService {
+            id: id.to_string(),
+            field_writer_service,
+            paragraph_writer_service,
+            vector_writer_service,
             document_service_version: 0,
             paragraph_service_version: 0,
             vector_service_version: 0,
