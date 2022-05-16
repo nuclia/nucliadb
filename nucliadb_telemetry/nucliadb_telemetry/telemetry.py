@@ -61,8 +61,8 @@ from opentelemetry.util._time import _time_ns  # type: ignore
 from thrift.protocol import TCompactProtocol  # type: ignore
 from thrift.transport import TTransport  # type: ignore
 
-from nucliadb_utils import logger
-from nucliadb_utils.settings import telemetry_settings
+from nucliadb_telemetry import logger
+from nucliadb_telemetry.settings import telemetry_settings
 
 UDP_PACKET_MAX_LENGTH = 65000
 

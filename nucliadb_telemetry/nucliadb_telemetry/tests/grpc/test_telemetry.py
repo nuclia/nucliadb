@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_utils.tests.telemetry import JAEGGER_MESSAGES, Greeter
+from nucliadb_telemetry.tests.telemetry import JAEGGER_MESSAGES, Greeter
 
 
 @pytest.mark.asyncio

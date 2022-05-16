@@ -12,13 +12,13 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
-from nucliadb_utils.settings import telemetry_settings
-from nucliadb_utils.telemetry import (
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.telemetry import (
     JetStreamContextTelemetry,
     OpenTelemetryGRPC,
     init_telemetry,
 )
-from nucliadb_utils.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
+from nucliadb_telemetry.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
 
 JAEGGER_MESSAGES = []
 
