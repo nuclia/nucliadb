@@ -106,6 +106,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
+          flags: ingest
 
   build:
     name: Build image and push
