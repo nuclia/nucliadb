@@ -4,12 +4,6 @@ use serde::{Deserialize, Serialize};
 
 pub const VECTORS_DIR: &str = "vectors";
 pub const KEYS_DIR: &str = "keys";
-
-pub trait ByteRpr {
-    fn as_byte_rpr(&self) -> Vec<u8>;
-    fn from_byte_rpr(bytes: &[u8]) -> Self;
-}
-
 pub trait Distance {
     fn cosine(i: &Self, j: &Self) -> f32;
 }

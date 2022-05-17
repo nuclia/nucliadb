@@ -21,5 +21,6 @@ rayon = "1.5.2"
 memmap2 = "0.5.3"
 fs2 = "0.4.3"
 nucliadb_service_interface = { path = "../nucliadb_service_interface" }
+nucliadb_byte_rpr = { path = "../nucliadb_byte_rpr"} 
 [dev-dependencies]
 env_logger = "0.9.0"
