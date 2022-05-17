@@ -56,9 +56,9 @@ class TransactionUtility:
 
     def __init__(
         self,
-        nats_creds: str,
         nats_servers: List[str],
         nats_target: str,
+        nats_creds: Optional[str] = None,
         nats_index_target: Optional[str] = None,
     ):
         self.nats_creds = nats_creds

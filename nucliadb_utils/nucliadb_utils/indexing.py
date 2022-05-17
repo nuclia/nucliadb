@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import nats
 from nats.aio.client import Client
@@ -33,13 +33,13 @@ from nucliadb_utils import logger
 class IndexingUtility:
 
     nc: Optional[Client] = None
-    js: Optional[JetStreamContext] = None
+    js: Optional[Union[JetStreamContext, JetStreamContextTelemetry]] = None
 
     def __init__(
         self,
-        nats_creds: str,
         nats_servers: List[str],
         nats_target: str,
+        nats_creds: Optional[str] = None,
         dummy: bool = False,
     ):
         self.nats_creds = nats_creds
@@ -65,7 +65,7 @@ class IndexingUtility:
         if self.dummy:
             return
 
-        options = {
+        options: Dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
             "reconnected_cb": self.reconnected_cb,

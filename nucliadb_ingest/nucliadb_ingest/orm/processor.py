@@ -56,7 +56,7 @@ class Processor:
         driver: Driver,
         storage: Storage,
         audit: AuditStorage,
-        cache: Cache,
+        cache: Optional[Cache] = None,
         partition: Optional[str] = None,
     ):
         self.messages = {}
@@ -270,7 +270,7 @@ class Processor:
         if resource is None:
             # Make sure we load the resource in case it already exusts on db
             if message.uuid is None and message.slug:
-                uuid = await kb.get_resource_uuid_by_slug()
+                uuid = await kb.get_resource_uuid_by_slug(message.slug)
             else:
                 uuid = message.uuid
             resource = await kb.get(uuid)

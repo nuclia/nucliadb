@@ -45,7 +45,7 @@ async def start_grpc(service_name: Optional[str] = None):
 
     servicer = WriterServicer()
     await servicer.initialize()
-    health_servicer = health.aio.HealthServicer()
+    health_servicer = health.aio.HealthServicer()  # type: ignore
     server.add_insecure_port(f"0.0.0.0:{settings.grpc_port}")
 
     writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)

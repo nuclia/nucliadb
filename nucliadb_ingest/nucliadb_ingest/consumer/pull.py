@@ -55,12 +55,12 @@ class PullWorker:
         zone: str,
         nuclia_cluster_url: str,
         nuclia_public_url: str,
-        cache: Cache,
         audit: AuditStorage,
         target: str,
         group: str,
         stream: str,
         onprem: bool,
+        cache: Optional[Cache] = None,
         service_name: Optional[str] = None,
         nats_creds: Optional[str] = None,
         nats_servers: Optional[List[str]] = [],
@@ -207,9 +207,10 @@ class PullWorker:
                     logger.info(
                         f"Successfully processed {message_type_name} message from {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, nucliadb seqid: {seqid}, partition: {self.partition} as {time}"
                     )
-                    await self.cache.delete(
-                        KB_COUNTER_CACHE.format(kbid=pb.kbid), invalidate=True
-                    )
+                    if self.cache is not None:
+                        await self.cache.delete(
+                            KB_COUNTER_CACHE.format(kbid=pb.kbid), invalidate=True
+                        )
                 else:
                     logger.error(
                         f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition})"
