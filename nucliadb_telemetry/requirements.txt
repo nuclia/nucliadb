@@ -12,6 +12,7 @@ opentelemetry-api==1.11.1
 opentelemetry-proto==1.11.1
 opentelemetry-exporter-jaeger==1.11.1
 opentelemetry-propagator-b3==1.11.1
+opentelemetry-instrumentation-fastapi==0.31b0
 pydantic
 requests
 fastapi
