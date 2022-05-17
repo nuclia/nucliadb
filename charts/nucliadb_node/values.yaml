@@ -46,7 +46,7 @@ running:
   sentry_url:
 
 tracing:
-  collectorHostPort: collector.tracing.svc.cluster.local:14250
+  enabled: false
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
@@ -55,6 +55,7 @@ tracing:
 ##   .Values.cache.cache_pubsub_nats_auth
 nats:
   secretName: nats-creds
+  jaegerAgentTag: 1.34.1
 
 indexing:
   index_jetstream_auth:

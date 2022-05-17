@@ -42,12 +42,12 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       dnsPolicy: ClusterFirst
-{{- if .Values.nats.secretName }}
+{{- if .Values.nats.secretName -}}
       volumes:
       - name: nats-creds
         secret:
           secretName: {{ .Values.nats.secretName }}
-{{- end }}
+{{- end -}}
       containers:
       - name: sidecar
         image: "{{ .Values.containerRegistry }}/{{ .Values.image_sidecar }}"
@@ -75,11 +75,11 @@ spec:
         volumeMounts:
         - name: node-pv
           mountPath: {{ .Values.config.data_path }}
-{{- if .Values.nats.secretName }}
+{{- if .Values.nats.secretName -}}
         - name: nats-creds
           readOnly: true
           mountPath: /appsecrets
-{{- end }}
+{{- end -}}
       - name: writer
         securityContext:
           privileged: true
@@ -143,8 +143,9 @@ spec:
         volumeMounts:
         - name: node-pv
           mountPath: {{ .Values.config.data_path }}
+{{- if .Values.tracing.enabled -}}
       - name: jaeger-agent
-        image: jaegertracing/jaeger-agent:latest
+        image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
         imagePullPolicy: IfNotPresent
         ports:
           - containerPort: 5775
@@ -163,8 +164,9 @@ spec:
             name: admin-http
             protocol: TCP
         args:
-          - "--reporter.grpc.host-port=dns:///{{ .Values.tracing.collectorHostPort }}"
+          - "--reporter.grpc.host-port=dns:///"$(JAEGER_COLLECTOR_HOST_PORT)""
           - --reporter.type=grpc
+{{- end -}}
   volumeClaimTemplates:
   - metadata:
       name: node-pv

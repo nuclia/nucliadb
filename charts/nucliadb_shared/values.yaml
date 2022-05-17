@@ -83,3 +83,11 @@ audit:
   audit_jetstream_auth:
   audit_partitions: 1
   audit_hash_seed: 1234
+
+tracing:
+  jaeger_agent_host: localhost
+  jaeger_agent_thrift_compact_port: 6831
+  jaeger_collector_host: collector.tracing.svc.cluster.local
+  jaeger_collector_grpc_port: 14250
+  jaeger_query_host: query.tracing.svc.cluster.local
+  jaeger_query_http_port: 16686
