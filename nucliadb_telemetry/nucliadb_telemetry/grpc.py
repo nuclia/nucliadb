@@ -110,7 +110,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         set_status_on_exception=False,
     ):
 
-        service, meth = handler_call_details.method.lstrip("/").split("/", 1)
+        service, meth = handler_call_details.method.lstrip("/").split("/", 1)  # type: ignore
         attributes = {
             SpanAttributes.RPC_SYSTEM: "grpc",
             SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value,
@@ -143,7 +143,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
             logger.warning("Failed to parse peer address '%s'", context.peer())
 
         return self.tracer.start_as_current_span(  # type: ignore
-            name=handler_call_details.method,
+            name=handler_call_details.method,  # type: ignore
             kind=SpanKind.SERVER,
             attributes=attributes,
             set_status_on_exception=set_status_on_exception,
