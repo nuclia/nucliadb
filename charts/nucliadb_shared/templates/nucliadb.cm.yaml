@@ -84,3 +84,8 @@ data:
   AUDIT_JETSTREAM_AUTH: {{ .Values.audit.audit_jetstream_auth }}
   AUDIT_PARTITIONS: {{ .Values.audit.audit_partitions | quote }}
   AUDIT_HASH_SEED: {{ .Values.audit.audit_hash_seed | quote }}
+  JAEGER_AGENT_HOST: "{{ .Values.tracing.jaeger_agent_host }}"
+  JAEGER_AGENT_PORT: "{{ .Values.tracing.jaeger_agent_thrift_compact_port }}"
+  JAEGER_COLLECTOR_HOST_PORT: "{{ .Values.tracing.jaeger_collector_host }}:{{ .Values.tracing.jaeger_collector_grpc_port }}"
+  JAEGER_QUERY_HOST: "{{ .Values.tracing.jaeger_query_host }}"
+  JAEGER_QUERY_PORT: "{{ .Values.tracing.jaeger_query_http_port }}"

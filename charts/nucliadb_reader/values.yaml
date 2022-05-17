@@ -49,3 +49,6 @@ ingest:
 
 serviceMonitor:
   enabled: False
+
+tracing:
+  enabled: false

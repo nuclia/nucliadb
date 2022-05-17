@@ -46,3 +46,6 @@ zone:
 
 serviceMonitor:
   enabled: False
+
+tracing:
+  enabled: false

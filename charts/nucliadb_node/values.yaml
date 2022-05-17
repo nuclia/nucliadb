@@ -46,7 +46,7 @@ running:
   sentry_url:
 
 tracing:
-  collectorHostPort: collector.tracing.svc.cluster.local:14250
+  enabled: false
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with

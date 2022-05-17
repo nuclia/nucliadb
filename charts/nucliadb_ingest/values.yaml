@@ -51,3 +51,6 @@ indexing:
   index_jetstream_servers:
     - nats1
   index_jetstream_target: "node.{node}"
+
+tracing:
+  enabled: false
