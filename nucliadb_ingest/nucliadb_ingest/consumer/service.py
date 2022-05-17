@@ -95,7 +95,7 @@ class ConsumerService:
         self.pull_workers = {}
         self.audit = get_audit()
 
-    async def run(self):
+    async def run(self, service_name: Optional[str] = None):
         logger.info(
             f"Pulling from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
         )
@@ -119,6 +119,7 @@ class ConsumerService:
                 nats_creds=self.nats_auth,
                 nats_servers=self.nats_url,
                 local_subscriber=self.local_subscriber,
+                service_name=service_name,
             )
             self.pull_workers_task[partition] = asyncio.create_task(
                 self.pull_workers[partition].loop()
@@ -127,13 +128,13 @@ class ConsumerService:
                 self._handle_task_result
             )
 
-    async def start(self):
+    async def start(self, service_name: Optional[str] = None):
         self.driver = await get_driver()
         self.cache = await get_cache()
         self.storage = await get_storage()
 
         # Start consummer coroutine
-        await self.run()
+        await self.run(service_name)
 
     async def stop(self):
         for value in self.pull_workers.values():

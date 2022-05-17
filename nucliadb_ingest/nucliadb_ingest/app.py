@@ -24,7 +24,7 @@ import sys
 from asyncio import tasks
 from typing import Callable, List
 
-from nucliadb_ingest import logger, logger_activity
+from nucliadb_ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb_ingest.consumer import start_consumer
 from nucliadb_ingest.metrics import start_metrics
 from nucliadb_ingest.partitions import assign_partitions
@@ -50,7 +50,7 @@ from nucliadb_utils.utilities import (
 )
 
 
-async def start_transaction_utility():
+async def start_transaction_utility(service_name: Optional[str] = None):
     if transaction_settings.transaction_local:
         transaction_utility = LocalTransactionUtility()
     else:
@@ -59,18 +59,18 @@ async def start_transaction_utility():
             nats_servers=transaction_settings.transaction_jetstream_servers,
             nats_target=transaction_settings.transaction_jetstream_target,
         )
-        await transaction_utility.initialize()
+        await transaction_utility.initialize(service_name)
     set_utility(Utility.TRANSACTION, transaction_utility)
 
 
-async def start_indexing_utility():
+async def start_indexing_utility(service_name: Optional[str] = None):
     if not indexing_settings.index_local:
         indexing_utility = IndexingUtility(
             nats_creds=indexing_settings.index_jetstream_auth,
             nats_servers=indexing_settings.index_jetstream_servers,
             nats_target=indexing_settings.index_jetstream_target,
         )
-        await indexing_utility.initialize()
+        await indexing_utility.initialize(service_name)
         set_utility(Utility.INDEXING, indexing_utility)
 
 
@@ -90,10 +90,10 @@ async def stop_indexing_utility():
 
 async def main() -> List[Callable]:
     swim = start_swim()
-    await start_transaction_utility()
-    await start_indexing_utility()
+    await start_transaction_utility(SERVICE_NAME)
+    await start_indexing_utility(SERVICE_NAME)
     await start_audit_utility()
-    grpc_finalizer = await start_grpc()
+    grpc_finalizer = await start_grpc(SERVICE_NAME)
     consumer_finalizer = await start_consumer()
     metrics_finalizer = await start_metrics()
     logger.info(f"======= Ingest finished starting ======")

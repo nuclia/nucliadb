@@ -61,6 +61,7 @@ class PullWorker:
         group: str,
         stream: str,
         onprem: bool,
+        service_name: Optional[str] = None,
         nats_creds: Optional[str] = None,
         nats_servers: Optional[List[str]] = [],
         creds: Optional[str] = None,
@@ -84,6 +85,7 @@ class PullWorker:
         self.group = group
         self.stream = stream
         self.onprem = onprem
+        self.service_name = service_name
         self.idle_heartbeat = 5 * 1_000_000_000
         self.ack_wait = 10.0
         self.nc = None

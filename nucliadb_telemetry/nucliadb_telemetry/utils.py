@@ -26,8 +26,8 @@ def init_telemetry(service_name: str):
     # create a JaegerExporter
     jaeger_exporter = JaegerExporterAsync(
         # configure agent
-        agent_host_name=telemetry_settings.jaeger_host,
-        agent_port=telemetry_settings.jaeger_port,
+        agent_host_name=telemetry_settings.jaeger_agent_host,
+        agent_port=telemetry_settings.jaeger_agent_port,
         # optional: configure also collector
         # collector_endpoint='http://localhost:14268/api/traces?format=jaeger.thrift',
         # username=xxxx, # optional

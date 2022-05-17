@@ -30,7 +30,7 @@ async def test_telemetry(http_service: AsyncClient, greeter: Greeter):
     client = AsyncClient()
     for _ in range(10):
         resp = await client.get(
-            f"http://localhost:{telemetry_settings.jaeger_http_port}/api/traces/f13dc5318bf3bef64a0a5ea607db93a1",
+            f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces/f13dc5318bf3bef64a0a5ea607db93a1",
             headers={"Accept": "application/json"},
         )
         if resp.status_code != 200 or len(resp.json()["data"][0]["spans"]) < 9:

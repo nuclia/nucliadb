@@ -2,10 +2,11 @@ from pydantic import BaseSettings
 
 
 class TelemetrySettings(BaseSettings):
-    jaeger_host: str = "jaeger.observability.svc.cluster.local"
-    jaeger_port: int = 6831
+    jaeger_agent_host: str = "localhost"
+    jaeger_agent_port: int = 6831
     jeager_enabled: bool = False
-    jaeger_http_port: int = 16686
+    jaeger_query_port: int = 16686
+    jaeger_query_host: str = "jaeger.observability.svc.cluster.local"
 
 
 telemetry_settings = TelemetrySettings()

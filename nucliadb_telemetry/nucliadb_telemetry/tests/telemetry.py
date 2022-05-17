@@ -63,9 +63,9 @@ async def jaeger_server():
 @pytest.fixture(scope="function")
 async def settings(jaeger_server: Jaeger):
     telemetry_settings.jeager_enabled = True
-    telemetry_settings.jaeger_host = "127.0.0.1"
-    telemetry_settings.jaeger_port = jaeger_server.get_port()
-    telemetry_settings.jaeger_http_port = jaeger_server.get_http_port()
+    telemetry_settings.jaeger_agent_host = "127.0.0.1"
+    telemetry_settings.jaeger_agent_port = jaeger_server.get_port()
+    telemetry_settings.jaeger_query_port = jaeger_server.get_http_port()
 
 
 @pytest.fixture(scope="function")

@@ -8,3 +8,6 @@ grpcio-status==1.44.0
 grpcio-tools==1.44.0
 grpcio-testing==1.44.0
 grpcio-reflection==1.44.0
+opentelemetry-sdk==1.11.1
+opentelemetry-api==1.11.1
+opentelemetry-proto==1.11.1

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import Optional
 
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc  # type: ignore
@@ -26,12 +27,21 @@ from nucliadb_ingest import logger
 from nucliadb_ingest.service.writer import WriterServicer
 from nucliadb_ingest.settings import settings
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 
 
-async def start_grpc():
+async def start_grpc(service_name: Optional[str] = None):
 
     aio.init_grpc_aio()
-    server = aio.server()
+
+    if telemetry_settings.jeager_enabled and service_name:
+        tracer_provider = get_telemetry(service_name)
+        otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
+        server = otgrpc.init_server()
+    else:
+        server = aio.server()
 
     servicer = WriterServicer()
     await servicer.initialize()

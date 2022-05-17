@@ -24,6 +24,9 @@ from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
 
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
 
 
@@ -58,7 +61,7 @@ class IndexingUtility:
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
 
-    async def initialize(self):
+    async def initialize(self, service_name: Optional[str] = None):
         if self.dummy:
             return
 
@@ -76,7 +79,15 @@ class IndexingUtility:
 
         self.nc = await nats.connect(**options)
 
-        self.js = self.nc.jetstream()
+        jetstream = self.nc.jetstream()
+
+        if telemetry_settings.jeager_enabled and service_name and jetstream:
+            tracer_provider = get_telemetry(service_name)
+            self.js = JetStreamContextTelemetry(
+                jetstream, f"{service_name}_transaction", tracer_provider
+            )
+        else:
+            self.js = jetstream
 
     async def finalize(self):
         if self.nc:
