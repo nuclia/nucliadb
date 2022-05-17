@@ -54,3 +54,4 @@ indexing:
 
 tracing:
   enabled: false
+  jaegerAgentTag: 1.34.1

@@ -55,6 +55,7 @@ tracing:
 ##   .Values.cache.cache_pubsub_nats_auth
 nats:
   secretName: nats-creds
+  jaegerAgentTag: 1.34.1
 
 indexing:
   index_jetstream_auth:

@@ -86,8 +86,8 @@ spec:
 {{- end -}}
 {{- if .Values.tracing.enabled -}}
       - name: jaeger-agent
-        image: jaegertracing/jaeger-agent:latest
-        imagePullPolicy: Always
+        image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
+        imagePullPolicy: IfNotPresent
         ports:
           - containerPort: 5775
             name: zk-compact-trft
