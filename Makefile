@@ -67,6 +67,7 @@ python-code-lint:
 	isort --profile black nucliadb_search
 	isort --profile black nucliadb_one
 	isort --profile black nucliadb_node
+	isort --profile black nucliadb_telemetry
 
 	flake8  --config nucliadb_swim/setup.cfg nucliadb_swim/nucliadb_swim
 	flake8  --config nucliadb_cluster/setup.cfg nucliadb_cluster/nucliadb_cluster
@@ -78,6 +79,7 @@ python-code-lint:
 	flake8  --config nucliadb_search/setup.cfg nucliadb_search/nucliadb_search
 	flake8  --config nucliadb_one/setup.cfg nucliadb_one/nucliadb_one
 	flake8  --config nucliadb_one/setup.cfg nucliadb_node/nucliadb_node
+	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 
 	black nucliadb_swim
 	black nucliadb_cluster
@@ -89,7 +91,9 @@ python-code-lint:
 	black nucliadb_search
 	black nucliadb_one
 	black nucliadb_node
+	black nucliadb_telemetry
 
+	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
 	MYPYPATH=./mypy_stubs mypy nucliadb_utils
 	MYPYPATH=./mypy_stubs mypy nucliadb_models
 	MYPYPATH=./mypy_stubs mypy nucliadb_swim
@@ -120,6 +124,7 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_reader
 	pip install -e ./nucliadb_writer
 	pip install -e ./nucliadb_search
+	pip install -e ./nucliadb_telemetry
 	pip install -r test-requirements.txt
 
 base-node-image:

@@ -23,7 +23,7 @@ from collections import Counter
 
 from nucliadb_ingest.utils import get_driver  # type: ignore
 from nucliadb_ingest.utils import start_ingest, stop_ingest
-from nucliadb_search import logger
+from nucliadb_search import SERVICE_NAME, logger
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
 from nucliadb_search.swim import start_swim
@@ -43,7 +43,7 @@ from nucliadb_utils.utilities import (
 
 async def initialize() -> None:
     set_utility(Utility.COUNTER, Counter())
-    await start_ingest()
+    await start_ingest(SERVICE_NAME)
     predict_util = PredictEngine(
         nuclia_settings.nuclia_inner_predict_url,
         nuclia_settings.nuclia_public_url,

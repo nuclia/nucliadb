@@ -43,9 +43,9 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 
 
-def get_resource_cache() -> Dict[str, ResourceORM]:
+def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
     value: Optional[Dict[str, ResourceORM]] = rcache.get()
-    if value is None:
+    if value is None or clear:
         value = {}
         rcache.set(value)
     return value
@@ -110,12 +110,17 @@ async def get_text_sentence(
         orm_resource = resouce_cache.get(rid)
 
     if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
+        logger.warn(f"{rid} does not exist on DB")
         return ""
 
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
+    if extracted_text is None:
+        logger.warn(
+            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
+        )
+        return ""
     start = start - 1
     if start < 0:
         start = 0
@@ -150,7 +155,7 @@ async def get_labels_sentence(
         orm_resource = resouce_cache.get(rid)
 
     if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
+        logger.warn(f"{rid} does not exist on DB")
         return []
 
     labels: List[str] = []
@@ -198,6 +203,12 @@ async def get_text_paragraph(result: ParagraphResult, kbid: str) -> str:
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
+    if extracted_text is None:
+        logger.warn(
+            f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
+        )
+        return ""
+
     if result.split not in (None, ""):
         text = extracted_text.split_text[result.split]
         splitted_text = text[result.start : result.end]

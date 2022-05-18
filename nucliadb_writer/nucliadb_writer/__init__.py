@@ -19,9 +19,10 @@
 #
 import logging
 
-logger = logging.getLogger("nucliadb_writer")
-
 API_PREFIX = "api"
+SERVICE_NAME = "nucliadb_writer"
+
+logger = logging.getLogger(SERVICE_NAME)
 
 
 # Define the filter

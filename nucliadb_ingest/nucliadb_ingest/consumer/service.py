@@ -38,29 +38,43 @@ class ConsumerService:
 
     def __init__(
         self,
-        partitions: Optional[List[int]] = None,
-        pull_time: Optional[float] = None,
+        partitions: Optional[List[str]] = None,
+        pull_time: Optional[int] = None,
         zone: Optional[str] = None,
         creds: Optional[str] = None,
         nuclia_cluster_url: Optional[str] = None,
         nuclia_public_url: Optional[str] = None,
-        nats_url: Optional[str] = None,
+        nats_servers: List[str] = [],
         nats_auth: Optional[str] = None,
         nats_target: Optional[str] = None,
         nats_group: Optional[str] = None,
         nats_stream: Optional[str] = None,
         onprem: Optional[bool] = None,
     ):
-        self.partitions = partitions if partitions else settings.partitions
-        self.pull_time = pull_time if pull_time else settings.pull_time
+        if partitions is not None:
+            self.partitions: List[str] = partitions
+        else:
+            self.partitions = settings.partitions
 
-        self.zone = zone if zone else nuclia_settings.nuclia_zone
-        self.nuclia_creds = creds if creds else nuclia_settings.nuclia_service_account
-        self.nuclia_cluster_url = (
-            nuclia_cluster_url
-            if nuclia_cluster_url
-            else nuclia_settings.nuclia_cluster_url
-        )
+        if pull_time is not None:
+            self.pull_time: int = pull_time
+        else:
+            self.pull_time = settings.pull_time
+
+        if zone is not None:
+            self.zone: str = zone
+        else:
+            self.zone = nuclia_settings.nuclia_zone
+
+        if creds is not None:
+            self.nuclia_creds: Optional[str] = creds
+        else:
+            self.nuclia_creds = nuclia_settings.nuclia_service_account
+
+        if nuclia_cluster_url is not None:
+            self.nuclia_cluster_url: str = nuclia_cluster_url
+        else:
+            self.nuclia_cluster_url = nuclia_settings.nuclia_cluster_url
 
         self.nuclia_public_url = (
             nuclia_public_url
@@ -72,30 +86,33 @@ class ConsumerService:
             nats_auth if nats_auth else transaction_settings.transaction_jetstream_auth
         )
         self.nats_url = (
-            nats_url if nats_url else transaction_settings.transaction_jetstream_servers
+            nats_servers
+            if len(nats_servers) > 0
+            else transaction_settings.transaction_jetstream_servers
         )
-        self.nats_target = (
-            nats_target
-            if nats_target
-            else transaction_settings.transaction_jetstream_target
-        )
-        self.nats_group = (
-            nats_group
-            if nats_group
-            else transaction_settings.transaction_jetstream_group
-        )
-        self.nats_stream = (
-            nats_stream
-            if nats_stream
-            else transaction_settings.transaction_jetstream_stream
-        )
+
+        if nats_target is not None:
+            self.nats_target: str = nats_target
+        else:
+            self.nats_target = transaction_settings.transaction_jetstream_target
+
+        if nats_group is not None:
+            self.nats_group: str = nats_group
+        else:
+            self.nats_group = transaction_settings.transaction_jetstream_group
+
+        if nats_stream is not None:
+            self.nats_stream: str = nats_stream
+        else:
+            self.nats_stream = transaction_settings.transaction_jetstream_stream
+
         self.local_subscriber = transaction_settings.transaction_local
         self.onprem = onprem if onprem is not None else nuclia_settings.onprem
         self.pull_workers_task = {}
         self.pull_workers = {}
         self.audit = get_audit()
 
-    async def run(self):
+    async def run(self, service_name: Optional[str] = None):
         logger.info(
             f"Pulling from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
         )
@@ -119,6 +136,7 @@ class ConsumerService:
                 nats_creds=self.nats_auth,
                 nats_servers=self.nats_url,
                 local_subscriber=self.local_subscriber,
+                service_name=service_name,
             )
             self.pull_workers_task[partition] = asyncio.create_task(
                 self.pull_workers[partition].loop()
@@ -127,13 +145,13 @@ class ConsumerService:
                 self._handle_task_result
             )
 
-    async def start(self):
+    async def start(self, service_name: Optional[str] = None):
         self.driver = await get_driver()
         self.cache = await get_cache()
         self.storage = await get_storage()
 
         # Start consummer coroutine
-        await self.run()
+        await self.run(service_name)
 
     async def stop(self):
         for value in self.pull_workers.values():

@@ -51,15 +51,11 @@ storage_settings = StorageSettings()
 
 class NucliaSettings(BaseSettings):
     nuclia_service_account: Optional[str] = None
-    nuclia_public_url: Optional[str] = "https://{zone}.nuclia.cloud"
-    nuclia_cluster_url: Optional[
-        str
-    ] = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
-    nuclia_inner_predict_url: Optional[
-        str
-    ] = "http://predict.learning.svc.cluster.local:8080"
+    nuclia_public_url: str = "https://{zone}.nuclia.cloud"
+    nuclia_cluster_url: str = "http://nucliadb_proxy.processing.svc.cluster.local:8080"
+    nuclia_inner_predict_url: str = "http://predict.learning.svc.cluster.local:8080"
 
-    nuclia_zone: Optional[str] = "dev"
+    nuclia_zone: str = "dev"
     onprem: bool = True
 
     nuclia_jwt_key: Optional[str] = None
@@ -87,10 +83,10 @@ nucliadb_settings = NucliaDBSettings()
 
 class TransactionSettings(BaseSettings):
     transaction_jetstream_auth: Optional[str] = None
-    transaction_jetstream_servers: Optional[List[str]] = ["nats://localhost:4222"]
-    transaction_jetstream_target: Optional[str] = "ndb.consumer.{partition}"
-    transaction_jetstream_group: Optional[str] = "nucliadb-{partition}"
-    transaction_jetstream_stream: Optional[str] = "nucliadb"
+    transaction_jetstream_servers: List[str] = ["nats://localhost:4222"]
+    transaction_jetstream_target: str = "ndb.consumer.{partition}"
+    transaction_jetstream_group: str = "nucliadb-{partition}"
+    transaction_jetstream_stream: str = "nucliadb"
     transaction_local: bool = False
 
 

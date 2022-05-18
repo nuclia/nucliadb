@@ -23,7 +23,6 @@ import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from fastapi_versioning import VersionedFastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -147,4 +146,3 @@ application.add_route("/accounting", accounting)
 # to both inner applications
 set_global_textmap(B3MultiFormat())
 FastAPIInstrumentor.instrument_app(application)
-HTTPXClientInstrumentor().instrument(skip_dep_check=True)

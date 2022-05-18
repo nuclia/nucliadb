@@ -19,7 +19,8 @@
 #
 import logging
 
-logger = logging.getLogger("nucliadb_reader")
+SERVICE_NAME = "nucliadb_reader"
+logger = logging.getLogger(SERVICE_NAME)
 
 API_PREFIX = "api"
 

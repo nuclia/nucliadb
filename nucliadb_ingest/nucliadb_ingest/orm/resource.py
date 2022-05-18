@@ -214,7 +214,7 @@ class Resource:
         basic = await self.get_basic()
         if basic is not None:
             brain.set_global_tags(basic, origin)
-        fields = await self.get_fields()
+        fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             await self.compute_global_text_field(fieldid, brain)
@@ -246,7 +246,7 @@ class Resource:
             for relation in relations.relations:
                 bm.relations.append(relation)
 
-        fields = await self.get_fields()
+        fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             extracted_text_cf = await field.get_extracted_text_cf()
             if extracted_text_cf is not None:
@@ -282,9 +282,9 @@ class Resource:
         return bm
 
     # Fields
-    async def get_fields(self) -> Dict[Tuple[int, str], Field]:
+    async def get_fields(self, force: bool = False) -> Dict[Tuple[int, str], Field]:
         # Get all fields
-        for type, field in await self.get_fields_ids():
+        for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type)
         return self.fields

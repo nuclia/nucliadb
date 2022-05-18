@@ -573,8 +573,10 @@ async def start_upload_field(
     elif rid is None:
         rid = md5
 
-    if field is None:
-        field = uuid.uuid4().hex
+    if field is None and md5 is None:
+        rid = uuid.uuid4().hex
+    elif field is None:
+        field = md5
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field

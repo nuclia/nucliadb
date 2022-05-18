@@ -20,5 +20,6 @@
 import logging
 import logging.config
 
-logger = logging.getLogger("nucliadb_ingest")
+SERVICE_NAME = "nucliadb_ingest"
+logger = logging.getLogger(SERVICE_NAME)
 logger_activity = logging.getLogger("nucliadb_ingest.activity")

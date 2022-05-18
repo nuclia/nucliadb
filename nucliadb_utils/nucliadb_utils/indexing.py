@@ -17,26 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
 
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
 
 
 class IndexingUtility:
 
     nc: Optional[Client] = None
-    js: Optional[JetStreamContext] = None
+    js: Optional[Union[JetStreamContext, JetStreamContextTelemetry]] = None
 
     def __init__(
         self,
-        nats_creds: str,
         nats_servers: List[str],
         nats_target: str,
+        nats_creds: Optional[str] = None,
         dummy: bool = False,
     ):
         self.nats_creds = nats_creds
@@ -58,11 +61,11 @@ class IndexingUtility:
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
 
-    async def initialize(self):
+    async def initialize(self, service_name: Optional[str] = None):
         if self.dummy:
             return
 
-        options = {
+        options: Dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
             "reconnected_cb": self.reconnected_cb,
@@ -76,7 +79,15 @@ class IndexingUtility:
 
         self.nc = await nats.connect(**options)
 
-        self.js = self.nc.jetstream()
+        jetstream = self.nc.jetstream()
+
+        if telemetry_settings.jeager_enabled and service_name and jetstream:
+            tracer_provider = get_telemetry(service_name)
+            self.js = JetStreamContextTelemetry(
+                jetstream, f"{service_name}_transaction", tracer_provider
+            )
+        else:
+            self.js = jetstream
 
     async def finalize(self):
         if self.nc:

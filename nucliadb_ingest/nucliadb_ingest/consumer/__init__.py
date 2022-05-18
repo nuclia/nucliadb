@@ -17,11 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Optional
+
 from nucliadb_ingest.consumer.service import ConsumerService
 
 
-async def start_consumer():
+async def start_consumer(service_name: Optional[str] = None):
     consumer = ConsumerService()
-    await consumer.start()
+    await consumer.start(service_name)
 
     return consumer.stop
