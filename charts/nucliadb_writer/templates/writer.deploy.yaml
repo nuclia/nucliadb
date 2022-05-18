@@ -58,10 +58,7 @@ spec:
           timeoutSeconds: 10
           periodSeconds: 20
         command: [
-          "uvicorn",
-          "--port={{ .Values.serving.port }}",
-          "--host=0.0.0.0",
-          "nucliadb_writer.app:application"
+          "writer-metrics"
         ]
         envFrom:
         - configMapRef:

@@ -45,6 +45,7 @@ setup(
     entry_points={
         "console_scripts": [
             "extract-openapi = nucliadb_reader.openapi:command_extract_openapi",
+            "reader-metrics = nucliadb_reader.run:run_with_metrics",
         ]
     },
     install_requires=requirements,

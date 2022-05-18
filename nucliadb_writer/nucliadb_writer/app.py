@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi_versioning import VersionedFastAPI
@@ -31,7 +30,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import HTMLResponse, PlainTextResponse
+from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
@@ -108,14 +107,8 @@ async def homepage(request):
     return HTMLResponse("NucliaDB Writer Service")
 
 
-async def metrics(request):
-    output = prometheus_client.exposition.generate_latest()
-    return PlainTextResponse(output.decode("utf8"))
-
-
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/metrics", metrics)
 # Enable forwarding of B3 headers to responses and external requests
 # to both inner applications
 
