@@ -54,25 +54,6 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ResourceID,
         nucliadb_protos.nodewriter_pb2.OpStatus]
 
-    SetRelations: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.SetRelationsRequest,
-        nucliadb_protos.nodewriter_pb2.OpStatus]
-    """Graph"""
-
-    DelRelations: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.DelRelationsRequest,
-        nucliadb_protos.nodewriter_pb2.OpStatus]
-    """Set relations on a resource"""
-
-    SetVectorsField: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.SetVectorFieldRequest,
-        nucliadb_protos.nodewriter_pb2.OpStatus]
-    """Vectors"""
-
-    DelVectorsField: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.nodewriter_pb2.DelVectorFieldRequest,
-        nucliadb_protos.nodewriter_pb2.OpStatus]
-
 
 class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -114,36 +95,6 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def RemoveResource(self,
         request: nucliadb_protos.noderesources_pb2.ResourceID,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
-
-    @abc.abstractmethod
-    def SetRelations(self,
-        request: nucliadb_protos.nodewriter_pb2.SetRelationsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus:
-        """Graph"""
-        pass
-
-    @abc.abstractmethod
-    def DelRelations(self,
-        request: nucliadb_protos.nodewriter_pb2.DelRelationsRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus:
-        """Set relations on a resource"""
-        pass
-
-    @abc.abstractmethod
-    def SetVectorsField(self,
-        request: nucliadb_protos.nodewriter_pb2.SetVectorFieldRequest,
-        context: grpc.ServicerContext,
-    ) -> nucliadb_protos.nodewriter_pb2.OpStatus:
-        """Vectors"""
-        pass
-
-    @abc.abstractmethod
-    def DelVectorsField(self,
-        request: nucliadb_protos.nodewriter_pb2.DelVectorFieldRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
 

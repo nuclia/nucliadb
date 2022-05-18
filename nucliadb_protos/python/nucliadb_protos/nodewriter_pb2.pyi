@@ -4,11 +4,8 @@ isort:skip_file
 """
 import builtins
 import google.protobuf.descriptor
-import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
-import nucliadb_protos.noderesources_pb2
-import nucliadb_protos.utils_pb2
 import typing
 import typing_extensions
 from nucliadb_protos.noderesources_pb2 import (
@@ -65,101 +62,6 @@ class OpStatus(google.protobuf.message.Message):
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["count",b"count","detail",b"detail","shard_id",b"shard_id","status",b"status"]) -> None: ...
 global___OpStatus = OpStatus
-
-class SetRelationsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    RESOURCE_FIELD_NUMBER: builtins.int
-    RELATIONS_FIELD_NUMBER: builtins.int
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    @property
-    def resource(self) -> nucliadb_protos.noderesources_pb2.ResourceID: ...
-    @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
-    shard_id: typing.Text
-    def __init__(self,
-        *,
-        resource: typing.Optional[nucliadb_protos.noderesources_pb2.ResourceID] = ...,
-        relations: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
-        shard_id: typing.Text = ...,
-        ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["resource",b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["relations",b"relations","resource",b"resource","shard_id",b"shard_id"]) -> None: ...
-global___SetRelationsRequest = SetRelationsRequest
-
-class DelVectorFieldRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    RESOURCE_FIELD_NUMBER: builtins.int
-    FIELD_FIELD_NUMBER: builtins.int
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    @property
-    def resource(self) -> nucliadb_protos.noderesources_pb2.ResourceID: ...
-    field: typing.Text
-    shard_id: typing.Text
-    def __init__(self,
-        *,
-        resource: typing.Optional[nucliadb_protos.noderesources_pb2.ResourceID] = ...,
-        field: typing.Text = ...,
-        shard_id: typing.Text = ...,
-        ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["resource",b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","resource",b"resource","shard_id",b"shard_id"]) -> None: ...
-global___DelVectorFieldRequest = DelVectorFieldRequest
-
-class SetVectorFieldRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    class VectorObject(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-        SENTENCE_FIELD_NUMBER: builtins.int
-        ITEM_FIELD_NUMBER: builtins.int
-        sentence: builtins.int
-        item: builtins.bytes
-        def __init__(self,
-            *,
-            sentence: builtins.int = ...,
-            item: builtins.bytes = ...,
-            ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["item",b"item","sentence",b"sentence"]) -> None: ...
-
-    RESOURCE_FIELD_NUMBER: builtins.int
-    FIELD_FIELD_NUMBER: builtins.int
-    VECTORS_FIELD_NUMBER: builtins.int
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    @property
-    def resource(self) -> nucliadb_protos.noderesources_pb2.ResourceID: ...
-    field: typing.Text
-    @property
-    def vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SetVectorFieldRequest.VectorObject]: ...
-    shard_id: typing.Text
-    def __init__(self,
-        *,
-        resource: typing.Optional[nucliadb_protos.noderesources_pb2.ResourceID] = ...,
-        field: typing.Text = ...,
-        vectors: typing.Optional[typing.Iterable[global___SetVectorFieldRequest.VectorObject]] = ...,
-        shard_id: typing.Text = ...,
-        ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["resource",b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","resource",b"resource","shard_id",b"shard_id","vectors",b"vectors"]) -> None: ...
-global___SetVectorFieldRequest = SetVectorFieldRequest
-
-class DelRelationsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    RESOURCE_FIELD_NUMBER: builtins.int
-    RELATIONS_FIELD_NUMBER: builtins.int
-    SHARD_ID_FIELD_NUMBER: builtins.int
-    @property
-    def resource(self) -> nucliadb_protos.noderesources_pb2.ResourceID: ...
-    @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
-    shard_id: typing.Text
-    def __init__(self,
-        *,
-        resource: typing.Optional[nucliadb_protos.noderesources_pb2.ResourceID] = ...,
-        relations: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
-        shard_id: typing.Text = ...,
-        ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["resource",b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["relations",b"relations","resource",b"resource","shard_id",b"shard_id"]) -> None: ...
-global___DelRelationsRequest = DelRelationsRequest
 
 class IndexMessage(google.protobuf.message.Message):
     """Implemented at nucliadb_object_storage

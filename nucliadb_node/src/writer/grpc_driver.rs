@@ -21,8 +21,7 @@
 use async_std::sync::{Arc, RwLock};
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
-    op_status, DelRelationsRequest, DelVectorFieldRequest, EmptyQuery, EmptyResponse, OpStatus,
-    Resource, ResourceId, SetRelationsRequest, SetVectorFieldRequest, ShardCreated, ShardId,
+    op_status, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
     ShardIds,
 };
 use opentelemetry::global;
@@ -201,81 +200,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 Err(tonic::Status::not_found(message))
             }
         }
-    }
-
-    async fn set_relations(
-        &self,
-        request: tonic::Request<SetRelationsRequest>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-        todo!()
-    }
-
-    async fn del_relations(
-        &self,
-        request: tonic::Request<DelRelationsRequest>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-        todo!()
-    }
-
-    async fn set_vectors_field(
-        &self,
-        request: tonic::Request<SetVectorFieldRequest>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-
-        let vector_request = request.into_inner();
-        let shard_id = ShardId {
-            id: vector_request.shard_id.clone(),
-        };
-        let mut writer = self.0.write().await;
-
-        match writer.set_vector_field(&shard_id, &vector_request).await {
-            Some(Ok(_)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: 0,
-                    shard_id: shard_id.id.clone(),
-                };
-                Ok(tonic::Response::new(status))
-            }
-            Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
-                let op_status = OpStatus {
-                    status,
-                    detail,
-                    count: 0_u64,
-                    shard_id: shard_id.id.clone(),
-                };
-                Ok(tonic::Response::new(op_status))
-            }
-            None => {
-                let message = format!("Error loading shard {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
-        }
-    }
-
-    async fn del_vectors_field(
-        &self,
-        request: tonic::Request<DelVectorFieldRequest>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-
-        let _vector_request = request.into_inner();
-
-        todo!()
     }
 
     async fn gc(
