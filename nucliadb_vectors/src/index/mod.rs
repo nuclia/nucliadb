@@ -28,7 +28,6 @@ use crate::memory_system::lmdb_driver::LMBDStorage;
 use crate::memory_system::mmap_driver::*;
 
 pub struct Index {
-    key_storage: Storage,
     vector_storage: Storage,
     lmdb_driver: LMBDStorage,
     time_stamp: u128,
@@ -48,7 +47,6 @@ impl Debug for Index {
 
 impl Index {
     pub fn reader(path: &Path) -> Index {
-        let key_storage = Storage::open(&path.join(KEYS_DIR));
         let vector_storage = Storage::open(&path.join(VECTORS_DIR));
         let lmdb_driver = LMBDStorage::open(path);
         let ro_txn = lmdb_driver.ro_txn();
@@ -62,7 +60,6 @@ impl Index {
         let removed = vec![];
         ro_txn.abort().unwrap();
         Index {
-            key_storage,
             vector_storage,
             lmdb_driver,
             layers_out,
@@ -74,7 +71,6 @@ impl Index {
         }
     }
     pub fn writer(path: &Path) -> Index {
-        let key_storage = Storage::create(&path.join(KEYS_DIR));
         let vector_storage = Storage::create(&path.join(VECTORS_DIR));
         let lmdb_driver = LMBDStorage::create(path);
         let ro_txn = lmdb_driver.ro_txn();
@@ -90,7 +86,6 @@ impl Index {
         let removed = vec![];
         ro_txn.abort().unwrap();
         Index {
-            key_storage,
             vector_storage,
             lmdb_driver,
             layers_out,
@@ -106,10 +101,10 @@ impl Index {
     }
     pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
         let txn = self.lmdb_driver.ro_txn();
-        let key = String::from_byte_rpr(self.key_storage.read(node.key).unwrap());
+        let key = self.lmdb_driver.get_node_key(&txn, node).unwrap();
         let all = labels
             .iter()
-            .all(|label| self.lmdb_driver.has_label(&txn, &key, label));
+            .all(|label| self.lmdb_driver.has_label(&txn, key, label));
         txn.abort().unwrap();
         all
     }
@@ -120,7 +115,14 @@ impl Index {
         exist
     }
     pub fn get_node_key(&self, node: Node) -> String {
-        String::from_byte_rpr(self.key_storage.read(node.key).unwrap())
+        let txn = self.lmdb_driver.ro_txn();
+        let key = self
+            .lmdb_driver
+            .get_node_key(&txn, node)
+            .unwrap()
+            .to_string();
+        txn.abort().unwrap();
+        key
     }
     pub fn get_node_vector(&self, node: Node) -> Vector {
         Vector::from_byte_rpr(self.vector_storage.read(node.vector).unwrap())
@@ -128,7 +130,6 @@ impl Index {
     pub fn reload(&mut self) {
         let txn = self.lmdb_driver.ro_txn();
         self.vector_storage.reload();
-        self.key_storage.reload();
         let log = self.lmdb_driver.get_log(&txn);
         if self.time_stamp != log.version_number {
             self.time_stamp = log.version_number;
@@ -149,7 +150,6 @@ impl Index {
             max_layer: self.layers_len as u64,
             version_number: self.time_stamp,
         };
-        let deleted = std::mem::take(&mut self.removed);
         self.time_stamp += 1;
         for i in 0..self.layers_len {
             let layer_out = self.layers_out[i].clone();
@@ -159,13 +159,12 @@ impl Index {
             self.lmdb_driver
                 .insert_layer_in(&mut rw_txn, i as u64, layer_in);
         }
-        for deleted in &deleted {
-            let key = self.get_node_key(*deleted);
-            self.lmdb_driver.remove_vector(&mut rw_txn, &key);
-        }
         self.lmdb_driver.insert_log(&mut rw_txn, log);
-        self.lmdb_driver
-            .marked_deleted(&mut rw_txn, self.time_stamp, deleted);
+        if !self.removed.is_empty() {
+            let deleted = std::mem::take(&mut self.removed);
+            self.lmdb_driver
+                .mark_deleted(&mut rw_txn, self.time_stamp, deleted);
+        }
         rw_txn.commit().unwrap();
     }
     pub fn run_garbage_collection(&mut self) {
@@ -173,7 +172,6 @@ impl Index {
         let deleted = self.lmdb_driver.clear_deleted(&mut rw_txn);
         for node in deleted {
             self.vector_storage.delete_segment(node.vector);
-            self.key_storage.delete_segment(node.key);
         }
         rw_txn.commit().unwrap();
     }
@@ -190,7 +188,6 @@ impl Index {
     pub fn add_node(&mut self, key: String, vector: Vector, layer: usize) -> Node {
         let mut txn = self.lmdb_driver.rw_txn();
         let node = Node {
-            key: self.key_storage.insert(&key.as_byte_rpr()),
             vector: self.vector_storage.insert(&vector.as_byte_rpr()),
         };
         self.lmdb_driver.add_node(&mut txn, key, node);
@@ -281,11 +278,7 @@ impl Index {
         };
         self.layers_out.truncate(self.layers_len);
         self.layers_in.truncate(self.layers_len);
-        let id = String::from_byte_rpr(self.key_storage.read(x.key).unwrap());
-        let mut txn = self.lmdb_driver.rw_txn();
-        self.lmdb_driver.remove_vector(&mut txn, &id);
         self.removed.push(x);
-        txn.commit().unwrap();
     }
     pub fn stats(&self) -> Stats {
         Stats {

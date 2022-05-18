@@ -39,7 +39,6 @@ mod test_heuristic_simple {
         let mut candidates = Vec::with_capacity(100);
         let node = Node {
             vector: FileSegment { start: 0, end: 0 },
-            key: FileSegment { start: 0, end: 0 },
         };
         for _ in 0..100 {
             let v = rand::random::<f32>();

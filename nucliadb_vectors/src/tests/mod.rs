@@ -119,6 +119,7 @@ fn single_graph() {
     writer.commit();
     writer.delete_vector(key.clone());
     writer.commit();
+    writer.run_garbage_collection();
     writer.insert(key.clone(), vec.clone(), vec![]);
     writer.commit();
     assert_eq!(writer.no_vectors(), 1);

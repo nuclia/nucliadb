@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 pub const VECTORS_DIR: &str = "vectors";
-pub const KEYS_DIR: &str = "keys";
 
 pub trait ByteRpr {
     fn as_byte_rpr(&self) -> Vec<u8>;
@@ -62,7 +61,6 @@ pub struct FileSegment {
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct Node {
-    pub key: FileSegment,
     pub vector: FileSegment,
 }
 
