@@ -213,6 +213,10 @@ message SearchResponse {
     VectorSearchResponse vector = 3;
 }
 
+message IdCollection {
+    repeated string ids = 1;
+}
+
 // Implemented at nucliadb_object_storage
 
 service NodeReader {
@@ -223,6 +227,10 @@ service NodeReader {
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
     rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
+
+    rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
+    rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
+    rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
 
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}

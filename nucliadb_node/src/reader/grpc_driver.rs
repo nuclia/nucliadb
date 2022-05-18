@@ -21,10 +21,10 @@
 use async_std::sync::{Arc, RwLock};
 use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EmptyQuery, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest, SuggestResponse,
-    VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, EmptyQuery, IdCollection,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse,
+    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest,
+    SuggestResponse, VectorSearchRequest, VectorSearchResponse,
 };
 use opentelemetry::global;
 use tracing::{instrument, Span, *};
@@ -241,6 +241,60 @@ impl NodeReader for NodeReaderGRPCDriver {
                 let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
+        }
+    }
+    async fn document_ids(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        info!("{:?}: gRPC get_shard", request);
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.document_ids(&shard_id).await {
+            Some(ids) => Ok(tonic::Response::new(ids)),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
+        }
+    }
+    async fn paragraph_ids(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        info!("{:?}: gRPC get_shard", request);
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.paragraph_ids(&shard_id).await {
+            Some(ids) => Ok(tonic::Response::new(ids)),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
+        }
+    }
+    async fn vector_ids(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        info!("{:?}: gRPC get_shard", request);
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.vector_ids(&shard_id).await {
+            Some(ids) => Ok(tonic::Response::new(ids)),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
         }
     }
 }

@@ -250,6 +250,11 @@ pub struct SearchResponse {
     #[prost(message, optional, tag="3")]
     pub vector: ::core::option::Option<VectorSearchResponse>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdCollection {
+    #[prost(string, repeated, tag="1")]
+    pub ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 /// Generated client implementations.
 pub mod node_reader_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -430,6 +435,63 @@ pub mod node_reader_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn document_ids(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::IdCollection>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/DocumentIds",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn paragraph_ids(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::IdCollection>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/ParagraphIds",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn vector_ids(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::IdCollection>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/VectorIds",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn search(
             &mut self,
             request: impl tonic::IntoRequest<super::SearchRequest>,
@@ -504,6 +566,18 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::RelationSearchRequest>,
         ) -> Result<tonic::Response<super::RelationSearchResponse>, tonic::Status>;
+        async fn document_ids(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::IdCollection>, tonic::Status>;
+        async fn paragraph_ids(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::IdCollection>, tonic::Status>;
+        async fn vector_ids(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::IdCollection>, tonic::Status>;
         async fn search(
             &self,
             request: tonic::Request<super::SearchRequest>,
@@ -788,6 +862,124 @@ pub mod node_reader_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = RelationSearchSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/DocumentIds" => {
+                    #[allow(non_camel_case_types)]
+                    struct DocumentIdsSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for DocumentIdsSvc<T> {
+                        type Response = super::IdCollection;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).document_ids(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DocumentIdsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/ParagraphIds" => {
+                    #[allow(non_camel_case_types)]
+                    struct ParagraphIdsSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for ParagraphIdsSvc<T> {
+                        type Response = super::IdCollection;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).paragraph_ids(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ParagraphIdsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/VectorIds" => {
+                    #[allow(non_camel_case_types)]
+                    struct VectorIdsSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for VectorIdsSvc<T> {
+                        type Response = super::IdCollection;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).vector_ids(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = VectorIdsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

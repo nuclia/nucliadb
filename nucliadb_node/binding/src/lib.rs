@@ -20,9 +20,8 @@
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
-    op_status, DelRelationsRequest, DelVectorFieldRequest, DocumentSearchRequest, OpStatus,
-    ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest,
-    SetRelationsRequest, SetVectorFieldRequest, ShardId, VectorSearchRequest,
+    op_status, DocumentSearchRequest, OpStatus, ParagraphSearchRequest, RelationSearchRequest,
+    Resource, ResourceId, SearchRequest, ShardId, VectorSearchRequest,
 };
 
 use prost::Message;
@@ -283,22 +282,18 @@ impl NodeWriter {
         })
     }
 
-    pub fn set_vectors_field<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn gc<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = writer.write().await;
-            let request = SetVectorFieldRequest::decode(&mut Cursor::new(request)).unwrap();
-
-            let shard_id = ShardId {
-                id: request.shard_id.clone(),
-            };
-            match lock.set_vector_field(&shard_id, &request).await {
+            let request = ShardId::decode(&mut Cursor::new(request)).unwrap();
+            match lock.gc(&request).await {
                 Some(Ok(_)) => {
                     let status = OpStatus {
                         status: 0,
                         detail: "Success!".to_string(),
                         count: 0,
-                        shard_id: shard_id.id.clone(),
+                        shard_id: request.id.clone(),
                     };
                     Ok(status.encode_to_vec())
                 }
@@ -309,40 +304,16 @@ impl NodeWriter {
                         status,
                         detail,
                         count: 0_u64,
-                        shard_id: shard_id.id.clone(),
+                        shard_id: request.id.clone(),
                     };
                     Ok(op_status.encode_to_vec())
                 }
                 None => {
-                    let message = format!("Error loading shard {:?}", shard_id);
+                    let message = format!("Error loading shard {:?}", request);
                     Err(exceptions::PyTypeError::new_err(message))
                 }
             }
         })
-    }
-
-    pub fn del_vectors_field<'p>(
-        &self,
-        request: RawProtos,
-        _py: Python<'p>,
-    ) -> PyResult<&'p PyAny> {
-        let _request = DelVectorFieldRequest::decode(&mut Cursor::new(request)).unwrap();
-        todo!()
-    }
-
-    pub fn set_relations<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _request = SetRelationsRequest::decode(&mut Cursor::new(request)).unwrap();
-        todo!()
-    }
-
-    pub fn del_relations<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _request = DelRelationsRequest::decode(&mut Cursor::new(request)).unwrap();
-        todo!()
-    }
-
-    pub fn gc<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _request = ShardId::decode(&mut Cursor::new(request)).unwrap();
-        todo!()
     }
 }
 

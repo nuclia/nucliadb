@@ -16,39 +16,6 @@ message OpStatus {
     string shard_id = 4;
 }
 
-message SetRelationsRequest {
-    noderesources.ResourceID resource = 1;
-    repeated utils.Relation relations = 2;
-    string shard_id = 3;
-}
-
-
-message DelVectorFieldRequest {
-    noderesources.ResourceID resource = 1;
-    string field = 2;
-    string shard_id = 3;
-}
-
-message SetVectorFieldRequest {
-    noderesources.ResourceID resource = 1;
-
-    string field = 2;
-
-    message VectorObject {
-        int32 sentence = 1;
-        bytes item = 2;
-    }
-
-    repeated VectorObject vectors = 3;
-    string shard_id = 4;
-}
-
-message DelRelationsRequest {
-    noderesources.ResourceID resource = 1;
-    repeated utils.Relation relations = 2;
-    string shard_id = 3;
-}
-
 // Implemented at nucliadb_object_storage
 
 message IndexMessage {
@@ -74,19 +41,6 @@ service NodeWriter {
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
-
-    // Graph
-    rpc SetRelations(SetRelationsRequest) returns (OpStatus) {}
-    // Set relations on a resource
-    rpc DelRelations(DelRelationsRequest) returns (OpStatus) {}
-    // Del relations on a resource
-
-    // Vectors
-    rpc SetVectorsField(SetVectorFieldRequest) returns (OpStatus) {}
-    // Set the vectors of a field in resource
-
-    rpc DelVectorsField(DelVectorFieldRequest) returns (OpStatus) {}
-    // Del the vectors of a field in resource
 
 }
 

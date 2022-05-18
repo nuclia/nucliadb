@@ -66,6 +66,27 @@ impl ShardReaderService {
         .unwrap()
     }
 
+    pub async fn get_field_keys(&self) -> Vec<String> {
+        self.reload_policy(true).await;
+        let field_reader_service = self.field_reader_service.clone();
+        tokio::task::spawn_blocking(move || field_reader_service.stored_ids())
+            .await
+            .unwrap()
+    }
+    pub async fn get_paragraphs_keys(&self) -> Vec<String> {
+        self.reload_policy(true).await;
+        let paragraph_reader_service = self.paragraph_reader_service.clone();
+        tokio::task::spawn_blocking(move || paragraph_reader_service.stored_ids())
+            .await
+            .unwrap()
+    }
+    pub async fn get_vectors_keys(&self) -> Vec<String> {
+        self.reload_policy(true).await;
+        let vector_reader_service = self.vector_reader_service.clone();
+        tokio::task::spawn_blocking(move || vector_reader_service.stored_ids())
+            .await
+            .unwrap()
+    }
     pub fn get_resources(&self) -> usize {
         self.field_reader_service.count()
     }

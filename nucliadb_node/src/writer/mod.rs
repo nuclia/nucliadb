@@ -22,9 +22,7 @@ pub mod grpc_driver;
 use std::collections::HashMap;
 use std::path::Path;
 
-use nucliadb_protos::{
-    Resource, ResourceId, SetVectorFieldRequest, ShardCreated, ShardId, ShardIds,
-};
+use nucliadb_protos::{Resource, ResourceId, ShardCreated, ShardId, ShardIds};
 use nucliadb_services::*;
 use tracing::*;
 use uuid::Uuid;
@@ -151,19 +149,6 @@ impl NodeWriterService {
                 .map(|_| shard.count())
                 .map_err(|e| e.into());
             Some(res)
-        } else {
-            None
-        }
-    }
-
-    pub async fn set_vector_field(
-        &mut self,
-        shard_id: &ShardId,
-        request: &SetVectorFieldRequest,
-    ) -> Option<ServiceResult<()>> {
-        self.load_shard(shard_id).await;
-        if let Some(shard) = self.get_mut_shard(shard_id).await {
-            Some(shard.set_vector_field(request).await.map_err(|e| e.into()))
         } else {
             None
         }

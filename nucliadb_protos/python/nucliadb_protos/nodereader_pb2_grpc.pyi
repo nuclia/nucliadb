@@ -62,6 +62,18 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         nucliadb_protos.nodereader_pb2.RelationSearchResponse]
 
+    DocumentIds: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection]
+
+    ParagraphIds: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection]
+
+    VectorIds: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection]
+
     Search: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.SearchRequest,
         nucliadb_protos.nodereader_pb2.SearchResponse]
@@ -110,6 +122,24 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.RelationSearchResponse: ...
+
+    @abc.abstractmethod
+    def DocumentIds(self,
+        request: nucliadb_protos.noderesources_pb2.ShardId,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+
+    @abc.abstractmethod
+    def ParagraphIds(self,
+        request: nucliadb_protos.noderesources_pb2.ShardId,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+
+    @abc.abstractmethod
+    def VectorIds(self,
+        request: nucliadb_protos.noderesources_pb2.ShardId,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
 
     @abc.abstractmethod
     def Search(self,

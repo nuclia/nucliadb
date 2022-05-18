@@ -19,7 +19,7 @@
 use std::path::Path;
 
 use futures::try_join;
-use nucliadb_protos::{Resource, ResourceId, SetVectorFieldRequest};
+use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_services::*;
 use tracing::*;
 
@@ -216,12 +216,6 @@ impl ShardWriterService {
         rparagraph?;
         rvector?;
         Ok(())
-    }
-    pub async fn set_vector_field(
-        &self,
-        _resource: &SetVectorFieldRequest,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        todo!();
     }
     pub async fn delete(&self) -> Result<(), std::io::Error> {
         let shard_path = Configuration::shards_path_id(&self.id);

@@ -79,4 +79,7 @@ impl Reader {
     pub fn stats(&self) -> Stats {
         self.index.stats()
     }
+    pub fn keys(&self) -> Vec<String> {
+        self.index.node_keys()
+    }
 }

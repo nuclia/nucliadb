@@ -20,16 +20,11 @@ except AttributeError:
 
 from nucliadb_protos.noderesources_pb2 import *
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n nucliadb_protos/nodewriter.proto\x12\nnodewriter\x1a#nucliadb_protos/noderesources.proto\"\x92\x01\n\x08OpStatus\x12+\n\x06status\x18\x01 \x01(\x0e\x32\x1b.nodewriter.OpStatus.Status\x12\x0e\n\x06\x64\x65tail\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x04\x12\x10\n\x08shard_id\x18\x04 \x01(\t\"(\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07WARNING\x10\x01\x12\t\n\x05\x45RROR\x10\x02\"x\n\x13SetRelationsRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\"\n\trelations\x18\x02 \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"e\n\x15\x44\x65lVectorFieldRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"\xd6\x01\n\x15SetVectorFieldRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\r\n\x05\x66ield\x18\x02 \x01(\t\x12?\n\x07vectors\x18\x03 \x03(\x0b\x32..nodewriter.SetVectorFieldRequest.VectorObject\x12\x10\n\x08shard_id\x18\x04 \x01(\t\x1a.\n\x0cVectorObject\x12\x10\n\x08sentence\x18\x01 \x01(\x05\x12\x0c\n\x04item\x18\x02 \x01(\x0c\"x\n\x13\x44\x65lRelationsRequest\x12+\n\x08resource\x18\x01 \x01(\x0b\x32\x19.noderesources.ResourceID\x12\"\n\trelations\x18\x02 \x03(\x0b\x32\x0f.utils.Relation\x12\x10\n\x08shard_id\x18\x03 \x01(\t\"\xc5\x01\n\x0cIndexMessage\x12\x0c\n\x04node\x18\x01 \x01(\t\x12\r\n\x05shard\x18\x02 \x01(\t\x12\x0c\n\x04txid\x18\x03 \x01(\x04\x12\x10\n\x08resource\x18\x04 \x01(\t\x12\x39\n\x0btypemessage\x18\x05 \x01(\x0e\x32$.nodewriter.IndexMessage.TypeMessage\x12\x12\n\nreindex_id\x18\x06 \x01(\t\")\n\x0bTypeMessage\x12\x0c\n\x08\x43REATION\x10\x00\x12\x0c\n\x08\x44\x45LETION\x10\x01\"\x1c\n\x07\x43ounter\x12\x11\n\tresources\x18\x01 \x01(\x04\x32\x86\x06\n\nNodeWriter\x12<\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x44\n\x08NewShard\x12\x19.noderesources.EmptyQuery\x1a\x1b.noderesources.ShardCreated\"\x00\x12?\n\x0b\x44\x65leteShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x42\n\nListShards\x12\x19.noderesources.EmptyQuery\x1a\x17.noderesources.ShardIds\"\x00\x12<\n\x02GC\x12\x16.noderesources.ShardId\x1a\x1c.noderesources.EmptyResponse\"\x00\x12>\n\x0bSetResource\x12\x17.noderesources.Resource\x1a\x14.nodewriter.OpStatus\"\x00\x12\x43\n\x0eRemoveResource\x12\x19.noderesources.ResourceID\x1a\x14.nodewriter.OpStatus\"\x00\x12G\n\x0cSetRelations\x12\x1f.nodewriter.SetRelationsRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12G\n\x0c\x44\x65lRelations\x12\x1f.nodewriter.DelRelationsRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12L\n\x0fSetVectorsField\x12!.nodewriter.SetVectorFieldRequest\x1a\x14.nodewriter.OpStatus\"\x00\x12L\n\x0f\x44\x65lVectorsField\x12!.nodewriter.DelVectorFieldRequest\x1a\x14.nodewriter.OpStatus\"\x00\x32H\n\x0bNodeSidecar\x12\x39\n\x08GetCount\x12\x16.noderesources.ShardId\x1a\x13.nodewriter.Counter\"\x00P\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n nucliadb_protos/nodewriter.proto\x12\nnodewriter\x1a#nucliadb_protos/noderesources.proto\"\x92\x01\n\x08OpStatus\x12+\n\x06status\x18\x01 \x01(\x0e\x32\x1b.nodewriter.OpStatus.Status\x12\x0e\n\x06\x64\x65tail\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\x04\x12\x10\n\x08shard_id\x18\x04 \x01(\t\"(\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0b\n\x07WARNING\x10\x01\x12\t\n\x05\x45RROR\x10\x02\"\xc5\x01\n\x0cIndexMessage\x12\x0c\n\x04node\x18\x01 \x01(\t\x12\r\n\x05shard\x18\x02 \x01(\t\x12\x0c\n\x04txid\x18\x03 \x01(\x04\x12\x10\n\x08resource\x18\x04 \x01(\t\x12\x39\n\x0btypemessage\x18\x05 \x01(\x0e\x32$.nodewriter.IndexMessage.TypeMessage\x12\x12\n\nreindex_id\x18\x06 \x01(\t\")\n\x0bTypeMessage\x12\x0c\n\x08\x43REATION\x10\x00\x12\x0c\n\x08\x44\x45LETION\x10\x01\"\x1c\n\x07\x43ounter\x12\x11\n\tresources\x18\x01 \x01(\x04\x32\xd8\x03\n\nNodeWriter\x12<\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x44\n\x08NewShard\x12\x19.noderesources.EmptyQuery\x1a\x1b.noderesources.ShardCreated\"\x00\x12?\n\x0b\x44\x65leteShard\x12\x16.noderesources.ShardId\x1a\x16.noderesources.ShardId\"\x00\x12\x42\n\nListShards\x12\x19.noderesources.EmptyQuery\x1a\x17.noderesources.ShardIds\"\x00\x12<\n\x02GC\x12\x16.noderesources.ShardId\x1a\x1c.noderesources.EmptyResponse\"\x00\x12>\n\x0bSetResource\x12\x17.noderesources.Resource\x1a\x14.nodewriter.OpStatus\"\x00\x12\x43\n\x0eRemoveResource\x12\x19.noderesources.ResourceID\x1a\x14.nodewriter.OpStatus\"\x00\x32H\n\x0bNodeSidecar\x12\x39\n\x08GetCount\x12\x16.noderesources.ShardId\x1a\x13.nodewriter.Counter\"\x00P\x00\x62\x06proto3')
 
 
 
 _OPSTATUS = DESCRIPTOR.message_types_by_name['OpStatus']
-_SETRELATIONSREQUEST = DESCRIPTOR.message_types_by_name['SetRelationsRequest']
-_DELVECTORFIELDREQUEST = DESCRIPTOR.message_types_by_name['DelVectorFieldRequest']
-_SETVECTORFIELDREQUEST = DESCRIPTOR.message_types_by_name['SetVectorFieldRequest']
-_SETVECTORFIELDREQUEST_VECTOROBJECT = _SETVECTORFIELDREQUEST.nested_types_by_name['VectorObject']
-_DELRELATIONSREQUEST = DESCRIPTOR.message_types_by_name['DelRelationsRequest']
 _INDEXMESSAGE = DESCRIPTOR.message_types_by_name['IndexMessage']
 _COUNTER = DESCRIPTOR.message_types_by_name['Counter']
 _OPSTATUS_STATUS = _OPSTATUS.enum_types_by_name['Status']
@@ -40,42 +35,6 @@ OpStatus = _reflection.GeneratedProtocolMessageType('OpStatus', (_message.Messag
   # @@protoc_insertion_point(class_scope:nodewriter.OpStatus)
   })
 _sym_db.RegisterMessage(OpStatus)
-
-SetRelationsRequest = _reflection.GeneratedProtocolMessageType('SetRelationsRequest', (_message.Message,), {
-  'DESCRIPTOR' : _SETRELATIONSREQUEST,
-  '__module__' : 'nucliadb_protos.nodewriter_pb2'
-  # @@protoc_insertion_point(class_scope:nodewriter.SetRelationsRequest)
-  })
-_sym_db.RegisterMessage(SetRelationsRequest)
-
-DelVectorFieldRequest = _reflection.GeneratedProtocolMessageType('DelVectorFieldRequest', (_message.Message,), {
-  'DESCRIPTOR' : _DELVECTORFIELDREQUEST,
-  '__module__' : 'nucliadb_protos.nodewriter_pb2'
-  # @@protoc_insertion_point(class_scope:nodewriter.DelVectorFieldRequest)
-  })
-_sym_db.RegisterMessage(DelVectorFieldRequest)
-
-SetVectorFieldRequest = _reflection.GeneratedProtocolMessageType('SetVectorFieldRequest', (_message.Message,), {
-
-  'VectorObject' : _reflection.GeneratedProtocolMessageType('VectorObject', (_message.Message,), {
-    'DESCRIPTOR' : _SETVECTORFIELDREQUEST_VECTOROBJECT,
-    '__module__' : 'nucliadb_protos.nodewriter_pb2'
-    # @@protoc_insertion_point(class_scope:nodewriter.SetVectorFieldRequest.VectorObject)
-    })
-  ,
-  'DESCRIPTOR' : _SETVECTORFIELDREQUEST,
-  '__module__' : 'nucliadb_protos.nodewriter_pb2'
-  # @@protoc_insertion_point(class_scope:nodewriter.SetVectorFieldRequest)
-  })
-_sym_db.RegisterMessage(SetVectorFieldRequest)
-_sym_db.RegisterMessage(SetVectorFieldRequest.VectorObject)
-
-DelRelationsRequest = _reflection.GeneratedProtocolMessageType('DelRelationsRequest', (_message.Message,), {
-  'DESCRIPTOR' : _DELRELATIONSREQUEST,
-  '__module__' : 'nucliadb_protos.nodewriter_pb2'
-  # @@protoc_insertion_point(class_scope:nodewriter.DelRelationsRequest)
-  })
-_sym_db.RegisterMessage(DelRelationsRequest)
 
 IndexMessage = _reflection.GeneratedProtocolMessageType('IndexMessage', (_message.Message,), {
   'DESCRIPTOR' : _INDEXMESSAGE,
@@ -100,24 +59,14 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _OPSTATUS._serialized_end=232
   _OPSTATUS_STATUS._serialized_start=192
   _OPSTATUS_STATUS._serialized_end=232
-  _SETRELATIONSREQUEST._serialized_start=234
-  _SETRELATIONSREQUEST._serialized_end=354
-  _DELVECTORFIELDREQUEST._serialized_start=356
-  _DELVECTORFIELDREQUEST._serialized_end=457
-  _SETVECTORFIELDREQUEST._serialized_start=460
-  _SETVECTORFIELDREQUEST._serialized_end=674
-  _SETVECTORFIELDREQUEST_VECTOROBJECT._serialized_start=628
-  _SETVECTORFIELDREQUEST_VECTOROBJECT._serialized_end=674
-  _DELRELATIONSREQUEST._serialized_start=676
-  _DELRELATIONSREQUEST._serialized_end=796
-  _INDEXMESSAGE._serialized_start=799
-  _INDEXMESSAGE._serialized_end=996
-  _INDEXMESSAGE_TYPEMESSAGE._serialized_start=955
-  _INDEXMESSAGE_TYPEMESSAGE._serialized_end=996
-  _COUNTER._serialized_start=998
-  _COUNTER._serialized_end=1026
-  _NODEWRITER._serialized_start=1029
-  _NODEWRITER._serialized_end=1803
-  _NODESIDECAR._serialized_start=1805
-  _NODESIDECAR._serialized_end=1877
+  _INDEXMESSAGE._serialized_start=235
+  _INDEXMESSAGE._serialized_end=432
+  _INDEXMESSAGE_TYPEMESSAGE._serialized_start=391
+  _INDEXMESSAGE_TYPEMESSAGE._serialized_end=432
+  _COUNTER._serialized_start=434
+  _COUNTER._serialized_end=462
+  _NODEWRITER._serialized_start=465
+  _NODEWRITER._serialized_end=937
+  _NODESIDECAR._serialized_start=939
+  _NODESIDECAR._serialized_end=1011
 # @@protoc_insertion_point(module_scope)

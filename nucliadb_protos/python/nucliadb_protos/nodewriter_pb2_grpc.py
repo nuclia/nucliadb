@@ -50,26 +50,6 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
                 )
-        self.SetRelations = channel.unary_unary(
-                '/nodewriter.NodeWriter/SetRelations',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.SetRelationsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
-        self.DelRelations = channel.unary_unary(
-                '/nodewriter.NodeWriter/DelRelations',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.DelRelationsRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
-        self.SetVectorsField = channel.unary_unary(
-                '/nodewriter.NodeWriter/SetVectorsField',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.SetVectorFieldRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
-        self.DelVectorsField = channel.unary_unary(
-                '/nodewriter.NodeWriter/DelVectorsField',
-                request_serializer=nucliadb__protos_dot_nodewriter__pb2.DelVectorFieldRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-                )
 
 
 class NodeWriterServicer(object):
@@ -117,33 +97,6 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SetRelations(self, request, context):
-        """Graph
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DelRelations(self, request, context):
-        """Set relations on a resource
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SetVectorsField(self, request, context):
-        """Vectors
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DelVectorsField(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_NodeWriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -180,26 +133,6 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'RemoveResource': grpc.unary_unary_rpc_method_handler(
                     servicer.RemoveResource,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'SetRelations': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetRelations,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.SetRelationsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'DelRelations': grpc.unary_unary_rpc_method_handler(
-                    servicer.DelRelations,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.DelRelationsRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'SetVectorsField': grpc.unary_unary_rpc_method_handler(
-                    servicer.SetVectorsField,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.SetVectorFieldRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
-            ),
-            'DelVectorsField': grpc.unary_unary_rpc_method_handler(
-                    servicer.DelVectorsField,
-                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.DelVectorFieldRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
             ),
     }
@@ -327,74 +260,6 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/RemoveResource',
             nucliadb__protos_dot_noderesources__pb2.ResourceID.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetRelations(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetRelations',
-            nucliadb__protos_dot_nodewriter__pb2.SetRelationsRequest.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DelRelations(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/DelRelations',
-            nucliadb__protos_dot_nodewriter__pb2.DelRelationsRequest.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def SetVectorsField(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/SetVectorsField',
-            nucliadb__protos_dot_nodewriter__pb2.SetVectorFieldRequest.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def DelVectorsField(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/DelVectorsField',
-            nucliadb__protos_dot_nodewriter__pb2.DelVectorFieldRequest.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

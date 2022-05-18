@@ -95,4 +95,5 @@ pub trait ReaderChild {
     type Response;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response>;
     fn reload(&self);
+    fn stored_ids(&self) -> Vec<String>;
 }

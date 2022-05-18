@@ -23,9 +23,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest,
-    SuggestResponse, VectorSearchRequest, VectorSearchResponse,
+    DocumentSearchRequest, DocumentSearchResponse, IdCollection, ParagraphSearchRequest,
+    ParagraphSearchResponse, SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList,
+    SuggestRequest, SuggestResponse, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_services::*;
 use tracing::*;
@@ -164,6 +164,30 @@ impl NodeReaderService {
     ) -> Option<ServiceResult<DocumentSearchResponse>> {
         if let Some(shard) = self.get_shard(shard_id).await {
             Some(shard.document_search(request).await.map_err(|e| e.into()))
+        } else {
+            None
+        }
+    }
+    pub async fn document_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            let ids = shard.get_field_keys().await;
+            Some(IdCollection { ids })
+        } else {
+            None
+        }
+    }
+    pub async fn paragraph_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            let ids = shard.get_paragraphs_keys().await;
+            Some(IdCollection { ids })
+        } else {
+            None
+        }
+    }
+    pub async fn vector_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            let ids = shard.get_vectors_keys().await;
+            Some(IdCollection { ids })
         } else {
             None
         }

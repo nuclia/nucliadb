@@ -80,6 +80,9 @@ impl ReaderChild for VectorReaderService {
     fn reload(&self) {
         self.index.reload();
     }
+    fn stored_ids(&self) -> Vec<String> {
+        self.index.keys()
+    }
 }
 
 impl VectorReaderService {
