@@ -21,6 +21,7 @@ spec:
       name: reader
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
       labels:
         app: reader
         version: "{{ .Chart.Version | replace "+" "_" }}"

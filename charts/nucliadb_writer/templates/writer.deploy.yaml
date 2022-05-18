@@ -27,6 +27,7 @@ spec:
         heritage: "{{ .Release.Service }}"
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.config.dm_redis_port }},{{.Values.services.maindb }},{{.Values.services.nats }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
