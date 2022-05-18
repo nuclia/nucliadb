@@ -20,7 +20,16 @@
 import logging
 import sys
 
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
+
 from nucliadb_ingest.utils import start_ingest, stop_ingest
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -38,6 +47,16 @@ from nucliadb_writer.utilities import get_processing
 
 
 async def initialize():
+    from nucliadb_writer.app import application
+
+    tracer_provider = None
+    if telemetry_settings.jaeger_enabled:
+        tracer_provider = get_telemetry(SERVICE_NAME)
+
+    set_global_textmap(B3MultiFormat())
+    FastAPIInstrumentor.instrument_app(application, tracer_provider=tracer_provider)
+    AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
+
     await start_ingest(SERVICE_NAME)
     processing_engine = ProcessingEngine(
         nuclia_service_account=nuclia_settings.nuclia_service_account,

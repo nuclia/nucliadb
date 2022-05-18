@@ -20,12 +20,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi_versioning import VersionedFastAPI
-from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
-    AioHttpClientInstrumentor,
-)
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -34,11 +28,9 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
-from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.settings import http_settings, running_settings
-from nucliadb_writer import API_PREFIX, SERVICE_NAME
+from nucliadb_writer import API_PREFIX
 from nucliadb_writer.api.v1.router import api as api_v1
 from nucliadb_writer.lifecycle import finalize, initialize
 from nucliadb_writer.sentry import set_sentry
@@ -111,11 +103,3 @@ async def homepage(request):
 application.add_route("/", homepage)
 # Enable forwarding of B3 headers to responses and external requests
 # to both inner applications
-
-tracer_provider = None
-if telemetry_settings.jaeger_enabled:
-    tracer_provider = get_telemetry(SERVICE_NAME)
-
-set_global_textmap(B3MultiFormat())
-FastAPIInstrumentor.instrument_app(application, tracer_provider=tracer_provider)
-AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
