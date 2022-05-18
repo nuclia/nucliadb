@@ -40,6 +40,7 @@ setup(
     entry_points={
         "console_scripts": [
             "extract-openapi = nucliadb_writer.openapi:command_extract_openapi",
+            "writer-metrics = nucliadb_writer.run:run_with_metrics",
         ]
     },
 )

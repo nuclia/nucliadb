@@ -15,3 +15,5 @@ spec:
   ports:
     - name: http-search
       port: {{ .Values.serving.port }}
+    - name: metrics
+      port: {{ .Values.serving.metricsPort}}

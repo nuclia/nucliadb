@@ -35,3 +35,5 @@ data:
   INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}
 
   TOTAL_REPLICAS: {{ .Values.replicaCount | quote }}
+
+  JAEGER_ENABLED: {{ .Values.tracing.enabled }}

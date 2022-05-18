@@ -12,6 +12,10 @@ class RunningSettings(BaseSettings):
     log_level: str = "DEBUG"
     activity_log_level: str = "INFO"
     swim_level: str = "INFO"
+    metrics_port: int = 3030
+    metrics_host: str = "0.0.0.0"
+    serving_port: int = 8080
+    serving_host: str = "0.0.0.0"
 
 
 running_settings = RunningSettings()
