@@ -29,6 +29,8 @@ from starlette.requests import Request
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import (
     get_cache,
@@ -119,6 +121,9 @@ async def create_resource(
     )
 
     set_status(writer.basic, item)
+
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.rid": uuid, "nuclia.kbid": kbid})
 
     try:
         seqid = await processing.send_to_process(toprocess, partition)

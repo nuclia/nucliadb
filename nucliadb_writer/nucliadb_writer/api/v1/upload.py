@@ -41,6 +41,8 @@ from nucliadb_protos.writer_pb2 import (
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
@@ -577,6 +579,11 @@ async def start_upload_field(
         rid = uuid.uuid4().hex
     elif field is None:
         field = md5
+
+    if telemetry_settings.jeager_enabled and rid and kbid and field:
+        set_info_on_span(
+            {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.field": field}
+        )
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field

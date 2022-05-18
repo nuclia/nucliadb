@@ -1,6 +1,9 @@
+from typing import Dict, Sequence, Union
+
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
 from opentelemetry.sdk.resources import Resource  # type: ignore
 from opentelemetry.sdk.trace import TracerProvider  # type: ignore
+from opentelemetry.trace import get_current_span
 
 from nucliadb_telemetry.batch_span import BatchSpanProcessor
 from nucliadb_telemetry.jaeger import JaegerExporterAsync
@@ -41,3 +44,22 @@ def init_telemetry(service_name: str):
     # add to the tracer
     tracer_provider.add_span_processor(span_processor)
     return tracer_provider
+
+
+def set_info_on_span(
+    headers: Dict[
+        str,
+        Union[
+            str,
+            bool,
+            int,
+            float,
+            Sequence[str],
+            Sequence[bool],
+            Sequence[int],
+            Sequence[float],
+        ],
+    ] = {}
+):
+    span = get_current_span()
+    span.set_attributes(headers)

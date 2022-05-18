@@ -36,6 +36,8 @@ from nucliadb_models.entities import EntitiesGroup
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.widgets import Widget, WidgetMode
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 from nucliadb_writer.api.v1.router import KB_PREFIX, api
@@ -65,6 +67,9 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
         entitypb.merged = entity.merged
         entitypb.represents.extend(entity.represents)
 
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.kbid": kbid})
+
     status: OpStatusWriter = await ingest.SetEntities(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
@@ -90,6 +95,10 @@ async def delete_entities(request: Request, kbid: str, group: str):
     pbrequest: DelEntitiesRequest = DelEntitiesRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.group = group
+
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.kbid": kbid})
+
     status: OpStatusWriter = await ingest.DelEntities(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
@@ -116,6 +125,10 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
     ingest = get_ingest()
     pbrequest: SetLabelsRequest = SetLabelsRequest(id=labelset)
     pbrequest.kb.uuid = kbid
+
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.kbid": kbid})
+
     if item.title:
         pbrequest.labelset.title = item.title
 
@@ -158,6 +171,8 @@ async def delete_labels(request: Request, kbid: str, labelset: str):
     pbrequest: DelLabelsRequest = DelLabelsRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.id = labelset
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.kbid": kbid})
     status: OpStatusWriter = await ingest.DelLabels(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
@@ -184,7 +199,8 @@ async def set_widget(request: Request, kbid: str, widget: str, item: Widget):
     pbrequest: SetWidgetsRequest = SetWidgetsRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.widget.id = widget
-
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.kbid": kbid})
     if item.description:
         pbrequest.widget.description = item.description
 
@@ -235,6 +251,8 @@ async def delete_widget(request: Request, kbid: str, widget: str):
     pbrequest: DetWidgetsRequest = DetWidgetsRequest()
     pbrequest.kb.uuid = kbid
     pbrequest.widget = widget
+    if telemetry_settings.jeager_enabled:
+        set_info_on_span({"nuclia.kbid": kbid})
     status: OpStatusWriter = await ingest.DelWidgets(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return None
