@@ -24,6 +24,7 @@ from fastapi_versioning import VersionedFastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
+from sentry_sdk import capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -69,6 +70,7 @@ on_shutdown = [finalize]
 
 
 async def global_exception_handler(request, exc):
+    capture_exception(exc)
     return JSONResponse(
         status_code=500,
         content={"detail": "Something went wrong, please contact your administrator"},

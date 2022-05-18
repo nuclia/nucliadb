@@ -279,6 +279,7 @@ class ProcessingEngine:
                 data = await resp.json()
                 seqid = data.get("seqid")
             elif resp.status == 412:
+                data = await resp.json()
                 raise LimitsExceededError(data["detail"])
             else:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")
