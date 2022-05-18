@@ -32,3 +32,5 @@ data:
   INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}
   INDEX_JETSTREAM_GROUP: {{ .Values.indexing.index_jetstream_group }}
   INDEX_JETSTREAM_STREAM: {{ .Values.indexing.index_jetstream_stream }}
+
+  JAEGER_ENABLED: {{ .Values.tracing.enabled }}
