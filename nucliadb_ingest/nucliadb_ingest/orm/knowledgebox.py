@@ -56,11 +56,14 @@ from nucliadb_ingest.orm.resource import (
     Resource,
 )
 from nucliadb_ingest.orm.shard import Shard
+from nucliadb_ingest.orm.utils import get_basic, get_node_klass, set_basic
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
+
+KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
 KB_KEYS = "/kbs/{kbid}/"
 KB_UUID = "/kbs/{kbid}/config"
@@ -70,7 +73,6 @@ KB_WIDGETS = "/kbs/{kbid}/widgets"
 KB_WIDGETS_WIDGET = "/kbs/{kbid}/widgets/{id}"
 KB_ENTITIES = "/kbs/{kbid}/entities"
 KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
-KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
 KB_SLUGS = KB_SLUGS_BASE + "{slug}"
@@ -196,10 +198,8 @@ class KnowledgeBox:
         # locate a node with renderzvouz
         if failed is False:
             try:
-                if indexing_settings.index_local:
-                    await LocalNode.create_shard_by_kbid(txn, uuid)
-                else:
-                    await Node.create_shard_by_kbid(txn, uuid)
+                node_klass = get_node_klass()
+                await node_klass.create_shard_by_kbid(txn, uuid)
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e
@@ -380,12 +380,10 @@ class KnowledgeBox:
         for shard in shards_obj.shards:
             # Delete the shard on nodes
             for replica in shard.replicas:
-                if indexing_settings.index_local:
-                    node: Optional[Union[LocalNode, Node]] = await LocalNode.get(
-                        replica.node
-                    )
-                else:
-                    node = await Node.get(replica.node)
+                node_klass = get_node_klass()
+                node: Optional[Union[LocalNode, Node]] = await node_klass.get(
+                    replica.node
+                )
                 if node is None:
                     await txn.abort()
                     raise NodeError(f"No node {replica.node} available")
@@ -429,7 +427,7 @@ class KnowledgeBox:
         return None
 
     async def get(self, uuid: str) -> Optional[Resource]:
-        raw_basic = await self.txn.get(KB_RESOURCE.format(kbid=self.kbid, uuid=uuid))
+        raw_basic = await get_basic(self.txn, self.kbid, uuid)
         if raw_basic:
             return Resource(
                 txn=self.txn,
@@ -442,8 +440,7 @@ class KnowledgeBox:
             return None
 
     async def delete_resource(self, uuid: str):
-        key = KB_RESOURCE.format(kbid=self.kbid, uuid=uuid)
-        raw_basic = await self.txn.get(key)
+        raw_basic = await get_basic(self.txn, self.kbid, uuid)
         if raw_basic:
             basic = Resource.parse_basic(raw_basic)
         else:
@@ -503,9 +500,7 @@ class KnowledgeBox:
             slug = uuid4().hex
         slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
-        await self.txn.set(
-            KB_RESOURCE.format(kbid=self.kbid, uuid=uuid), basic.SerializeToString()
-        )
+        await set_basic(self.txn, self.kbid, uuid, basic)
         return Resource(
             storage=self.storage, txn=self.txn, kb=self, uuid=uuid, basic=basic
         )

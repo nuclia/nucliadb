@@ -22,6 +22,7 @@ import asyncio
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc  # type: ignore
 
+from nucliadb_ingest import logger
 from nucliadb_ingest.service.writer import WriterServicer
 from nucliadb_ingest.settings import settings
 from nucliadb_protos import writer_pb2_grpc
@@ -40,6 +41,9 @@ async def start_grpc():
     writer_pb2_grpc.add_WriterServicer_to_server(servicer, server)
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     await server.start()
+    logger.info(
+        f"======= Ingest GRPC serving on http://0.0.0.0:{settings.grpc_port}/ ======"
+    )
 
     def finalizer():
         asyncio.create_task(servicer.finalize())

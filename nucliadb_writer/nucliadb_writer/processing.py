@@ -126,7 +126,7 @@ class ProcessingEngine:
         elif driver == "s3":
             self.driver = 1
         else:
-            logger.error(f"Not valid driver to processing {driver}")
+            logger.error(f"Not valid driver to processing: {driver}")
             self.driver = 2
         self._exit_stack = AsyncExitStack()
 
@@ -281,7 +281,7 @@ class ProcessingEngine:
             elif resp.status == 412:
                 raise LimitsExceededError(data["detail"])
             else:
-                raise SendToProcessError(f"{resp.status}: {resp.content}")
+                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         else:
             headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
             headers.update(trace_headers)
@@ -297,7 +297,7 @@ class ProcessingEngine:
             elif resp.status == 412:
                 raise LimitsExceededError(data["detail"])
             else:
-                raise SendToProcessError(f"{resp.status}: {resp.content}")
+                raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         logger.info(
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, ingest seqid: {seqid}, partition: {partition}"
         )

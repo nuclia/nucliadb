@@ -47,13 +47,13 @@ from nucliadb_ingest.fields.link import Link
 from nucliadb_ingest.fields.text import Text
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.brain import ResourceBrain
+from nucliadb_ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:
     from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 
-KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
@@ -135,9 +135,7 @@ class Resource:
     async def exists(self) -> bool:
         exists = True
         if self.basic is None:
-            payload = await self.txn.get(
-                KB_RESOURCE_BASIC.format(kbid=self.kb.kbid, uuid=self.uuid)
-            )
+            payload = await get_basic(self.txn, self.kb.kbid, self.uuid)
             if payload is not None:
                 pb = PBBasic()
                 pb.ParseFromString(payload)
@@ -149,9 +147,7 @@ class Resource:
     # Basic
     async def get_basic(self) -> Optional[PBBasic]:
         if self.basic is None:
-            payload = await self.txn.get(
-                KB_RESOURCE_BASIC.format(kbid=self.kb.kbid, uuid=self.uuid)
-            )
+            payload = await get_basic(self.txn, self.kb.kbid, self.uuid)
             self.basic = self.parse_basic(payload) if payload is not None else PBBasic()
         return self.basic
 
@@ -164,10 +160,7 @@ class Resource:
         if slug is not None and slug != "":
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
-        await self.txn.set(
-            KB_RESOURCE_BASIC.format(kbid=self.kb.kbid, uuid=self.uuid),
-            self.basic.SerializeToString(),
-        )
+        await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
         self.modified = True
 
     # Origin

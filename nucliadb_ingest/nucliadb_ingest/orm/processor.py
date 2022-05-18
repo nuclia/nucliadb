@@ -32,9 +32,9 @@ from nucliadb_ingest import logger
 from nucliadb_ingest.maindb.driver import Driver, Transaction
 from nucliadb_ingest.orm.exceptions import DeadletteredError
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb_ingest.orm.node import Node
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_ingest.orm.shard import Shard
+from nucliadb_ingest.orm.utils import get_node_klass
 from nucliadb_ingest.settings import settings
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
@@ -180,18 +180,19 @@ class Processor:
                 if shard_id is not None:
                     shard = await kb.get_resource_shard(shard_id)
 
+                node_klass = get_node_klass()
                 if shard is None:
                     # Its a new resource
                     # Check if we have enough resource to create a new shard
-                    shard = await Node.actual_shard(txn, kbid)
+                    shard = await node_klass.actual_shard(txn, kbid)
                     if shard is None:
-                        shard = await Node.create_shard_by_kbid(txn, kbid)
+                        shard = await node_klass.create_shard_by_kbid(txn, kbid)
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
                     count = await shard.add_resource(resource.indexer.brain, seqid)
                     if count > settings.max_node_fields:
-                        shard = await Node.create_shard_by_kbid(txn, kbid)
+                        shard = await node_klass.create_shard_by_kbid(txn, kbid)
 
                 else:
                     raise AttributeError("Shard is not available")
@@ -225,7 +226,10 @@ class Processor:
                 await txn.abort()
 
         if handled_exception is not None:
-            raise DeadletteredError() from handled_exception
+            if seqid == -1:
+                raise handled_exception
+            else:
+                raise DeadletteredError() from handled_exception
 
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         await self.txn([message], seqid, partition)
@@ -423,5 +427,5 @@ class Processor:
         return uuid
 
     async def notify(self, channel, payload: bytes):
-        if self.cache.pubsub is not None:
+        if self.cache is not None and self.cache.pubsub is not None:
             await self.cache.pubsub.publish(channel, payload)

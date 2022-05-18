@@ -11,6 +11,71 @@ import os
 logger = logging.getLogger("nucliadb")
 
 
+# this is default (site-packages\uvicorn\main.py)
+log_config = {
+    "version": 1,
+    "disable_existing_loggers": True,
+    "formatters": {
+        "default": {
+            "()": "uvicorn.logging.DefaultFormatter",
+            "fmt": "%(levelprefix)s %(message)s",
+            "use_colors": None,
+        },
+        "access": {
+            "()": "uvicorn.logging.AccessFormatter",
+            "fmt": '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+        },
+    },
+    "handlers": {
+        "default": {
+            "formatter": "default",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stderr",
+        },
+        "access": {
+            "formatter": "access",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "loggers": {
+        "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.error": {"level": "INFO", "handlers": ["default"], "propagate": False},
+        "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+        "nucliadb": {
+            "level": "INFO",
+            "handlers": ["default"],
+            "propagate": True,
+        },
+        "nucliadb_one": {
+            "level": "INFO",
+            "handlers": ["default"],
+            "propagate": True,
+        },
+        "nucliadb_ingest": {
+            "level": "INFO",
+            "handlers": ["default"],
+            "propagate": True,
+        },
+        "nucliadb_search": {
+            "level": "INFO",
+            "handlers": ["default"],
+            "propagate": True,
+        },
+        "nucliadb_writer": {
+            "level": "INFO",
+            "handlers": ["default"],
+            "propagate": True,
+        },
+        "nucliadb_reader": {
+            "level": "INFO",
+            "handlers": ["default"],
+            "propagate": True,
+        },
+    },
+}
+
+
 def arg_parse():
 
     parser = argparse.ArgumentParser(description="Process some integers.")
@@ -33,6 +98,16 @@ def arg_parse():
 
     parser.add_argument("-z", "--zone", dest="zone", help="Understanding API Zone")
 
+    parser.add_argument(
+        "-g", "--grpc", dest="grpc", default=8030, help="NucliaDB GRPC Port", type=int
+    )
+
+    parser.add_argument(
+        "-s", "--http", dest="http", default=8080, help="NucliaDB HTTP Port", type=int
+    )
+
+    parser.add_argument("--log", dest="log", default="INFO", help="LOG LEVEL")
+
     args = parser.parse_args()
     return args
 
@@ -52,9 +127,11 @@ def run():
         indexing_settings,
     )
     from nucliadb_utils.cache.settings import settings as cache_settings
+    from nucliadb_one.app import application
 
     nucliadb_args = arg_parse()
 
+    running_settings.log_level = nucliadb_args.log.upper()
     ingest_settings.driver = "local"
     ingest_settings.driver_local_url = nucliadb_args.maindb
     ingest_settings.swim_enabled = False
@@ -74,16 +151,22 @@ def run():
     indexing_settings.index_local = True
     cache_settings.cache_enabled = False
     writer_settings.dm_enabled = False
+    ingest_settings.grpc_port = nucliadb_args.grpc
 
-    os.environ["VECTORS_DIMENSION"] = "768"
     os.environ["DATA_PATH"] = nucliadb_args.node
 
     local_node = LocalNode()
     NODE_CLUSTER.local_node = local_node
-
     uvicorn.run(
-        "nucliadb_one.app:application", host="127.0.0.1", port=8080, log_level="info"
+        application,
+        host="0.0.0.0",
+        port=nucliadb_args.http,
+        log_config=log_config,
+        log_level=logging.getLevelName("INFO"),
+        debug=True,
+        reload=False,
     )
+    logger.info(f"======= REST API on http://0.0.0.0:{nucliadb_args.http}/ ======")
 
 
 def purge():
