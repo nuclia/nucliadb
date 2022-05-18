@@ -27,6 +27,7 @@ spec:
         heritage: "{{ .Release.Service }}"
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.config.dm_redis_port }},{{.Values.services.maindb }},{{.Values.services.nats }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
@@ -66,7 +67,10 @@ spec:
         - configMapRef:
             name: writer-config
         ports:
-        - containerPort: {{ .Values.serving.port }}
+        - name: http-writer
+          containerPort: {{ .Values.serving.port }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
@@ -79,6 +83,11 @@ spec:
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: writer-config
         ports:
           - containerPort: 5775
             name: zk-compact-trft

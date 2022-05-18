@@ -21,6 +21,7 @@ spec:
       name: reader
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
       labels:
         app: reader
         version: "{{ .Chart.Version | replace "+" "_" }}"
@@ -66,7 +67,10 @@ spec:
         - configMapRef:
             name: reader-config
         ports:
-        - containerPort: {{ .Values.serving.port }}
+        - name: http-reader
+          containerPort: {{ .Values.serving.port }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
@@ -79,6 +83,11 @@ spec:
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: reader-config
         ports:
           - containerPort: 5775
             name: zk-compact-trft

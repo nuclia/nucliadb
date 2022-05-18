@@ -21,7 +21,7 @@ spec:
       name: search
       annotations:
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.swim.binding.port }},{{ .Values.services.nats }},{{ .Values.services.maindb }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.swim.binding.port }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.swim.binding.port }},{{ .Values.serving.metricsPort }}"
       labels:
         app: search
         version: "{{ .Chart.Version | replace "+" "_" }}"
@@ -67,7 +67,10 @@ spec:
         - configMapRef:
             name: search-config
         ports:
-        - containerPort: {{ .Values.serving.port }}
+        - name: http-search
+          containerPort: {{ .Values.serving.port }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         - name: swim
           containerPort: {{ .Values.swim.binding.port }}
           protocol: UDP
@@ -83,6 +86,11 @@ spec:
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: search-config
         ports:
           - containerPort: 5775
             name: zk-compact-trft
