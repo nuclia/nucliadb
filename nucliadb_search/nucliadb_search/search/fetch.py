@@ -43,9 +43,9 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 
 
-def get_resource_cache() -> Dict[str, ResourceORM]:
+def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
     value: Optional[Dict[str, ResourceORM]] = rcache.get()
-    if value is None:
+    if value is None or clear:
         value = {}
         rcache.set(value)
     return value

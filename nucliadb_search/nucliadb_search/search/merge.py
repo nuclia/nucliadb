@@ -44,6 +44,7 @@ from nucliadb_search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_labels_sentence,
+    get_resource_cache,
     get_text_paragraph,
     get_text_sentence,
 )
@@ -239,6 +240,8 @@ async def merge_results(
         vectors.append(result.vector)
 
     api_results = KnowledgeboxSearchResults()
+
+    get_resource_cache(clear=True)
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
