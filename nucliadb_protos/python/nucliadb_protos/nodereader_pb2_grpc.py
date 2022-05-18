@@ -47,6 +47,21 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.FromString,
                 )
+        self.DocumentIds = channel.unary_unary(
+                '/nodereader.NodeReader/DocumentIds',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
+                )
+        self.ParagraphIds = channel.unary_unary(
+                '/nodereader.NodeReader/ParagraphIds',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
+                )
+        self.VectorIds = channel.unary_unary(
+                '/nodereader.NodeReader/VectorIds',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
+                )
         self.Search = channel.unary_unary(
                 '/nodereader.NodeReader/Search',
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.SearchRequest.SerializeToString,
@@ -100,6 +115,24 @@ class NodeReaderServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DocumentIds(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ParagraphIds(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def VectorIds(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def Search(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -144,6 +177,21 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.RelationSearch,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.SerializeToString,
+            ),
+            'DocumentIds': grpc.unary_unary_rpc_method_handler(
+                    servicer.DocumentIds,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.SerializeToString,
+            ),
+            'ParagraphIds': grpc.unary_unary_rpc_method_handler(
+                    servicer.ParagraphIds,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.SerializeToString,
+            ),
+            'VectorIds': grpc.unary_unary_rpc_method_handler(
+                    servicer.VectorIds,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.IdCollection.SerializeToString,
             ),
             'Search': grpc.unary_unary_rpc_method_handler(
                     servicer.Search,
@@ -266,6 +314,57 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/RelationSearch',
             nucliadb__protos_dot_nodereader__pb2.RelationSearchRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.RelationSearchResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DocumentIds(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/DocumentIds',
+            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ParagraphIds(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/ParagraphIds',
+            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def VectorIds(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/VectorIds',
+            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.IdCollection.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

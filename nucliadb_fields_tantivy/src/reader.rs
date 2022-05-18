@@ -28,7 +28,9 @@ use nucliadb_protos::{
     OrderBy, ResourceId,
 };
 use nucliadb_service_interface::prelude::*;
-use tantivy::collector::{Count, FacetCollector, FacetCounts, MultiCollector, TopDocs};
+use tantivy::collector::{
+    Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
+};
 use tantivy::query::{AllQuery, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
@@ -89,6 +91,9 @@ impl ReaderChild for FieldReaderService {
 
     fn reload(&self) {
         self.reader.reload().unwrap();
+    }
+    fn stored_ids(&self) -> Vec<String> {
+        self.keys()
     }
 }
 
@@ -465,6 +470,24 @@ impl FieldReaderService {
                 )
             }
         }
+    }
+    fn keys(&self) -> Vec<String> {
+        let searcher = self.reader.searcher();
+        searcher
+            .search(&AllQuery, &DocSetCollector)
+            .unwrap()
+            .into_iter()
+            .map(|addr| {
+                searcher
+                    .doc(addr)
+                    .unwrap()
+                    .get_first(self.schema.uuid)
+                    .expect("document doesn't appear to have uuid.")
+                    .as_text()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect()
     }
 }
 
