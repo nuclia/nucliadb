@@ -85,7 +85,7 @@ def prepare_field_put(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    if telemetry_settings.jeager_enabled:
+    if telemetry_settings.jaeger_enabled:
         set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     parse_audit(writer.audit, request)

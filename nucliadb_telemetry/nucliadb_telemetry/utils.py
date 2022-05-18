@@ -19,7 +19,7 @@ def get_telemetry(service_name: str):
 
 
 def init_telemetry(service_name: str):
-    if telemetry_settings.jeager_enabled is False:
+    if telemetry_settings.jaeger_enabled is False:
         return
 
     tracer_provider = TracerProvider(

@@ -580,7 +580,7 @@ async def start_upload_field(
     elif field is None:
         field = md5
 
-    if telemetry_settings.jeager_enabled and rid and kbid and field:
+    if telemetry_settings.jaeger_enabled and rid and kbid and field:
         set_info_on_span(
             {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.field": field}
         )

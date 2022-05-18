@@ -36,7 +36,7 @@ async def start_grpc(service_name: Optional[str] = None):
 
     aio.init_grpc_aio()
 
-    if telemetry_settings.jeager_enabled and service_name:
+    if telemetry_settings.jaeger_enabled and service_name:
         tracer_provider = get_telemetry(service_name)
         otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
         server = otgrpc.init_server()

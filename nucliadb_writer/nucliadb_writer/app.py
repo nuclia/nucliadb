@@ -113,7 +113,7 @@ application.add_route("/", homepage)
 # to both inner applications
 
 tracer_provider = None
-if telemetry_settings.jeager_enabled:
+if telemetry_settings.jaeger_enabled:
     tracer_provider = get_telemetry(SERVICE_NAME)
 
 set_global_textmap(B3MultiFormat())

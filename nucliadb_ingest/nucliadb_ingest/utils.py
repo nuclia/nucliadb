@@ -90,7 +90,7 @@ async def get_driver() -> Driver:
 async def start_ingest(service_name: Optional[str] = None):
     if nucliadb_settings.nucliadb_ingest is not None:
         # Its distributed lets create a GRPC client
-        if telemetry_settings.jeager_enabled and service_name:
+        if telemetry_settings.jaeger_enabled and service_name:
             # We want Jaeger telemetry enabled
             provider = get_telemetry(service_name)
             otgrpc = OpenTelemetryGRPC(f"{service_name}_ingest", provider)

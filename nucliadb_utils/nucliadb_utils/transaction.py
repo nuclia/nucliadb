@@ -96,7 +96,7 @@ class TransactionUtility:
         self.nc = await nats.connect(**options)
 
         jetstream = self.nc.jetstream()
-        if telemetry_settings.jeager_enabled and service_name and jetstream:
+        if telemetry_settings.jaeger_enabled and service_name and jetstream:
             tracer_provider = get_telemetry(service_name)
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{service_name}_transaction", tracer_provider

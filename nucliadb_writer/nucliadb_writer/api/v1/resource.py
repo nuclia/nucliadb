@@ -122,7 +122,7 @@ async def create_resource(
 
     set_status(writer.basic, item)
 
-    if telemetry_settings.jeager_enabled:
+    if telemetry_settings.jaeger_enabled:
         set_info_on_span({"nuclia.rid": uuid, "nuclia.kbid": kbid})
 
     try:

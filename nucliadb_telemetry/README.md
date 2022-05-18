@@ -5,7 +5,7 @@ Open telemetry compatible plugin to propagate traceid on FastAPI, Nats and GRPC 
 ENV vars:
 
 ```
-    JEAGER_ENABLED = True
+    JAEGER_ENABLED = True
     JAEGER_HOST = "127.0.0.1"
     JAEGER_PORT = server.port
 ```
