@@ -17,7 +17,7 @@ spec:
     matchLabels:
       app: reader
   endpoints:
-  - port: metrics
+  - targetPort: {{ .Values.serving.metricsPort }}
     interval: 10s
     path: /metrics
 {{- end }}

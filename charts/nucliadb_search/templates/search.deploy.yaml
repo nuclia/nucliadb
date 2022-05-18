@@ -67,7 +67,10 @@ spec:
         - configMapRef:
             name: search-config
         ports:
-        - containerPort: {{ .Values.serving.port }}
+        - name: http-search
+          containerPort: {{ .Values.serving.port }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         - name: swim
           containerPort: {{ .Values.swim.binding.port }}
           protocol: UDP

@@ -67,7 +67,10 @@ spec:
         - configMapRef:
             name: writer-config
         ports:
-        - containerPort: {{ .Values.serving.port }}
+        - name: http-writer
+          containerPort: {{ .Values.serving.port }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
