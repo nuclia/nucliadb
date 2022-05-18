@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
-from nucliadb_ingest.orm.utils import get_basic, set_basic
 
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -48,6 +47,7 @@ from nucliadb_ingest.fields.link import Link
 from nucliadb_ingest.fields.text import Text
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.brain import ResourceBrain
+from nucliadb_ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
 

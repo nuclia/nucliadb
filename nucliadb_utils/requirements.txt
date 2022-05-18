@@ -16,3 +16,4 @@ prometheus_client
 google-auth==2.4.1
 mmh3==3.0.0
 aiofiles==0.8.0
+fastapi==0.75.0
