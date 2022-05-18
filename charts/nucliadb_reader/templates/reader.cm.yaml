@@ -12,3 +12,5 @@ metadata:
 data:
   SENTRY_URL: {{ .Values.running.sentry_url }}
   JAEGER_ENABLED: {{ .Values.tracing.enabled }}
+  SERVING_PORT: {{ .Values.serving.port }}
+  METRICS_PORT: {{ .Values.serving.metricsPort }}

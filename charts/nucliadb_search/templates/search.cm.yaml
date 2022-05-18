@@ -17,3 +17,5 @@ data:
   SEARCH_TIMEOUT: {{ .Values.config.search_timeout | quote }}
   SWIM_LEVEL: {{ .Values.running.swim_level }}
   JAEGER_ENABLED: {{ .Values.tracing.enabled }}
+  SERVING_PORT: {{ .Values.serving.port }}
+  METRICS_PORT: {{ .Values.serving.metricsPort }}
