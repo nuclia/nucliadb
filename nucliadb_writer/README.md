@@ -12,3 +12,4 @@
 
 - Write text field (get vectors, entities and classification from Nuclia) (title, description, html, mk) (go to Nuclia for indexing)
 - Write Layout field (get vector, entities and classification from Nuclia) (go to Nuclia for indexing)
+- Telemetry
