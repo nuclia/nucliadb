@@ -58,12 +58,14 @@ COPY nucliadb_search/requirements.txt /usr/src/app/requirements-search.txt
 COPY nucliadb_writer/requirements.txt /usr/src/app/requirements-writer.txt
 COPY nucliadb_reader/requirements.txt /usr/src/app/requirements-reader.txt
 COPY nucliadb_one/requirements.txt /usr/src/app/requirements-one.txt
+COPY nucliadb_telemetry/requirements.txt /usr/src/app/requirements-telemetry.txt
 
 RUN set -eux; \
     pip install --no-cache-dir \
     -r /usr/src/app/requirements-swim.txt \
     -r /usr/src/app/requirements-cluster.txt \
     -r /usr/src/app/requirements-utils.txt \
+    -r /usr/src/app/requirements-telemetry.txt \
     -r /usr/src/app/requirements-protos.txt \
     -r /usr/src/app/requirements-models.txt \
     -r /usr/src/app/requirements-ingest.txt \
@@ -76,6 +78,7 @@ RUN set -eux; \
 COPY nucliadb_swim /usr/src/app/nucliadb_swim
 COPY nucliadb_cluster /usr/src/app/nucliadb_cluster
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
+COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb_ingest /usr/src/app/nucliadb_ingest
