@@ -22,11 +22,16 @@ import sys
 
 from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_reader import SERVICE_NAME, logger
+from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import start_audit_utility, stop_audit_utility
 
 
 async def initialize() -> None:
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider:
+        await init_telemetry(tracer_provider)
+
     await start_ingest(SERVICE_NAME)
     await start_audit_utility()
     logging.basicConfig(
@@ -42,3 +47,4 @@ async def initialize() -> None:
 async def finalize() -> None:
     await stop_ingest()
     await stop_audit_utility()
+    await clean_telemetry(SERVICE_NAME)

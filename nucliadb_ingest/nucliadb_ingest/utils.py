@@ -25,7 +25,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -93,6 +93,7 @@ async def start_ingest(service_name: Optional[str] = None):
         provider = get_telemetry(service_name)
 
         if provider is not None:
+            await init_telemetry(provider)
             otgrpc = OpenTelemetryGRPC(f"{service_name}_ingest", provider)
             channel = otgrpc.init_client(nucliadb_settings.nucliadb_ingest)
         else:

@@ -28,6 +28,7 @@ from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
 from nucliadb_search.swim import start_swim
 from nucliadb_search.utilities import get_swim
+from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
     Utility,
@@ -42,6 +43,10 @@ from nucliadb_utils.utilities import (
 
 
 async def initialize() -> None:
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider:
+        await init_telemetry(tracer_provider)
+
     set_utility(Utility.COUNTER, Counter())
     await start_ingest(SERVICE_NAME)
     predict_util = PredictEngine(
@@ -91,3 +96,4 @@ async def finalize() -> None:
         clean_utility(Utility.SWIM)
     await finalize_utilities()
     await stop_audit_utility()
+    await clean_telemetry(SERVICE_NAME)

@@ -28,7 +28,7 @@ from nucliadb_ingest.service.writer import WriterServicer
 from nucliadb_ingest.settings import settings
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
 
 async def start_grpc(service_name: Optional[str] = None):
@@ -38,6 +38,7 @@ async def start_grpc(service_name: Optional[str] = None):
     tracer_provider = get_telemetry(service_name)
 
     if tracer_provider is not None:
+        await init_telemetry(tracer_provider)
         otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
         server = otgrpc.init_server()
     else:

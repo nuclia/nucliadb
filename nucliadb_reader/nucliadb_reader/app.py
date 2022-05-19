@@ -19,8 +19,9 @@
 #
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from fastapi_versioning import VersionedFastAPI
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from sentry_sdk import capture_exception
@@ -33,11 +34,14 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
-from nucliadb_reader import API_PREFIX
+from nucliadb_reader import API_PREFIX, SERVICE_NAME
 from nucliadb_reader.api.v1.router import api as api_v1
 from nucliadb_reader.lifecycle import finalize, initialize
 from nucliadb_reader.sentry import set_sentry
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.instrumentation import instrument_app
+from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 
 middleware = [
@@ -93,7 +97,9 @@ application = VersionedFastAPI(
     base_app,
     version_format="{major}",
     prefix_format=f"/{API_PREFIX}/v{{major}}",
-    **fastapi_settings,
+    default_version=(1, 0),
+    enable_latest=False,
+    kwargs=fastapi_settings,
 )
 
 # Fastapi versioning does not propagate exception handlers to inner mounted apps
@@ -109,7 +115,10 @@ async def homepage(request: Request) -> HTMLResponse:
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
+
 # Enable forwarding of B3 headers to responses and external requests
 # to both inner applications
+tracer_provider = get_telemetry(SERVICE_NAME)
 set_global_textmap(B3MultiFormat())
-FastAPIInstrumentor.instrument_app(application)
+instrument_app(application, tracer_provider=tracer_provider, excluded_urls=["/"])
+AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
