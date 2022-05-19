@@ -55,7 +55,7 @@ async def initialize():
 
     set_global_textmap(B3MultiFormat())
     FastAPIInstrumentor.instrument_app(
-        application, tracer_provider=tracer_provider, excluded_urls=["/"]
+        application, tracer_provider=tracer_provider, excluded_urls="/"
     )
     AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
 

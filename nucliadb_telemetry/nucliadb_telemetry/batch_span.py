@@ -88,12 +88,15 @@ class BatchSpanProcessor(SpanProcessor):
             return
         if not span.context.trace_flags.sampled:
             return
-        if self.queue.qsize() == self.max_queue_size:
+        if self.queue.full() == self.max_queue_size:
             if not self._spans_dropped:
                 logger.warning("Queue is full, likely spans will be dropped.")
                 self._spans_dropped = True
 
-        self.queue.put_nowait(span)
+        try:
+            self.queue.put_nowait(span)
+        except:
+            logger.error(f"Queue size : {self.queue.qsize()}")
 
         if self.queue.qsize() >= self.max_export_batch_size:
             asyncio.create_task(self.notify())
