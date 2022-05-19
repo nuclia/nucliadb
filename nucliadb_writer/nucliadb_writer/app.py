@@ -85,7 +85,9 @@ application = VersionedFastAPI(
     base_app,
     version_format="{major}",
     prefix_format=f"/{API_PREFIX}/v{{major}}",
-    **fastapi_settings,
+    default_version=(1, 0),
+    enable_latest=False,
+    kwargs=fastapi_settings,
 )
 
 # Fastapi versioning does not propagate exception handlers to inner mounted apps

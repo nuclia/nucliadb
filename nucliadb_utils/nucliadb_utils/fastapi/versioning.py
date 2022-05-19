@@ -31,7 +31,7 @@ def VersionedFastAPI(
     prefix_format: str = "/v{major}_{minor}",
     default_version: Tuple[int, int] = (1, 0),
     enable_latest: bool = False,
-    **kwargs: Dict[str, object],
+    kwargs: Dict[str, object] = {},
 ) -> FastAPI:
     parent_app = FastAPI(
         title=app.title,
