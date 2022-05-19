@@ -103,25 +103,19 @@ impl FixedByteLen for FileSegment {
 
 impl ByteRpr for Node {
     fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = Vec::new();
-        result.append(&mut self.key.as_byte_rpr());
-        result.append(&mut self.vector.as_byte_rpr());
-        result
+        self.vector.as_byte_rpr()
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let key_start = 0;
-        let key_end = key_start + FileSegment::segment_len();
-        let vector_start = key_end;
+        let vector_start = 0;
         let vector_end = vector_start + FileSegment::segment_len();
         Node {
-            key: FileSegment::from_byte_rpr(&bytes[key_start..key_end]),
             vector: FileSegment::from_byte_rpr(&bytes[vector_start..vector_end]),
         }
     }
 }
 impl FixedByteLen for Node {
     fn segment_len() -> usize {
-        2 * FileSegment::segment_len()
+        FileSegment::segment_len()
     }
 }
 
@@ -414,7 +408,6 @@ mod node_test_serialization {
         for i in 0..len {
             let i = i as u64;
             let node = Node {
-                key: FileSegment { start: i, end: i },
                 vector: FileSegment { start: i, end: i },
             };
             nodes.push(node);

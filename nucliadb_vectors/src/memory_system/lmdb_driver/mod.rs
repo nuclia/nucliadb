@@ -28,6 +28,7 @@ use crate::memory_system::elements::*;
 
 const LMDB_ENV: &str = "ENV_lmdb";
 const DB_NODES: &str = "NODES_lmdb";
+const DB_NODES_INV: &str = "NODES_INV_lmdb";
 const DB_LABELS: &str = "LABELS_lmdb";
 const DB_LAYERS_OUT: &str = "LAYERS_OUT_ldmd";
 const DB_LAYERS_IN: &str = "LAYERS_IN_lmdb";
@@ -43,6 +44,8 @@ pub struct LMBDStorage {
     label_db: Database<Str, Unit>,
     // (String, Node)
     node_db: Database<Str, ByteSlice>,
+    // (Node, String)
+    node_inv_db: Database<ByteSlice, Str>,
     // (u64, GraphLayer)
     layer_out_db: Database<ByteSlice, ByteSlice>,
     // (u64, GraphLayer)
@@ -67,6 +70,7 @@ impl LMBDStorage {
             let env = env_builder.open(&env_path).unwrap();
             let label_db = env.create_database(Some(DB_LABELS)).unwrap();
             let node_db = env.create_database(Some(DB_NODES)).unwrap();
+            let node_inv_db = env.create_database(Some(DB_NODES_INV)).unwrap();
             let layer_out_db = env.create_database(Some(DB_LAYERS_OUT)).unwrap();
             let layer_in_db = env.create_database(Some(DB_LAYERS_IN)).unwrap();
             let log = env.create_database(Some(DB_LOG)).unwrap();
@@ -75,6 +79,7 @@ impl LMBDStorage {
                 env,
                 label_db,
                 node_db,
+                node_inv_db,
                 layer_out_db,
                 layer_in_db,
                 deleted_log,
@@ -110,6 +115,7 @@ impl LMBDStorage {
         let env = env_builder.open(&env_path).unwrap();
         let label_db = env.open_database(Some(DB_LABELS)).unwrap().unwrap();
         let node_db = env.open_database(Some(DB_NODES)).unwrap().unwrap();
+        let node_inv_db = env.create_database(Some(DB_NODES_INV)).unwrap();
         let layer_out_db = env.open_database(Some(DB_LAYERS_OUT)).unwrap().unwrap();
         let layer_in_db = env.open_database(Some(DB_LAYERS_IN)).unwrap().unwrap();
         let log = env.open_database(Some(DB_LOG)).unwrap().unwrap();
@@ -118,6 +124,7 @@ impl LMBDStorage {
             env,
             label_db,
             node_db,
+            node_inv_db,
             layer_out_db,
             layer_in_db,
             deleted_log,
@@ -134,6 +141,17 @@ impl LMBDStorage {
         let v = self.node_db.get(txn, vector).unwrap();
         v.map(Node::from_byte_rpr)
     }
+    pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Node) -> Option<&'a str> {
+        self.node_inv_db.get(txn, &node.as_byte_rpr()).unwrap()
+    }
+    pub fn get_keys(&self, txn: &RoTxn) -> Vec<String> {
+        let mut result = vec![];
+        let mut it = self.node_db.iter(txn).unwrap();
+        while let Some((key, _)) = it.next().transpose().unwrap() {
+            result.push(key.to_string());
+        }
+        result
+    }
     pub fn has_label(&self, txn: &RoTxn<'_>, key: &str, label: &str) -> bool {
         let path = format!("{}/{}", key, label);
         let exist = self.label_db.get(txn, path.as_str()).unwrap();
@@ -142,18 +160,11 @@ impl LMBDStorage {
     pub fn add_node(&self, txn: &mut RwTxn<'_, '_>, key: String, node: Node) {
         let node = node.as_byte_rpr();
         self.node_db.put(txn, key.as_str(), &node).unwrap();
+        self.node_inv_db.put(txn, &node, key.as_str()).unwrap();
     }
     pub fn add_label(&self, txn: &mut RwTxn<'_, '_>, key: String, label: String) {
         let path = format!("{}/{}", key, label);
         self.label_db.put(txn, path.as_str(), &()).unwrap();
-    }
-    pub fn remove_vector(&self, txn: &mut RwTxn<'_, '_>, vector: &str) {
-        self.node_db.delete(txn, vector).unwrap();
-        let label_query = format!("{}/", vector);
-        let mut iter = self.label_db.prefix_iter_mut(txn, &label_query).unwrap();
-        while iter.next().transpose().unwrap().is_some() {
-            iter.del_current().unwrap();
-        }
     }
     pub fn get_prefixed(&self, txn: &RoTxn, prefix: &str) -> Vec<String> {
         let mut result = vec![];
@@ -208,7 +219,7 @@ impl LMBDStorage {
             )
             .unwrap();
     }
-    pub fn marked_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128, rmv: Vec<Node>) {
+    pub fn mark_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128, rmv: Vec<Node>) {
         self.deleted_log
             .put(txn, &time_stamp.as_byte_rpr(), &rmv.as_byte_rpr())
             .unwrap();
@@ -222,9 +233,20 @@ impl LMBDStorage {
         match delete {
             Some((stamp, deleted)) => {
                 self.deleted_log.delete(txn, &stamp.as_byte_rpr()).unwrap();
+                deleted.iter().for_each(|n| self.remove_vector(txn, *n));
                 deleted
             }
             None => vec![],
+        }
+    }
+    pub fn remove_vector(&self, txn: &mut RwTxn<'_, '_>, node: Node) {
+        let key = self.get_node_key(txn, node).unwrap().to_string();
+        self.node_db.delete(txn, &key).unwrap();
+        self.node_inv_db.delete(txn, &node.as_byte_rpr()).unwrap();
+        let label_query = format!("{}/", key);
+        let mut iter = self.label_db.prefix_iter_mut(txn, &label_query).unwrap();
+        while iter.next().transpose().unwrap().is_some() {
+            iter.del_current().unwrap();
         }
     }
     pub fn get_log(&self, txn: &RoTxn<'_>) -> GraphLog {
