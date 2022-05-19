@@ -88,5 +88,6 @@ def set_info_on_span(
         ],
     ] = {}
 ):
-    span = get_current_span()
-    span.set_attributes(headers)
+    if telemetry_settings.jaeger_enabled:
+        span = get_current_span()
+        span.set_attributes(headers)

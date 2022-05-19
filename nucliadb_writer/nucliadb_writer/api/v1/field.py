@@ -28,7 +28,6 @@ from starlette.requests import Request
 
 import nucliadb_models as models
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_partitioning, get_transaction
@@ -85,8 +84,7 @@ def prepare_field_put(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    if telemetry_settings.jaeger_enabled:
-        set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
+    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     parse_audit(writer.audit, request)
     return writer, toprocess, partition
