@@ -22,7 +22,7 @@ import sys
 
 from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -97,3 +97,5 @@ async def finalize():
         await processing.finalize()
 
     await storage_finalize()
+
+    await clean_telemetry(SERVICE_NAME)

@@ -16,7 +16,12 @@ from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry, set_info_on_span
+from nucliadb_telemetry.utils import (
+    clean_telemetry,
+    get_telemetry,
+    init_telemetry,
+    set_info_on_span,
+)
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
@@ -132,7 +137,6 @@ async def greeter(settings, natsd: str):
 @pytest.fixture(scope="function")
 async def grpc_service(telemetry_grpc: OpenTelemetryGRPC, greeter: Greeter):
     server = telemetry_grpc.init_server()
-    await greeter.initialize()
     helloworld_pb2_grpc.add_GreeterServicer_to_server(greeter, server)
     port = server.add_insecure_port("[::]:0")
     await server.start()
@@ -161,3 +165,4 @@ async def http_service(settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service
     client_base_url = "http://test"
     client = AsyncClient(app=app, base_url=client_base_url)  # type: ignore
     yield client
+    await clean_telemetry("HTTP_SERVICE")

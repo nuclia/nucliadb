@@ -42,7 +42,7 @@ def start_span_client_js(tracer: Tracer, subject: str):
     }
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=subject,
+        name=f"Publish on {subject}",
         kind=SpanKind.CLIENT,
         attributes=attributes,
     )

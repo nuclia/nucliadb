@@ -76,7 +76,6 @@ class JaegerClientProtocol:
 
     def connection_made(self, transport):
         self.transport = transport
-        print("Send:", self.message)
         self.transport.sendto(self.message)
 
 
@@ -143,8 +142,6 @@ class AgentClientUDPAsync:
 
         loop = asyncio.get_running_loop()
         on_con_lost = loop.create_future()
-        logger.error(f"Publishing on {self.host_name}:{self.port}")
-        logger.error(buff)
         transport, _ = await loop.create_datagram_endpoint(
             lambda: JaegerClientProtocol(buff, on_con_lost),  # type: ignore
             remote_addr=(self.host_name, self.port),

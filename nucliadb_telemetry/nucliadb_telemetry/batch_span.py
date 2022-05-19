@@ -43,7 +43,7 @@ class BatchSpanProcessor(SpanProcessor):
         max_queue_size: int = 2048,
         schedule_delay_millis: int = 5000,
         max_export_batch_size: int = 512,
-        export_timeout_millis: float = 30000,
+        export_timeout_millis: int = 30000,
     ):
 
         if max_queue_size <= 0:
@@ -88,7 +88,7 @@ class BatchSpanProcessor(SpanProcessor):
             return
         if not span.context.trace_flags.sampled:
             return
-        if self.queue.full() == self.max_queue_size:
+        if self.queue.full():
             if not self._spans_dropped:
                 logger.warning("Queue is full, likely spans will be dropped.")
                 self._spans_dropped = True
@@ -149,7 +149,7 @@ class BatchSpanProcessor(SpanProcessor):
 
         # there might have been a new flush request while export was running
         # and before the done flag switched to true
-        with self.condition:
+        async with self.condition:
             shutdown_flush_request = self._get_and_unset_flush_request()
 
         # be sure that all spans are sent
@@ -244,28 +244,31 @@ class BatchSpanProcessor(SpanProcessor):
         while self.queue.qsize():
             await self._export_batch()
 
-    # async def force_flush(self, timeout_millis: int = None) -> bool:
+    async def force_flush(self, timeout_millis: int = None) -> bool:
 
-    #     if timeout_millis is None:
-    #         timeout_millis = self.export_timeout_millis
+        if timeout_millis is None:
+            timeout_millis = self.export_timeout_millis
 
-    #     if self.done:
-    #         logger.warning("Already shutdown, ignoring call to force_flush().")
-    #         return True
+        if self.done:
+            logger.warning("Already shutdown, ignoring call to force_flush().")
+            return True
 
-    #     async with self.condition:
-    #         flush_request = self._get_or_create_flush_request()
-    #         # signal the worker thread to flush and wait for it to finish
-    #         await self.condition.notify_all()
+        async with self.condition:
+            flush_request = self._get_or_create_flush_request()
+            # signal the worker task to flush and wait for it to finish
+            self.condition.notify_all()
 
-    #     # wait for token to be processed
-    #     ret = flush_request.event.wait(timeout_millis / 1e3)
-    #     if not ret:
-    #         logger.warning("Timeout was exceeded in force_flush().")
-    #     return ret
+        if flush_request.num_spans == 0:
+            return True
+
+        # wait for token to be processed
+        ret = await asyncio.wait_for(flush_request.event.wait(), timeout_millis)
+        if not ret:
+            logger.warning("Timeout was exceeded in force_flush().")
+            return False
+        return ret
 
     def shutdown(self) -> None:
         # signal the worker thread to finish and then wait for it
         self.done = True
-        asyncio.create_task(self.notify_all())
         self.span_exporter.shutdown()

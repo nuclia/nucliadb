@@ -27,7 +27,6 @@ import aiohttp
 import jwt
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
-from opentelemetry import trace
 from pydantic import BaseModel
 
 import nucliadb_models as models
@@ -262,18 +261,12 @@ class ProcessingEngine:
             self.calls.append(item.dict())
             return 1
 
-        span = trace.get_current_span().get_span_context()
-        hex_trace_id = hex(span.trace_id)[2:]
-        hex_span_id = hex(span.span_id)[2:]
-        trace_headers = {"x-ndb-trace-id": hex_trace_id, "x-ndb-span-id": hex_span_id}
-
         if self.onprem is False:
             # Upload the payload
             item.partition = partition
             resp = await self.session.post(
                 url=f"{self.nuclia_internal_push}",
                 json=item.dict(),
-                headers=trace_headers,
             )
             if resp.status == 200:
                 data = await resp.json()
@@ -285,7 +278,6 @@ class ProcessingEngine:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         else:
             headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
-            headers.update(trace_headers)
             # Upload the payload
             resp = await self.session.post(
                 url=self.nuclia_external_push + "?partition=" + str(partition),

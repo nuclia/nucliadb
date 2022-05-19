@@ -19,7 +19,12 @@
 #
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from nucliadb_telemetry.utils import get_telemetry
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -28,6 +33,7 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -35,13 +41,6 @@ from nucliadb_writer import API_PREFIX, SERVICE_NAME
 from nucliadb_writer.api.v1.router import api as api_v1
 from nucliadb_writer.lifecycle import finalize, initialize
 from nucliadb_writer.sentry import set_sentry
-from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
-    AioHttpClientInstrumentor,
-)
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
-
 
 middleware = [
     Middleware(

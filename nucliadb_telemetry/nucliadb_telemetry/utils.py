@@ -2,34 +2,49 @@ from typing import Dict, Sequence, Union
 
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
 from opentelemetry.sdk.resources import Resource  # type: ignore
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore
 from opentelemetry.trace import get_current_span
 
 from nucliadb_telemetry.batch_span import BatchSpanProcessor
 from nucliadb_telemetry.jaeger import JaegerExporterAsync
 from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.tracerprovider import (
+    AsyncMultiSpanProcessor,
+    AsyncTracerProvider,
+)
 
-GLOBAL_PROVIDER = {}
+GLOBAL_PROVIDER: Dict[str, AsyncTracerProvider] = {}
 
 
-def get_telemetry(service_name: str):
+def get_telemetry(service_name: str) -> AsyncTracerProvider:
     if service_name not in GLOBAL_PROVIDER and service_name:
         GLOBAL_PROVIDER[service_name] = create_telemetry(service_name)
-    return GLOBAL_PROVIDER.get(service_name)
+    return GLOBAL_PROVIDER[service_name]
 
 
-def create_telemetry(service_name: str):
+def create_telemetry(service_name: str) -> AsyncTracerProvider:
     if telemetry_settings.jaeger_enabled is False:
-        return
+        raise AttributeError("Telemetry is not enabled")
 
-    tracer_provider = TracerProvider(
-        resource=Resource.create({SERVICE_NAME: service_name})
+    tracer_provider = AsyncTracerProvider(
+        active_span_processor=AsyncMultiSpanProcessor(),
+        resource=Resource.create({SERVICE_NAME: service_name}),
     )
 
     return tracer_provider
 
 
-async def init_telemetry(tracer_provider: TracerProvider):
+async def clean_telemetry(service_name: str):
+    if service_name in GLOBAL_PROVIDER and service_name:
+        tracer_provider = GLOBAL_PROVIDER[service_name]
+        await tracer_provider.force_flush()
+        tracer_provider.shutdown()
+    del GLOBAL_PROVIDER[service_name]
+
+
+async def init_telemetry(tracer_provider: AsyncTracerProvider):
+    if tracer_provider._active_span_processor._span_processors:
+        return
+
     # create a JaegerExporter
     jaeger_exporter = JaegerExporterAsync(
         # configure agent
@@ -46,7 +61,7 @@ async def init_telemetry(tracer_provider: TracerProvider):
     span_processor = BatchSpanProcessor(jaeger_exporter)
 
     # add to the tracer
-    tracer_provider.add_span_processor(span_processor)
+    await tracer_provider.add_span_processor(span_processor)
 
 
 def set_info_on_span(
