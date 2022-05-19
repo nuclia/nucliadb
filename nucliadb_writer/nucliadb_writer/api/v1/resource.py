@@ -247,6 +247,7 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_resource(request: Request, kbid: str, rid: str):
+
     transaction = get_transaction()
     partitioning = get_partitioning()
 
