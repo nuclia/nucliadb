@@ -19,7 +19,6 @@
 #
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -29,6 +28,7 @@ from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 from nucliadb_writer import API_PREFIX
 from nucliadb_writer.api.v1.router import api as api_v1

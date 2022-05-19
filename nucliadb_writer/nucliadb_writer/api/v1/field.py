@@ -129,7 +129,7 @@ async def add_resource_field_text(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -156,7 +156,7 @@ async def add_resource_field_link(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -183,7 +183,7 @@ async def add_resource_field_keywordset(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -210,7 +210,7 @@ async def add_resource_field_datetime(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -237,7 +237,7 @@ async def add_resource_field_layout(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -266,7 +266,7 @@ async def add_resource_field_conversation(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -300,7 +300,7 @@ async def add_resource_field_file(
     try:
         seqid = await finish_field_put(writer, toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceFieldAdded(seqid=seqid)
 
@@ -346,7 +346,7 @@ async def append_messages_to_conversation_field(
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
@@ -394,7 +394,7 @@ async def append_blocks_to_layout_field(
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)

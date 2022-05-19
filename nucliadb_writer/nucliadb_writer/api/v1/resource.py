@@ -128,7 +128,7 @@ async def create_resource(
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
@@ -184,7 +184,7 @@ async def modify_resource(
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
@@ -233,7 +233,7 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     return ResourceUpdated(seqid=seqid)
 

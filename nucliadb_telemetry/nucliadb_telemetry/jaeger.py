@@ -1,6 +1,6 @@
 import asyncio
-from asyncio import Future
 import math
+from asyncio import Future
 from typing import List
 
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore

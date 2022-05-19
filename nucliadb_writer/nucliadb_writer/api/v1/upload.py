@@ -403,7 +403,7 @@ async def patch(
                 item=creation_payload,
             )
         except LimitsExceededError as exc:
-            raise HTTPException(status_code=412, detail=str(exc))
+            raise HTTPException(status_code=402, detail=str(exc))
 
         headers["NDB-Seq"] = f"{seqid}"
     else:
@@ -532,7 +532,7 @@ async def upload(
             bucket=await storage_manager.storage.get_bucket_name(kbid),
         )
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     headers = {}
     headers["NDB-Seq"] = f"{seqid}"
@@ -678,7 +678,7 @@ async def store_file_on_nuclia_db(
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
-        raise HTTPException(status_code=412, detail=str(exc))
+        raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     await transaction.commit(writer, partition)
