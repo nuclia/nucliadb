@@ -23,6 +23,7 @@ pub use layer_insert::*;
 use crate::index::*;
 use crate::memory_system::elements::*;
 use crate::query::Query;
+use crate::query_delete::*;
 use crate::query_search::layer_search::*;
 pub(crate) mod layer_insert;
 use rand::distributions::Uniform;
@@ -51,7 +52,20 @@ impl<'a> Query for InsertQuery<'a> {
 
     fn run(&mut self) -> Self::Output {
         if self.index.has_node(&self.key) {
-            return;
+            let node = self.index.get_node(&self.key).unwrap();
+            let value = self.index.get_node_vector(node);
+            match self.index.is_in_deleted_queue(&self.key) {
+                false if value.raw != self.element => DeleteQuery {
+                    delete: self.key.clone(),
+                    m_max: self.m_max,
+                    m: self.m,
+                    ef_construction: self.ef_construction,
+                    index: self.index,
+                }
+                .run(),
+                false if value.raw == self.element => return,
+                _ => (),
+            }
         }
         let label_adder = {
             let labels = std::mem::take(&mut self.labels);

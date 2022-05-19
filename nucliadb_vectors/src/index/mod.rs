@@ -109,10 +109,14 @@ impl Index {
         all
     }
     pub fn has_node(&self, key: &str) -> bool {
-        let txn = self.lmdb_driver.ro_txn();
-        let exist = self.lmdb_driver.get_node(&txn, key).is_some();
-        txn.abort().unwrap();
-        exist
+        self.get_node(key).is_some()
+    }
+    pub fn is_in_deleted_queue(&self, key: &str) -> bool {
+        match (self.get_node(key), self.layers_out.get(0)) {
+            (Some(n), Some(layer)) => !layer.has_node(n),
+            (Some(_), None) => true,
+            _ => false,
+        }
     }
     pub fn get_node_key(&self, node: Node) -> String {
         let txn = self.lmdb_driver.ro_txn();
@@ -375,8 +379,12 @@ impl LockIndex {
     pub fn in_edges(&self, layer: usize, node: Node) -> HashMap<Node, Edge> {
         self.index.read().unwrap().in_edges(layer, node)
     }
+    #[allow(unused)]
     pub fn has_node(&self, key: &str) -> bool {
         self.index.read().unwrap().has_node(key)
+    }
+    pub fn is_in_deleted_queue(&self, key: &str) -> bool {
+        self.index.read().unwrap().is_in_deleted_queue(key)
     }
     pub fn set_entry_point(&self, ep: EntryPoint) {
         self.index.write().unwrap().set_entry_point(ep)
