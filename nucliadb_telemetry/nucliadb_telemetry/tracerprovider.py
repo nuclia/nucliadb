@@ -70,6 +70,8 @@ class AsyncMultiSpanProcessor(SpanProcessor):
 
 
 class AsyncTracerProvider(TracerProvider):
+    initialized: bool = False
+
     async def add_span_processor(self, span_processor: SpanProcessor) -> None:
         await self._active_span_processor.add_span_processor(span_processor)
 

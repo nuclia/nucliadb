@@ -1,4 +1,4 @@
-from typing import Dict, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
 from opentelemetry.sdk.resources import Resource  # type: ignore
@@ -15,15 +15,20 @@ from nucliadb_telemetry.tracerprovider import (
 GLOBAL_PROVIDER: Dict[str, AsyncTracerProvider] = {}
 
 
-def get_telemetry(service_name: str) -> AsyncTracerProvider:
-    if service_name not in GLOBAL_PROVIDER and service_name:
-        GLOBAL_PROVIDER[service_name] = create_telemetry(service_name)
-    return GLOBAL_PROVIDER[service_name]
+def get_telemetry(service_name: Optional[str] = None) -> Optional[AsyncTracerProvider]:
+    if service_name is None:
+        return None
+    if service_name not in GLOBAL_PROVIDER and service_name is not None:
+        provider = create_telemetry(service_name)
+
+        if provider is not None:
+            GLOBAL_PROVIDER[service_name] = provider
+    return GLOBAL_PROVIDER.get(service_name)
 
 
-def create_telemetry(service_name: str) -> AsyncTracerProvider:
+def create_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
     if telemetry_settings.jaeger_enabled is False:
-        raise AttributeError("Telemetry is not enabled")
+        return None
 
     tracer_provider = AsyncTracerProvider(
         active_span_processor=AsyncMultiSpanProcessor(),
@@ -38,11 +43,14 @@ async def clean_telemetry(service_name: str):
         tracer_provider = GLOBAL_PROVIDER[service_name]
         await tracer_provider.force_flush()
         tracer_provider.shutdown()
-    del GLOBAL_PROVIDER[service_name]
+        del GLOBAL_PROVIDER[service_name]
 
 
-async def init_telemetry(tracer_provider: AsyncTracerProvider):
-    if tracer_provider._active_span_processor._span_processors:
+async def init_telemetry(tracer_provider: Optional[AsyncTracerProvider] = None):
+    if tracer_provider is None:
+        return
+
+    if tracer_provider.initialized:
         return
 
     # create a JaegerExporter
@@ -62,6 +70,7 @@ async def init_telemetry(tracer_provider: AsyncTracerProvider):
 
     # add to the tracer
     await tracer_provider.add_span_processor(span_processor)
+    tracer_provider.initialized = True
 
 
 def set_info_on_span(

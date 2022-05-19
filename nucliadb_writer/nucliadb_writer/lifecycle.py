@@ -21,7 +21,6 @@ import logging
 import sys
 
 from nucliadb_ingest.utils import start_ingest, stop_ingest
-from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import (
@@ -40,8 +39,8 @@ from nucliadb_writer.utilities import get_processing
 
 
 async def initialize():
-    if telemetry_settings.jaeger_enabled:
-        tracer_provider = get_telemetry(SERVICE_NAME)
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider:
         await init_telemetry(tracer_provider)
 
     await start_ingest(SERVICE_NAME)

@@ -25,7 +25,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
@@ -90,9 +89,10 @@ async def get_driver() -> Driver:
 async def start_ingest(service_name: Optional[str] = None):
     if nucliadb_settings.nucliadb_ingest is not None:
         # Its distributed lets create a GRPC client
-        if telemetry_settings.jaeger_enabled and service_name:
-            # We want Jaeger telemetry enabled
-            provider = get_telemetry(service_name)
+        # We want Jaeger telemetry enabled
+        provider = get_telemetry(service_name)
+
+        if provider is not None:
             otgrpc = OpenTelemetryGRPC(f"{service_name}_ingest", provider)
             channel = otgrpc.init_client(nucliadb_settings.nucliadb_ingest)
         else:

@@ -25,7 +25,6 @@ from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
 
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
-from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
 
@@ -81,8 +80,9 @@ class IndexingUtility:
 
         jetstream = self.nc.jetstream()
 
-        if telemetry_settings.jaeger_enabled and service_name and jetstream:
-            tracer_provider = get_telemetry(service_name)
+        tracer_provider = get_telemetry(service_name)
+
+        if tracer_provider is not None and jetstream is not None:
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{service_name}_transaction", tracer_provider
             )
