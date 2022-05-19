@@ -10,7 +10,7 @@ from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
 
-from nucliadb_telemetry.common import finish_span, set_span_exception
+from nucliadb_telemetry.common import set_span_exception
 
 
 def start_span_server_js(tracer: Tracer, msg: Msg):
@@ -68,8 +68,6 @@ class JetStreamContextTelemetry:
                     if type(error) != Exception:
                         set_span_exception(span, error)
                     raise error
-                else:
-                    finish_span(span)
 
         wrapped_cb = partial(wrapper, cb, tracer)
         return await self.js.subscribe(cb=wrapped_cb, **kwargs)
@@ -85,7 +83,5 @@ class JetStreamContextTelemetry:
                 if type(error) != Exception:
                     set_span_exception(span, error)
                 raise error
-            else:
-                finish_span(span)
 
         return result

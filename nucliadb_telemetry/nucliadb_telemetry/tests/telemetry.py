@@ -16,7 +16,7 @@ from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
-from nucliadb_telemetry.utils import get_telemetry, set_info_on_span
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry, set_info_on_span
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
@@ -71,6 +71,7 @@ async def settings(jaeger_server: Jaeger):
 @pytest.fixture(scope="function")
 async def telemetry_grpc(settings):
     tracer_provider = get_telemetry("GRPC_SERVICE")
+    await init_telemetry(tracer_provider)
     util = OpenTelemetryGRPC("test_telemetry", tracer_provider)
     yield util
 
@@ -99,6 +100,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
         await self.js.add_stream(name="testing", subjects=["testing.*"])
 
         self.tracer_provider = get_telemetry("NATS_SERVICE")
+        await init_telemetry(self.tracer_provider)
         self.jsotel = JetStreamContextTelemetry(
             self.js, "nats_service", self.tracer_provider
         )
@@ -141,6 +143,7 @@ async def grpc_service(telemetry_grpc: OpenTelemetryGRPC, greeter: Greeter):
 @pytest.fixture(scope="function")
 async def http_service(settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service: int):
     tracer_provider = get_telemetry("HTTP_SERVICE")
+    await init_telemetry(tracer_provider)
     app = FastAPI(title="Test API")  # type: ignore
     set_global_textmap(B3MultiFormat())
     FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer_provider)

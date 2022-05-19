@@ -13,31 +13,43 @@ ENV vars:
 On FastAPI you should add:
 
 ```python
-    tracer_provider = init_telemetry("HTTP_SERVICE")
+    tracer_provider = get_telemetry("HTTP_SERVICE")
     app = FastAPI(title="Test API")  # type: ignore
     set_global_textmap(B3MultiFormat())
     FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer_provider)
+
+    ..
+    await init_telemetry(tracer_provider)  # To start asyncio task
+    ..
+
 ```
 
 On GRPC Server you should add:
 
 ```python
-    tracer_provider = init_telemetry("GRPC_SERVER_SERVICE")
+    tracer_provider = get_telemetry("GRPC_SERVER_SERVICE")
     telemetry_grpc = OpenTelemetryGRPC("GRPC_CLIENT_SERVICE", tracer_provider)
     set_global_textmap(B3MultiFormat())
     server = telemetry_grpc.init_server()
     helloworld_pb2_grpc.add_GreeterServicer_to_server(SERVICER, server)
 
+    ..
+    await init_telemetry(tracer_provider)  # To start asyncio task
+    ..
 ```
 
 On GRPC Client you should add:
 
 ```python
-    tracer_provider = init_telemetry("GRPC_CLIENT_SERVICE")
+    tracer_provider = get_telemetry("GRPC_CLIENT_SERVICE")
     telemetry_grpc = OpenTelemetryGRPC("GRPC_CLIENT_SERVICE", tracer_provider)
     set_global_textmap(B3MultiFormat())
     channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
     stub = helloworld_pb2_grpc.GreeterStub(channel)
+
+    ..
+    await init_telemetry(tracer_provider)  # To start asyncio task
+    ..
 
 ```
 

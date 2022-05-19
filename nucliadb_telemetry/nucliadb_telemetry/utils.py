@@ -14,11 +14,11 @@ GLOBAL_PROVIDER = {}
 
 def get_telemetry(service_name: str):
     if service_name not in GLOBAL_PROVIDER and service_name:
-        GLOBAL_PROVIDER[service_name] = init_telemetry(service_name)
+        GLOBAL_PROVIDER[service_name] = create_telemetry(service_name)
     return GLOBAL_PROVIDER.get(service_name)
 
 
-def init_telemetry(service_name: str):
+def create_telemetry(service_name: str):
     if telemetry_settings.jaeger_enabled is False:
         return
 
@@ -26,6 +26,10 @@ def init_telemetry(service_name: str):
         resource=Resource.create({SERVICE_NAME: service_name})
     )
 
+    return tracer_provider
+
+
+async def init_telemetry(tracer_provider: TracerProvider):
     # create a JaegerExporter
     jaeger_exporter = JaegerExporterAsync(
         # configure agent
@@ -43,7 +47,6 @@ def init_telemetry(service_name: str):
 
     # add to the tracer
     tracer_provider.add_span_processor(span_processor)
-    return tracer_provider
 
 
 def set_info_on_span(

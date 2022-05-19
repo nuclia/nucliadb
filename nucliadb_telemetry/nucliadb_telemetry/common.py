@@ -22,12 +22,3 @@ def set_span_exception(span: Optional[Span], exception: Exception):
         if span._end_time is not None:
             logger.error("Aqui 1")
         span.end()
-
-
-def finish_span(span: Optional[Span]):
-    if span is not None:
-        if span._end_time is not None:
-            logger.error("Aqui 2")
-        span.end()
-    if hasattr(span, "token"):
-        detach(span.token)

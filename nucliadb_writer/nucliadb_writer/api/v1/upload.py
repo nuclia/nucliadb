@@ -439,6 +439,7 @@ async def upload(
     x_md5: Optional[List[str]] = Header(None),  # type: ignore
 ) -> Response:
 
+    logger.info(request.headers)
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
     try:
         path, rid, valid_field = await start_upload_field(

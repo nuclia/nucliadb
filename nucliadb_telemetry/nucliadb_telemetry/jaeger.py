@@ -66,11 +66,13 @@ class JaegerClientProtocol:
 
     def error_received(self, exc):
         logger.exception("Error received from Jaeger", exc_info=exc)
-        self.on_con_lost.set_result(False)
+        if not self.on_con_lost.done():
+            self.on_con_lost.set_result(False)
 
     def connection_lost(self, exc):
         logger.exception("Connection lost with Jaeger", exc_info=exc)
-        self.on_con_lost.set_result(True)
+        if not self.on_con_lost.done():
+            self.on_con_lost.set_result(True)
 
     def connection_made(self, transport):
         self.transport = transport
