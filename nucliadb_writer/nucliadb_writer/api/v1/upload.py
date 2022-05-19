@@ -51,6 +51,7 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction,
 )
+from nucliadb_writer import logger
 from nucliadb_writer.api.models import CreateResourcePayload
 from nucliadb_writer.exceptions import (
     ConflictError,
@@ -581,6 +582,7 @@ async def start_upload_field(
         field = md5
 
     if telemetry_settings.jaeger_enabled and rid and kbid and field:
+        logger.info({"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.field": field})
         set_info_on_span(
             {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.field": field}
         )

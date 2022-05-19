@@ -48,6 +48,8 @@ def finish_span_grpc(span: Span, result):
                 description=result._cython_call._status.details(),
             )
         )
+    if span._end_time is not None:
+        logger.error("Aqui 3")
     span.end()
 
 
