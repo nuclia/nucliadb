@@ -54,7 +54,9 @@ async def initialize():
         tracer_provider = get_telemetry(SERVICE_NAME)
 
     set_global_textmap(B3MultiFormat())
-    FastAPIInstrumentor.instrument_app(application, tracer_provider=tracer_provider)
+    FastAPIInstrumentor.instrument_app(
+        application, tracer_provider=tracer_provider, excluded_urls=["/"]
+    )
     AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)
 
     await start_ingest(SERVICE_NAME)
