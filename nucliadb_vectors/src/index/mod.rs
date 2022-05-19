@@ -295,14 +295,10 @@ impl Index {
     pub fn no_layers(&self) -> usize {
         self.layers_len
     }
-    pub fn node_keys(&self) -> Vec<String> {
-        let mut keys = vec![];
-        let layer_0 = &self.layers_out[0];
-        for node in layer_0.get_nodes() {
-            let raw_key = self.key_storage.read(node.key).unwrap();
-            let key = String::from_byte_rpr(raw_key);
-            keys.push(key);
-        }
+    pub fn get_keys(&self) -> Vec<String> {
+        let txn = self.lmdb_driver.ro_txn();
+        let keys = self.lmdb_driver.get_keys(&txn);
+        txn.abort().unwrap();
         keys
     }
 }
@@ -404,7 +400,7 @@ impl LockIndex {
     pub fn no_layers(&self) -> usize {
         self.index.read().unwrap().no_layers()
     }
-    pub fn node_keys(&self) -> Vec<String> {
-        self.index.read().unwrap().node_keys()
+    pub fn get_keys(&self) -> Vec<String> {
+        self.index.read().unwrap().get_keys()
     }
 }

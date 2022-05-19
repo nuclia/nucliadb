@@ -128,9 +128,6 @@ impl GraphLayer {
     pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
         self.cnx[&from].clone()
     }
-    pub fn get_nodes(&self) -> Vec<Node> {
-        self.cnx.keys().copied().collect()
-    }
     #[allow(unused)]
     #[cfg(test)]
     pub fn no_edges(&self, node: Node) -> Option<usize> {

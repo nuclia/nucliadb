@@ -144,6 +144,14 @@ impl LMBDStorage {
     pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Node) -> Option<&'a str> {
         self.node_inv_db.get(txn, &node.as_byte_rpr()).unwrap()
     }
+    pub fn get_keys(&self, txn: &RoTxn) -> Vec<String> {
+        let mut result = vec![];
+        let mut it = self.node_db.iter(txn).unwrap();
+        while let Some((key, _)) = it.next().transpose().unwrap() {
+            result.push(key.to_string());
+        }
+        result
+    }
     pub fn has_label(&self, txn: &RoTxn<'_>, key: &str, label: &str) -> bool {
         let path = format!("{}/{}", key, label);
         let exist = self.label_db.get(txn, path.as_str()).unwrap();
