@@ -577,7 +577,7 @@ async def start_upload_field(
         rid = md5
 
     if field is None and md5 is None:
-        rid = uuid.uuid4().hex
+        field = uuid.uuid4().hex
     elif field is None:
         field = md5
 

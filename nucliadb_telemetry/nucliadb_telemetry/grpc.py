@@ -68,7 +68,7 @@ def start_span_client(
 
     attributes = {
         SpanAttributes.RPC_SYSTEM: "grpc",
-        SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value,
+        SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],
         SpanAttributes.RPC_METHOD: meth,
         SpanAttributes.RPC_SERVICE: service,
     }
@@ -115,7 +115,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         service, meth = handler_call_details.method.lstrip("/").split("/", 1)  # type: ignore
         attributes = {
             SpanAttributes.RPC_SYSTEM: "grpc",
-            SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value,
+            SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],
             SpanAttributes.RPC_METHOD: meth,
             SpanAttributes.RPC_SERVICE: service,
         }

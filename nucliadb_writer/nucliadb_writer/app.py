@@ -19,7 +19,7 @@
 #
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from fastapi_versioning import VersionedFastAPI
+from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware

@@ -1,4 +1,5 @@
 import asyncio
+from asyncio import Future
 import math
 from typing import List
 
@@ -35,6 +36,8 @@ class JaegerExporterAsync(JaegerExporter):
         # TracerProvider, so it is safe to assume that all Spans in a single
         # batch all originate from one TracerProvider (and in turn have all
         # the same service.name)
+        if len(spans) == 0:
+            return SpanExportResult.SUCCESS
         if spans:
             service_name = spans[0].resource.attributes.get(SERVICE_NAME)
             if service_name:
@@ -56,10 +59,18 @@ class JaegerExporterAsync(JaegerExporter):
 
 
 class JaegerClientProtocol:
-    def __init__(self, message, on_con_lost):
+    def __init__(self, message: bytes, on_con_lost: Future):
         self.message = message
         self.on_con_lost = on_con_lost
         self.transport = None
+
+    def error_received(self, exc):
+        logger.exception("Error received from Jaeger", exc_info=exc)
+        self.on_con_lost.set_result(False)
+
+    def connection_lost(self, exc):
+        logger.exception("Connection lost with Jaeger", exc_info=exc)
+        self.on_con_lost.set_result(True)
 
     def connection_made(self, transport):
         self.transport = transport
@@ -132,7 +143,7 @@ class AgentClientUDPAsync:
         on_con_lost = loop.create_future()
         logger.error(f"Publishing on {self.host_name}:{self.port}")
         logger.error(buff)
-        transport, protocol = await loop.create_datagram_endpoint(
+        transport, _ = await loop.create_datagram_endpoint(
             lambda: JaegerClientProtocol(buff, on_con_lost),  # type: ignore
             remote_addr=(self.host_name, self.port),
         )
