@@ -28,14 +28,14 @@ use crate::memory_system::lmdb_driver::LMBDStorage;
 use crate::memory_system::mmap_driver::*;
 
 pub struct Index {
-    vector_storage: Storage,
-    lmdb_driver: LMBDStorage,
-    time_stamp: u128,
-    layers_len: usize,
-    removed: Vec<Node>,
-    entry_point: Option<EntryPoint>,
-    layers_out: Vec<GraphLayer>,
-    layers_in: Vec<GraphLayer>,
+    pub(crate) vector_storage: Storage,
+    pub(crate) lmdb_driver: LMBDStorage,
+    pub(crate) time_stamp: u128,
+    pub(crate) layers_len: usize,
+    pub(crate) removed: Vec<Node>,
+    pub(crate) entry_point: Option<EntryPoint>,
+    pub(crate) layers_out: Vec<GraphLayer>,
+    pub(crate) layers_in: Vec<GraphLayer>,
 }
 
 impl Debug for Index {
