@@ -18,18 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod heuristics;
-mod index;
-mod memory_system;
-mod query;
-mod query_delete;
-mod query_insert;
-mod query_post_search;
-mod query_search;
-pub mod reader;
-pub mod service;
-pub mod sic;
-#[cfg(test)]
-mod tests;
-mod utils;
-pub mod writer;
+mod index_report;
+mod layer_coherence_check;
+
+pub fn checks(path: &std::path::Path, output: &std::path::Path) {
+    let index = crate::index::Index::writer(path);
+    let no_nodes = index.no_nodes();
+    println!("Starting checks, {no_nodes} nodes");
+    println!("Checking layer coherence");
+    layer_coherence_check::check(&index);
+    println!("All checks passed");
+    println!("Building reports");
+    index_report::generate_report(&index, output);
+    println!("Reports can be found at {}", output.display());
+}

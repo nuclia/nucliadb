@@ -99,6 +99,12 @@ impl Default for GraphLayer {
     }
 }
 
+impl std::ops::Index<Node> for GraphLayer {
+    type Output = HashMap<Node, Edge>;
+    fn index(&self, from: Node) -> &Self::Output {
+        &self.cnx[&from]
+    }
+}
 impl std::ops::Index<(Node, Node)> for GraphLayer {
     type Output = Edge;
     fn index(&self, (from, to): (Node, Node)) -> &Self::Output {
