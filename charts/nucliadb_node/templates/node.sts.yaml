@@ -147,11 +147,6 @@ spec:
       - name: jaeger-agent
         image: "jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}"
         imagePullPolicy: IfNotPresent
-        envFrom:
-        - configMapRef:
-            name: node-config
-        - configMapRef:
-            name: nucliadb-config
         ports:
           - containerPort: 5775
             name: zk-compact-trft
@@ -169,7 +164,7 @@ spec:
             name: admin-http
             protocol: TCP
         args:
-          - "--reporter.grpc.host-port=dns:///$(JAEGER_COLLECTOR_HOST_PORT)"
+          - --reporter.grpc.host-port=dns:///{{ .Values.tracing.jaegerCollectorHost }}:{{ .Values.tracing.jaegerCollectorGrpcPort }}
           - --reporter.type=grpc
 {{- end }}
   volumeClaimTemplates:
