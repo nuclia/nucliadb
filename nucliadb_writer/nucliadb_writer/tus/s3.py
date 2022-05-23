@@ -156,7 +156,10 @@ class S3FileStorageManager(FileStorageManager):
     ):
         if headers is None:
             headers = {}
-        downloader = await self._download(uri, kbid, **headers)
+        try:
+            downloader = await self._download(uri, kbid, **headers)
+        except self.storage._s3aioclient.exceptions.NoSuchKey:
+            raise CloudFileNotFound()
 
         # we do not want to timeout ever from this...
         # downloader['Body'].set_socket_timeout(999999)
@@ -179,24 +182,38 @@ class S3FileStorageManager(FileStorageManager):
         ):
             yield chunk
 
+    async def delete_upload(self, uri: str, kbid: str):
+        bucket = await self.storage.get_bucket_name(kbid)
+        if uri is not None:
+            try:
+                await self.storage._s3aioclient.delete_object(Bucket=bucket, Key=uri)
+            except botocore.exceptions.ClientError:
+                logger.warn("Error deleting object", exc_info=True)
+        else:
+            raise AttributeError("No valid uri")
+
 
 class S3BlobStore(BlobStore):
     async def check_exists(self, bucket_name: str) -> bool:
-        missing = False
+        exists = True
         try:
             res = await self._s3aioclient.head_bucket(Bucket=bucket_name)
             if res["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                missing = True
+                exists = False
         except botocore.exceptions.ClientError as e:
             error_code = int(e.response["Error"]["Code"])
             if error_code == 404:
-                missing = True
-        return missing
+                exists = False
+        return exists
+
+    async def get_bucket_name(self, kbid: str) -> str:
+        return await super().get_bucket_name(kbid)
 
     async def create_bucket(self, bucket):
-        missing = await self.check_exists(bucket)
-        if missing:
+        exists = await self.check_exists(bucket)
+        if not exists:
             await self._s3aioclient.create_bucket(Bucket=bucket)
+        return exists
 
     async def finalize(self):
         await self._exit_stack.__aexit__(None, None, None)

@@ -190,18 +190,25 @@ class GCloudFileStorageManager(FileStorageManager):
             self.storage.upload_url.format(bucket=bucket),
             quote_plus(path),
         )
-
-        metadata = json.dumps({"NAME": dm.filename})
+        if dm.filename == 0:
+            filename = "file"
+        else:
+            filename = dm.filename
+        metadata = json.dumps({"NAME": filename})
         call_size = len(metadata)
         headers = await self.storage.get_access_headers()
+
         headers.update(
             {
-                "X-Upload-Content-Type": to_str(dm.content_type),
-                "X-Upload-Content-Length": str(dm.size),
                 "Content-Type": "application/json; charset=UTF-8",
                 "Content-Length": str(call_size),
             }
         )
+        if dm.content_type:
+            headers["X-Upload-Content-Type"] = dm.content_type
+
+        if dm.size:
+            headers["X-Upload-Content-Length"] = str(dm.size)
 
         async with self.storage.session.post(
             init_url,
@@ -263,11 +270,17 @@ class GCloudFileStorageManager(FileStorageManager):
         resumable_uri = dm.get("resumable_uri")
         if resumable_uri is None:
             raise ResumableURINotAvailable()
+
+        content_type = dm.content_type
+        if content_type is None:
+            content_type = "application/octet-stream"
+        else:
+            content_type = to_str(dm.content_type)
         async with self.storage.session.put(
             resumable_uri,
             headers={
                 "Content-Length": str(len(data)),
-                "Content-Type": to_str(dm.content_type),
+                "Content-Type": content_type,
                 "Content-Range": content_range,
             },
             data=data,
@@ -308,6 +321,26 @@ class GCloudFileStorageManager(FileStorageManager):
         return count
 
     async def finish(self, dm: FileDataMangaer):
+        if dm.size == 0:
+            if self.storage.session is None:
+                raise AttributeError()
+            # If there is been no size finish the upload
+            content_range = "bytes {init}-{chunk}/{total}".format(
+                init=dm.offset, chunk=dm.offset, total=dm.offset
+            )
+            resumable_uri = dm.get("resumable_uri")
+            async with self.storage.session.put(
+                resumable_uri,
+                headers={
+                    "Content-Length": "0",
+                    "Content-Range": content_range,
+                },
+                data="",
+            ) as call:
+                text = await call.text()  # noqa
+                if call.status not in [200, 201, 308]:
+                    logger.error(text)
+                return call
         path = dm.get("path")
         await dm.finish()
         return path
@@ -354,7 +387,7 @@ class GCloudFileStorageManager(FileStorageManager):
             if api_resp.status not in (200, 206):
                 text = await api_resp.text()
                 if api_resp.status == 404:
-                    raise HTTPNotFound(detail="Google cloud file not found")
+                    raise CloudFileNotFound("Google cloud file not found")
                 elif api_resp.status == 401:
                     logger.warning(f"Invalid google cloud credentials error: {text}")
                     raise HTTPNotFound(
