@@ -111,6 +111,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
     ):
 
         service, meth = handler_call_details.method.lstrip("/").split("/", 1)  # type: ignore
+
         attributes = {
             SpanAttributes.RPC_SYSTEM: "grpc",
             SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],  # type: ignore
@@ -228,6 +229,9 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
                 return value
 
             return wrapper
+
+        if "grpc.health.v1.Health" in handler_call_details.method:  # type: ignore
+            return handler
 
         return wrap_server_method_handler(wrapper, handler)
 

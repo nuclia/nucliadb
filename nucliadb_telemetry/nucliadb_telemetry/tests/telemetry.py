@@ -6,7 +6,6 @@ import requests
 from fastapi import FastAPI
 from httpx import AsyncClient
 from nats.aio.msg import Msg
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from pytest_docker_fixtures import images  # type: ignore
@@ -22,6 +21,7 @@ from nucliadb_telemetry.utils import (
     init_telemetry,
     set_info_on_span,
 )
+from nucliadb_utils.fastapi.instrumentation import instrument_app
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
@@ -150,7 +150,7 @@ async def http_service(settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service
     await init_telemetry(tracer_provider)
     app = FastAPI(title="Test API")  # type: ignore
     set_global_textmap(B3MultiFormat())
-    FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer_provider)
+    instrument_app(app, tracer_provider=tracer_provider, excluded_urls=[])
 
     @app.get("/")
     async def simple_api():
