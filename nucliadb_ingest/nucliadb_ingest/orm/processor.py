@@ -105,7 +105,10 @@ class Processor:
             await self.commit(message, seqid, partition)
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
-        await self.audit.report(message)
+        if self.audit is not None:
+            await self.audit.report(message)
+        else:
+            logger.warn("No audit defined")
         return True
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:

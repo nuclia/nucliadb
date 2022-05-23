@@ -127,6 +127,21 @@ class GCloudBlobStore(BlobStore):
         loop = asyncio.get_event_loop()
         self.session = aiohttp.ClientSession(loop=loop)
 
+    async def check_exists(self, bucket_name: str):
+        if self.session is None:
+            raise AttributeError()
+
+        headers = await self.get_access_headers()
+        url = f"{self.object_base_url}/{bucket_name}?project={self.project}"
+        async with self.session.get(
+            url,
+            headers=headers,
+        ) as resp:
+            if resp.status == 200:
+                logger.debug(f"Won't create bucket {bucket_name}, already exists")
+                return True
+        return False
+
     async def create_bucket(self, bucket_name: str):
         if self.session is None:
             raise AttributeError()
