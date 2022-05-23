@@ -31,11 +31,13 @@ from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from sentry_sdk import capture_exception
 
-from nucliadb_node import logger
+from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import (
     Utility,
@@ -106,8 +108,16 @@ class Worker:
 
         self.nc = await nats.connect(**options)
 
+        tracer_provider = get_telemetry(SERVICE_NAME)
+        jetstream = self.nc.jetstream()
+        if tracer_provider is not None:
+            self.js = JetStreamContextTelemetry(
+                jetstream, f"{SERVICE_NAME}_js_worker", tracer_provider
+            )
+        else:
+            self.js = jetstream
+
         logger.info(f"Nats: Connected to {indexing_settings.index_jetstream_servers}")
-        self.js = self.nc.jetstream()
         await self.subscribe()
         self.gc_task = asyncio.create_task(self.garbage())
 
@@ -181,6 +191,12 @@ class Worker:
                     )
                     raise grpc_error
 
+            except KeyError:
+                if SENTRY:
+                    capture_exception(grpc_error)
+                logger.warn(
+                    "Error retrieving the indexing payload we do not block as that means its already deleted"
+                )
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)

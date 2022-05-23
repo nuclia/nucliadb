@@ -55,4 +55,5 @@ def set_sentry(
             environment=environment,
             dsn=sentry_url,
             integrations=enabled_integrations,
+            default_integrations=False,
         )

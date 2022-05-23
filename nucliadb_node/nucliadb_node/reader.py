@@ -26,6 +26,10 @@ from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 
+from nucliadb_node import SERVICE_NAME  # type: ignore
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.utils import get_telemetry
+
 CACHE = LRU(128)
 
 
@@ -35,7 +39,14 @@ class Reader:
 
     def __init__(self, grpc_reader_address: str):
         self.lock = asyncio.Lock()
-        self.channel = aio.insecure_channel(grpc_reader_address)
+        tracer_provider = get_telemetry(SERVICE_NAME)
+        if tracer_provider is not None:
+            telemetry_grpc = OpenTelemetryGRPC(
+                f"{SERVICE_NAME}_grpc_reader", tracer_provider
+            )
+            self.channel = telemetry_grpc.init_client(grpc_reader_address)
+        else:
+            self.channel = aio.insecure_channel(grpc_reader_address)
         self.stub = NodeReaderStub(self.channel)
 
     async def get_count(self, pb: ShardId) -> Optional[int]:

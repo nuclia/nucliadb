@@ -26,13 +26,17 @@ import uuid
 from asyncio import tasks
 from typing import Callable, List
 
-from nucliadb_node import logger
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
+
+from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY, set_sentry
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.settings import running_settings
 
 
@@ -56,6 +60,11 @@ async def main() -> App:
             node = str(uuid.UUID(bytes=uuid_bytes))
     else:
         node = settings.force_host_id
+
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider is not None:
+        set_global_textmap(B3MultiFormat())
+        await init_telemetry(tracer_provider)  # To start asyncio task
 
     logger.info(f"Node ID : {node}")
 

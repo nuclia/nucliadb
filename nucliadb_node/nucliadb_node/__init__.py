@@ -38,4 +38,6 @@
 
 import logging
 
-logger = logging.getLogger("nucliadb_node")
+SERVICE_NAME = "nucliadb_node"
+
+logger = logging.getLogger(SERVICE_NAME)

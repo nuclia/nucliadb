@@ -20,7 +20,7 @@
 import asyncio
 from typing import Optional
 
-from grpc import aio  # type: ignore
+from grpc import aio
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery,
     Resource,
@@ -31,6 +31,10 @@ from nucliadb_protos.noderesources_pb2 import (
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 
+from nucliadb_node import SERVICE_NAME  # type: ignore
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.utils import get_telemetry
+
 
 class Writer:
     _stub: Optional[NodeWriterStub] = None
@@ -38,7 +42,14 @@ class Writer:
 
     def __init__(self, grpc_writer_address: str):
         self.lock = asyncio.Lock()
-        self.channel = aio.insecure_channel(grpc_writer_address)
+        tracer_provider = get_telemetry(SERVICE_NAME)
+        if tracer_provider is not None:
+            telemetry_grpc = OpenTelemetryGRPC(
+                f"{SERVICE_NAME}_grpc_writer", tracer_provider
+            )
+            self.channel = telemetry_grpc.init_client(grpc_writer_address)
+        else:
+            self.channel = aio.insecure_channel(grpc_writer_address)
         self.stub = NodeWriterStub(self.channel)
 
     async def set_resource(self, pb: Resource) -> OpStatus:

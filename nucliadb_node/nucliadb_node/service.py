@@ -22,18 +22,28 @@ import asyncio
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
 
+from nucliadb_node import SERVICE_NAME
 from nucliadb_node.reader import Reader  # type: ignore
 from nucliadb_node.servicer import SidecarServicer
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.utils import get_telemetry
 
 
 async def start_grpc(writer: Writer, reader: Reader):
 
     aio.init_grpc_aio()
-    server = aio.server()
 
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider is not None:
+        telemetry_grpc = OpenTelemetryGRPC(
+            f"{SERVICE_NAME}_grpc_server", tracer_provider
+        )
+        server = telemetry_grpc.init_server()
+    else:
+        server = aio.server()
     servicer = SidecarServicer(reader=reader, writer=writer)
     await servicer.initialize()
     health_servicer = health.aio.HealthServicer()  # type: ignore
