@@ -37,18 +37,16 @@ class BlobStore:
     async def create_bucket(self, bucket_name: str):
         raise NotImplementedError()
 
+    async def check_exists(self, bucket_name: str) -> bool:
+        raise NotImplementedError()
+
     async def get_bucket_name(self, kbid: str):
         bucket = self.bucket.format(kbid=kbid)
         if bucket in self.cached_buckets:
             return bucket
-        found = False
-        try:
-            found = await self.create_bucket(bucket)
-            self.cached_buckets.append(bucket)
-        except Exception:
-            logger.exception(f"Could not create bucket {bucket}", exc_info=True)
+        found = await self.check_exists(bucket)
         if found is True:
-            logger.info(f"Already exists {bucket}")
+            self.cached_buckets.append(bucket)
         return bucket
 
 

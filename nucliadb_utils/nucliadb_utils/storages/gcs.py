@@ -484,12 +484,11 @@ class GCSStorage(Storage):
         else:
             raise AttributeError("No valid uri")
 
-    async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
+    async def check_exists(self, bucket_name: str):
         if self.session is None:
             raise AttributeError()
 
         headers = await self.get_access_headers()
-
         url = f"{self.object_base_url}/{bucket_name}?project={self._project}"
         async with self.session.get(
             url,
@@ -497,7 +496,17 @@ class GCSStorage(Storage):
         ) as resp:
             if resp.status == 200:
                 logger.debug(f"Won't create bucket {bucket_name}, already exists")
-                return
+                return True
+        return False
+
+    async def create_bucket(self, bucket_name: str, kbid: Optional[str] = None):
+        if self.session is None:
+            raise AttributeError()
+        exists = await self.check_exists(bucket_name=bucket_name)
+        if exists:
+            return
+
+        headers = await self.get_access_headers()
 
         url = f"{self.object_base_url}?project={self._project}"
         labels = deepcopy(self._bucket_labels)
