@@ -207,7 +207,11 @@ class S3BlobStore(BlobStore):
         return exists
 
     async def get_bucket_name(self, kbid: str) -> str:
-        return await super().get_bucket_name(kbid)
+        bucket_name = await super().get_bucket_name(kbid)
+        if bucket_name is not None:
+            return bucket_name.replace("_", "-")
+        else:
+            return bucket_name
 
     async def create_bucket(self, bucket):
         exists = await self.check_exists(bucket)
