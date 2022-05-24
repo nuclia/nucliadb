@@ -115,11 +115,11 @@ impl LMBDStorage {
         let env = env_builder.open(&env_path).unwrap();
         let label_db = env.open_database(Some(DB_LABELS)).unwrap().unwrap();
         let node_db = env.open_database(Some(DB_NODES)).unwrap().unwrap();
-        let node_inv_db = env.create_database(Some(DB_NODES_INV)).unwrap();
+        let node_inv_db = env.open_database(Some(DB_NODES_INV)).unwrap().unwrap();
         let layer_out_db = env.open_database(Some(DB_LAYERS_OUT)).unwrap().unwrap();
         let layer_in_db = env.open_database(Some(DB_LAYERS_IN)).unwrap().unwrap();
         let log = env.open_database(Some(DB_LOG)).unwrap().unwrap();
-        let deleted_log = env.create_database(Some(DB_DELETED)).unwrap();
+        let deleted_log = env.open_database(Some(DB_DELETED)).unwrap().unwrap();
         LMBDStorage {
             env,
             label_db,
