@@ -27,11 +27,13 @@ from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb_ingest import logger, logger_activity
+from nucliadb_ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.orm.exceptions import DeadletteredError
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.sentry import SENTRY
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.cache.utility import Cache
@@ -134,7 +136,15 @@ class PullWorker:
                 pass
 
             if self.nc is not None:
-                self.js = self.nc.jetstream()
+                jetstream = self.nc.jetstream()
+
+                tracer_provider = get_telemetry(SERVICE_NAME)
+                if tracer_provider is not None:
+                    self.js = JetStreamContextTelemetry(
+                        jetstream, f"{SERVICE_NAME}_worker", tracer_provider
+                    )
+                else:
+                    self.js = jetstream
 
                 last_seqid = await self.processor.driver.last_seqid(self.partition)
                 if last_seqid is None:

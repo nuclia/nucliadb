@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict
+from typing import Dict, List
 
 from nats.aio.msg import Msg
 from nats.js.client import JetStreamContext
@@ -56,6 +56,12 @@ class JetStreamContextTelemetry:
         self.js = js
         self.service_name = service_name
         self.tracer_provider = tracer_provider
+
+    async def stream_info(self, name: str):
+        return self.js.stream_info(name)
+
+    async def add_stream(self, name: str, subjects: List[str]):
+        return self.js.add_stream(name=name, subjects=subjects)
 
     async def subscribe(self, cb, **kwargs):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_server")

@@ -24,6 +24,9 @@ import sys
 from asyncio import tasks
 from typing import Callable, List, Optional, Union
 
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
+
 from nucliadb_ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb_ingest.consumer import start_consumer
 from nucliadb_ingest.metrics import start_metrics
@@ -32,6 +35,7 @@ from nucliadb_ingest.sentry import SENTRY, set_sentry
 from nucliadb_ingest.service import start_grpc
 from nucliadb_ingest.settings import settings
 from nucliadb_ingest.swim import start_swim
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import (
     indexing_settings,
@@ -98,7 +102,13 @@ async def stop_indexing_utility():
 
 
 async def main() -> List[Callable]:
+    tracer_provider = get_telemetry(SERVICE_NAME)
+    if tracer_provider is not None:
+        set_global_textmap(B3MultiFormat())
+        await init_telemetry(tracer_provider)  # To start asyncio task
+
     swim = start_swim()
+
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)
     await start_audit_utility()
