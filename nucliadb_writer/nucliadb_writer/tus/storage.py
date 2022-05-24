@@ -19,8 +19,9 @@
 #
 from __future__ import annotations
 
-from typing import AsyncIterator, Dict, List, Optional
+from typing import AsyncIterator, Dict, Optional
 
+from lru import LRU  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from starlette.responses import StreamingResponse
 
@@ -28,28 +29,21 @@ from nucliadb_writer import logger
 from nucliadb_writer.tus.dm import FileDataMangaer
 from nucliadb_writer.tus.exceptions import HTTPRangeNotSatisfiable
 
+CACHED_BUCKETS = LRU(50)
+
 
 class BlobStore:
     bucket: str
     source: CloudFile.Source.V
-    cached_buckets: List[str] = []
 
-    async def create_bucket(self, bucket_name: str):
+    async def create_bucket(self, bucket_name: str) -> bool:
         raise NotImplementedError()
 
-    async def get_bucket_name(self, kbid: str):
-        bucket = self.bucket.format(kbid=kbid)
-        if bucket in self.cached_buckets:
-            return bucket
-        found = False
-        try:
-            found = await self.create_bucket(bucket)
-            self.cached_buckets.append(bucket)
-        except Exception:
-            logger.exception(f"Could not create bucket {bucket}", exc_info=True)
-        if found is True:
-            logger.info(f"Already exists {bucket}")
-        return bucket
+    async def check_exists(self, bucket_name: str) -> bool:
+        raise NotImplementedError()
+
+    async def get_bucket_name(self, kbid: str) -> str:
+        return self.bucket.format(kbid=kbid)
 
 
 class FileStorageManager:
@@ -78,6 +72,9 @@ class FileStorageManager:
         raise NotImplementedError()
 
     async def get_file_metadata(self, uri: str, kbid: str):
+        raise NotImplementedError()
+
+    async def delete_upload(self, uri, kbid):
         raise NotImplementedError()
 
     async def full_download(self, content_length, content_type, upload_id):

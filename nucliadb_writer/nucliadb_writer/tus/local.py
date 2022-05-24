@@ -139,6 +139,10 @@ class LocalBlobStore(BlobStore):
     def get_bucket_path(self, bucket: str):
         return f"{self.local_testing_files}/{bucket}"
 
+    async def check_exists(self, bucket_name: str) -> bool:
+        path = self.get_bucket_path(bucket_name)
+        return os.path.exists(path)
+
     async def create_bucket(self, bucket: str):
         path = self.get_bucket_path(bucket)
         try:

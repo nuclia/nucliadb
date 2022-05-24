@@ -84,7 +84,7 @@ class IndexingUtility:
 
         if tracer_provider is not None and jetstream is not None:
             self.js = JetStreamContextTelemetry(
-                jetstream, f"{service_name}_transaction", tracer_provider
+                jetstream, f"{service_name}_index", tracer_provider
             )
         else:
             self.js = jetstream

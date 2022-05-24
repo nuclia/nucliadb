@@ -191,9 +191,9 @@ class Worker:
                     )
                     raise grpc_error
 
-            except KeyError:
+            except KeyError as storage_error:
                 if SENTRY:
-                    capture_exception(grpc_error)
+                    capture_exception(storage_error)
                 logger.warn(
                     "Error retrieving the indexing payload we do not block as that means its already deleted"
                 )
