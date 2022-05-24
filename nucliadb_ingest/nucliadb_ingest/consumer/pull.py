@@ -268,7 +268,26 @@ class PullWorker:
                 await msg.ack()
 
     async def loop(self):
-        await self.initialize()
+        while True:
+            try:
+                await self.initialize()
+                break
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                logger.exception("Exception on initializing worker", exc_info=e)
+                await asyncio.sleep(10)
+
+        while True:
+            try:
+                await self._loop()
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                logger.exception("Exception on worker", exc_info=e)
+                await asyncio.sleep(10)
+
+    async def _loop(self):
 
         if self.pull_time == 0:
             return
