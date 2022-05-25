@@ -128,6 +128,7 @@ class ResourceSearchResults(BaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
+    shards: Optional[List[Tuple[str, str, str]]]
 
 
 class KnowledgeboxSearchResults(BaseModel):
@@ -136,11 +137,12 @@ class KnowledgeboxSearchResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     fulltext: Optional[Resources] = None
     relations: Optional[Relations] = None
-    shards: Optional[List[Tuple[str, str]]]
+    shards: Optional[List[Tuple[str, str, str]]]
 
 
 class KnowledgeboxSuggestResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
+    shards: Optional[List[Tuple[str, str, str]]]
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -148,6 +150,7 @@ class KnowledgeboxCounters(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
+    shards: Optional[List[Tuple[str, str, str]]]
 
 
 class SortOption(str, Enum):

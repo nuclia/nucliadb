@@ -54,6 +54,7 @@ from nucliadb_utils.exceptions import ShardsNotFound
     status_code=200,
     description="Suggestions on a knowledge box",
     response_model=KnowledgeboxSuggestResults,
+    response_model_exclude_unset=True,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
@@ -82,6 +83,7 @@ async def suggest_knowledgebox(
     x_ndb_client: SearchClientType = Header(SearchClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
+    debug: bool = Query(False),
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
@@ -109,9 +111,10 @@ async def suggest_knowledgebox(
 
     incomplete_results = False
     ops = []
+    queried_shards = []
     for shard in shard_groups:
         try:
-            node, shard_id = nodemanager.choose_node(shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard)
         except KeyError:
             incomplete_results = True
         else:
@@ -119,6 +122,7 @@ async def suggest_knowledgebox(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(suggest_shard(node, shard_id, pb_query))
+                queried_shards.append((node.label, shard_id, node_id))
 
     if not ops:
         await abort_transaction()
@@ -168,4 +172,6 @@ async def suggest_knowledgebox(
 
     get_counter()[f"{kbid}_-_suggest_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
+    if debug:
+        search_results.shards = queried_shards
     return search_results

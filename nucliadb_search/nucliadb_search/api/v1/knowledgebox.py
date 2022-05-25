@@ -20,7 +20,7 @@
 import asyncio
 from typing import List, Optional
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Query, Request
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -80,10 +80,15 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
     description="Summary of amount of different things inside a knowledgebox",
     response_model=KnowledgeboxCounters,
     tags=["Knowledge Boxes"],
+    response_model_exclude_unset=True,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def knowledgebox_counters(request: Request, kbid: str) -> KnowledgeboxCounters:
+async def knowledgebox_counters(
+    request: Request,
+    kbid: str,
+    debug: bool = Query(False),
+) -> KnowledgeboxCounters:
 
     cache = await get_cache()
 
@@ -104,9 +109,10 @@ async def knowledgebox_counters(request: Request, kbid: str) -> KnowledgeboxCoun
         )
 
     ops = []
+    queried_shards = []
     for shard_object in shard_groups:
         try:
-            node, shard_id = nodemanager.choose_node(shard_object)
+            node, shard_id, node_id = nodemanager.choose_node(shard_object)
         except KeyError:
             raise HTTPException(
                 status_code=500,
@@ -117,6 +123,7 @@ async def knowledgebox_counters(request: Request, kbid: str) -> KnowledgeboxCoun
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(get_shard(node, shard_id))
+                queried_shards.append((node.label, shard_id, node_id))
 
     if not ops:
         await abort_transaction()
@@ -185,6 +192,8 @@ async def knowledgebox_counters(request: Request, kbid: str) -> KnowledgeboxCoun
         sentences=sentence_count,
     )
 
+    if debug:
+        counters.shards = queried_shards
     if cache is not None:
         await cache.set(KB_COUNTER_CACHE.format(kbid=kbid), counters.json())
     return counters

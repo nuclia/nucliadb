@@ -131,7 +131,7 @@ async def search_knowledgebox(
     queried_shards = []
     for shard in shard_groups:
         try:
-            node, shard_id = nodemanager.choose_node(shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard)
         except KeyError:
             incomplete_results = True
         else:
@@ -139,7 +139,7 @@ async def search_knowledgebox(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(query_shard(node, shard_id, pb_query))
-                queried_shards.append((node.label, shard_id))
+                queried_shards.append((node.label, shard_id, node_id))
 
     if not ops:
         await abort_transaction()

@@ -53,7 +53,7 @@ class NodesManager:
         shards = await self.get_shards_by_kbid_inner(kbid)
         return [x for x in shards.shards]
 
-    def choose_node(self, shard: ShardObject) -> Tuple[Node, Optional[str]]:
+    def choose_node(self, shard: ShardObject) -> Tuple[Node, Optional[str], str]:
         nodes = [x for x in range(len(shard.replicas))]
         random.shuffle(nodes)
         node_obj = None
@@ -65,7 +65,7 @@ class NodesManager:
                 shard_id = shard.replicas[node].shard.id
                 break
 
-        if node_obj is None:
+        if node_obj is None or node_id is None:
             raise KeyError("Could not find a node to query")
 
-        return node_obj, shard_id
+        return node_obj, shard_id, node_id

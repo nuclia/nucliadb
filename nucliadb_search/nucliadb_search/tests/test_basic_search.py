@@ -124,6 +124,15 @@ async def test_search_resource_all(
 
                 vectors = await node_obj.reader.VectorSearch(vrequest)  # type: ignore
 
-                assert vectors.documents[2].score > vectors.documents[1].score
-                assert vectors.documents[2].score > vectors.documents[0].score
+                # 0-19 : My own text Ramon
+                # 20-45 : This is great to be here
+                # 48-65 : Where is my beer?
+
+                # Q : Where is my wine?
+                results = [(x.doc_id.id, x.score) for x in vectors.documents]
+                results.sort(reverse=True, key=lambda x: x[1])
+                assert results[0][0].endswith("48-65")
+                assert results[1][0].endswith("0-19")
+                assert results[2][0].endswith("20-45")
+
     await txn.abort()
