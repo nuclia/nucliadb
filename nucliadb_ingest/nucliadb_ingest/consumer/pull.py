@@ -92,6 +92,7 @@ class PullWorker:
         self.ack_wait = 10.0
         self.nc = None
         self.js = None
+        self.initialized = False
 
         self.subscriptions = []
 
@@ -170,6 +171,7 @@ class PullWorker:
                 logger.info(
                     f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream}"
                 )
+            self.initialized = True
 
     async def finalize(self):
         for subscription in self.subscriptions:
@@ -268,16 +270,19 @@ class PullWorker:
                 await msg.ack()
 
     async def loop(self):
-        while True:
+        while self.initialized is False:
             try:
                 await self.initialize()
-                break
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
                 logger.exception("Exception on initializing worker", exc_info=e)
                 await asyncio.sleep(10)
 
+        if self.pull_time == 0:
+            return
+
+        # Lets do pooling from NUA
         while True:
             try:
                 await self._loop()
@@ -288,9 +293,6 @@ class PullWorker:
                 await asyncio.sleep(10)
 
     async def _loop(self):
-
-        if self.pull_time == 0:
-            return
 
         headers = {}
         if self.creds is not None:
@@ -309,6 +311,8 @@ class PullWorker:
                 + self.partition
             )
         async with aiohttp.ClientSession() as session:
+            logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
+
             while True:
                 try:
                     async with session.get(
