@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.1 (unreleased)
+1.0.1 (2022-05-25)
 ------------------
 
 - Fix jetstream wrapper
