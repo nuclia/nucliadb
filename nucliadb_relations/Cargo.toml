@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 heed = { version = "0.11.0", default-features = false, features = ["lmdb", "sync-read-txn"] }
 nucliadb_byte_rpr= {path= "../nucliadb_byte_rpr"}
+nucliadb_service_interface = {path = "../nucliadb_service_interface"}
 tempfile = "3"

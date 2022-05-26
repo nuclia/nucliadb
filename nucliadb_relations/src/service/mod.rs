@@ -18,15 +18,5 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod edge;
-mod identifier;
-mod node;
-pub mod service;
-pub mod storage_system;
-
-mod graph {
-    pub use crate::edge::*;
-    pub use crate::identifier::*;
-    pub use crate::node::*;
-    pub use crate::storage_system::*;
-}
+pub mod reader;
+pub mod writer;

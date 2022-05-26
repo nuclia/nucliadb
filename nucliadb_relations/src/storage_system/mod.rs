@@ -2,7 +2,7 @@ use std::path::Path;
 
 use heed::flags::Flags;
 use heed::types::{ByteSlice, Str, Unit};
-use heed::{Database, Env, EnvOpenOptions, RoPrefix, RoTxn, RwTxn};
+use heed::{Database, Env, EnvOpenOptions, RoIter, RoPrefix, RoTxn, RwTxn};
 use nucliadb_byte_rpr::*;
 
 use crate::edge::*;
@@ -29,6 +29,14 @@ mod storage_state {
 }
 
 pub struct RoToken<'a>(RoTxn<'a>);
+impl<'a> RoToken<'a> {
+    pub fn commit(self) -> Result<(), heed::Error> {
+        self.0.commit()
+    }
+    pub fn abort(self) -> Result<(), heed::Error> {
+        self.0.abort()
+    }
+}
 impl<'a> std::ops::Deref for RoToken<'a> {
     type Target = RoTxn<'a>;
 
@@ -41,7 +49,16 @@ impl<'a> std::ops::DerefMut for RoToken<'a> {
         &mut self.0
     }
 }
+
 pub struct RwToken<'a>(RwTxn<'a, 'a>);
+impl<'a> RwToken<'a> {
+    pub fn commit(self) -> Result<(), heed::Error> {
+        self.0.commit()
+    }
+    pub fn abort(self) -> Result<(), heed::Error> {
+        self.0.abort()
+    }
+}
 impl<'a> std::ops::Deref for RwToken<'a> {
     type Target = RwTxn<'a, 'a>;
 
@@ -60,12 +77,26 @@ pub struct EdgeIter<'a> {
 }
 impl<'a> Iterator for EdgeIter<'a> {
     type Item = Edge;
-    fn next(&mut self) -> Option<Edge> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
             .transpose()
             .unwrap()
             .map(|(k, _)| Edge::from(k))
+    }
+}
+
+pub struct KeyIter<'a> {
+    iter: RoIter<'a, Str, ByteSlice>,
+}
+impl<'a> Iterator for KeyIter<'a> {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .transpose()
+            .unwrap()
+            .map(|(k, _)| k.to_string())
     }
 }
 
@@ -336,6 +367,14 @@ impl StorageSystem {
         let iter = self.edges.prefix_iter(txn, &query_formated).unwrap();
         EdgeIter { iter }
     }
+    pub fn get_keys<'a>(&self, txn: &'a RoTxn) -> KeyIter<'a> {
+        KeyIter {
+            iter: self.keys.iter(txn).unwrap(),
+        }
+    }
+    pub fn no_nodes(&self, txn: &RoTxn) -> u64 {
+        self.keys.len(txn).unwrap()
+    }
     fn get_fresh_resource_id(&self, txn: &mut RwTxn) -> ResourceID {
         let mut fresh = self
             .state
@@ -405,6 +444,8 @@ mod tests {
             name: "Name".to_string(),
         };
         assert!(system.add_resource(&mut txn, resource));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert!(system.get_resource_id(&txn, "Name").is_some());
         assert!(system.get_resource_id(&txn, "Nonexistent").is_none());
         assert!(system
@@ -417,6 +458,7 @@ mod tests {
                 .name,
             "Name"
         );
+        txn.abort().unwrap();
     }
     #[test]
     fn same_resource_same_id() {
@@ -430,6 +472,7 @@ mod tests {
         };
         assert!(system.add_resource(&mut txn, resource0));
         assert!(!system.add_resource(&mut txn, resource1));
+        txn.commit().unwrap();
     }
     #[test]
     fn different_resource_different_id() {
@@ -445,6 +488,8 @@ mod tests {
         assert!(system.add_resource(&mut txn, resource1));
         assert!(system.get_resource_id(&txn, "Name0").is_some());
         assert!(system.get_resource_id(&txn, "Name1").is_some());
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert_ne!(
             system.get_resource_id(&txn, "Name0").unwrap(),
             system.get_resource_id(&txn, "Name1").unwrap()
@@ -458,7 +503,8 @@ mod tests {
                 .get_resource(&txn, system.get_resource_id(&txn, "Name1").unwrap())
                 .unwrap()
                 .name,
-        )
+        );
+        txn.abort().unwrap();
     }
     #[test]
     fn add_entity() {
@@ -468,6 +514,8 @@ mod tests {
             name: "Name".to_string(),
         };
         assert!(system.add_entity(&mut txn, entity));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert!(system.get_entity_id(&txn, "Name").is_some());
         assert!(system.get_entity_id(&txn, "Nonexistent").is_none());
         assert!(system
@@ -480,6 +528,7 @@ mod tests {
                 .name,
             "Name"
         );
+        txn.abort().unwrap();
     }
     #[test]
     fn same_entity_same_id() {
@@ -493,6 +542,7 @@ mod tests {
         };
         assert!(system.add_entity(&mut txn, entity0));
         assert!(!system.add_entity(&mut txn, entity1));
+        txn.commit().unwrap();
     }
     #[test]
     fn different_entity_different_id() {
@@ -506,6 +556,8 @@ mod tests {
         };
         assert!(system.add_entity(&mut txn, entity0));
         assert!(system.add_entity(&mut txn, entity1));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert!(system.get_entity_id(&txn, "Name0").is_some());
         assert!(system.get_entity_id(&txn, "Name1").is_some());
         assert_ne!(
@@ -521,7 +573,8 @@ mod tests {
                 .get_entity(&txn, system.get_entity_id(&txn, "Name1").unwrap())
                 .unwrap()
                 .name,
-        )
+        );
+        txn.abort().unwrap();
     }
     #[test]
     fn add_label() {
@@ -531,6 +584,9 @@ mod tests {
             name: "Name".to_string(),
         };
         assert!(system.add_label(&mut txn, label));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
+
         assert!(system.get_label_id(&txn, "Name").is_some());
         assert!(system.get_label_id(&txn, "Nonexistent").is_none());
         assert!(system
@@ -543,6 +599,7 @@ mod tests {
                 .name,
             "Name"
         );
+        txn.abort().unwrap();
     }
     #[test]
     fn same_label_same_id() {
@@ -556,6 +613,7 @@ mod tests {
         };
         assert!(system.add_label(&mut txn, label0));
         assert!(!system.add_label(&mut txn, label1));
+        txn.commit().unwrap();
     }
     #[test]
     fn different_label_different_id() {
@@ -569,6 +627,8 @@ mod tests {
         };
         assert!(system.add_label(&mut txn, label0));
         assert!(system.add_label(&mut txn, label1));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert!(system.get_label_id(&txn, "Name0").is_some());
         assert!(system.get_label_id(&txn, "Name1").is_some());
         assert_ne!(
@@ -584,7 +644,8 @@ mod tests {
                 .get_label(&txn, system.get_label_id(&txn, "Name1").unwrap())
                 .unwrap()
                 .name,
-        )
+        );
+        txn.abort().unwrap();
     }
     #[test]
     fn add_colaborator() {
@@ -594,6 +655,8 @@ mod tests {
             name: "Name".to_string(),
         };
         assert!(system.add_colaborator(&mut txn, colaborator));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert!(system.get_colaborator_id(&txn, "Name").is_some());
         assert!(system.get_colaborator_id(&txn, "Nonexistent").is_none());
         assert!(system
@@ -606,6 +669,7 @@ mod tests {
                 .name,
             "Name"
         );
+        txn.abort().unwrap();
     }
     #[test]
     fn same_colaborator_same_id() {
@@ -619,6 +683,7 @@ mod tests {
         };
         assert!(system.add_colaborator(&mut txn, colaborator0));
         assert!(!system.add_colaborator(&mut txn, colaborator1));
+        txn.commit().unwrap();
     }
     #[test]
     fn different_colaborator_different_id() {
@@ -632,6 +697,8 @@ mod tests {
         };
         assert!(system.add_colaborator(&mut txn, colaborator0));
         assert!(system.add_colaborator(&mut txn, colaborator1));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         assert!(system.get_colaborator_id(&txn, "Name0").is_some());
         assert!(system.get_colaborator_id(&txn, "Name1").is_some());
         assert_ne!(
@@ -647,7 +714,8 @@ mod tests {
                 .get_colaborator(&txn, system.get_colaborator_id(&txn, "Name1").unwrap())
                 .unwrap()
                 .name,
-        )
+        );
+        txn.abort().unwrap();
     }
 
     #[test]
@@ -675,6 +743,7 @@ mod tests {
         let r1 = system.get_resource_id(&txn, "R1").unwrap();
         let l0 = system.get_label_id(&txn, "L0").unwrap();
         let l1 = system.get_label_id(&txn, "L1").unwrap();
+        assert_eq!(system.no_nodes(&txn), 4);
 
         // Edges
         let edges_r0 = HashSet::from([Edge::Child(r0, r1), Edge::About(r0, l0)]);
@@ -687,6 +756,8 @@ mod tests {
         assert!(edges_r1
             .iter()
             .all(|edge| !system.add_edge(&mut txn, *edge)));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
         {
             let result: HashSet<_> = system.process_query(&txn, Query::AllR(r0)).collect();
             assert_eq!(result, edges_r0);
@@ -739,5 +810,6 @@ mod tests {
                 .intersection(&results_r1)
                 .all(|e| intersection.contains(e)));
         }
+        txn.abort().unwrap();
     }
 }
