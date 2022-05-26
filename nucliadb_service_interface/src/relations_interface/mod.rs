@@ -17,28 +17,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod fields_interface;
-pub mod paragraphs_interface;
-pub mod service_interface;
-pub mod vectos_interface;
-pub mod relations_interface;
+use crate::service_interface::InternalError;
 
-pub mod dependencies {
-    pub extern crate anyhow;
-    pub extern crate async_std;
-    pub extern crate async_trait;
-    pub extern crate nucliadb_protos;
-    pub extern crate prost_types;
-    pub extern crate tempdir;
-    pub extern crate tokio;
-    pub extern crate tracing;
+#[derive(Clone)]
+pub struct RelationsServiceConfiguration {
+    pub path: String,
 }
 
-pub mod prelude {
-    pub use crate::dependencies::*;
-    pub use crate::fields_interface::*;
-    pub use crate::paragraphs_interface::*;
-    pub use crate::service_interface::*;
-    pub use crate::vectos_interface::*;
-    pub use crate::relations_interface::*;
+#[derive(Debug)]
+pub struct RelationError {
+    pub msg: String,
 }
+
+impl std::fmt::Display for RelationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.msg)
+    }
+}
+
+impl InternalError for RelationError {}
