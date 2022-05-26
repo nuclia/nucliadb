@@ -77,6 +77,45 @@ async def test_kb_counters_cached(
         assert data["paragraphs"] == 100
         assert data["fields"] == 100
         assert data["sentences"] == 100
+        assert "shards" not in data
+
+
+@pytest.mark.asyncio
+async def test_kb_counters_cached_nodebug(
+    search_api: Callable[..., AsyncClient], test_search_resource: str
+) -> None:
+    from nucliadb_utils.utilities import get_cache
+
+    kbid = test_search_resource
+
+    cache = await get_cache()
+    assert cache is not None
+
+    await cache.set(
+        KB_COUNTER_CACHE.format(kbid=kbid),
+        json.dumps(
+            {
+                "resources": 100,
+                "paragraphs": 100,
+                "fields": 100,
+                "sentences": 100,
+                "shards": [],
+            }
+        ),
+    )
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/counters",
+        )
+        assert resp.status_code == 200
+
+        data = resp.json()
+        assert data["resources"] == 100
+        assert data["paragraphs"] == 100
+        assert data["fields"] == 100
+        assert data["sentences"] == 100
+        assert "shards" not in data
 
 
 @pytest.mark.asyncio

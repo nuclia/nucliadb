@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import json
 from typing import List, Optional
 
 from fastapi import HTTPException, Query, Request
@@ -96,7 +97,11 @@ async def knowledgebox_counters(
         cached_counters = await cache.get(KB_COUNTER_CACHE.format(kbid=kbid))
 
         if cached_counters is not None:
-            return KnowledgeboxCounters.parse_raw(cached_counters)
+            cached_counters_obj = json.loads(cached_counters)
+            # In case shards get cached, we don't want it to be retrieved if we are not debugging
+            if not debug:
+                cached_counters_obj.pop("shards", None)
+            return KnowledgeboxCounters.parse_obj(cached_counters_obj)
 
     nodemanager = get_nodes()
 
