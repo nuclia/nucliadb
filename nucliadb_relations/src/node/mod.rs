@@ -121,11 +121,11 @@ mod tests {
             resource,
             ResourceData::from_byte_rpr(&resource.as_byte_rpr())
         );
-        assert_eq!(entity, EntityData::from_byte_rpr(&entity.as_byte_rpr()));
-        assert_eq!(label, LabelData::from_byte_rpr(&label.as_byte_rpr()));
         assert_eq!(
             colaborator,
             ColabData::from_byte_rpr(&colaborator.as_byte_rpr())
         );
+        assert_eq!(entity, EntityData::from_byte_rpr(&entity.as_byte_rpr()));
+        assert_eq!(label, LabelData::from_byte_rpr(&label.as_byte_rpr()));
     }
 }

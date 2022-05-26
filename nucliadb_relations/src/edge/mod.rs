@@ -1,8 +1,9 @@
 use std::fmt::Display;
+use std::hash::Hash;
 
 use crate::identifier::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Edge {
     Child(ResourceID, ResourceID),
     About(ResourceID, LabelID),
