@@ -679,18 +679,14 @@ mod tests {
         // Edges
         let edges_r0 = HashSet::from([Edge::Child(r0, r1), Edge::About(r0, l0)]);
         let edges_r1 = HashSet::from([Edge::About(r1, l0), Edge::About(r1, l1)]);
+        assert!(edges_r0.iter().all(|edge| system.add_edge(&mut txn, *edge)));
+        assert!(edges_r1.iter().all(|edge| system.add_edge(&mut txn, *edge)));
         assert!(edges_r0
             .iter()
-            .fold(true, |prev, edge| prev && system.add_edge(&mut txn, *edge)));
+            .all(|edge| !system.add_edge(&mut txn, *edge)));
         assert!(edges_r1
             .iter()
-            .fold(true, |prev, edge| prev && system.add_edge(&mut txn, *edge)));
-        assert!(!edges_r0
-            .iter()
-            .fold(false, |prev, edge| prev || system.add_edge(&mut txn, *edge)));
-        assert!(!edges_r1
-            .iter()
-            .fold(false, |prev, edge| prev || system.add_edge(&mut txn, *edge)));
+            .all(|edge| !system.add_edge(&mut txn, *edge)));
         {
             let result: HashSet<_> = system.process_query(&txn, Query::AllR(r0)).collect();
             assert_eq!(result, edges_r0);

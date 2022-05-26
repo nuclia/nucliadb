@@ -116,7 +116,7 @@ mod tests {
         let resource = ResourceData { name: name.clone() };
         let entity = EntityData { name: name.clone() };
         let label = LabelData { name: name.clone() };
-        let colaborator = ColabData { name: name.clone() };
+        let colaborator = ColabData { name };
         assert_eq!(
             resource,
             ResourceData::from_byte_rpr(&resource.as_byte_rpr())
