@@ -28,17 +28,37 @@ pub struct SearchQuery {
 }
 
 impl SearchQuery {
+    fn preprocess_text(text: &str) -> Vec<String> {
+        let mut words = vec![];
+        let mut current_word = String::new();
+        let mut inside_quotes = false;
+        for c in text.chars() {
+            match c {
+                '"' if inside_quotes => {
+                    words.push(std::mem::take(&mut current_word));
+                    inside_quotes = false;
+                }
+                '"' if !inside_quotes => {
+                    words.push(std::mem::take(&mut current_word));
+                    inside_quotes = true;
+                }
+                ' ' if !inside_quotes => words.push(std::mem::take(&mut current_word)),
+                c => current_word.push(c),
+            }
+        }
+        words.push(current_word);
+        words.into_iter().filter(|word| !word.is_empty()).collect()
+    }
     fn text_query(text: &str) -> String {
         let mut result = String::new();
-
-        let words: Vec<&str> = text.split(' ').collect();
+        let words = SearchQuery::preprocess_text(text);
         for word in &words[0..words.len() - 1] {
             result.push_str(format!("text:\"{}\" AND ", word).as_str());
         }
+
         // let term = Term::from_field_text(country_field, "japon");
         // let fuzzy_query = FuzzyTermQuery::new(term, 1, true);
         result.push_str(format!("text:\"{}\"", words[words.len() - 1]).as_str());
-
         result
     }
 

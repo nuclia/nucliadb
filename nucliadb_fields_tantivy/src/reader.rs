@@ -624,6 +624,21 @@ mod tests {
         };
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
+            body: "\"enough test\"".to_string(),
+            fields: vec!["body".to_string()],
+            filter: Some(filter.clone()),
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+        };
+        let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 0);
+
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
             body: "enough test".to_string(),
             fields: vec!["body".to_string()],
             filter: Some(filter.clone()),
@@ -649,6 +664,7 @@ mod tests {
             timestamps: Some(timestamps),
             reload: false,
         };
+
         let result = field_reader_service.search(&search).unwrap();
 
         assert_eq!(result.total, 2);
