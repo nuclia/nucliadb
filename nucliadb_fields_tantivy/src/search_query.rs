@@ -29,25 +29,19 @@ pub struct SearchQuery {
 
 impl SearchQuery {
     fn preprocess_text(text: &str) -> Vec<String> {
-        let mut words = vec![];
-        let mut current_word = String::new();
-        let mut inside_quotes = false;
+        let mut treated = String::new();
+        let quoted = text.chars().next().map_or(false, |c| c == '"');
         for c in text.chars() {
             match c {
-                '"' if inside_quotes => {
-                    words.push(std::mem::take(&mut current_word));
-                    inside_quotes = false;
-                }
-                '"' if !inside_quotes => {
-                    words.push(std::mem::take(&mut current_word));
-                    inside_quotes = true;
-                }
-                ' ' if !inside_quotes => words.push(std::mem::take(&mut current_word)),
-                c => current_word.push(c),
+                '"' => treated.push(' '),
+                c => treated.push(c),
             }
         }
-        words.push(current_word);
-        words.into_iter().filter(|word| !word.is_empty()).collect()
+        if quoted {
+            vec![treated]
+        } else {
+            treated.split(' ').filter(|s| !s.is_empty()).map(String::from).collect()
+        }
     }
     fn text_query(text: &str) -> String {
         let mut result = String::new();

@@ -49,16 +49,18 @@ pub struct SearchQuery {
 
 impl SearchQuery {
     fn preprocess_text(text: &str) -> Vec<String> {
-        let mut words = vec![];
-        let mut current_word = String::new();
+        let mut treated = String::new();
         for c in text.chars() {
             match c {
-                c if c.is_alphanumeric() => current_word.push(c),
-                _ => words.push(std::mem::take(&mut current_word)),
+                '"' => treated.push(' '),
+                c => treated.push(c),
             }
         }
-        words.push(current_word);
-        words.into_iter().filter(|word| !word.is_empty()).collect()
+        treated
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
     }
     fn parse_query(text: &str, field: Field, distance: Distance) -> Vec<(Occur, Box<dyn Query>)> {
         let distance = distance.into();
