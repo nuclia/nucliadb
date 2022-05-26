@@ -48,9 +48,21 @@ pub struct SearchQuery {
 }
 
 impl SearchQuery {
+    fn preprocess_text(text: &str) -> Vec<String> {
+        let mut words = vec![];
+        let mut current_word = String::new();
+        for c in text.chars() {
+            match c {
+                c if c.is_alphanumeric() => current_word.push(c),
+                _ => words.push(std::mem::take(&mut current_word)),
+            }
+        }
+        words.push(current_word);
+        words.into_iter().filter(|word| !word.is_empty()).collect()
+    }
     fn parse_query(text: &str, field: Field, distance: Distance) -> Vec<(Occur, Box<dyn Query>)> {
         let distance = distance.into();
-        let mut words: Vec<&str> = text.split(' ').collect();
+        let mut words = SearchQuery::preprocess_text(text);
         let last = words.pop();
         let mut terms: Vec<(Occur, Box<dyn Query>)> = Vec::with_capacity(words.len());
         for word in &words {
@@ -59,7 +71,7 @@ impl SearchQuery {
             terms.push((Occur::Must, Box::new(fuzzy_term)));
         }
         if let Some(word) = last {
-            let term = Term::from_field_text(field, word);
+            let term = Term::from_field_text(field, &word);
             let fuzzy_term = FuzzyTermQuery::new_prefix(term, distance, true);
             terms.push((Occur::Must, Box::new(fuzzy_term)));
         }
