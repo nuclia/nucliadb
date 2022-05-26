@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::panic;
 
 use async_std::fs;
@@ -31,15 +31,25 @@ use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
     Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
-use tantivy::query::{AllQuery, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy, Searcher,
+    TantivyError,
 };
 use tracing::*;
 
 use super::schema::FieldSchema;
 use crate::search_query::SearchQuery;
+
+#[derive(Debug)]
+struct TError(TantivyError);
+impl InternalError for TError {}
+impl Display for TError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 pub struct SearchResponse<S> {
     pub facets_count: FacetCounts,
@@ -84,9 +94,9 @@ impl ReaderChild for FieldReaderService {
     type Request = DocumentSearchRequest;
     type Response = DocumentSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        let result = self.do_search(request);
         info!("Document search at {}:{}", line!(), file!());
-        Ok(result)
+        self.do_search(request)
+            .map_err(|e| Box::new(TError(e)) as Box<dyn InternalError>)
     }
 
     fn reload(&self) {
@@ -373,7 +383,10 @@ impl FieldReaderService {
         }
     }
 
-    fn do_search(&self, request: &DocumentSearchRequest) -> DocumentSearchResponse {
+    fn do_search(
+        &self,
+        request: &DocumentSearchRequest,
+    ) -> tantivy::Result<DocumentSearchResponse> {
         info!("Document search starts {}:{}", line!(), file!());
         let query = if !request.body.is_empty() {
             info!("Body was not empty document search {}:{}", line!(), file!());
@@ -381,11 +394,11 @@ impl FieldReaderService {
             info!("{}", extended_query);
             let query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             info!("Request parsed {}:{}", line!(), file!());
-            query_parser.parse_query(&extended_query).unwrap()
+            query_parser.parse_query(&extended_query)
         } else {
             info!("Document search at {}:{}", line!(), file!());
-            Box::new(AllQuery)
-        };
+            Ok(Box::new(AllQuery) as Box<dyn Query>)
+        }?;
 
         info!("Document search at {}:{}", line!(), file!());
         let results = request.result_per_page as usize;
@@ -435,7 +448,7 @@ impl FieldReaderService {
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
                 info!("Document search at {}:{}", line!(), file!());
-                self.convert_int_order(
+                Ok(self.convert_int_order(
                     SearchResponse {
                         facets_count,
                         facets,
@@ -445,7 +458,7 @@ impl FieldReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
-                )
+                ))
             }
             None => {
                 info!("Document search at {}:{}", line!(), file!());
@@ -457,7 +470,7 @@ impl FieldReaderService {
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
                 info!("Document search at {}:{}", line!(), file!());
-                self.convert_bm25_order(
+                Ok(self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
                         facets,
@@ -467,7 +480,7 @@ impl FieldReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
-                )
+                ))
             }
         }
     }
