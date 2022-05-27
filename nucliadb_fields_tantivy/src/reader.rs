@@ -392,14 +392,14 @@ impl FieldReaderService {
             info!("Body was not empty document search {}:{}", line!(), file!());
             let extended_query = SearchQuery::document(request).unwrap();
             info!("{}", extended_query);
-            let query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
+            let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
+            query_parser.set_conjunction_by_default();
             info!("Request parsed {}:{}", line!(), file!());
             query_parser.parse_query(&extended_query)
         } else {
             info!("Document search at {}:{}", line!(), file!());
             Ok(Box::new(AllQuery) as Box<dyn Query>)
         }?;
-
         info!("Document search at {}:{}", line!(), file!());
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;

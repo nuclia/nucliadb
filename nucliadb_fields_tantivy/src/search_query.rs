@@ -28,47 +28,18 @@ pub struct SearchQuery {
 }
 
 impl SearchQuery {
-    fn preprocess_text(text: &str) -> Vec<String> {
-        let mut treated = String::new();
-        let quoted = text.chars().next().map_or(false, |c| c == '"');
-        for c in text.chars() {
-            match c {
-                '"' => treated.push(' '),
-                c => treated.push(c),
-            }
-        }
-        if quoted {
-            vec![treated]
-        } else {
-            treated.split(' ').filter(|s| !s.is_empty()).map(String::from).collect()
-        }
-    }
-    fn text_query(text: &str) -> String {
-        let mut result = String::new();
-        let words = SearchQuery::preprocess_text(text);
-        for word in &words[0..words.len() - 1] {
-            result.push_str(format!("text:\"{}\" AND ", word).as_str());
-        }
-
-        // let term = Term::from_field_text(country_field, "japon");
-        // let fuzzy_query = FuzzyTermQuery::new(term, 1, true);
-        result.push_str(format!("text:\"{}\"", words[words.len() - 1]).as_str());
-        result
-    }
-
     fn create(search: &DocumentSearchRequest) -> String {
         let fields = &search.fields;
         let body = &search.body;
         let filter = &search.filter;
 
         let mut query = String::from("");
-
         if !body.is_empty() {
-            query.push_str(&SearchQuery::text_query(body));
+            query.push_str(body);
         }
 
         if !fields.is_empty() {
-            query.push_str(" AND ( ")
+            query.push_str(" ( ")
         }
 
         let mut first: bool = true;
@@ -93,14 +64,13 @@ impl SearchQuery {
         // if let Some(timestamps) = &search.timestamps {
         //     SearchQuery::add_date_filters(timestamps, &mut query);
         // }
-
         query
     }
 
     fn add_filter(filter: &Option<Filter>, query: &mut String) {
         if let Some(filter) = filter {
             for value in &filter.tags {
-                query.push_str(&format!(" AND facets:\"{}\"", value));
+                query.push_str(&format!(" facets:\"{}\"", value));
             }
         }
     }
