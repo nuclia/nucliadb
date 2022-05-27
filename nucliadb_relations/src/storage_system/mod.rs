@@ -191,6 +191,7 @@ impl StorageSystem {
             let colaborators = env.create_database(Some(COLABORATORS_DB)).unwrap();
             let edges = env.create_database(Some(EDGE_DB)).unwrap();
             let state = env.create_database(Some(STATE_DB)).unwrap();
+            std::fs::File::create(path.join(STAMP)).unwrap();
             StorageSystem {
                 env,
                 keys,
@@ -436,6 +437,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         StorageSystem::create(dir.path())
     }
+
+    #[test]
+    fn open_and_create() {
+        let dir = tempfile::tempdir().unwrap();
+        StorageSystem::create(dir.path());
+        StorageSystem::open(dir.path());
+        assert!(true);
+    } 
+
     #[test]
     fn add_resource() {
         let system = initialize_storage_system();
