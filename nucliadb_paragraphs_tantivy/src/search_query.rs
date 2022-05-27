@@ -20,8 +20,8 @@
 
 use nucliadb_protos::ParagraphSearchRequest;
 use nucliadb_service_interface::prelude::*;
-use tantivy::query::{AllQuery, FuzzyTermQuery, Occur, Query, TermQuery};
-use tantivy::schema::{Facet, Field, IndexRecordOption};
+use tantivy::query::{AllQuery, FuzzyTermQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::schema::{Facet, IndexRecordOption, Type};
 use tantivy::Term;
 
 use crate::schema::ParagraphSchema;
@@ -43,69 +43,75 @@ impl From<Distance> for u8 {
     }
 }
 
-pub struct SearchQuery {
-    pub query: String,
+fn parse_query(
+    parser: &QueryParser,
+    text: &str,
+    distance: Distance,
+) -> Vec<(Occur, Box<dyn Query>)> {
+    use std::collections::BTreeMap;
+
+    let distance = distance.into();
+    let mut collector = BTreeMap::new();
+    let query = parser.parse_query(text).unwrap();
+    query.query_terms(&mut collector);
+    let mut fuzzy_terms: Vec<_> = collector
+        .into_iter()
+        .filter(|(term, _)| term.typ() == Type::Str)
+        .map(|(term, _)| term)
+        .collect();
+    let last = fuzzy_terms
+        .pop()
+        .into_iter()
+        .map(|term| Box::new(FuzzyTermQuery::new(term, distance, true)) as Box<dyn Query>)
+        .map(|query| (Occur::Must, query));
+    fuzzy_terms
+        .into_iter()
+        .map(|term| Box::new(FuzzyTermQuery::new(term, distance, true)) as Box<dyn Query>)
+        .map(|query| (Occur::Must, query))
+        .chain(last)
+        .collect()
 }
 
-impl SearchQuery {
-    fn parse_query(text: &str, field: Field, distance: Distance) -> Vec<(Occur, Box<dyn Query>)> {
-        let distance = distance.into();
-        let mut words: Vec<&str> = text.split(' ').collect();
-        let last = words.pop();
-        let mut terms: Vec<(Occur, Box<dyn Query>)> = Vec::with_capacity(words.len());
-        for word in &words {
-            let term = Term::from_field_text(field, word);
-            let fuzzy_term = FuzzyTermQuery::new(term, distance, true);
-            terms.push((Occur::Must, Box::new(fuzzy_term)));
-        }
-        if let Some(word) = last {
-            let term = Term::from_field_text(field, word);
-            let fuzzy_term = FuzzyTermQuery::new_prefix(term, distance, true);
-            terms.push((Occur::Must, Box::new(fuzzy_term)));
-        }
-        terms
+pub fn process(
+    parser: &QueryParser,
+    search: &ParagraphSearchRequest,
+    schema: &ParagraphSchema,
+    distance: Distance,
+) -> Result<Vec<QueryParams>, String> {
+    // Parse basic search by tokens
+    let mut boolean_vec = if !search.body.is_empty() {
+        parse_query(parser, &search.body.to_string(), distance)
+    } else {
+        vec![(Occur::Should, Box::new(AllQuery) as Box<dyn Query>)]
+    };
+
+    if !search.uuid.is_empty() {
+        let term = Term::from_field_text(schema.uuid, &search.uuid);
+        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+        boolean_vec.push((Occur::Must, Box::new(term_query)))
     }
 
-    pub fn process(
-        search: &ParagraphSearchRequest,
-        schema: &ParagraphSchema,
-        distance: Distance,
-    ) -> Result<Vec<QueryParams>, String> {
-        // Parse basic search by tokens
-        let mut boolean_vec = if !search.body.is_empty() {
-            SearchQuery::parse_query(&search.body.to_string(), schema.text, distance)
-        } else {
-            vec![(Occur::Should, Box::new(AllQuery) as Box<dyn Query>)]
-        };
+    // Fields
+    for value in &search.fields {
+        let facet_key: String = format!("/{}", value);
+        let facet = Facet::from(facet_key.as_str());
+        let facet_term = Term::from_facet(schema.field, &facet);
+        let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+        boolean_vec.push((Occur::Should, Box::new(facet_term_query)));
+    }
 
-        if !search.uuid.is_empty() {
-            let term = Term::from_field_text(schema.uuid, &search.uuid);
-            let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-            boolean_vec.push((Occur::Must, Box::new(term_query)))
-        }
-
-        // Fields
-        for value in &search.fields {
-            let facet_key: String = format!("/{}", value);
-            let facet = Facet::from(facet_key.as_str());
-            let facet_term = Term::from_facet(schema.field, &facet);
-            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            boolean_vec.push((Occur::Should, Box::new(facet_term_query)));
-        }
-
-        // Add filter
-        match search.filter.as_ref() {
-            Some(filter) if !filter.tags.is_empty() => {
-                for value in &filter.tags {
-                    let facet = Facet::from(value.as_str());
-                    let facet_term = Term::from_facet(schema.facets, &facet);
-                    let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-                    boolean_vec.push((Occur::Must, Box::new(facet_term_query)));
-                }
+    // Add filter
+    match search.filter.as_ref() {
+        Some(filter) if !filter.tags.is_empty() => {
+            for value in &filter.tags {
+                let facet = Facet::from(value.as_str());
+                let facet_term = Term::from_facet(schema.facets, &facet);
+                let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+                boolean_vec.push((Occur::Must, Box::new(facet_term_query)));
             }
-            _ => (),
         }
-
-        Ok(boolean_vec)
+        _ => (),
     }
+
+    Ok(boolean_vec)
 }

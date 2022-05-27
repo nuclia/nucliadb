@@ -28,7 +28,7 @@ use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
     Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy,
@@ -36,7 +36,7 @@ use tantivy::{
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::search_query::{Distance, SearchQuery};
+use crate::search_query::{self, Distance};
 use crate::search_response::SearchResponse;
 pub struct ParagraphReaderService {
     index: Index,
@@ -72,9 +72,11 @@ impl ReaderChild for ParagraphReaderService {
     type Response = ParagraphSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         let query = {
-            let first_attemp = SearchQuery::process(request, &self.schema, Distance::Low).unwrap();
+            let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
+            let first_attemp =
+                search_query::process(&parser, request, &self.schema, Distance::Low).unwrap();
             if first_attemp.is_empty() {
-                SearchQuery::process(request, &self.schema, Distance::High).unwrap()
+                search_query::process(&parser, request, &self.schema, Distance::High).unwrap()
             } else {
                 first_attemp
             }
@@ -538,6 +540,23 @@ mod tests {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
             body: "shoupd enaugh".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 1);
+
+        // Search on all paragraphs in resource with typo
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: UUID.to_string(),
+            body: "\"shoupd\" enaugh".to_string(),
             fields: vec![],
             filter: None,
             faceted: None,
