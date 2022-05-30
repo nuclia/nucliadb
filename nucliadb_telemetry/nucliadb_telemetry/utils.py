@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Optional, Sequence, Union
 
 from opentelemetry.sdk.resources import SERVICE_NAME  # type: ignore
@@ -66,7 +67,18 @@ async def init_telemetry(tracer_provider: Optional[AsyncTracerProvider] = None):
     )
 
     # Create a BatchSpanProcessor and add the exporter to it
-    span_processor = BatchSpanProcessor(jaeger_exporter)
+    schedule_delay_millis = int(os.environ.get("OTEL_BSP_SCHEDULE_DELAY", 5000))
+    max_queue_size = int(os.environ.get("OTEL_BSP_MAX_QUEUE_SIZE", 2048))
+    max_export_batch_size = int(os.environ.get("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 512))
+    export_timeout_millis = int(os.environ.get("OTEL_BSP_EXPORT_TIMEOUT", 30000))
+
+    span_processor = BatchSpanProcessor(
+        jaeger_exporter,
+        schedule_delay_millis=schedule_delay_millis,
+        max_queue_size=max_queue_size,
+        max_export_batch_size=max_export_batch_size,
+        export_timeout_millis=export_timeout_millis,
+    )
 
     # add to the tracer
     await tracer_provider.add_span_processor(span_processor)

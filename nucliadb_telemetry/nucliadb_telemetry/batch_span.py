@@ -115,6 +115,7 @@ class BatchSpanProcessor(SpanProcessor):
             await self._worker()
         except Exception as e:
             logger.exception(e)
+            raise e
 
     async def _worker(self):
         timeout = self.schedule_delay_millis / 1e3
@@ -124,6 +125,7 @@ class BatchSpanProcessor(SpanProcessor):
                 if self.done:
                     # done flag may have changed, avoid waiting
                     break
+                logger.debug(f"{self.queue.qsize()} spans on queue")
                 flush_request = self._get_and_unset_flush_request()
                 if (
                     self.queue.qsize() < self.max_export_batch_size
@@ -279,3 +281,7 @@ class BatchSpanProcessor(SpanProcessor):
         # signal the worker thread to finish and then wait for it
         self.done = True
         self.span_exporter.shutdown()
+        try:
+            self.worker_task.cancel()
+        except RuntimeError:
+            pass

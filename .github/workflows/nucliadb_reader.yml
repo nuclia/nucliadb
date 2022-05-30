@@ -12,6 +12,7 @@ on:
       - "nucliadb_utils/**"
       - "nucliadb_ingest/**"
       - "nucliadb_models/**"
+      - "nucliadb_telemetry/**"
       - "Dockerfile.reader"
   push:
     branches:
@@ -23,6 +24,7 @@ on:
       - "nucliadb_models/**"
       - "nucliadb_ingest/**"
       - "nucliadb_models/**"
+      - "nucliadb_telemetry/**"
       - "Dockerfile.reader"
 
 env:
