@@ -4,7 +4,7 @@ CHANGELOG
 1.0.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Log in case event loop is dead
 
 
 1.0.1 (2022-05-25)

@@ -110,6 +110,13 @@ class BatchSpanProcessor(SpanProcessor):
             self.condition.notify_all()
 
     async def worker(self):
+        try:
+            logger.info("Batch telemetry event loop started")
+            await self._worker()
+        except Exception as e:
+            logger.exception(e)
+
+    async def _worker(self):
         timeout = self.schedule_delay_millis / 1e3
         flush_request = None  # type: Optional[_FlushRequest]
         while not self.done:
