@@ -21,7 +21,7 @@ import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from starlette.responses import PlainTextResponse
 
-from nucliadb_utils.settings import running_settings
+from nucliadb_utils.settings_running import running_settings
 
 
 async def metrics(request):
