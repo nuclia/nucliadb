@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.3 (unreleased)
+1.0.3 (2022-05-31)
 ------------------
 
 - Split dependencies for easier installation
