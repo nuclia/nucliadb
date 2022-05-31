@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.1 (2022-05-31)
+1.0.1 (unreleased)
 ------------------
 
 - Fix release
