@@ -7,7 +7,7 @@ fastapi-versioning==0.10.0
 fastapi==0.75.0
 pydantic==1.9.0
 sentry-sdk==1.5.12
-pyjwt==2.3.0
+pyjwt==2.4.0
 mmh3==3.0.0
 httpx==0.19.0
 types-orjson
