@@ -1,4 +1,4 @@
-pydantic==1.9.0
+pydantic>=1.8.2
 nats-py[nkeys]==2.0.0
 aioredis==2.0.1
 orjson==3.6.7

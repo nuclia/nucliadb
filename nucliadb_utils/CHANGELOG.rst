@@ -4,7 +4,7 @@ CHANGELOG
 1.0.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Update Pydantic dependency to >= 1.8.2
 
 
 1.0.1 (2022-05-31)
