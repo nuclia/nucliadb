@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.6 (unreleased)
+1.0.6 (2022-05-31)
 ------------------
 
 - Split running settings on a different module
