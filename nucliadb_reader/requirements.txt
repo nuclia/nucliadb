@@ -1,4 +1,4 @@
-starlette-prometheus
+starlette-prometheus==0.9.0
 uvicorn
 opentelemetry-instrumentation-fastapi==0.30b1
 opentelemetry-instrumentation-aiohttp-client

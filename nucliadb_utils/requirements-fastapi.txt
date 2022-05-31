@@ -1,0 +1,3 @@
+fastapi==0.75.0
+uvicorn==0.16.0
+starlette

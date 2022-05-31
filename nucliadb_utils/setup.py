@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+from typing import List
 
 from setuptools import Extension, find_packages, setup
 
@@ -33,7 +34,24 @@ def load_reqs(filename):
         ]
 
 
+def load_extra(sections: List[str]):
+    result = {}
+    for section in sections:
+        with open(f"requirements-{section}.txt") as reqs_file:
+            result[section] = [
+                line
+                for line in reqs_file.readlines()
+                if not (
+                    re.match(r"\s*#", line)  # noqa
+                    or re.match("-e", line)
+                    or re.match("-r", line)
+                )
+            ]
+
+
 requirements = load_reqs("requirements.txt")
+
+extra_requirements = load_extra(["cache", "storages", "fastapi"])
 
 lru_module = Extension(
     "nucliadb_utils.cache.lru", sources=["nucliadb_utils/cache/lru.c"]
@@ -58,4 +76,5 @@ setup(
     ext_modules=[lru_module],
     packages=find_packages(),
     install_requires=requirements,
+    extra_require=extra_requirements,
 )

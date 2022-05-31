@@ -4,7 +4,7 @@ CHANGELOG
 1.0.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Split dependencies for easier installation
 
 
 1.0.2 (2022-05-31)
