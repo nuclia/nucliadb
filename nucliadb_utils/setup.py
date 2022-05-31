@@ -14,7 +14,7 @@ def build_readme():
 
     readme += "\n"
 
-    with open("CHANGELOG") as f:
+    with open("CHANGELOG.rst") as f:
         readme += f.read()
 
     return readme
