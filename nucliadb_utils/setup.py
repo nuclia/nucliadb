@@ -76,5 +76,5 @@ setup(
     ext_modules=[lru_module],
     packages=find_packages(),
     install_requires=requirements,
-    extra_require=extra_requirements,
+    extra_requirements=extra_requirements,
 )
