@@ -47,6 +47,7 @@ def load_extra(sections: List[str]):
                     or re.match("-r", line)
                 )
             ]
+    return result
 
 
 requirements = load_reqs("requirements.txt")
@@ -76,5 +77,5 @@ setup(
     ext_modules=[lru_module],
     packages=find_packages(),
     install_requires=requirements,
-    extra_requirements=extra_requirements,
+    extras_require=extra_requirements,
 )
