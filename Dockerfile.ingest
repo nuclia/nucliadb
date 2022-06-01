@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y jq
 COPY nucliadb_swim/requirements.txt /usr/src/app/requirements-swim.txt
 COPY nucliadb_cluster/requirements.txt /usr/src/app/requirements-cluster.txt
 COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
+COPY nucliadb_utils/requirements-cache.txt /usr/src/app/requirements-cache.txt
+COPY nucliadb_utils/requirements-storages.txt /usr/src/app/requirements-storages.txt
+COPY nucliadb_utils/requirements-fastapi.txt /usr/src/app/requirements-fastapi.txt
 COPY nucliadb_protos/python/requirements.txt /usr/src/app/requirements-protos.txt
 COPY nucliadb_models/requirements.txt /usr/src/app/requirements-models.txt
 COPY nucliadb_ingest/requirements.txt /usr/src/app/requirements-ingest.txt
@@ -25,6 +28,9 @@ RUN set -eux; \
     -r /usr/src/app/requirements-swim.txt \
     -r /usr/src/app/requirements-cluster.txt \
     -r /usr/src/app/requirements-utils.txt \
+    -r /usr/src/app/requirements-storages.txt \
+    -r /usr/src/app/requirements-fastapi.txt \
+    -r /usr/src/app/requirements-cache.txt \
     -r /usr/src/app/requirements-telemetry.txt \
     -r /usr/src/app/requirements-protos.txt \
     -r /usr/src/app/requirements-models.txt \
