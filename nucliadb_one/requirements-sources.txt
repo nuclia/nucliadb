@@ -2,7 +2,7 @@
 -e ./nucliadb_writer
 -e ./nucliadb_ingest
 -e ./nucliadb_protos/python
--e ./nucliadb_utils
+-e ./nucliadb_utils[storages,fastapi,cache]
 -e ./nucliadb_swim
 -e ./nucliadb_cluster
 -e ./nucliadb_models
