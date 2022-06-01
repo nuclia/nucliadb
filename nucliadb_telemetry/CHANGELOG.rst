@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.0.3 (unreleased)
+1.0.3 (2022-06-01)
 ------------------
 
 - Adding more debug information
