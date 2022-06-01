@@ -23,7 +23,7 @@ CHANGELOG
 1.0.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Adding more debug information
 
 
 1.0.2 (2022-05-30)
