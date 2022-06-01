@@ -140,6 +140,7 @@ class BatchSpanProcessor(SpanProcessor):
         timeout = self.schedule_delay_millis / 1e3
         flush_request = None  # type: Optional[_FlushRequest]
         while not self.done:
+            logger.debug("Waiting condition")
             async with self.condition:
                 if self.done:
                     # done flag may have changed, avoid waiting
@@ -167,7 +168,10 @@ class BatchSpanProcessor(SpanProcessor):
 
             # subtract the duration of this export call to the next timeout
             start = _time_ns()
-            await self._export(flush_request)
+            try:
+                await asyncio.wait_for(await self._export(flush_request), timeout)
+            except asyncio.TimeoutError:
+                logger.exception("Took to much time to export, network problem ahead")
             end = _time_ns()
             duration = (end - start) / 1e9
             timeout = self.schedule_delay_millis / 1e3 - duration
