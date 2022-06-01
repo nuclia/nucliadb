@@ -23,7 +23,7 @@ CHANGELOG
 1.0.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix await
 
 
 1.0.3 (2022-06-01)
