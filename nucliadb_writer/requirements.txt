@@ -11,5 +11,6 @@ pyjwt==2.4.0
 mmh3==3.0.0
 httpx==0.19.0
 types-orjson
+types-aiofiles
 types-setuptools
 aiohttp==3.7.4

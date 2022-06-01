@@ -3,7 +3,8 @@ clandestined==1.0.1
 tikv-client>=0.0.3
 lru-dict==1.1.7
 backoff
-aiofiles
+aiofiles==0.8.0
+types-aiofiles==0.8.3
 protobuf==3.20.1
 nats-py[nkeys]==2.0.0
 types-protobuf==3.19.20
