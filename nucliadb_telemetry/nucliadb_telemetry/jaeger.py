@@ -19,7 +19,9 @@
 
 import asyncio
 import math
+import socket
 from asyncio import Future
+from functools import partial
 from typing import List
 
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore
@@ -123,6 +125,9 @@ class AgentClientUDPAsync:
         self.buffer = TTransport.TMemoryBuffer()
         self.client = client(iprot=TCompactProtocol.TCompactProtocol(trans=self.buffer))
         self.split_oversized_batches = split_oversized_batches
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._sock.setblocking(False)
+        self._addr = (host_name, int(port))
 
     async def emit(self, batch: Collector.Batch):
         """
@@ -161,11 +166,24 @@ class AgentClientUDPAsync:
 
         loop = asyncio.get_running_loop()
         on_con_lost = loop.create_future()
-        transport, _ = await loop.create_datagram_endpoint(
-            lambda: JaegerClientProtocol(buff, on_con_lost),  # type: ignore
-            remote_addr=(self.host_name, self.port),
-        )
+
+        send_to = partial(self._sendto, buff, on_con_lost)
+        loop.add_writer(self._sock.fileno(), send_to)
         try:
             await on_con_lost
+        except Exception:
+            logger.exception("Exception on sending to jaeger", stack_info=True)
         finally:
-            transport.close()
+            loop.remove_writer(self._sock.fileno())
+
+    def _sendto(self, buff, on_con_lost: asyncio.Future):
+        try:
+            self._sock.sendto(buff, self._addr)
+        except (BlockingIOError, InterruptedError):
+            return
+        except OSError as exc:
+            on_con_lost.set_exception(exc)
+        except Exception as exc:
+            on_con_lost.set_exception(exc)
+        else:
+            on_con_lost.set_result(True)

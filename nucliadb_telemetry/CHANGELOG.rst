@@ -23,7 +23,7 @@ CHANGELOG
 1.0.5 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Simpler aproach on UDP sending packages
 
 
 1.0.4 (2022-06-01)
