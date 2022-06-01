@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.0.5 (unreleased)
+1.0.5 (2022-06-01)
 ------------------
 
 - Simpler aproach on UDP sending packages
