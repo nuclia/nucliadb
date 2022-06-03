@@ -76,7 +76,12 @@ def prepare_field_put(
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
-    toprocess = PushPayload(uuid=rid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     writer.kbid = kbid
     writer.uuid = rid
@@ -326,7 +331,12 @@ async def append_messages_to_conversation_field(
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
-    toprocess = PushPayload(uuid=rid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     writer.kbid = kbid
     writer.uuid = rid
@@ -375,7 +385,12 @@ async def append_blocks_to_layout_field(
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
-    toprocess = PushPayload(uuid=rid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     writer.kbid = kbid
     writer.uuid = rid

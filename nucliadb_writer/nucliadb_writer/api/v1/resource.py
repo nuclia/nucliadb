@@ -93,7 +93,12 @@ async def create_resource(
     partition = partitioning.generate_partition(kbid, uuid)
 
     writer = BrokerMessage()
-    toprocess = PushPayload(uuid=uuid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=uuid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     writer.kbid = kbid
     toprocess.kbid = kbid
@@ -157,7 +162,12 @@ async def modify_resource(
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
-    toprocess = PushPayload(uuid=rid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     writer.kbid = kbid
     writer.uuid = rid
@@ -204,7 +214,12 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
 
-    toprocess = PushPayload(uuid=rid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     toprocess.kbid = kbid
     toprocess.uuid = rid
