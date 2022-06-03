@@ -617,7 +617,12 @@ async def store_file_on_nuclia_db(
     partition = partitioning.generate_partition(kbid, rid)
 
     writer = BrokerMessage()
-    toprocess = PushPayload(uuid=rid, kbid=kbid, partition=partition)
+    toprocess = PushPayload(
+        uuid=rid,
+        kbid=kbid,
+        partition=partition,
+        userid=request.headers.get("X-NUCLIADB-USER", ""),
+    )
 
     writer.kbid = kbid
     toprocess.kbid = kbid
