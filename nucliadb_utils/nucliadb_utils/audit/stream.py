@@ -19,7 +19,7 @@
 #
 import asyncio
 from datetime import datetime
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 import mmh3  # type: ignore
 import nats
@@ -29,7 +29,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
-
 
 if TYPE_CHECKING:
     AuditTypeValue = AuditRequest.AuditType.V

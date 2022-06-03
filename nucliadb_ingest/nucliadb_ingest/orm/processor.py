@@ -42,7 +42,6 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_cache, get_storage
 
-
 DEFAULT_WIDGET = Widget(id="dashboard", mode=Widget.WidgetMode.INPUT)
 DEFAULT_WIDGET.features.useFilters = True
 DEFAULT_WIDGET.features.suggestEntities = True
@@ -50,6 +49,7 @@ DEFAULT_WIDGET.features.suggestSentences = True
 DEFAULT_WIDGET.features.suggestParagraphs = True
 
 from enum import Enum
+
 
 class TxnResult(Enum):
     RESOURCE_CREATED = 0
