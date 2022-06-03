@@ -19,7 +19,7 @@
 #
 import asyncio
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import List, Optional
 
 import mmh3  # type: ignore
 import nats
@@ -29,11 +29,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
-
-if TYPE_CHECKING:
-    AuditTypeValue = AuditRequest.AuditType.V
-else:
-    AuditTypeValue = int
 
 
 class StreamAuditStorage(AuditStorage):
@@ -128,9 +123,7 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(
-        self, message: BrokerMessage, audit_type: AuditTypeValue
-    ):
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value):  # type: ignore
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
         auditrequest.kbid = message.kbid

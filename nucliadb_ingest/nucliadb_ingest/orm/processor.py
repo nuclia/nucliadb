@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from enum import Enum
 from typing import Dict, List, Optional
 
 from nucliadb_protos.audit_pb2 import AuditRequest
@@ -48,8 +49,6 @@ DEFAULT_WIDGET.features.suggestEntities = True
 DEFAULT_WIDGET.features.suggestSentences = True
 DEFAULT_WIDGET.features.suggestParagraphs = True
 
-from enum import Enum
-
 
 class TxnResult(Enum):
     RESOURCE_CREATED = 0
@@ -58,8 +57,9 @@ class TxnResult(Enum):
 
 AUDIT_TYPES: Dict[TxnResult, int] = {
     TxnResult.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
-    TxnResult.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED
+    TxnResult.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED,
 }
+
 
 class Processor:
     messages: Dict[str, List[BrokerMessage]]

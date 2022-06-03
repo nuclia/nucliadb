@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING
-
 from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -26,20 +24,13 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 
-if TYPE_CHECKING:
-    AuditTypeValue = AuditRequest.AuditType.V
-else:
-    AuditTypeValue = int
-
 
 class BasicAuditStorage(AuditStorage):
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 
-    async def report(
-        self, message: BrokerMessage, audit_type: AuditTypeValue
-    ):
-        logger.debug(f"AUDIT {self.message_to_str(message)}")
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value):  # type: ignore
+        logger.debug(f"AUDIT {audit_type} {self.message_to_str(message)}")
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
         logger.debug(f"VISITED {kbid} {uuid} {user} {origin}")
