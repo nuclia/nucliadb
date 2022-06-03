@@ -17,12 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 class AuditStorage:
-    async def report(self, message: BrokerMessage):
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType):
         raise NotImplementedError
 
     async def initialize(self):

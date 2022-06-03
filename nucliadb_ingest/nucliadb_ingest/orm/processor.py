@@ -19,6 +19,7 @@
 #
 from typing import Dict, List, Optional
 
+from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -95,18 +96,35 @@ class Processor:
             if last_seqid is not None and seqid <= last_seqid:
                 return False
 
+        audit_type: Optional[bool] = None
+
         if message.type == BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition)
+            audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
-            await self.autocommit(message, seqid, partition)
+            created = await self.autocommit(message, seqid, partition)
+            audit_type = (
+                AuditRequest.AuditType.NEW
+                if created
+                else AuditRequest.AuditType.MODIFIED
+            )
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
             await self.commit(message, seqid, partition)
+            audit_type = (
+                AuditRequest.AuditType.NEW
+                if created
+                else AuditRequest.AuditType.MODIFIED
+            )
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
-        if self.audit is not None:
-            await self.audit.report(message)
+
+        # There are some operations that doesn't require audit report
+        # this is signlaed with audit_type == None
+        if self.audit is not None and audit_type is None:
+            audit_type = AuditRequest.AuditType.MODIFIED
+            await self.audit.report(message, audit_type)
         else:
             logger.warn("No audit defined")
         return True
@@ -148,7 +166,9 @@ class Processor:
     def generate_index(self, resource: Resource, messages: List[BrokerMessage]):
         pass
 
-    async def txn(self, messages: List[BrokerMessage], seqid: int, partition: str):
+    async def txn(
+        self, messages: List[BrokerMessage], seqid: int, partition: str
+    ) -> bool:
         if len(messages) == 0:
             return
 
@@ -165,6 +185,8 @@ class Processor:
         resource: Optional[Resource] = None
         handled_exception = None
         origin_txn = seqid
+
+        created = resource is None
 
         try:
             for message in messages:
@@ -234,6 +256,8 @@ class Processor:
             else:
                 raise DeadletteredError() from handled_exception
 
+        return created
+
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         await self.txn([message], seqid, partition)
 
@@ -248,7 +272,7 @@ class Processor:
             del self.messages[message.multiid]
             return
         else:
-            await self.txn([message], seqid, partition)
+            return await self.txn([message], seqid, partition)
 
     async def rollback(self, message: BrokerMessage, seqid: int, partition: str):
         # Error
