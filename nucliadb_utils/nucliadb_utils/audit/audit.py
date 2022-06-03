@@ -21,9 +21,18 @@ from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    AuditTypeValue = AuditRequest.AuditType.V
+else:
+    AuditTypeValue = int
+
 
 class AuditStorage:
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType):
+    async def report(
+        self, message: BrokerMessage, audit_type: AuditTypeValue
+    ):
         raise NotImplementedError
 
     async def initialize(self):

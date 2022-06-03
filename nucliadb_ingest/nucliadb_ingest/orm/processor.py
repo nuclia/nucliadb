@@ -42,12 +42,24 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_cache, get_storage
 
+
 DEFAULT_WIDGET = Widget(id="dashboard", mode=Widget.WidgetMode.INPUT)
 DEFAULT_WIDGET.features.useFilters = True
 DEFAULT_WIDGET.features.suggestEntities = True
 DEFAULT_WIDGET.features.suggestSentences = True
 DEFAULT_WIDGET.features.suggestParagraphs = True
 
+from enum import Enum
+
+class TxnResult(Enum):
+    RESOURCE_CREATED = 0
+    RESOURCE_MODIFIED = 1
+
+
+AUDIT_TYPES: Dict[TxnResult, int] = {
+    TxnResult.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
+    TxnResult.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED
+}
 
 class Processor:
     messages: Dict[str, List[BrokerMessage]]
@@ -96,34 +108,25 @@ class Processor:
             if last_seqid is not None and seqid <= last_seqid:
                 return False
 
-        audit_type: Optional[bool] = None
-
+        audit_type: Optional[int] = None
         if message.type == BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition)
             audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
-            created = await self.autocommit(message, seqid, partition)
-            audit_type = (
-                AuditRequest.AuditType.NEW
-                if created
-                else AuditRequest.AuditType.MODIFIED
-            )
+            txn_result = await self.autocommit(message, seqid, partition)
+            audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
-            await self.commit(message, seqid, partition)
-            audit_type = (
-                AuditRequest.AuditType.NEW
-                if created
-                else AuditRequest.AuditType.MODIFIED
-            )
+            txn_result = await self.commit(message, seqid, partition)
+            audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
 
-        # There are some operations that doesn't require audit report
-        # this is signlaed with audit_type == None
-        if self.audit is not None and audit_type is None:
-            audit_type = AuditRequest.AuditType.MODIFIED
+        # There are some operations that doesn't require audit report by definition
+        # like rollback ol multi and others because there was no action executed for
+        # some reason. This is signaled as audit_type == None
+        if self.audit is not None and audit_type is not None:
             await self.audit.report(message, audit_type)
         else:
             logger.warn("No audit defined")
@@ -168,16 +171,16 @@ class Processor:
 
     async def txn(
         self, messages: List[BrokerMessage], seqid: int, partition: str
-    ) -> bool:
+    ) -> Optional[TxnResult]:
         if len(messages) == 0:
-            return
+            return None
 
         txn = await self.driver.begin()
         kbid = messages[0].kbid
         if not await KnowledgeBox.exist_kb(txn, kbid):
             logger.warn(f"KB {kbid} is deleted: skiping txn")
             await txn.commit(partition, seqid)
-            return
+            return None
 
         multi = messages[0].multiid
         kb = KnowledgeBox(txn, self.storage, self.cache, kbid)
@@ -256,7 +259,7 @@ class Processor:
             else:
                 raise DeadletteredError() from handled_exception
 
-        return created
+        return TxnResult.RESOURCE_CREATED if created else TxnResult.RESOURCE_MODIFIED
 
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         await self.txn([message], seqid, partition)
