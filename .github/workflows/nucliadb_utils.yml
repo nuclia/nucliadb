@@ -64,7 +64,7 @@ jobs:
           pip install -r test-requirements.txt
           pip install -r nucliadb_utils/requirements-sources.txt
           pip install -r nucliadb_utils/requirements.txt
-          pip install -e nucliadb_utils
+          pip install -e nucliadb_utils[cache,storages,fastapi]
 
       - name: Check mypy
         run: |
