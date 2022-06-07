@@ -44,6 +44,8 @@ header:
     - "**/setup.py"
     - "**/requirements*"
     - "**/*.md"
+    - "**/*.in"
+    - "**/*.rst"
     - "**/CHANGELOG"
     - "**/py.typed"
     - "**/.mypy_cache/**"

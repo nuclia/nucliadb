@@ -90,8 +90,7 @@ class JetStreamContextTelemetry:
                 try:
                     await origin_cb(msg)
                 except Exception as error:
-                    if type(error) != Exception:
-                        set_span_exception(span, error)
+                    set_span_exception(span, error)
                     raise error
 
         wrapped_cb = partial(wrapper, cb, tracer)
