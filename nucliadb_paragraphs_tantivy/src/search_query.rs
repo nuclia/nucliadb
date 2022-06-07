@@ -62,7 +62,7 @@ fn parse_query(
     let last = fuzzy_terms
         .pop()
         .into_iter()
-        .map(|term| Box::new(FuzzyTermQuery::new(term, distance, true)) as Box<dyn Query>)
+        .map(|term| Box::new(FuzzyTermQuery::new_prefix(term, distance, true)) as Box<dyn Query>)
         .map(|query| (Occur::Must, query));
     fuzzy_terms
         .into_iter()
