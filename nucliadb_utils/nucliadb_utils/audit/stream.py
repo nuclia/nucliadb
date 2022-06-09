@@ -123,14 +123,14 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(self, message: BrokerMessage):
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value):  # type: ignore
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
         auditrequest.kbid = message.kbid
         auditrequest.userid = message.audit.user
         auditrequest.rid = message.uuid
         auditrequest.origin = message.audit.origin
-        auditrequest.type = AuditRequest.MODIFIED
+        auditrequest.type = audit_type
         auditrequest.time.CopyFrom(message.audit.when)
 
         for field in message.field_metadata:

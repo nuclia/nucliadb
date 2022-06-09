@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from enum import Enum
 from typing import Dict, List, Optional
 
+from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -46,6 +48,17 @@ DEFAULT_WIDGET.features.useFilters = True
 DEFAULT_WIDGET.features.suggestEntities = True
 DEFAULT_WIDGET.features.suggestSentences = True
 DEFAULT_WIDGET.features.suggestParagraphs = True
+
+
+class TxnResult(Enum):
+    RESOURCE_CREATED = 0
+    RESOURCE_MODIFIED = 1
+
+
+AUDIT_TYPES: Dict[TxnResult, int] = {
+    TxnResult.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
+    TxnResult.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED,
+}
 
 
 class Processor:
@@ -95,18 +108,26 @@ class Processor:
             if last_seqid is not None and seqid <= last_seqid:
                 return False
 
+        audit_type: Optional[int] = None
         if message.type == BrokerMessage.MessageType.DELETE:
             await self.delete_resource(message, seqid, partition)
+            audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
-            await self.autocommit(message, seqid, partition)
+            txn_result = await self.autocommit(message, seqid, partition)
+            audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
-            await self.commit(message, seqid, partition)
+            txn_result = await self.commit(message, seqid, partition)
+            audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
-        if self.audit is not None:
-            await self.audit.report(message)
+
+        # There are some operations that doesn't require audit report by definition
+        # like rollback ol multi and others because there was no action executed for
+        # some reason. This is signaled as audit_type == None
+        if self.audit is not None and audit_type is not None:
+            await self.audit.report(message, audit_type)
         else:
             logger.warn("No audit defined")
         return True
@@ -148,16 +169,18 @@ class Processor:
     def generate_index(self, resource: Resource, messages: List[BrokerMessage]):
         pass
 
-    async def txn(self, messages: List[BrokerMessage], seqid: int, partition: str):
+    async def txn(
+        self, messages: List[BrokerMessage], seqid: int, partition: str
+    ) -> Optional[TxnResult]:
         if len(messages) == 0:
-            return
+            return None
 
         txn = await self.driver.begin()
         kbid = messages[0].kbid
         if not await KnowledgeBox.exist_kb(txn, kbid):
             logger.warn(f"KB {kbid} is deleted: skiping txn")
             await txn.commit(partition, seqid)
-            return
+            return None
 
         multi = messages[0].multiid
         kb = KnowledgeBox(txn, self.storage, self.cache, kbid)
@@ -165,6 +188,8 @@ class Processor:
         resource: Optional[Resource] = None
         handled_exception = None
         origin_txn = seqid
+
+        created = resource is None
 
         try:
             for message in messages:
@@ -234,6 +259,8 @@ class Processor:
             else:
                 raise DeadletteredError() from handled_exception
 
+        return TxnResult.RESOURCE_CREATED if created else TxnResult.RESOURCE_MODIFIED
+
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         await self.txn([message], seqid, partition)
 
@@ -248,7 +275,7 @@ class Processor:
             del self.messages[message.multiid]
             return
         else:
-            await self.txn([message], seqid, partition)
+            return await self.txn([message], seqid, partition)
 
     async def rollback(self, message: BrokerMessage, seqid: int, partition: str):
         # Error
