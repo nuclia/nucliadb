@@ -69,15 +69,13 @@ impl WriterChild for VectorWriterService {
                 for index in paragraph.paragraphs.values() {
                     let mut labels = resource.labels.clone();
                     labels.append(&mut index.labels.clone());
-                    let mut counter = 0;
-                    for (key, sentence) in index.sentences.iter() {
+                    for (counter, (key, sentence)) in index.sentences.iter().enumerate() {
                         self.index.write().unwrap().insert(
                             key.clone(),
                             sentence.vector.clone(),
                             labels.clone(),
                         );
                         info!("Counter {}", counter);
-                        counter += 1;
                     }
                 }
                 self.index.write().unwrap().commit();
