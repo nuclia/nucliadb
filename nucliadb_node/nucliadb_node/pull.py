@@ -128,6 +128,7 @@ class Worker:
             if self.event.is_set():
                 async with self.lock:
                     try:
+                        logger.info(f"Mr Propper working")
                         shards: ShardIds = await self.writer.shards()
                         for shard in shards.ids:
                             await self.writer.garbage_collector(shard)
@@ -168,16 +169,20 @@ class Worker:
                 pb.ParseFromString(msg.data)
                 if pb.typemessage == IndexMessage.TypeMessage.CREATION:
                     brain: Resource = await storage.get_indexing(pb)
+                    logger.info(
+                        f"Added {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
+                    )
                     status = await self.writer.set_resource(brain)
+                    logger.info(f"...done")
 
-                    logger.info(f"Added {brain.resource.uuid} at {brain.shard_id}")
                     del brain
                 elif pb.typemessage == IndexMessage.TypeMessage.DELETION:
                     rid = ResourceID()
                     rid.shard_id = pb.shard
                     rid.uuid = pb.resource
+                    logger.info(f"Deleting {pb.resource} otx:{pb.txid}")
                     status = await self.writer.delete_resource(rid)
-                    logger.info(f"Deleted {pb.resource}")
+                    logger.info(f"...done")
                 self.reader.update(pb.shard, status)
 
             except AioRpcError as grpc_error:
