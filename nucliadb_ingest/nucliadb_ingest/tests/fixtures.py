@@ -37,6 +37,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
+from nucliadb_ingest.chitchat import start_chitchat
 from nucliadb_ingest.consumer.service import ConsumerService
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.maindb.redis import RedisDriver
@@ -46,7 +47,6 @@ from nucliadb_ingest.orm.node import Node
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.service.writer import WriterServicer
 from nucliadb_ingest.settings import settings
-from nucliadb_ingest.swim import start_swim
 from nucliadb_ingest.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -69,6 +69,7 @@ images.settings["nucliadb_node_reader"] = {
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
+        "CHITCHAT_ADDR": "0.0.0.0:4444",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_swim=ERROR,nucliadb_cluster=ERROR",
@@ -89,10 +90,10 @@ images.settings["nucliadb_node_writer"] = {
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-        "SWIM_ADDR": "0.0.0.0:4444",
-        "SWIM_TIMEOUT": "10",
+        "CHITCHAT_ADDR": "0.0.0.0:4444",
+        "SEED_NODES": "",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_swim=ERROR,nucliadb_cluster=ERROR",
+        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_cluster=DEBUG",
     },
     "options": {
         "command": [
@@ -112,6 +113,7 @@ images.settings["nucliadb_node_sidecar"] = {
         "INDEX_JETSTREAM_SERVERS": "[]",
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
+        "CHITCHAT_ADDR": "0.0.0.0:4444",
         "SIDECAR_LISTEN_ADDRESS": "0.0.0.0:4447",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
@@ -124,8 +126,25 @@ images.settings["nucliadb_node_sidecar"] = {
     },
 }
 
+images.settings["nucliadb_cluster_manager"] = {
+    "image": "eu.gcr.io/stashify-218417/cluster_mgr",
+    "version": "latest",
+    "network": "host",
+    "env": {
+        "LISTEN_ADDR": "0.0.0.0:4444",
+        "NODE_TYPE": "Node",
+        "SEEDS": "0.0.0.0:4444",
+        "MONITOR_ADDR": "0.0.0.0:31337",
+        "RUST_LOG": "trace",
+        "RUST_BACKTRACE": "full",
+    },
+    "options": {
+        "ports": {"4444/UDP": None},
+    },
+}
 
-def get_swim_port(container_obj, port):
+
+def get_chitchat_port(container_obj, port):
     network = container_obj.attrs["NetworkSettings"]
     service_port = "{0}/udp".format(port)
     for netport in network["Ports"].keys():
@@ -254,8 +273,8 @@ async def cache(redis):
 
 
 @pytest.fixture(scope="function")
-async def swim():
-    start_swim()
+async def chitchat():
+    start_chitchat()
 
 
 class nucliadbNodeReader(BaseImage):
@@ -308,6 +327,29 @@ class nucliadbNodeWriter(BaseImage):
             return False
 
 
+class nucliadbChitchatNode(BaseImage):
+    name = "nucliadb_cluster_manager"
+    port = 4440
+
+    def run(self):
+        return super(nucliadbChitchatNode, self).run()
+
+    def get_image_options(self):
+        options = super(nucliadbChitchatNode, self).get_image_options()
+        return options
+
+    def check(self):
+        return True
+        # channel = insecure_channel(f"{self.host}:{self.get_port()}")
+        # stub = health_pb2_grpc.HealthStub(channel)
+        # pb = HealthCheckRequest(service="Chitchat")
+        # try:
+        #    result = stub.Check(pb)
+        #    return result.status == 1
+        # except:  # noqa
+        #    return False
+
+
 class nucliadbNodeSidecar(BaseImage):
     name = "nucliadb_node_sidecar"
     port = 4447
@@ -336,6 +378,7 @@ class nucliadbNodeSidecar(BaseImage):
 nucliadb_node_1_reader = nucliadbNodeReader()
 nucliadb_node_1_writer = nucliadbNodeWriter()
 nucliadb_node_1_sidecar = nucliadbNodeSidecar()
+nucliadb_cluster_mgr = nucliadbChitchatNode()
 
 nucliadb_node_2_reader = nucliadbNodeReader()
 nucliadb_node_2_writer = nucliadbNodeWriter()
@@ -355,10 +398,23 @@ def node(natsd: str, gcs: str):
     volume_node_1 = docker_client.volumes.create(driver="local")
     volume_node_2 = docker_client.volumes.create(driver="local")
 
+    images.settings["nucliadb_cluster_manager"]["env"][
+        "MONITOR_ADDR"
+    ] = f"{docker_internal_host}:31337"
+    cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
+    print(f"cluster_mgr_port: {cluster_mgr_port}")
+
+    cluster_mgr_chitchat = get_chitchat_port(
+        nucliadb_cluster_mgr.container_obj, "4444"
+    )
+    images.settings["nucliadb_node_writer"]["env"]["SEED_NODES"] = [
+        f"{docker_internal_host}:{cluster_mgr_chitchat}"
+    ]
     writer1_host, writer1_port = nucliadb_node_1_writer.run(volume_node_1)
-    writer1_swim = get_swim_port(nucliadb_node_1_writer.container_obj, "4444")
+    writer1_chitchat = get_chitchat_port(nucliadb_node_1_writer.container_obj, "4444")
+
     writer2_host, writer2_port = nucliadb_node_2_writer.run(volume_node_2)
-    writer2_swim = get_swim_port(nucliadb_node_2_writer.container_obj, "4444")
+    writer2_chitchat = get_chitchat_port(nucliadb_node_2_writer.container_obj, "4444")
 
     reader1_host, reader1_port = nucliadb_node_1_reader.run(volume_node_1)
     reader2_host, reader2_port = nucliadb_node_2_reader.run(volume_node_2)
@@ -394,11 +450,17 @@ def node(natsd: str, gcs: str):
 
     sidecar2_host, sidecar2_port = nucliadb_node_2_sidecar.run(volume_node_2)
 
-    settings.writer_port_map = {writer1_swim: writer1_port, writer2_swim: writer2_port}
-    settings.reader_port_map = {writer1_swim: reader1_port, writer2_swim: reader2_port}
+    settings.writer_port_map = {
+        writer1_chitchat: writer1_port,
+        writer2_chitchat: writer2_port,
+    }
+    settings.reader_port_map = {
+        writer1_chitchat: reader1_port,
+        writer2_chitchat: reader2_port,
+    }
     settings.sidecar_port_map = {
-        writer1_swim: sidecar1_port,
-        writer2_swim: sidecar2_port,
+        writer1_chitchat: sidecar1_port,
+        writer2_chitchat: sidecar2_port,
     }
 
     settings.node_writer_port = None  # type: ignore
@@ -406,8 +468,18 @@ def node(natsd: str, gcs: str):
     settings.node_sidecar_port = None  # type: ignore
 
     yield {
-        "writer1": {"host": writer1_host, "port": writer1_port, "swim": writer1_swim},
-        "writer2": {"host": writer2_host, "port": writer2_port, "swim": writer2_swim},
+        "writer1": {
+            "host": writer1_host,
+            "port": writer1_port,
+        },
+        "chitchat": {
+            "host": cluster_mgr_host,
+            "port": cluster_mgr_port,
+        },
+        "writer2": {
+            "host": writer2_host,
+            "port": writer2_port,
+        },
         "reader1": {
             "host": reader1_host,
             "port": reader1_port,
@@ -432,6 +504,7 @@ def node(natsd: str, gcs: str):
     nucliadb_node_2_writer.stop()
     nucliadb_node_2_reader.stop()
     nucliadb_node_2_sidecar.stop()
+    nucliadb_cluster_mgr.stop()
 
     for container in (
         nucliadb_node_1_reader,
@@ -440,6 +513,7 @@ def node(natsd: str, gcs: str):
         nucliadb_node_2_writer,
         nucliadb_node_2_sidecar,
         nucliadb_node_2_sidecar,
+        nucliadb_cluster_mgr,
     ):
         for i in range(5):
             try:

@@ -85,3 +85,6 @@ tonic-build = "0.7.0"
 [features]
 ci-test = []
 release-feature-set = []
+
+[profile.release]
+lto = true

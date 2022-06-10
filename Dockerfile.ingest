@@ -12,8 +12,6 @@ RUN apt-get update && apt-get install -y jq
 
 # Copy requirements from all packages to install them before
 # transfering the source code.
-COPY nucliadb_swim/requirements.txt /usr/src/app/requirements-swim.txt
-COPY nucliadb_cluster/requirements.txt /usr/src/app/requirements-cluster.txt
 COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
 COPY nucliadb_utils/requirements-cache.txt /usr/src/app/requirements-cache.txt
 COPY nucliadb_utils/requirements-storages.txt /usr/src/app/requirements-storages.txt
@@ -25,8 +23,6 @@ COPY nucliadb_telemetry/requirements.txt /usr/src/app/requirements-telemetry.txt
 
 RUN set -eux; \
     pip install --no-cache-dir \
-    -r /usr/src/app/requirements-swim.txt \
-    -r /usr/src/app/requirements-cluster.txt \
     -r /usr/src/app/requirements-utils.txt \
     -r /usr/src/app/requirements-storages.txt \
     -r /usr/src/app/requirements-fastapi.txt \
@@ -37,8 +33,6 @@ RUN set -eux; \
     -r /usr/src/app/requirements-ingest.txt
 
 # Copy source code
-COPY nucliadb_swim /usr/src/app/nucliadb_swim
-COPY nucliadb_cluster /usr/src/app/nucliadb_cluster
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos

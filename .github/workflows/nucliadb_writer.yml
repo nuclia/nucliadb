@@ -82,8 +82,6 @@ jobs:
         run: |
           pip install -r test-requirements.txt
           pip install -r nucliadb_writer/requirements-sources.txt
-          pip install -e nucliadb_swim
-          pip install -e nucliadb_cluster
           pip install -r nucliadb_ingest/requirements.txt
           pip install -e nucliadb_ingest
           pip install -r nucliadb_writer/requirements.txt

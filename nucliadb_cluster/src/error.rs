@@ -33,6 +33,12 @@ pub enum ClusterError {
         /// Underlying error message.
         message: String,
     },
+
+    /// Incorrect node type 
+    #[error("Failed to parse node type from string: `{message}`")]
+    ParseNodeTypeError {
+        message: String,
+    }
 }
 
 impl From<ClusterError> for tonic::Status {
@@ -42,6 +48,7 @@ impl From<ClusterError> for tonic::Status {
             ClusterError::UDPPortBindingError { .. } => tonic::Code::PermissionDenied,
             ClusterError::ReadHostKeyError { .. } => tonic::Code::Internal,
             ClusterError::WriteHostKeyError { .. } => tonic::Code::Internal,
+            ClusterError::ParseNodeTypeError { .. } => tonic::Code::Internal,
         };
         let message = error.to_string();
         tonic::Status::new(code, message)

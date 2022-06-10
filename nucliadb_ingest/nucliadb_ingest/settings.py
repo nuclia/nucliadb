@@ -43,15 +43,15 @@ class Settings(BaseSettings):
 
     # NODE INFORMATION
 
-    node_replicas: int = 2
+    node_replicas: int = 2  # TODO discuss default value
 
-    swim_peers_addr: List[str] = ["localhost:3001"]
-    swim_interval: float = 5.0
-    swim_timeout: float = 5.0
-    swim_binding_host: str = "0.0.0.0"
-    swim_binding_port: int = 4440
-    swim_host_key: str = "ingest.key"
-    swim_enabled: bool = True
+    chitchat_binding_host: str = "0.0.0.0"
+    chitchat_binding_port: int = 4440
+    chitchat_enabled: bool = True
+    chitchat_sock_path = "/tmp/rust_python.sock"  # TODO discuss default value
+
+    # chitchat_peers_addr: List[str] = ["localhost:3001"] # TODO is it seed list?
+    # swim_host_key: str = "ingest.key" # TODO: ask if it's swim specific keys?
 
     monitor: bool = False
     monitor_port: int = 50101

@@ -66,7 +66,7 @@ def test_settings_one(gcs, redis, node):  # type: ignore
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
-    ingest_settings.swim_peers_addr = [
+    ingest_settings.chitchat_peers_addr = [
         f'{node["writer1"]["host"]}:{node["writer1"]["swim"]}',
         f'{node["writer2"]["host"]}:{node["writer2"]["swim"]}',
     ]

@@ -16,36 +16,6 @@ repos:
     entry: flake8 --config=nucliadb_ingest/setup.cfg
     language: system
     files: nucliadb_ingest/.*\.py$$
-  - id: isort_cluster
-    name: ISort Cluster
-    entry: isort --profile black -c
-    language: system
-    files: nucliadb_cluster/.*\.py$$
-  - id: black_cluster
-    name: Black Cluster
-    entry: black --check --verbose
-    language: system
-    files: nucliadb_cluster/.*\.py$$
-  - id: flake8_cluster
-    name: Flake8 Cluster
-    entry: flake8 --config=nucliadb_cluster/setup.cfg
-    language: system
-    files: nucliadb_cluster/.*\.py$$
-  - id: isort_swim
-    name: ISort SWIM
-    entry: isort --profile black -c
-    language: system
-    files: nucliadb_swim/.*\.py$$
-  - id: black_swim
-    name: Black SWIM
-    entry: black --check --verbose
-    language: system
-    files: nucliadb_swim/.*\.py$$
-  - id: flake8_swim
-    name: Flake8 SWIM
-    entry: flake8 --config=nucliadb_swim/setup.cfg
-    language: system
-    files: nucliadb_swim/.*\.py$$
   - id: isort_utils
     name: ISort UTILS
     entry: isort --profile black -c

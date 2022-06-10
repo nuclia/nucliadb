@@ -22,7 +22,18 @@ from typing import Dict, List, Optional
 from pydantic import BaseSettings
 from pydantic.class_validators import root_validator
 
-from nucliadb_utils.settings_running import running_settings  # noqa
+
+class RunningSettings(BaseSettings):
+    debug: bool = True
+    sentry_url: Optional[str] = None
+    running_environment: str = "local"
+    logging_integration: bool = False
+    log_level: str = "DEBUG"
+    activity_log_level: str = "INFO"
+    chitchat_level: str = "INFO"
+
+
+running_settings = RunningSettings()
 
 
 class HTTPSettings(BaseSettings):

@@ -57,8 +57,6 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_swim
-	isort --profile black nucliadb_cluster
 	isort --profile black nucliadb_reader
 	isort --profile black nucliadb_writer
 	isort --profile black nucliadb_ingest
@@ -69,8 +67,6 @@ python-code-lint:
 	isort --profile black nucliadb_node
 	isort --profile black nucliadb_telemetry
 
-	flake8  --config nucliadb_swim/setup.cfg nucliadb_swim/nucliadb_swim
-	flake8  --config nucliadb_cluster/setup.cfg nucliadb_cluster/nucliadb_cluster
 	flake8  --config nucliadb_reader/setup.cfg nucliadb_reader/nucliadb_reader
 	flake8  --config nucliadb_writer/setup.cfg nucliadb_writer/nucliadb_writer
 	flake8  --config nucliadb_ingest/setup.cfg nucliadb_ingest/nucliadb_ingest
@@ -81,8 +77,6 @@ python-code-lint:
 	flake8  --config nucliadb_one/setup.cfg nucliadb_node/nucliadb_node
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 
-	black nucliadb_swim
-	black nucliadb_cluster
 	black nucliadb_reader
 	black nucliadb_writer
 	black nucliadb_ingest
@@ -96,8 +90,6 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
 	MYPYPATH=./mypy_stubs mypy nucliadb_utils
 	MYPYPATH=./mypy_stubs mypy nucliadb_models
-	MYPYPATH=./mypy_stubs mypy nucliadb_swim
-	MYPYPATH=./mypy_stubs mypy nucliadb_cluster
 	MYPYPATH=./mypy_stubs mypy nucliadb_reader
 	MYPYPATH=./mypy_stubs mypy nucliadb_writer
 	MYPYPATH=./mypy_stubs mypy nucliadb_ingest
@@ -115,8 +107,6 @@ install: ## Install dependencies (on the active environment)
 	pip install Cython==0.29.24
 	pip install grpcio-tools
 	pip install -r code-requirements.txt
-	pip install -e ./nucliadb_swim
-	pip install -e ./nucliadb_cluster
 	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_protos/python
 	pip install -e ./nucliadb_models
@@ -130,10 +120,6 @@ install: ## Install dependencies (on the active environment)
 base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
-
-build-binding-swim:
-	maturin build nucliadb_cluster/binding
-	pip install target/wheels/nucliadb_cluster_rust-0.1.0-cp39-cp39-macosx_11_0_arm64.whl
 
 build-local-node:
 	docker build -t eu.gcr.io/stashify-218417/basenode:latest -f Dockerfile.basenode .
