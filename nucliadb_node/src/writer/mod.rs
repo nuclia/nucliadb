@@ -83,7 +83,7 @@ impl NodeWriterService {
                 self.shards.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
             }
-        }  else {
+        } else {
             info!("{}: Shard was in memory", shard_id.id);
         }
     }
