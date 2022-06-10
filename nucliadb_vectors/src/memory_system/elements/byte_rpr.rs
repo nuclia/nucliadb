@@ -20,9 +20,10 @@
 
 pub use std::collections::HashMap;
 
+pub use nucliadb_byte_rpr::*;
+
 use super::definitions::*;
 use crate::memory_system::mmap_driver::*;
-pub use nucliadb_byte_rpr::*;
 
 pub fn semi_mapped_consine_similarity(x: &[f32], y: Node, storage: &Storage) -> f32 {
     let f32_len = f32::segment_len() as u64;
@@ -221,9 +222,6 @@ impl ByteRpr for GraphLayer {
     }
 }
 
-
-
-
 #[cfg(test)]
 mod entry_point_test_serialization {
     use super::*;
@@ -289,7 +287,6 @@ mod vector_test_serialization {
         assert_eq!(serialized, vector);
     }
 }
-
 
 #[cfg(test)]
 mod graph_layer_test_serialization {

@@ -19,7 +19,7 @@
 //
 
 use crate::heuristics::heuristic_paper::select_neighbours_heuristic;
-use crate::index::LockIndex;
+use crate::index::Index;
 use crate::memory_system::elements::*;
 use crate::query::Query;
 use crate::query_search::layer_search::{LayerSearchQuery, LayerSearchValue};
@@ -31,7 +31,7 @@ pub struct LayerDeleteQuery<'a> {
     pub m: usize,
     pub ef_construction: usize,
     pub vector: &'a Vector,
-    pub index: &'a LockIndex,
+    pub index: &'a mut Index,
 }
 
 impl<'a> Query for LayerDeleteQuery<'a> {
@@ -56,7 +56,7 @@ impl<'a> Query for LayerDeleteQuery<'a> {
         assert!(self.index.in_edges(self.layer, self.delete).is_empty());
         assert!(self.index.out_edges(self.layer, self.delete).is_empty());
         for source in reaching {
-            if self.index.out_edges(self.layer, source).len() < self.m {
+            if self.index.out_edges(self.layer, source).len() < (self.m / 2) {
                 let LayerSearchValue { neighbours } = LayerSearchQuery {
                     layer: self.layer,
                     elem: self.vector,

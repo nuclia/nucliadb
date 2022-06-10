@@ -21,14 +21,14 @@
 pub(crate) mod layer_delete;
 use layer_delete::LayerDeleteQuery;
 
-use crate::index::LockIndex;
+use crate::index::Index;
 use crate::query::Query;
 pub struct DeleteQuery<'a> {
     pub delete: String,
     pub m_max: usize,
     pub m: usize,
     pub ef_construction: usize,
-    pub index: &'a LockIndex,
+    pub index: &'a mut Index,
 }
 
 impl<'a> Query for DeleteQuery<'a> {

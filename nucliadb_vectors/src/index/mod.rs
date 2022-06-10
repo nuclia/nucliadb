@@ -21,7 +21,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::path::Path;
-use std::sync::{Arc, RwLock};
 
 use crate::memory_system::elements::*;
 use crate::memory_system::lmdb_driver::LMBDStorage;
@@ -309,98 +308,4 @@ pub struct Stats {
     pub nodes_per_in_layer: Vec<usize>,
     pub nodes_in_total: usize,
     pub entry_point: Option<EntryPoint>,
-}
-
-#[derive(Debug, Clone)]
-pub struct LockIndex {
-    index: Arc<RwLock<Index>>,
-}
-impl From<Index> for LockIndex {
-    fn from(index: Index) -> Self {
-        LockIndex {
-            index: Arc::new(RwLock::new(index)),
-        }
-    }
-}
-
-impl LockIndex {
-    pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
-        self.index.read().unwrap().has_labels(node, labels)
-    }
-    pub fn get_node_vector(&self, node: Node) -> Vector {
-        self.index.read().unwrap().get_node_vector(node)
-    }
-    pub fn get_node_key(&self, node: Node) -> String {
-        self.index.read().unwrap().get_node_key(node)
-    }
-    pub fn semi_mapped_similarity(&self, i: &Vector, j: Node) -> f32 {
-        self.index.read().unwrap().semi_mapped_similarity(i, j)
-    }
-    pub fn reload(&self) {
-        self.index.write().unwrap().reload()
-    }
-    pub fn no_nodes(&self) -> usize {
-        self.index.read().unwrap().no_nodes()
-    }
-    pub fn is_node_at(&self, layer: usize, node: Node) -> bool {
-        self.index.read().unwrap().is_node_at(layer, node)
-    }
-    pub fn get_entry_point(&self) -> Option<EntryPoint> {
-        self.index.read().unwrap().get_entry_point()
-    }
-    pub fn get_node(&self, key: &str) -> Option<Node> {
-        self.index.read().unwrap().get_node(key)
-    }
-    pub fn get_prefixed(&self, prefix: &str) -> Vec<String> {
-        self.index.read().unwrap().get_prefixed(prefix)
-    }
-    pub fn add_node(&self, key: String, vector: Vector, layer: usize) -> Node {
-        self.index.write().unwrap().add_node(key, vector, layer)
-    }
-    pub fn add_label(&self, key: String, label: String) {
-        self.index.write().unwrap().add_label(key, label)
-    }
-    pub fn connect(&self, layer: usize, edge: Edge) {
-        self.index.write().unwrap().connect(layer, edge)
-    }
-    pub fn disconnect(&self, layer: usize, source: Node, destination: Node) {
-        self.index
-            .write()
-            .unwrap()
-            .disconnect(layer, source, destination)
-    }
-    pub fn out_edges(&self, layer: usize, node: Node) -> HashMap<Node, Edge> {
-        self.index.read().unwrap().out_edges(layer, node)
-    }
-    pub fn in_edges(&self, layer: usize, node: Node) -> HashMap<Node, Edge> {
-        self.index.read().unwrap().in_edges(layer, node)
-    }
-    #[allow(unused)]
-    pub fn has_node(&self, key: &str) -> bool {
-        self.index.read().unwrap().has_node(key)
-    }
-    pub fn is_in_deleted_queue(&self, key: &str) -> bool {
-        self.index.read().unwrap().is_in_deleted_queue(key)
-    }
-    pub fn set_entry_point(&self, ep: EntryPoint) {
-        self.index.write().unwrap().set_entry_point(ep)
-    }
-    pub fn erase(&self, node: Node) {
-        self.index.write().unwrap().erase(node);
-    }
-    pub fn commit(&mut self) {
-        self.index.write().unwrap().commit()
-    }
-    pub fn run_garbage_collection(&mut self) {
-        self.index.write().unwrap().run_garbage_collection()
-    }
-    pub fn stats(&self) -> Stats {
-        self.index.read().unwrap().stats()
-    }
-    pub fn no_layers(&self) -> usize {
-        self.index.read().unwrap().no_layers()
-    }
-    pub fn get_keys(&self) -> Vec<String> {
-        self.index.read().unwrap().get_keys()
-    }
 }

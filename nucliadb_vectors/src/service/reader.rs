@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt::Debug;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use nucliadb_protos::{
@@ -30,7 +31,7 @@ use crate::reader::Reader;
 
 pub struct VectorReaderService {
     no_results: usize,
-    index: Reader,
+    index: RwLock<Reader>,
 }
 impl Debug for VectorReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -48,7 +49,7 @@ impl ServiceChild for VectorReaderService {
         Ok(())
     }
     fn count(&self) -> usize {
-        self.index.no_vectors()
+        self.index.read().unwrap().no_vectors()
     }
 }
 
@@ -62,7 +63,7 @@ impl ReaderChild for VectorReaderService {
             request.tags.len(),
             request.vector.len()
         );
-        let raw_result = self.index.search(
+        let raw_result = self.index.read().unwrap().search(
             request.vector.clone(),
             request.tags.clone(),
             self.no_results,
@@ -78,10 +79,10 @@ impl ReaderChild for VectorReaderService {
     }
 
     fn reload(&self) {
-        self.index.reload();
+        self.index.write().unwrap().reload();
     }
     fn stored_ids(&self) -> Vec<String> {
-        self.index.keys()
+        self.index.read().unwrap().keys()
     }
 }
 
@@ -103,7 +104,7 @@ impl VectorReaderService {
 
             Ok(VectorReaderService {
                 no_results: config.no_results.unwrap(),
-                index: Reader::new(&config.path),
+                index: RwLock::new(Reader::new(&config.path)),
             })
         }
     }
@@ -115,7 +116,7 @@ impl VectorReaderService {
         } else {
             Ok(VectorReaderService {
                 no_results: config.no_results.unwrap(),
-                index: Reader::new(&config.path),
+                index: RwLock::new(Reader::new(&config.path)),
             })
         }
     }

@@ -30,7 +30,7 @@ use crate::query_post_search::{PostSearchQuery, PostSearchValue};
 use crate::query_search::{SearchQuery, SearchValue};
 
 pub struct Reader {
-    index: LockIndex,
+    index: Index,
 }
 
 impl Debug for Reader {
@@ -44,7 +44,7 @@ impl Debug for Reader {
 impl Reader {
     pub fn new(path: &str) -> Reader {
         Reader {
-            index: Index::reader(Path::new(path)).into(),
+            index: Index::reader(Path::new(path)),
         }
     }
     pub fn search(
@@ -70,7 +70,7 @@ impl Reader {
         .run();
         filtered
     }
-    pub fn reload(&self) {
+    pub fn reload(&mut self) {
         self.index.reload();
     }
     pub fn no_vectors(&self) -> usize {

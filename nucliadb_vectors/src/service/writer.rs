@@ -57,7 +57,7 @@ impl WriterChild for VectorWriterService {
         self.index
             .write()
             .unwrap()
-            .delete_document(resource_id.shard_id.clone());
+            .delete_document(resource_id.uuid.clone());
         self.index.write().unwrap().commit();
         info!("Delete resource in vector ends");
         Ok(())
@@ -65,21 +65,25 @@ impl WriterChild for VectorWriterService {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         info!("Set resource in vector starts");
         if resource.status != ResourceStatus::Delete as i32 {
+            let mut s_counter = 0;
             for paragraph in resource.paragraphs.values() {
                 for index in paragraph.paragraphs.values() {
                     let mut labels = resource.labels.clone();
                     labels.append(&mut index.labels.clone());
-                    for (counter, (key, sentence)) in index.sentences.iter().enumerate() {
+                    for (key, sentence) in index.sentences.iter() {
+                        s_counter += 1;
                         self.index.write().unwrap().insert(
                             key.clone(),
                             sentence.vector.clone(),
                             labels.clone(),
                         );
-                        info!("Counter {}", counter);
+                        if s_counter % 500 == 0 {
+                            self.index.write().unwrap().commit();
+                        }
                     }
                 }
-                self.index.write().unwrap().commit();
             }
+            self.index.write().unwrap().commit();
         }
         info!("Set resource in vector ends");
         Ok(())
@@ -173,7 +177,7 @@ mod tests {
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
-            uuid: "".to_string(),
+            uuid: "DOC/KEY".to_string(),
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).await.unwrap();

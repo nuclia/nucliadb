@@ -34,7 +34,7 @@ pub struct SearchValue {
 pub struct SearchQuery<'a> {
     pub elem: Vector,
     pub k_neighbours: usize,
-    pub index: &'a LockIndex,
+    pub index: &'a Index,
     pub with_filter: &'a Vec<String>,
 }
 
