@@ -57,7 +57,7 @@ impl WriterChild for VectorWriterService {
         self.index
             .write()
             .unwrap()
-            .delete_document(resource_id.shard_id.clone());
+            .delete_document(resource_id.uuid.clone());
         self.index.write().unwrap().commit();
         info!("Delete resource in vector ends");
         Ok(())
@@ -177,7 +177,7 @@ mod tests {
         };
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
-            uuid: "".to_string(),
+            uuid: "DOC/KEY".to_string(),
         };
         // insert - delete - insert sequence
         let mut writer = VectorWriterService::start(&vsc).await.unwrap();
