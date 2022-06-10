@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.0.6 (unreleased)
+1.0.6 (2022-06-10)
 ------------------
 
 - Fix jetstream helper functions asyncio
