@@ -39,7 +39,7 @@ pub struct LayerSearchQuery<'a> {
     pub k_neighbours: usize,
     pub entry_points: Vec<Node>,
     pub with_filter: &'a Vec<String>,
-    pub index: &'a LockIndex,
+    pub index: &'a Index,
 }
 
 impl<'a> Query for LayerSearchQuery<'a> {

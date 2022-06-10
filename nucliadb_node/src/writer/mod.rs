@@ -74,7 +74,7 @@ impl NodeWriterService {
         info!("{}: Loading shard", shard_id.id);
         let in_memory = self.shards.contains_key(&shard_id.id);
         if !in_memory {
-            info!("{}: Shard was in memory", shard_id.id);
+            info!("{}: Shard was not in memory", shard_id.id);
             let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id.id);
@@ -83,6 +83,8 @@ impl NodeWriterService {
                 self.shards.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
             }
+        }  else {
+            info!("{}: Shard was in memory", shard_id.id);
         }
     }
 

@@ -27,7 +27,7 @@ use crate::writer::Writer;
 fn simple_flow() {
     let temp_dir = tempfile::tempdir().unwrap();
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
-    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut reader = Reader::new(temp_dir.path().to_str().unwrap());
     let mut labels = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
@@ -62,7 +62,7 @@ fn simple_flow() {
 fn accuracy_test() {
     let temp_dir = tempfile::tempdir().unwrap();
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
-    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut reader = Reader::new(temp_dir.path().to_str().unwrap());
     let mut labels = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
@@ -112,7 +112,7 @@ fn insert_delete_all() {
 fn single_graph() {
     let temp_dir = tempfile::tempdir().unwrap();
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
-    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut reader = Reader::new(temp_dir.path().to_str().unwrap());
     let key = "KEY_0".to_string();
     let vec = create_query();
     writer.insert(key.clone(), vec.clone(), vec![]);
@@ -143,7 +143,7 @@ fn stress_test() {
     use std::time::{Duration, SystemTime};
     let temp_dir = tempfile::tempdir().unwrap();
     let mut writer = Writer::new(temp_dir.path().to_str().unwrap());
-    let reader = Reader::new(temp_dir.path().to_str().unwrap());
+    let mut reader = Reader::new(temp_dir.path().to_str().unwrap());
     let mut total = Duration::from_secs(0);
     let mut labels = vec![];
     for i in 0..50 {
@@ -188,7 +188,7 @@ fn stress_test() {
 //#[test]
 #[allow(unused)]
 fn concurrency_test() {
-    fn reader_process(reader: Reader, _: Arc<Mutex<()>>) {
+    fn reader_process(mut reader: Reader, _: Arc<Mutex<()>>) {
         let mut index = 1;
         loop {
             let query = create_query();

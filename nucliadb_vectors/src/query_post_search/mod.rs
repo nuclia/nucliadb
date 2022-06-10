@@ -32,7 +32,7 @@ pub struct PostSearchQuery<'a> {
     pub up_to: usize,
     pub pre_filter: Vec<(Node, f32)>,
     pub with_filter: Vec<String>,
-    pub index: &'a LockIndex,
+    pub index: &'a Index,
 }
 
 impl<'a> Query for PostSearchQuery<'a> {

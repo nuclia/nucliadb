@@ -29,7 +29,7 @@ use crate::query::Query;
 use crate::query_delete::DeleteQuery;
 use crate::query_insert::InsertQuery;
 pub struct Writer {
-    index: LockIndex,
+    index: Index,
 }
 
 impl Debug for Writer {
@@ -43,7 +43,7 @@ impl Debug for Writer {
 impl Writer {
     pub fn new(path: &str) -> Writer {
         Writer {
-            index: Index::writer(Path::new(path)).into(),
+            index: Index::writer(Path::new(path)),
         }
     }
     pub fn insert(&mut self, key: String, element: Vec<f32>, labels: Vec<String>) {
@@ -54,7 +54,7 @@ impl Writer {
             m: hnsw_params::m(),
             m_max: hnsw_params::m_max(),
             ef_construction: hnsw_params::ef_construction(),
-            index: &self.index,
+            index: &mut self.index,
         }
         .run();
     }
@@ -69,7 +69,7 @@ impl Writer {
             m: hnsw_params::m(),
             m_max: hnsw_params::m_max(),
             ef_construction: hnsw_params::ef_construction(),
-            index: &self.index,
+            index: &mut self.index,
         }
         .run();
     }
