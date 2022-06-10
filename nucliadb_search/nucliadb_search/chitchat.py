@@ -78,8 +78,8 @@ class ChitchatNucliaDBSearch:
         while True:
             try:
                 print("wait data in socket")
-                update_readed = await reader.read(512)
-                print("data readed")
+                update_readed = await reader.read()
+                print(f"data readed {update_readed}")
                 members: List[ClusterMember] = json.loads(
                     update_readed.decode("utf8").replace("'", '"')
                 )

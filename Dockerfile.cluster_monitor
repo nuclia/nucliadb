@@ -24,6 +24,8 @@ ENV NODE_TYPE ""
 ENV SEEDS ""
 ENV MONITOR_ADDR ""
 
+EXPOSE 4444/udp
+
 WORKDIR /nucliadb_cluster
 COPY --from=builder /nucliadb_cluster/target/release/cluster_manager /nucliadb_cluster/
 ENTRYPOINT /nucliadb_cluster/cluster_manager -l $LISTEN_ADDR -n $NODE_TYPE -s $SEEDS -m $MONITOR_ADDR

@@ -48,37 +48,44 @@ def start_chitchat() -> Optional[ChitchatNucliaDBIngest]:
 
 
 class ChitchatNucliaDBIngest:
-    update_task: Optional[asyncio.Task] = None
+    chitchat_update_srv: Optional[asyncio.Task] = None
 
-    def __init__(self, sock_path: str):
-        self.sock_path = sock_path
-        self.update_task = None
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+        self.chitchat_update_srv = None
 
-    def start(self):
-        loop = asyncio.get_event_loop()
-        self.update_task = asyncio.start_unix_server(
-            self.socket_reader, path=self.sock_path
+    async def start(self):
+        print("enter chitchat.start()")
+        self.chitchat_update_srv = await asyncio.start_server(
+            self.socket_reader, host=self.host, port=self.port
         )
-        loop.run_until_complete(self.update_task)
+        print("tcp server created ")
+        async with self.chitchat_update_srv:
+            print("awaiting connections from rust part of cluster")
+            await asyncio.create_task(self.chitchat_update_srv.serve_forever())
 
     async def socket_reader(self, reader: asyncio.StreamReader, _):
+        print("new connection accepted")
         while True:
             try:
-                update_readed = await reader.read(512)
+                print("wait data in socket")
+                update_readed = await reader.read()
+                print("data readed")
                 members: List[ClusterMember] = json.loads(
                     update_readed.decode("utf8").replace("'", '"')
                 )
                 if len(members) != 0:
+                    print(f"members: {members}")
                     await chitchat_update_node(members)
                 else:
                     print("connection closed by writer")
                     break
             except IOError as e:
+                print("exception")
                 if SENTRY:
                     capture_exception(e)
                 logger.exception(f"error while reading update from unix socket: {e}")
 
-    async def close(self):  # TODO ask where it's used
-        # await chitchat_reset()
-        self.members_task.cancel()
-        self.update_task.cancel()
+    async def close(self):
+        self.chitchat_update_srv.cancel()

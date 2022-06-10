@@ -102,7 +102,6 @@ async def search_api(
             route.app.middleware_stack.handler = handler  # type: ignore
 
     await application.router.startup()
-    start_chitchat()
 
     # Make sure is clean
     await asyncio.sleep(1)

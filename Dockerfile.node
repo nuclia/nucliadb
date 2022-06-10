@@ -42,4 +42,6 @@ RUN curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-hea
 COPY nucliadb_node/entrypoint.sh /
 RUN chmod 750 /entrypoint.sh
 
+EXPOSE 4444/udp
+
 ENTRYPOINT ["/entrypoint.sh"]

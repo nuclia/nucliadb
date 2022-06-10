@@ -124,3 +124,6 @@ base-node-image:
 build-local-node:
 	docker build -t eu.gcr.io/stashify-218417/basenode:latest -f Dockerfile.basenode .
 	docker build -t eu.gcr.io/stashify-218417/node:latest -f Dockerfile.node .
+
+build-local-cluster-manager:
+	docker build -t eu.gcr.io/stashify-218417/cluster_mgr:latest -f Dockerfile.cluster_monitor .

@@ -99,7 +99,7 @@ images.settings["nucliadb_node_writer"] = {
         "command": [
             "/usr/local/bin/node_writer",
         ],
-        "ports": {"4444/UDP": None, "4446": None},
+        "ports": {"4446": None},
     },
 }
 
@@ -135,11 +135,8 @@ images.settings["nucliadb_cluster_manager"] = {
         "NODE_TYPE": "Node",
         "SEEDS": "0.0.0.0:4444",
         "MONITOR_ADDR": "0.0.0.0:31337",
-        "RUST_LOG": "trace",
+        "RUST_LOG": "nucliadb_cluster=trace",
         "RUST_BACKTRACE": "full",
-    },
-    "options": {
-        "ports": {"4444/UDP": None},
     },
 }
 
@@ -148,11 +145,12 @@ def get_chitchat_port(container_obj, port):
     network = container_obj.attrs["NetworkSettings"]
     service_port = "{0}/udp".format(port)
     for netport in network["Ports"].keys():
-        if netport == "6543/tcp":
-            continue
-
         if netport == service_port:
             return network["Ports"][service_port][0]["HostPort"]
+
+
+def get_chitchat_host(container_obj):
+    return container_obj.attrs["NetworkSettings"]["IPAddress"]
 
 
 repo_root_path = os.path.sep.join(__file__.split(os.path.sep)[:-4])
@@ -329,7 +327,7 @@ class nucliadbNodeWriter(BaseImage):
 
 class nucliadbChitchatNode(BaseImage):
     name = "nucliadb_cluster_manager"
-    port = 4440
+    port = 4444
 
     def run(self):
         return super(nucliadbChitchatNode, self).run()
@@ -378,6 +376,7 @@ class nucliadbNodeSidecar(BaseImage):
 nucliadb_node_1_reader = nucliadbNodeReader()
 nucliadb_node_1_writer = nucliadbNodeWriter()
 nucliadb_node_1_sidecar = nucliadbNodeSidecar()
+
 nucliadb_cluster_mgr = nucliadbChitchatNode()
 
 nucliadb_node_2_reader = nucliadbNodeReader()
@@ -402,14 +401,12 @@ def node(natsd: str, gcs: str):
         "MONITOR_ADDR"
     ] = f"{docker_internal_host}:31337"
     cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
-    print(f"cluster_mgr_port: {cluster_mgr_port}")
+    cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
+    cluster_mgr_real_host = get_chitchat_host(nucliadb_cluster_mgr.container_obj)
 
-    cluster_mgr_chitchat = get_chitchat_port(
-        nucliadb_cluster_mgr.container_obj, "4444"
-    )
-    images.settings["nucliadb_node_writer"]["env"]["SEED_NODES"] = [
-        f"{docker_internal_host}:{cluster_mgr_chitchat}"
-    ]
+    images.settings["nucliadb_node_writer"]["env"][
+        "SEED_NODES"
+    ] = f"{cluster_mgr_real_host}:4444"
     writer1_host, writer1_port = nucliadb_node_1_writer.run(volume_node_1)
     writer1_chitchat = get_chitchat_port(nucliadb_node_1_writer.container_obj, "4444")
 
@@ -467,6 +464,9 @@ def node(natsd: str, gcs: str):
     settings.node_reader_port = None  # type: ignore
     settings.node_sidecar_port = None  # type: ignore
 
+    import pdb
+
+    pdb.set_trace()
     yield {
         "writer1": {
             "host": writer1_host,

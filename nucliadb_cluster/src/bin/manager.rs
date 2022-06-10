@@ -1,14 +1,14 @@
 use anyhow::Context;
+use clap::Parser;
+use log::error;
 use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
-use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio::signal::unix::{signal, SignalKind};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
-use uuid::Uuid;
-use clap::Parser;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
-use log::error;
+use tokio::signal::unix::{signal, SignalKind};
+use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -23,18 +23,19 @@ struct CliArgs {
     seeds: Vec<String>,
 
     #[clap(short, long)]
-    monitor_addr: Option<String>
+    monitor_addr: Option<String>,
 }
 
 async fn get_writer(monitor_addr: Option<String>) -> anyhow::Result<Box<dyn AsyncWrite + Unpin>> {
     if let Some(socket_addr) = monitor_addr {
         let monitor_sock = loop {
+            println!("Connecting to {:?}", socket_addr);
             match TcpStream::connect(&socket_addr).await {
                 Ok(s) => break s,
                 Err(e) => {
                     error!("Can't connect to monitor socket: {e}. Sleep 200ms and reconnect");
                     tokio::time::sleep(Duration::from_millis(200)).await;
-                    continue
+                    continue;
                 }
             }
         };
@@ -42,7 +43,7 @@ async fn get_writer(monitor_addr: Option<String>) -> anyhow::Result<Box<dyn Asyn
     } else {
         let std_io = tokio::io::stdout();
         Ok(Box::new(std_io))
-    }   
+    }
 }
 
 #[tokio::main]
@@ -52,19 +53,19 @@ async fn main() -> anyhow::Result<()> {
 
     let mut termination = signal(SignalKind::terminate())?;
 
-    let addr = SocketAddr::from_str(&args.listen_addr).with_context(|| "Can't create cluster listener socket")?;
-    let node_type = NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
+    let addr = SocketAddr::from_str(&args.listen_addr)
+        .with_context(|| "Can't create cluster listener socket")?;
+    let node_type =
+        NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(
-        node_id.to_string(),
-        addr,
-        node_type,
-        args.seeds
-    ).await.with_context(|| "Can't create cluster instance ")?;
+    let cluster = Cluster::new(node_id.to_string(), addr, node_type, args.seeds)
+        .await
+        .with_context(|| "Can't create cluster instance ")?;
 
     let mut watcher = cluster.members_change_watcher();
-    let mut writer =  get_writer(args.monitor_addr).await.with_context(|| "Can't create update writer")?;
-    
+    let mut writer = get_writer(args.monitor_addr)
+        .await
+        .with_context(|| "Can't create update writer")?;
     loop {
         tokio::select! {
             _ = termination.recv() => {
@@ -82,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
                     continue
                 };
                 let ser = match serde_json::to_string(&update){
-                    Ok(s) => s, 
+                    Ok(s) => s,
                     Err(e) => {
                         error!("Error during vector of members serialization: {e}");
                         continue
@@ -91,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
                 if let Err(e) = writer.write_all(ser.as_bytes()).await {
                     error!("Error during writing cluster members vector: {e}")
                 };
+                println!("Sent data {:?}", ser.as_bytes());
                 if let Err(e) = writer.flush().await {
                     error!("Error during flushing writer: {e}")
                 }
