@@ -56,7 +56,7 @@ impl<'a> Query for LayerDeleteQuery<'a> {
         assert!(self.index.in_edges(self.layer, self.delete).is_empty());
         assert!(self.index.out_edges(self.layer, self.delete).is_empty());
         for source in reaching {
-            if self.index.out_edges(self.layer, source).len() < self.m {
+            if self.index.out_edges(self.layer, source).len() < (self.m / 2) {
                 let LayerSearchValue { neighbours } = LayerSearchQuery {
                     layer: self.layer,
                     elem: self.vector,

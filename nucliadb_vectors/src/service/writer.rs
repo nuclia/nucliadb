@@ -65,21 +65,25 @@ impl WriterChild for VectorWriterService {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         info!("Set resource in vector starts");
         if resource.status != ResourceStatus::Delete as i32 {
+            let mut s_counter = 0;
             for paragraph in resource.paragraphs.values() {
                 for index in paragraph.paragraphs.values() {
                     let mut labels = resource.labels.clone();
                     labels.append(&mut index.labels.clone());
-                    for (counter, (key, sentence)) in index.sentences.iter().enumerate() {
+                    for (key, sentence) in index.sentences.iter() {
+                        s_counter += 1;
                         self.index.write().unwrap().insert(
                             key.clone(),
                             sentence.vector.clone(),
                             labels.clone(),
                         );
-                        info!("Counter {}", counter);
+                        if s_counter % 500 == 0 {
+                            self.index.write().unwrap().commit();
+                        }
                     }
                 }
-                self.index.write().unwrap().commit();
             }
+            self.index.write().unwrap().commit();
         }
         info!("Set resource in vector ends");
         Ok(())

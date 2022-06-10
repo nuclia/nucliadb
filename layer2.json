@@ -1,0 +1,10 @@
+{
+  "id": 2,
+  "no_nodes": 260,
+  "max_in": 136,
+  "max_out": 100,
+  "min_in": 30,
+  "min_out": 30,
+  "no_scc_in": 6,
+  "no_scc_out": 65
+}
