@@ -23,7 +23,7 @@ CHANGELOG
 1.0.6 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix jetstream helper functions asyncio
 
 
 1.0.5 (2022-06-01)
