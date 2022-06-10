@@ -38,6 +38,8 @@ from nucliadb_reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_ingest
 
+google
+
 
 @api.get(
     f"/{KBS_PREFIX}",
