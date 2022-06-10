@@ -12,7 +12,7 @@ metadata:
 data:
 {{- if .Values.debug }}
   DEBUG: "True"
-  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_swim=DEBUG"
+  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG"
 {{- else }}
   RUST_LOG: "nucliadb_node=WARN,nucliadb_swim=WARN"
 {{- end }}
