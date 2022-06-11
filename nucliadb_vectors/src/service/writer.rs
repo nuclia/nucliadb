@@ -77,7 +77,7 @@ impl WriterChild for VectorWriterService {
                             sentence.vector.clone(),
                             labels.clone(),
                         );
-                        if s_counter % 500 == 0 {
+                        if s_counter % 100 == 0 {
                             self.index.write().unwrap().commit();
                         }
                     }
