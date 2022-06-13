@@ -174,12 +174,12 @@ impl LMBDStorage {
         }
         result
     }
-    pub fn insert_layer_out(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: GraphLayer) {
+    pub fn insert_layer_out(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: &GraphLayer) {
         self.layer_out_db
             .put(txn, &id.as_byte_rpr(), &layer.as_byte_rpr())
             .unwrap();
     }
-    pub fn insert_layer_in(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: GraphLayer) {
+    pub fn insert_layer_in(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: &GraphLayer) {
         self.layer_in_db
             .put(txn, &id.as_byte_rpr(), &layer.as_byte_rpr())
             .unwrap();
