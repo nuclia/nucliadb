@@ -177,17 +177,16 @@ impl ShardWriterService {
             let mut writer = paragraph_writer_service.write().unwrap();
             writer.set_resource(&paragraph_resource)
         });
-        let vector_writer_service = self.vector_writer_service.clone();
-        let vector_resource = resource.clone();
-        let vector_task = tokio::task::spawn_blocking(move || {
-            let mut writer = vector_writer_service.write().unwrap();
-            writer.set_resource(&vector_resource)
-        });
-        let (rtext, rparagraph, rvector) =
-            try_join!(text_task, paragraph_task, vector_task).unwrap();
+        let (rtext, rparagraph) = try_join!(text_task, paragraph_task).unwrap();
         rtext?;
         rparagraph?;
-        rvector?;
+
+        let vector_writer_service = self.vector_writer_service.clone();
+        let vector_resource = resource.clone();
+        // let vector_task = tokio::task::spawn_blocking(move || {
+        let mut writer = vector_writer_service.write().unwrap();
+        writer.set_resource(&vector_resource)?;
+        //});
         Ok(())
     }
 
