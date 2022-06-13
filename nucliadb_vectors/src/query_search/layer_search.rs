@@ -59,7 +59,12 @@ impl<'a> Query for LayerSearchQuery<'a> {
                 (None, _) => break,
                 (Some(StandardElem(_, cs)), Some(Reverse(StandardElem(_, ws)))) if cs < ws => break,
                 (Some(StandardElem(cn, _)), Some(Reverse(StandardElem(_, ws)))) => {
-                    for (node, _) in self.index.out_edges(self.layer, cn) {
+                    let destinations = self
+                        .index
+                        .get_out_layer(self.layer)
+                        .get_edges(cn)
+                        .map(|e| e.to);
+                    for node in destinations {
                         if !visited.contains(&node) {
                             visited.insert(node);
                             let similarity = self.index.semi_mapped_similarity(self.elem, node);

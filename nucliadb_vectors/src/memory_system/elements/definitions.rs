@@ -21,6 +21,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use std::iter::Iterator;
 
 pub const VECTORS_DIR: &str = "vectors";
 
@@ -103,6 +104,16 @@ impl From<Vector> for Vec<f32> {
     }
 }
 
+
+pub struct Connexions(HashMap<Node, Edge>);
+impl std::iter::IntoIterator for Connexions {
+    type IntoIter = std::collections::hash_map::IntoValues<Node, Edge>;
+    type Item = Edge;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_values()
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GraphLayer {
     pub cnx: HashMap<Node, HashMap<Node, Edge>>,
@@ -146,13 +157,14 @@ impl GraphLayer {
     pub fn remove_node(&mut self, node: Node) {
         self.cnx.remove(&node);
     }
-    pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
-        self.cnx[&from].clone()
+    pub fn full_disconnexion(&mut self, from: Node) -> Connexions {
+        Connexions(std::mem::take(&mut self.cnx[&from]))
     }
-    #[allow(unused)]
-    #[cfg(test)]
-    pub fn no_edges(&self, node: Node) -> Option<usize> {
-        self.cnx.get(&node).map(|v| v.len())
+    pub fn get_edges(&self, from: Node) -> impl Iterator<Item = &Edge> {
+        self.cnx[&from].values()
+    }
+    pub fn no_edges(&self, node: Node) -> usize {
+        self.cnx.get(&node).map(|v| v.len()).unwrap_or_default()
     }
     pub fn no_nodes(&self) -> usize {
         self.cnx.len()

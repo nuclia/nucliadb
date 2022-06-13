@@ -70,17 +70,17 @@ impl<'a> Query for LayerInsertQuery<'a> {
             };
             self.index.connect(self.layer, new_to_neighbour);
             self.index.connect(self.layer, neighbour_to_new);
-            if self.index.out_edges(self.layer, neighbour).len() > self.m_max {
+            if self.index.get_out_layer(self.layer).no_edges(neighbour) > self.m_max {
                 need_repair.insert(neighbour);
             }
             query_value.neighbours.push(neighbour);
         }
         for source in need_repair {
-            let edges = self.index.out_edges(self.layer, source);
-            let mut candidates = Vec::with_capacity(edges.len());
-            for (destination, edge) in edges {
-                candidates.push((destination, edge.dist));
-                self.index.disconnect(self.layer, source, destination);
+            let edges = self.index.get_out_layer(self.layer).get_edges(source);
+            let mut candidates = Vec::new();
+            for edge in edges.cloned() {
+                candidates.push((edge.to, edge.dist));
+                self.index.disconnect(self.layer, source, edge.to);
             }
             for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
                 let edge = Edge {

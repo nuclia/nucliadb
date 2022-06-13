@@ -41,22 +41,31 @@ impl<'a> Query for LayerDeleteQuery<'a> {
         if !self.index.is_node_at(self.layer, self.delete) {
             return;
         }
-        let in_edges = self.index.in_edges(self.layer, self.delete);
-        let out_edges = self.index.out_edges(self.layer, self.delete);
-        for (node, _) in out_edges {
+        let in_edges = self.index.get_in_layer(self.layer).get_edges(self.delete);
+        let out_edges = self.index.get_out_layer(self.layer).get_edges(self.delete);
+        let mut reaching = Vec::with_capacity(in_edges.count());
+        for node in out_edges.map(|edge| edge.to) {
             self.index.disconnect(self.layer, self.delete, node);
         }
-        let mut reaching = Vec::with_capacity(in_edges.len());
-        for (node, edge) in in_edges {
-            assert_eq!(node, edge.to);
-            assert_eq!(self.delete, edge.from);
+        for node in in_edges.map(|edge| edge.to) {
             self.index.disconnect(self.layer, node, self.delete);
             reaching.push(node);
         }
-        assert!(self.index.in_edges(self.layer, self.delete).is_empty());
-        assert!(self.index.out_edges(self.layer, self.delete).is_empty());
+        #[cfg(debug_assertions)]
+        {
+            let no_out_edges = self
+                .index
+                .get_out_layer(self.layer)
+                .no_edges(self.delete);
+            let no_in_edges = self
+                .index
+                .get_in_layer(self.layer)
+                .no_edges(self.delete);
+            assert_eq!(no_out_edges, 0);
+            assert_eq!(no_in_edges, 0);
+        }
         for source in reaching {
-            if self.index.out_edges(self.layer, source).len() < (self.m / 2) {
+            if self.index.get_out_layer(self.layer).no_edges(source) < (self.m / 2) {
                 let LayerSearchValue { neighbours } = LayerSearchQuery {
                     layer: self.layer,
                     elem: self.vector,
@@ -67,9 +76,9 @@ impl<'a> Query for LayerDeleteQuery<'a> {
                 }
                 .run();
                 let mut candidates = neighbours;
-                for (destination, edge) in self.index.out_edges(self.layer, source) {
-                    candidates.push((destination, edge.dist));
-                    self.index.disconnect(self.layer, source, destination);
+                for edge in self.index.get_out_layer(self.layer).get_edges(source) {
+                    candidates.push((edge.to, edge.dist));
+                    self.index.disconnect(self.layer, source, edge.to);
                 }
                 for (destination, dist) in select_neighbours_heuristic(self.m_max, candidates) {
                     if destination != source && destination != self.delete {

@@ -18,13 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::path::Path;
-
 use crate::memory_system::elements::*;
 use crate::memory_system::lmdb_driver::LMBDStorage;
 use crate::memory_system::mmap_driver::*;
+use std::fmt::{Debug, Formatter};
+use std::iter::Iterator;
+use std::path::Path;
 
 pub struct Index {
     pub(crate) vector_storage: Storage,
@@ -236,11 +235,11 @@ impl Index {
         self.lmdb_driver.add_label(&mut txn, key, label);
         txn.commit().unwrap();
     }
-    pub fn out_edges(&self, layer: usize, node: Node) -> HashMap<Node, Edge> {
-        self.layers_out[layer].get_edges(node)
+    pub fn get_out_layer(&self, layer: usize) -> &GraphLayer {
+        &self.layers_out[layer]
     }
-    pub fn in_edges(&self, layer: usize, node: Node) -> HashMap<Node, Edge> {
-        self.layers_in[layer].get_edges(node)
+    pub fn get_in_layer(&self, layer: usize) -> &GraphLayer {
+        &self.layers_in[layer]
     }
     pub fn is_node_at(&self, layer: usize, node: Node) -> bool {
         self.layers_out[layer].has_node(node)
@@ -255,6 +254,12 @@ impl Index {
             }
             _ => (),
         }
+    }
+    pub fn full_out_disconnexion(&mut self, layer: usize, node: Node) -> Connexions {
+        self.layers_out[layer].full_disconnexion(node)
+    }
+    pub fn full_in_disconnexion(&mut self, layer: usize, node: Node) -> Connexions {
+        self.layers_in[layer].full_disconnexion(node)
     }
     pub fn erase(&mut self, x: Node) {
         let mut max_layer = 0;
