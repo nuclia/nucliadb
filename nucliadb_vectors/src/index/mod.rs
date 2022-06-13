@@ -155,12 +155,10 @@ impl Index {
         };
         self.time_stamp += 1;
         for i in 0..self.layers_len {
-            let layer_out = self.layers_out[i].clone();
-            let layer_in = self.layers_in[i].clone();
             self.lmdb_driver
-                .insert_layer_out(&mut rw_txn, i as u64, layer_out);
+                .insert_layer_out(&mut rw_txn, i as u64, &self.layers_out[i]);
             self.lmdb_driver
-                .insert_layer_in(&mut rw_txn, i as u64, layer_in);
+                .insert_layer_in(&mut rw_txn, i as u64, &self.layers_in[i]);
         }
         self.lmdb_driver.insert_log(&mut rw_txn, log);
         if !self.removed.is_empty() {
