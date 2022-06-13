@@ -80,6 +80,7 @@ impl WriterChild for VectorWriterService {
                         if s_counter % 100 == 0 {
                             self.index.write().unwrap().commit();
                         }
+                        println!("Vector: {}", s_counter);
                     }
                 }
             }
