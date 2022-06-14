@@ -19,6 +19,7 @@
 #
 from enum import Enum
 from typing import Dict, List, Optional
+from nucliadb_ingest.sentry import SENTRY
 
 from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
@@ -42,6 +43,7 @@ from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_cache, get_storage
+from sentry_sdk import capture_exception
 
 DEFAULT_WIDGET = Widget(id="dashboard", mode=Widget.WidgetMode.INPUT)
 DEFAULT_WIDGET.features.useFilters = True
@@ -418,6 +420,8 @@ class Processor:
             )
         except Exception as e:
             await txn.abort()
+            if SENTRY:
+                capture_exception(e)
             raise e
 
         if not failed:

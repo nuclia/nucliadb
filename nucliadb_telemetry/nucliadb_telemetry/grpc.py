@@ -214,18 +214,14 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
     ) -> grpc.RpcMethodHandler:
 
         handler = await continuation(handler_call_details)
+        if handler and (
+            handler.request_streaming or handler.response_streaming
+        ):  # pytype: disable=attribute-error
+            return handler
 
         def wrapper(behavior: Callable[[Any, aio.ServicerContext], Any]):
             @functools.wraps(behavior)
             async def wrapper(request: Any, context: aio.ServicerContext) -> Any:
-                if handler.response_streaming:
-                    return self._intercept_server_stream(
-                        behavior,
-                        handler_call_details,
-                        request,
-                        context,
-                    )
-
                 with self._set_remote_context(context):
                     with self.start_span_server(
                         handler_call_details,
@@ -286,6 +282,7 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
         self, continuation, client_call_details: ClientCallDetails, request
     ):
         span = start_span_client(self.tracer, client_call_details)
+
         try:
             call = await continuation(client_call_details, request)
         except Exception as error:
@@ -349,10 +346,14 @@ class OpenTelemetryGRPC:
         self.service_name = service_name
         self.tracer_provider = tracer_provider
 
-    def init_client(self, server_addr: str):
+    def init_client(self, server_addr: str, max_receive_message: int = 100):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_client")
+        options = [
+            ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
+        ]
         channel = aio.insecure_channel(
             server_addr,
+            options=options,
             interceptors=[
                 UnaryUnaryClientInterceptor(tracer=tracer),
                 UnaryStreamClientInterceptor(tracer=tracer),
@@ -362,11 +363,15 @@ class OpenTelemetryGRPC:
         )
         return channel
 
-    def init_server(self, concurrency: int = 4):
+    def init_server(self, concurrency: int = 4, max_send_message: int = 100):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_server")
         interceptors = [OpenTelemetryServerInterceptor(tracer=tracer)]
+        options = [
+            ("grpc.max_send_message_length", max_send_message * 1024 * 1024),
+        ]
         server = aio.server(
             futures.ThreadPoolExecutor(max_workers=concurrency),
             interceptors=interceptors,
+            options=options,
         )
         return server
