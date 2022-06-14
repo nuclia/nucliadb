@@ -236,10 +236,10 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
     if resource is None:
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
+    await extract_fields(resource=resource, toprocess=toprocess)
+
     if txn.open:
         await txn.abort()
-
-    await extract_fields(resource=resource, toprocess=toprocess)
 
     # Send current resource to reprocess.
 
