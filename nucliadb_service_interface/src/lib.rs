@@ -19,9 +19,9 @@
 //
 pub mod fields_interface;
 pub mod paragraphs_interface;
+pub mod relations_interface;
 pub mod service_interface;
 pub mod vectos_interface;
-pub mod relations_interface;
 
 pub mod dependencies {
     pub extern crate anyhow;
@@ -38,7 +38,7 @@ pub mod prelude {
     pub use crate::dependencies::*;
     pub use crate::fields_interface::*;
     pub use crate::paragraphs_interface::*;
+    pub use crate::relations_interface::*;
     pub use crate::service_interface::*;
     pub use crate::vectos_interface::*;
-    pub use crate::relations_interface::*;
 }

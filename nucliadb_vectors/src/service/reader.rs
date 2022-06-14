@@ -42,6 +42,8 @@ impl Debug for VectorReaderService {
 }
 
 impl RService for VectorReaderService {}
+impl VectorServiceReader for VectorReaderService {}
+impl VectorReaderOnly for VectorReaderService {}
 #[async_trait]
 impl ServiceChild for VectorReaderService {
     async fn stop(&self) -> InternalResult<()> {

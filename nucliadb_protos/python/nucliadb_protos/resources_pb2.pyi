@@ -12,9 +12,9 @@ import nucliadb_protos.utils_pb2
 import typing
 import typing_extensions
 from nucliadb_protos.utils_pb2 import (
-    EntityRelation as EntityRelation,
     ExtractedText as ExtractedText,
     Relation as Relation,
+    RelationNode as RelationNode,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,

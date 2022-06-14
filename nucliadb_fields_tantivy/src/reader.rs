@@ -76,6 +76,8 @@ impl Debug for FieldReaderService {
 }
 
 impl RService for FieldReaderService {}
+impl FieldServiceReader for FieldReaderService {}
+impl FieldReaderOnly for FieldReaderService {}
 
 #[async_trait]
 impl ServiceChild for FieldReaderService {

@@ -54,6 +54,8 @@ impl Debug for ParagraphReaderService {
 }
 
 impl RService for ParagraphReaderService {}
+impl ParagraphServiceReader for ParagraphReaderService {}
+impl ParagraphReaderOnly for ParagraphReaderService {}
 
 #[async_trait]
 impl ServiceChild for ParagraphReaderService {
