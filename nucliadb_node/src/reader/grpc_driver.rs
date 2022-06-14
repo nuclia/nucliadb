@@ -21,10 +21,10 @@
 use async_std::sync::{Arc, RwLock};
 use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::*;
-use Shard as ShardPB;
 use opentelemetry::global;
 use tracing::{instrument, Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use Shard as ShardPB;
 
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;

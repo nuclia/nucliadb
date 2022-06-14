@@ -23,9 +23,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, IdCollection, ParagraphSearchRequest,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
     ParagraphSearchResponse, SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList,
-    SuggestRequest, SuggestResponse, VectorSearchRequest, VectorSearchResponse, EdgeList, TypeList
+    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_services::*;
 use tracing::*;

@@ -23,9 +23,10 @@ use std::time::SystemTime;
 // use crate::services::vector::config::Distance;
 // use crate::services::vector::config::VectorServiceConfiguration;
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, SuggestRequest,
-    SuggestResponse, VectorSearchRequest, VectorSearchResponse, TypeList, EdgeList,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
+    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
+    SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_services::*;
 use tokio::{task, try_join};
