@@ -31,7 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     Metadata,
     Origin,
 )
-from nucliadb_protos.utils_pb2 import Relation, VectorObject
+from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
 
 from nucliadb_ingest.orm.labels import BASE_TAGS, flat_resource_tags
 
@@ -171,13 +171,16 @@ class ResourceBrain:
         elif status == Metadata.Status.PENDING:
             self.brain.status = PBBrainResource.PENDING
 
-    def set_global_tags(self, basic: Basic, origin: Optional[Origin]):
+    def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
 
         self.brain.metadata.created.CopyFrom(basic.created)
         self.brain.metadata.modified.CopyFrom(basic.modified)
 
         self.set_status(basic.metadata.status, basic.metadata.useful)
 
+        relationnodedocument = RelationNode(
+            value=uuid, ntype=RelationNode.NodeType.RESOURCE
+        )
         if origin is not None:
             if origin.source_id:
                 self.tags["o"] = [origin.source_id]
@@ -191,8 +194,15 @@ class ResourceBrain:
             # origin contributors
             for contrib in origin.colaborators:
                 self.tags["u"].append(f"o/{contrib}")
+                relationnodeuser = RelationNode(
+                    value=contrib, ntype=RelationNode.NodeType.USER
+                )
                 self.brain.relations.append(
-                    Relation(relation=Relation.COLAB, user=contrib)
+                    Relation(
+                        relation=Relation.COLAB,
+                        source=relationnodedocument,
+                        to=relationnodeuser,
+                    )
                 )
 
         # icon
@@ -209,34 +219,51 @@ class ResourceBrain:
         # labels
         for classification in basic.usermetadata.classifications:
             self.tags["l"].append(f"{classification.labelset}/{classification.label}")
+            relationnodelabel = RelationNode(
+                value=f"{classification.labelset}/{classification.label}",
+                ntype=RelationNode.NodeType.LABEL,
+            )
             self.brain.relations.append(
                 Relation(
                     relation=Relation.ABOUT,
-                    label=f"{classification.labelset}/{classification.label}",
+                    source=relationnodedocument,
+                    to=relationnodelabel,
                 )
             )
 
         self.compute_tags()
 
     def process_meta(
-        self, field_key: str, metadata: FieldMetadata, tags: Dict[str, List[str]]
+        self,
+        field_key: str,
+        metadata: FieldMetadata,
+        tags: Dict[str, List[str]],
+        relationnodedocument: RelationNode,
     ):
         for classification in metadata.classifications:
             tags["l"].append(f"{classification.labelset}/{classification.label}")
+            relationnodelabel = RelationNode(
+                value=f"{classification.labelset}/{classification.label}",
+                ntype=RelationNode.NodeType.LABEL,
+            )
             self.brain.relations.append(
                 Relation(
                     relation=Relation.ABOUT,
-                    label=f"{classification.labelset}/{classification.label}",
+                    source=relationnodedocument,
+                    to=relationnodelabel,
                 )
             )
 
         for entity, klass in metadata.ner.items():
             tags["e"].append(f"{klass}/{entity}")
+            relationnodeentity = RelationNode(
+                value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
+            )
             rel = Relation(
                 relation=Relation.ENTITY,
+                source=relationnodedocument,
+                to=relationnodeentity,
             )
-            rel.entity.entity = entity
-            rel.entity.entity_type = klass
             self.brain.relations.append(rel)
 
     def process_keywordset_fields(self, field_key: str, field: FieldKeywordset):
@@ -247,12 +274,15 @@ class ResourceBrain:
                 self.tags["fg"].append(keyword.value)
 
     def apply_field_tags_globally(
-        self, field_key: str, metadata: FieldComputedMetadata
+        self, field_key: str, metadata: FieldComputedMetadata, uuid: str
     ):
+        relationnodedocument = RelationNode(
+            value=uuid, ntype=RelationNode.NodeType.RESOURCE
+        )
         tags: Dict[str, List[str]] = {"l": [], "e": []}
         for meta in metadata.split_metadata.values():
-            self.process_meta(field_key, meta, tags)
-        self.process_meta(field_key, metadata.metadata, tags)
+            self.process_meta(field_key, meta, tags, relationnodedocument)
+        self.process_meta(field_key, metadata.metadata, tags, relationnodedocument)
         self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
 
     def compute_tags(self):
