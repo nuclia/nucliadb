@@ -29,6 +29,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     Widget,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
+from sentry_sdk import capture_exception
 
 from nucliadb_ingest import logger
 from nucliadb_ingest.maindb.driver import Driver, Transaction
@@ -37,6 +38,7 @@ from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_ingest.orm.shard import Shard
 from nucliadb_ingest.orm.utils import get_node_klass
+from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
@@ -418,6 +420,8 @@ class Processor:
             )
         except Exception as e:
             await txn.abort()
+            if SENTRY:
+                capture_exception(e)
             raise e
 
         if not failed:
