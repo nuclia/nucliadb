@@ -33,10 +33,11 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.settings import telemetry_settings
-from nucliadb_telemetry.tests.grpc import helloworld_pb2, helloworld_pb2_grpc
 from nucliadb_telemetry.tests.grpc import (
     hellostreamingworld_pb2,
     hellostreamingworld_pb2_grpc,
+    helloworld_pb2,
+    helloworld_pb2_grpc,
 )
 from nucliadb_telemetry.utils import (
     clean_telemetry,
