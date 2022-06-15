@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.0.7 (unreleased)
+1.0.7 (2022-06-15)
 ------------------
 
 - Avoid telemetry on stream response right now
