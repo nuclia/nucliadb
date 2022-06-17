@@ -126,4 +126,4 @@ build-local-node:
 	docker build -t eu.gcr.io/stashify-218417/node:latest -f Dockerfile.node .
 
 build-local-cluster-manager:
-	docker build -t eu.gcr.io/stashify-218417/cluster_mgr:latest -f Dockerfile.cluster_monitor .
+	docker build -t eu.gcr.io/stashify-218417/cluster_manager:latest -f Dockerfile.cluster_monitor .

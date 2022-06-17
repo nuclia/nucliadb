@@ -128,7 +128,7 @@ images.settings["nucliadb_node_sidecar"] = {
 }
 
 images.settings["nucliadb_cluster_manager"] = {
-    "image": "eu.gcr.io/stashify-218417/cluster_mgr",
+    "image": "eu.gcr.io/stashify-218417/cluster_manager",
     "version": "latest",
     "network": "host",
     "env": {
