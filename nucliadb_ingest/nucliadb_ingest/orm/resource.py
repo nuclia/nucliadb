@@ -420,7 +420,10 @@ class Resource:
             if self.basic.icon == "":
                 self.basic.icon = "application/stf-link"
                 basic_modified = True
-            if self.basic.title == "" and link_extracted_data.title != "":
+            if (
+                self.basic.title.startswith("http") and link_extracted_data.title != ""
+            ) or (self.basic.title == "" and link_extracted_data.title != ""):
+                # If the title was http something or empty replace
                 self.basic.title = link_extracted_data.title
                 basic_modified = True
             if self.basic.summary == "" and link_extracted_data.description != "":
