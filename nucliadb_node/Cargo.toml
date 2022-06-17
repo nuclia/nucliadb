@@ -67,7 +67,7 @@ rand = "0.8.4"
 nucliadb_services = {path = "../nucliadb_services"}
 nucliadb_vectors = { path = "../nucliadb_vectors" }
 nucliadb_protos = { path = "../nucliadb_protos/rust" }
-nucliadb-cluster = { path = "../nucliadb_cluster"}
+nucliadb_cluster = { path = "../nucliadb_cluster"}
 
 # test
 tempdir = "0.3.7"

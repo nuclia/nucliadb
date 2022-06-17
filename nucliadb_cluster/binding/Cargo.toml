@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.16.5", features = ["extension-module"] }
-nucliadb-cluster = { path = "../../nucliadb_cluster" }
+nucliadb_cluster = { path = "../../nucliadb_cluster" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 log = "0.4"

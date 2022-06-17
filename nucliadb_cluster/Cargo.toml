@@ -1,5 +1,5 @@
 [package]
-name = "nucliadb-cluster"
+name = "nucliadb_cluster"
 version = "0.1.0"
 authors = ['Bosutech S.L.']
 edition = "2021"
