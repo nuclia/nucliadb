@@ -132,6 +132,7 @@ impl TestClusterState {
     }
 }
 
+#[allow(unused_assignments)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_integration_3_nodes_with_monitor() {
     let registry = env::var("IMAGE_REPOSITORY").unwrap();
@@ -145,7 +146,7 @@ async fn test_integration_3_nodes_with_monitor() {
 
     tokio::spawn(async move {
         loop {
-            if let Ok(_) = unix_stream.readable().await {
+            if unix_stream.readable().await.is_ok() {
                 let mut buffer = BytesMut::with_capacity(512);
                 match unix_stream.try_read(&mut buffer) {
                     Ok(bytes_read) => {
