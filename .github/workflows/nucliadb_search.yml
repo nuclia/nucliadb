@@ -1,11 +1,6 @@
 name: nucliadb Search (py)
 
 on:
-  workflow_run:
-    workflows: ["nucliadb Cluster rust"]
-    types:
-      - completed
-
   pull_request:
     branches:
       - main
@@ -70,7 +65,6 @@ jobs:
 
   # Job to run tests
   tests:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     strategy:
