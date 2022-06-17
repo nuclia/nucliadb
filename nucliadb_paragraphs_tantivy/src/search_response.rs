@@ -62,7 +62,11 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
                         .to_string();
 
                     let field = doc
-                        .get_first(schema.field)
+                        // This can be used instead of get_first() considering there is only one
+                        // field. Done because of a bug in the writing
+                        // process [sc 1604].
+                        .get_all(schema.field)
+                        .last()
                         .expect("document doesn't appear to have uuid.")
                         .as_facet()
                         .unwrap()
