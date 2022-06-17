@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package train;
+
+import "google/protobuf/timestamp.proto";
+
+import public "nucliadb_protos/knowledgebox.proto";
+
+message GetOntologyRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message Ontology {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    knowledgebox.Labels labels = 2;
+    enum Status {
+        OK = 0;
+        NOTFOUND = 1;
+    }
+    Status status = 3;
+
+}
+
+message GetEntitiesRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message Entities {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    map <string, knowledgebox.EntitiesGroup> groups = 2;
+    enum Status {
+        OK = 0;
+        NOTFOUND = 1;
+    }
+    Status status = 3;
+}
+
+message GetResourcesRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    bool text = 2;
+    bool entities = 3;
+    bool labels = 4;
+}
+
+message GetParagraphRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string uuid = 2;
+    bool ner = 3;
+    bool labels = 4;
+}
+
+message GetSentenceRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string uuid = 2;
+    bool vector = 3;
+    bool ner = 4;
+    bool labels = 5;
+}
+
+message Sentence {
+    string uuid = 1;
+    string sentence = 2;
+    repeated string labels = 3;
+    map<string, string> ner = 4;
+}
+
+
+message Paragraph {
+    string uuid = 1;
+    string paragraph = 2;
+    repeated string labels = 3;
+    map<string, string> ner = 4;
+}
+
+message Resource {
+    string uuid = 1;
+    string title = 2;
+    string icon = 3;
+    string slug = 4;
+    string text = 5;
+    google.protobuf.Timestamp created = 6;
+    google.protobuf.Timestamp modified = 7;
+    repeated string labels = 8;
+}
+
+service Train {
+    rpc GetSentences(GetSentenceRequest) returns (stream Sentences) {}
+    rpc GetParagraphs(GetParagraphRequest) returns (stream Paragraphs) {}
+    rpc GetResources(GetResourcesRequest) returns (stream Resources) {}
+    rpc GetOntology(GetOntologyRequest) returns (Ontology) {}
+    rpc GetEntities(GetEntitiesRequest) returns (Entities) {}
+}
