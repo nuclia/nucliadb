@@ -19,6 +19,7 @@
 #
 import logging
 
+import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
     AioHttpClientInstrumentor,
@@ -30,7 +31,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
@@ -46,8 +47,8 @@ from nucliadb_utils.fastapi.instrumentation import instrument_app
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 
-logging.getLogger("nucliadb_swim").setLevel(
-    logging.getLevelName(running_settings.swim_level.upper())
+logging.getLogger("nucliadb_chitchat").setLevel(
+    logging.getLevelName(running_settings.chitchat_level.upper())
 )
 
 middleware = [
@@ -116,7 +117,12 @@ async def homepage(request: Request) -> HTMLResponse:
     return HTMLResponse("NucliaDB Search Service")
 
 
-async def swim_members(request: Request) -> JSONResponse:
+async def metrics(request: Request) -> PlainTextResponse:
+    output = prometheus_client.exposition.generate_latest()
+    return PlainTextResponse(output.decode("utf8"))
+
+
+async def chitchat_members(request: Request) -> JSONResponse:
     return JSONResponse(
         [
             {
@@ -139,7 +145,8 @@ async def accounting(request: Request) -> JSONResponse:
 
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
-application.add_route("/swim/members", swim_members)
+application.add_route("/metrics", metrics)
+application.add_route("/chitchat/members", chitchat_members)
 application.add_route("/accounting", accounting)
 
 # Enable forwarding of B3 headers to responses and external requests

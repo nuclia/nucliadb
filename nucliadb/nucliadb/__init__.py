@@ -134,8 +134,8 @@ def run():
     running_settings.log_level = nucliadb_args.log.upper()
     ingest_settings.driver = "local"
     ingest_settings.driver_local_url = nucliadb_args.maindb
-    ingest_settings.swim_enabled = False
-    search_settings.swim_enabled = False
+    ingest_settings.chitchat_enabled = False
+    search_settings.chitchat_enabled = False
     running_settings.debug = True
     http_settings.cors_origins = ["*"]
     storage_settings.file_backend = "local"

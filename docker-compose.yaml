@@ -9,12 +9,10 @@ services:
       - DATA_PATH=/data
       - READER_LISTEN_ADDRESS=0.0.0.0:10001
       - WRITER_LISTEN_ADDRESS=0.0.0.0:10000
-      - SWIM_ADDR=node1:4440
       - RUST_LOG=nucliadb_node=DEBUG
     ports:
       - "10003:10001"
       - "10004:10000"
-      - "4440:4440"
     volumes:
       - node1-data:/data
     healthcheck:
@@ -32,8 +30,6 @@ services:
       - DATA_PATH=/data
       - READER_LISTEN_ADDRESS=0.0.0.0:10001
       - WRITER_LISTEN_ADDRESS=0.0.0.0:10000
-      - SWIM_ADDR=node2:4440
-      - SWIM_PEERS_ADDR=node1:4440
     ports:
       - "10005:10001"
       - "10006:10000"
@@ -57,8 +53,6 @@ services:
       - DATA_PATH=/data
       - READER_LISTEN_ADDRESS=0.0.0.0:10001
       - WRITER_LISTEN_ADDRESS=0.0.0.0:10000
-      - SWIM_ADDR=node3:4440
-      - SWIM_PEERS_ADDR=node1:4440
     ports:
       - "10007:10001"
       - "10008:10000"
@@ -96,10 +90,8 @@ services:
       - DRIVER=tikv
       - DRIVER_TIKV_URL=["pd0:2379", "pd1:2379", "pd2:2379"]
       - PARTITIONS=["1"]
-      - SWIM_PEERS=["node1:4440"]
       - CACHE_PUBSUB_DRIVER=nats
       - CACHE_PUBSUB_NATS_URL=["nats://nats1:4222", "nats://nats2:4222", "nats://nats3:4222"]
-      - SWIM_BINDING_HOST=0.0.0.0
       - TRANSACTION_JETSTREAM_STREAM=nucliadb
       - MONITOR=True
       - INNER_METRICS_PORT=8045

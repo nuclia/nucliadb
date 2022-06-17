@@ -24,10 +24,10 @@ from collections import Counter
 from nucliadb_ingest.utils import get_driver  # type: ignore
 from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_search import SERVICE_NAME, logger
+from nucliadb_search.chitchat import start_chitchat
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
-from nucliadb_search.swim import start_swim
-from nucliadb_search.utilities import get_swim
+from nucliadb_search.utilities import get_chitchat
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
@@ -63,11 +63,11 @@ async def initialize() -> None:
     cache = await get_cache()
     set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))
 
-    swim = start_swim()
-    if swim is not None:
-        set_utility(Utility.SWIM, swim)
+    chitchat = start_chitchat()
+    if chitchat is not None:
+        set_utility(Utility.CHITCHAT, chitchat)
     else:
-        logger.info("Not registering search swim")
+        logger.info("Not registering search chitchat")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -90,10 +90,10 @@ async def finalize() -> None:
         clean_utility(Utility.NODES)
     if get_utility(Utility.COUNTER):
         clean_utility(Utility.COUNTER)
-    if get_utility(Utility.SWIM):
-        util = get_swim()
+    if get_utility(Utility.CHITCHAT):
+        util = get_chitchat()
         await util.close()
-        clean_utility(Utility.SWIM)
+        clean_utility(Utility.CHITCHAT)
     await finalize_utilities()
     await stop_audit_utility()
     await clean_telemetry(SERVICE_NAME)

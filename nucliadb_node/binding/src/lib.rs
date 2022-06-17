@@ -17,18 +17,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::Cursor;
+use std::sync::Arc;
+
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
     op_status, DocumentSearchRequest, OpStatus, ParagraphSearchRequest, RelationSearchRequest,
     Resource, ResourceId, SearchRequest, ShardId, VectorSearchRequest,
 };
-
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
-use std::io::Cursor;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 type RawProtos = Vec<u8>;
 

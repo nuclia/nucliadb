@@ -24,6 +24,6 @@ spec:
     port: {{ .Values.serving.grpc_writer }}
     protocol: TCP
     appProtocol: grpc
-  - name: swim
-    port: {{ .Values.serving.swim_port }}
+  - name: chitchat 
+    port: {{ .Values.serving.chitchat_port }}
     protocol: UDP

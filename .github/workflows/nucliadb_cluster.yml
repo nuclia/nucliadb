@@ -1,0 +1,160 @@
+name: nucliadb cluster rust
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_node.yml"
+      - ".github/workflows/nucliadb_cluster.yml"
+      - "charts/nucliadb_node/**"
+      - "Dockerfile.cluster_monitor"
+      - "Dockerfile.node"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "nucliadb_node/**"
+      - "nucliadb_cluster/src/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_node.yml"
+      - ".github/workflows/nucliadb_cluster.yml"
+      - "charts/nucliadb_node/**"
+      - "Dockerfile.cluster_monitor"
+      - "Dockerfile.node"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "nucliadb_node/**"
+      - "nucliadb_cluster/src/**"
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  API_VERSION: 1
+  COMPONENT: nucliadb-cluster
+  CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
+  IMAGE_NAME_CLUSTER_MGR: cluster_manager
+
+jobs:
+  icenses:
+  name: Check Licenses
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v3
+    - uses: EmbarkStudios/cargo-deny-action@v1
+      name: cargo deny
+      with:
+        log-level: warn
+        command: check licenses
+
+  format-rust:
+    name: Code Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          components: rustfmt
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: rustfmt
+        run: cargo +nightly fmt -p nucliadb_cluster -- --check
+
+  clippy-rust:
+    name: Clippy lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.59.0
+          profile: default
+          override: true
+
+      - uses: actions/checkout@v3
+
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: -p nucliadb_cluster --tests
+
+  tests-rust:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: [clippy-rust, format-rust, licenses]
+
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.59.0
+          profile: default
+          override: true
+
+      - uses: actions/checkout@v3
+
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: actions-rs/cargo@v1
+        name: cargo test
+        with:
+          command: test
+          args: --all-features --no-fail-fast -p nucliadb_cluster 
+
+  build-rust:
+   name: Build image and push
+   runs-on: ubuntu-latest
+   needs: tests-rust
+
+   steps:
+     - name: Checkout repository
+       uses: actions/checkout@v3
+
+     - name: Calculate short sha
+       id: env-vars
+       run: |-
+         HASH=`git rev-parse --short HEAD`
+         BRANCH=${GITHUB_REF##*/}
+         echo "::set-output name=short_sha::$HASH"
+         echo "::set-output name=branch::$BRANCH"
+
+     # As base image is on a private registry, we need to authenticate 1st to be able to download that image
+     - name: Setup gcloud CLI
+       uses: google-github-actions/auth@v0
+       with:
+         credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+     - name: "Set up Cloud SDK"
+       uses: "google-github-actions/setup-gcloud@v0"
+
+     - name: Configure Docker
+       run: gcloud auth configure-docker --quiet
+
+     - name: Docker - Build
+       run: |-
+         docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.cluster_monitor
+
+     # PR workflows END here
+     # PUSH workflows contine with deploy activities
+
+     - name: Docker - Tag
+       if: github.event_name == 'push'
+       run: |-
+         docker tag $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.branch }}
+
+     - name: Docker - Push sha
+       if: github.event_name == 'push'
+       run: |-
+         docker push $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.short_sha }}
+
+     - name: Docker - Push latest
+       if: github.event_name == 'push'
+       run: |-
+         docker push $CONTAINER_REGISTRY/$IMAGE_NAME_CLUSTER_MGR:${{ steps.env-vars.outputs.branch }} 

@@ -19,6 +19,3 @@ spec:
     port: {{ .Values.serving.grpc }}
     protocol: TCP
     appProtocol: grpc
-  - name: swim
-    port: {{ .Values.serving.swim }}
-    protocol: UDP

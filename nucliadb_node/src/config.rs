@@ -27,46 +27,6 @@ use tracing::*;
 pub struct Configuration {}
 
 impl Configuration {
-    pub fn swim_timeout() -> usize {
-        let default: usize = 5;
-        match env::var("SWIM_TIMEOUT") {
-            Ok(var) => match var.parse() {
-                Ok(result) => result,
-                Err(e) => {
-                    warn!(
-                        "SWIM_TIMEOUT parsing error: {} defaulting to: {}",
-                        e, default
-                    );
-                    default
-                }
-            },
-            Err(_) => {
-                warn!("SWIM_TIMEOUT not defined. Defaulting to: {}", default);
-                default
-            }
-        }
-    }
-
-    pub fn swim_interval() -> usize {
-        let default: usize = 5;
-        match env::var("SWIM_INTERVAL") {
-            Ok(var) => match var.parse() {
-                Ok(result) => result,
-                Err(e) => {
-                    warn!(
-                        "SWIM_INTERVAL parsing error: {} defaulting to: {}",
-                        e, default
-                    );
-                    default
-                }
-            },
-            Err(_) => {
-                warn!("SWIM_INTERVAL not defined. Defaulting to: {}", default);
-                default
-            }
-        }
-    }
-
     /// Vector dimensions
     pub fn vectors_dimension() -> usize {
         let default: usize = 768;
@@ -107,8 +67,7 @@ impl Configuration {
 
     /// Reader GRPC service port
     pub fn reader_listen_address() -> SocketAddr {
-        let swim_addr = Configuration::swim_addr();
-        let port = swim_addr.port() + 2;
+        let port = Configuration::chitchat_port() + 2;
 
         let default = SocketAddr::new(IpAddr::from_str("::1").unwrap(), port);
 
@@ -129,9 +88,7 @@ impl Configuration {
     }
 
     pub fn writer_listen_address() -> SocketAddr {
-        let swim_addr = Configuration::swim_addr();
-        let port = swim_addr.port() + 1;
-
+        let port = Configuration::chitchat_port() + 1;
         let default = SocketAddr::new(IpAddr::from_str("::1").unwrap(), port);
 
         match env::var("WRITER_LISTEN_ADDRESS") {
@@ -181,19 +138,37 @@ impl Configuration {
         }
     }
 
-    pub fn swim_addr() -> SocketAddr {
-        let default = SocketAddr::new(IpAddr::from_str("::1").unwrap(), 9999);
-        match env::var("SWIM_ADDR") {
-            Ok(var) => var
-                .to_socket_addrs()
-                .unwrap()
-                .next()
-                .expect("Error parsing Socket address for swim peers addrs"),
+    pub fn chitchat_port() -> u16 {
+        let default: u16 = 40100;
+        match env::var("CHITCHAT_PORT") {
+            Ok(var) => u16::from_str(&var).unwrap_or_else(|e| {
+                error!("Can't parse CHITCHAT_PORT variable: {e}");
+                default
+            }),
             Err(_) => {
-                warn!(
-                    "READER_LISTEN_ADDRESS not defined. Defaulting to: {}",
-                    default
-                );
+                warn!("CHITCHAT_ADDR not defined. Defaulting to: {}", default);
+                default
+            }
+        }
+    }
+
+    pub fn public_ip() -> IpAddr {
+        let default = IpAddr::from_str("::1").unwrap();
+        match env::var("PUBLIC_IP") {
+            Ok(v) => IpAddr::from_str(&v).unwrap(),
+            Err(e) => {
+                error!("PUBLIC_IP node defined. Defaulting to: {default}. Error details: {e}");
+                default
+            }
+        }
+    }
+
+    pub fn seed_nodes() -> Vec<String> {
+        let default = vec![];
+        match env::var("SEED_NODES") {
+            Ok(v) => v.split(';').map(|addr| addr.to_string()).collect(),
+            Err(e) => {
+                error!("Error parsing environment varialbe SEED_NODES: {e}");
                 default
             }
         }
@@ -209,29 +184,6 @@ impl Configuration {
                     default
                 }
             },
-            Err(_) => default,
-        }
-    }
-
-    pub fn swim_peers_addrs() -> Vec<SocketAddr> {
-        let default = vec![];
-
-        match env::var("SWIM_PEERS_ADDR") {
-            Ok(var) => {
-                let addrs_str: Vec<&str> =
-                    serde_json::from_str(&var).unwrap_or_else(|_| Vec::default());
-                trace!("Swim peer address: {:?}", addrs_str);
-
-                addrs_str
-                    .iter()
-                    .map(|addr| {
-                        addr.to_socket_addrs()
-                            .unwrap()
-                            .next()
-                            .expect("Error parsing Socket address for swim peers addrs")
-                    })
-                    .collect()
-            }
             Err(_) => default,
         }
     }

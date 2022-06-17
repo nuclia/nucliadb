@@ -12,16 +12,17 @@ metadata:
 data:
 {{- if .Values.debug }}
   DEBUG: "True"
-  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG"
+  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_cluster=DEBUG"
 {{- else }}
-  RUST_LOG: "nucliadb_node=WARN,nucliadb_swim=WARN"
+  RUST_LOG: "nucliadb_node=WARN,nucliadb_cluster=WARN,nucliadb_cluster=WARN"
 {{- end }}
   HOST_KEY_PATH: "{{ .Values.config.data_path }}/node.key"
   SENTRY_URL: {{ .Values.running.sentry_url }}
   READER_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_reader }}
   WRITER_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_writer }}
   SIDECAR_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_sidecar }}
-  SWIM_ADDR: 0.0.0.0:{{ .Values.serving.swim_port }}
+  CHITCHAT_LISTEN_ADDR: 0.0.0.0:{{ .Values.serving.chitchat_port }}
+  NODE_TYPE: "{{ .Values.serving.node_type }}"
   DATA_PATH: "{{.Values.config.data_path}}"
 {{- if .Values.config.lazyloading }}
   LAZY_LOADING: "true"

@@ -57,7 +57,7 @@ class Utility(str, Enum):
     CACHE = "cache"
     NODES = "nodes"
     COUNTER = "counter"
-    SWIM = "swim"
+    CHITCHAT = "chitchat"
     PUBSUB = "pubsub"
     INDEXING = "indexing"
     AUDIT = "audit"

@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -18,14 +19,15 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::Path;
-use std::sync::Arc;
-use std::time::Instant;
+use std::str::FromStr;
+use std::time::{Duration, Instant};
 
-use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster};
+use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NucliaDBNodeType};
 use nucliadb_node::config::Configuration;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
+use tokio::time::sleep;
 use tonic::transport::Server;
 use tracing::*;
 
@@ -53,26 +55,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service);
     let host_key_path = Configuration::host_key_path();
-    let swim_addr = Configuration::swim_addr();
-    let swim_peers_addrs = Configuration::swim_peers_addrs();
+    let public_ip = Configuration::public_ip();
+    let chitchat_port = Configuration::chitchat_port();
+    let seed_nodes = Configuration::seed_nodes();
+
+    let chitchat_addr = SocketAddr::from_str(&format!("{}:{}", public_ip, chitchat_port))?;
 
     // Cluster
     let host_key = read_or_create_host_key(Path::new(&host_key_path))?;
-    let cluster = Arc::new(Cluster::new(
+    let chitchat_cluster = Cluster::new(
         host_key.to_string(),
-        swim_addr,
-        'N',
-        Configuration::swim_timeout() as u64,
-        Configuration::swim_interval() as u64,
-    )?);
-
-    // Basicamente especifica todos los peers y quita el que soy yo.
-    for peer_addr in swim_peers_addrs {
-        if peer_addr != swim_addr {
-            debug!("Add peer node: {}", peer_addr);
-            cluster.add_peer_node(peer_addr).await;
-        }
-    }
+        chitchat_addr,
+        NucliaDBNodeType::Node,
+        seed_nodes,
+    )
+    .await?;
 
     let writer_task = tokio::spawn(async move {
         let addr = Configuration::writer_listen_address();
@@ -88,6 +85,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .serve(addr)
             .await
             .expect("Error starting gRPC writer");
+    });
+
+    tokio::spawn(async move {
+        let mut watcher = chitchat_cluster.members_change_watcher();
+        loop {
+            sleep(Duration::from_secs(1)).await;
+            if watcher.changed().await.is_ok() {
+                let update = &*watcher.borrow();
+                if let Ok(json_update) = serde_json::to_string(&update) {
+                    debug!("Chitchat cluster updated: {json_update}");
+                }
+            } else {
+                error!("Chitchat cluster updated monitor fail");
+            }
+        }
     });
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());

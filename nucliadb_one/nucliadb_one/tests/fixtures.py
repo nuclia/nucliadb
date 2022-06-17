@@ -61,15 +61,15 @@ def test_settings_one(gcs, redis, node):  # type: ignore
     ingest_settings.pull_time = 0
     ingest_settings.driver = "redis"
     ingest_settings.driver_redis_url = url
-    ingest_settings.swim_binding_port = 4440
-    search_settings.swim_enabled = False
+    ingest_settings.chitchat_binding_port = 4444
+    search_settings.chitchat_enabled = False
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
-    ingest_settings.swim_peers_addr = [
-        f'{node["writer1"]["host"]}:{node["writer1"]["swim"]}',
-        f'{node["writer2"]["host"]}:{node["writer2"]["swim"]}',
-    ]
+    # ingest_settings.chitchat_peers_addr = [
+    #    f'{node["writer1"]["host"]}:{node["writer1"]["chitchat"]}',
+    #    f'{node["writer2"]["host"]}:{node["writer2"]["chitchat"]}',
+    # ]
 
     extended_storage_settings.local_testing_files = f"{dirname(__file__)}"
 

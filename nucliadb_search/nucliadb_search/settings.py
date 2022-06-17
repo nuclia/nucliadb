@@ -27,13 +27,9 @@ class Settings(BaseSettings):
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
 
-    swim_peers_addr: List[str] = []
-    swim_interval: float = 5.0
-    swim_timeout: float = 5.0
-    swim_binding_host: str = "0.0.0.0"
-    swim_binding_port: int = 4440
-    swim_host_key: str = "search.key"
-    swim_enabled: bool = True
+    chitchat_binding_host: str = "0.0.0.0"
+    chitchat_binding_port: int = 31337
+    chitchat_enabled: bool = True
 
     nodes_load_ingest: bool = False
 

@@ -54,7 +54,6 @@ data:
   NUCLIADB_INGEST: {{ .Values.nucliadb.ingest }}
   NODE_WRITER_PORT: {{ .Values.nucliadb.node_writer_port | quote }}
   NODE_READER_PORT: {{ .Values.nucliadb.node_reader_port | quote }}
-  SWIM_PEERS_ADDR: {{ toJson .Values.nucliadb.swim_peers_addr | quote }}
   CACHE_PUBSUB_DRIVER: {{ .Values.cache.cache_pubsub_driver }}
 {{- if eq .Values.cache.cache_pubsub_driver "redis" }}
   CACHE_PUBSUB_REDIS_URL: {{ .Values.cache.cache_pubsub_redis_url }}
@@ -76,8 +75,6 @@ data:
 {{- else if eq .Values.maindb.driver "tikv" }}
   DRIVER_TIKV_URL: {{ toJson .Values.maindb.driver_tikv_url | quote }}
 {{- end }}
-  SWIM_INTERVAL: {{ .Values.swim.interval_seconds | quote}}
-  SWIM_TIMEOUT: {{ .Values.swim.timeout_seconds | quote}}
   AUDIT_DRIVER: {{ .Values.audit.driver }}
   AUDIT_JETSTREAM_TARGET: {{ .Values.audit.audit_jetstream_target }}
   AUDIT_JETSTREAM_SERVERS: {{ toJson .Values.audit.audit_jetstream_servers | quote }}
