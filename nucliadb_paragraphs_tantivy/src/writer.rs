@@ -227,18 +227,19 @@ impl ParagraphWriterService {
             paragraphs: HashMap::with_capacity(0),
         };
         for (field, text_info) in &resource.texts {
+            let mut field_doc = doc.clone();
             let paragraphs = resource.paragraphs.get(field).unwrap_or(&empty_paragraph);
             // TODO: Make sure we do not copy
             #[allow(clippy::iter_cloned_collect)]
             let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
             for label in field_labels {
-                doc.add_facet(self.schema.facets, Facet::from(label.as_str()));
+                field_doc.add_facet(self.schema.facets, Facet::from(label.as_str()));
             }
             let facet_field = format!("/{}", field);
-            doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
+            field_doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
 
             for (paragraph_id, p) in &paragraphs.paragraphs {
-                let mut subdoc = doc.clone();
+                let mut subdoc = field_doc.clone();
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
