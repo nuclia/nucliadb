@@ -19,7 +19,6 @@
 #
 import logging
 import os
-import random
 import time
 import uuid
 from dataclasses import dataclass
@@ -157,13 +156,6 @@ def get_chitchat_port(container_obj, port):
 
 def get_chitchat_host(container_obj):
     return container_obj.attrs["NetworkSettings"]["IPAddress"]
-
-
-def generate_new_ip(existing_host: str) -> str:
-    octets = existing_host.split(".")
-    last = int(octets[3])
-    octets[3] = random.randint(last + 1, 255)
-    return ".".join(octets)
 
 
 repo_root_path = os.path.sep.join(__file__.split(os.path.sep)[:-4])
