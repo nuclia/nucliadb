@@ -126,9 +126,6 @@ class Node:
                 print(f"Node obj: {node_obj}")
                 if node_obj is None:
                     raise NodesUnsync()
-                import pdb
-
-                pdb.set_trace()
                 shard_created = await node_obj.new_shard()
                 sr = ShardReplica(node=str(node))
                 sr.shard.CopyFrom(shard_created)
