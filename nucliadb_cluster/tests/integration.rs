@@ -11,7 +11,7 @@ use tokio::net::UnixStream;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-const SEED_NODE: &str = "127.0.0.1:40400";
+const SEED_NODE: &str = "0.0.0.0:40400";
 
 pub async fn create_seed_node() -> anyhow::Result<Cluster> {
     // create seed node
@@ -38,7 +38,7 @@ pub async fn create_cluster_for_test_with_id(
 ) -> anyhow::Result<Cluster> {
     let port = find_available_port()?;
     eprintln!("port: {port}");
-    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
+    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port);
     let cluster = Cluster::new(
         peer_uuid,
         peer_addr,
@@ -132,6 +132,7 @@ impl TestClusterState {
     }
 }
 
+#[ignore = "ignore"]
 #[allow(unused_assignments)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_integration_3_nodes_with_monitor() {
