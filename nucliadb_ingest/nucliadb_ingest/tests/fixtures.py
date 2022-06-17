@@ -470,10 +470,6 @@ def node(natsd: str, gcs: str):
     settings.node_reader_port = None  # type: ignore
     settings.node_sidecar_port = None  # type: ignore
 
-    import pdb
-
-    pdb.set_trace()
-
     yield {
         "writer1": {
             "host": writer1_host,
