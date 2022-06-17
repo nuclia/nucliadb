@@ -17,7 +17,6 @@ use std::net::SocketAddr;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
 use std::path::Path;
 use std::str::FromStr;
 use std::time::{Duration, Instant};

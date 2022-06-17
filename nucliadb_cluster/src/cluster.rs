@@ -75,7 +75,7 @@ pub enum NucliaDBNodeType {
 impl fmt::Display for NucliaDBNodeType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NucliaDBNodeType::Search=> write!(f, "Search"),
+            NucliaDBNodeType::Search => write!(f, "Search"),
             NucliaDBNodeType::Ingest => write!(f, "Ingest"),
             NucliaDBNodeType::Node => write!(f, "Node"),
         }
