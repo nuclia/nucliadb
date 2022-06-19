@@ -69,8 +69,6 @@ images.settings["nucliadb_node_reader"] = {
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
-        "CHITCHAT_PORT": "4444",
-        "PUBLIC_IP": "0.0.0.0",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_cluster=ERROR",
@@ -92,7 +90,7 @@ images.settings["nucliadb_node_writer"] = {
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "CHITCHAT_PORT": "4444",
-        "PUBLIC_IP": "0.0.0.0",
+        "SEED_NODES": "",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_cluster=DEBUG,chitchat=TRACE",
     },
@@ -114,7 +112,6 @@ images.settings["nucliadb_node_sidecar"] = {
         "INDEX_JETSTREAM_SERVERS": "[]",
         "HOST_KEY_PATH": "/data/node.key",
         "DATA_PATH": "/data",
-        "CHITCHAT_ADDR": "0.0.0.0:4444",
         "SIDECAR_LISTEN_ADDRESS": "0.0.0.0:4447",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
@@ -133,7 +130,6 @@ images.settings["nucliadb_cluster_manager"] = {
     "network": "host",
     "env": {
         "LISTEN_PORT": "4444",
-        "PUBLIC_IP": "0.0.0.0",
         "NODE_TYPE": "Ingest",
         "SEEDS": "0.0.0.0:4444",
         "MONITOR_ADDR": "0.0.0.0:31337",
@@ -154,7 +150,7 @@ def get_chitchat_port(container_obj, port):
             return network["Ports"][service_port][0]["HostPort"]
 
 
-def get_chitchat_host(container_obj):
+def get_container_host(container_obj):
     return container_obj.attrs["NetworkSettings"]["IPAddress"]
 
 
@@ -407,17 +403,14 @@ def node(natsd: str, gcs: str):
     cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
 
     cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
-    cluster_mgr_real_host = get_chitchat_host(nucliadb_cluster_mgr.container_obj)
+    cluster_mgr_real_host = get_container_host(nucliadb_cluster_mgr.container_obj)
 
     images.settings["nucliadb_node_writer"]["env"][
         "SEED_NODES"
     ] = f"{cluster_mgr_real_host}:4444"
-
     writer1_host, writer1_port = nucliadb_node_1_writer.run(volume_node_1)
-    writer2_host, writer2_port = nucliadb_node_2_writer.run(volume_node_1)
-    writer1_chitchat = get_chitchat_port(nucliadb_node_1_writer.container_obj, 4444)
 
-    writer2_chitchat = get_chitchat_port(nucliadb_node_2_writer.container_obj, 4444)
+    writer2_host, writer2_port = nucliadb_node_2_writer.run(volume_node_2)
     reader1_host, reader1_port = nucliadb_node_1_reader.run(volume_node_1)
 
     reader2_host, reader2_port = nucliadb_node_2_reader.run(volume_node_2)
@@ -453,17 +446,20 @@ def node(natsd: str, gcs: str):
 
     sidecar2_host, sidecar2_port = nucliadb_node_2_sidecar.run(volume_node_2)
 
+    writer1_internal_host = get_container_host(nucliadb_node_1_writer.container_obj)
+    writer2_internal_host = get_container_host(nucliadb_node_2_writer.container_obj)
+
     settings.writer_port_map = {
-        writer1_chitchat: writer1_port,
-        writer2_chitchat: writer2_port,
+        writer1_internal_host: writer1_port,
+        writer2_internal_host: writer2_port,
     }
     settings.reader_port_map = {
-        writer1_chitchat: reader1_port,
-        writer2_chitchat: reader2_port,
+        writer1_internal_host: reader1_port,
+        writer2_internal_host: reader2_port,
     }
     settings.sidecar_port_map = {
-        writer1_chitchat: sidecar1_port,
-        writer2_chitchat: sidecar2_port,
+        writer1_internal_host: sidecar1_port,
+        writer2_internal_host: sidecar2_port,
     }
 
     settings.node_writer_port = None  # type: ignore

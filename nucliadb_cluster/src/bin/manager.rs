@@ -9,6 +9,7 @@ use log::{debug, error, info};
 use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
 use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net;
 use tokio::net::TcpStream;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::timeout;
@@ -123,9 +124,16 @@ async fn main() -> anyhow::Result<()> {
 
     let mut termination = signal(SignalKind::terminate())?;
 
-    let pub_ip = env::var("PUBLIC_IP")?;
-    let addr = SocketAddr::from_str(&format!("{}:{}", pub_ip, &args.listen_port))
+    let pub_ip = env::var("HOSTNAME")?;
+    let host = format!("{}:{}", pub_ip, &args.listen_port);
+    let mut addrs_iter = net::lookup_host(host)
+        .await
         .with_context(|| "Can't create cluster listener socket")?;
+    let optional_addr = addrs_iter.next();
+    let addr = match optional_addr {
+        Some(x) => x,
+        None => SocketAddr::from_str("::1:4444").unwrap(),
+    };
     let node_type =
         NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
     let node_id = Uuid::new_v4();

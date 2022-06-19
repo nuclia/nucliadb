@@ -121,9 +121,15 @@ base-node-image:
 	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
 	docker push eu.gcr.io/stashify-218417/basenode:latest
 
+build-search-images: build-local-node build-local-cluster-manager build-local-sidecar
+
 build-local-node:
 	docker build -t eu.gcr.io/stashify-218417/basenode:latest -f Dockerfile.basenode .
 	docker build -t eu.gcr.io/stashify-218417/node:latest -f Dockerfile.node .
 
 build-local-cluster-manager:
 	docker build -t eu.gcr.io/stashify-218417/cluster_manager:latest -f Dockerfile.cluster_monitor .
+
+build-local-sidecar:
+	docker build -t eu.gcr.io/stashify-218417/node_sidecar:latest -f Dockerfile.node_sidecar .
+	

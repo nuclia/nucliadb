@@ -55,11 +55,23 @@ async def main() -> App:
     reader = Reader(settings.reader_listen_address)
 
     if settings.force_host_id is None:
-        with open(settings.host_key_path, "rb") as file_key:
-            uuid_bytes = file_key.read()
-            node = str(uuid.UUID(bytes=uuid_bytes))
+        node = None
+        i = 0
+        while node is None and i < 20:
+            try:
+                with open(settings.host_key_path, "rb") as file_key:
+                    uuid_bytes = file_key.read()
+                    node = str(uuid.UUID(bytes=uuid_bytes))
+            except FileNotFoundError:
+                logger.error("Could not find key")
+                node = None
+                i += 1
+                await asyncio.sleep(2)
     else:
         node = settings.force_host_id
+
+    if node is None:
+        raise Exception("No Key defined")
 
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:

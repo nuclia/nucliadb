@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service);
     let host_key_path = Configuration::host_key_path();
-    let public_ip = Configuration::public_ip();
+    let public_ip = Configuration::public_ip().await;
     let chitchat_port = Configuration::chitchat_port();
     let seed_nodes = Configuration::seed_nodes();
 

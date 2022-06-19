@@ -20,7 +20,7 @@
 use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
-
+use tokio::net;
 use tracing::*;
 
 /// Global configuration options
@@ -152,12 +152,20 @@ impl Configuration {
         }
     }
 
-    pub fn public_ip() -> IpAddr {
+    pub async fn public_ip() -> IpAddr {
         let default = IpAddr::from_str("::1").unwrap();
-        match env::var("PUBLIC_IP") {
-            Ok(v) => IpAddr::from_str(&v).unwrap(),
+        match env::var("HOSTNAME") {
+            Ok(v) => {
+                let host = format!("{}:4444", &v);
+                let mut addrs_iter = net::lookup_host(host).await.unwrap();
+                let addr = addrs_iter.next();
+                match addr {
+                    Some(x) => x.ip(),
+                    None => IpAddr::from_str(&v).unwrap(),
+                }
+            }
             Err(e) => {
-                error!("PUBLIC_IP node defined. Defaulting to: {default}. Error details: {e}");
+                error!("HOSTNAME node defined. Defaulting to: {default}. Error details: {e}");
                 default
             }
         }

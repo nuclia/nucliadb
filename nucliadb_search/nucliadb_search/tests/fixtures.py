@@ -140,6 +140,10 @@ async def search_api(
     await driver.flushall()
     clear_ingest_cache()
     clear_global_cache()
+    for node in NODES.values():
+        node._reader = None
+        node._writer = None
+        node._sidecar = None
 
 
 @pytest.fixture(scope="function")

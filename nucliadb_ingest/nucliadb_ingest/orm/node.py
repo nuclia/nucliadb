@@ -205,9 +205,8 @@ class Node:
             hostname = self.address.split(":")[0]
             if settings.node_sidecar_port is None:
                 # For testing proposes we need to be able to have a writing port
-                chitchat_port = self.address.split(":")[1]
-                sidecar_port = settings.sidecar_port_map[chitchat_port]
-                grpc_address = f"{hostname}:{sidecar_port}"
+                sidecar_port = settings.sidecar_port_map[hostname]
+                grpc_address = f"localhost:{sidecar_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_sidecar_port}"
             SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(
@@ -231,13 +230,12 @@ class Node:
             and self.dummy is False
         ):
             hostname = self.address.split(":")[0]
-            # if settings.node_writer_port is None:
-            #    # For testing proposes we need to be able to have a writing port
-            #    chitchat_port = self.address.split(":")[1]
-            #    writer_port = settings.writer_port_map[chitchat_port]
-            #    grpc_address = f"{hostname}:{writer_port}"
-            # else:
-            grpc_address = f"{hostname}:{settings.node_writer_port}"
+            if settings.node_writer_port is None:
+                # For testing proposes we need to be able to have a writing port
+                writer_port = settings.writer_port_map[hostname]
+                grpc_address = f"localhost:{writer_port}"
+            else:
+                grpc_address = f"{hostname}:{settings.node_writer_port}"
             WRITE_CONNECTIONS[self.address] = NodeWriterStub(
                 aio.insecure_channel(grpc_address)
             )
@@ -261,9 +259,8 @@ class Node:
             hostname = self.address.split(":")[0]
             if settings.node_reader_port is None:
                 # For testing proposes we need to be able to have a writing port
-                chitchat_port = self.address.split(":")[1]
-                reader_port = settings.reader_port_map[chitchat_port]
-                grpc_address = f"{hostname}:{reader_port}"
+                reader_port = settings.reader_port_map[hostname]
+                grpc_address = f"localhost:{reader_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_reader_port}"
             READ_CONNECTIONS[self.address] = NodeReaderStub(
