@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     node_replicas: int = 2  # TODO discuss default value
 
     chitchat_binding_host: str = "0.0.0.0"
-    chitchat_binding_port: int = 4440
+    chitchat_binding_port: int = 31337
     chitchat_enabled: bool = True
     chitchat_sock_path = "/tmp/rust_python.sock"  # TODO discuss default value
 

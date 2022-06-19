@@ -132,7 +132,7 @@ images.settings["nucliadb_cluster_manager"] = {
         "LISTEN_PORT": "4444",
         "NODE_TYPE": "Ingest",
         "SEEDS": "0.0.0.0:4444",
-        "MONITOR_ADDR": "0.0.0.0:31337",
+        "MONITOR_ADDR": "TO_REPLACE",
         "RUST_LOG": "debug",
         "RUST_BACKTRACE": "full",
     },

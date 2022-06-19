@@ -39,7 +39,6 @@ from nucliadb_utils.utilities import clear_global_cache
 @pytest.fixture(scope="function")
 def test_settings_search(gcs, redis, node):  # type: ignore
     from nucliadb_ingest.settings import settings as ingest_settings
-    from nucliadb_search.settings import settings as search_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
         nuclia_settings,
@@ -66,9 +65,9 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     ingest_settings.pull_time = 0
     ingest_settings.driver = "redis"
     ingest_settings.driver_redis_url = url
-    search_settings.chitchat_binding_host = "0.0.0.0"
-    search_settings.chitchat_binding_port = 31337
-    search_settings.chitchat_enabled = True
+    ingest_settings.chitchat_binding_host = "0.0.0.0"
+    ingest_settings.chitchat_binding_port = 31337
+    ingest_settings.chitchat_enabled = True
 
     nuclia_settings.dummy_processing = True
 

@@ -27,10 +27,6 @@ class Settings(BaseSettings):
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
 
-    chitchat_binding_host: str = "0.0.0.0"
-    chitchat_binding_port: int = 31337
-    chitchat_enabled: bool = True
-
     nodes_load_ingest: bool = False
 
     search_timeout: float = 10.0

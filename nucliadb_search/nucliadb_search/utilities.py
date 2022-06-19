@@ -20,7 +20,6 @@
 from collections import Counter
 
 from nucliadb_ingest.utils import get_driver  # noqa
-from nucliadb_search.chitchat import ChitchatNucliaDBSearch
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
 from nucliadb_utils.utilities import Utility, get_utility
@@ -36,7 +35,3 @@ def get_nodes() -> NodesManager:
 
 def get_counter() -> Counter:
     return get_utility(Utility.COUNTER)  # type: ignore
-
-
-def get_chitchat() -> ChitchatNucliaDBSearch:
-    return get_utility(Utility.CHITCHAT)

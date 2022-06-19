@@ -28,25 +28,30 @@ from nucliadb_ingest import logger
 from nucliadb_ingest.orm.node import ClusterMember, chitchat_update_node
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
+from nucliadb_utils.utilities import Utility, set_utility
 
 if SENTRY:
     from sentry_sdk import capture_exception
 
 
-def start_chitchat() -> Optional[ChitchatNucliaDBIngest]:
+def start_chitchat() -> Optional[ChitchatNucliaDB]:
+
     if settings.chitchat_enabled is False:
+        logger.info("Chitchat not enabled")
         return None
 
-    chitchat = ChitchatNucliaDBIngest(
+    chitchat = ChitchatNucliaDB(
         settings.chitchat_binding_host, settings.chitchat_binding_port
     )
     asyncio.create_task(chitchat.start())
+    logger.info("Chitchat started")
+    set_utility(Utility.CHITCHAT, chitchat)
 
     return chitchat
 
 
-class ChitchatNucliaDBIngest:
-    chitchat_update_srv: Optional[asyncio.Task] = None
+class ChitchatNucliaDB:
+    chitchat_update_srv: Optional[asyncio.Server] = None
 
     def __init__(self, host: str, port: int):
         self.host = host
@@ -114,4 +119,4 @@ class ChitchatNucliaDBIngest:
                 logger.exception(f"error while reading update from unix socket: {e}")
 
     async def close(self):
-        self.chitchat_update_srv.cancel()
+        self.chitchat_update_srv.close()

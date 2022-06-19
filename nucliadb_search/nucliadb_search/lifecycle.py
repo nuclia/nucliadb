@@ -22,12 +22,11 @@ import sys
 from collections import Counter
 
 from nucliadb_ingest.utils import get_driver  # type: ignore
-from nucliadb_ingest.utils import start_ingest, stop_ingest
+from nucliadb_ingest.utils import get_chitchat, start_ingest, stop_ingest
 from nucliadb_search import SERVICE_NAME, logger
 from nucliadb_search.chitchat import start_chitchat
 from nucliadb_search.nodes import NodesManager
 from nucliadb_search.predict import PredictEngine
-from nucliadb_search.utilities import get_chitchat
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
@@ -63,11 +62,13 @@ async def initialize() -> None:
     cache = await get_cache()
     set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))
 
-    chitchat = start_chitchat()
-    if chitchat is not None:
-        set_utility(Utility.CHITCHAT, chitchat)
+    existing_chitchat_utility = get_utility(Utility.CHITCHAT)
+    if existing_chitchat_utility is None:
+        start_chitchat()
     else:
-        logger.info("Not registering search chitchat")
+        logger.info(
+            "Not registering search chitchat as already exist a chitchat utility"
+        )
 
     logging.basicConfig(
         level=logging.INFO,
