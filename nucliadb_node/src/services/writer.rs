@@ -194,27 +194,27 @@ impl ShardWriterService {
     pub async fn remove_resource(&mut self, resource: &ResourceId) -> InternalResult<()> {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
-        let text_task = tokio::task::spawn_blocking(move || {
+        let _text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
             writer.delete_resource(&field_resource)
-        });
+        }).await.unwrap()?;
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer_service.clone();
-        let paragraph_task = tokio::task::spawn_blocking(move || {
+        let _paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
             writer.delete_resource(&paragraph_resource)
-        });
+        }).await.unwrap()?;
         let vector_writer_service = self.vector_writer_service.clone();
         let vector_resource = resource.clone();
-        let vector_task = tokio::task::spawn_blocking(move || {
+        let _vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
             writer.delete_resource(&vector_resource)
-        });
-        let (rtext, rparagraph, rvector) =
-            try_join!(text_task, paragraph_task, vector_task).unwrap();
-        rtext?;
-        rparagraph?;
-        rvector?;
+        }).await.unwrap()?;
+        // let (rtext, rparagraph, rvector) =
+        //     try_join!(text_task, paragraph_task, vector_task).unwrap();
+        // rtext?;
+        // rparagraph?;
+        // rvector?;
         Ok(())
     }
     pub async fn delete(&self) -> Result<(), std::io::Error> {
