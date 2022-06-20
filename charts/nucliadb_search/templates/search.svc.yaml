@@ -18,4 +18,4 @@ spec:
     - name: metrics
       port: {{ .Values.serving.metricsPort}}
     - name: cluster-monitor
-      port: {{ .Values.cluster_manager.port }}
+      port: {{ .Values.chitchat.cluster_manager.port }}

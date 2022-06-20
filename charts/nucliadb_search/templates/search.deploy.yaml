@@ -20,8 +20,8 @@ spec:
     metadata:
       name: search
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.chitchat.binding.port }},{{ .Values.services.nats }},{{ .Values.services.maindb }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.chitchat.binding.port }},{{ .Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.chitchat.cluster_manager.port }},{{ .Values.chitchat.node.chitchat_port}},{{ .Values.services.nats }},{{ .Values.services.maindb }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.chitchat.cluster_manager.port }},{{ .Values.chitchat.node.chitchat_port}},{{ .Values.serving.metricsPort }}"
       labels:
         app: search
         version: "{{ .Chart.Version | replace "+" "_" }}"
@@ -72,7 +72,7 @@ spec:
         - name: metrics
           containerPort: {{ .Values.serving.metricsPort }}
         - name: cluster-monitor
-          containerPort: {{ .Values.cluster_manager.port }}
+          containerPort: {{ .Values.chitchat.cluster_manager.port }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
@@ -93,7 +93,7 @@ spec:
             name: search-config
         ports:
         - name: chitchat
-          containerPort: {{ .Values.node.chitchat_port }}
+          containerPort: {{ .Values.chitchat.node.chitchat_port }}
           protocol: UDP
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent

@@ -21,6 +21,6 @@ data:
 
   MONITOR_ADDR: "{{ .Values.chitchat.cluster_manager.host }}:{{ .Values.chitchat.cluster_manager.port }}"
 
-  LISTEN_PORT: {{ .Values.node.chitchat_port }}
-  NODE_TYPE: {{ .Values.node.node_type }}
-  SEEDS: {{ .Values.node.node0_svc_fixed_ip }}
+  LISTEN_PORT: {{ .Values.chitchat.node.chitchat_port }}
+  NODE_TYPE: {{ .Values.chitchat.node.node_type }}
+  SEEDS: {{ .Values.chitchat.node.node0_svc_fixed_ip }}

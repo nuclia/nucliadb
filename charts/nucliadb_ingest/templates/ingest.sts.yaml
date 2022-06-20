@@ -74,7 +74,7 @@ spec:
         - containerPort: {{ .Values.serving.monitor }}
         - containerPort: {{ .Values.serving.metrics }}
         - name: cluster-monitor
-          containerPort: {{ .Values.cluster_manager.port }}
+          containerPort: {{ .Values.chitchat.cluster_manager.port }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
@@ -95,7 +95,7 @@ spec:
             name: {{ .Release.Name }}-config
         ports:
         - name: chitchat
-          containerPort: {{ .Values.node.chitchat_port }}
+          containerPort: {{ .Values.chitchat.node.chitchat_port }}
           protocol: UDP
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent

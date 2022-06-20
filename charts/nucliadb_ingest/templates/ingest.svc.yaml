@@ -17,4 +17,4 @@ spec:
       port: {{ .Values.serving.grpc }}
       appProtocol: grpc
     - name: cluster-monitor
-      port: {{ .Values.cluster_manager.port }}
+      port: {{ .Values.chitchat.cluster_manager.port }}
