@@ -42,6 +42,8 @@ class CreateResourcePayload(BaseModel):
     keywordsets: Dict[str, models.FieldKeywordset] = {}
     datetimes: Dict[str, models.FieldDatetime] = {}
 
+    textProcessingEnabled: Optional[bool] = True
+
     @validator("icon")
     def icon_check(cls, v):
 
@@ -69,6 +71,8 @@ class UpdateResourcePayload(BaseModel):
     conversations: Dict[str, models.InputConversationField] = {}
     keywordsets: Dict[str, models.FieldKeywordset] = {}
     datetimes: Dict[str, models.FieldDatetime] = {}
+
+    textProcessingEnabled: Optional[bool] = True
 
 
 class ResourceCreated(BaseModel):

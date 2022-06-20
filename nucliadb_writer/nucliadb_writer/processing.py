@@ -73,6 +73,9 @@ class PushPayload(BaseModel):
     # Only internal
     partition: int
 
+    # Enable text processing
+    textProcessingEnabled: Optional[bool] = True
+
 
 class PushResponse(BaseModel):
     seqid: Optional[int] = None
