@@ -1,3 +1,3 @@
 # NUCLIADB SEARCH
 
-Search API
+Search
