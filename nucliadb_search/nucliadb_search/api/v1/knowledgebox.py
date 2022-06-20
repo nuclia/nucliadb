@@ -43,7 +43,7 @@ from nucliadb_search.search.fetch import abort_transaction  # type: ignore
 from nucliadb_search.search.shards import get_shard
 from nucliadb_search.settings import settings
 from nucliadb_search.utilities import get_driver, get_nodes
-from nucliadb_utils.authentication import requires
+from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_cache
@@ -83,7 +83,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
     tags=["Knowledge Boxes"],
     response_model_exclude_unset=True,
 )
-@requires([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def knowledgebox_counters(
     request: Request,
