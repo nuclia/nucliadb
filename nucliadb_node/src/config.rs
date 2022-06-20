@@ -147,7 +147,7 @@ impl Configuration {
                 default
             }),
             Err(_) => {
-                warn!("CHITCHAT_ADDR not defined. Defaulting to: {}", default);
+                warn!("CHITCHAT_PORT not defined. Defaulting to: {}", default);
                 default
             }
         }

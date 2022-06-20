@@ -21,7 +21,7 @@ data:
   READER_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_reader }}
   WRITER_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_writer }}
   SIDECAR_LISTEN_ADDRESS: 0.0.0.0:{{ .Values.serving.grpc_sidecar }}
-  CHITCHAT_LISTEN_ADDR: 0.0.0.0:{{ .Values.serving.chitchat_port }}
+  CHITCHAT_PORT: "{{ .Values.serving.chitchat_port }}"
   NODE_TYPE: "{{ .Values.serving.node_type }}"
   DATA_PATH: "{{.Values.config.data_path}}"
   SEED_NODES: "{{.Values.serving.node0_svc_fixed_ip}}"
