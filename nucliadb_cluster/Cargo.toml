@@ -40,4 +40,4 @@ tempfile = "3"
 
 [[test]]
 name = "integration"
-paht = "tests/integration.rs"
+path = "tests/integration.rs"

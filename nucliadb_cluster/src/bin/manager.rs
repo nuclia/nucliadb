@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-use clap::Parser;
 use log::{debug, error, info};
 use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
 use rand::Rng;
@@ -15,20 +14,31 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::timeout;
 use uuid::Uuid;
 
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct CliArgs {
-    #[clap(short, long)]
+#[derive(Debug)]
+struct ClusterMgrArgs {
     listen_port: String,
-
-    #[clap(short, long)]
     node_type: String,
-
-    #[clap(short, long)]
     seeds: Vec<String>,
+    monitor_addr: String,
+}
 
-    #[clap(short, long)]
-    monitor_addr: Option<String>,
+impl ClusterMgrArgs {
+    pub fn init_from_env() -> anyhow::Result<Self> {
+        let listen_port = env::var("LISTEN_PORT")?;
+        let node_type = env::var("NODE_TYPE")?;
+        let seeds = env::var("SEEDS")?
+            .split(';')
+            .map(|s| s.to_owned())
+            .collect();
+        let monitor_addr = env::var("MONITOR_ADDR")?;
+
+        Ok(ClusterMgrArgs {
+            listen_port,
+            node_type,
+            seeds,
+            monitor_addr,
+        })
+    }
 }
 
 async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
@@ -67,27 +77,23 @@ async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
     }
 }
 
-async fn get_stream(monitor_addr: Option<String>) -> anyhow::Result<TcpStream> {
-    if let Some(socket_addr) = monitor_addr {
-        loop {
-            match TcpStream::connect(&socket_addr).await {
-                Ok(mut s) => {
-                    if check_peer(&mut s).await? {
-                        break Ok(s);
-                    }
-                    debug!("Invalid peer. Sleep 1s and reconnect");
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    s.shutdown().await?
+async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
+    loop {
+        match TcpStream::connect(&monitor_addr).await {
+            Ok(mut s) => {
+                if check_peer(&mut s).await? {
+                    break Ok(s);
                 }
-                Err(e) => {
-                    error!("Can't connect to monitor socket: {e}. Sleep 200ms and reconnect");
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-                    continue;
-                }
+                debug!("Invalid peer. Sleep 1s and reconnect");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                s.shutdown().await?
+            }
+            Err(e) => {
+                error!("Can't connect to monitor socket: {e}. Sleep 200ms and reconnect");
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                continue;
             }
         }
-    } else {
-        panic!("invalid monitor addr")
     }
 }
 
@@ -120,7 +126,7 @@ async fn send_update(update: String, stream: &mut TcpStream) -> anyhow::Result<(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    let args = CliArgs::parse();
+    let args = ClusterMgrArgs::init_from_env()?;
 
     let mut termination = signal(SignalKind::terminate())?;
 
