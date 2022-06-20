@@ -197,19 +197,25 @@ impl ShardWriterService {
         let _text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
             writer.delete_resource(&field_resource)
-        }).await.unwrap()?;
+        })
+        .await
+        .unwrap()?;
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer_service.clone();
         let _paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
             writer.delete_resource(&paragraph_resource)
-        }).await.unwrap()?;
+        })
+        .await
+        .unwrap()?;
         let vector_writer_service = self.vector_writer_service.clone();
         let vector_resource = resource.clone();
         let _vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
             writer.delete_resource(&vector_resource)
-        }).await.unwrap()?;
+        })
+        .await
+        .unwrap()?;
         // let (rtext, rparagraph, rvector) =
         //     try_join!(text_task, paragraph_task, vector_task).unwrap();
         // rtext?;
