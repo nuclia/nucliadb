@@ -59,16 +59,16 @@ images.settings["nucliadb_node_writer"] = {
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-        "SWIM_ADDR": "0.0.0.0:4444",
-        "SWIM_TIMEOUT": "10",
+        "CHITCHAT_PORT": "4444",
+        "SEED_NODES": "",
         "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_swim=DEBUG",
+        "RUST_LOG": "nucliadb_cluster=DEBUG",
     },
     "options": {
         "command": [
             "/usr/local/bin/node_writer",
         ],
-        "ports": {"4444/UDP": None, "4446": None},
+        "ports": {"4446": None},
     },
 }
 

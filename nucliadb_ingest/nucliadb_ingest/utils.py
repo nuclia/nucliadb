@@ -19,9 +19,10 @@
 #
 from typing import Optional
 
-from grpc import aio  # type: ignore
+from grpc import aio
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb_ingest.chitchat import ChitchatNucliaDB  # type: ignore
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
@@ -117,3 +118,7 @@ async def stop_ingest():
     if get_utility(Utility.INGEST):
         util = get_utility(Utility.INGEST)
         await util.finalize()
+
+
+def get_chitchat() -> ChitchatNucliaDB:
+    return get_utility(Utility.CHITCHAT)

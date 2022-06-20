@@ -1,2 +1,0 @@
-include README.md LICENSE-MIT
-recursive-include nucliadb_swim *.pyi

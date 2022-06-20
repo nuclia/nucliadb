@@ -2,20 +2,19 @@ extern crate tokio;
 #[macro_use]
 extern crate log;
 
-use std::{
-    net::ToSocketAddrs,
-    sync::mpsc::{Receiver, Sender},
-    thread::JoinHandle,
-};
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread::JoinHandle;
 
-use nucliadb_cluster::cluster::{Cluster as RustCluster, Member as RustMember};
+use anyhow;
+use nucliadb_cluster::cluster::{Cluster as RustCluster, Member as RustMember, NucliaDBNodeType};
 use pyo3::prelude::*;
-use std::sync::mpsc::channel;
 use tokio::runtime::Runtime;
 
 #[pyclass]
 pub struct Cluster {
-    tx_command: Sender<String>,
+    tx_command: Sender<ClusterCommands>,
     rx_members: Receiver<Vec<RustMember>>,
     _t_handle: JoinHandle<()>,
 }
@@ -34,20 +33,62 @@ pub struct Member {
 
     // Type of node 'l': node reader 'e': node writer 'r': reader 'w': writer
     #[pyo3(get, set)]
-    pub node_type: char,
+    pub node_type: String,
 
     /// If true, it means self.
     #[pyo3(get, set)]
     pub is_self: bool,
 }
 
+enum ClusterCommands {
+    GetMembers,
+    AddPeerNode(String),
+}
+
 impl From<RustMember> for Member {
     fn from(m: RustMember) -> Self {
         Member {
-            node_id: m.node_id.to_string(),
+            node_id: m.node_id,
             listen_addr: m.listen_addr.to_string(),
-            node_type: m.node_type,
+            node_type: m.node_type.to_string(),
             is_self: m.is_self,
+        }
+    }
+}
+
+async fn cluster_creator(
+    node_id: String,
+    listen_addr: SocketAddr,
+    node_type: String,
+    rx_command: Receiver<ClusterCommands>,
+    tx_members: Sender<Vec<RustMember>>,
+) -> anyhow::Result<()> {
+    info!("Starting ChitChat cluster");
+    let cluster = RustCluster::new(
+        node_id,
+        listen_addr,
+        NucliaDBNodeType::from_str(&node_type)?,
+        Vec::<String>::new(),
+    )
+    .await?;
+
+    loop {
+        debug!("Waiting for command...");
+        let command = rx_command.recv().expect("Error in channel rx get_members");
+        match command {
+            ClusterCommands::GetMembers => {
+                debug!("GetMembers command received");
+                tx_members
+                    .send(cluster.members().await)
+                    .expect("Error sending members through channel")
+            }
+            ClusterCommands::AddPeerNode(addr) => {
+                debug!("AddPeerNode command receieved");
+                let addr = SocketAddr::from_str(&addr)?;
+                cluster
+                    .add_peer_node(addr)
+                    .expect("Error during send Syn message to peer");
+            }
         }
     }
 }
@@ -55,67 +96,37 @@ impl From<RustMember> for Member {
 #[pymethods]
 impl Cluster {
     #[new]
-    fn new(
-        node_id: String,
-        listen_addr: &str,
-        node_type: char,
-        timeout: u64,
-        interval: u64,
-    ) -> Cluster {
-        let listen_addr = listen_addr
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .expect("Error parsing Socket address for swim peers addrs");
+    fn new(node_id: String, listen_addr: &str, node_type: String) -> PyResult<Cluster> {
+        let listen_addr = SocketAddr::from_str(listen_addr)?;
 
-        let (tx_command, rx_command): (Sender<String>, Receiver<String>) = channel();
-        let (tx_members, rx_members) = channel();
+        let (tx_command, rx_command) = channel::<ClusterCommands>();
+        let (tx_members, rx_members) = channel::<Vec<RustMember>>();
 
         let t_handle = std::thread::spawn(move || {
             // Create the runtime
             let rt = Runtime::new().expect("Error creating tokio runtime");
-            rt.block_on(async move {
-                info!("Starting SWIM cluster");
-                let cluster =
-                    RustCluster::new(node_id, listen_addr, node_type, timeout, interval).unwrap();
-
-                loop {
-                    debug!("Waiting for command...");
-                    let command = rx_command.recv().expect("Error in channel rx get_members");
-                    let command: Vec<_> = command.split('|').collect();
-                    match command[0] {
-                        "get_members" => {
-                            debug!("get_members");
-                            tx_members
-                                .send(cluster.members())
-                                .expect("Error sending members through channel")
-                        }
-                        "add_peer_node" => {
-                            debug!("add_peer_node");
-                            let addr = command[1]
-                                .to_socket_addrs()
-                                .unwrap()
-                                .next()
-                                .expect("Error parsing Socket address for swim peers addrs");
-
-                            cluster.add_peer_node(addr).await;
-                        }
-                        _ => info!("Invalid command sent to Cluster: {}", command[0]),
-                    }
-                }
-            });
+            if let Err(e) = rt.block_on(cluster_creator(
+                node_id,
+                listen_addr,
+                node_type,
+                rx_command,
+                tx_members,
+            )) {
+                error!("{e}");
+                return;
+            }
         });
 
-        Cluster {
+        Ok(Cluster {
             tx_command,
             rx_members,
             _t_handle: t_handle,
-        }
+        })
     }
 
     fn get_members(&self) -> Vec<Member> {
         self.tx_command
-            .send("get_members".to_string())
+            .send(ClusterCommands::GetMembers)
             .expect("Error sending command");
 
         self.rx_members
@@ -126,45 +137,10 @@ impl Cluster {
             .collect()
     }
 
-    fn add_peer_node(&self, addr: &str) {
-        let command = format!("add_peer_node|{}", addr);
+    fn add_peer_node(&self, addr: String) {
         self.tx_command
-            .send(command)
+            .send(ClusterCommands::AddPeerNode(addr))
             .expect("Error sending command");
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::time::Duration;
-
-    use log::{debug, LevelFilter};
-
-    use crate::Cluster;
-
-    fn init() {
-        let _ = env_logger::builder()
-            .is_test(true)
-            .filter_level(LevelFilter::Trace)
-            .try_init();
-    }
-
-    #[test]
-    fn swim() {
-        init();
-        let cluster = Cluster::new("cluster1".to_string(), "localhost:4444", 'N', 2);
-
-        let cluster2 = Cluster::new("cluster2".to_string(), "localhost:5555", 'W', 2);
-        cluster2.add_peer_node("localhost:4444");
-
-        let mut count = 0;
-        while count < 100 {
-            let members = cluster.get_members();
-            debug!("Members: {:?}", members);
-
-            std::thread::sleep(Duration::from_millis(1000));
-            count += 1;
-        }
     }
 }
 

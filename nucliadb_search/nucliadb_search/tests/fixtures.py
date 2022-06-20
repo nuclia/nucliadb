@@ -1,5 +1,4 @@
-# Copyright (C) 2021 Bosutech XXI S.L.
-#
+# Copyright (C) 2021 Bosutech XXI S.L.#
 # nucliadb is offered under the AGPL v3.0 and as commercial software.
 # For commercial licensing, contact us at info@nuclia.com.
 #
@@ -40,7 +39,6 @@ from nucliadb_utils.utilities import clear_global_cache
 @pytest.fixture(scope="function")
 def test_settings_search(gcs, redis, node):  # type: ignore
     from nucliadb_ingest.settings import settings as ingest_settings
-    from nucliadb_search.settings import settings as search_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
         nuclia_settings,
@@ -67,18 +65,14 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     ingest_settings.pull_time = 0
     ingest_settings.driver = "redis"
     ingest_settings.driver_redis_url = url
-    search_settings.swim_binding_port = 4440
-    search_settings.swim_enabled = True
-    ingest_settings.swim_enabled = False
+    ingest_settings.chitchat_binding_host = "0.0.0.0"
+    ingest_settings.chitchat_binding_port = 31337
+    ingest_settings.chitchat_enabled = True
 
     nuclia_settings.dummy_processing = True
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
-    search_settings.swim_peers_addr = [
-        f'127.0.0.1:{node["writer1"]["swim"]}',
-        f'127.0.0.1:{node["writer2"]["swim"]}',
-    ]
     extended_storage_settings.local_testing_files = f"{dirname(__file__)}"
 
 
@@ -110,6 +104,7 @@ async def search_api(
     # Make sure is clean
     await asyncio.sleep(1)
     while len(NODES) < 2:
+        print("awaiting cluster nodes - fixtures.py:113")
         await asyncio.sleep(4)
 
     def make_client_fixture(
@@ -144,6 +139,10 @@ async def search_api(
     await driver.flushall()
     clear_ingest_cache()
     clear_global_cache()
+    for node in NODES.values():
+        node._reader = None
+        node._writer = None
+        node._sidecar = None
 
 
 @pytest.fixture(scope="function")

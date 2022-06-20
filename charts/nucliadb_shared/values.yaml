@@ -49,9 +49,6 @@ nucliadb:
   ingest: ingest:4242
   node_writer_port: 10001
   node_reader_port: 10000
-  swim_peers_addr:
-    - node-0:4440
-    - ingest-0:4440
 
 transaction:
   transaction_jetstream_auth:
@@ -70,10 +67,6 @@ cache:
   cache_pubsub_channel: nucliadb.cache.invalidations
   cache_pubsub_redis_url:
   cache_pubsub_driver: nats # nats | redis
-
-swim:
-  interval_seconds: 5
-  timeout_seconds: 5
 
 audit:
   driver: basic

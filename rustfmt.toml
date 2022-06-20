@@ -1,6 +1,4 @@
 ignore = [
-  "nucliadb_cluster",
-  "nucliadb_swim",
 ]
 
 comment_width = 120

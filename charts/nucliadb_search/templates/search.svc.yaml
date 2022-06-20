@@ -17,3 +17,5 @@ spec:
       port: {{ .Values.serving.port }}
     - name: metrics
       port: {{ .Values.serving.metricsPort}}
+    - name: cluster-monitor
+      port: {{ .Values.cluster_mgr.binding.port }}

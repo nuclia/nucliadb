@@ -32,11 +32,12 @@ resources:
 
 
 serving:
-  swim_port: 4440
+  chitchat_port: 4444
   grpc_reader: 10000
   grpc_writer: 10001
   grpc_sidecar: 10002
   node0_svc_fixed_ip: 10.4.0.255
+  node_type: Node
 
 storage:
   class: ssd

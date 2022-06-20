@@ -10,12 +10,10 @@ on:
       - "nucliadb_search/**"
       - "Dockerfile.search"
       - "nucliadb_utils/**"
-      - "nucliadb_swim/nucliadb_swim/**"
       - "nucliadb_ingest/**"
       - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/nucliadb_cluster/**"
       - "nucliadb_models/**"
   push:
     branches:
@@ -26,12 +24,10 @@ on:
       - "nucliadb_search/**"
       - "Dockerfile.search"
       - "nucliadb_utils/**"
-      - "nucliadb_swim/nucliadb_swim/**"
       - "nucliadb_ingest/**"
       - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/nucliadb_cluster/**"
       - "nucliadb_models/**"
 
 env:
@@ -101,8 +97,6 @@ jobs:
         run: |
           pip install -r test-requirements.txt
           pip install -r nucliadb_search/requirements-sources.txt
-          pip install -e nucliadb_swim
-          pip install -e nucliadb_cluster
           pip install -r nucliadb_ingest/requirements.txt
           pip install -e nucliadb_ingest
           pip install -r nucliadb_search/requirements.txt

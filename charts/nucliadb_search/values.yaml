@@ -24,12 +24,16 @@ services:
 
 running:
   sentry_url:
-  swim_level: INFO
+  chitchat_level: INFO
 
-swim:
-  key: "search.key"
+chitchat:
   binding:
-    port: 4440
+    port: 4444
+    host: "0.0.0.0"
+
+cluster-mgr:
+  bindings:
+    port: 31337
     host: "0.0.0.0"
 
 config:

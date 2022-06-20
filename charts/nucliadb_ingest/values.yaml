@@ -2,8 +2,6 @@
 config:
   pull_time: 100
   node_replicas: 2
-  swim_binding_host: "0.0.0.0"
-  swim_host_key: "ingest.key"
   monitor: False
 
 affinity: {}
@@ -25,7 +23,11 @@ serving:
   grpc: 8030
   monitor: 50101
   metrics: 8081
-  swim: 4440
+
+chitchat:
+  binding:
+    port: 4444
+    host: "0.0.0.0"
 
 # Value of ports to where this component connects to
 services:
@@ -35,7 +37,6 @@ services:
 
 running:
   sentry_url:
-  swim_level: INFO
   activity_log_level: INFO
 
 # secret containing NATS user credentials

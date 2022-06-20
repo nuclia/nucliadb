@@ -28,13 +28,13 @@ from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
 from nucliadb_ingest import SERVICE_NAME, logger, logger_activity
+from nucliadb_ingest.chitchat import start_chitchat
 from nucliadb_ingest.consumer import start_consumer
 from nucliadb_ingest.metrics import start_metrics
 from nucliadb_ingest.partitions import assign_partitions
 from nucliadb_ingest.sentry import SENTRY, set_sentry
 from nucliadb_ingest.service import start_grpc
 from nucliadb_ingest.settings import settings
-from nucliadb_ingest.swim import start_swim
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import (
@@ -107,7 +107,8 @@ async def main() -> List[Callable]:
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
 
-    swim = start_swim()
+    logger.info(f"======= Ingest starting chitchat ======")
+    chitchat = start_chitchat()
 
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)
@@ -125,8 +126,8 @@ async def main() -> List[Callable]:
         stop_audit_utility,
     ]
 
-    if swim is not None:
-        finalizers.append(swim.close)
+    if chitchat is not None:
+        finalizers.append(chitchat.close)
 
     # Using ensure_future as Signal handlers
     # cannot handle couroutines as callbacks
@@ -183,8 +184,8 @@ def run():
     logger_activity.setLevel(
         logging.getLevelName(running_settings.activity_log_level.upper())
     )
-    logging.getLogger("nucliadb_swim").setLevel(
-        logging.getLevelName(running_settings.swim_level.upper())
+    logging.getLogger("nucliadb_chitchat").setLevel(
+        logging.getLevelName(running_settings.chitchat_level.upper())
     )
 
     logging.getLogger("asyncio").setLevel(logging.ERROR)

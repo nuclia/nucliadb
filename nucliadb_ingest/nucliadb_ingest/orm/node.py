@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -36,7 +37,6 @@ from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb_cluster.cluster import Member
 from nucliadb_ingest import logger
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm import NODE_CLUSTER, NODES
@@ -95,6 +95,15 @@ class DummySidecarStub:
         return Shard(shard_id="shard", resources=2)
 
 
+@dataclass
+class ClusterMember:
+    node_id: str
+    listen_addr: str
+    node_type: str
+    online: bool
+    is_self: bool
+
+
 class Node:
     _writer: Optional[NodeWriterStub] = None
     _reader: Optional[NodeReaderStub] = None
@@ -112,7 +121,9 @@ class Node:
         shard = PBShard(shard=sharduuid)
         try:
             for node in nodes:
+                print(f"Node description: {node}")
                 node_obj = NODES.get(node)
+                print(f"Node obj: {node_obj}")
                 if node_obj is None:
                     raise NodesUnsync()
                 shard_created = await node_obj.new_shard()
@@ -194,9 +205,8 @@ class Node:
             hostname = self.address.split(":")[0]
             if settings.node_sidecar_port is None:
                 # For testing proposes we need to be able to have a writing port
-                swim_port = self.address.split(":")[1]
-                sidecar_port = settings.sidecar_port_map[swim_port]
-                grpc_address = f"{hostname}:{sidecar_port}"
+                sidecar_port = settings.sidecar_port_map[hostname]
+                grpc_address = f"localhost:{sidecar_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_sidecar_port}"
             SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(
@@ -222,9 +232,8 @@ class Node:
             hostname = self.address.split(":")[0]
             if settings.node_writer_port is None:
                 # For testing proposes we need to be able to have a writing port
-                swim_port = self.address.split(":")[1]
-                writer_port = settings.writer_port_map[swim_port]
-                grpc_address = f"{hostname}:{writer_port}"
+                writer_port = settings.writer_port_map[hostname]
+                grpc_address = f"localhost:{writer_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_writer_port}"
             WRITE_CONNECTIONS[self.address] = NodeWriterStub(
@@ -250,9 +259,8 @@ class Node:
             hostname = self.address.split(":")[0]
             if settings.node_reader_port is None:
                 # For testing proposes we need to be able to have a writing port
-                swim_port = self.address.split(":")[1]
-                reader_port = settings.reader_port_map[swim_port]
-                grpc_address = f"{hostname}:{reader_port}"
+                reader_port = settings.reader_port_map[hostname]
+                grpc_address = f"localhost:{reader_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_reader_port}"
             READ_CONNECTIONS[self.address] = NodeReaderStub(
@@ -294,24 +302,27 @@ class Node:
         return resp.shards
 
 
-async def swim_update_node(members: List[Member]) -> None:
+async def chitchat_update_node(members: List[ClusterMember]) -> None:
     valid_ids = []
     for member in members:
-        if member.online:
-            valid_ids.append(member.node_id)
-            if (
-                member.is_self is False
-                and member.node_type == "N"
-                and member.node_id not in NODES
-            ):
-                logger.debug(
-                    f"{member.node_id}/{member.node_type} add {member.listen_addr}"
-                )
-                await Node.set(
-                    member.node_id,
-                    address=member.listen_addr,
-                    label=member.node_type,
-                )
+        valid_ids.append(member.node_id)
+        if (
+            member.is_self is False
+            and member.node_type == "Node"
+            and member.node_id not in NODES
+        ):
+            print(
+                f"logger debug: {member.node_id}/{member.node_type} add {member.listen_addr}"
+            )
+            logger.debug(
+                f"{member.node_id}/{member.node_type} add {member.listen_addr}"
+            )
+            await Node.set(
+                member.node_id,
+                address=member.listen_addr,
+                label=member.node_type,
+            )
+            print("Node added")
     node_ids = [x for x in NODES.keys()]
     for key in node_ids:
         if key not in valid_ids:
@@ -319,16 +330,6 @@ async def swim_update_node(members: List[Member]) -> None:
             if node is not None:
                 logger.info(f"{key}/{node.label} remove {node.address}")
                 await Node.destroy(key)
-
-
-async def swim_reset() -> None:
-    nodes_to_delete = [x for x in NODES.keys()]
-    for key in nodes_to_delete:
-        node = NODES.get(key)
-        if node:
-            logger.info(f"{key}/{node.label} remove {node.address}")
-            await Node.destroy(key)
-    NODES.clear()
 
 
 class DefinedNodesNucliaDBSearch:

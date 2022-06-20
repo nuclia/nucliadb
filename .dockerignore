@@ -19,3 +19,5 @@ nucliadb_one/nats-server
 nucliadb_ingest/nats-server
 nucliadb_ingest/pd-server
 nucliadb_ingest/tikv-server
+nucliadb_telemetry/nats-server
+nucliadb_utils/nats-server 

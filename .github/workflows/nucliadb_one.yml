@@ -12,7 +12,6 @@ on:
       - "nucliadb_one/**"
       - "Dockerfile.one"
       - "nucliadb_utils/**"
-      - "nucliadb_swim/**"
       - "nucliadb_ingest/**"
       - "nucliadb_writer/**"
       - "nucliadb_one/**"
@@ -31,7 +30,6 @@ on:
       - "nucliadb_one/**"
       - "Dockerfile.one"
       - "nucliadb_utils/**"
-      - "nucliadb_swim/**"
       - "nucliadb_ingest/**"
       - "nucliadb_writer/**"
       - "nucliadb_one/**"
@@ -103,8 +101,6 @@ jobs:
         run: |
           pip install -r test-requirements.txt
           pip install -r nucliadb_one/requirements-sources.txt
-          pip install -e nucliadb_swim
-          pip install -e nucliadb_cluster
           pip install -r nucliadb_ingest/requirements.txt
           pip install -e nucliadb_ingest
           pip install -r nucliadb_search/requirements.txt

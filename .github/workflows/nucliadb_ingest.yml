@@ -13,9 +13,7 @@ on:
       - "nucliadb_telemetry/**"
       - "test-requirements.txt"
       - "Dockerfile.ingest"
-      - "nucliadb_swim/nucliadb_swim/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/nucliadb_cluster/**"
 
   push:
     branches:
@@ -29,9 +27,7 @@ on:
       - "nucliadb_telemetry/**"
       - "test-requirements.txt"
       - "Dockerfile.ingest"
-      - "nucliadb_swim/nucliadb_swim/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/nucliadb_cluster/**"
 
 env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}

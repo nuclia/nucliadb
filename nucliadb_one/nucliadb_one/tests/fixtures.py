@@ -38,7 +38,6 @@ from nucliadb_utils.utilities import clear_global_cache
 @pytest.fixture(scope="function")
 def test_settings_one(gcs, redis, node):  # type: ignore
     from nucliadb_ingest.settings import settings as ingest_settings
-    from nucliadb_search.settings import settings as search_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
         nucliadb_settings,
@@ -61,15 +60,16 @@ def test_settings_one(gcs, redis, node):  # type: ignore
     ingest_settings.pull_time = 0
     ingest_settings.driver = "redis"
     ingest_settings.driver_redis_url = url
-    ingest_settings.swim_binding_port = 4440
-    search_settings.swim_enabled = False
+    ingest_settings.chitchat_binding_host = "0.0.0.0"
+    ingest_settings.chitchat_binding_port = 31337
+    ingest_settings.chitchat_enabled = True
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
-    ingest_settings.swim_peers_addr = [
-        f'{node["writer1"]["host"]}:{node["writer1"]["swim"]}',
-        f'{node["writer2"]["host"]}:{node["writer2"]["swim"]}',
-    ]
+    # ingest_settings.chitchat_peers_addr = [
+    #    f'{node["writer1"]["host"]}:{node["writer1"]["chitchat"]}',
+    #    f'{node["writer2"]["host"]}:{node["writer2"]["chitchat"]}',
+    # ]
 
     extended_storage_settings.local_testing_files = f"{dirname(__file__)}"
 
@@ -116,6 +116,10 @@ async def nucliadb_api(redis, transaction_utility, test_settings_one: None, even
     await driver.flushall()
     clear_ingest_cache()
     clear_global_cache()
+    for node in NODES.values():
+        node._reader = None
+        node._writer = None
+        node._sidecar = None
 
 
 @pytest.fixture(scope="function")

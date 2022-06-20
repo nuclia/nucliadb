@@ -2,7 +2,6 @@
 
 members = [
   "nucliadb_protos/rust",
-  "nucliadb_swim",
   "nucliadb_cluster",
   "nucliadb_cluster/binding",
   "nucliadb_node",

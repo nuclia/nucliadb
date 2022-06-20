@@ -20,8 +20,8 @@ spec:
     metadata:
       name: search
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.swim.binding.port }},{{ .Values.services.nats }},{{ .Values.services.maindb }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.swim.binding.port }},{{ .Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.chitchat.binding.port }},{{ .Values.services.nats }},{{ .Values.services.maindb }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.chitchat.binding.port }},{{ .Values.serving.metricsPort }}"
       labels:
         app: search
         version: "{{ .Chart.Version | replace "+" "_" }}"
@@ -71,9 +71,8 @@ spec:
           containerPort: {{ .Values.serving.port }}
         - name: metrics
           containerPort: {{ .Values.serving.metricsPort }}
-        - name: swim
-          containerPort: {{ .Values.swim.binding.port }}
-          protocol: UDP
+        - name: cluster-monitor
+          containerPort: {{ .Values.cluster_mgr.binding.port }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
@@ -82,6 +81,16 @@ spec:
             readOnly: true
             mountPath: /appsecrets
 {{- end }}
+      - name: cluster-manager
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        envFrom:
+        - configMapRef:
+          name: nucliadb-config
+        ports:
+        - name: chitchat
+          containerPort: {{ .Values.chitchat.binding.port }}
+          protocol: UDP
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
