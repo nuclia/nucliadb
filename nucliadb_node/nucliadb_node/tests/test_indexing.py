@@ -35,6 +35,7 @@ async def test_indexing(sidecar: App, shard: str):
     # Upload a payload
 
     pb = Resource()
+    pb.shard_id = shard
     pb.resource.shard_id = shard
     pb.resource.uuid = "1"
     pb.metadata.modified.FromDatetime(datetime.now())
