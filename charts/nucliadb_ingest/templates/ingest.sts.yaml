@@ -82,7 +82,7 @@ spec:
             mountPath: /appsecrets
 {{- end }}
       - name: cluster-manager
-        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        image: "{{ .Values.containerRegistry }}/cluster_manager:main"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         envFrom:
         - configMapRef:
