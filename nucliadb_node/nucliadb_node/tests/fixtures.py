@@ -35,7 +35,7 @@ from nucliadb_node.settings import settings
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "command": "bash -c 'node_reader & node_writer'",
     "env": {
         "VECTORS_DIMENSION": "768",
@@ -54,7 +54,7 @@ images.settings["nucliadb_node_reader"] = {
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "env": {
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",

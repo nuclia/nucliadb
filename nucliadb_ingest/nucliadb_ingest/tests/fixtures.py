@@ -62,7 +62,7 @@ from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "command": "bash -c 'node_reader & node_writer'",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
@@ -83,7 +83,7 @@ images.settings["nucliadb_node_reader"] = {
 
 images.settings["nucliadb_node_writer"] = {
     "image": "eu.gcr.io/stashify-218417/node",
-    "version": "latest",
+    "version": "main",
     "env": {
         "HOST_KEY_PATH": "/data/node.key",
         "VECTORS_DIMENSION": "768",
@@ -104,7 +104,7 @@ images.settings["nucliadb_node_writer"] = {
 
 images.settings["nucliadb_node_sidecar"] = {
     "image": "eu.gcr.io/stashify-218417/node_sidecar",
-    "version": "latest",
+    "version": "main",
     "env": {
         "INDEX_JETSTREAM_TARGET": "node.{node}",
         "INDEX_JETSTREAM_GROUP": "node-{node}",
@@ -126,7 +126,7 @@ images.settings["nucliadb_node_sidecar"] = {
 
 images.settings["nucliadb_cluster_manager"] = {
     "image": "eu.gcr.io/stashify-218417/cluster_manager",
-    "version": "latest",
+    "version": "main",
     "network": "host",
     "env": {
         "LISTEN_PORT": "4444",
