@@ -58,8 +58,8 @@ pub struct LMBDStorage {
 
 impl LMBDStorage {
     pub fn create(path: &Path) -> LMBDStorage {
-        let env_path = path.join(LMDB_ENV);
-        if !env_path.exists() {
+        if !path.join(STAMP).exists() {
+            let env_path = path.join(LMDB_ENV);
             std::fs::create_dir_all(&env_path).unwrap();
             let mut env_builder = EnvOpenOptions::new();
             env_builder.max_dbs(MAX_DBS);
