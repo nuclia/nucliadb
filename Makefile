@@ -118,18 +118,18 @@ install: ## Install dependencies (on the active environment)
 	pip install -r test-requirements.txt
 
 base-node-image:
-	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
-	docker push eu.gcr.io/stashify-218417/basenode:latest
+	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:main . -f Dockerfile.basenode
+	docker push eu.gcr.io/stashify-218417/basenode:main
 
 build-search-images: build-local-node build-local-cluster-manager build-local-sidecar
 
 build-local-node:
-	docker build -t eu.gcr.io/stashify-218417/basenode:latest -f Dockerfile.basenode .
-	docker build -t eu.gcr.io/stashify-218417/node:latest -f Dockerfile.node .
+	docker build -t eu.gcr.io/stashify-218417/basenode:main -f Dockerfile.basenode .
+	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
 build-local-cluster-manager:
-	docker build -t eu.gcr.io/stashify-218417/cluster_manager:latest -f Dockerfile.cluster_monitor .
+	docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
 
 build-local-sidecar:
-	docker build -t eu.gcr.io/stashify-218417/node_sidecar:latest -f Dockerfile.node_sidecar .
+	docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
 	
