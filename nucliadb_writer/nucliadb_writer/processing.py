@@ -73,8 +73,8 @@ class PushPayload(BaseModel):
     # Only internal
     partition: int
 
-    # Enable text processing
-    textProcessingEnabled: Optional[bool] = True
+    # Enable ML processing
+    ml_processing: Optional[bool] = True
 
 
 class PushResponse(BaseModel):
