@@ -24,7 +24,7 @@ data:
   CHITCHAT_LISTEN_ADDR: 0.0.0.0:{{ .Values.serving.chitchat_port }}
   NODE_TYPE: "{{ .Values.serving.node_type }}"
   DATA_PATH: "{{.Values.config.data_path}}"
-  SEED_NODES: "{{.Values.node0_svc_fixed_ip}}"
+  SEED_NODES: "{{.Values.serving.node0_svc_fixed_ip}}"
 {{- if .Values.config.lazyloading }}
   LAZY_LOADING: "true"
 {{- end }}
