@@ -16,3 +16,5 @@ spec:
     - name: grpc-ingest
       port: {{ .Values.serving.grpc }}
       appProtocol: grpc
+    - name: cluster-monitor
+      port: {{ .Values.cluster_manager.port }}
