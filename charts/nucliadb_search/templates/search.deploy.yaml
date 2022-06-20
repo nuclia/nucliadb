@@ -86,7 +86,7 @@ spec:
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         envFrom:
         - configMapRef:
-          name: nucliadb-config
+            name: nucliadb-config
         ports:
         - name: chitchat
           containerPort: {{ .Values.chitchat.binding.port }}
