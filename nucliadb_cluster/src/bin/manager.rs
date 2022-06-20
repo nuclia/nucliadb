@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
-use clap::Parser;
 use log::{debug, error, info};
 use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
 use rand::Rng;
@@ -27,14 +26,17 @@ impl ClusterMgrArgs {
     pub fn init_from_env() -> anyhow::Result<Self> {
         let listen_port = env::var("LISTEN_PORT")?;
         let node_type = env::var("NODE_TYPE")?;
-        let seeds = env::var("SEEDS")?.split(';').map(|s| s.to_owned()).collect();
+        let seeds = env::var("SEEDS")?
+            .split(';')
+            .map(|s| s.to_owned())
+            .collect();
         let monitor_addr = env::var("MONITOR_ADDR")?;
 
-        Ok(ClusterMgrArgs{
+        Ok(ClusterMgrArgs {
             listen_port,
             node_type,
             seeds,
-            monitor_addr
+            monitor_addr,
         })
     }
 }
