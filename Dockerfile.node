@@ -1,4 +1,4 @@
-FROM eu.gcr.io/stashify-218417/basenode:latest AS builder
+FROM eu.gcr.io/stashify-218417/basenode:main AS builder
 
 ARG CARGO_FEATURES=release-feature-set
 ARG CARGO_PROFILE=release
