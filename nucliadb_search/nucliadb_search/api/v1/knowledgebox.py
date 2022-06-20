@@ -83,7 +83,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
     tags=["Knowledge Boxes"],
     response_model_exclude_unset=True,
 )
-@requires(NucliaDBRoles.READER)
+@requires(NucliaDBRoles.READER, NucliaDBRoles.MANAGER)
 @version(1)
 async def knowledgebox_counters(
     request: Request,
