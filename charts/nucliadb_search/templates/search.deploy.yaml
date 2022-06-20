@@ -84,9 +84,13 @@ spec:
       - name: cluster-manager
         image: "{{ .Values.containerRegistry }}/cluster_manager:main"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command: ["/entrypoint.sh"]
+        args: ["/nucliadb_cluster/cluster_manager"]
         envFrom:
         - configMapRef:
             name: nucliadb-config
+        - configMapRef:
+            name: search-config
         ports:
         - name: chitchat
           containerPort: {{ .Values.chitchat.binding.port }}

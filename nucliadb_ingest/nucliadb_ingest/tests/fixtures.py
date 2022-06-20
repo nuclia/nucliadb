@@ -136,6 +136,11 @@ images.settings["nucliadb_cluster_manager"] = {
         "RUST_LOG": "debug",
         "RUST_BACKTRACE": "full",
     },
+    "options": {
+        "command": [
+            "/nucliadb_cluster/cluster_manager",
+        ],
+    },
 }
 
 

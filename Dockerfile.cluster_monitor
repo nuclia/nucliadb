@@ -29,6 +29,7 @@ EXPOSE 4444/udp
 WORKDIR /nucliadb_cluster
 COPY --from=builder /nucliadb_cluster/target/release/cluster_manager /nucliadb_cluster/
 
-COPY ./nucliadb_cluster/entrypoint.sh /entrypoint.sh
-ENTRYPOINT /entrypoint.sh
-CMD [ "/nucliadb_cluster/cluster_manager" ]
+COPY ./nucliadb_cluster/entrypoint.sh /
+RUN chmod 750 /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

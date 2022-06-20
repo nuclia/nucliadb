@@ -2,7 +2,5 @@
 set -e
 
 echo "DEBUG: Environment = $(env)"
-
+echo "$@"
 exec "$@"
-
-echo "ENDED"
