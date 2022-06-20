@@ -73,6 +73,8 @@ spec:
           containerPort: {{ .Values.serving.grpc }}
         - containerPort: {{ .Values.serving.monitor }}
         - containerPort: {{ .Values.serving.metrics }}
+        - name: cluster-monitor
+          containerPort: {{ .Values.cluster_mgr.bindings.port }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
 {{- if .Values.nats.secretName }}
