@@ -25,14 +25,13 @@ serving:
   metrics: 8081
 
 chitchat:
-  binding:
-    port: 4444
-    host: "0.0.0.0"
-
-cluster_mgr:
-  bindings:
+  cluster_manager:
     port: 31337
     host: "0.0.0.0"
+  node:
+    node_type: Ingest
+    node0_svc_fixed_ip: 10.4.0.255
+    chitchat_port: 4444
 
 # Value of ports to where this component connects to
 services:

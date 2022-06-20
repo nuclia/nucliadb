@@ -26,8 +26,6 @@ data:
   MONITOR_PORT: {{ .Values.serving.monitor | quote }}
   SENTRY_URL: {{ .Values.running.sentry_url }}
 
-  CHITCHAT_BINDING_PORT: {{ .Values.chitchat.binding.port | quote }}
-  CHITCHAT_BINDING_HOST: {{ .Values.chitchat.binding.host }}
   INDEX_JETSTREAM_TARGET: {{ .Values.indexing.index_jetstream_target }}
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}
@@ -35,3 +33,12 @@ data:
   TOTAL_REPLICAS: {{ .Values.replicaCount | quote }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
+
+  CHITCHAT_BINDING_PORT: {{ .Values.chitchat.cluster_manager.port | quote }}
+  CHITCHAT_BINDING_HOST: {{ .Values.chitchat.cluster_manager.host }}
+
+  MONITOR_ADDR: "{{ .Values.chitchat.cluster_manager.host }}:{{ .Values.chitchat.cluster_manager.port }}"
+
+  LISTEN_PORT: {{ .Values.node.chitchat_port }}
+  NODE_TYPE: {{ .Values.node.node_type }}
+  SEEDS: {{ .Values.node.node0_svc_fixed_ip }}

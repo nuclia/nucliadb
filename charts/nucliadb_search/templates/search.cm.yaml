@@ -11,9 +11,16 @@ metadata:
     chart: "{{ .Chart.Name }}"
 data:
   SENTRY_URL: {{ .Values.running.sentry_url }}
-  CHITCHAT_BINDING_PORT: {{ .Values.chitchat.binding.port | quote }}
-  CHITCHAT_BINDING_HOST: {{ .Values.chitchat.binding.host }}
   SEARCH_TIMEOUT: {{ .Values.config.search_timeout | quote }}
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
+
+  CHITCHAT_BINDING_PORT: {{ .Values.chitchat.cluster_manager.port | quote }}
+  CHITCHAT_BINDING_HOST: {{ .Values.chitchat.cluster_manager.host }}
+
+  MONITOR_ADDR: "{{ .Values.chitchat.cluster_manager.host }}:{{ .Values.chitchat.cluster_manager.port }}"
+
+  LISTEN_PORT: {{ .Values.node.chitchat_port }}
+  NODE_TYPE: {{ .Values.node.node_type }}
+  SEEDS: {{ .Values.node.node0_svc_fixed_ip }}
