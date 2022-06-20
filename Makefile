@@ -118,13 +118,12 @@ install: ## Install dependencies (on the active environment)
 	pip install -r test-requirements.txt
 
 base-node-image:
-	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:main . -f Dockerfile.basenode
-	docker push eu.gcr.io/stashify-218417/basenode:main
+	docker buildx build --platform=linux/amd64 -t eu.gcr.io/stashify-218417/basenode:latest . -f Dockerfile.basenode
+	docker push eu.gcr.io/stashify-218417/basenode:latest
 
 build-search-images: build-local-node build-local-cluster-manager build-local-sidecar
 
 build-local-node:
-	docker build -t eu.gcr.io/stashify-218417/basenode:main -f Dockerfile.basenode .
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
 build-local-cluster-manager:
