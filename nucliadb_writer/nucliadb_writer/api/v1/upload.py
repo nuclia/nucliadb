@@ -637,6 +637,8 @@ async def store_file_on_nuclia_db(
             writer.slug = item.slug
             toprocess.slug = item.slug
 
+        toprocess.processing_options = item.processing_options
+
         parse_basic(writer, item, toprocess)
         if item.origin is not None:
             parse_origin(writer.origin, item.origin)

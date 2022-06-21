@@ -45,6 +45,11 @@ class Source(SourceValue, Enum):  # type: ignore
     INGEST = 1
 
 
+class PushProcessingOptions(BaseModel):
+    # Enable ML processing
+    ml_text: Optional[bool] = True
+
+
 class PushPayload(BaseModel):
     # There are multiple options of payload
     uuid: str
@@ -72,6 +77,9 @@ class PushPayload(BaseModel):
 
     # Only internal
     partition: int
+
+    # List of available processing options (with default values)
+    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
 
 
 class PushResponse(BaseModel):

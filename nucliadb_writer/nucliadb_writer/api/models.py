@@ -22,6 +22,7 @@ from typing import Dict, Optional, Union
 from pydantic import BaseModel, validator
 
 import nucliadb_models as models
+from nucliadb_writer.processing import PushProcessingOptions
 
 
 class CreateResourcePayload(BaseModel):
@@ -41,6 +42,9 @@ class CreateResourcePayload(BaseModel):
     conversations: Dict[str, models.InputConversationField] = {}
     keywordsets: Dict[str, models.FieldKeywordset] = {}
     datetimes: Dict[str, models.FieldDatetime] = {}
+
+    # Processing options
+    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
 
     @validator("icon")
     def icon_check(cls, v):
@@ -69,6 +73,9 @@ class UpdateResourcePayload(BaseModel):
     conversations: Dict[str, models.InputConversationField] = {}
     keywordsets: Dict[str, models.FieldKeywordset] = {}
     datetimes: Dict[str, models.FieldDatetime] = {}
+
+    # Processing options
+    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
 
 
 class ResourceCreated(BaseModel):
