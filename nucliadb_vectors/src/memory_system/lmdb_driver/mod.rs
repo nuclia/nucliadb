@@ -34,7 +34,6 @@ const DB_LAYERS_OUT: &str = "LAYERS_OUT_ldmd";
 const DB_LAYERS_IN: &str = "LAYERS_IN_lmdb";
 const DB_LOG: &str = "LOG_lmdb";
 const DB_DELETED: &str = "DELETED_lmdb";
-const STAMP: &str = "stamp.nuclia";
 const MAP_SIZE: usize = 1048576 * 100000;
 const MAX_DBS: u32 = 3000;
 
@@ -58,8 +57,8 @@ pub struct LMBDStorage {
 
 impl LMBDStorage {
     pub fn create(path: &Path) -> LMBDStorage {
-        if !path.join(STAMP).exists() {
-            let env_path = path.join(LMDB_ENV);
+        let env_path = path.join(LMDB_ENV);
+        if !env_path.exists() {
             std::fs::create_dir_all(&env_path).unwrap();
             let mut env_builder = EnvOpenOptions::new();
             env_builder.max_dbs(MAX_DBS);
@@ -93,7 +92,6 @@ impl LMBDStorage {
             };
             lmdb.insert_log(&mut w_txn, log);
             w_txn.commit().unwrap();
-            std::fs::File::create(&path.join(STAMP)).unwrap();
             lmdb
         } else {
             LMBDStorage::open(path)
@@ -102,8 +100,7 @@ impl LMBDStorage {
     pub fn open(path: &Path) -> LMBDStorage {
         let sleep_time = std::time::Duration::from_millis(20);
         let env_path = path.join(LMDB_ENV);
-        let stamp_path = path.join(STAMP);
-        while !stamp_path.exists() {
+        while !env_path.exists() {
             std::thread::sleep(sleep_time);
         }
         let mut env_builder = EnvOpenOptions::new();
