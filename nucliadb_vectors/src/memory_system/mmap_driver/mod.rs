@@ -28,7 +28,6 @@ use memmap2::{Mmap, MmapMut};
 
 use crate::memory_system::elements::{ByteRpr, FileSegment, FixedByteLen};
 
-const NUCLIA_STAMP: &str = "STAMP.nuclia";
 const STORAGE: &str = "STORAGE.nuclia";
 const STORAGE_LOCK: &str = "STORAGE_LOCK.nuclia";
 const STACK: &str = "STACK.nuclia";
@@ -146,7 +145,6 @@ impl SegmentWriter for Storage {
 impl Storage {
     pub fn create(path: &Path) -> Storage {
         std::fs::create_dir_all(&path).unwrap();
-        let nuclia_stamp = path.join(NUCLIA_STAMP);
         let path_storage = path.join(STORAGE);
         let path_lock = path.join(STORAGE_LOCK);
         let path_stack = path.join(STACK);
@@ -164,7 +162,6 @@ impl Storage {
             .unwrap();
         let storage = unsafe { Mmap::map(&storage).unwrap() };
         let deleted = DiskStack::new(path_stack.as_path());
-        File::create(&nuclia_stamp).unwrap();
         Storage {
             path_storage,
             lock,
@@ -173,12 +170,6 @@ impl Storage {
         }
     }
     pub fn open(path: &Path) -> Storage {
-        let sleep = std::time::Duration::from_millis(10);
-        let stamp = path.join(NUCLIA_STAMP);
-        while !stamp.exists() {
-            std::thread::sleep(sleep);
-        }
-        let nuclia_stamp = path.join(NUCLIA_STAMP);
         let path_storage = path.join(STORAGE);
         let path_lock = path.join(STORAGE_LOCK);
         let path_stack = path.join(STACK);
@@ -186,7 +177,6 @@ impl Storage {
         let lock = OpenOptions::new().read(true).open(&path_lock).unwrap();
         let storage = unsafe { Mmap::map(&storage).unwrap() };
         let deleted = DiskStack::new(path_stack.as_path());
-        File::create(&nuclia_stamp).unwrap();
         Storage {
             path_storage,
             lock,
