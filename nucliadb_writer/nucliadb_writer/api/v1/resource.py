@@ -98,7 +98,7 @@ async def create_resource(
         kbid=kbid,
         partition=partition,
         userid=request.headers.get("X-NUCLIADB-USER", ""),
-        ml_processing=item.ml_processing,
+        options=item.processing_options,
     )
 
     writer.kbid = kbid
@@ -168,7 +168,7 @@ async def modify_resource(
         kbid=kbid,
         partition=partition,
         userid=request.headers.get("X-NUCLIADB-USER", ""),
-        ml_processing=item.ml_processing,
+        options=item.processing_options,
     )
 
     writer.kbid = kbid
