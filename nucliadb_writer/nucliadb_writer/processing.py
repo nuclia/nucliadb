@@ -47,7 +47,7 @@ class Source(SourceValue, Enum):  # type: ignore
 
 class PushProcessingOptions(BaseModel):
     # Enable ML processing
-    ml_processing: Optional[bool] = True
+    ml_text: Optional[bool] = True
 
 
 class PushPayload(BaseModel):
@@ -79,7 +79,7 @@ class PushPayload(BaseModel):
     partition: int
 
     # List of available processing options (with default values)
-    options: Optional[PushProcessingOptions] = PushProcessingOptions()
+    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
 
 
 class PushResponse(BaseModel):

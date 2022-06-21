@@ -25,7 +25,6 @@ import nucliadb_models as models
 from nucliadb_writer.processing import PushProcessingOptions
 
 
-
 class CreateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
