@@ -132,7 +132,7 @@ impl Member {
                 let node_type = NucliaDBNodeType::from_str(node_type_str)?;
                 return Ok(Member {
                     node_id: node_id.id.clone(),
-                    node_type: node_type,
+                    node_type,
                     is_self: node_id.eq(chitchat.self_node_id()),
                     listen_addr: node_id.gossip_public_address,
                 });
