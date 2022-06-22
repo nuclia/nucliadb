@@ -58,8 +58,8 @@ pub struct LMBDStorage {
 
 impl LMBDStorage {
     pub fn create(path: &Path) -> LMBDStorage {
-        let env_path = path.join(LMDB_ENV);
-        if !env_path.exists() {
+        if !path.join(STAMP).exists() {
+            let env_path = path.join(LMDB_ENV);
             std::fs::create_dir_all(&env_path).unwrap();
             let mut env_builder = EnvOpenOptions::new();
             env_builder.max_dbs(MAX_DBS);
@@ -100,18 +100,13 @@ impl LMBDStorage {
         }
     }
     pub fn open(path: &Path) -> LMBDStorage {
-        let sleep_time = std::time::Duration::from_millis(20);
-        let env_path = path.join(LMDB_ENV);
-        let stamp_path = path.join(STAMP);
-        while !stamp_path.exists() {
-            std::thread::sleep(sleep_time);
-        }
         let mut env_builder = EnvOpenOptions::new();
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
         }
         env_builder.max_dbs(MAX_DBS);
         env_builder.map_size(MAP_SIZE);
+        let env_path = path.join(LMDB_ENV);
         let env = env_builder.open(&env_path).unwrap();
         let label_db = env.open_database(Some(DB_LABELS)).unwrap().unwrap();
         let node_db = env.open_database(Some(DB_NODES)).unwrap().unwrap();

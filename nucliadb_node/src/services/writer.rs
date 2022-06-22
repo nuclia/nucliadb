@@ -167,27 +167,39 @@ impl ShardWriterService {
     pub async fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
-        let text_task = tokio::task::spawn_blocking(move || {
+        info!("Field service starts");
+        let _text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
             writer.set_resource(&field_resource)
-        });
+        })
+        .await
+        .unwrap()?;
+        info!("Field service ends");
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer_service.clone();
-        let paragraph_task = tokio::task::spawn_blocking(move || {
+        info!("Paragraph service starts");
+        let _paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
             writer.set_resource(&paragraph_resource)
-        });
+        })
+        .await
+        .unwrap()?;
+        info!("Paragraph service ends");
         let vector_writer_service = self.vector_writer_service.clone();
         let vector_resource = resource.clone();
-        let vector_task = tokio::task::spawn_blocking(move || {
+        info!("Vector service starts");
+        let _vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
             writer.set_resource(&vector_resource)
-        });
-        let (rtext, rparagraph, rvector) =
-            try_join!(text_task, paragraph_task, vector_task).unwrap();
-        rtext?;
-        rparagraph?;
-        rvector?;
+        })
+        .await
+        .unwrap()?;
+        info!("Vector service ends");
+        // let (rtext, rparagraph, rvector) =
+        //     try_join!(text_task, paragraph_task, vector_task).unwrap();
+        // rtext?;
+        // rparagraph?;
+        // rvector?;
         Ok(())
     }
 

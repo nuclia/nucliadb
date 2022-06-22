@@ -173,10 +173,8 @@ impl Storage {
         }
     }
     pub fn open(path: &Path) -> Storage {
-        let sleep = std::time::Duration::from_millis(10);
-        let stamp = path.join(NUCLIA_STAMP);
-        while !stamp.exists() {
-            std::thread::sleep(sleep);
+        if !path.join(NUCLIA_STAMP).exists() {
+            panic!("Not a valid path to a Storage");
         }
         let nuclia_stamp = path.join(NUCLIA_STAMP);
         let path_storage = path.join(STORAGE);
