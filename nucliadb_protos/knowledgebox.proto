@@ -93,9 +93,16 @@ message Label {
 }
 
 message LabelSet {
+    enum LabelSetKind {
+        RESOURCES = 0;
+        PARAGRAPHS = 1;
+        SENTENCES = 2;
+    }
     string title = 1;
     string color = 2;
     repeated Label labels = 3;
+    bool checkbox = 4;
+    repeated LabelSetKind kind = 5;
 }
 
 message Labels {

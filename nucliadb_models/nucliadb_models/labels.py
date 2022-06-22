@@ -18,9 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
+
+
+class LabelSetKind(str, Enum):
+    RESOURCES = "RESOURCES"
+    PARAGRAPHS = "PARAGRAPHS"
+    SENTENCES = "SENTENCES"
 
 
 class Label(BaseModel):
@@ -33,6 +40,8 @@ class Label(BaseModel):
 class LabelSet(BaseModel):
     title: Optional[str] = "no title"
     color: Optional[str] = "blue"
+    checkbox: bool = True
+    kind: List[LabelSetKind] = []
     labels: List[Label] = []
 
 

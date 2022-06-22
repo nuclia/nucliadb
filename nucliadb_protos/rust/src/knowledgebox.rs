@@ -109,6 +109,20 @@ pub struct LabelSet {
     pub color: ::prost::alloc::string::String,
     #[prost(message, repeated, tag="3")]
     pub labels: ::prost::alloc::vec::Vec<Label>,
+    #[prost(bool, tag="4")]
+    pub checkbox: bool,
+    #[prost(enumeration="label_set::LabelSetKind", repeated, tag="5")]
+    pub kind: ::prost::alloc::vec::Vec<i32>,
+}
+/// Nested message and enum types in `LabelSet`.
+pub mod label_set {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum LabelSetKind {
+        Resources = 0,
+        Paragraphs = 1,
+        Sentences = 2,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Labels {
