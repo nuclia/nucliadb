@@ -230,13 +230,15 @@ impl ParagraphWriterService {
             let mut field_doc = doc.clone();
             let paragraphs = resource.paragraphs.get(field).unwrap_or(&empty_paragraph);
             // TODO: Make sure we do not copy
-            #[allow(clippy::iter_cloned_collect)]
-            let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
-            for label in field_labels {
-                field_doc.add_facet(self.schema.facets, Facet::from(label.as_str()));
+            // #[allow(clippy::iter_cloned_collect)]
+            // let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
+            for label in text_info.labels.iter() {
+                field_doc.add_facet(self.schema.facets, Facet::from(label));
             }
             let facet_field = format!("/{}", field);
             field_doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
+
+            let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
 
             for (paragraph_id, p) in &paragraphs.paragraphs {
                 let mut subdoc = field_doc.clone();
@@ -244,15 +246,12 @@ impl ParagraphWriterService {
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
                 let labels = &p.labels;
-                let text = REGEX.replace_all(&text_info.text, " ");
-                let chars: Vec<char> = text.chars().collect();
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
                 let mut text = String::new();
                 for elem in &chars[lower_bound..upper_bound] {
                     text.push(*elem);
                 }
-
                 subdoc.add_text(self.schema.paragraph, paragraph_id.clone());
                 subdoc.add_text(self.schema.text, &text);
                 subdoc.add_u64(self.schema.start_pos, start_pos);
