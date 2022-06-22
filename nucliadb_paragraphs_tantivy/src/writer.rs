@@ -229,13 +229,16 @@ impl ParagraphWriterService {
         for (field, text_info) in &resource.texts {
             let mut field_doc = doc.clone();
             let paragraphs = resource.paragraphs.get(field).unwrap_or(&empty_paragraph);
+            // TODO: Make sure we do not copy
+            // #[allow(clippy::iter_cloned_collect)]
+            // let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
+            for label in text_info.labels.iter() {
+                field_doc.add_facet(self.schema.facets, Facet::from(label));
+            }
             let facet_field = format!("/{}", field);
-            let text = REGEX.replace_all(&text_info.text, " ");
-            text_info
-                .labels
-                .iter()
-                .for_each(|label| field_doc.add_facet(self.schema.facets, Facet::from(label)));
             field_doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
+
+            let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
 
             for (paragraph_id, p) in &paragraphs.paragraphs {
                 let mut subdoc = field_doc.clone();
@@ -243,20 +246,27 @@ impl ParagraphWriterService {
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
                 let labels = &p.labels;
-                let split = &p.split;
-                let lower_bound = std::cmp::min(start_pos as usize, text.len());
-                let upper_bound = std::cmp::min(end_pos as usize, text.len());
-                let text = text[lower_bound..upper_bound].to_string();
-
+                let lower_bound = std::cmp::min(start_pos as usize, chars.len());
+                let upper_bound = std::cmp::min(end_pos as usize, chars.len());
+                let mut text = String::new();
+                for elem in &chars[lower_bound..upper_bound] {
+                    text.push(*elem);
+                }
                 subdoc.add_text(self.schema.paragraph, paragraph_id.clone());
                 subdoc.add_text(self.schema.text, &text);
                 subdoc.add_u64(self.schema.start_pos, start_pos);
                 subdoc.add_u64(self.schema.end_pos, end_pos);
                 subdoc.add_u64(self.schema.index, index);
+
+                let split = &p.split;
                 subdoc.add_text(self.schema.split, split);
-                labels
-                    .iter()
-                    .for_each(|label| subdoc.add_facet(self.schema.facets, Facet::from(label)));
+
+                #[allow(clippy::iter_cloned_collect)]
+                let paragraph_labels: Vec<String> = labels.iter().cloned().collect();
+                for label in paragraph_labels {
+                    subdoc.add_facet(self.schema.facets, Facet::from(label.as_str()));
+                }
+
                 info!(
                     "Adding paragraph for {} with labels as {:?} [{} - {}]: {} ({})",
                     field, labels, start_pos, end_pos, text, paragraph_id
