@@ -231,10 +231,10 @@ impl ParagraphWriterService {
             let paragraphs = resource.paragraphs.get(field).unwrap_or(&empty_paragraph);
             let facet_field = format!("/{}", field);
             let text = REGEX.replace_all(&text_info.text, " ");
-
-            for label in text_info.labels.iter() {
-                field_doc.add_facet(self.schema.facets, Facet::from(label));
-            }
+            text_info
+                .labels
+                .iter()
+                .for_each(|label| field_doc.add_facet(self.schema.facets, Facet::from(label)));
             field_doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
 
             for (paragraph_id, p) in &paragraphs.paragraphs {
