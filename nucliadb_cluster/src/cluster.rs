@@ -7,7 +7,9 @@ use std::time::Duration;
 use std::{fmt, fs};
 
 use chitchat::transport::UdpTransport;
-use chitchat::{spawn_chitchat, ChitchatConfig, ChitchatHandle, FailureDetectorConfig, NodeId};
+use chitchat::{
+    spawn_chitchat, Chitchat, ChitchatConfig, ChitchatHandle, FailureDetectorConfig, NodeId,
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use tokio_stream::StreamExt;
@@ -123,6 +125,25 @@ impl From<&Cluster> for Member {
     }
 }
 
+impl Member {
+    pub fn build(node_id: &NodeId, chitchat: &Chitchat) -> ClusterResult<Self> {
+        if let Some(state) = chitchat.node_state(node_id) {
+            if let Some(node_type_str) = state.get("node_type") {
+                let node_type = NucliaDBNodeType::from_str(node_type_str)?;
+                return Ok(Member {
+                    node_id: node_id.id.clone(),
+                    node_type,
+                    is_self: node_id.eq(chitchat.self_node_id()),
+                    listen_addr: node_id.gossip_public_address,
+                });
+            }
+        }
+        Err(ClusterError::ChitchatError {
+            message: "can't get node state".to_string(),
+        })
+    }
+}
+
 /// This is an implementation of a cluster using the chitchat protocol.
 pub struct Cluster {
     /// A socket address that represents itself.
@@ -203,25 +224,19 @@ impl Cluster {
         // Start to monitor the node status updates.
         tokio::task::spawn(async move {
             while !task_stop.load(Ordering::Relaxed) {
+                handle_clone.lock().await.update_heartbeat();
                 if let Some(live_nodes) = cluster_watcher.next().await {
-                    let chitchat = handle_clone.lock().await;
+                    let guard = handle_clone.lock().await;
                     let update_members: Vec<Member> = live_nodes
                         .iter()
-                        .map(|node_id| {
-                            let state = chitchat.node_state(node_id).unwrap();
-                            Member {
-                                node_id: node_id.id.clone(),
-                                node_type: NucliaDBNodeType::from_str(
-                                    state.get("node_type").unwrap(),
-                                )
-                                .unwrap(),
-                                is_self: node_id.clone() == chitchat.self_node_id().clone(),
-                                listen_addr: node_id.gossip_public_address,
-                            }
-                        })
+                        .map(|node_id| Member::build(node_id, &*guard).unwrap())
                         .collect();
-
+                    let dead: Vec<Member> = guard
+                        .dead_nodes()
+                        .map(|node_id| Member::build(node_id, &*guard).unwrap())
+                        .collect();
                     debug!(updated_memberlist=?update_members);
+                    debug!(dead_nodes=?dead);
                     if let Err(e) = members_tx.send(update_members) {
                         debug!("all member updates receivers closed: {e}");
                         break;
@@ -239,15 +254,15 @@ impl Cluster {
         self.members.clone()
     }
 
-    pub fn add_peer_node(&self, peer_addr: SocketAddr) -> Result<(), anyhow::Error> {
+    pub async fn add_peer_node(&self, peer_addr: SocketAddr) -> Result<(), anyhow::Error> {
         self.chitchat_handle.gossip(peer_addr)
     }
 
     pub async fn shutdown(self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Err(e) = self.chitchat_handle.shutdown().await {
-            error!("Error during chitchat shutdown: {e}")
-        };
+            error!("Error during chitchat shutdown: {e}");
+        }
     }
 
     /// Return `members` list
@@ -258,16 +273,7 @@ impl Cluster {
                 chitchat.update_nodes_liveliness();
                 chitchat
                     .live_nodes()
-                    .map(|node_id| {
-                        let state = chitchat.node_state(node_id).unwrap();
-                        Member {
-                            node_id: node_id.id.clone(),
-                            node_type: NucliaDBNodeType::from_str(state.get("node_type").unwrap())
-                                .unwrap(),
-                            is_self: node_id.clone() == self.id,
-                            listen_addr: node_id.gossip_public_address,
-                        }
-                    })
+                    .map(|node_id| Member::build(node_id, chitchat).unwrap())
                     .collect()
             })
             .await;

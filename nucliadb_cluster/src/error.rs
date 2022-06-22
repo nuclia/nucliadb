@@ -37,6 +37,9 @@ pub enum ClusterError {
     /// Incorrect node type
     #[error("Failed to parse node type from string: `{message}`")]
     ParseNodeTypeError { message: String },
+
+    #[error("Error from chitchat crate: `{message}`")]
+    ChitchatError { message: String },
 }
 
 impl From<ClusterError> for tonic::Status {
@@ -47,6 +50,7 @@ impl From<ClusterError> for tonic::Status {
             ClusterError::ReadHostKeyError { .. } => tonic::Code::Internal,
             ClusterError::WriteHostKeyError { .. } => tonic::Code::Internal,
             ClusterError::ParseNodeTypeError { .. } => tonic::Code::Internal,
+            ClusterError::ChitchatError { .. } => tonic::Code::Internal,
         };
         let message = error.to_string();
         tonic::Status::new(code, message)

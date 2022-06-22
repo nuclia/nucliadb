@@ -20,6 +20,7 @@ struct ClusterMgrArgs {
     node_type: String,
     seeds: Vec<String>,
     monitor_addr: String,
+    pub_ip: String,
 }
 
 impl ClusterMgrArgs {
@@ -31,12 +32,14 @@ impl ClusterMgrArgs {
             .map(|s| s.to_owned())
             .collect();
         let monitor_addr = env::var("MONITOR_ADDR")?;
+        let pub_ip = env::var("HOSTNAME")?;
 
         Ok(ClusterMgrArgs {
             listen_port,
             node_type,
             seeds,
             monitor_addr,
+            pub_ip,
         })
     }
 }
@@ -130,8 +133,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut termination = signal(SignalKind::terminate())?;
 
-    let pub_ip = env::var("HOSTNAME")?;
-    let host = format!("{}:{}", pub_ip, &args.listen_port);
+    let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
     let mut addrs_iter = net::lookup_host(host)
         .await
         .with_context(|| "Can't create cluster listener socket")?;
