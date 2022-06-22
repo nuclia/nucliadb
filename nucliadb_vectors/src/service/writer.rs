@@ -65,16 +65,19 @@ impl WriterChild for VectorWriterService {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         info!("Set resource in vector starts");
         if resource.status != ResourceStatus::Delete as i32 {
+            let mut vector_id = 0;
             for paragraph in resource.paragraphs.values() {
                 for index in paragraph.paragraphs.values() {
                     let mut labels = resource.labels.clone();
                     labels.append(&mut index.labels.clone());
                     for (key, sentence) in index.sentences.iter() {
+                        vector_id += 1;
                         self.index.write().unwrap().insert(
                             key.clone(),
                             sentence.vector.clone(),
                             labels.clone(),
                         );
+                        info!("Vectors added {vector_id}");
                     }
                 }
             }
