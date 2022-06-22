@@ -6,11 +6,11 @@ LABEL org.opencontainers.image.vendor="Nuclia Inc."
 
 RUN apt-get -y update \
     && apt-get -y install ca-certificates \
-                          cmake \
-                          libpq-dev \
-                          libpq5  \
-                          libssl-dev \
-                          openssh-client \
+    cmake \
+    libpq-dev \
+    libpq5  \
+    libssl-dev \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY ./nucliadb_cluster /nucliadb_cluster
@@ -23,6 +23,8 @@ ENV LISTEN_PORT ""
 ENV NODE_TYPE ""
 ENV SEEDS ""
 ENV MONITOR_ADDR ""
+ENV RUST_LOG=nucliadb_cluster=DEBUG
+ENV RUST_BACKTRACE=1
 
 EXPOSE 4444/udp
 
