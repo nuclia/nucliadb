@@ -95,9 +95,6 @@ spec:
         - name: chitchat
           containerPort: {{ .Values.chitchat.node.chitchat_port }}
           protocol: UDP
-        volumeMounts:
-          - name: cluster-mgr-pv
-            mountPath: {{ .Values.config.data_path }}
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}

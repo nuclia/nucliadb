@@ -17,11 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::net::SocketAddr;
-use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
 
-use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NucliaDBNodeType};
+use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
 use nucliadb_node::config::Configuration;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
@@ -30,6 +29,7 @@ use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use tracing::*;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service);
-    let host_key_path = Configuration::host_key_path();
+    let _host_key_path = Configuration::host_key_path();
     let public_ip = Configuration::public_ip().await;
     let chitchat_port = Configuration::chitchat_port();
     let seed_nodes = Configuration::seed_nodes();
@@ -62,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let chitchat_addr = SocketAddr::from_str(&format!("{}:{}", public_ip, chitchat_port))?;
 
     // Cluster
-    let host_key = read_or_create_host_key(Path::new(&host_key_path))?;
+    let host_key = Uuid::new_v4(); // read_or_create_host_key(Path::new(&host_key_path))?;
     let chitchat_cluster = Cluster::new(
         host_key.to_string(),
         chitchat_addr,
@@ -90,10 +90,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let monitor_task = tokio::spawn(async move {
         let mut watcher = WatchStream::new(chitchat_cluster.members_change_watcher());
         loop {
+            debug!("node writer wait updates");
             if let Some(update) = watcher.next().await {
                 if let Ok(json_update) = serde_json::to_string(&update) {
-                    info!("Chitchat cluster updated: {json_update}");
-                };
+                    debug!("Chitchat cluster updated: {json_update}");
+                } else {
+                    debug!("writer error while deserialization update");
+                }
             } else {
                 error!("Chitchat cluster updated monitor fail");
             }

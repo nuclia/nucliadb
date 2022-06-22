@@ -1,18 +1,18 @@
 use std::env;
 use std::net::SocketAddr;
-use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use log::{debug, error, info};
-use nucliadb_cluster::cluster::{read_host_key, Cluster, NucliaDBNodeType};
+use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
 use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
 use tokio::net::TcpStream;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::timeout;
+use uuid::Uuid;
 
 #[derive(Debug)]
 struct ClusterMgrArgs {
@@ -20,8 +20,6 @@ struct ClusterMgrArgs {
     node_type: String,
     seeds: Vec<String>,
     monitor_addr: String,
-    host_key_path: String,
-    pub_ip: String,
 }
 
 impl ClusterMgrArgs {
@@ -33,16 +31,12 @@ impl ClusterMgrArgs {
             .map(|s| s.to_owned())
             .collect();
         let monitor_addr = env::var("MONITOR_ADDR")?;
-        let host_key_path = env::var("HOST_KEY_PATH")?;
-        let pub_ip = env::var("HOSTNAME")?;
 
         Ok(ClusterMgrArgs {
             listen_port,
             node_type,
             seeds,
             monitor_addr,
-            host_key_path,
-            pub_ip,
         })
     }
 }
@@ -135,7 +129,9 @@ async fn main() -> anyhow::Result<()> {
     let args = ClusterMgrArgs::init_from_env()?;
 
     let mut termination = signal(SignalKind::terminate())?;
-    let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
+
+    let pub_ip = env::var("HOSTNAME")?;
+    let host = format!("{}:{}", pub_ip, &args.listen_port);
     let mut addrs_iter = net::lookup_host(host)
         .await
         .with_context(|| "Can't create cluster listener socket")?;
@@ -146,7 +142,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let node_type =
         NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
-    let node_id = read_host_key(Path::new(&args.host_key_path))?;
+    let node_id = Uuid::new_v4();
     let cluster = Cluster::new(node_id.to_string(), addr, node_type, args.seeds)
         .await
         .with_context(|| "Can't create cluster instance ")?;

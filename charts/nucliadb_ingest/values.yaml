@@ -3,7 +3,6 @@ config:
   pull_time: 100
   node_replicas: 2
   monitor: False
-  data_path: /data
 
 affinity: {}
 nodeSelector: {}
