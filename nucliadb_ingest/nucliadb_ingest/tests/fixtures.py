@@ -129,6 +129,7 @@ images.settings["nucliadb_cluster_manager"] = {
     "version": "main",
     "network": "host",
     "env": {
+        "HOST_KEY_PATH": "/data/node.key",
         "LISTEN_PORT": "4444",
         "NODE_TYPE": "Ingest",
         "SEEDS": "0.0.0.0:4444",
@@ -335,11 +336,14 @@ class nucliadbChitchatNode(BaseImage):
     name = "nucliadb_cluster_manager"
     port = 4444
 
-    def run(self):
+    def run(self, volume):
+        self._volume = volume
+        self._mount = "/data"
         return super(nucliadbChitchatNode, self).run()
 
     def get_image_options(self):
         options = super(nucliadbChitchatNode, self).get_image_options()
+        options["volumes"] = {self._volume.name: {"bind": "/data"}}
         return options
 
     def check(self):
@@ -401,11 +405,12 @@ def node(natsd: str, gcs: str):
 
     volume_node_1 = docker_client.volumes.create(driver="local")
     volume_node_2 = docker_client.volumes.create(driver="local")
+    volume_cluster_mgr = docker_client.volumes.create(driver="local")
 
     images.settings["nucliadb_cluster_manager"]["env"][
         "MONITOR_ADDR"
     ] = f"{docker_internal_host}:31337"
-    cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
+    cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run(volume_cluster_mgr)
 
     cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
     cluster_mgr_real_host = get_container_host(nucliadb_cluster_mgr.container_obj)

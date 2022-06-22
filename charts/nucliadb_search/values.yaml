@@ -12,6 +12,8 @@ resources: {}
 #    memory: "600Mi"
 #  requests:
 #    cpu: "300m"
+config:
+  data_path: /data
 
 serving:
   port: 8080
