@@ -17,10 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
+use std::time::Duration;
 
 use http::Uri;
 use opentelemetry::propagation::Extractor;
+use tokio::net;
+use tokio::time::sleep;
 use tonic::transport::Endpoint;
 
 /// Prepares a socket addr for a grpc endpoint to connect to
@@ -55,4 +59,18 @@ impl<'a> Extractor for MetadataMap<'a> {
             })
             .collect::<Vec<_>>()
     }
+}
+
+pub async fn reliable_lookup_host(host: &str) -> IpAddr {
+    let mut tries = 5;
+    while tries != 0 {
+        if let Ok(mut addr_iter) = net::lookup_host(host).await {
+            if let Some(addr) = addr_iter.next() {
+                return addr.ip();
+            }
+        }
+        tries -= 1;
+        sleep(Duration::from_secs(1)).await;
+    }
+    IpAddr::from_str(host).unwrap()
 }

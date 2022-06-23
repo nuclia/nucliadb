@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use log::{debug, error, info};
 use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
 use rand::Rng;
@@ -11,7 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
 use tokio::net::TcpStream;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -125,6 +125,19 @@ async fn send_update(update: String, stream: &mut TcpStream) -> anyhow::Result<(
         Err(anyhow!("invalid ack"))
     }
 }
+pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
+    let mut tries = 5;
+    while tries != 0 {
+        if let Ok(mut addr_iter) = net::lookup_host(host).await {
+            if let Some(addr) = addr_iter.next() {
+                return Ok(addr);
+            }
+        }
+        tries -= 1;
+        sleep(Duration::from_secs(1)).await;
+    }
+    bail!("Can't lookup public ip")
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -134,14 +147,7 @@ async fn main() -> anyhow::Result<()> {
     let mut termination = signal(SignalKind::terminate())?;
 
     let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
-    let mut addrs_iter = net::lookup_host(host)
-        .await
-        .with_context(|| "Can't create cluster listener socket")?;
-    let optional_addr = addrs_iter.next();
-    let addr = match optional_addr {
-        Some(x) => x,
-        None => SocketAddr::from_str("::1:4444").unwrap(),
-    };
+    let addr = reliable_lookup_host(&host).await?;
     let node_type =
         NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
     let node_id = Uuid::new_v4();
