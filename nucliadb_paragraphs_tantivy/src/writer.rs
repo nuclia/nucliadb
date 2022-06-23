@@ -24,7 +24,7 @@ use std::sync::RwLock;
 use async_std::fs;
 use async_trait::async_trait;
 use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{IndexParagraphs, Resource, ResourceId};
+use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
 use regex::Regex;
 use tantivy::collector::Count;
@@ -205,43 +205,35 @@ impl ParagraphWriterService {
 
     fn index_paragraph(&mut self, resource: &Resource) -> tantivy::Result<()> {
         let metadata = resource.metadata.as_ref().unwrap();
-
         let modified = metadata.modified.as_ref().unwrap();
         let created = metadata.created.as_ref().unwrap();
+        let empty_paragraph = HashMap::with_capacity(0);
 
-        let mut doc = doc!(
-            self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
-            self.schema.modified => timestamp_to_datetime_utc(modified),
-            self.schema.created => timestamp_to_datetime_utc(created),
-            self.schema.status => resource.status as u64,
-        );
-
-        #[allow(clippy::iter_cloned_collect)]
-        let resource_labels: Vec<String> = resource.labels.iter().cloned().collect();
-        for label in &resource_labels {
-            let facet = Facet::from(label.as_str());
-            doc.add_facet(self.schema.facets, facet);
-        }
-
-        let empty_paragraph = IndexParagraphs {
-            paragraphs: HashMap::with_capacity(0),
-        };
         for (field, text_info) in &resource.texts {
-            let mut field_doc = doc.clone();
-            let paragraphs = resource.paragraphs.get(field).unwrap_or(&empty_paragraph);
-            // TODO: Make sure we do not copy
-            // #[allow(clippy::iter_cloned_collect)]
-            // let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
-            for label in text_info.labels.iter() {
-                field_doc.add_facet(self.schema.facets, Facet::from(label));
-            }
-            let facet_field = format!("/{}", field);
-            field_doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
+            let paragraphs = resource
+                .paragraphs
+                .get(field)
+                .map_or_else(|| &empty_paragraph, |i| &i.paragraphs);
+            for (paragraph_id, p) in paragraphs {
+                let mut doc = doc!(
+                    self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
+                    self.schema.modified => timestamp_to_datetime_utc(modified),
+                    self.schema.created => timestamp_to_datetime_utc(created),
+                    self.schema.status => resource.status as u64,
+                );
+                #[allow(clippy::iter_cloned_collect)]
+                let resource_labels: Vec<String> = resource.labels.iter().cloned().collect();
+                for label in &resource_labels {
+                    let facet = Facet::from(label.as_str());
+                    doc.add_facet(self.schema.facets, facet);
+                }
+                for label in text_info.labels.iter() {
+                    doc.add_facet(self.schema.facets, Facet::from(label));
+                }
+                let facet_field = format!("/{}", field);
+                doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
 
-            let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
-
-            for (paragraph_id, p) in &paragraphs.paragraphs {
-                let mut subdoc = field_doc.clone();
+                let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
@@ -252,26 +244,21 @@ impl ParagraphWriterService {
                 for elem in &chars[lower_bound..upper_bound] {
                     text.push(*elem);
                 }
-                subdoc.add_text(self.schema.paragraph, paragraph_id.clone());
-                subdoc.add_text(self.schema.text, &text);
-                subdoc.add_u64(self.schema.start_pos, start_pos);
-                subdoc.add_u64(self.schema.end_pos, end_pos);
-                subdoc.add_u64(self.schema.index, index);
+                doc.add_text(self.schema.paragraph, paragraph_id.clone());
+                doc.add_text(self.schema.text, &text);
+                doc.add_u64(self.schema.start_pos, start_pos);
+                doc.add_u64(self.schema.end_pos, end_pos);
+                doc.add_u64(self.schema.index, index);
 
                 let split = &p.split;
-                subdoc.add_text(self.schema.split, split);
+                doc.add_text(self.schema.split, split);
 
                 #[allow(clippy::iter_cloned_collect)]
                 let paragraph_labels: Vec<String> = labels.iter().cloned().collect();
                 for label in paragraph_labels {
-                    subdoc.add_facet(self.schema.facets, Facet::from(label.as_str()));
+                    doc.add_facet(self.schema.facets, Facet::from(label.as_str()));
                 }
-
-                info!(
-                    "Adding paragraph for {} with labels as {:?} [{} - {}]: {} ({})",
-                    field, labels, start_pos, end_pos, text, paragraph_id
-                );
-                self.writer.write().unwrap().add_document(subdoc).unwrap();
+                self.writer.write().unwrap().add_document(doc).unwrap();
             }
         }
 
