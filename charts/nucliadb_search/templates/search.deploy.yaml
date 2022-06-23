@@ -82,7 +82,7 @@ spec:
             mountPath: /appsecrets
 {{- end }}
       - name: cluster-manager
-        image: "{{ .Values.containerRegistry }}/cluster_manager:main"
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image_other }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         command: ["/entrypoint.sh"]
         args: ["/nucliadb_cluster/cluster_manager"]
