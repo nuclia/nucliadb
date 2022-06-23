@@ -214,9 +214,10 @@ impl ParagraphWriterService {
                 .get(field)
                 .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
         };
-
+        let mut paragraph_counter = 0;
         for (field, text_info) in &resource.texts {
-            for (paragraph_id, p) in inspect_paragraph(&field) {
+            for (paragraph_id, p) in inspect_paragraph(field) {
+                paragraph_counter += 1;
                 let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
@@ -247,7 +248,12 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
+                info!("Paragraph added");
                 self.writer.write().unwrap().add_document(doc).unwrap();
+                if paragraph_counter % 500 == 0 {
+                    info!("Commited");
+                    self.writer.write().unwrap().commit().unwrap();
+                }
             }
         }
 
