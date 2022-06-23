@@ -208,57 +208,52 @@ impl ParagraphWriterService {
         let modified = metadata.modified.as_ref().unwrap();
         let created = metadata.created.as_ref().unwrap();
         let empty_paragraph = HashMap::with_capacity(0);
-
-        for (field, text_info) in &resource.texts {
-            let paragraphs = resource
+        let inspect_paragraph = |field: &str| {
+            resource
                 .paragraphs
                 .get(field)
-                .map_or_else(|| &empty_paragraph, |i| &i.paragraphs);
-            for (paragraph_id, p) in paragraphs {
+                .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
+        };
+        let mut paragraph_counter = 0;
+        for (field, text_info) in &resource.texts {
+            for (paragraph_id, p) in inspect_paragraph(field) {
+                paragraph_counter += 1;
+                let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
+                let start_pos = p.start as u64;
+                let end_pos = p.end as u64;
+                let index = p.index as u64;
+                let labels = &p.labels;
+                let split = &p.split;
+                let lower_bound = std::cmp::min(start_pos as usize, chars.len());
+                let upper_bound = std::cmp::min(end_pos as usize, chars.len());
+                let text: String = chars[lower_bound..upper_bound].iter().collect();
+                let facet_field = format!("/{}", field);
                 let mut doc = doc!(
                     self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
                     self.schema.modified => timestamp_to_datetime_utc(modified),
                     self.schema.created => timestamp_to_datetime_utc(created),
                     self.schema.status => resource.status as u64,
                 );
-                #[allow(clippy::iter_cloned_collect)]
-                let resource_labels: Vec<String> = resource.labels.iter().cloned().collect();
-                for label in &resource_labels {
-                    let facet = Facet::from(label.as_str());
-                    doc.add_facet(self.schema.facets, facet);
-                }
-                for label in text_info.labels.iter() {
-                    doc.add_facet(self.schema.facets, Facet::from(label));
-                }
-                let facet_field = format!("/{}", field);
-                doc.add_facet(self.schema.field, Facet::from(facet_field.as_str()));
-
-                let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
-                let start_pos = p.start as u64;
-                let end_pos = p.end as u64;
-                let index = p.index as u64;
-                let labels = &p.labels;
-                let lower_bound = std::cmp::min(start_pos as usize, chars.len());
-                let upper_bound = std::cmp::min(end_pos as usize, chars.len());
-                let mut text = String::new();
-                for elem in &chars[lower_bound..upper_bound] {
-                    text.push(*elem);
-                }
+                resource
+                    .labels
+                    .iter()
+                    .chain(text_info.labels.iter())
+                    .chain(labels.iter())
+                    .map(Facet::from)
+                    .for_each(|facet| doc.add_facet(self.schema.facets, facet));
+                doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
                 doc.add_text(self.schema.text, &text);
                 doc.add_u64(self.schema.start_pos, start_pos);
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
-
-                let split = &p.split;
                 doc.add_text(self.schema.split, split);
-
-                #[allow(clippy::iter_cloned_collect)]
-                let paragraph_labels: Vec<String> = labels.iter().cloned().collect();
-                for label in paragraph_labels {
-                    doc.add_facet(self.schema.facets, Facet::from(label.as_str()));
-                }
+                info!("Paragraph added");
                 self.writer.write().unwrap().add_document(doc).unwrap();
+                if paragraph_counter % 500 == 0 {
+                    info!("Commited");
+                    self.writer.write().unwrap().commit().unwrap();
+                }
             }
         }
 
