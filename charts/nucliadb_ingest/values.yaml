@@ -12,6 +12,7 @@ revisionHistoryLimit: 2
 imagePullPolicy: IfNotPresent
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
+image_other: cluster_manager:main
 debug: False
 resources: {}
 #  limits:
