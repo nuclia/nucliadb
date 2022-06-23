@@ -206,7 +206,7 @@ impl Cluster {
 
         let (members_tx, members_rx) = watch::channel(Vec::<Member>::new());
 
-        let handle_clone = chitchat_handle.chitchat();
+        let chitchat = chitchat_handle.chitchat();
 
         // Create cluster.
         let cluster = Cluster {
@@ -217,16 +217,15 @@ impl Cluster {
             members: members_rx,
             stop: Arc::new(AtomicBool::new(false)),
         };
-
         // Prepare to start a task that will monitor cluster events.
-        let task_stop = cluster.stop.clone();
+        let monitor_task_stop = cluster.stop.clone();
 
+        let chitchat_clone = Arc::clone(&chitchat);
         // Start to monitor the node status updates.
         tokio::task::spawn(async move {
-            while !task_stop.load(Ordering::Relaxed) {
-                handle_clone.lock().await.update_heartbeat();
+            while !monitor_task_stop.load(Ordering::Relaxed) {
                 if let Some(live_nodes) = cluster_watcher.next().await {
-                    let guard = handle_clone.lock().await;
+                    let guard = chitchat_clone.lock().await;
                     let update_members: Vec<Member> = live_nodes
                         .iter()
                         .map(|node_id| Member::build(node_id, &*guard).unwrap())
@@ -244,6 +243,17 @@ impl Cluster {
                 }
             }
             debug!("receive a stop signal");
+        });
+
+        let chitchat_clone = Arc::clone(&chitchat);
+        let interval_task_stop = cluster.stop.clone();
+        tokio::task::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(500));
+            while !interval_task_stop.load(Ordering::Relaxed) {
+                interval.tick().await;
+                let mut chitchat_guard = chitchat_clone.lock().await;
+                chitchat_guard.update_nodes_liveliness();
+            }
         });
 
         Ok(cluster)
