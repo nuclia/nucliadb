@@ -79,7 +79,9 @@ class PushPayload(BaseModel):
     partition: int
 
     # List of available processing options (with default values)
-    processing_options: Optional[PushProcessingOptions] = Field(default_factory=PushProcessingOptions)
+    processing_options: Optional[PushProcessingOptions] = Field(
+        default_factory=PushProcessingOptions
+    )
 
 
 class PushResponse(BaseModel):
