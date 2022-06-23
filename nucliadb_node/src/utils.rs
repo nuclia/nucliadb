@@ -21,7 +21,9 @@ use http::Uri;
 use opentelemetry::propagation::Extractor;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
+use std::time::Duration;
 use tokio::net;
+use tokio::time::sleep;
 use tonic::transport::Endpoint;
 
 /// Prepares a socket addr for a grpc endpoint to connect to
@@ -67,6 +69,7 @@ pub async fn reliable_lookup_host(host: &str) -> IpAddr {
             }
         }
         tries -= 1;
+        sleep(Duration::from_secs(1)).await;
     }
     IpAddr::from_str(host).unwrap()
 }

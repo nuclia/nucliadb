@@ -11,7 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
 use tokio::net::TcpStream;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -134,6 +134,7 @@ pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
             }
         }
         tries -= 1;
+        sleep(Duration::from_secs(1)).await;
     }
     bail!("Can't lookup public ip")
 }
