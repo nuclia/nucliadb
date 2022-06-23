@@ -17,11 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use http::Uri;
-use opentelemetry::propagation::Extractor;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::time::Duration;
+
+use http::Uri;
+use opentelemetry::propagation::Extractor;
 use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
