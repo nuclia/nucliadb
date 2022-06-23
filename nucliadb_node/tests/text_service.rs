@@ -1200,7 +1200,7 @@
 //         let mut writer = NodeWriterService::new();
 //         let mut reader = NodeReaderService::new();
 
-//         let resources_dir = std::path::Path::new("/Users/hermegarcia/RustWorkspace/data");
+//         let resources_dir = std::path::Path::new("YOUR PATH");
 //         let new_shard = writer.new_shard().await;
 //         let shard_id = ShardId {
 //             id: new_shard.id.clone(),
