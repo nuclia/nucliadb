@@ -167,6 +167,9 @@ impl GraphLayer {
     pub fn is_empty(&self) -> bool {
         self.cnx.len() == 0
     }
+    pub fn shrink(&mut self) {
+        self.cnx.shrink_to_fit();
+    }
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GraphLog {

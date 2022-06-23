@@ -159,6 +159,8 @@ impl Index {
                 .insert_layer_out(&mut rw_txn, i as u64, &self.layers_out[i]);
             self.lmdb_driver
                 .insert_layer_in(&mut rw_txn, i as u64, &self.layers_in[i]);
+            self.layers_out[i].shrink();
+            self.layers_in[i].shrink();
         }
         self.lmdb_driver.insert_log(&mut rw_txn, log);
         if !self.removed.is_empty() {
