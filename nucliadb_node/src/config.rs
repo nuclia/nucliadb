@@ -20,9 +20,9 @@
 use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
-
-use tokio::net;
 use tracing::*;
+
+use crate::utils::reliable_lookup_host;
 
 /// Global configuration options
 pub struct Configuration {}
@@ -158,12 +158,7 @@ impl Configuration {
         match env::var("HOSTNAME") {
             Ok(v) => {
                 let host = format!("{}:4444", &v);
-                let mut addrs_iter = net::lookup_host(host).await.unwrap();
-                let addr = addrs_iter.next();
-                match addr {
-                    Some(x) => x.ip(),
-                    None => IpAddr::from_str(&v).unwrap(),
-                }
+                reliable_lookup_host(&host).await
             }
             Err(e) => {
                 error!("HOSTNAME node defined. Defaulting to: {default}. Error details: {e}");
