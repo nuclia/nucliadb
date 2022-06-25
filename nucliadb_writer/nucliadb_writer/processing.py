@@ -27,7 +27,7 @@ import aiohttp
 import jwt
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import nucliadb_models as models
 from nucliadb_utils.storages.storage import Storage
@@ -79,7 +79,9 @@ class PushPayload(BaseModel):
     partition: int
 
     # List of available processing options (with default values)
-    processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
+    processing_options: Optional[PushProcessingOptions] = Field(
+        default_factory=PushProcessingOptions
+    )
 
 
 class PushResponse(BaseModel):
