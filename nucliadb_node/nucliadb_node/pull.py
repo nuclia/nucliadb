@@ -186,7 +186,7 @@ class Worker:
                 self.reader.update(pb.shard, status)
 
             except AioRpcError as grpc_error:
-                if grpc_error.code == StatusCode.NOT_FOUND:
+                if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exit {pb.shard}")
                 else:
                     if SENTRY:

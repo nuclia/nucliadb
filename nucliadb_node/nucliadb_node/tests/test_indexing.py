@@ -28,6 +28,7 @@ from nucliadb_node.app import App
 from nucliadb_node.settings import settings
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import get_storage
+from grpc.aio import AioRpcError  # type: ignore
 
 
 @pytest.mark.asyncio
@@ -87,3 +88,44 @@ async def test_indexing(sidecar: App, shard: str):
     storage = await get_storage()
     with pytest.raises(KeyError):
         await storage.get_indexing(index)
+
+
+@pytest.mark.asyncio
+async def test_indexing_not_found(sidecar: App):
+    # Upload a payload
+
+    pb = Resource()
+    pb.shard_id = "shard"
+    pb.resource.shard_id = "shard"
+    pb.resource.uuid = "1"
+    pb.metadata.modified.FromDatetime(datetime.now())
+    pb.metadata.created.FromDatetime(datetime.now())
+    pb.texts["title"].text = "My title"
+    pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
+    pb.texts["description"].text = "My description is amazing"
+    pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
+    pb.status = Resource.ResourceStatus.PROCESSED
+    pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
+    pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
+    pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
+    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
+        "title/0-10/0-10"
+    ].vector.extend([1.0] * 768)
+
+    # Create the message
+    storage = await get_storage()
+    assert settings.force_host_id is not None
+    index: IndexMessage = await storage.indexing(pb, settings.force_host_id, "shard", 1)
+
+    # Push on stream
+    assert indexing_settings.index_jetstream_target is not None
+    await sidecar.worker.js.publish(
+        indexing_settings.index_jetstream_target.format(node=settings.force_host_id),
+        index.SerializeToString(),
+    )
+
+    sipb = ShardId()
+    sipb.id = "shard"
+
+    with pytest.raises(AioRpcError):
+        await sidecar.reader.get_count(sipb)
