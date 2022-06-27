@@ -21,6 +21,7 @@ import asyncio
 from datetime import datetime
 
 import pytest
+from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 
@@ -28,7 +29,6 @@ from nucliadb_node.app import App
 from nucliadb_node.settings import settings
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import get_storage
-from grpc.aio import AioRpcError  # type: ignore
 
 
 @pytest.mark.asyncio

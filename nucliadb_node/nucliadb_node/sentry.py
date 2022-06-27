@@ -22,7 +22,6 @@ from typing import Any, List
 
 try:
     import sentry_sdk
-    from sentry_sdk.integrations.excepthook import ExcepthookIntegration
     from sentry_sdk.integrations.logging import LoggingIntegration
 
     SENTRY = True
