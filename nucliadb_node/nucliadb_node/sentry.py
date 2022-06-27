@@ -38,8 +38,8 @@ def set_sentry(
     if sentry_url:
         enabled_integrations: List[Any] = []
 
-        sentry_exception = ExcepthookIntegration(always_run=True)
-        enabled_integrations.append(sentry_exception)
+        # sentry_exception = ExcepthookIntegration(always_run=True)
+        # enabled_integrations.append(sentry_exception)
 
         if logging_integration:
             sentry_logging = LoggingIntegration(
