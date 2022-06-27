@@ -20,6 +20,7 @@
 from fastapi import HTTPException, Response
 from fastapi_versioning import version  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
+from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.knowledgebox_pb2 import Widget as WidgetPB
 from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
@@ -130,6 +131,10 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
 
     if item.color:
         pbrequest.labelset.color = item.color
+
+    pbrequest.labelset.multiple = item.multiple
+    for kind in item.kind:
+        pbrequest.labelset.kind.append(LabelSetPB.LabelSetKind.Value(kind))
 
     for label_input in item.labels:
         lbl = LabelPB()

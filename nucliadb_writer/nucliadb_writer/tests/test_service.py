@@ -87,7 +87,9 @@ async def test_service_lifecycle_labels(writer_api):
         kbid = data["uuid"]
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-        ls = LabelSet(title="My labelset", color="#0000000")
+        ls = LabelSet(
+            title="My labelset", color="#0000000", multiple=False, kind=["RESOURCES"]
+        )
         ls.labels.append(Label(title="asd"))
         ls.labels.append(Label(title="asd"))
         resp = await client.post(f"/{KB_PREFIX}/{kbid}/labelset/ls1", json=ls.dict())

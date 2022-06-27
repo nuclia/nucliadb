@@ -232,20 +232,42 @@ global___Label = Label
 
 class LabelSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class _LabelSetKind:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _LabelSetKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[LabelSet._LabelSetKind.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        RESOURCES: LabelSet._LabelSetKind.ValueType  # 0
+        PARAGRAPHS: LabelSet._LabelSetKind.ValueType  # 1
+        SENTENCES: LabelSet._LabelSetKind.ValueType  # 2
+    class LabelSetKind(_LabelSetKind, metaclass=_LabelSetKindEnumTypeWrapper):
+        pass
+
+    RESOURCES: LabelSet.LabelSetKind.ValueType  # 0
+    PARAGRAPHS: LabelSet.LabelSetKind.ValueType  # 1
+    SENTENCES: LabelSet.LabelSetKind.ValueType  # 2
+
     TITLE_FIELD_NUMBER: builtins.int
     COLOR_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
+    MULTIPLE_FIELD_NUMBER: builtins.int
+    KIND_FIELD_NUMBER: builtins.int
     title: typing.Text
     color: typing.Text
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Label]: ...
+    multiple: builtins.bool
+    @property
+    def kind(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[global___LabelSet.LabelSetKind.ValueType]: ...
     def __init__(self,
         *,
         title: typing.Text = ...,
         color: typing.Text = ...,
         labels: typing.Optional[typing.Iterable[global___Label]] = ...,
+        multiple: builtins.bool = ...,
+        kind: typing.Optional[typing.Iterable[global___LabelSet.LabelSetKind.ValueType]] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","labels",b"labels","title",b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","kind",b"kind","labels",b"labels","multiple",b"multiple","title",b"title"]) -> None: ...
 global___LabelSet = LabelSet
 
 class Labels(google.protobuf.message.Message):
