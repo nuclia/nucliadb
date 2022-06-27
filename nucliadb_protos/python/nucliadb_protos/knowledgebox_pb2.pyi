@@ -250,13 +250,13 @@ class LabelSet(google.protobuf.message.Message):
     TITLE_FIELD_NUMBER: builtins.int
     COLOR_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
-    CHECKBOX_FIELD_NUMBER: builtins.int
+    MULTIPLE_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
     title: typing.Text
     color: typing.Text
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Label]: ...
-    checkbox: builtins.bool
+    multiple: builtins.bool
     @property
     def kind(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[global___LabelSet.LabelSetKind.ValueType]: ...
     def __init__(self,
@@ -264,10 +264,10 @@ class LabelSet(google.protobuf.message.Message):
         title: typing.Text = ...,
         color: typing.Text = ...,
         labels: typing.Optional[typing.Iterable[global___Label]] = ...,
-        checkbox: builtins.bool = ...,
+        multiple: builtins.bool = ...,
         kind: typing.Optional[typing.Iterable[global___LabelSet.LabelSetKind.ValueType]] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["checkbox",b"checkbox","color",b"color","kind",b"kind","labels",b"labels","title",b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","kind",b"kind","labels",b"labels","multiple",b"multiple","title",b"title"]) -> None: ...
 global___LabelSet = LabelSet
 
 class Labels(google.protobuf.message.Message):

@@ -88,7 +88,7 @@ async def test_service_lifecycle_labels(writer_api):
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         ls = LabelSet(
-            title="My labelset", color="#0000000", checkbox=False, kind=["RESOURCES"]
+            title="My labelset", color="#0000000", multiple=False, kind=["RESOURCES"]
         )
         ls.labels.append(Label(title="asd"))
         ls.labels.append(Label(title="asd"))

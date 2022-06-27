@@ -110,7 +110,7 @@ pub struct LabelSet {
     #[prost(message, repeated, tag="3")]
     pub labels: ::prost::alloc::vec::Vec<Label>,
     #[prost(bool, tag="4")]
-    pub checkbox: bool,
+    pub multiple: bool,
     #[prost(enumeration="label_set::LabelSetKind", repeated, tag="5")]
     pub kind: ::prost::alloc::vec::Vec<i32>,
 }

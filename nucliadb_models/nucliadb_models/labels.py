@@ -40,7 +40,7 @@ class Label(BaseModel):
 class LabelSet(BaseModel):
     title: Optional[str] = "no title"
     color: Optional[str] = "blue"
-    checkbox: bool = True
+    multiple: bool = True
     kind: List[LabelSetKind] = []
     labels: List[Label] = []
 

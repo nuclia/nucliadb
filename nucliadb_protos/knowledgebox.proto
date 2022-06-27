@@ -101,7 +101,7 @@ message LabelSet {
     string title = 1;
     string color = 2;
     repeated Label labels = 3;
-    bool checkbox = 4;
+    bool multiple = 4;
     repeated LabelSetKind kind = 5;
 }
 

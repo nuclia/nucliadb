@@ -132,7 +132,7 @@ async def set_labels(request: Request, kbid: str, labelset: str, item: LabelSet)
     if item.color:
         pbrequest.labelset.color = item.color
 
-    pbrequest.labelset.checkbox = item.checkbox
+    pbrequest.labelset.multiple = item.multiple
     for kind in item.kind:
         pbrequest.labelset.kind.append(LabelSetPB.LabelSetKind.Value(kind))
 
