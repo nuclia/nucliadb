@@ -29,7 +29,7 @@ spec:
       name: ingest
       annotations:
         traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.monitor }},{{.Values.serving.metrics }}"
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
       labels:
         app: ingest
         app.kubernetes.io/name: ingest
