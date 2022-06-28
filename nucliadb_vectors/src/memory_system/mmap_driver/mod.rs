@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 // use std::sync::atomic::{AtomicBool, Ordering};
 // use std::sync::Arc;
 use fs2::FileExt;
-use memmap2::{Mmap, MmapMut};
+use memmap2::Mmap;
 
 use crate::memory_system::elements::{ByteRpr, FileSegment, FixedByteLen};
 
@@ -200,18 +200,16 @@ impl Storage {
     }
     fn update_segment(&mut self, segment: FileSegment, bytes: &[u8]) -> FileSegment {
         self.lock.lock_exclusive().unwrap();
-        let range = (segment.start as usize)..(segment.end as usize);
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .read(true)
-            .append(true)
+            .write(true)
             .open(&self.path_storage)
             .unwrap();
-        let mut mmap_mut = unsafe { MmapMut::map_mut(&file).unwrap() };
-        if let Some(slice) = mmap_mut.get_mut(range.clone()) {
-            slice.clone_from_slice(bytes);
-            mmap_mut.flush_range(range.start, range.len()).unwrap();
-            self.storage = unsafe { Mmap::map(&file).unwrap() };
-        }
+        file.seek(SeekFrom::Start(segment.start)).unwrap();
+        file.write_all(bytes).unwrap();
+        file.flush().unwrap();
+        file.seek(SeekFrom::Start(0)).unwrap();
+        self.storage = unsafe { Mmap::map(&file).unwrap() };
         self.lock.unlock().unwrap();
         segment
     }
@@ -219,7 +217,7 @@ impl Storage {
         self.lock.lock_exclusive().unwrap();
         let mut file = OpenOptions::new()
             .read(true)
-            .append(true)
+            .write(true)
             .open(&self.path_storage)
             .unwrap();
         let metadata = file.metadata().unwrap();
@@ -227,8 +225,10 @@ impl Storage {
             start: metadata.len(),
             end: metadata.len() + (bytes.len() as u64),
         };
+        file.seek(SeekFrom::End(0)).unwrap();
         file.write_all(bytes).unwrap();
         file.flush().unwrap();
+        file.seek(SeekFrom::Start(0)).unwrap();
         self.storage = unsafe { Mmap::map(&file).unwrap() };
         self.lock.unlock().unwrap();
         segment
