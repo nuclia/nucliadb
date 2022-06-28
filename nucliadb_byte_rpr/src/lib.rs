@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub use std::collections::HashMap;
+pub use std::collections::{HashMap, BTreeMap};
 
 pub trait ByteRpr {
     fn as_byte_rpr(&self) -> Vec<u8>;
@@ -82,11 +82,12 @@ where T: ByteRpr + FixedByteLen
             start = end;
             end = start + segment_len;
         }
+        deserealized.shrink_to_fit();
         deserealized
     }
 }
 
-impl<K, V> ByteRpr for std::collections::HashMap<K, V>
+impl<K, V> ByteRpr for HashMap<K, V>
 where
     K: std::hash::Hash + Eq + ByteRpr + FixedByteLen,
     V: ByteRpr + FixedByteLen,
@@ -102,6 +103,40 @@ where
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let segment_len = K::segment_len() + V::segment_len();
         let mut deserealized = HashMap::new();
+        let mut start = 0;
+        let mut end = segment_len;
+        while start < bytes.len() {
+            let key_start = start;
+            let key_end = key_start + K::segment_len();
+            let value_start = key_end;
+            let value_end = value_start + V::segment_len();
+            let key = K::from_byte_rpr(&bytes[key_start..key_end]);
+            let value = V::from_byte_rpr(&bytes[value_start..value_end]);
+            deserealized.insert(key, value);
+            start = end;
+            end = start + segment_len;
+        }
+        deserealized.shrink_to_fit();
+        deserealized
+    }
+}
+
+impl<K, V> ByteRpr for BTreeMap<K, V>
+where
+    K: std::cmp::Ord + Eq  + ByteRpr + FixedByteLen,
+    V: ByteRpr + FixedByteLen,
+{
+    fn as_byte_rpr(&self) -> Vec<u8> {
+        let mut result = vec![];
+        for (k, v) in self {
+            result.append(&mut k.as_byte_rpr());
+            result.append(&mut v.as_byte_rpr());
+        }
+        result
+    }
+    fn from_byte_rpr(bytes: &[u8]) -> Self {
+        let segment_len = K::segment_len() + V::segment_len();
+        let mut deserealized = BTreeMap::new();
         let mut start = 0;
         let mut end = segment_len;
         while start < bytes.len() {
@@ -227,6 +262,17 @@ mod hashmap_test_serialization {
     fn serialize() {
         let map: HashMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
         let tested: HashMap<u64, u64> = HashMap::from_byte_rpr(&map.as_byte_rpr());
+        assert_eq!(tested, map);
+    }
+}
+
+#[cfg(test)]
+mod btreemap_test_serialization {
+    use super::*;
+    #[test]
+    fn serialize() {
+        let map: BTreeMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
+        let tested: BTreeMap<u64, u64> = BTreeMap::from_byte_rpr(&map.as_byte_rpr());
         assert_eq!(tested, map);
     }
 }
