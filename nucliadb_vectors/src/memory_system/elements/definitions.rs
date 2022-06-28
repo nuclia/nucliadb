@@ -18,11 +18,30 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
-
 pub const VECTORS_DIR: &str = "vectors";
+const INITIAL_CAPACITY: usize = 1000;
+const OCCUPANCY_MIN: usize = 70;
+const OCCUPANCY_MAX: usize = 90;
+const OCCUPANCY_MID: usize = 80;
+
+const fn should_increase(len: usize, cap: usize) -> bool {
+    let occupancy = (len / cap) * 100;
+    occupancy > OCCUPANCY_MAX
+}
+const fn should_decrease(len: usize, cap: usize) -> bool {
+    let occupancy = (len / cap) * 100;
+    cap > INITIAL_CAPACITY && occupancy < OCCUPANCY_MIN
+}
+
+const fn resize_by(len: usize, cap: usize) -> i64 {
+    let len = len as i64;
+    let cap = cap as i64;
+    let ocup = OCCUPANCY_MID as i64;
+    ((100 * len) - (ocup * cap)) / ocup
+}
 
 pub trait Distance {
     fn cosine(i: &Self, j: &Self) -> f32;
@@ -105,7 +124,7 @@ impl From<Vector> for Vec<f32> {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GraphLayer {
-    pub cnx: HashMap<Node, HashMap<Node, Edge>>,
+    pub cnx: HashMap<Node, BTreeMap<Node, Edge>>,
 }
 
 impl Default for GraphLayer {
@@ -115,7 +134,7 @@ impl Default for GraphLayer {
 }
 
 impl std::ops::Index<Node> for GraphLayer {
-    type Output = HashMap<Node, Edge>;
+    type Output = BTreeMap<Node, Edge>;
     fn index(&self, from: Node) -> &Self::Output {
         &self.cnx[&from]
     }
@@ -130,24 +149,26 @@ impl std::ops::Index<(Node, Node)> for GraphLayer {
 impl GraphLayer {
     pub fn new() -> GraphLayer {
         GraphLayer {
-            cnx: HashMap::new(),
+            cnx: HashMap::with_capacity(INITIAL_CAPACITY),
         }
     }
     pub fn has_node(&self, node: Node) -> bool {
         self.cnx.contains_key(&node)
     }
     pub fn add_node(&mut self, node: Node) {
-        self.cnx.insert(node, HashMap::new());
+        self.cnx.insert(node, BTreeMap::new());
+        self.increase_policy();
     }
     pub fn add_edge(&mut self, node: Node, edge: Edge) {
-        let edges = self.cnx.entry(node).or_insert_with(HashMap::new);
+        let edges = self.cnx.entry(node).or_insert_with(BTreeMap::new);
         edges.insert(edge.to, edge);
     }
     pub fn remove_node(&mut self, node: Node) {
         self.cnx.remove(&node);
+        self.decrease_policy();
     }
     pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
-        self.cnx[&from].clone()
+        self.cnx[&from].clone().into_iter().collect()
     }
     #[allow(unused)]
     #[cfg(test)]
@@ -167,10 +188,28 @@ impl GraphLayer {
     pub fn is_empty(&self) -> bool {
         self.cnx.len() == 0
     }
-    pub fn shrink(&mut self) {
-        self.cnx.shrink_to_fit();
+    fn increase_policy(&mut self) {
+        if let Some(factor) = self.check_policy(should_increase) {
+            self.cnx.reserve(factor as usize);
+        }
+    }
+    fn decrease_policy(&mut self) {
+        if let Some(factor) = self.check_policy(should_decrease) {
+            let cap = ((self.cnx.capacity() as i64) + factor) as usize;
+            self.cnx.shrink_to(cap);
+        }
+    }
+    fn check_policy(&self, policy: fn(_: usize, _: usize) -> bool) -> Option<i64> {
+        let len = self.cnx.len();
+        let cap = self.cnx.capacity();
+        if policy(self.cnx.len(), self.cnx.capacity()) {
+            Some(resize_by(len, cap))
+        } else {
+            None
+        }
     }
 }
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GraphLog {
     pub version_number: u128,

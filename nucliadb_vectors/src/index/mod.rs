@@ -50,7 +50,7 @@ impl Index {
         let lmdb_driver = LMBDStorage::open(path);
         let ro_txn = lmdb_driver.ro_txn();
         let log = lmdb_driver.get_log(&ro_txn);
-        let layers_in = vec![];
+        let layers_in = Vec::with_capacity(0);
         let mut layers_out = vec![];
         for i in 0..log.max_layer {
             let layer_out = lmdb_driver.get_layer_out(&ro_txn, i).unwrap();
@@ -159,8 +159,6 @@ impl Index {
                 .insert_layer_out(&mut rw_txn, i as u64, &self.layers_out[i]);
             self.lmdb_driver
                 .insert_layer_in(&mut rw_txn, i as u64, &self.layers_in[i]);
-            self.layers_out[i].shrink();
-            self.layers_in[i].shrink();
         }
         self.lmdb_driver.insert_log(&mut rw_txn, log);
         if !self.removed.is_empty() {

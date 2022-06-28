@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub use std::collections::HashMap;
+pub use std::collections::{BTreeMap, HashMap};
 
 pub use nucliadb_byte_rpr::*;
 
@@ -214,7 +214,7 @@ impl ByteRpr for GraphLayer {
             let hash_block = u64::from_byte_rpr(&bytes[len_start..len_end]) as usize;
             let edges_start = len_end;
             let edges_end = edges_start + hash_block;
-            let edges = HashMap::from_byte_rpr(&bytes[edges_start..edges_end]);
+            let edges = BTreeMap::from_byte_rpr(&bytes[edges_start..edges_end]);
             cnx.insert(key, edges);
             segment_start = edges_end;
         }
