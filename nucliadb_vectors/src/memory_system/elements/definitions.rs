@@ -27,6 +27,22 @@ const OCCUPANCY_MIN: usize = 70;
 const OCCUPANCY_MAX: usize = 90;
 const OCCUPANCY_MID: usize = 80;
 
+const fn should_increase(len: usize, cap: usize) -> bool {
+    let occupancy = (len / cap) * 100;
+    occupancy > OCCUPANCY_MAX
+}
+const fn should_decrease(len: usize, cap: usize) -> bool {
+    let occupancy = (len / cap) * 100;
+    cap > INITIAL_CAPACITY && occupancy < OCCUPANCY_MIN
+}
+
+const fn resize_by(len: usize, cap: usize) -> i64 {
+    let len = len as i64;
+    let cap = cap as i64;
+    let ocup = OCCUPANCY_MID as i64;
+    ((100 * len) - (ocup * cap)) / ocup
+}
+
 pub trait Distance {
     fn cosine(i: &Self, j: &Self) -> f32;
 }
@@ -141,7 +157,7 @@ impl GraphLayer {
     }
     pub fn add_node(&mut self, node: Node) {
         self.cnx.insert(node, BTreeMap::new());
-        self.increse_policy();
+        self.increase_policy();
     }
     pub fn add_edge(&mut self, node: Node, edge: Edge) {
         let edges = self.cnx.entry(node).or_insert_with(BTreeMap::new);
@@ -149,7 +165,7 @@ impl GraphLayer {
     }
     pub fn remove_node(&mut self, node: Node) {
         self.cnx.remove(&node);
-        self.decrese_policy();
+        self.decrease_policy();
     }
     pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
         self.cnx[&from].clone().into_iter().collect()
@@ -172,25 +188,28 @@ impl GraphLayer {
     pub fn is_empty(&self) -> bool {
         self.cnx.len() == 0
     }
-    fn increse_policy(&mut self) {
-        let len = self.cnx.len();
-        let cap = self.cnx.capacity();
-        let occupancy = (len / cap) * 100;
-        if occupancy > OCCUPANCY_MAX {
-            let cap = (len * 100) / OCCUPANCY_MID;
+    fn increase_policy(&mut self) {
+        if let Some(factor) = self.check_policy(should_increase) {
+            self.cnx.reserve(factor as usize);
+        }
+    }
+    fn decrease_policy(&mut self) {
+        if let Some(factor) = self.check_policy(should_decrease) {
+            let cap = ((self.cnx.capacity() as i64) + factor) as usize;
             self.cnx.shrink_to(cap);
         }
     }
-    fn decrese_policy(&mut self) {
+    fn check_policy(&self, policy: fn(_: usize, _: usize) -> bool) -> Option<i64> {
         let len = self.cnx.len();
         let cap = self.cnx.capacity();
-        let occupancy = (len / cap) * 100;
-        if cap > INITIAL_CAPACITY && occupancy < OCCUPANCY_MIN {
-            let cap = (len * 100) / OCCUPANCY_MID;
-            self.cnx.shrink_to(cap);
+        if policy(self.cnx.len(), self.cnx.capacity()) {
+            Some(resize_by(len, cap))
+        } else {
+            None
         }
     }
 }
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GraphLog {
     pub version_number: u128,
