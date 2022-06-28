@@ -21,8 +21,6 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-// use std::sync::atomic::{AtomicBool, Ordering};
-// use std::sync::Arc;
 use fs2::FileExt;
 use memmap2::Mmap;
 
@@ -77,13 +75,9 @@ impl DiskStack {
                 let mut buffer = vec![0u8; FileSegment::segment_len()];
                 stack.read_exact(&mut buffer).unwrap();
                 stack.set_len(new_len).unwrap();
-                stack.rewind().unwrap();
                 Some(FileSegment::from_byte_rpr(&buffer))
             }
-            Err(_) => {
-                stack.rewind().unwrap();
-                None
-            }
+            Err(_) => None,
         }
     }
     pub fn clear(&self) {
@@ -208,7 +202,6 @@ impl Storage {
         file.seek(SeekFrom::Start(segment.start)).unwrap();
         file.write_all(bytes).unwrap();
         file.flush().unwrap();
-        file.seek(SeekFrom::Start(0)).unwrap();
         self.storage = unsafe { Mmap::map(&file).unwrap() };
         self.lock.unlock().unwrap();
         segment
@@ -228,7 +221,6 @@ impl Storage {
         file.seek(SeekFrom::End(0)).unwrap();
         file.write_all(bytes).unwrap();
         file.flush().unwrap();
-        file.seek(SeekFrom::Start(0)).unwrap();
         self.storage = unsafe { Mmap::map(&file).unwrap() };
         self.lock.unlock().unwrap();
         segment
