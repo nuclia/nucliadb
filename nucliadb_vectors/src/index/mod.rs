@@ -147,26 +147,32 @@ impl Index {
         txn.abort().unwrap();
     }
     pub fn commit(&mut self) {
-        let mut rw_txn = self.lmdb_driver.rw_txn();
-        let log = GraphLog {
-            entry_point: self.entry_point,
-            max_layer: self.layers_len as u64,
-            version_number: self.time_stamp,
-        };
-        self.time_stamp += 1;
         for i in 0..self.layers_len {
+            let mut rw_txn = self.lmdb_driver.rw_txn();
             self.lmdb_driver
                 .insert_layer_out(&mut rw_txn, i as u64, &self.layers_out[i]);
             self.lmdb_driver
                 .insert_layer_in(&mut rw_txn, i as u64, &self.layers_in[i]);
+            rw_txn.commit().unwrap();
         }
-        self.lmdb_driver.insert_log(&mut rw_txn, log);
+        {
+            let mut rw_txn = self.lmdb_driver.rw_txn();
+            let log = GraphLog {
+                entry_point: self.entry_point,
+                max_layer: self.layers_len as u64,
+                version_number: self.time_stamp,
+            };
+            self.time_stamp += 1;
+            self.lmdb_driver.insert_log(&mut rw_txn, log);
+            rw_txn.commit().unwrap();
+        }
         if !self.removed.is_empty() {
+            let mut rw_txn = self.lmdb_driver.rw_txn();
             let deleted = std::mem::take(&mut self.removed);
             self.lmdb_driver
                 .mark_deleted(&mut rw_txn, self.time_stamp, deleted);
+            rw_txn.commit().unwrap();
         }
-        rw_txn.commit().unwrap();
     }
     pub fn run_garbage_collection(&mut self) {
         let mut rw_txn = self.lmdb_driver.rw_txn();

@@ -78,13 +78,10 @@ impl WriterChild for VectorWriterService {
                             labels.clone(),
                         );
                         info!("Vectors added {vector_id}");
-                        if vector_id % 500 == 0 {
-                            info!("Commit on {vector_id}");
-                            self.index.write().unwrap().commit();
-                        }
                     }
                 }
             }
+            info!("Commit on {vector_id}");
             self.index.write().unwrap().commit();
         }
         info!("Set resource in vector ends");
