@@ -19,7 +19,6 @@ path = "src/bin/reader.rs"
 name = "node_writer"
 path = "src/bin/writer.rs"
 
-
 [dependencies]
 tonic = "0.7"
 tonic-health = "0.6"

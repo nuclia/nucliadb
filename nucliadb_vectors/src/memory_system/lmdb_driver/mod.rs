@@ -214,7 +214,7 @@ impl LMBDStorage {
             )
             .unwrap();
     }
-    pub fn mark_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128, rmv: Vec<Node>) {
+    pub fn mark_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128, rmv: &Vec<Node>) {
         self.deleted_log
             .put(txn, &time_stamp.as_byte_rpr(), &rmv.as_byte_rpr())
             .unwrap();
