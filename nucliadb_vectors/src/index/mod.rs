@@ -162,16 +162,16 @@ impl Index {
                 max_layer: self.layers_len as u64,
                 version_number: self.time_stamp,
             };
-            self.time_stamp += 1;
             self.lmdb_driver.insert_log(&mut rw_txn, log);
             rw_txn.commit().unwrap();
+            self.time_stamp += 1;
         }
         if !self.removed.is_empty() {
             let mut rw_txn = self.lmdb_driver.rw_txn();
-            let deleted = std::mem::take(&mut self.removed);
             self.lmdb_driver
-                .mark_deleted(&mut rw_txn, self.time_stamp, deleted);
+                .mark_deleted(&mut rw_txn, self.time_stamp, &self.removed);
             rw_txn.commit().unwrap();
+            self.removed.clear();
         }
     }
     pub fn run_garbage_collection(&mut self) {
