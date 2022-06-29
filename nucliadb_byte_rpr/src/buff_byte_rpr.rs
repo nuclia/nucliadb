@@ -18,12 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod buff_byte_rpr;
-
-use std::collections::{BTreeMap, HashMap};
+pub use std::collections::{BTreeMap, HashMap};
+use std::io::Write;
 
 pub trait ByteRpr {
-    fn as_byte_rpr(&self) -> Vec<u8>;
+    fn alloc_byte_rpr(&self) -> Vec<u8> {
+        let mut buff = vec![];
+        self.as_byte_rpr(&mut buff);
+        buff
+    }
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize;
     fn from_byte_rpr(bytes: &[u8]) -> Self;
 }
 
@@ -34,18 +38,23 @@ pub trait FixedByteLen: ByteRpr {
 impl<T> ByteRpr for Option<T>
 where T: ByteRpr + FixedByteLen
 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut buff = vec![0];
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
         match self {
             Some(e) => {
-                buff[0] = 1;
-                buff.append(&mut e.as_byte_rpr());
+                let variant = [1];
+                buff.write_all(&variant).unwrap();
+                buff.flush().unwrap();
+                let v_len = e.as_byte_rpr(buff);
+                v_len + 1
             }
             None => {
-                buff.append(&mut vec![0; T::segment_len()]);
+                let variant = [0];
+                buff.write_all(&variant).unwrap();
+                buff.flush().unwrap();
+                let v_len = vec![0u8; T::segment_len()].as_byte_rpr(buff);
+                v_len + 1
             }
         }
-        buff
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         match bytes[0] {
@@ -67,12 +76,8 @@ where T: ByteRpr + FixedByteLen
 impl<T> ByteRpr for Vec<T>
 where T: ByteRpr + FixedByteLen
 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = vec![];
-        for elem in self {
-            result.append(&mut elem.as_byte_rpr());
-        }
-        result
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.iter().fold(0, |p, elem| p + elem.as_byte_rpr(buff))
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let segment_len = T::segment_len();
@@ -94,13 +99,9 @@ where
     K: std::hash::Hash + Eq + ByteRpr + FixedByteLen,
     V: ByteRpr + FixedByteLen,
 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = vec![];
-        for (k, v) in self {
-            result.append(&mut k.as_byte_rpr());
-            result.append(&mut v.as_byte_rpr());
-        }
-        result
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.iter()
+            .fold(0, |p, (k, v)| p + k.as_byte_rpr(buff) + v.as_byte_rpr(buff))
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let segment_len = K::segment_len() + V::segment_len();
@@ -128,13 +129,9 @@ where
     K: std::cmp::Ord + Eq + ByteRpr + FixedByteLen,
     V: ByteRpr + FixedByteLen,
 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = vec![];
-        for (k, v) in self {
-            result.append(&mut k.as_byte_rpr());
-            result.append(&mut v.as_byte_rpr());
-        }
-        result
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.iter()
+            .fold(0, |p, (k, v)| p + k.as_byte_rpr(buff) + v.as_byte_rpr(buff))
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let segment_len = K::segment_len() + V::segment_len();
@@ -157,8 +154,11 @@ where
 }
 
 impl ByteRpr for u64 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        self.to_le_bytes().to_vec()
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        let bytes = self.to_le_bytes();
+        buff.write_all(&bytes).unwrap();
+        buff.flush().unwrap();
+        bytes.len()
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let mut buff: [u8; 8] = [0; 8];
@@ -173,8 +173,11 @@ impl FixedByteLen for u64 {
 }
 
 impl ByteRpr for u128 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        self.to_le_bytes().to_vec()
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        let bytes = self.to_le_bytes();
+        buff.write_all(&bytes).unwrap();
+        buff.flush().unwrap();
+        bytes.len()
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let mut buff: [u8; 16] = [0; 16];
@@ -188,8 +191,11 @@ impl FixedByteLen for u128 {
     }
 }
 impl ByteRpr for f32 {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        self.to_le_bytes().to_vec()
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        let bytes = self.to_le_bytes();
+        buff.write_all(&bytes).unwrap();
+        buff.flush().unwrap();
+        bytes.len()
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let mut buff: [u8; 4] = [0; 4];
@@ -204,8 +210,8 @@ impl FixedByteLen for f32 {
 }
 
 impl ByteRpr for () {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        Vec::with_capacity(0)
+    fn as_byte_rpr(&self, _: &mut dyn Write) -> usize {
+        0
     }
     fn from_byte_rpr(_: &[u8]) -> Self {}
 }
@@ -216,8 +222,11 @@ impl FixedByteLen for () {
 }
 
 impl ByteRpr for String {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        let bytes = self.as_bytes();
+        buff.write_all(bytes).unwrap();
+        buff.flush().unwrap();
+        bytes.len()
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         String::from_utf8(bytes.to_vec()).unwrap()
@@ -225,8 +234,10 @@ impl ByteRpr for String {
 }
 
 impl ByteRpr for Vec<u8> {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        self.clone()
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        buff.write_all(self).unwrap();
+        buff.flush().unwrap();
+        self.len()
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         bytes.to_vec()
@@ -238,12 +249,14 @@ mod option_test_serialization {
     use super::*;
     #[test]
     fn serialize() {
-        let elem = Some(0u64);
-        let none_elem: Option<u64> = None;
-        assert_eq!(Option::from_byte_rpr(&elem.as_byte_rpr()), Some(0u64));
-        assert_eq!(Option::from_byte_rpr(&none_elem.as_byte_rpr()), none_elem);
-        assert_eq!(elem.as_byte_rpr().len(), Option::<u64>::segment_len());
-        assert_eq!(none_elem.as_byte_rpr().len(), Option::<u64>::segment_len());
+        let some = Some(0u64);
+        let none: Option<u64> = None;
+        assert_eq!(Option::from_byte_rpr(&some.alloc_byte_rpr()), Some(0u64));
+        assert_eq!(Option::from_byte_rpr(&none.alloc_byte_rpr()), none);
+        assert_eq!(some.alloc_byte_rpr().len(), some.as_byte_rpr(&mut vec![]));
+        assert_eq!(none.alloc_byte_rpr().len(), none.as_byte_rpr(&mut vec![]));
+        assert_eq!(some.alloc_byte_rpr().len(), Option::<u64>::segment_len());
+        assert_eq!(none.alloc_byte_rpr().len(), Option::<u64>::segment_len());
     }
 }
 #[cfg(test)]
@@ -252,7 +265,11 @@ mod vec_test_serialization {
     #[test]
     fn serialize() {
         let vector: Vec<u64> = vec![12; 7];
-        let tested: Vec<u64> = Vec::from_byte_rpr(&vector.as_byte_rpr());
+        let tested: Vec<u64> = Vec::from_byte_rpr(&vector.alloc_byte_rpr());
+        assert_eq!(
+            vector.alloc_byte_rpr().len(),
+            vector.as_byte_rpr(&mut vec![])
+        );
         assert_eq!(tested, vector);
     }
 }
@@ -263,7 +280,8 @@ mod hashmap_test_serialization {
     #[test]
     fn serialize() {
         let map: HashMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
-        let tested: HashMap<u64, u64> = HashMap::from_byte_rpr(&map.as_byte_rpr());
+        let tested: HashMap<u64, u64> = HashMap::from_byte_rpr(&map.alloc_byte_rpr());
+        assert_eq!(map.alloc_byte_rpr().len(), map.as_byte_rpr(&mut vec![]));
         assert_eq!(tested, map);
     }
 }
@@ -274,7 +292,8 @@ mod btreemap_test_serialization {
     #[test]
     fn serialize() {
         let map: BTreeMap<u64, u64> = [(0, 0), (1, 1), (2, 2)].into_iter().collect();
-        let tested: BTreeMap<u64, u64> = BTreeMap::from_byte_rpr(&map.as_byte_rpr());
+        let tested: BTreeMap<u64, u64> = BTreeMap::from_byte_rpr(&map.alloc_byte_rpr());
+        assert_eq!(map.alloc_byte_rpr().len(), map.as_byte_rpr(&mut vec![]));
         assert_eq!(tested, map);
     }
 }

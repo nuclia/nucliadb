@@ -19,9 +19,7 @@
 //
 
 pub use std::collections::{BTreeMap, HashMap};
-
-pub use nucliadb_byte_rpr::*;
-
+pub use nucliadb_byte_rpr::buff_byte_rpr::*;
 use super::definitions::*;
 use crate::memory_system::mmap_driver::*;
 
