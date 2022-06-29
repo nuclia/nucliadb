@@ -648,6 +648,7 @@ class Paragraph(google.protobuf.message.Message):
     CLASSIFICATIONS_FIELD_NUMBER: builtins.int
     SENTENCES_FIELD_NUMBER: builtins.int
     KEY_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
     start: builtins.int
     end: builtins.int
     @property
@@ -660,6 +661,7 @@ class Paragraph(google.protobuf.message.Message):
     @property
     def sentences(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Sentence]: ...
     key: typing.Text
+    text: typing.Text
     def __init__(self,
         *,
         start: builtins.int = ...,
@@ -670,8 +672,9 @@ class Paragraph(google.protobuf.message.Message):
         classifications: typing.Optional[typing.Iterable[global___Classification]] = ...,
         sentences: typing.Optional[typing.Iterable[global___Sentence]] = ...,
         key: typing.Text = ...,
+        text: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications",b"classifications","end",b"end","end_seconds",b"end_seconds","key",b"key","kind",b"kind","sentences",b"sentences","start",b"start","start_seconds",b"start_seconds"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications",b"classifications","end",b"end","end_seconds",b"end_seconds","key",b"key","kind",b"kind","sentences",b"sentences","start",b"start","start_seconds",b"start_seconds","text",b"text"]) -> None: ...
 global___Paragraph = Paragraph
 
 class FieldMetadata(google.protobuf.message.Message):

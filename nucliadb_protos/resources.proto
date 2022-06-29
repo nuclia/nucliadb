@@ -186,6 +186,7 @@ message Paragraph {
     repeated Classification classifications = 6;
     repeated Sentence sentences = 7;
     string key = 8;
+    string text = 9;  // Optional, as a computed value
 }
 
 message FieldMetadata {

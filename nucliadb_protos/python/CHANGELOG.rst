@@ -4,7 +4,7 @@ CHANGELOG
 0.0.25 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Add optional text on paragraph resource
 
 
 0.0.24 (2022-05-11)

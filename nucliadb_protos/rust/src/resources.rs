@@ -278,6 +278,8 @@ pub struct Paragraph {
     pub sentences: ::prost::alloc::vec::Vec<Sentence>,
     #[prost(string, tag="8")]
     pub key: ::prost::alloc::string::String,
+    #[prost(string, tag="9")]
+    pub text: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `Paragraph`.
 pub mod paragraph {
