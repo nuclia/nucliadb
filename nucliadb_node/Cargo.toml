@@ -19,10 +19,6 @@ path = "src/bin/reader.rs"
 name = "node_writer"
 path = "src/bin/writer.rs"
 
-# [[bin]]
-# name = "payload_test"
-# path = "src/bin/payload_test.rs"
-
 
 [dependencies]
 tonic = "0.7"
