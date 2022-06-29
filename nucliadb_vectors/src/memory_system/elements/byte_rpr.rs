@@ -19,9 +19,7 @@
 //
 
 pub use std::collections::{BTreeMap, HashMap};
-
-pub use nucliadb_byte_rpr::*;
-
+pub use nucliadb_byte_rpr::buff_byte_rpr::*;
 use super::definitions::*;
 use crate::memory_system::mmap_driver::*;
 
@@ -46,8 +44,10 @@ pub fn semi_mapped_consine_similarity(x: &[f32], y: Node, storage: &Storage) -> 
 }
 
 impl ByteRpr for LogField {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        vec![*self as u8]
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        buff.write_all(&[*self as u8]).unwrap();
+        buff.flush().unwrap();
+        1
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         use LogField::*;
@@ -66,13 +66,8 @@ impl FixedByteLen for LogField {
     }
 }
 impl ByteRpr for EntryPoint {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut node = self.node.as_byte_rpr();
-        let mut layer = self.layer.as_byte_rpr();
-        let mut result = Vec::new();
-        result.append(&mut node);
-        result.append(&mut layer);
-        result
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.node.as_byte_rpr(buff) + self.layer.as_byte_rpr(buff)
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let node_start = 0;
@@ -95,11 +90,8 @@ impl FixedByteLen for EntryPoint {
 }
 
 impl ByteRpr for FileSegment {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = vec![];
-        result.append(&mut self.start.as_byte_rpr());
-        result.append(&mut self.end.as_byte_rpr());
-        result
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.start.as_byte_rpr(buff) + self.end.as_byte_rpr(buff)
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let start_s = 0;
@@ -120,8 +112,8 @@ impl FixedByteLen for FileSegment {
 }
 
 impl ByteRpr for Node {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        self.vector.as_byte_rpr()
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.vector.as_byte_rpr(buff)
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let vector_start = 0;
@@ -138,12 +130,8 @@ impl FixedByteLen for Node {
 }
 
 impl ByteRpr for Edge {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = Vec::new();
-        result.append(&mut self.from.as_byte_rpr());
-        result.append(&mut self.to.as_byte_rpr());
-        result.append(&mut self.dist.to_le_bytes().to_vec());
-        result
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.from.as_byte_rpr(buff) + self.to.as_byte_rpr(buff) + self.dist.as_byte_rpr(buff)
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let from_start = 0;
@@ -169,13 +157,10 @@ impl FixedByteLen for Edge {
 }
 
 impl ByteRpr for Vector {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut result = vec![];
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
         let len = self.raw.len() as u64;
         let body = &self.raw;
-        result.append(&mut len.as_byte_rpr());
-        result.append(&mut body.as_byte_rpr());
-        result
+        len.as_byte_rpr(buff) + body.as_byte_rpr(buff)
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let len_start = 0;
@@ -190,17 +175,14 @@ impl ByteRpr for Vector {
 }
 
 impl ByteRpr for GraphLayer {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut serialized = vec![];
-        for (k, v) in &self.cnx {
-            let mut serialized_key = k.as_byte_rpr();
-            let mut serialized_value = v.as_byte_rpr();
-            let mut len = (serialized_value.len() as u64).as_byte_rpr();
-            serialized.append(&mut serialized_key);
-            serialized.append(&mut len);
-            serialized.append(&mut serialized_value);
-        }
-        serialized
+    fn as_byte_rpr(&self, buff: &mut dyn std::io::Write) -> usize {
+        self.cnx.iter().fold(0, |p, (k, v)| {
+            let serialized_value = v.alloc_byte_rpr();
+            let key_len = k.as_byte_rpr(buff);
+            let value_len_len = (serialized_value.len() as u64).as_byte_rpr(buff);
+            let value_len = serialized_value.as_byte_rpr(buff);
+            p + key_len + value_len_len + value_len
+        })
     }
     fn from_byte_rpr(bytes: &[u8]) -> Self {
         let mut cnx = HashMap::new();
@@ -232,9 +214,10 @@ mod entry_point_test_serialization {
             node: id_0,
             layer: 0,
         };
-        assert_eq!(Node::from_byte_rpr(&id_0.as_byte_rpr()), id_0);
-        assert_eq!(ep.as_byte_rpr().len(), EntryPoint::segment_len());
-        assert_eq!(ep, EntryPoint::from_byte_rpr(&ep.as_byte_rpr()));
+        assert_eq!(Node::from_byte_rpr(&id_0.alloc_byte_rpr()), id_0);
+        assert_eq!(ep.alloc_byte_rpr().len(), ep.as_byte_rpr(&mut vec![]));
+        assert_eq!(ep.alloc_byte_rpr().len(), EntryPoint::segment_len());
+        assert_eq!(ep, EntryPoint::from_byte_rpr(&ep.alloc_byte_rpr()));
     }
 }
 
@@ -255,8 +238,9 @@ mod node_test_serialization {
     #[test]
     fn serialize() {
         let node = test_nodes(1).pop().unwrap();
-        assert_eq!(node.as_byte_rpr().len(), Node::segment_len());
-        assert_eq!(Node::from_byte_rpr(&node.as_byte_rpr()), node);
+        assert_eq!(node.alloc_byte_rpr().len(), Node::segment_len());
+        assert_eq!(node.alloc_byte_rpr().len(), node.as_byte_rpr(&mut vec![]));
+        assert_eq!(Node::from_byte_rpr(&node.alloc_byte_rpr()), node);
     }
 }
 
@@ -271,8 +255,9 @@ mod edge_test_serialization {
             to: nodes[1],
             dist: 1.2,
         };
-        assert_eq!(edge.as_byte_rpr().len(), Edge::segment_len());
-        assert_eq!(Edge::from_byte_rpr(&edge.as_byte_rpr()), edge);
+        assert_eq!(edge.alloc_byte_rpr().len(), Edge::segment_len());
+        assert_eq!(edge.alloc_byte_rpr().len(), edge.as_byte_rpr(&mut vec![]));
+        assert_eq!(Edge::from_byte_rpr(&edge.alloc_byte_rpr()), edge);
     }
 }
 
@@ -282,7 +267,11 @@ mod vector_test_serialization {
     #[test]
     fn serialize() {
         let vector = Vector::from(vec![2.0; 3]);
-        let serialized = Vector::from_byte_rpr(&vector.as_byte_rpr());
+        let serialized = Vector::from_byte_rpr(&vector.alloc_byte_rpr());
+        assert_eq!(
+            vector.alloc_byte_rpr().len(),
+            vector.as_byte_rpr(&mut vec![])
+        );
         assert_eq!(serialized.raw.len(), vector.raw.len());
         assert_eq!(serialized, vector);
     }
@@ -314,7 +303,8 @@ mod graph_layer_test_serialization {
     fn serialize() {
         let (nodes, mut graph) = test_layer(1);
         let graph = graph.pop().unwrap();
-        let tested = GraphLayer::from_byte_rpr(&graph.as_byte_rpr());
+        let tested = GraphLayer::from_byte_rpr(&graph.alloc_byte_rpr());
+        assert_eq!(graph.alloc_byte_rpr().len(), graph.as_byte_rpr(&mut vec![]));
         assert_eq!(graph.no_edges(nodes[0]), tested.no_edges(nodes[0]));
         assert_eq!(graph.no_edges(nodes[1]), tested.no_edges(nodes[1]));
         assert_eq!(graph[(nodes[0], nodes[1])], tested[(nodes[0], nodes[1])]);
@@ -338,7 +328,8 @@ mod file_segment_test_serialization {
     #[test]
     fn serialize() {
         let fs = test_segments(1);
-        assert_eq!(fs[0].as_byte_rpr().len(), FileSegment::segment_len());
-        assert_eq!(FileSegment::from_byte_rpr(&fs[0].as_byte_rpr()), fs[0]);
+        assert_eq!(fs[0].alloc_byte_rpr().len(), FileSegment::segment_len());
+        assert_eq!(fs[0].alloc_byte_rpr().len(), fs[0].as_byte_rpr(&mut vec![]));
+        assert_eq!(FileSegment::from_byte_rpr(&fs[0].alloc_byte_rpr()), fs[0]);
     }
 }

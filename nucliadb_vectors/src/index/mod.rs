@@ -195,7 +195,7 @@ impl Index {
     pub fn add_node(&mut self, key: String, vector: Vector, layer: usize) -> Node {
         let mut txn = self.lmdb_driver.rw_txn();
         let node = Node {
-            vector: self.vector_storage.insert(&vector.as_byte_rpr()),
+            vector: self.vector_storage.insert(&vector.alloc_byte_rpr()),
         };
         self.lmdb_driver.add_node(&mut txn, key, node);
         txn.commit().unwrap();

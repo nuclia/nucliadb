@@ -137,7 +137,7 @@ impl LMBDStorage {
         v.map(Node::from_byte_rpr)
     }
     pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Node) -> Option<&'a str> {
-        self.node_inv_db.get(txn, &node.as_byte_rpr()).unwrap()
+        self.node_inv_db.get(txn, &node.alloc_byte_rpr()).unwrap()
     }
     pub fn get_keys(&self, txn: &RoTxn) -> Vec<String> {
         let mut result = vec![];
@@ -153,7 +153,7 @@ impl LMBDStorage {
         exist.is_some()
     }
     pub fn add_node(&self, txn: &mut RwTxn<'_, '_>, key: String, node: Node) {
-        let node = node.as_byte_rpr();
+        let node = node.alloc_byte_rpr();
         self.node_db.put(txn, key.as_str(), &node).unwrap();
         self.node_inv_db.put(txn, &node, key.as_str()).unwrap();
     }
@@ -171,23 +171,23 @@ impl LMBDStorage {
     }
     pub fn insert_layer_out(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: &GraphLayer) {
         self.layer_out_db
-            .put(txn, &id.as_byte_rpr(), &layer.as_byte_rpr())
+            .put(txn, &id.alloc_byte_rpr(), &layer.alloc_byte_rpr())
             .unwrap();
     }
     pub fn insert_layer_in(&self, txn: &mut RwTxn<'_, '_>, id: u64, layer: &GraphLayer) {
         self.layer_in_db
-            .put(txn, &id.as_byte_rpr(), &layer.as_byte_rpr())
+            .put(txn, &id.alloc_byte_rpr(), &layer.alloc_byte_rpr())
             .unwrap();
     }
     pub fn get_layer_out(&self, txn: &RoTxn<'_>, layer: u64) -> Option<GraphLayer> {
         self.layer_out_db
-            .get(txn, &layer.as_byte_rpr())
+            .get(txn, &layer.alloc_byte_rpr())
             .unwrap()
             .map(GraphLayer::from_byte_rpr)
     }
     pub fn get_layer_in(&self, txn: &RoTxn<'_>, layer: u64) -> Option<GraphLayer> {
         self.layer_in_db
-            .get(txn, &layer.as_byte_rpr())
+            .get(txn, &layer.alloc_byte_rpr())
             .unwrap()
             .map(GraphLayer::from_byte_rpr)
     }
@@ -195,40 +195,42 @@ impl LMBDStorage {
         self.log
             .put(
                 txn,
-                &LogField::EntryPoint.as_byte_rpr(),
-                &log.entry_point.as_byte_rpr(),
+                &LogField::EntryPoint.alloc_byte_rpr(),
+                &log.entry_point.alloc_byte_rpr(),
             )
             .unwrap();
         self.log
             .put(
                 txn,
-                &LogField::NoLayers.as_byte_rpr(),
-                &log.max_layer.as_byte_rpr(),
+                &LogField::NoLayers.alloc_byte_rpr(),
+                &log.max_layer.alloc_byte_rpr(),
             )
             .unwrap();
         self.log
             .put(
                 txn,
-                &LogField::VersionNumber.as_byte_rpr(),
-                &log.version_number.as_byte_rpr(),
+                &LogField::VersionNumber.alloc_byte_rpr(),
+                &log.version_number.alloc_byte_rpr(),
             )
             .unwrap();
     }
     #[allow(clippy::ptr_arg)]
     pub fn mark_deleted(&self, txn: &mut RwTxn<'_, '_>, time_stamp: u128, rmv: &Vec<Node>) {
         self.deleted_log
-            .put(txn, &time_stamp.as_byte_rpr(), &rmv.as_byte_rpr())
+            .put(txn, &time_stamp.alloc_byte_rpr(), &rmv.alloc_byte_rpr())
             .unwrap();
     }
     pub fn clear_deleted(&self, txn: &mut RwTxn<'_, '_>) -> Vec<Node> {
         let delete = self
             .deleted_log
-            .get_greater_than(txn, &0u128.as_byte_rpr())
+            .get_greater_than(txn, &0u128.alloc_byte_rpr())
             .unwrap()
             .map(|(node, v)| (u128::from_byte_rpr(node), Vec::from_byte_rpr(v)));
         match delete {
             Some((stamp, deleted)) => {
-                self.deleted_log.delete(txn, &stamp.as_byte_rpr()).unwrap();
+                self.deleted_log
+                    .delete(txn, &stamp.alloc_byte_rpr())
+                    .unwrap();
                 deleted.iter().for_each(|n| self.remove_vector(txn, *n));
                 deleted
             }
@@ -238,7 +240,9 @@ impl LMBDStorage {
     pub fn remove_vector(&self, txn: &mut RwTxn<'_, '_>, node: Node) {
         let key = self.get_node_key(txn, node).unwrap().to_string();
         self.node_db.delete(txn, &key).unwrap();
-        self.node_inv_db.delete(txn, &node.as_byte_rpr()).unwrap();
+        self.node_inv_db
+            .delete(txn, &node.alloc_byte_rpr())
+            .unwrap();
         let label_query = format!("{}/", key);
         let mut iter = self.label_db.prefix_iter_mut(txn, &label_query).unwrap();
         while iter.next().transpose().unwrap().is_some() {
@@ -248,19 +252,19 @@ impl LMBDStorage {
     pub fn get_log(&self, txn: &RoTxn<'_>) -> GraphLog {
         let version_number = self
             .log
-            .get(txn, &LogField::VersionNumber.as_byte_rpr())
+            .get(txn, &LogField::VersionNumber.alloc_byte_rpr())
             .unwrap()
             .map(u128::from_byte_rpr)
             .unwrap();
         let max_layer = self
             .log
-            .get(txn, &LogField::NoLayers.as_byte_rpr())
+            .get(txn, &LogField::NoLayers.alloc_byte_rpr())
             .unwrap()
             .map(u64::from_byte_rpr)
             .unwrap();
         let entry_point = self
             .log
-            .get(txn, &LogField::EntryPoint.as_byte_rpr())
+            .get(txn, &LogField::EntryPoint.alloc_byte_rpr())
             .unwrap()
             .map(Option::from_byte_rpr)
             .unwrap();
