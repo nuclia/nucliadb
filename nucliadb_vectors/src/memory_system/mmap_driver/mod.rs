@@ -60,7 +60,7 @@ impl DiskStack {
             .create(true)
             .open(&self.stack)
             .unwrap();
-        stack.write_all(&segment.as_byte_rpr()).unwrap();
+        stack.write_all(&segment.alloc_byte_rpr()).unwrap();
         stack.flush().unwrap();
     }
     pub fn pop(&self) -> Option<FileSegment> {
