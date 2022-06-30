@@ -85,14 +85,11 @@ spec:
           privileged: true
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_writer }}", "-service=nodewriter.NodeWriter"]
-          initialDelaySeconds: 2
         livenessProbe:
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_writer }}", "-service=nodewriter.NodeWriter"]
-          initialDelaySeconds: 2
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc_writer }}", "-service=nodewriter.NodeWriter", "-connect-timeout=2000ms", "-rpc-timeout=2000ms"]
+          initialDelaySeconds: 10
+          periodSeconds: 60
         command: ["/entrypoint.sh"]
         args: ["node_writer"]
         envFrom:
