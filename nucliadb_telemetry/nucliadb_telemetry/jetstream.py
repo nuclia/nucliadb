@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from contextlib import contextmanager
 from functools import partial
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
+from nats.aio.client import Client
 from nats.aio.msg import Msg
 from nats.js.client import JetStreamContext
 from opentelemetry.context import attach
@@ -32,7 +34,21 @@ from opentelemetry.trace import Tracer  # type: ignore
 from nucliadb_telemetry.common import set_span_exception
 
 
-def start_span_server_js(tracer: Tracer, msg: Msg):
+@contextmanager
+def telemetry_message_handler(tracer: Tracer, message: Msg):
+    """
+    Starts a span and yields control to the code that is
+    actually doing fetch calls and handling messages
+    """
+    with start_span_message_receiver(tracer, message) as span:
+        try:
+            yield message
+        except Exception as error:
+            set_span_exception(span, error)
+            raise error
+
+
+def start_span_message_receiver(tracer: Tracer, msg: Msg):
 
     attributes = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
@@ -45,7 +61,7 @@ def start_span_server_js(tracer: Tracer, msg: Msg):
     token = attach(ctx)
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=msg.reply,
+        name=f"Receive message from {msg.subject}",
         kind=SpanKind.SERVER,
         attributes=attributes,
     )
@@ -53,7 +69,7 @@ def start_span_server_js(tracer: Tracer, msg: Msg):
     return span
 
 
-def start_span_client_js(tracer: Tracer, subject: str):
+def start_span_message_publisher(tracer: Tracer, subject: str):
 
     attributes = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
@@ -83,10 +99,10 @@ class JetStreamContextTelemetry:
         return await self.js.add_stream(name=name, subjects=subjects)
 
     async def subscribe(self, cb, **kwargs):
-        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_server")
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
-            with start_span_server_js(tracer, msg) as span:
+            with start_span_message_receiver(tracer, msg) as span:
                 try:
                     await origin_cb(msg)
                 except Exception as error:
@@ -96,13 +112,83 @@ class JetStreamContextTelemetry:
         wrapped_cb = partial(wrapper, cb, tracer)
         return await self.js.subscribe(cb=wrapped_cb, **kwargs)
 
-    async def publish(self, subject: str, body: bytes):
-        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_client")
-        headers: Dict[str, str] = {}
+    async def publish(
+        self,
+        subject: str,
+        body: bytes,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ):
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_publisher")
+        headers = {} if headers is None else {}
         inject(headers)
-        with start_span_client_js(tracer, subject) as span:
+        with start_span_message_publisher(tracer, subject) as span:
             try:
-                result = await self.js.publish(subject, body, headers=headers)
+                result = await self.js.publish(subject, body, headers=headers, **kwargs)
+            except Exception as error:
+                if type(error) != Exception:
+                    set_span_exception(span, error)
+                raise error
+
+        return result
+
+
+class NatsClientTelemetry:
+    def __init__(self, nc: Client, service_name: str, tracer_provider: TracerProvider):
+        self.nc = nc
+        self.service_name = service_name
+        self.tracer_provider = tracer_provider
+
+    async def subscribe(self, cb, **kwargs):
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_subscriber")
+
+        async def wrapper(origin_cb, tracer, msg: Msg):
+            with start_span_message_receiver(tracer, msg) as span:
+                try:
+                    await origin_cb(msg)
+                except Exception as error:
+                    set_span_exception(span, error)
+                    raise error
+
+        wrapped_cb = partial(wrapper, cb, tracer)
+        return await self.nc.subscribe(cb=wrapped_cb, **kwargs)
+
+    async def publish(
+        self,
+        subject: str,
+        body: bytes,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ):
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
+        headers = {} if headers is None else {}
+        inject(headers)
+        with start_span_message_publisher(tracer, subject) as span:
+            try:
+                result = await self.nc.publish(subject, body, headers=headers, **kwargs)
+            except Exception as error:
+                if type(error) != Exception:
+                    set_span_exception(span, error)
+                raise error
+
+        return result
+
+    async def request(
+        self,
+        subject: str,
+        payload: bytes = b"",
+        timeout: float = 0.5,
+        old_style: bool = False,
+        headers: Dict[str, Any] = None,
+    ) -> Msg:
+        headers = {} if headers is None else {}
+        inject(headers)
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
+        with start_span_message_publisher(tracer, subject) as span:
+            try:
+                result = await self.nc.request(
+                    subject, payload, timeout, old_style, headers  # type: ignore
+                )
             except Exception as error:
                 if type(error) != Exception:
                     set_span_exception(span, error)

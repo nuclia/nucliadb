@@ -62,7 +62,7 @@ On GRPC Client you should add:
 
 ```
 
-On Nats Server you should add:
+On Nats jetstream push subscriber you should add:
 
 ```python
     nc = await nats.connect(servers=[self.natsd])
@@ -83,7 +83,7 @@ On Nats Server you should add:
 
 ```
 
-On Nats client you should add:
+On Nats publisher you should add:
 
 ```python
     nc = await nats.connect(servers=[self.natsd])
@@ -100,3 +100,94 @@ On Nats client you should add:
      await jsotel.publish("testing.telemetry", request.name.encode())
 
 ```
+
+
+On Nats jetstream pull subscription you should
+
+```python
+    nc = await nats.connect(servers=[self.natsd])
+    js = self.nc.jetstream()
+    tracer_provider = get_telemetry("NATS_SERVICE")
+    if not tracer_provider.initialized:
+        await init_telemetry(tracer_provider)
+    set_global_textmap(B3MultiFormat())
+    jsotel = JetStreamContextTelemetry(
+        js, "NATS_SERVICE", tracer_provider
+    )
+
+    subscription = await jsotel.pull_subscribe(
+        subject="testing.telemetry",
+        durable="consumer_name"
+        stream="testing",
+    )
+
+    tracer = self.tracer_provider.get_tracer("pull_worker")
+    while True:
+        messages = subscription.fetch(3)
+        for message in messages:
+            with telemetry_message_handler(tracer, msgs[0]) as message:
+                self.messages.append(message)
+
+```
+
+
+On Nats client (NO Jestream! ) publisher you should add:
+
+```python
+    nc = await nats.connect(servers=[self.natsd])
+    js = self.nc.jetstream()
+    tracer_provider = get_telemetry("NATS_SERVICE")
+    if not tracer_provider.initialized:
+        await init_telemetry(tracer_provider)
+
+    set_global_textmap(B3MultiFormat())
+    ncotel = NatsClientTelemetry(
+        nc, "NATS_SERVICE", tracer_provider
+    )
+
+     await ncotel.publish("testing.telemetry", request.name.encode())
+
+```
+
+On Nats client (NO Jestream! ) subscriber you should add:
+
+```python
+    nc = await nats.connect(servers=[self.natsd])
+    js = self.nc.jetstream()
+    tracer_provider = get_telemetry("NATS_SERVICE")
+    if not tracer_provider.initialized:
+        await init_telemetry(tracer_provider)
+    set_global_textmap(B3MultiFormat())
+    ncotel = NatsClientContextTelemetry(
+        js, "NATS_SERVICE", tracer_provider
+    )
+
+    subscription = await ncotel.subscribe(
+        subject="testing.telemetry",
+        queue="queue_nname",
+        cb=handler,
+    )
+
+```
+
+
+On Nats client (NO Jestream! ) request you should add:
+
+```python
+    nc = await nats.connect(servers=[self.natsd])
+    js = self.nc.jetstream()
+    tracer_provider = get_telemetry("NATS_SERVICE")
+    if not tracer_provider.initialized:
+        await init_telemetry(tracer_provider)
+
+    set_global_textmap(B3MultiFormat())
+    ncotel = NatsClientTelemetry(
+        nc, "NATS_SERVICE", tracer_provider
+    )
+
+    response = await ncotel.request("testing.telemetry", request.name.encode())
+
+```
+
+And to handle responses on the other side, you can use the same pattern as in plain Nats client
+subscriber, just adding the `msg.respond()` on the handler when done
