@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import os
 
 import nats
@@ -25,13 +26,14 @@ import requests
 from fastapi import FastAPI
 from httpx import AsyncClient
 from nats.aio.msg import Msg
+from nats.js import api
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
-from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry, NatsClientTelemetry
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.grpc import (
     hellostreamingworld_pb2,
@@ -109,11 +111,11 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
     def __init__(self, natsd):
         self.natsd = natsd
         self.nc = None
-        self.subscription = None
+        self.push_subscription = None
         self.tracer_provider = None
         self.messages = []
 
-    async def subscription_worker(self, msg: Msg):
+    async def push_subscription_worker(self, msg: Msg):
         tracer = self.tracer_provider.get_tracer("message_worker")
         with tracer.start_as_current_span("message_worker_span") as _:
             self.messages.append(msg)
@@ -133,14 +135,14 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
             self.js, "nats_service", self.tracer_provider
         )
 
-        self.subscription = await self.jsotel.subscribe(
+        self.push_subscription = await self.jsotel.subscribe(
             subject="testing.stelemetry",
             stream="testing",
-            cb=self.subscription_worker,
+            cb=self.push_subscription_worker,
         )
 
     async def finalize(self):
-        await self.subscription.unsubscribe()
+        await self.push_subscription.unsubscribe()
         await self.nc.drain()
         await self.nc.close()
 
@@ -156,14 +158,35 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
     def __init__(self, natsd):
         self.natsd = natsd
         self.nc = None
-        self.subscription = None
+        self.push_subscription = None
+        self.pull_subscription_one = None
+        self.puller_task = None
+        self.pubsub_subscription = None
         self.tracer_provider = None
         self.messages = []
+        self.puller_task_one = None
 
-    async def subscription_worker(self, msg: Msg):
+    async def push_subscription_worker(self, msg: Msg):
         tracer = self.tracer_provider.get_tracer("message_worker")
         with tracer.start_as_current_span("message_worker_span") as _:
             self.messages.append(msg)
+
+    async def pull_subscription_worker_one(self):
+        async def callback(message):
+            self.messages.append(message)
+
+        await self.jsotel.pull_one(self.pull_subscription_one, callback)
+
+    async def pubsub_subscription_worker(self, msg: Msg):
+        tracer = self.tracer_provider.get_tracer("pubsub_worker")
+        with tracer.start_as_current_span("pubsub_worker_span") as _:
+            self.messages.append(msg)
+
+    async def reqresp_subscription_worker(self, msg: Msg):
+        tracer = self.tracer_provider.get_tracer("reqresp_worker")
+        with tracer.start_as_current_span("reqresp_worker_span") as _:
+            self.messages.append(msg)
+            await msg.respond(b"Bye Bye!")
 
     async def initialize(self):
         self.nc = await nats.connect(servers=[self.natsd])
@@ -180,19 +203,73 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
             self.js, "nats_service", self.tracer_provider
         )
 
-        self.subscription = await self.jsotel.subscribe(
+        self.push_subscription = await self.jsotel.subscribe(
             subject="testing.telemetry",
             stream="testing",
-            cb=self.subscription_worker,
+            cb=self.push_subscription_worker,
+        )
+
+        # Nats Jetstream Pull subscription including consumer creation
+        # and task to pull one message
+        config = api.ConsumerConfig()
+        config.filter_subject = "testing.telemetry_pull_one"
+        config.durable_name = "testing_consumer_one"
+        await self.js._jsm.add_consumer(stream="testing", config=config)
+
+        self.pull_subscription_one = await self.jsotel.pull_subscribe(
+            subject=config.filter_subject, durable=config.durable_name, stream="testing"
+        )
+
+        self.puller_task_one = asyncio.create_task(self.pull_subscription_worker_one())
+
+        # Plain nats instrumentation and subscription
+        # (no streams neither consumers used here)
+        self.ncotel = NatsClientTelemetry(self.nc, "nats_service", self.tracer_provider)
+
+        self.pubsub_subscription = await self.ncotel.subscribe(
+            subject="testing.telemetry_nats_pubsub",
+            queue="telemetry_nats_pubsub",
+            cb=self.pubsub_subscription_worker,
+        )
+
+        # Plain nats request-response
+
+        self.reqresp_subscription = await self.ncotel.subscribe(
+            subject="testing.telemetry_nats_reqresp",
+            queue="telemetry_nats_reqresp",
+            cb=self.reqresp_subscription_worker,
         )
 
     async def finalize(self):
-        await self.subscription.unsubscribe()
+        await self.push_subscription.unsubscribe()
+
+        await self.pull_subscription_one.unsubscribe()
+        self.puller_task_one.cancel()
+        await self.js._jsm.delete_consumer(
+            stream="testing", consumer="testing_consumer_one"
+        )
+
+        await self.pubsub_subscription.unsubscribe()
         await self.nc.drain()
         await self.nc.close()
 
     async def SayHello(self, request, context):
+        # Send message to test Jetstream publish and subscribe message
         await self.jsotel.publish("testing.telemetry", request.name.encode())
+
+        # Send message to test Jetstream pull subscriber one
+        await self.jsotel.publish("testing.telemetry_pull_one", request.name.encode())
+
+        # Test regular nats pubsub
+        await self.ncotel.publish(
+            "testing.telemetry_nats_pubsub", request.name.encode()
+        )
+
+        # Test regular nats request-response
+        await self.ncotel.request(
+            "testing.telemetry_nats_reqresp", request.name.encode()
+        )
+
         return helloworld_pb2.HelloReply(
             message=("Hello, %s!" % request.name) * 2_000_000
         )

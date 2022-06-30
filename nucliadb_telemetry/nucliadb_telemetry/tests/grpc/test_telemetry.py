@@ -18,12 +18,34 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import json
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.telemetry import Greeter
+
+
+def fmt_span(span):
+    tags_by_key = {tag["key"]: tag["value"] for tag in span["tags"]}
+    return {
+        "time": span["startTime"],
+        "id": span["spanID"],
+        "parent": span["references"][0]["spanID"],
+        "process": span["processID"],
+        "scope": tags_by_key["otel.scope.name"],
+        "operation": span["operationName"],
+    }
+
+
+def debug_spans(spans):
+    print(
+        json.dumps(
+            sorted([fmt_span(span) for span in spans], key=lambda x: x["time"]),
+            indent=4,
+        )
+    )
 
 
 @pytest.mark.asyncio
@@ -45,6 +67,10 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
         == "f13dc5318bf3bef64a0a5ea607db93a1"
     )
 
+    assert len(greeter.messages) == 4
+
+    expected_spans = 19
+
     await asyncio.sleep(2)
     client = AsyncClient()
     for _ in range(10):
@@ -52,11 +78,18 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
             f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces/f13dc5318bf3bef64a0a5ea607db93a1",
             headers={"Accept": "application/json"},
         )
-        if resp.status_code != 200 or len(resp.json()["data"][0]["spans"]) < 9:
+        if (
+            resp.status_code != 200
+            or len(resp.json()["data"][0]["spans"]) < expected_spans
+        ):
             await asyncio.sleep(2)
         else:
             break
 
     assert resp.json()["data"][0]["traceID"] == "f13dc5318bf3bef64a0a5ea607db93a1"
-    assert len(resp.json()["data"][0]["spans"]) == 11
+
+    # Enable this block for debugging purposes, to see sunmmarized and sorted details of all spans
+    # debug_spans(resp.json()["data"][0]["spans"])
+
+    assert len(resp.json()["data"][0]["spans"]) == expected_spans
     assert len(resp.json()["data"][0]["processes"]) == 3

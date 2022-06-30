@@ -20,10 +20,11 @@
 CHANGELOG
 =========
 
-1.0.8 (unreleased)
+1.1.0 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Added support for jetstream pull subscriptions
+- Added support for nats pub-sub and request-responses
 
 
 1.0.7 (2022-06-15)
