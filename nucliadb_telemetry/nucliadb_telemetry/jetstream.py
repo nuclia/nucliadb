@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from contextlib import contextmanager
 from functools import partial
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from nats.aio.client import Client
 from nats.aio.msg import Msg
@@ -32,20 +31,6 @@ from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
 
 from nucliadb_telemetry.common import set_span_exception
-
-
-@contextmanager
-def telemetry_message_handler(tracer: Tracer, message: Msg):
-    """
-    Starts a span and yields control to the code that is
-    actually doing fetch calls and handling messages
-    """
-    with start_span_message_receiver(tracer, message) as span:
-        try:
-            yield message
-        except Exception as error:
-            set_span_exception(span, error)
-            raise error
 
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
@@ -61,7 +46,7 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     token = attach(ctx)
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=f"Receive message from {msg.subject}",
+        name=f"Received message from {msg.subject}",
         kind=SpanKind.SERVER,
         attributes=attributes,
     )
@@ -77,7 +62,7 @@ def start_span_message_publisher(tracer: Tracer, subject: str):
     }
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=f"Publish on {subject}",
+        name=f"Published on {subject}",
         kind=SpanKind.CLIENT,
         attributes=attributes,
     )
@@ -131,6 +116,51 @@ class JetStreamContextTelemetry:
                 raise error
 
         return result
+
+    # Just for convenience, to wrap all we use in the context of
+    # telemetry-instrumented stuff using the JetStreamContextTelemetry class
+
+    async def pull_subscribe(
+        self, *args, **kwargs
+    ) -> JetStreamContext.PullSubscription:
+        return await self.js.pull_subscribe(*args, **kwargs)
+
+    async def pull_subscribe_bind(
+        self, *args, **kwargs
+    ) -> JetStreamContext.PullSubscription:
+        return await self.js.pull_subscribe_bind(*args, **kwargs)
+
+    async def pull_many(
+        self,
+        subscription: JetStreamContext.PullSubscription,
+        timeout: int = 5,
+        fetch_count: int = 1,
+    ) -> AsyncIterator[Msg]:
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_many")
+        messages = await subscription.fetch(fetch_count, timeout=timeout)
+        for message in messages:
+            with start_span_message_receiver(tracer, message) as span:
+                try:
+                    yield message
+                except Exception as error:
+                    set_span_exception(span, error)
+                    raise error
+
+    async def pull_one(
+        self,
+        subscription: JetStreamContext.PullSubscription,
+        timeout: int = 5,
+    ) -> Msg:
+        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_one")
+        messages = await subscription.fetch(1, timeout=timeout)
+        with start_span_message_receiver(tracer, messages[0]) as span:
+            try:
+                message = messages[0]
+            except Exception as error:
+                set_span_exception(span, error)
+                raise error
+
+        return message
 
 
 class NatsClientTelemetry:

@@ -102,7 +102,8 @@ On Nats publisher you should add:
 ```
 
 
-On Nats jetstream pull subscription you should
+On Nats jetstream pull subscription you can use different patterns if you want to
+just get one message and exit or pull several ones. For just one message
 
 ```python
     nc = await nats.connect(servers=[self.natsd])
@@ -115,18 +116,45 @@ On Nats jetstream pull subscription you should
         js, "NATS_SERVICE", tracer_provider
     )
 
+    # You can use either pull_subscribe or pull_subscribe_bind
     subscription = await jsotel.pull_subscribe(
         subject="testing.telemetry",
         durable="consumer_name"
         stream="testing",
     )
 
-    tracer = self.tracer_provider.get_tracer("pull_worker")
+    message = await jsotel.pull_one(subscription)
+    # Do something with your message
+
+```
+and for many:
+
+```python
+    nc = await nats.connect(servers=[self.natsd])
+    js = self.nc.jetstream()
+    tracer_provider = get_telemetry("NATS_SERVICE")
+    if not tracer_provider.initialized:
+        await init_telemetry(tracer_provider)
+    set_global_textmap(B3MultiFormat())
+    jsotel = JetStreamContextTelemetry(
+        js, "NATS_SERVICE", tracer_provider
+    )
+
+    # You can use either pull_subscribe or pull_subscribe_bind
+    subscription = await jsotel.pull_subscribe(
+        subject="testing.telemetry",
+        durable="consumer_name"
+        stream="testing",
+    )
+
+
     while True:
-        messages = subscription.fetch(3)
-        for message in messages:
-            with telemetry_message_handler(tracer, msgs[0]) as message:
-                self.messages.append(message)
+        try:
+            async for message in jsotel.pull_many(subscription, fetch_count=2):
+                # Do something with each message
+        except errors.TimeoutError:
+            # No messages
+            pass
 
 ```
 
