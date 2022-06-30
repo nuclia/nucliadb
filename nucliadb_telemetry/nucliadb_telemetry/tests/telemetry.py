@@ -174,14 +174,22 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
             self.messages.append(msg)
 
     async def pull_subscription_worker_one(self):
-        message = await self.jsotel.pull_one(self.pull_subscription)
-        self.messages.append(message)
+
+        async def callback(message):
+            self.messages.append(message)
+
+        await self.jsotel.pull_one(self.pull_subscription_one, callback)
+
 
     async def pull_subscription_worker_many(self):
-        async for message in self.jsotel.pull_many(
-            self.pull_subscription, fetch_count=2
-        ):
+
+        async def callback(message):
             self.messages.append(message)
+
+        async for result in self.jsotel.pull_many(
+            self.pull_subscription_many, callback, fetch_count=2
+        ):
+            pass
 
     async def pubsub_subscription_worker(self, msg: Msg):
         tracer = self.tracer_provider.get_tracer("pubsub_worker")
@@ -289,7 +297,8 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
         # Send message to test Jetstream pull subscriber many
         await self.jsotel.publish("testing.telemetry_pull_many", request.name.encode())
-        await self.jsotel.publish("testing.telemetry_pull_many", request.name.encode())
+        await asyncio.sleep(1)
+        await self.jsotel.publish("testing.telemetry_pull_many", (request.name + "2").encode())
 
         # Test regular nats pubsub
         await self.ncotel.publish(

@@ -123,8 +123,13 @@ just get one message and exit or pull several ones. For just one message
         stream="testing",
     )
 
-    message = await jsotel.pull_one(subscription)
-    # Do something with your message
+    async def callback(message):
+        # Do something with your message
+        # and optionally return something
+        return True
+
+    result = await jsotel.pull_one(subscription, callback)
+
 
 ```
 and for many:
@@ -147,11 +152,16 @@ and for many:
         stream="testing",
     )
 
+    async def callback(message):
+        # Do something with your message
+        # and optionally return something
+        return True
 
     while True:
         try:
-            async for message in jsotel.pull_many(subscription, fetch_count=2):
-                # Do something with each message
+            async for result in jsotel.pull_many(subscription, callback, fetch_count=2):
+                # Do something with the result of the callback of each message
+                assert result
         except errors.TimeoutError:
             # No messages
             pass

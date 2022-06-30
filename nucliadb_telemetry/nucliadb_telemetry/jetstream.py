@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from functools import partial
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable, AsyncIterator
 
 from nats.aio.client import Client
 from nats.aio.msg import Msg
@@ -133,6 +133,7 @@ class JetStreamContextTelemetry:
     async def pull_many(
         self,
         subscription: JetStreamContext.PullSubscription,
+        cb: Callable[[Msg], Any],
         timeout: int = 5,
         fetch_count: int = 1,
     ) -> AsyncIterator[Msg]:
@@ -141,7 +142,8 @@ class JetStreamContextTelemetry:
         for message in messages:
             with start_span_message_receiver(tracer, message) as span:
                 try:
-                    yield message
+                    result = await cb(message)
+                    yield result
                 except Exception as error:
                     set_span_exception(span, error)
                     raise error
@@ -149,6 +151,7 @@ class JetStreamContextTelemetry:
     async def pull_one(
         self,
         subscription: JetStreamContext.PullSubscription,
+        cb: Callable[[Msg], Any],
         timeout: int = 5,
     ) -> Msg:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_one")
@@ -156,11 +159,10 @@ class JetStreamContextTelemetry:
         with start_span_message_receiver(tracer, messages[0]) as span:
             try:
                 message = messages[0]
+                return await cb(message)
             except Exception as error:
                 set_span_exception(span, error)
                 raise error
-
-        return message
 
 
 class NatsClientTelemetry:
