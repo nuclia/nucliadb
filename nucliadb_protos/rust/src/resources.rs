@@ -278,6 +278,7 @@ pub struct Paragraph {
     pub sentences: ::prost::alloc::vec::Vec<Sentence>,
     #[prost(string, tag="8")]
     pub key: ::prost::alloc::string::String,
+    /// Optional, as a computed value
     #[prost(string, tag="9")]
     pub text: ::prost::alloc::string::String,
 }
