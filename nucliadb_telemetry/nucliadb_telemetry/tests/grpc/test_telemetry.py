@@ -67,9 +67,9 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
         == "f13dc5318bf3bef64a0a5ea607db93a1"
     )
 
-    assert len(greeter.messages) == 5
+    assert len(greeter.messages) == 4
 
-    expected_spans = 22
+    expected_spans = 19
 
     await asyncio.sleep(2)
     client = AsyncClient()

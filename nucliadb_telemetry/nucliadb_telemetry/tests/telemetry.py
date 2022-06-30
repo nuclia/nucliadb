@@ -160,13 +160,11 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
         self.nc = None
         self.push_subscription = None
         self.pull_subscription_one = None
-        self.pull_subscription_many = None
         self.puller_task = None
         self.pubsub_subscription = None
         self.tracer_provider = None
         self.messages = []
         self.puller_task_one = None
-        self.puller_task_many = None
 
     async def push_subscription_worker(self, msg: Msg):
         tracer = self.tracer_provider.get_tracer("message_worker")
@@ -174,22 +172,10 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
             self.messages.append(msg)
 
     async def pull_subscription_worker_one(self):
-
         async def callback(message):
             self.messages.append(message)
 
         await self.jsotel.pull_one(self.pull_subscription_one, callback)
-
-
-    async def pull_subscription_worker_many(self):
-
-        async def callback(message):
-            self.messages.append(message)
-
-        async for result in self.jsotel.pull_many(
-            self.pull_subscription_many, callback, fetch_count=2
-        ):
-            pass
 
     async def pubsub_subscription_worker(self, msg: Msg):
         tracer = self.tracer_provider.get_tracer("pubsub_worker")
@@ -221,21 +207,6 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
             subject="testing.telemetry",
             stream="testing",
             cb=self.push_subscription_worker,
-        )
-
-        # Nats Jetstream Pull subscription including consumer creation
-        # and task to pull several messages
-        config = api.ConsumerConfig()
-        config.filter_subject = "testing.telemetry_pull_many"
-        config.durable_name = "testing_consumer_many"
-        await self.js._jsm.add_consumer(stream="testing", config=config)
-
-        self.pull_subscription_many = await self.jsotel.pull_subscribe(
-            subject=config.filter_subject, durable=config.durable_name, stream="testing"
-        )
-
-        self.puller_task_many = asyncio.create_task(
-            self.pull_subscription_worker_many()
         )
 
         # Nats Jetstream Pull subscription including consumer creation
@@ -278,12 +249,6 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
             stream="testing", consumer="testing_consumer_one"
         )
 
-        await self.pull_subscription_many.unsubscribe()
-        self.puller_task_many.cancel()
-        await self.js._jsm.delete_consumer(
-            stream="testing", consumer="testing_consumer_many"
-        )
-
         await self.pubsub_subscription.unsubscribe()
         await self.nc.drain()
         await self.nc.close()
@@ -294,11 +259,6 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
         # Send message to test Jetstream pull subscriber one
         await self.jsotel.publish("testing.telemetry_pull_one", request.name.encode())
-
-        # Send message to test Jetstream pull subscriber many
-        await self.jsotel.publish("testing.telemetry_pull_many", request.name.encode())
-        await asyncio.sleep(1)
-        await self.jsotel.publish("testing.telemetry_pull_many", (request.name + "2").encode())
 
         # Test regular nats pubsub
         await self.ncotel.publish(

@@ -128,42 +128,19 @@ just get one message and exit or pull several ones. For just one message
         # and optionally return something
         return True
 
-    result = await jsotel.pull_one(subscription, callback)
-
+    try:
+        result = await jsotel.pull_one(subscription, callback)
+    except errors.TimeoutError
+        pass
 
 ```
-and for many:
+For multiple messages just wrap it in a loop:
 
 ```python
-    nc = await nats.connect(servers=[self.natsd])
-    js = self.nc.jetstream()
-    tracer_provider = get_telemetry("NATS_SERVICE")
-    if not tracer_provider.initialized:
-        await init_telemetry(tracer_provider)
-    set_global_textmap(B3MultiFormat())
-    jsotel = JetStreamContextTelemetry(
-        js, "NATS_SERVICE", tracer_provider
-    )
-
-    # You can use either pull_subscribe or pull_subscribe_bind
-    subscription = await jsotel.pull_subscribe(
-        subject="testing.telemetry",
-        durable="consumer_name"
-        stream="testing",
-    )
-
-    async def callback(message):
-        # Do something with your message
-        # and optionally return something
-        return True
-
     while True:
         try:
-            async for result in jsotel.pull_many(subscription, callback, fetch_count=2):
-                # Do something with the result of the callback of each message
-                assert result
-        except errors.TimeoutError:
-            # No messages
+            result = await jsotel.pull_one(subscription, callback)
+        except errors.TimeoutError
             pass
 
 ```

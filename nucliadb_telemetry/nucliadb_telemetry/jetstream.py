@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from functools import partial
-from typing import Any, Dict, List, Optional, Callable, AsyncIterator
+from typing import Any, Callable, Dict, List, Optional
 
 from nats.aio.client import Client
 from nats.aio.msg import Msg
@@ -46,7 +46,7 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
     token = attach(ctx)
 
     span = tracer.start_as_current_span(  # type: ignore
-        name=f"Received message from {msg.subject}",
+        name=f"Received from {msg.subject}",
         kind=SpanKind.SERVER,
         attributes=attributes,
     )
@@ -129,24 +129,6 @@ class JetStreamContextTelemetry:
         self, *args, **kwargs
     ) -> JetStreamContext.PullSubscription:
         return await self.js.pull_subscribe_bind(*args, **kwargs)
-
-    async def pull_many(
-        self,
-        subscription: JetStreamContext.PullSubscription,
-        cb: Callable[[Msg], Any],
-        timeout: int = 5,
-        fetch_count: int = 1,
-    ) -> AsyncIterator[Msg]:
-        tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_many")
-        messages = await subscription.fetch(fetch_count, timeout=timeout)
-        for message in messages:
-            with start_span_message_receiver(tracer, message) as span:
-                try:
-                    result = await cb(message)
-                    yield result
-                except Exception as error:
-                    set_span_exception(span, error)
-                    raise error
 
     async def pull_one(
         self,
