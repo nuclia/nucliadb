@@ -168,44 +168,32 @@ impl ShardWriterService {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
         info!("Field service starts");
-        let _text_task = {
+        let text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
             writer.set_resource(&field_resource)
-        };
-        // tokio::task::spawn_blocking(move || {
-        //     let mut writer = field_writer_service.write().unwrap();
-        //     writer.set_resource(&field_resource)
-        // });
+        });
         info!("Field service ends");
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer_service.clone();
         info!("Paragraph service starts");
-        let _paragraph_task = {
+        let paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
             writer.set_resource(&paragraph_resource)
-        };
-        // tokio::task::spawn_blocking(move || {
-        //     let mut writer = paragraph_writer_service.write().unwrap();
-        //     writer.set_resource(&paragraph_resource)
-        // });
+        });
         info!("Paragraph service ends");
         let vector_writer_service = self.vector_writer_service.clone();
         let vector_resource = resource.clone();
         info!("Vector service starts");
-        let _vector_task = {
+        let vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
             writer.set_resource(&vector_resource)
-        };
-        // tokio::task::spawn_blocking(move || {
-        //     let mut writer = vector_writer_service.write().unwrap();
-        //     writer.set_resource(&vector_resource)
-        // });
+        });
         info!("Vector service ends");
-        // let (rtext, rparagraph, rvector) =
-        //     try_join!(text_task, paragraph_task, vector_task).unwrap();
-        // rtext?;
-        // rparagraph?;
-        // rvector?;
+        let (rtext, rparagraph, rvector) =
+            try_join!(text_task, paragraph_task, vector_task).unwrap();
+        rtext?;
+        rparagraph?;
+        rvector?;
         Ok(())
     }
 
