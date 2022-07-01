@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.1.1 (unreleased)
+1.1.1 (2022-07-01)
 ------------------
 
 - Fix: Do not create a span on nats messages without headers
