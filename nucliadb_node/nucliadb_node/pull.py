@@ -87,7 +87,8 @@ class Worker:
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.info("There was an error on the worker: {}".format(e))
+        capture_exception(e)
+        logger.error("There was an error on the worker, check sentry: {}".format(e))
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")

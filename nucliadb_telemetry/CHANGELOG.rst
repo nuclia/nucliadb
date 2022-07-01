@@ -23,7 +23,7 @@ CHANGELOG
 1.1.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix: Do not create a span on nats messages without headers
 
 
 1.1.0 (2022-07-01)

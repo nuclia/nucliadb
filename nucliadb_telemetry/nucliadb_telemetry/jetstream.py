@@ -30,6 +30,7 @@ from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import SpanKind  # type: ignore
 from opentelemetry.trace import Tracer  # type: ignore
 
+from nucliadb_telemetry import logger
 from nucliadb_telemetry.common import set_span_exception
 
 
@@ -87,6 +88,12 @@ class JetStreamContextTelemetry:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
+            # Execute the callback without tracing
+            if msg.headers is None:
+                logger.warning("Message received without headers, skipping span")
+                await origin_cb(msg)
+                return
+
             with start_span_message_receiver(tracer, msg) as span:
                 try:
                     await origin_cb(msg)
@@ -105,7 +112,7 @@ class JetStreamContextTelemetry:
         **kwargs,
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_publisher")
-        headers = {} if headers is None else {}
+        headers = {} if headers is None else headers
         inject(headers)
         with start_span_message_publisher(tracer, subject) as span:
             try:
@@ -138,9 +145,17 @@ class JetStreamContextTelemetry:
     ) -> Msg:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_js_pull_one")
         messages = await subscription.fetch(1, timeout=timeout)
-        with start_span_message_receiver(tracer, messages[0]) as span:
+
+        # If there is no message, fetch will raise a timeout
+        message = messages[0]
+
+        # Execute the callback without tracing
+        if message.headers is None:
+            logger.warning("Message received without headers, skipping span")
+            return await cb(message)
+
+        with start_span_message_receiver(tracer, message) as span:
             try:
-                message = messages[0]
                 return await cb(message)
             except Exception as error:
                 set_span_exception(span, error)
@@ -157,6 +172,12 @@ class NatsClientTelemetry:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_subscriber")
 
         async def wrapper(origin_cb, tracer, msg: Msg):
+            # Execute the callback without tracing
+            if msg.headers is None:
+                logger.warning("Message received without headers, skipping span")
+                await origin_cb(msg)
+                return
+
             with start_span_message_receiver(tracer, msg) as span:
                 try:
                     await origin_cb(msg)
@@ -175,8 +196,9 @@ class NatsClientTelemetry:
         **kwargs,
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_publisher")
-        headers = {} if headers is None else {}
+        headers = {} if headers is None else headers
         inject(headers)
+
         with start_span_message_publisher(tracer, subject) as span:
             try:
                 result = await self.nc.publish(subject, body, headers=headers, **kwargs)
@@ -195,7 +217,7 @@ class NatsClientTelemetry:
         old_style: bool = False,
         headers: Dict[str, Any] = None,
     ) -> Msg:
-        headers = {} if headers is None else {}
+        headers = {} if headers is None else headers
         inject(headers)
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_nc_request")
         with start_span_message_publisher(tracer, subject) as span:
