@@ -97,6 +97,7 @@ class TransactionUtility:
         jetstream = self.nc.jetstream()
         tracer_provider = get_telemetry(service_name)
         if tracer_provider is not None and jetstream is not None:
+            logger.info("Configuring transaction queue with telemetry")
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{service_name}_transaction", tracer_provider
             )

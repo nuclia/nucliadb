@@ -112,6 +112,7 @@ class Worker:
         tracer_provider = get_telemetry(SERVICE_NAME)
         jetstream = self.nc.jetstream()
         if tracer_provider is not None:
+            logger.info("Configuring node queue with telemetry")
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{SERVICE_NAME}_js_worker", tracer_provider
             )

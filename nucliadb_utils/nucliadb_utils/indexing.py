@@ -83,6 +83,7 @@ class IndexingUtility:
         tracer_provider = get_telemetry(service_name)
 
         if tracer_provider is not None and jetstream is not None:
+            logger.info("Configuring indexing queue with telemetry")
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{service_name}_index", tracer_provider
             )
