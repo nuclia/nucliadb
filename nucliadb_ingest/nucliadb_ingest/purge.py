@@ -62,9 +62,10 @@ async def main():
             logger.info(f"  √ Successfully Purged {kbid}")
         except (ShardsNotFound, ShardNotFound) as exc:
             capture_exception(exc)
-            logger.info(f"  > {exc}")
-            logger.info(f"  > will delete all stored keys for this kb anyway")
-            await KnowledgeBox.delete_all_kb_keys(driver, kbid)
+            logger.info(
+                f"  X At least one shard was unavailable while purging {kbid}, skipping"
+            )
+            continue
         except NodeError as exc:
             capture_exception(exc)
             logger.info(
@@ -135,6 +136,7 @@ async def main():
                 await txn.commit(resource=False)
 
     await storage.finalize()
+    logger.info("FINISH PURGING KB STORAGE")
 
 
 def run() -> int:

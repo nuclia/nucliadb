@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
 from uuid import uuid4
 
+from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroup,
@@ -394,6 +395,8 @@ class KnowledgeBox:
                         f"Succeded deleting shard from nodeid={replica.node} at {node.address}"
                     )
                 except AioRpcError as exc:
+                    if exc.code() == StatusCode.NOT_FOUND:
+                        continue
                     await txn.abort()
                     raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
