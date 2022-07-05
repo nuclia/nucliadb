@@ -662,6 +662,8 @@ class Paragraph(google.protobuf.message.Message):
     def sentences(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Sentence]: ...
     key: typing.Text
     text: typing.Text
+    """Optional, as a computed value"""
+
     def __init__(self,
         *,
         start: builtins.int = ...,

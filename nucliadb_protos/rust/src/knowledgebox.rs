@@ -32,6 +32,8 @@ pub struct KnowledgeBoxConfig {
     pub enabled_insights: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag="5")]
     pub slug: ::prost::alloc::string::String,
+    #[prost(bool, tag="6")]
+    pub vector_index: bool,
 }
 // NEW
 
