@@ -22,8 +22,8 @@ use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
 
 use tracing::*;
-use crate::utils::reliable_lookup_host;
-use crate::utils::parse_log_level;
+
+use crate::utils::{parse_log_level, reliable_lookup_host};
 
 /// Global configuration options
 pub struct Configuration {}

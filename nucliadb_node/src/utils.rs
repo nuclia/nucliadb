@@ -17,9 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::net::SocketAddr;
 use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -99,9 +97,7 @@ where
 }
 
 pub async fn measure_time_async<T>(fut: impl Future<Output = T>, comment: &str) -> T
-where
-    T: Sized,
-{
+where T: Sized {
     let now = Instant::now();
     let result = fut.await;
     info!("{comment} {}ms", now.elapsed().as_millis());
