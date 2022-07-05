@@ -17,10 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+
 use nucliadb_protos::node_writer_client::NodeWriterClient;
 use nucliadb_protos::EmptyQuery;
 use tonic::Request;
 
+#[ignore]
 #[tokio::test]
 pub async fn create_shard() {
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
@@ -34,3 +36,23 @@ pub async fn create_shard() {
 
     println!("response id {}", response.get_ref().id)
 }
+
+//#[ignore]
+//#[tokio::test]
+//pub async fn set_and_search_vectors() {
+//    let mut writer_client = NodeWriterClient::connect("http://127.0.0.1:4446")
+//        .await
+//        .expect("Error creating NodeWriter client");
+//    writer_client.set_resource(Resource {});
+//
+//    let mut reader_client = NodeReaderClient::connect("http://127.0.0.1:4445")
+//        .await
+//        .expect("Error creating NodeWriter client");
+//
+//    reader_client.vector_search(Request::new(VectorSearchRequest {
+//        id: todo!(),
+//        vector: todo!(),
+//        tags: todo!(),
+//        reload: todo!(),
+//    }))
+//}
