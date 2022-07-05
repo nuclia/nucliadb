@@ -50,7 +50,10 @@ class ClusterObject:
             nodes = self.cluster.find_nodes(kbid)
             if len(nodes) != len(set(nodes)):
                 raise NodeClusterSmall()
-            return nodes
+            if len(nodes) < settings.node_replicas:
+                raise NodeClusterSmall()
+
+            return nodes[: settings.node_replicas]
         else:
             raise NodeClusterNotFound()
 
