@@ -32,5 +32,5 @@ pub async fn create_shard() {
         .await
         .expect("Error in new_shard request");
 
-    response.get_ref().id.clone();
+    println!("response id {}", response.get_ref().id)
 }
