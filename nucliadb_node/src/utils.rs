@@ -77,7 +77,7 @@ pub async fn reliable_lookup_host(host: &str) -> IpAddr {
     IpAddr::from_str(host).unwrap()
 }
 
-pub fn parse_log_level(levels: &String) -> Vec<(String, Level)> {
+pub fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
     levels
         .split(',')
         .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
@@ -97,7 +97,9 @@ where
 }
 
 pub async fn measure_time_async<T>(fut: impl Future<Output = T>, comment: &str) -> T
-where T: Sized {
+where
+    T: Sized,
+{
     let now = Instant::now();
     let result = fut.await;
     info!("{comment} {}ms", now.elapsed().as_millis());
