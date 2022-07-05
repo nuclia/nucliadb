@@ -34,7 +34,6 @@ use tracing::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Env file path: {}", dotenvy::dotenv().unwrap().display());
     eprintln!("NucliaDB Writer Node starting...");
 
     init_telemetry()?;
