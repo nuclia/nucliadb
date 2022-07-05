@@ -39,7 +39,7 @@ pub async fn create_shard() {
 
 //#[ignore]
 //#[tokio::test]
-//pub async fn set_and_search_vectors() {
+// pub async fn set_and_search_vectors() {
 //    let mut writer_client = NodeWriterClient::connect("http://127.0.0.1:4446")
 //        .await
 //        .expect("Error creating NodeWriter client");
