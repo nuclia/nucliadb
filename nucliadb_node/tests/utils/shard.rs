@@ -17,19 +17,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use nucliadb_protos::noderesources;
-use nucliadb_protos::nodewriter::node_writer_client::NodeWriterClient;
+use nucliadb_protos::node_writer_client::NodeWriterClient;
+use nucliadb_protos::EmptyQuery;
 use tonic::Request;
 
-pub async fn create_shard() -> String {
-    let mut client = NodeWriterClient::connect("http://[::1]:10000")
+#[tokio::test]
+pub async fn create_shard() {
+    let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
         .await
         .expect("Error creating NodeWriter client");
 
     let response = client
-        .new_shard(Request::new(noderesources::EmptyQuery {}))
+        .new_shard(Request::new(EmptyQuery {}))
         .await
         .expect("Error in new_shard request");
 
-    response.get_ref().id.clone()
+    response.get_ref().id.clone();
 }

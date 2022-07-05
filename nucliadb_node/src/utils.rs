@@ -17,15 +17,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::net::SocketAddr;
 use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
 use std::str::FromStr;
 use std::time::Duration;
 
+use futures::Future;
 use http::Uri;
 use opentelemetry::propagation::Extractor;
 use tokio::net;
-use tokio::time::sleep;
+use tokio::time::{sleep, Instant};
 use tonic::transport::Endpoint;
+use tracing::{info, Level};
 
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
@@ -73,4 +77,33 @@ pub async fn reliable_lookup_host(host: &str) -> IpAddr {
         sleep(Duration::from_secs(1)).await;
     }
     IpAddr::from_str(host).unwrap()
+}
+
+pub fn parse_log_level(levels: &String) -> Vec<(String, Level)> {
+    levels
+        .split(',')
+        .map(|s| s.splitn(2, '=').collect::<Vec<_>>())
+        .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
+        .collect()
+}
+
+pub fn measure_time<T, F>(f: F, comment: &str) -> T
+where
+    T: Sized,
+    F: FnOnce() -> T,
+{
+    let now = Instant::now();
+    let result = f();
+    info!("{comment} {}ms", now.elapsed().as_millis());
+    result
+}
+
+pub async fn measure_time_async<T>(fut: impl Future<Output = T>, comment: &str) -> T
+where
+    T: Sized,
+{
+    let now = Instant::now();
+    let result = fut.await;
+    info!("{comment} {}ms", now.elapsed().as_millis());
+    result
 }

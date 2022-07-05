@@ -22,6 +22,7 @@ use std::time::Instant;
 use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
+use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_protos::node_reader_server::NodeReaderServer;
 use tonic::transport::Server;
 use tracing::*;
@@ -29,7 +30,8 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Reader Node starting...");
-    env_logger::init();
+
+    init_telemetry()?;
 
     let _guard = sentry::init((
         Configuration::sentry_url(),

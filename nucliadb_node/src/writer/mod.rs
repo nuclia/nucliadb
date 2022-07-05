@@ -96,6 +96,8 @@ impl NodeWriterService {
         self.load_shard(shard_id).await;
         self.shards.get_mut(&shard_id.id)
     }
+
+    #[tracing::instrument(name = "NodeWriterService::new_shard", skip(self))]
     pub async fn new_shard(&mut self) -> ShardCreated {
         let new_id = Uuid::new_v4().to_string();
         let new_shard = ShardWriterService::new(&new_id).await.unwrap();
@@ -120,6 +122,7 @@ impl NodeWriterService {
         }
     }
 
+    #[tracing::instrument(name = "set_resource", skip(self))]
     pub async fn set_resource(
         &mut self,
         shard_id: &ShardId,

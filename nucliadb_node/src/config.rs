@@ -22,8 +22,8 @@ use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
 
 use tracing::*;
-
 use crate::utils::reliable_lookup_host;
+use crate::utils::parse_log_level;
 
 /// Global configuration options
 pub struct Configuration {}
@@ -84,6 +84,31 @@ impl Configuration {
                     "READER_LISTEN_ADDRESS not defined. Defaulting to: {}",
                     default
                 );
+                default
+            }
+        }
+    }
+
+    pub fn jaeger_agent_endp() -> String {
+        let default_host = "localhost".to_string();
+        let default_port = "6831".to_string();
+        let host = env::var("JAEGER_AGENT_HOST").unwrap_or_else(|_| {
+            warn!("JAEGER_AGENT_HOST not defined: Defaulting to {default_host}");
+            default_host
+        });
+        let port = env::var("JAEGER_AGENT_PORT").unwrap_or_else(|_| {
+            warn!("JAEGER_AGENT_PORT not defined: Defaulting to {default_port}");
+            default_port
+        });
+        format!("{host}:{port}")
+    }
+
+    pub fn jaeger_enabled() -> bool {
+        let default = false;
+        match env::var("JAEGER_ENABLED") {
+            Ok(v) => bool::from_str(&v).unwrap(),
+            Err(_) => {
+                warn!("JAEGER_ENABLED not defined: Defaulting to {}", default);
                 default
             }
         }
@@ -190,6 +215,17 @@ impl Configuration {
                 }
             },
             Err(_) => default,
+        }
+    }
+
+    pub fn log_level() -> Vec<(String, Level)> {
+        let default = "nucliadb_node=WARN,nucliadb_cluster=WARN,nucliadb_cluster=WARN".to_string();
+        match env::var("RUST_LOG") {
+            Ok(levels) => parse_log_level(&levels),
+            Err(_) => {
+                error!("RUST_LOG not defined. Defaulting to {default}");
+                parse_log_level(&default)
+            }
         }
     }
 }

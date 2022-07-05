@@ -87,6 +87,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         Ok(tonic::Response::new(shards))
     }
 
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::vector_search", skip(self))]
     async fn vector_search(
         &self,
         request: tonic::Request<VectorSearchRequest>,
@@ -116,6 +117,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::relation_search", skip(self))]
     async fn relation_search(
         &self,
         request: tonic::Request<RelationSearchRequest>,
@@ -127,6 +129,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         todo!()
     }
 
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::search", skip(self))]
     async fn search(
         &self,
         request: tonic::Request<SearchRequest>,
@@ -185,6 +188,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::document_search", skip(self))]
     async fn document_search(
         &self,
         request: tonic::Request<DocumentSearchRequest>,
@@ -215,6 +219,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::paragraph_search", skip(self))]
     async fn paragraph_search(
         &self,
         request: tonic::Request<ParagraphSearchRequest>,
