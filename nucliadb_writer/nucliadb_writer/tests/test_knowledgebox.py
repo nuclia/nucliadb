@@ -20,14 +20,14 @@
 import pytest
 
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_writer.api.v1.router import KB_PREFIX
+from nucliadb_writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 
 
 @pytest.mark.asyncio
 async def test_knowledgebox_lifecycle(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}",
+            f"/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
