@@ -97,9 +97,7 @@ where
 }
 
 pub async fn measure_time_async<T>(fut: impl Future<Output = T>, comment: &str) -> T
-where
-    T: Sized,
-{
+where T: Sized {
     let now = Instant::now();
     let result = fut.await;
     info!("{comment} {}ms", now.elapsed().as_millis());
