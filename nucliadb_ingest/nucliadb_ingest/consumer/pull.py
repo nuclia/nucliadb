@@ -169,7 +169,7 @@ class PullWorker:
                 )
                 self.subscriptions.append(res)
                 logger.info(
-                    f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream}"
+                    f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream} from {last_seqid}"
                 )
             self.initialized = True
 
