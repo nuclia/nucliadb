@@ -11,6 +11,10 @@ spec:
   - name: nucliadb_writer
     match:
     - uri:
+        regex: '^/api/v\d+/kb/[^/]+'
+      method:
+        regex: 'PATCH|DELETE|OPTIONS'
+    - uri:
         regex: '^/api/v\d+/kb/[^/]+/(resource|resources|entitiesgroup|labelset|widget)/.*'
       method:
         regex: 'PUT|DELETE|POST|PATCH|OPTIONS'
