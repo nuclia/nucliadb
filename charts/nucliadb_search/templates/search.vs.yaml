@@ -11,15 +11,15 @@ spec:
   - name: nucliadb_search
     match:
     - uri:
-        regex: ^/api/v\d+/kb/[^/]+(/resource/[^/]+)?/search$
+        regex: '^/api/v\d+/kb/[^/]+(/resource/[^/]+)?/search$'
       method:
         regex: 'GET|OPTIONS'
     - uri:
-        regex: ^/api/v\d+/kb/[^/]+/counters
+        regex: '^/api/v\d+/kb/[^/]+/counters'
       method:
         regex: 'GET|OPTIONS'
     - uri:
-        regex: ^/api/v\d+/kb/[^/]+/suggest
+        regex: '^/api/v\d+/kb/[^/]+/suggest'
       method:
         regex: 'GET|OPTIONS'
     route:
