@@ -329,9 +329,14 @@ impl ShardReaderService {
     ) -> InternalResult<ParagraphSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let paragraph_reader_service = self.paragraph_reader_service.clone();
-        task::spawn_blocking(move || paragraph_reader_service.search(&search_request))
-            .await
-            .unwrap()
+        task::spawn_blocking(move || {
+            measure_time(
+                || paragraph_reader_service.search(&search_request),
+                "paragraph_reader search time",
+            )
+        })
+        .await
+        .unwrap()
     }
 
     #[tracing::instrument(name = "ShardReaderService::document_search", skip(self))]
@@ -341,9 +346,14 @@ impl ShardReaderService {
     ) -> InternalResult<DocumentSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let field_reader_service = self.field_reader_service.clone();
-        task::spawn_blocking(move || field_reader_service.search(&search_request))
-            .await
-            .unwrap()
+        task::spawn_blocking(move || {
+            measure_time(
+                || field_reader_service.search(&search_request),
+                "field reader search time",
+            )
+        })
+        .await
+        .unwrap()
     }
 
     #[tracing::instrument(name = "ShardReaderService::vector_search", skip(self))]
@@ -353,9 +363,14 @@ impl ShardReaderService {
     ) -> InternalResult<VectorSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let vector_reader_service = self.vector_reader_service.clone();
-        task::spawn_blocking(move || vector_reader_service.search(&search_request))
-            .await
-            .unwrap()
+        task::spawn_blocking(move || {
+            measure_time(
+                || vector_reader_service.search(&search_request),
+                "vector reader search time",
+            )
+        })
+        .await
+        .unwrap()
     }
 
     async fn reload_policy(&self, trigger: bool) {

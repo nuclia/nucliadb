@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use opentelemetry::global;
 use tracing::{debug, error};
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
@@ -52,6 +53,8 @@ pub fn init_telemetry() -> ServiceResult<()> {
                 _ => false,
             }
         });
+        global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+
         let jaeger_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
             .with_filter(filter)
