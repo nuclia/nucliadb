@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use opentelemetry::global;
 use tracing::{debug, error};
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
@@ -38,7 +39,6 @@ pub fn init_telemetry() -> ServiceResult<()> {
             .with_agent_endpoint(agent_endpoint)
             .with_service_name("nucliadb_node")
             .with_auto_split_batch(true)
-            .with_max_packet_size(9216) // just for MacOS local tests
             .install_batch(opentelemetry::runtime::Tokio)
             .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
 
@@ -52,6 +52,8 @@ pub fn init_telemetry() -> ServiceResult<()> {
                 _ => false,
             }
         });
+        global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+
         let jaeger_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
             .with_filter(filter)

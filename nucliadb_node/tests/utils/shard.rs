@@ -18,23 +18,51 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_protos::node_writer_client::NodeWriterClient;
 use nucliadb_protos::EmptyQuery;
+use opentelemetry::propagation::Injector;
+use opentelemetry::{global, Context};
+use tonic::metadata::{AsciiMetadataKey, MetadataMap};
 use tonic::Request;
+use tracing::Instrument;
 
-#[ignore]
+pub struct TestMetadataMap<'a>(pub &'a mut MetadataMap);
+
+impl<'a> Injector for TestMetadataMap<'a> {
+    fn set(&mut self, key: &str, value: String) {
+        let key = AsciiMetadataKey::from_bytes(key.to_ascii_lowercase().as_bytes()).unwrap();
+        self.0.append(key, value.parse().unwrap());
+    }
+}
+
+#[ignore] // just for local testing jaeger tracing
 #[tokio::test]
 pub async fn create_shard() {
+    println!("{}", dotenvy::dotenv().unwrap().display());
+    init_telemetry().unwrap();
+    let span = tracing::info_span!("creating client");
+
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
+        .instrument(span)
         .await
         .expect("Error creating NodeWriter client");
 
+    let mut req = Request::new(EmptyQuery {});
+    let mut ctx_prop = TestMetadataMap(req.metadata_mut());
+    println!("current context {:#?}", Context::current());
+
+    global::get_text_map_propagator(|prop| prop.inject(&mut ctx_prop));
+
+    let span = tracing::info_span!("sending request");
     let response = client
-        .new_shard(Request::new(EmptyQuery {}))
+        .new_shard(req)
+        .instrument(span)
         .await
         .expect("Error in new_shard request");
 
-    println!("response id {}", response.get_ref().id)
+    global::shutdown_tracer_provider();
+    println!("response id {}", response.get_ref().id);
 }
 
 //#[ignore]

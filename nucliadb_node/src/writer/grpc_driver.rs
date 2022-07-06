@@ -64,7 +64,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::new_shard", skip(self))]
     async fn new_shard(
         &self,
         request: tonic::Request<EmptyQuery>,
