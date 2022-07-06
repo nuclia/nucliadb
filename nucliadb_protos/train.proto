@@ -35,41 +35,49 @@ message Entities {
     Status status = 3;
 }
 
+message EnabledMetadata {
+    bool text = 1;
+    bool entities = 2;
+    bool labels = 3;
+    bool vector = 4;
+}
+
+message Metadata {
+    string text = 1;
+    map<string, string> entities = 2;
+    repeated string labels = 3;
+    repeated float vector = 4;
+}
+
 message GetResourcesRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
-    bool text = 2;
-    bool entities = 3;
-    bool labels = 4;
+    EnabledMetadata metadata = 2;
 }
 
 message GetParagraphRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
-    bool ner = 3;
-    bool labels = 4;
+    EnabledMetadata metadata = 3;
 }
 
 message GetSentenceRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
-    bool vector = 3;
-    bool ner = 4;
-    bool labels = 5;
+    EnabledMetadata  metadata = 4;
 }
 
 message Sentence {
     string uuid = 1;
-    string sentence = 2;
-    repeated string labels = 3;
-    map<string, string> ner = 4;
+    string paragraph = 2;
+    string sentence = 3;
+    Metadata metadata = 4;
 }
 
 
 message Paragraph {
     string uuid = 1;
     string paragraph = 2;
-    repeated string labels = 3;
-    map<string, string> ner = 4;
+    Metadata metadata = 4;
 }
 
 message Resource {
@@ -77,16 +85,15 @@ message Resource {
     string title = 2;
     string icon = 3;
     string slug = 4;
-    string text = 5;
-    google.protobuf.Timestamp created = 6;
-    google.protobuf.Timestamp modified = 7;
-    repeated string labels = 8;
+    google.protobuf.Timestamp created = 5;
+    google.protobuf.Timestamp modified = 6;
+    Metadata metadata = 7;
 }
 
 service Train {
-    rpc GetSentences(GetSentenceRequest) returns (stream Sentences) {}
-    rpc GetParagraphs(GetParagraphRequest) returns (stream Paragraphs) {}
-    rpc GetResources(GetResourcesRequest) returns (stream Resources) {}
+    rpc GetSentences(GetSentenceRequest) returns (stream Sentence) {}
+    rpc GetParagraphs(GetParagraphRequest) returns (stream Paragraph) {}
+    rpc GetResources(GetResourcesRequest) returns (stream Resource) {}
     rpc GetOntology(GetOntologyRequest) returns (Ontology) {}
     rpc GetEntities(GetEntitiesRequest) returns (Entities) {}
 }

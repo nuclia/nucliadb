@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 
 from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
@@ -28,6 +28,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxResponseStatus,
     Widget,
 )
+from nucliadb_protos.train_pb2 import GetSentenceRequest, Sentence
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from sentry_sdk import capture_exception
 
@@ -463,3 +464,20 @@ class Processor:
     async def notify(self, channel, payload: bytes):
         if self.cache is not None and self.cache.pubsub is not None:
             await self.cache.pubsub.publish(channel, payload)
+
+    async def kb_sentences(
+        self, request: GetSentenceRequest
+    ) -> AsyncIterator[Sentence, None]:
+        txn = await self.driver.begin()
+        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        if request.HasField("uuid"):
+            # Filter by uuid
+            resource = await kb.get(request.uuid)
+            if resource:
+                async for sentence in resource.iterate_sentences(request.metadata):
+                    yield sentence
+        else:
+            async for resource in kb.iterate_resources():
+                async for sentence in resource.iterate_sentences(request.metadata):
+                    yield sentence
+        await txn.abort()

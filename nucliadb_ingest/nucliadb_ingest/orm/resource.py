@@ -33,6 +33,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
+from nucliadb_protos.train_pb2 import EnabledMetadata
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -559,3 +560,12 @@ class Resource:
 
     def clean(self):
         self._indexer = None
+
+    async def iterate_sentences(self, enabled_metadata: EnabledMetadata):
+        fields = await self.get_fields(force=True)
+        for ((type_id, field_id), field) in fields.items():
+            fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
+            fm = await field.get_field_metadata()
+            for paragraph in fm.metadata.paragraphs:
+                for sentence in paragraph.sentences:
+                    sentence.
