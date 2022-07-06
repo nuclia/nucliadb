@@ -69,6 +69,22 @@ async def test_widget_service(
 
 
 @pytest.mark.asyncio
+async def test_disable_vectors_service(
+    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+) -> None:
+
+    async with nucliadb_api(roles=[NucliaDBRoles.MANAGER]) as client:
+
+        data = {"disable_vectors": True}
+        resp = await client.patch(f"/{KB_PREFIX}/{knowledgebox_one}", json=data)
+        assert resp.status_code == 200
+
+    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}")
+        assert resp.json()["config"]["disable_vectors"]
+
+
+@pytest.mark.asyncio
 async def test_entities_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:

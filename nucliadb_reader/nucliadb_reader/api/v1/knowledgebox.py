@@ -75,7 +75,9 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     kbobj: KnowledgeBox = await ingest.GetKnowledgeBox(KnowledgeBoxID(uuid=kbid))  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObj(
-            uuid=kbobj.uuid, slug=kbobj.slug, config=MessageToDict(kbobj.config)
+            uuid=kbobj.uuid,
+            slug=kbobj.slug,
+            config=MessageToDict(kbobj.config, preserving_proto_field_name=True),
         )
     elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
