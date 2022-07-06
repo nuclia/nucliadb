@@ -18,19 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use dotenvy;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_protos::node_writer_client::NodeWriterClient;
 use nucliadb_protos::EmptyQuery;
 use opentelemetry::propagation::Injector;
-use opentelemetry::sdk::trace::Span;
-use opentelemetry::trace::Tracer;
 use opentelemetry::{global, Context};
-use opentelemetry_jaeger::Propagator;
 use tonic::metadata::{AsciiMetadataKey, MetadataMap};
 use tonic::Request;
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub struct TestMetadataMap<'a>(pub &'a mut MetadataMap);
 
@@ -46,7 +41,7 @@ impl<'a> Injector for TestMetadataMap<'a> {
 pub async fn create_shard() {
     println!("{}", dotenvy::dotenv().unwrap().display());
     init_telemetry().unwrap();
-    let span = ("creating client");
+    let span = tracing::info_span!("creating client");
 
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
         .instrument(span)
