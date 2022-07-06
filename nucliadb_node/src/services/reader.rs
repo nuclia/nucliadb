@@ -35,6 +35,7 @@ use tracing::*;
 use crate::config::Configuration;
 use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
+use crate::utils::measure_time;
 
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;
@@ -247,6 +248,7 @@ impl ShardReaderService {
         })
     }
 
+    #[tracing::instrument(name = "ShardReaderService::search", skip(self))]
     pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload).await;
         let field_request = DocumentSearchRequest {
@@ -263,7 +265,12 @@ impl ShardReaderService {
         };
 
         let field_reader_service = self.field_reader_service.clone();
-        let text_task = task::spawn_blocking(move || field_reader_service.search(&field_request));
+        let text_task = task::spawn_blocking(move || {
+            measure_time(
+                || field_reader_service.search(&field_request),
+                "field_reader search time",
+            )
+        });
         info!("{}:{}", line!(), file!());
 
         let paragraph_request = ParagraphSearchRequest {
@@ -281,8 +288,12 @@ impl ShardReaderService {
         };
 
         let paragraph_reader_service = self.paragraph_reader_service.clone();
-        let paragraph_task =
-            task::spawn_blocking(move || paragraph_reader_service.search(&paragraph_request));
+        let paragraph_task = task::spawn_blocking(move || {
+            measure_time(
+                || paragraph_reader_service.search(&paragraph_request),
+                "paragraph_reader search time",
+            )
+        });
         info!("{}:{}", line!(), file!());
 
         let vector_request = VectorSearchRequest {
@@ -292,8 +303,12 @@ impl ShardReaderService {
             reload: search_request.reload,
         };
         let vector_reader_service = self.vector_reader_service.clone();
-        let vector_task =
-            task::spawn_blocking(move || vector_reader_service.search(&vector_request));
+        let vector_task = task::spawn_blocking(move || {
+            measure_time(
+                || vector_reader_service.search(&vector_request),
+                "vector_reader search time",
+            )
+        });
         info!("{}:{}", line!(), file!());
 
         let (rtext, rparagraph, rvector) =
@@ -307,6 +322,7 @@ impl ShardReaderService {
         })
     }
 
+    #[tracing::instrument(name = "ShardReaderService::paragraph_search", skip(self))]
     pub async fn paragraph_search(
         &self,
         search_request: ParagraphSearchRequest,
@@ -318,6 +334,7 @@ impl ShardReaderService {
             .unwrap()
     }
 
+    #[tracing::instrument(name = "ShardReaderService::document_search", skip(self))]
     pub async fn document_search(
         &self,
         search_request: DocumentSearchRequest,
@@ -329,6 +346,7 @@ impl ShardReaderService {
             .unwrap()
     }
 
+    #[tracing::instrument(name = "ShardReaderService::vector_search", skip(self))]
     pub async fn vector_search(
         &self,
         search_request: VectorSearchRequest,

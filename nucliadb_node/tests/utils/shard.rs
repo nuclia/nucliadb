@@ -17,19 +17,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use nucliadb_protos::noderesources;
-use nucliadb_protos::nodewriter::node_writer_client::NodeWriterClient;
+
+use nucliadb_protos::node_writer_client::NodeWriterClient;
+use nucliadb_protos::EmptyQuery;
 use tonic::Request;
 
-pub async fn create_shard() -> String {
-    let mut client = NodeWriterClient::connect("http://[::1]:10000")
+#[ignore]
+#[tokio::test]
+pub async fn create_shard() {
+    let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
         .await
         .expect("Error creating NodeWriter client");
 
     let response = client
-        .new_shard(Request::new(noderesources::EmptyQuery {}))
+        .new_shard(Request::new(EmptyQuery {}))
         .await
         .expect("Error in new_shard request");
 
-    response.get_ref().id.clone()
+    println!("response id {}", response.get_ref().id)
 }
+
+//#[ignore]
+//#[tokio::test]
+// pub async fn set_and_search_vectors() {
+//    let mut writer_client = NodeWriterClient::connect("http://127.0.0.1:4446")
+//        .await
+//        .expect("Error creating NodeWriter client");
+//    writer_client.set_resource(Resource {});
+//
+//    let mut reader_client = NodeReaderClient::connect("http://127.0.0.1:4445")
+//        .await
+//        .expect("Error creating NodeWriter client");
+//
+//    reader_client.vector_search(Request::new(VectorSearchRequest {
+//        id: todo!(),
+//        vector: todo!(),
+//        tags: todo!(),
+//        reload: todo!(),
+//    }))
+//}

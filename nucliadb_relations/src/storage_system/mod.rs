@@ -464,7 +464,7 @@ mod tests {
         StorageSystem::create(dir.path());
         StorageSystem::open(dir.path());
         assert!(true);
-    } 
+    }
 
     #[test]
     fn add_resource() {

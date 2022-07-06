@@ -23,6 +23,7 @@ use std::time::Instant;
 
 use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NucliaDBNodeType};
 use nucliadb_node::config::Configuration;
+use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
@@ -34,7 +35,8 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Writer Node starting...");
-    env_logger::init();
+
+    init_telemetry()?;
 
     let _guard = sentry::init((
         Configuration::sentry_url(),

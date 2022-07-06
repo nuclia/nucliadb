@@ -38,5 +38,8 @@ pub mod reader;
 /// Utilities
 pub mod utils;
 
+// Telemetry
+pub mod telemetry;
+
 /// GRPC writing service
 pub mod writer;
