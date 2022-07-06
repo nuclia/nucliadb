@@ -104,6 +104,8 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
     if item.title:
         pbrequest.config.title = item.title
 
+    pbrequest.config.disable_vectors = item.disable_vectors
+
     if item.description:
         pbrequest.config.description = item.description
 
