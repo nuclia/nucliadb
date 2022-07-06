@@ -80,7 +80,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     ENABLED_FILTERS_FIELD_NUMBER: builtins.int
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     SLUG_FIELD_NUMBER: builtins.int
-    VECTOR_INDEX_FIELD_NUMBER: builtins.int
+    DISABLE_VECTORS_FIELD_NUMBER: builtins.int
     title: typing.Text
     description: typing.Text
     @property
@@ -88,7 +88,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     @property
     def enabled_insights(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     slug: typing.Text
-    vector_index: builtins.bool
+    disable_vectors: builtins.bool
     def __init__(self,
         *,
         title: typing.Text = ...,
@@ -96,9 +96,9 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         enabled_filters: typing.Optional[typing.Iterable[typing.Text]] = ...,
         enabled_insights: typing.Optional[typing.Iterable[typing.Text]] = ...,
         slug: typing.Text = ...,
-        vector_index: builtins.bool = ...,
+        disable_vectors: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description",b"description","enabled_filters",b"enabled_filters","enabled_insights",b"enabled_insights","slug",b"slug","title",b"title","vector_index",b"vector_index"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description",b"description","disable_vectors",b"disable_vectors","enabled_filters",b"enabled_filters","enabled_insights",b"enabled_insights","slug",b"slug","title",b"title"]) -> None: ...
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 
 class KnowledgeBoxNew(google.protobuf.message.Message):

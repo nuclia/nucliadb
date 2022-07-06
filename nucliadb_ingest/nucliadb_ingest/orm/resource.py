@@ -96,7 +96,7 @@ class Resource:
         kb: KnowledgeBox,
         uuid: str,
         basic: PBBasic = None,
-        vector_index: bool = True,
+        disable_vectors: bool = True,
     ):
         self.fields: Dict[Tuple[int, str], Field] = {}
         self.conversations: Dict[int, PBConversation] = {}
@@ -112,7 +112,7 @@ class Resource:
         self.kb = kb
         self.uuid = uuid
         self.basic = basic
-        self.vector_index = vector_index
+        self.disable_vectors = disable_vectors
 
     @property
     def indexer(self) -> ResourceBrain:
@@ -226,7 +226,7 @@ class Resource:
             if field_metadata is not None:
                 brain.apply_field_metadata(field_key, field_metadata, [], {})
 
-            if self.vector_index:
+            if self.disable_vectors is False:
                 vo = await field.get_vectors()
                 if vo is not None:
                     brain.apply_field_vectors(field_key, vo, [], {})
@@ -477,7 +477,7 @@ class Resource:
 
         # Upload to binary storage
         # Vector indexing
-        if self.vector_index:
+        if self.disable_vectors is False:
             for field_vectors in message.field_vectors:
                 field_obj = await self.get_field(
                     field_vectors.field.field,

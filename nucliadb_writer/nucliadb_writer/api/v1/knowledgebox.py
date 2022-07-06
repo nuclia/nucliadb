@@ -62,7 +62,7 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
     if item.description:
         requestpb.config.description = item.description
 
-    requestpb.config.vector_index = item.vector_index
+    requestpb.config.disable_vectors = item.disable_vectors
 
     requestpb.config.enabled_filters.extend(item.enabled_filters)
     requestpb.config.enabled_insights.extend(item.enabled_insights)

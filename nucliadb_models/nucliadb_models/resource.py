@@ -58,7 +58,7 @@ class KnowledgeBoxConfig(BaseModel):
     description: Optional[str] = None
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
-    vector_index: bool = True
+    disable_vectors: bool = False
 
     @validator("slug")
     def id_check(cls, v: str) -> str:

@@ -453,7 +453,7 @@ class KnowledgeBox:
                 kb=self,
                 uuid=uuid,
                 basic=Resource.parse_basic(raw_basic),
-                vector_index=config.vector_index if config is not None else True,
+                disable_vectors=config.disable_vectors if config is not None else True,
             )
         else:
             return None
@@ -527,7 +527,7 @@ class KnowledgeBox:
             kb=self,
             uuid=uuid,
             basic=basic,
-            vector_index=config.vector_index if config is not None else True,
+            disable_vectors=config.disable_vectors if config is not None else False,
         )
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
@@ -541,5 +541,7 @@ class KnowledgeBox:
                     self.storage,
                     self,
                     uuid,
-                    vector_index=config.vector_index if config is not None else True,
+                    disable_vectors=config.disable_vectors
+                    if config is not None
+                    else False,
                 )

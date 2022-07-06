@@ -33,7 +33,7 @@ pub struct KnowledgeBoxConfig {
     #[prost(string, tag="5")]
     pub slug: ::prost::alloc::string::String,
     #[prost(bool, tag="6")]
-    pub vector_index: bool,
+    pub disable_vectors: bool,
 }
 // NEW
 
