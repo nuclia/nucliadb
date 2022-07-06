@@ -36,7 +36,7 @@ pub fn init_telemetry() -> ServiceResult<()> {
 
     if Configuration::jaeger_enabled() {
         let tracer = opentelemetry_jaeger::new_pipeline()
-        .with_agent_endpoint(agent_endpoint)
+            .with_agent_endpoint(agent_endpoint)
             .with_service_name("nucliadb_node")
             .with_auto_split_batch(true)
             .install_batch(opentelemetry::runtime::Tokio)
