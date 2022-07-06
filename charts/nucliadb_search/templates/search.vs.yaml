@@ -13,7 +13,7 @@ spec:
     - uri:
         regex: ^/api/v\d+/kb/[^/]+(/resource/[^/]+)?/search$
       method:
-        regex: 'GET'
+        regex: 'GET|OPTIONS'
     - uri:
         regex: ^/api/v\d+/kb/[^/]+/counters
       method:
