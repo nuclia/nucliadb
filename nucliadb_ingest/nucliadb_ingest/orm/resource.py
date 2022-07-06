@@ -19,9 +19,9 @@
 #
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
-from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import Basic as PBBasic, Sentence
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -561,11 +561,18 @@ class Resource:
     def clean(self):
         self._indexer = None
 
-    async def iterate_sentences(self, enabled_metadata: EnabledMetadata):
+    async def iterate_sentences(self, enabled_metadata: EnabledMetadata) -> AsyncIterator[Sentence, None]:
         fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             fm = await field.get_field_metadata()
+            if enabled_metadata.labels:
+                for label in fm.metadata.classifications:
+                    label
             for paragraph in fm.metadata.paragraphs:
                 for sentence in paragraph.sentences:
-                    sentence.
+                    if enabled_metadata.text:
+                        # Get the text from the sentence
+                        sentence.start
+                    if enabled_metadata.labels:
+                        #

@@ -9,6 +9,7 @@ import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import nucliadb_protos.knowledgebox_pb2
+import nucliadb_protos.resources_pb2
 import typing
 import typing_extensions
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -33,6 +34,58 @@ from nucliadb_protos.knowledgebox_pb2 import (
     OK as OK,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     Widget as Widget,
+)
+
+from nucliadb_protos.resources_pb2 import (
+    Basic as Basic,
+    Block as Block,
+    CONVERSATION as CONVERSATION,
+    Classification as Classification,
+    CloudFile as CloudFile,
+    Conversation as Conversation,
+    DATETIME as DATETIME,
+    Entity as Entity,
+    ExtractedTextWrapper as ExtractedTextWrapper,
+    ExtractedVectorsWrapper as ExtractedVectorsWrapper,
+    FILE as FILE,
+    FieldComputedMetadata as FieldComputedMetadata,
+    FieldComputedMetadataWrapper as FieldComputedMetadataWrapper,
+    FieldConversation as FieldConversation,
+    FieldDatetime as FieldDatetime,
+    FieldFile as FieldFile,
+    FieldID as FieldID,
+    FieldKeywordset as FieldKeywordset,
+    FieldLargeMetadata as FieldLargeMetadata,
+    FieldLayout as FieldLayout,
+    FieldLink as FieldLink,
+    FieldMetadata as FieldMetadata,
+    FieldText as FieldText,
+    FieldType as FieldType,
+    FileExtractedData as FileExtractedData,
+    FilePages as FilePages,
+    GENERIC as GENERIC,
+    KEYWORDSET as KEYWORDSET,
+    Keyword as Keyword,
+    LAYOUT as LAYOUT,
+    LINK as LINK,
+    LargeComputedMetadata as LargeComputedMetadata,
+    LargeComputedMetadataWrapper as LargeComputedMetadataWrapper,
+    LayoutContent as LayoutContent,
+    LinkExtractedData as LinkExtractedData,
+    Message as Message,
+    MessageContent as MessageContent,
+    Metadata as Metadata,
+    NestedPosition as NestedPosition,
+    Origin as Origin,
+    PagePositions as PagePositions,
+    Paragraph as Paragraph,
+    Relations as Relations,
+    RowsPreview as RowsPreview,
+    Sentence as Sentence,
+    TEXT as TEXT,
+    TokenSplit as TokenSplit,
+    UserFieldMetadata as UserFieldMetadata,
+    UserMetadata as UserMetadata,
 )
 
 
@@ -165,6 +218,26 @@ class EnabledMetadata(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["entities",b"entities","labels",b"labels","text",b"text","vector",b"vector"]) -> None: ...
 global___EnabledMetadata = EnabledMetadata
 
+class Labels(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    RESOURCE_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    PARAGRAPH_FIELD_NUMBER: builtins.int
+    @property
+    def resource(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.Classification]: ...
+    @property
+    def field(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.Classification]: ...
+    @property
+    def paragraph(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.Classification]: ...
+    def __init__(self,
+        *,
+        resource: typing.Optional[typing.Iterable[nucliadb_protos.resources_pb2.Classification]] = ...,
+        field: typing.Optional[typing.Iterable[nucliadb_protos.resources_pb2.Classification]] = ...,
+        paragraph: typing.Optional[typing.Iterable[nucliadb_protos.resources_pb2.Classification]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","paragraph",b"paragraph","resource",b"resource"]) -> None: ...
+global___Labels = Labels
+
 class Metadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class EntitiesEntry(google.protobuf.message.Message):
@@ -188,16 +261,17 @@ class Metadata(google.protobuf.message.Message):
     @property
     def entities(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]: ...
     @property
-    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def labels(self) -> global___Labels: ...
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
     def __init__(self,
         *,
         text: typing.Text = ...,
         entities: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
-        labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        labels: typing.Optional[global___Labels] = ...,
         vector: typing.Optional[typing.Iterable[builtins.float]] = ...,
         ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["labels",b"labels"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["entities",b"entities","labels",b"labels","text",b"text","vector",b"vector"]) -> None: ...
 global___Metadata = Metadata
 
@@ -222,49 +296,84 @@ class GetParagraphRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     uuid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     @property
     def metadata(self) -> global___EnabledMetadata: ...
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
         uuid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         metadata: typing.Optional[global___EnabledMetadata] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
 global___GetParagraphRequest = GetParagraphRequest
 
 class GetSentenceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     uuid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     @property
     def metadata(self) -> global___EnabledMetadata: ...
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
         uuid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         metadata: typing.Optional[global___EnabledMetadata] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
 global___GetSentenceRequest = GetSentenceRequest
+
+class GetFieldRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KB_FIELD_NUMBER: builtins.int
+    UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    uuid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
+    @property
+    def metadata(self) -> global___EnabledMetadata: ...
+    def __init__(self,
+        *,
+        kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
+        uuid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
+        metadata: typing.Optional[global___EnabledMetadata] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+global___GetFieldRequest = GetFieldRequest
 
 class Sentence(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
     PARAGRAPH_FIELD_NUMBER: builtins.int
     SENTENCE_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     uuid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     paragraph: typing.Text
     sentence: typing.Text
     @property
@@ -272,32 +381,57 @@ class Sentence(google.protobuf.message.Message):
     def __init__(self,
         *,
         uuid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         paragraph: typing.Text = ...,
         sentence: typing.Text = ...,
         metadata: typing.Optional[global___Metadata] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["metadata",b"metadata","paragraph",b"paragraph","sentence",b"sentence","uuid",b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata","paragraph",b"paragraph","sentence",b"sentence","uuid",b"uuid"]) -> None: ...
 global___Sentence = Sentence
 
 class Paragraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
     PARAGRAPH_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     uuid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     paragraph: typing.Text
     @property
     def metadata(self) -> global___Metadata: ...
     def __init__(self,
         *,
         uuid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         paragraph: typing.Text = ...,
         metadata: typing.Optional[global___Metadata] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["metadata",b"metadata","paragraph",b"paragraph","uuid",b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata","paragraph",b"paragraph","uuid",b"uuid"]) -> None: ...
 global___Paragraph = Paragraph
+
+class Fields(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    uuid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
+    @property
+    def metadata(self) -> global___Metadata: ...
+    def __init__(self,
+        *,
+        uuid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
+        metadata: typing.Optional[global___Metadata] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+global___Fields = Fields
 
 class Resource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

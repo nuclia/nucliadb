@@ -5,6 +5,7 @@ package train;
 import "google/protobuf/timestamp.proto";
 
 import public "nucliadb_protos/knowledgebox.proto";
+import public "nucliadb_protos/resources.proto";
 
 message GetOntologyRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
@@ -42,10 +43,17 @@ message EnabledMetadata {
     bool vector = 4;
 }
 
+
+message Labels {
+    repeated resources.Classification resource = 1;
+    repeated resources.Classification field = 2;
+    repeated resources.Classification paragraph = 3;
+}
+
 message Metadata {
     string text = 1;
     map<string, string> entities = 2;
-    repeated string labels = 3;
+    Labels labels = 3;
     repeated float vector = 4;
 }
 
@@ -57,28 +65,47 @@ message GetResourcesRequest {
 message GetParagraphRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
-    EnabledMetadata metadata = 3;
+    resources.FieldID field = 3;
+    EnabledMetadata metadata = 4;
 }
 
 message GetSentenceRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
-    EnabledMetadata  metadata = 4;
+    resources.FieldID field = 3;
+    EnabledMetadata metadata = 4;
 }
+
+message GetFieldRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string uuid = 2;
+    resources.FieldID field = 3;
+    EnabledMetadata metadata = 4;
+}
+
 
 message Sentence {
     string uuid = 1;
-    string paragraph = 2;
-    string sentence = 3;
-    Metadata metadata = 4;
+    resources.FieldID field = 2;
+    string paragraph = 3;
+    string sentence = 4;
+    Metadata metadata = 5;
 }
 
 
 message Paragraph {
     string uuid = 1;
-    string paragraph = 2;
+    resources.FieldID field = 2;
+    string paragraph = 3;
     Metadata metadata = 4;
 }
+
+message Fields {
+    string uuid = 1;
+    resources.FieldID field = 2;
+    Metadata metadata = 7;
+}
+
 
 message Resource {
     string uuid = 1;
