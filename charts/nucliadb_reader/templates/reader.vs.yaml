@@ -11,25 +11,25 @@ spec:
   - name: nucliadb_reader
     match:
     - method:
-        regex: GET
+        regex: 'GET|OPTIONS'
       uri:
-        regex: ^/api/v\d+/kb/[^/]+$
+        regex: '^/api/v\d+/kb/[^/]+$'
     - method:
-        regex: GET
+        regex: 'GET|OPTIONS'
       uri:
-        regex: ^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|widget)s?.*
+        regex: '^/api/v\d+/kb/[^/]+/(entitiesgroup|labelset|widget)s?.*'
     - method:
-        regex: GET
+        regex: 'GET|OPTIONS'
       uri:
-        regex: ^/api/v\d+/kb/[^/]+/resource/[^/]+$
+        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+$'
     - method:
-        regex: GET
+        regex: 'GET|OPTIONS'
       uri:
-        regex: ^/api/v\d+/kb/[^/]+/resource/[^/]+/(text|file|link|layout|conversation|keywordset|datetime).*
+        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+/(text|file|link|layout|conversation|keywordset|datetime).*'
     - uri:
-        regex: ^/api/v\d+/kb/[^/]+/resources
+        regex: '^/api/v\d+/kb/[^/]+/resources'
       method:
-        regex: 'GET'
+        regex: 'GET|OPTIONS'
     route:
     - destination:
         port:
