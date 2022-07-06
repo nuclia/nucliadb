@@ -17,11 +17,11 @@ spec:
     - uri:
         regex: ^/api/v\d+/kb/[^/]+/counters
       method:
-        regex: 'GET'
+        regex: 'GET|OPTIONS'
     - uri:
         regex: ^/api/v\d+/kb/[^/]+/suggest
       method:
-        regex: 'GET'
+        regex: 'GET|OPTIONS'
     route:
     - destination:
         port:
