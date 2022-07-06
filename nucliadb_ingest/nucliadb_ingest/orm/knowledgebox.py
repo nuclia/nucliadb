@@ -93,7 +93,7 @@ class KnowledgeBox:
         self.storage = storage
         self.kbid = kbid
         self.cache = cache
-        self._config = None
+        self._config: Optional[KnowledgeBoxConfig] = None
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
@@ -453,7 +453,7 @@ class KnowledgeBox:
                 kb=self,
                 uuid=uuid,
                 basic=Resource.parse_basic(raw_basic),
-                vector_index=config.vector_index,
+                vector_index=config.vector_index if config is not None else True,
             )
         else:
             return None
@@ -527,7 +527,7 @@ class KnowledgeBox:
             kb=self,
             uuid=uuid,
             basic=basic,
-            vector_index=config.vector_index,
+            vector_index=config.vector_index if config is not None else True,
         )
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
@@ -537,5 +537,9 @@ class KnowledgeBox:
             uuid = await self.get_resource_uuid_by_slug(key.split("/")[-1])
             if uuid is not None:
                 yield Resource(
-                    self.txn, self.storage, self, uuid, vector_index=config.vector_index
+                    self.txn,
+                    self.storage,
+                    self,
+                    uuid,
+                    vector_index=config.vector_index if config is not None else True,
                 )
