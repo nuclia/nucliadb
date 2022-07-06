@@ -93,6 +93,20 @@ class KnowledgeBox:
         self.storage = storage
         self.kbid = kbid
         self.cache = cache
+        self._config: Optional[KnowledgeBoxConfig] = None
+
+    async def get_config(self) -> Optional[KnowledgeBoxConfig]:
+        if self._config is None:
+            payload = await self.txn.get(KB_UUID.format(kbid=self.kbid))
+            if payload is not None:
+                response = KnowledgeBoxConfig()
+                response.ParseFromString(payload)
+                self._config = response
+                return response
+            else:
+                return None
+        else:
+            return self._config
 
     @classmethod
     async def get_kb(cls, txn: Transaction, uuid: str) -> Optional[KnowledgeBoxConfig]:
@@ -432,12 +446,14 @@ class KnowledgeBox:
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)
         if raw_basic:
+            config = await self.get_config()
             return Resource(
                 txn=self.txn,
                 storage=self.storage,
                 kb=self,
                 uuid=uuid,
                 basic=Resource.parse_basic(raw_basic),
+                disable_vectors=config.disable_vectors if config is not None else True,
             )
         else:
             return None
@@ -504,13 +520,28 @@ class KnowledgeBox:
         slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
         await set_basic(self.txn, self.kbid, uuid, basic)
+        config = await self.get_config()
         return Resource(
-            storage=self.storage, txn=self.txn, kb=self, uuid=uuid, basic=basic
+            storage=self.storage,
+            txn=self.txn,
+            kb=self,
+            uuid=uuid,
+            basic=basic,
+            disable_vectors=config.disable_vectors if config is not None else False,
         )
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
         base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
+        config = await self.get_config()
         async for key in self.txn.keys(match=base, count=-1):
             uuid = await self.get_resource_uuid_by_slug(key.split("/")[-1])
             if uuid is not None:
-                yield Resource(self.txn, self.storage, self, uuid)
+                yield Resource(
+                    self.txn,
+                    self.storage,
+                    self,
+                    uuid,
+                    disable_vectors=config.disable_vectors
+                    if config is not None
+                    else False,
+                )

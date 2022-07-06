@@ -96,6 +96,7 @@ class Resource:
         kb: KnowledgeBox,
         uuid: str,
         basic: PBBasic = None,
+        disable_vectors: bool = True,
     ):
         self.fields: Dict[Tuple[int, str], Field] = {}
         self.conversations: Dict[int, PBConversation] = {}
@@ -111,6 +112,7 @@ class Resource:
         self.kb = kb
         self.uuid = uuid
         self.basic = basic
+        self.disable_vectors = disable_vectors
 
     @property
     def indexer(self) -> ResourceBrain:
@@ -224,9 +226,10 @@ class Resource:
             if field_metadata is not None:
                 brain.apply_field_metadata(field_key, field_metadata, [], {})
 
-            vo = await field.get_vectors()
-            if vo is not None:
-                brain.apply_field_vectors(field_key, vo, [], {})
+            if self.disable_vectors is False:
+                vo = await field.get_vectors()
+                if vo is not None:
+                    brain.apply_field_vectors(field_key, vo, [], {})
         return brain
 
     async def generate_broker_message(self) -> BrokerMessage:
@@ -474,22 +477,23 @@ class Resource:
 
         # Upload to binary storage
         # Vector indexing
-        for field_vectors in message.field_vectors:
-            field_obj = await self.get_field(
-                field_vectors.field.field,
-                field_vectors.field.field_type,
-                load=False,
-            )
-            vo, replace_field, replace_splits = await field_obj.set_vectors(
-                field_vectors
-            )
-            field_key = self.generate_field_id(field_vectors.field)
-            if vo is not None:
-                self.indexer.apply_field_vectors(
-                    field_key, vo, replace_field, replace_splits
+        if self.disable_vectors is False:
+            for field_vectors in message.field_vectors:
+                field_obj = await self.get_field(
+                    field_vectors.field.field,
+                    field_vectors.field.field_type,
+                    load=False,
                 )
-            else:
-                raise AttributeError("VO not found on set")
+                vo, replace_field, replace_splits = await field_obj.set_vectors(
+                    field_vectors
+                )
+                field_key = self.generate_field_id(field_vectors.field)
+                if vo is not None:
+                    self.indexer.apply_field_vectors(
+                        field_key, vo, replace_field, replace_splits
+                    )
+                else:
+                    raise AttributeError("VO not found on set")
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
