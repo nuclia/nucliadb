@@ -11,7 +11,7 @@ spec:
   - name: nucliadb_writer
     match:
     - uri:
-        regex: '^/api/v\d+/kb/[^/]/(resource|resources|entitiesgroup|labelset|widget)/.*'
+        regex: '^/api/v\d+/kb/[^/]+/(resource|resources|entitiesgroup|labelset|widget)/.*'
       method:
         regex: 'PUT|DELETE|POST|PATCH|OPTIONS'
     route:
@@ -36,11 +36,11 @@ spec:
   - name: nucliadb_writer_tus
     match:
     - uri:
-        regex: '^/api/v\d+/kb/[^/]/resource/[^/]/file/[^/]/tusupload.*'
+        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+/file/[^/]+/tusupload.*'
       method:
         regex: 'POST|PATCH|HEAD|OPTIONS'
     - uri:
-        regex: '^/api/v\d+/kb/[^/]/tusupload.*'
+        regex: '^/api/v\d+/kb/[^/]+/tusupload.*'
       method:
         regex: 'POST|PATCH|HEAD|OPTIONS'
     route:
