@@ -24,14 +24,14 @@ from nucliadb_models.labels import Label, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.utilities import get_ingest
-from nucliadb_writer.api.v1.router import KB_PREFIX
+from nucliadb_writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 
 
 @pytest.mark.asyncio
 async def test_service_lifecycle_entities(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}",
+            f"/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",
@@ -75,7 +75,7 @@ async def test_service_lifecycle_entities(writer_api):
 async def test_service_lifecycle_labels(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}",
+            f"/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",

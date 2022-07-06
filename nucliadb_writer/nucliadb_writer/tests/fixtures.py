@@ -29,7 +29,7 @@ from nucliadb_ingest.tests.fixtures import IngestFixture
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import nuclia_settings, nucliadb_settings, storage_settings
 from nucliadb_writer import API_PREFIX
-from nucliadb_writer.api.v1.router import KB_PREFIX
+from nucliadb_writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_writer.settings import settings
 from nucliadb_writer.tus import clear_storage
 from nucliadb_writer.utilities import get_processing
@@ -89,7 +89,7 @@ async def gcs_storage_writer(gcs):
 async def knowledgebox_writer(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}",
+            f"/{KBS_PREFIX}",
             json={
                 "slug": "kbid1",
                 "title": "My Knowledge Box",

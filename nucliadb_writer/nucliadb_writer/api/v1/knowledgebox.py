@@ -38,11 +38,11 @@ from nucliadb_models.resource import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
-from nucliadb_writer.api.v1.router import KB_PREFIX, api
+from nucliadb_writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 
 
 @api.post(
-    f"/{KB_PREFIX}",
+    f"/{KBS_PREFIX}",
     status_code=201,
     name="Create Knowledge Box",
     response_model=KnowledgeBoxObj,

@@ -31,7 +31,7 @@ from starlette.routing import Mount
 from nucliadb_ingest.cache import clear_ingest_cache
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_search import API_PREFIX
-from nucliadb_search.api.v1.router import KB_PREFIX
+from nucliadb_search.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_utils.utilities import clear_global_cache
 
 
@@ -127,7 +127,7 @@ async def knowledgebox_one(nucliadb_api):
     kbslug = str(uuid.uuid4())
     async with nucliadb_api(roles=[NucliaDBRoles.MANAGER]) as client:
         data = {"slug": kbslug}
-        resp = await client.post(f"/{KB_PREFIX}", json=data)
+        resp = await client.post(f"/{KBS_PREFIX}", json=data)
         assert resp.status_code == 201
         kbid = resp.json()["uuid"]
     yield kbid
