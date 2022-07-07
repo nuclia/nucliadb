@@ -70,7 +70,7 @@ class Processor:
         self,
         driver: Driver,
         storage: Storage,
-        audit: AuditStorage,
+        audit: Optional[AuditStorage] = None,
         cache: Optional[Cache] = None,
         partition: Optional[str] = None,
     ):
@@ -130,8 +130,10 @@ class Processor:
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
             await self.audit.report(message, audit_type)
-        else:
+        elif self.audit is None:
             logger.warn("No audit defined")
+        elif audit_type is None:
+            logger.warn(f"Audit type empty txn_result: {txn_result}")
         return True
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:
@@ -264,7 +266,7 @@ class Processor:
         return TxnResult.RESOURCE_CREATED if created else TxnResult.RESOURCE_MODIFIED
 
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
-        await self.txn([message], seqid, partition)
+        return await self.txn([message], seqid, partition)
 
     async def multi(self, message: BrokerMessage, seqid: int):
         self.messages.setdefault(message.multiid, []).append(message)

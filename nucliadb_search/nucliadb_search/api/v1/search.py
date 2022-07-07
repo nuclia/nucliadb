@@ -193,14 +193,15 @@ async def search_knowledgebox(
 
     get_counter()[f"{kbid}_-_search_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
-    await audit.search(
-        kbid,
-        x_nucliadb_user,
-        x_forwarded_for,
-        pb_query,
-        timeit - time(),
-        len(search_results.resources),
-    )
+    if audit is not None:
+        await audit.search(
+            kbid,
+            x_nucliadb_user,
+            x_forwarded_for,
+            pb_query,
+            timeit - time(),
+            len(search_results.resources),
+        )
     if debug:
         search_results.shards = queried_shards
     return search_results
