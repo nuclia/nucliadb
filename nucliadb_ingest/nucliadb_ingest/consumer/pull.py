@@ -57,7 +57,7 @@ class PullWorker:
         zone: str,
         nuclia_cluster_url: str,
         nuclia_public_url: str,
-        audit: AuditStorage,
+        audit: Optional[AuditStorage],
         target: str,
         group: str,
         stream: str,

@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, List, Optional
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
@@ -95,6 +96,7 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         )
         set_utility(Utility.STORAGE, s3util)
         await s3util.initialize()
+        logger.info("Configuring S3 Storage")
 
     elif storage_settings.file_backend == "gcs" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.gcs import GCSStorage
@@ -113,6 +115,7 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         )
         set_utility(Utility.STORAGE, gcsutil)
         await gcsutil.initialize()
+        logger.info("Configuring GCS Storage")
 
     elif (
         storage_settings.file_backend == "local"
@@ -126,6 +129,7 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
         )
         set_utility(Utility.STORAGE, localutil)
         await localutil.initialize()
+        logger.info("Configuring Local Storage")
 
     if MAIN.get(Utility.STORAGE) is None:
         raise AttributeError()
@@ -140,6 +144,7 @@ def get_local_storage() -> LocalStorage:
         MAIN["local_storage"] = LocalStorage(
             local_testing_files=extended_storage_settings.local_testing_files
         )
+        logger.info("Configuring Local Storage")
     return MAIN.get("local_storage", None)
 
 
@@ -150,6 +155,7 @@ def get_nuclia_storage() -> NucliaStorage:
         MAIN["nuclia_storage"] = NucliaStorage(
             service_account=nuclia_settings.nuclia_service_account
         )
+        logger.info("Configuring Nuclia Storage")
     return MAIN.get("nuclia_storage", None)
 
 
@@ -158,6 +164,8 @@ async def get_cache() -> Optional[Cache]:
     if util is None and cache_settings.cache_enabled:
         driver = Cache()
         set_utility(Utility.CACHE, driver)
+        logger.info("Configuring cache")
+
     cache = get_utility(Utility.CACHE)
     if cache and not cache.initialized:
         await cache.initialize()
@@ -169,12 +177,14 @@ async def get_pubsub() -> PubSubDriver:
     if cache_settings.cache_pubsub_driver == "redis" and driver is None:
         driver = RedisPubsub(cache_settings.cache_pubsub_redis_url)
         set_utility(Utility.PUBSUB, driver)
+        logger.info("Configuring redis pubsub")
     elif cache_settings.cache_pubsub_driver == "nats" and driver is None:
         driver = NatsPubsub(
             hosts=cache_settings.cache_pubsub_nats_url,
             user_credentials_file=cache_settings.cache_pubsub_nats_auth,
         )
         set_utility(Utility.PUBSUB, driver)
+        logger.info("Configuring nats pubsub")
     elif driver is None:
         raise NotImplementedError("Invalid driver")
 
@@ -215,13 +225,15 @@ def get_indexing() -> IndexingUtility:
     return get_utility(Utility.INDEXING)
 
 
-def get_audit() -> AuditStorage:
+def get_audit() -> Optional[AuditStorage]:
     return get_utility(Utility.AUDIT)
 
 
 async def start_audit_utility():
+    audit_utility = None
     if audit_settings.audit_driver == "basic":
         audit_utility = BasicAuditStorage()
+        logger.info("Configuring basic audit log")
     elif audit_settings.audit_driver == "stream":
         audit_utility = StreamAuditStorage(
             nats_creds=audit_settings.audit_jetstream_auth,
@@ -230,7 +242,11 @@ async def start_audit_utility():
             partitions=audit_settings.audit_partitions,
             seed=audit_settings.audit_hash_seed,
         )
-    await audit_utility.initialize()
+        logger.info(
+            f"Configuring stream audit log {audit_settings.audit_jetstream_target}"
+        )
+    if audit_utility:
+        await audit_utility.initialize()
     set_utility(Utility.AUDIT, audit_utility)
 
 
