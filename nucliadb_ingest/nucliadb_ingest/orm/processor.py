@@ -242,6 +242,7 @@ class Processor:
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
+                logger.warn(f"This message did not modified resource")
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
             # as we need to do some cleanup. Exception will be reraised at the end of the function
