@@ -183,7 +183,7 @@ impl ParagraphReaderService {
 
         fs::create_dir_all(&config.path).await?;
 
-        info!("Creating index builder {}:{}", line!(), file!());
+        debug!("Creating index builder {}:{}", line!(), file!());
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
@@ -196,14 +196,14 @@ impl ParagraphReaderService {
         index_builder = index_builder.settings(settings);
 
         let index = index_builder.create_in_dir(&config.path).unwrap();
-        info!("Index builder created  {}:{}", line!(), file!());
+        debug!("Index builder created  {}:{}", line!(), file!());
 
-        info!("Creating index  {}:{}", line!(), file!());
+        debug!("Creating index  {}:{}", line!(), file!());
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into()?;
-        info!("Index created  {}:{}", line!(), file!());
+        debug!("Index created  {}:{}", line!(), file!());
         Ok(ParagraphReaderService {
             index,
             reader,
@@ -256,11 +256,11 @@ impl ParagraphReaderService {
 
         let query = BooleanQuery::new(query);
         let searcher = self.reader.searcher();
-        info!("{:?}", query);
+        debug!("{:?}", query);
         let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
         let facets_count = facet_handler.extract(&mut multi_fruit);
         let top_docs = topdocs_handler.extract(&mut multi_fruit);
-        info!("{:?}", top_docs);
+        debug!("{:?}", top_docs);
         // top_docs.retain(|(v, _)| *v > 0.2f32);
         (top_docs, facets_count)
     }
