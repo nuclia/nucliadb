@@ -52,7 +52,7 @@ pub fn init_telemetry() -> ServiceResult<()> {
         //    }
         //});
         let filter = tracing_subscriber::EnvFilter::from_default_env();
-        global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+        global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
         let jaeger_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
