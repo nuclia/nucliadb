@@ -6,35 +6,8 @@ import "google/protobuf/timestamp.proto";
 
 import public "nucliadb_protos/knowledgebox.proto";
 import public "nucliadb_protos/resources.proto";
+import public "nucliadb_protos/writer.proto";
 
-message GetOntologyRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-}
-
-message Ontology {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    knowledgebox.Labels labels = 2;
-    enum Status {
-        OK = 0;
-        NOTFOUND = 1;
-    }
-    Status status = 3;
-
-}
-
-message GetEntitiesRequest {
-    knowledgebox.KnowledgeBoxID kb = 1;
-}
-
-message Entities {
-    knowledgebox.KnowledgeBoxID kb = 1;
-    map <string, knowledgebox.EntitiesGroup> groups = 2;
-    enum Status {
-        OK = 0;
-        NOTFOUND = 1;
-    }
-    Status status = 3;
-}
 
 message EnabledMetadata {
     bool text = 1;
@@ -44,16 +17,16 @@ message EnabledMetadata {
 }
 
 
-message Labels {
+message TrainLabels {
     repeated resources.Classification resource = 1;
     repeated resources.Classification field = 2;
     repeated resources.Classification paragraph = 3;
 }
 
-message Metadata {
+message TrainMetadata {
     string text = 1;
     map<string, string> entities = 2;
-    Labels labels = 3;
+    TrainLabels labels = 3;
     repeated float vector = 4;
 }
 
@@ -84,45 +57,81 @@ message GetFieldsRequest {
 }
 
 
-message Sentence {
+message TrainSentence {
     string uuid = 1;
     resources.FieldID field = 2;
     string paragraph = 3;
     string sentence = 4;
-    Metadata metadata = 5;
+    TrainMetadata metadata = 5;
 }
 
 
-message Paragraph {
+message TrainParagraph {
     string uuid = 1;
     resources.FieldID field = 2;
     string paragraph = 3;
-    Metadata metadata = 4;
+    TrainMetadata metadata = 4;
 }
 
-message Field {
+message TrainField {
     string uuid = 1;
     resources.FieldID field = 2;
     string subfield = 3;
-    Metadata metadata = 4;
+    TrainMetadata metadata = 4;
 }
 
 
-message Resource {
+message TrainResource {
     string uuid = 1;
     string title = 2;
     string icon = 3;
     string slug = 4;
     google.protobuf.Timestamp created = 5;
     google.protobuf.Timestamp modified = 6;
-    Metadata metadata = 7;
+    TrainMetadata metadata = 7;
 }
 
 service Train {
-    rpc GetSentences(GetSentencesRequest) returns (stream Sentence) {}
-    rpc GetParagraphs(GetParagraphsRequest) returns (stream Paragraph) {}
-    rpc GetFields(GetFieldsRequest) returns (stream Field) {}
-    rpc GetResources(GetResourcesRequest) returns (stream Resource) {}
-    rpc GetOntology(GetOntologyRequest) returns (Ontology) {}
-    rpc GetEntities(GetEntitiesRequest) returns (Entities) {}
+    rpc GetSentences(GetSentencesRequest) returns (stream TrainSentence) {}
+    rpc GetParagraphs(GetParagraphsRequest) returns (stream TrainParagraph) {}
+    rpc GetFields(GetFieldsRequest) returns (stream TrainField) {}
+    rpc GetResources(GetResourcesRequest) returns (stream TrainResource) {}
+    rpc GetOntology(fdbwriter.GetLabelsRequest) returns (fdbwriter.GetLabelsResponse) {}
+    rpc GetEntities(fdbwriter.GetEntitiesRequest) returns (fdbwriter.GetEntitiesResponse) {}
+}
+
+message RegisterRequest { string key = 1; }
+message RegisterResponse { bool status = 1;}
+
+message CloseRequest {}
+
+message MessageToServer {
+    oneof MessageBody {
+        RegisterRequest register_request = 1;
+        CloseRequest close_request = 2;
+        TrainResource resource = 3;
+        TrainField field = 4;
+        TrainParagraph paragraph = 5;
+        TrainSentence sentence = 6;
+        bool end_of_stream = 7;
+        fdbwriter.GetLabelsResponse labels = 8;
+        fdbwriter.GetEntitiesResponse entities = 9;
+    }
+}
+
+message MessageFromServer {
+    oneof MessageBody {
+        RegisterResponse register_response = 1;
+        GetSentencesRequest get_sentences_request = 2;
+        GetParagraphsRequest get_paragraphs_request = 3;
+        GetFieldsRequest get_fields_request = 4;
+        GetResourcesRequest get_resources_request = 5;
+        fdbwriter.GetLabelsRequest get_labels_request = 6;
+        fdbwriter.GetEntitiesRequest get_entities_request = 7;
+        CloseRequest close_request = 8;
+    }
+}
+
+service Tunnel {
+    rpc Tunnel(stream MessageToServer) returns (stream MessageFromServer);
 }

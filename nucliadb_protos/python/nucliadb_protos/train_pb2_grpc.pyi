@@ -5,6 +5,7 @@ isort:skip_file
 import abc
 import grpc
 import nucliadb_protos.train_pb2
+import nucliadb_protos.writer_pb2
 import typing
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
@@ -82,32 +83,71 @@ from nucliadb_protos.resources_pb2 import (
     UserMetadata as UserMetadata,
 )
 
+from nucliadb_protos.writer_pb2 import (
+    Audit as Audit,
+    BrokerMessage as BrokerMessage,
+    DelEntitiesRequest as DelEntitiesRequest,
+    DelLabelsRequest as DelLabelsRequest,
+    DetWidgetsRequest as DetWidgetsRequest,
+    Error as Error,
+    GetEntitiesGroupRequest as GetEntitiesGroupRequest,
+    GetEntitiesGroupResponse as GetEntitiesGroupResponse,
+    GetEntitiesRequest as GetEntitiesRequest,
+    GetEntitiesResponse as GetEntitiesResponse,
+    GetLabelSetRequest as GetLabelSetRequest,
+    GetLabelSetResponse as GetLabelSetResponse,
+    GetLabelsRequest as GetLabelsRequest,
+    GetLabelsResponse as GetLabelsResponse,
+    GetWidgetRequest as GetWidgetRequest,
+    GetWidgetResponse as GetWidgetResponse,
+    GetWidgetsRequest as GetWidgetsRequest,
+    GetWidgetsResponse as GetWidgetsResponse,
+    IndexResource as IndexResource,
+    IndexStatus as IndexStatus,
+    ListMembersRequest as ListMembersRequest,
+    ListMembersResponse as ListMembersResponse,
+    Member as Member,
+    MergeEntitiesRequest as MergeEntitiesRequest,
+    Notification as Notification,
+    OpStatusWriter as OpStatusWriter,
+    ResourceFieldExistsResponse as ResourceFieldExistsResponse,
+    ResourceFieldId as ResourceFieldId,
+    SetEntitiesRequest as SetEntitiesRequest,
+    SetLabelsRequest as SetLabelsRequest,
+    SetWidgetsRequest as SetWidgetsRequest,
+    ShardObject as ShardObject,
+    ShardReplica as ShardReplica,
+    Shards as Shards,
+    WriterStatusRequest as WriterStatusRequest,
+    WriterStatusResponse as WriterStatusResponse,
+)
+
 
 class TrainStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetSentences: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.train_pb2.GetSentencesRequest,
-        nucliadb_protos.train_pb2.Sentence]
+        nucliadb_protos.train_pb2.TrainSentence]
 
     GetParagraphs: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.train_pb2.GetParagraphsRequest,
-        nucliadb_protos.train_pb2.Paragraph]
+        nucliadb_protos.train_pb2.TrainParagraph]
 
     GetFields: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.train_pb2.GetFieldsRequest,
-        nucliadb_protos.train_pb2.Field]
+        nucliadb_protos.train_pb2.TrainField]
 
     GetResources: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.train_pb2.GetResourcesRequest,
-        nucliadb_protos.train_pb2.Resource]
+        nucliadb_protos.train_pb2.TrainResource]
 
     GetOntology: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.train_pb2.GetOntologyRequest,
-        nucliadb_protos.train_pb2.Ontology]
+        nucliadb_protos.writer_pb2.GetLabelsRequest,
+        nucliadb_protos.writer_pb2.GetLabelsResponse]
 
     GetEntities: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.train_pb2.GetEntitiesRequest,
-        nucliadb_protos.train_pb2.Entities]
+        nucliadb_protos.writer_pb2.GetEntitiesRequest,
+        nucliadb_protos.writer_pb2.GetEntitiesResponse]
 
 
 class TrainServicer(metaclass=abc.ABCMeta):
@@ -115,37 +155,54 @@ class TrainServicer(metaclass=abc.ABCMeta):
     def GetSentences(self,
         request: nucliadb_protos.train_pb2.GetSentencesRequest,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.train_pb2.Sentence]: ...
+    ) -> typing.Iterator[nucliadb_protos.train_pb2.TrainSentence]: ...
 
     @abc.abstractmethod
     def GetParagraphs(self,
         request: nucliadb_protos.train_pb2.GetParagraphsRequest,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.train_pb2.Paragraph]: ...
+    ) -> typing.Iterator[nucliadb_protos.train_pb2.TrainParagraph]: ...
 
     @abc.abstractmethod
     def GetFields(self,
         request: nucliadb_protos.train_pb2.GetFieldsRequest,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.train_pb2.Field]: ...
+    ) -> typing.Iterator[nucliadb_protos.train_pb2.TrainField]: ...
 
     @abc.abstractmethod
     def GetResources(self,
         request: nucliadb_protos.train_pb2.GetResourcesRequest,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.train_pb2.Resource]: ...
+    ) -> typing.Iterator[nucliadb_protos.train_pb2.TrainResource]: ...
 
     @abc.abstractmethod
     def GetOntology(self,
-        request: nucliadb_protos.train_pb2.GetOntologyRequest,
+        request: nucliadb_protos.writer_pb2.GetLabelsRequest,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.train_pb2.Ontology: ...
+    ) -> nucliadb_protos.writer_pb2.GetLabelsResponse: ...
 
     @abc.abstractmethod
     def GetEntities(self,
-        request: nucliadb_protos.train_pb2.GetEntitiesRequest,
+        request: nucliadb_protos.writer_pb2.GetEntitiesRequest,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.train_pb2.Entities: ...
+    ) -> nucliadb_protos.writer_pb2.GetEntitiesResponse: ...
 
 
 def add_TrainServicer_to_server(servicer: TrainServicer, server: grpc.Server) -> None: ...
+
+class TunnelStub:
+    def __init__(self, channel: grpc.Channel) -> None: ...
+    Tunnel: grpc.StreamStreamMultiCallable[
+        nucliadb_protos.train_pb2.MessageToServer,
+        nucliadb_protos.train_pb2.MessageFromServer]
+
+
+class TunnelServicer(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def Tunnel(self,
+        request_iterator: typing.Iterator[nucliadb_protos.train_pb2.MessageToServer],
+        context: grpc.ServicerContext,
+    ) -> typing.Iterator[nucliadb_protos.train_pb2.MessageFromServer]: ...
+
+
+def add_TunnelServicer_to_server(servicer: TunnelServicer, server: grpc.Server) -> None: ...

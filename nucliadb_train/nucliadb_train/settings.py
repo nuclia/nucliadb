@@ -24,9 +24,12 @@ from pydantic import BaseSettings
 
 class Settings(BaseSettings):
     grpc_port: int = 8030
+    train_grpc_address: Optional[str] = None
 
-    inner_metrics_host: str = "0.0.0.0"
-    inner_metrics_port: int = 8081
+    root_certificates_file: Optional[str] = None
+    private_key_file: Optional[str] = None
+    certificate_chain_file: Optional[str] = None
+    training_key: Optional[str] = None
 
     driver: str = "redis"  # redis | tikv
     driver_redis_url: Optional[str] = None
@@ -37,7 +40,7 @@ class Settings(BaseSettings):
 
     node_writer_port: int = 10000
     node_reader_port: int = 10001
-    node_sidecar_port: int = 100002
+    node_sidecar_port: int = 10002
 
     # Only for testing proposes
     writer_port_map: Dict[int, int] = {}

@@ -27,10 +27,6 @@ services:
 running:
   sentry_url:
 
-vs:
-  gateway:
-  host:
-
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
 ## what's configured on nucliadb_shared
@@ -38,15 +34,6 @@ vs:
 ##   .Values.cache.cache_pubsub_nats_auth
 nats:
   secretName: nats-creds
-
-zone:
-
-# This configuration must match the one in ingest
-# THis is needed as reader component uses the orm module in ingest
-ingest:
-  driver: redis # tikv | redis
-  driver_redis_url: xx
-  driver_tikv_url: xx
 
 serviceMonitor:
   enabled: False

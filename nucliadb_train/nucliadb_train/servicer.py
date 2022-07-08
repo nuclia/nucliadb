@@ -17,55 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import traceback
-import uuid
-from typing import AsyncIterator, Optional
+from typing import Optional
 
+from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
-    GetSentencesRequest,
+    GetFieldsRequest,
     GetParagraphsRequest,
     GetResourcesRequest,
-    GetFieldsRequest,
-    GetOntologyRequest,
+    GetSentencesRequest,
+)
+from nucliadb_protos.writer_pb2 import (
     GetEntitiesRequest,
-    Field,
-    Sentence,
-    Paragraph,
-    Resource,
-    Ontology,
-    Entities,
+    GetEntitiesResponse,
+    GetLabelsRequest,
+    GetLabelsResponse,
 )
 
-from nucliadb_ingest import logger
-from nucliadb_ingest.maindb.driver import TXNID
-from nucliadb_ingest.orm import NODES
-from nucliadb_ingest.orm.exceptions import KnowledgeBoxNotFound
-from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
 from nucliadb_ingest.orm.processor import Processor
-from nucliadb_ingest.orm.resource import Resource as ResourceORM
-from nucliadb_ingest.orm.shard import Shard
-from nucliadb_ingest.orm.utils import get_node_klass
-from nucliadb_ingest.sentry import SENTRY
-from nucliadb_ingest.settings import settings
 from nucliadb_ingest.utils import get_driver
 from nucliadb_protos import train_pb2_grpc
-from nucliadb_utils.utilities import (
-    get_audit,
-    get_cache,
-    get_partitioning,
-    get_storage,
-    get_transaction,
-)
-
-if SENTRY:
-    from sentry_sdk import capture_exception
+from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
-    def __init__(self):
-        self.partitions = settings.partitions
-
     async def initialize(self):
         storage = await get_storage()
         audit = get_audit()
@@ -77,26 +51,52 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
     async def finalize(self):
         await self.proc.finalize()
 
-    async def GetSentences(self, request: GetSentencesRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
+    async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):
             yield sentence
 
-    async def GetParagraphs(self, request: GetParagraphsRequest, context=None) -> AsyncIterator[Paragraph, None]:  # type: ignore
+    async def GetParagraphs(self, request: GetParagraphsRequest, context=None):
         async for paragraph in self.proc.kb_paragraphs(request):
             yield paragraph
 
-    async def GetFields(self, request: GetFieldsRequest, context=None) -> AsyncIterator[Field, None]:  # type: ignore
+    async def GetFields(self, request: GetFieldsRequest, context=None):
         async for field in self.proc.kb_fields(request):
             yield field
 
-    async def GetRespources(self, request: GetResourcesRequest, context=None) -> AsyncIterator[Resource, None]:  # type: ignore
-        async for resource in self.proc.kb_resources(request):
+    async def GetResources(self, request: GetResourcesRequest, context=None):
+        for resource in self.proc.kb_resources(request):
             yield resource
 
-    async def GetEntities(self, request: GetSentencesRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
-        async for sentence in self.proc.kb_sentences(request):
-            yield sentence
+    async def GetEntities(  # type: ignore
+        self, request: GetEntitiesRequest, context=None
+    ) -> GetEntitiesResponse:
+        txn = await self.proc.driver.begin()
+        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        response = GetEntitiesResponse()
+        if kbobj is not None:
+            await kbobj.get_entities(response)
+            response.kb.uuid = kbobj.kbid
+            response.status = GetEntitiesResponse.Status.OK
+        await txn.abort()
+        if kbobj is None:
+            response.status = GetEntitiesResponse.Status.NOTFOUND
+        return response
 
-    async def GetOntology(self, request: GetSentencesRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
-        async for sentence in self.proc.kb_sentences(request):
-            yield sentence
+    async def GetOntology(  # type: ignore
+        self, request: GetLabelsRequest, context=None
+    ) -> GetLabelsResponse:
+        txn = await self.proc.driver.begin()
+        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        labels: Optional[Labels] = None
+        if kbobj is not None:
+            labels = await kbobj.get_labels()
+        await txn.abort()
+        response = GetLabelsResponse()
+        if kbobj is None:
+            response.status = GetLabelsResponse.Status.NOTFOUND
+        else:
+            response.kb.uuid = kbobj.kbid
+            if labels is not None:
+                response.labels.CopyFrom(labels)
+
+        return response

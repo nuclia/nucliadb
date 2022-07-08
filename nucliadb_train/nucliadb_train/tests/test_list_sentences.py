@@ -17,29 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_ingest.fields.base import Field
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.train_pb2 import GetSentencesRequest
 
-VALID_GLOBAL = ("title", "summary")
+import pytest
 
 
-class Generic(Field):
-    pbklass = str
-    value: str
-    type: str = "a"
+@pytest.mark.asyncio
+async def test_list_sentences(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetSentencesRequest()
+    req.kb.uuid = knowledgebox
+    req.metadata.entities = True
+    req.metadata.labels = True
+    req.metadata.text = True
+    req.metadata.vector = True
+    async for sentence in train_client.GetSentences(req):
+        print(sentence)
 
-    async def set_value(self, payload: str):
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
+    import pdb
 
-        if self.resource.basic is None:
-            await self.resource.get_basic()
+    pdb.set_trace()
 
-        setattr(self.resource.basic, self.id, payload)
-
-    async def get_value(self) -> str:
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
-        if self.resource.basic is None:
-            await self.resource.get_basic()
-
-        return getattr(self.resource.basic, self.id)
+    pass

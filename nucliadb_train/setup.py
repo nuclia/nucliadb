@@ -29,7 +29,7 @@ setup(
     version=version,
     author="nucliadb Authors",
     author_email="nucliadb@nuclia.com",
-    description="NucliaDB Reader Python process",
+    description="NucliaDB Train Python process",
     long_description=readme,
     long_description_content_type="text/markdown",
     license="MIT",
@@ -47,8 +47,7 @@ setup(
     packages=find_packages(),
     entry_points={
         "console_scripts": [
-            "extract-openapi = nucliadb_reader.openapi:command_extract_openapi",
-            "reader-metrics = nucliadb_reader.run:run_with_metrics",
+            "ndb_train = nucliadb_train.app:run",
         ]
     },
     install_requires=requirements,

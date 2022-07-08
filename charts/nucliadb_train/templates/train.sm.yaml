@@ -2,9 +2,9 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: reader-monitor
+  name: train-monitor
   labels:
-    app: reader
+    app: train
     version: "{{ .Chart.Version | replace "+" "_" }}"
     chart: "{{ .Chart.Name }}"
     release: "{{ .Release.Name }}"
@@ -15,7 +15,7 @@ spec:
     - "{{ .Release.Namespace }}"
   selector:
     matchLabels:
-      app: reader
+      app: train
   endpoints:
   - targetPort: {{ .Values.serving.metricsPort }}
     interval: 10s

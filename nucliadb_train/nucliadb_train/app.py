@@ -19,82 +19,19 @@
 #
 import asyncio
 import logging
-import signal
 import sys
 from asyncio import tasks
-from typing import Callable, List, Optional, Union
+from typing import Callable, List
 
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_train import SERVICE_NAME, logger
 from nucliadb_train.sentry import SENTRY, set_sentry
-from nucliadb_train.server import start_grpc
+from nucliadb_train.server import start_grpc, start_tunnel_grpc
 from nucliadb_train.settings import settings
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
-from nucliadb_utils.indexing import IndexingUtility
-from nucliadb_utils.settings import (
-    indexing_settings,
-    running_settings,
-    transaction_settings,
-)
-from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
-from nucliadb_utils.utilities import (
-    Utility,
-    clean_utility,
-    get_indexing,
-    get_transaction,
-    set_utility,
-    start_audit_utility,
-    stop_audit_utility,
-)
-
-
-async def start_transaction_utility(service_name: Optional[str] = None):
-    if transaction_settings.transaction_local:
-        transaction_utility: Union[
-            LocalTransactionUtility, TransactionUtility
-        ] = LocalTransactionUtility()
-    elif (
-        transaction_settings.transaction_jetstream_servers is not None
-        and transaction_settings.transaction_jetstream_target is not None
-    ):
-        transaction_utility = TransactionUtility(
-            nats_creds=transaction_settings.transaction_jetstream_auth,
-            nats_servers=transaction_settings.transaction_jetstream_servers,
-            nats_target=transaction_settings.transaction_jetstream_target,
-        )
-        await transaction_utility.initialize(service_name)
-    set_utility(Utility.TRANSACTION, transaction_utility)
-
-
-async def start_indexing_utility(service_name: Optional[str] = None):
-    if (
-        not indexing_settings.index_local
-        and indexing_settings.index_jetstream_servers is not None
-        and indexing_settings.index_jetstream_target is not None
-    ):
-        indexing_utility = IndexingUtility(
-            nats_creds=indexing_settings.index_jetstream_auth,
-            nats_servers=indexing_settings.index_jetstream_servers,
-            nats_target=indexing_settings.index_jetstream_target,
-        )
-        await indexing_utility.initialize(service_name)
-        set_utility(Utility.INDEXING, indexing_utility)
-
-
-async def stop_transaction_utility():
-    transaction_utility = get_transaction()
-    if transaction_utility:
-        await transaction_utility.finalize()
-        clean_utility(Utility.TRANSACTION)
-
-
-async def stop_indexing_utility():
-    indexing_utility = get_indexing()
-    if indexing_utility:
-        await indexing_utility.finalize()
-        clean_utility(Utility.INDEXING)
+from nucliadb_utils.settings import nuclia_settings, running_settings
 
 
 async def main() -> List[Callable]:
@@ -103,36 +40,14 @@ async def main() -> List[Callable]:
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
 
-    logger.info(f"======= Ingest starting chitchat ======")
-    chitchat = start_chitchat()
-
-    await start_transaction_utility(SERVICE_NAME)
-    await start_indexing_utility(SERVICE_NAME)
-    await start_audit_utility()
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
-    consumer_finalizer = await start_consumer(SERVICE_NAME)
-    metrics_finalizer = await start_metrics()
-    logger.info(f"======= Ingest finished starting ======")
+    if nuclia_settings.onprem:
+        grpc_finalizer = await start_tunnel_grpc(SERVICE_NAME)
+    else:
+        grpc_finalizer = await start_grpc(SERVICE_NAME)
+    logger.info(f"======= Train finished starting ======")
     finalizers = [
         grpc_finalizer,
-        metrics_finalizer,
-        consumer_finalizer,
-        stop_transaction_utility,
-        stop_indexing_utility,
-        stop_audit_utility,
     ]
-
-    if chitchat is not None:
-        finalizers.append(chitchat.close)
-
-    # Using ensure_future as Signal handlers
-    # cannot handle couroutines as callbacks
-    def stop_pulling():
-        logger.info("Received signal to stop pulling!")
-        asyncio.ensure_future(consumer_finalizer())
-
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGUSR1, stop_pulling)
 
     return finalizers
 
@@ -177,21 +92,12 @@ def run():
 
     logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
 
-    logger_activity.setLevel(
-        logging.getLevelName(running_settings.activity_log_level.upper())
-    )
-    logging.getLogger("nucliadb_chitchat").setLevel(
-        logging.getLevelName(running_settings.chitchat_level.upper())
-    )
-
     logging.getLogger("asyncio").setLevel(logging.ERROR)
 
     if settings.logging_config:
         logging.config.fileConfig(
             settings.logging_config, disable_existing_loggers=True
         )
-
-    assign_partitions(settings)
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")
@@ -204,15 +110,7 @@ def run():
             loop.set_debug(running_settings.debug)
         finalizers.extend(loop.run_until_complete(main()))
 
-        if settings.monitor is True:
-            import aiomonitor  # type: ignore
-
-            with aiomonitor.start_monitor(
-                loop=loop, host="0.0.0.0", port=settings.monitor_port
-            ):
-                loop.run_forever()
-        else:
-            loop.run_forever()
+        loop.run_forever()
     finally:
         try:
             for finalizer in finalizers:
