@@ -1,10 +1,16 @@
 CHANGELOG
 =========
 
-1.0.7 (unreleased)
+1.0.8 (unreleased)
 ------------------
 
 - Nothing changed yet.
+
+
+1.0.7 (2022-07-08)
+------------------
+
+- Updated nats.py package
 
 
 1.0.6 (2022-05-31)

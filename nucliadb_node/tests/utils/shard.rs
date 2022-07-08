@@ -18,51 +18,85 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_node::telemetry::init_telemetry;
+use nucliadb_node::config::Configuration;
 use nucliadb_protos::node_writer_client::NodeWriterClient;
 use nucliadb_protos::EmptyQuery;
+use opentelemetry::global;
+use opentelemetry::global::shutdown_tracer_provider;
 use opentelemetry::propagation::Injector;
-use opentelemetry::{global, Context};
-use tonic::metadata::{AsciiMetadataKey, MetadataMap};
 use tonic::Request;
-use tracing::Instrument;
+use tracing::info_span;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
-pub struct TestMetadataMap<'a>(pub &'a mut MetadataMap);
+struct TestMetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
 
 impl<'a> Injector for TestMetadataMap<'a> {
+    /// Set a key and value in the MetadataMap.  Does nothing if the key or value are not valid
+    /// inputs
+    #[allow(deprecated)]
     fn set(&mut self, key: &str, value: String) {
-        let key = AsciiMetadataKey::from_bytes(key.to_ascii_lowercase().as_bytes()).unwrap();
-        self.0.append(key, value.parse().unwrap());
+        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
+            if let Ok(val) = tonic::metadata::MetadataValue::from_str(&value) {
+                self.0.insert(key, val);
+            }
+        }
     }
 }
 
-#[ignore] // just for local testing jaeger tracing
-#[tokio::test]
-pub async fn create_shard() {
+// just for local testing jaeger tracing
+#[ignore]
+#[test]
+pub fn create_shard() {
     println!("{}", dotenvy::dotenv().unwrap().display());
-    init_telemetry().unwrap();
-    let span = tracing::info_span!("creating client");
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let id = rt.block_on(send_request());
+    println!("response id {id}");
+}
+
+fn tracing_init() {
+    let agent_endpoint = Configuration::jaeger_agent_endp();
+    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+    let tracer = opentelemetry_jaeger::new_pipeline()
+        .with_agent_endpoint(agent_endpoint)
+        .with_service_name("grpc-client")
+        .install_simple()
+        .unwrap();
+    tracing_subscriber::registry()
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .try_init()
+        .unwrap();
+}
+
+async fn send_request() -> String {
+    tracing_init();
+    let span = info_span!("test parent link");
+    let _guard = span.enter();
 
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
-        .instrument(span)
         .await
         .expect("Error creating NodeWriter client");
 
     let mut req = Request::new(EmptyQuery {});
-    let mut ctx_prop = TestMetadataMap(req.metadata_mut());
-    println!("current context {:#?}", Context::current());
+    global::get_text_map_propagator(|prop| {
+        prop.inject_context(
+            &tracing::Span::current().context(),
+            &mut TestMetadataMap(req.metadata_mut()),
+        )
+    });
 
-    global::get_text_map_propagator(|prop| prop.inject(&mut ctx_prop));
-
-    let span = tracing::info_span!("sending request");
     let response = client
         .new_shard(req)
-        .instrument(span)
         .await
         .expect("Error in new_shard request");
-
-    global::shutdown_tracer_provider();
-    println!("response id {}", response.get_ref().id);
+    let id = response.get_ref().id.clone();
+    shutdown_tracer_provider();
+    id
 }
 
 //#[ignore]

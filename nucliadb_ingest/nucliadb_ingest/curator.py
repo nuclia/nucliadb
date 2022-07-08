@@ -139,7 +139,7 @@ class Consumer:
         if last_curator_seq is None:
             last_curator_seq = 1
         else:
-            last_curator_seq = int(last_curator_seq)
+            last_curator_seq = int(last_curator_seq) + 1
 
         target = audit_settings.audit_jetstream_target.format(
             partition=self.partition, type=AuditRequest.MODIFIED
@@ -176,16 +176,10 @@ class Consumer:
                 logger.info(f"Still {self.dead_time - time.time()} seconds left")
                 msg = await self.subscription.next_msg(timeout=0.5)
                 seq = await self.subscription_worker(msg)
-            logger.info("Consumer: {self.partition} Time if off")
+            logger.info(f"Consumer: {self.partition} Time if off")
         except errors.TimeoutError:
+            logger.info(f"No more messages on audit log")
             pass
-
-        if seq is not None and self.dryrun is False:
-            logger.info("Consumer: {self.partition} Write last entity")
-            last_curator_key = CURATOR_ID.format(worker=self.partition)
-            txn = await self.driver.begin()
-            await txn.set(last_curator_key, f"{seq}".encode())
-            await txn.commit(resource=False)
 
         kbs = set(self.kbs_touch)
 
@@ -206,14 +200,25 @@ class Consumer:
                 kbid_obj = KnowledgeBoxID()
                 kbid_obj.uuid = kbid
                 kbobj = await self.proc.get_kb_obj(txn, kbid_obj)
+                await txn.abort()
                 if kbobj is not None:
                     for group, entities in entities.items():
                         logger.info(
                             f"Consumer: {self.partition} commiting  {kbid} - {group}"
                         )
+                        txn = await self.driver.begin()
+                        kbobj.txn = txn
                         await kbobj.set_entities(group, entities)
-                await txn.commit(resource=False)
+                        await txn.commit(resource=False)
                 logger.info(f"Consumer: {self.partition} commited  {kbid}")
+        logger.info(f"Consumer: {self.partition} Loop done")
+
+        if seq is not None and self.dryrun is False:
+            logger.info(f"Consumer: {self.partition} Write last entity with seq {seq}")
+            last_curator_key = CURATOR_ID.format(worker=self.partition)
+            txn = await self.driver.begin()
+            await txn.set(last_curator_key, f"{seq}".encode())
+            await txn.commit(resource=False)
 
     async def subscription_worker(self, msg: Msg) -> int:
         subject = msg.subject
@@ -244,7 +249,7 @@ class Consumer:
                 if SENTRY:
                     capture_exception(e)
 
-                logger.info(f"Check sentry for more details: {str(e)}")
+                logger.error(f"Check sentry for more details: {str(e)}")
                 raise e
             else:
                 # Successful processing

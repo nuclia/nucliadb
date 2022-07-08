@@ -19,7 +19,6 @@
 
 use opentelemetry::global;
 use tracing::{debug, error};
-use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
@@ -30,7 +29,7 @@ use crate::result::{ServiceError, ServiceResult};
 pub fn init_telemetry() -> ServiceResult<()> {
     let agent_endpoint = Configuration::jaeger_agent_endp();
     debug!("{agent_endpoint}");
-    let log_levels = Configuration::log_level();
+    let _log_levels = Configuration::log_level();
 
     let mut layers = Vec::new();
 
@@ -42,17 +41,18 @@ pub fn init_telemetry() -> ServiceResult<()> {
             .install_batch(opentelemetry::runtime::Tokio)
             .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
 
-        let filter = FilterFn::new(|metadata| {
-            let target = metadata.target();
-            match metadata.module_path() {
-                Some(module_path) if module_path.contains("nucliadb_node") => {
-                    target.contains("nucliadb_node::writer")
-                        || target.contains("nucliadb_node::reader")
-                }
-                _ => false,
-            }
-        });
-        global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+        // let filter = FilterFn::new(|metadata| {
+        //    let target = metadata.target();
+        //    match metadata.module_path() {
+        //        Some(module_path) if module_path.contains("nucliadb_node") => {
+        //            target.contains("nucliadb_node::writer")
+        //                || target.contains("nucliadb_node::reader")
+        //        }
+        //        _ => false,
+        //    }
+        //});
+        let filter = tracing_subscriber::EnvFilter::from_default_env();
+        global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
         let jaeger_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
@@ -61,10 +61,12 @@ pub fn init_telemetry() -> ServiceResult<()> {
         layers.push(jaeger_layer);
     }
 
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
     let stdout_layer = tracing_subscriber::fmt::layer()
         .pretty()
         .with_level(true)
-        .with_filter(Targets::new().with_targets(log_levels))
+        .with_filter(filter)
+        //.with_filter(Targets::new().with_targets(log_levels))
         .boxed();
 
     layers.push(stdout_layer);

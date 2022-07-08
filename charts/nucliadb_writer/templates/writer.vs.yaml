@@ -13,7 +13,7 @@ spec:
     - uri:
         regex: '^/api/v\d+/kb/[^/]+'
       method:
-        regex: 'PATCH|PUT|DELETE|OPTIONS'
+        regex: 'POST|PATCH|PUT|DELETE|OPTIONS'
     - uri:
         regex: '^/api/v\d+/kb/[^/]+/(resource|resources|entitiesgroup|labelset|widget)/.*'
       method:

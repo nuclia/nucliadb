@@ -160,7 +160,8 @@ async def get_resource(
     x_forwarded_for: str = Header(""),
 ) -> Resource:
     audit = get_audit()
-    await audit.visited(kbid, rid, x_nucliadb_user, x_forwarded_for)
+    if audit is not None:
+        await audit.visited(kbid, rid, x_nucliadb_user, x_forwarded_for)
 
     result = await serialize(kbid, rid, show, field_type_filter, extracted)
     if result is None:
