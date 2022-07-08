@@ -97,7 +97,7 @@ impl WriterChild for ParagraphWriterService {
         match self.writer.write().unwrap().commit() {
             _ if !modified => Ok(()),
             Ok(opstamp) => {
-                info!("Commit {}!", opstamp);
+                debug!("Commit {}!", opstamp);
                 Ok(())
             }
             Err(e) => {
@@ -112,7 +112,7 @@ impl WriterChild for ParagraphWriterService {
         self.writer.write().unwrap().delete_term(uuid_term);
         match self.writer.write().unwrap().commit() {
             Ok(opstamp) => {
-                info!("Commit {}!", opstamp);
+                debug!("Commit {}!", opstamp);
                 Ok(())
             }
             Err(e) => {
@@ -248,10 +248,10 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
-                info!("Paragraph added");
+                debug!("Paragraph added");
                 self.writer.write().unwrap().add_document(doc).unwrap();
                 if paragraph_counter % 500 == 0 {
-                    info!("Commited");
+                    debug!("Commited");
                     self.writer.write().unwrap().commit().unwrap();
                 }
             }

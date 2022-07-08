@@ -53,17 +53,17 @@ impl ServiceChild for VectorWriterService {
 
 impl WriterChild for VectorWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
-        info!("Delete resource in vector starts");
+        debug!("Delete resource in vector starts");
         self.index
             .write()
             .unwrap()
             .delete_document(resource_id.uuid.clone());
         self.index.write().unwrap().commit();
-        info!("Delete resource in vector ends");
+        debug!("Delete resource in vector ends");
         Ok(())
     }
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        info!("Set resource in vector starts");
+        debug!("Set resource in vector starts");
         if resource.status != ResourceStatus::Delete as i32 {
             let mut vector_id = 0;
             for paragraph in resource.paragraphs.values() {
@@ -77,14 +77,14 @@ impl WriterChild for VectorWriterService {
                             sentence.vector.clone(),
                             labels.clone(),
                         );
-                        info!("Vectors added {vector_id}");
+                        debug!("Vectors added {vector_id}");
                     }
                 }
             }
-            info!("Commit on {vector_id}");
+            debug!("Commit on {vector_id}");
             self.index.write().unwrap().commit();
         }
-        info!("Set resource in vector ends");
+        debug!("Set resource in vector ends");
         Ok(())
     }
     fn garbage_collection(&mut self) {
