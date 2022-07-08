@@ -16,13 +16,18 @@ class TrainStub(object):
         """
         self.GetSentences = channel.unary_stream(
                 '/train.Train/GetSentences',
-                request_serializer=nucliadb__protos_dot_train__pb2.GetSentenceRequest.SerializeToString,
+                request_serializer=nucliadb__protos_dot_train__pb2.GetSentencesRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_train__pb2.Sentence.FromString,
                 )
         self.GetParagraphs = channel.unary_stream(
                 '/train.Train/GetParagraphs',
-                request_serializer=nucliadb__protos_dot_train__pb2.GetParagraphRequest.SerializeToString,
+                request_serializer=nucliadb__protos_dot_train__pb2.GetParagraphsRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_train__pb2.Paragraph.FromString,
+                )
+        self.GetFields = channel.unary_stream(
+                '/train.Train/GetFields',
+                request_serializer=nucliadb__protos_dot_train__pb2.GetFieldsRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_train__pb2.Field.FromString,
                 )
         self.GetResources = channel.unary_stream(
                 '/train.Train/GetResources',
@@ -56,6 +61,12 @@ class TrainServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetFields(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetResources(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -79,13 +90,18 @@ def add_TrainServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetSentences': grpc.unary_stream_rpc_method_handler(
                     servicer.GetSentences,
-                    request_deserializer=nucliadb__protos_dot_train__pb2.GetSentenceRequest.FromString,
+                    request_deserializer=nucliadb__protos_dot_train__pb2.GetSentencesRequest.FromString,
                     response_serializer=nucliadb__protos_dot_train__pb2.Sentence.SerializeToString,
             ),
             'GetParagraphs': grpc.unary_stream_rpc_method_handler(
                     servicer.GetParagraphs,
-                    request_deserializer=nucliadb__protos_dot_train__pb2.GetParagraphRequest.FromString,
+                    request_deserializer=nucliadb__protos_dot_train__pb2.GetParagraphsRequest.FromString,
                     response_serializer=nucliadb__protos_dot_train__pb2.Paragraph.SerializeToString,
+            ),
+            'GetFields': grpc.unary_stream_rpc_method_handler(
+                    servicer.GetFields,
+                    request_deserializer=nucliadb__protos_dot_train__pb2.GetFieldsRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_train__pb2.Field.SerializeToString,
             ),
             'GetResources': grpc.unary_stream_rpc_method_handler(
                     servicer.GetResources,
@@ -124,7 +140,7 @@ class Train(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/train.Train/GetSentences',
-            nucliadb__protos_dot_train__pb2.GetSentenceRequest.SerializeToString,
+            nucliadb__protos_dot_train__pb2.GetSentencesRequest.SerializeToString,
             nucliadb__protos_dot_train__pb2.Sentence.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -141,8 +157,25 @@ class Train(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/train.Train/GetParagraphs',
-            nucliadb__protos_dot_train__pb2.GetParagraphRequest.SerializeToString,
+            nucliadb__protos_dot_train__pb2.GetParagraphsRequest.SerializeToString,
             nucliadb__protos_dot_train__pb2.Paragraph.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetFields(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/train.Train/GetFields',
+            nucliadb__protos_dot_train__pb2.GetFieldsRequest.SerializeToString,
+            nucliadb__protos_dot_train__pb2.Field.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

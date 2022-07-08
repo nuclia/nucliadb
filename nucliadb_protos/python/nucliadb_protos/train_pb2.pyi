@@ -292,7 +292,7 @@ class GetResourcesRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata"]) -> None: ...
 global___GetResourcesRequest = GetResourcesRequest
 
-class GetParagraphRequest(google.protobuf.message.Message):
+class GetParagraphsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
@@ -314,9 +314,9 @@ class GetParagraphRequest(google.protobuf.message.Message):
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
-global___GetParagraphRequest = GetParagraphRequest
+global___GetParagraphsRequest = GetParagraphsRequest
 
-class GetSentenceRequest(google.protobuf.message.Message):
+class GetSentencesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
@@ -338,9 +338,9 @@ class GetSentenceRequest(google.protobuf.message.Message):
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
-global___GetSentenceRequest = GetSentenceRequest
+global___GetSentencesRequest = GetSentencesRequest
 
-class GetFieldRequest(google.protobuf.message.Message):
+class GetFieldsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
@@ -362,7 +362,7 @@ class GetFieldRequest(google.protobuf.message.Message):
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
-global___GetFieldRequest = GetFieldRequest
+global___GetFieldsRequest = GetFieldsRequest
 
 class Sentence(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -413,25 +413,28 @@ class Paragraph(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata","paragraph",b"paragraph","uuid",b"uuid"]) -> None: ...
 global___Paragraph = Paragraph
 
-class Fields(google.protobuf.message.Message):
+class Field(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     UUID_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
+    SUBFIELD_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     uuid: typing.Text
     @property
     def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
+    subfield: typing.Text
     @property
     def metadata(self) -> global___Metadata: ...
     def __init__(self,
         *,
         uuid: typing.Text = ...,
         field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
+        subfield: typing.Text = ...,
         metadata: typing.Optional[global___Metadata] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
-global___Fields = Fields
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","metadata",b"metadata","subfield",b"subfield","uuid",b"uuid"]) -> None: ...
+global___Field = Field
 
 class Resource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

@@ -62,21 +62,21 @@ message GetResourcesRequest {
     EnabledMetadata metadata = 2;
 }
 
-message GetParagraphRequest {
+message GetParagraphsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
     resources.FieldID field = 3;
     EnabledMetadata metadata = 4;
 }
 
-message GetSentenceRequest {
+message GetSentencesRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
     resources.FieldID field = 3;
     EnabledMetadata metadata = 4;
 }
 
-message GetFieldRequest {
+message GetFieldsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     string uuid = 2;
     resources.FieldID field = 3;
@@ -100,10 +100,11 @@ message Paragraph {
     Metadata metadata = 4;
 }
 
-message Fields {
+message Field {
     string uuid = 1;
     resources.FieldID field = 2;
-    Metadata metadata = 7;
+    string subfield = 3;
+    Metadata metadata = 4;
 }
 
 
@@ -118,8 +119,9 @@ message Resource {
 }
 
 service Train {
-    rpc GetSentences(GetSentenceRequest) returns (stream Sentence) {}
-    rpc GetParagraphs(GetParagraphRequest) returns (stream Paragraph) {}
+    rpc GetSentences(GetSentencesRequest) returns (stream Sentence) {}
+    rpc GetParagraphs(GetParagraphsRequest) returns (stream Paragraph) {}
+    rpc GetFields(GetFieldsRequest) returns (stream Field) {}
     rpc GetResources(GetResourcesRequest) returns (stream Resource) {}
     rpc GetOntology(GetOntologyRequest) returns (Ontology) {}
     rpc GetEntities(GetEntitiesRequest) returns (Entities) {}

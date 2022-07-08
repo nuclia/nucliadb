@@ -22,11 +22,13 @@ import uuid
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.train_pb2 import (
-    GetSentenceRequest,
-    GetParagraphRequest,
+    GetSentencesRequest,
+    GetParagraphsRequest,
     GetResourcesRequest,
+    GetFieldsRequest,
     GetOntologyRequest,
     GetEntitiesRequest,
+    Field,
     Sentence,
     Paragraph,
     Resource,
@@ -75,6 +77,26 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
     async def finalize(self):
         await self.proc.finalize()
 
-    async def GetSentences(self, request: GetSentenceRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
+    async def GetSentences(self, request: GetSentencesRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
+        async for sentence in self.proc.kb_sentences(request):
+            yield sentence
+
+    async def GetParagraphs(self, request: GetParagraphsRequest, context=None) -> AsyncIterator[Paragraph, None]:  # type: ignore
+        async for paragraph in self.proc.kb_paragraphs(request):
+            yield paragraph
+
+    async def GetFields(self, request: GetFieldsRequest, context=None) -> AsyncIterator[Field, None]:  # type: ignore
+        async for field in self.proc.kb_fields(request):
+            yield field
+
+    async def GetRespources(self, request: GetResourcesRequest, context=None) -> AsyncIterator[Resource, None]:  # type: ignore
+        async for resource in self.proc.kb_resources(request):
+            yield resource
+
+    async def GetEntities(self, request: GetSentencesRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
+        async for sentence in self.proc.kb_sentences(request):
+            yield sentence
+
+    async def GetOntology(self, request: GetSentencesRequest, context=None) -> AsyncIterator[Sentence, None]:  # type: ignore
         async for sentence in self.proc.kb_sentences(request):
             yield sentence

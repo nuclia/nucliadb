@@ -28,7 +28,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxResponseStatus,
     Widget,
 )
-from nucliadb_protos.train_pb2 import GetSentenceRequest, Sentence
+from nucliadb_protos.train_pb2 import GetSentencesRequest, Sentence, Paragraph
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from sentry_sdk import capture_exception
 
@@ -466,7 +466,7 @@ class Processor:
             await self.cache.pubsub.publish(channel, payload)
 
     async def kb_sentences(
-        self, request: GetSentenceRequest
+        self, request: GetSentencesRequest
     ) -> AsyncIterator[Sentence, None]:
         txn = await self.driver.begin()
         kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
@@ -480,4 +480,38 @@ class Processor:
             async for resource in kb.iterate_resources():
                 async for sentence in resource.iterate_sentences(request.metadata):
                     yield sentence
+        await txn.abort()
+
+    async def kb_paragraphs(
+        self, request: GetSentencesRequest
+    ) -> AsyncIterator[Paragraph, None]:
+        txn = await self.driver.begin()
+        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        if request.HasField("uuid"):
+            # Filter by uuid
+            resource = await kb.get(request.uuid)
+            if resource:
+                async for paragraph in resource.iterate_paragraphs(request.metadata):
+                    yield paragraph
+        else:
+            async for resource in kb.iterate_resources():
+                async for paragraph in resource.iterate_paragraphs(request.metadata):
+                    yield paragraph
+        await txn.abort()
+
+    async def kb_fields(
+        self, request: GetSentencesRequest
+    ) -> AsyncIterator[Paragraph, None]:
+        txn = await self.driver.begin()
+        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
+        if request.HasField("uuid"):
+            # Filter by uuid
+            resource = await kb.get(request.uuid)
+            if resource:
+                async for paragraph in resource.iterate_paragraphs(request.metadata):
+                    yield paragraph
+        else:
+            async for resource in kb.iterate_resources():
+                async for paragraph in resource.iterate_paragraphs(request.metadata):
+                    yield paragraph
         await txn.abort()

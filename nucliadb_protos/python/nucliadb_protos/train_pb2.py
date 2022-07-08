@@ -23,7 +23,7 @@ except AttributeError:
 from nucliadb_protos.knowledgebox_pb2 import *
 from nucliadb_protos.resources_pb2 import *
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bnucliadb_protos/train.proto\x12\x05train\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"nucliadb_protos/knowledgebox.proto\x1a\x1fnucliadb_protos/resources.proto\">\n\x12GetOntologyRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\"\xa2\x01\n\x08Ontology\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12$\n\x06labels\x18\x02 \x01(\x0b\x32\x14.knowledgebox.Labels\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.train.Ontology.Status\"\x1e\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0c\n\x08NOTFOUND\x10\x01\">\n\x12GetEntitiesRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\"\xf5\x01\n\x08\x45ntities\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12+\n\x06groups\x18\x02 \x03(\x0b\x32\x1b.train.Entities.GroupsEntry\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.train.Entities.Status\x1aJ\n\x0bGroupsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.knowledgebox.EntitiesGroup:\x02\x38\x01\"\x1e\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0c\n\x08NOTFOUND\x10\x01\"Q\n\x0f\x45nabledMetadata\x12\x0c\n\x04text\x18\x01 \x01(\x08\x12\x10\n\x08\x65ntities\x18\x02 \x01(\x08\x12\x0e\n\x06labels\x18\x03 \x01(\x08\x12\x0e\n\x06vector\x18\x04 \x01(\x08\"\x8d\x01\n\x06Labels\x12+\n\x08resource\x18\x01 \x03(\x0b\x32\x19.resources.Classification\x12(\n\x05\x66ield\x18\x02 \x03(\x0b\x32\x19.resources.Classification\x12,\n\tparagraph\x18\x03 \x03(\x0b\x32\x19.resources.Classification\"\xa9\x01\n\x08Metadata\x12\x0c\n\x04text\x18\x01 \x01(\t\x12/\n\x08\x65ntities\x18\x02 \x03(\x0b\x32\x1d.train.Metadata.EntitiesEntry\x12\x1d\n\x06labels\x18\x03 \x01(\x0b\x32\r.train.Labels\x12\x0e\n\x06vector\x18\x04 \x03(\x02\x1a/\n\rEntitiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"i\n\x13GetResourcesRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12(\n\x08metadata\x18\x02 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x9a\x01\n\x13GetParagraphRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12!\n\x05\x66ield\x18\x03 \x01(\x0b\x32\x12.resources.FieldID\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x99\x01\n\x12GetSentenceRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12!\n\x05\x66ield\x18\x03 \x01(\x0b\x32\x12.resources.FieldID\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x96\x01\n\x0fGetFieldRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12!\n\x05\x66ield\x18\x03 \x01(\x0b\x32\x12.resources.FieldID\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x83\x01\n\x08Sentence\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12!\n\x05\x66ield\x18\x02 \x01(\x0b\x32\x12.resources.FieldID\x12\x11\n\tparagraph\x18\x03 \x01(\t\x12\x10\n\x08sentence\x18\x04 \x01(\t\x12!\n\x08metadata\x18\x05 \x01(\x0b\x32\x0f.train.Metadata\"r\n\tParagraph\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12!\n\x05\x66ield\x18\x02 \x01(\x0b\x32\x12.resources.FieldID\x12\x11\n\tparagraph\x18\x03 \x01(\t\x12!\n\x08metadata\x18\x04 \x01(\x0b\x32\x0f.train.Metadata\"\\\n\x06\x46ields\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12!\n\x05\x66ield\x18\x02 \x01(\x0b\x32\x12.resources.FieldID\x12!\n\x08metadata\x18\x07 \x01(\x0b\x32\x0f.train.Metadata\"\xc1\x01\n\x08Resource\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04icon\x18\x03 \x01(\t\x12\x0c\n\x04slug\x18\x04 \x01(\t\x12+\n\x07\x63reated\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08modified\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12!\n\x08metadata\x18\x07 \x01(\x0b\x32\x0f.train.Metadata2\xc5\x02\n\x05Train\x12>\n\x0cGetSentences\x12\x19.train.GetSentenceRequest\x1a\x0f.train.Sentence\"\x00\x30\x01\x12\x41\n\rGetParagraphs\x12\x1a.train.GetParagraphRequest\x1a\x10.train.Paragraph\"\x00\x30\x01\x12?\n\x0cGetResources\x12\x1a.train.GetResourcesRequest\x1a\x0f.train.Resource\"\x00\x30\x01\x12;\n\x0bGetOntology\x12\x19.train.GetOntologyRequest\x1a\x0f.train.Ontology\"\x00\x12;\n\x0bGetEntities\x12\x19.train.GetEntitiesRequest\x1a\x0f.train.Entities\"\x00P\x01P\x02\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bnucliadb_protos/train.proto\x12\x05train\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"nucliadb_protos/knowledgebox.proto\x1a\x1fnucliadb_protos/resources.proto\">\n\x12GetOntologyRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\"\xa2\x01\n\x08Ontology\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12$\n\x06labels\x18\x02 \x01(\x0b\x32\x14.knowledgebox.Labels\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.train.Ontology.Status\"\x1e\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0c\n\x08NOTFOUND\x10\x01\">\n\x12GetEntitiesRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\"\xf5\x01\n\x08\x45ntities\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12+\n\x06groups\x18\x02 \x03(\x0b\x32\x1b.train.Entities.GroupsEntry\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.train.Entities.Status\x1aJ\n\x0bGroupsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.knowledgebox.EntitiesGroup:\x02\x38\x01\"\x1e\n\x06Status\x12\x06\n\x02OK\x10\x00\x12\x0c\n\x08NOTFOUND\x10\x01\"Q\n\x0f\x45nabledMetadata\x12\x0c\n\x04text\x18\x01 \x01(\x08\x12\x10\n\x08\x65ntities\x18\x02 \x01(\x08\x12\x0e\n\x06labels\x18\x03 \x01(\x08\x12\x0e\n\x06vector\x18\x04 \x01(\x08\"\x8d\x01\n\x06Labels\x12+\n\x08resource\x18\x01 \x03(\x0b\x32\x19.resources.Classification\x12(\n\x05\x66ield\x18\x02 \x03(\x0b\x32\x19.resources.Classification\x12,\n\tparagraph\x18\x03 \x03(\x0b\x32\x19.resources.Classification\"\xa9\x01\n\x08Metadata\x12\x0c\n\x04text\x18\x01 \x01(\t\x12/\n\x08\x65ntities\x18\x02 \x03(\x0b\x32\x1d.train.Metadata.EntitiesEntry\x12\x1d\n\x06labels\x18\x03 \x01(\x0b\x32\r.train.Labels\x12\x0e\n\x06vector\x18\x04 \x03(\x02\x1a/\n\rEntitiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"i\n\x13GetResourcesRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12(\n\x08metadata\x18\x02 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x9b\x01\n\x14GetParagraphsRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12!\n\x05\x66ield\x18\x03 \x01(\x0b\x32\x12.resources.FieldID\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x9a\x01\n\x13GetSentencesRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12!\n\x05\x66ield\x18\x03 \x01(\x0b\x32\x12.resources.FieldID\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x97\x01\n\x10GetFieldsRequest\x12(\n\x02kb\x18\x01 \x01(\x0b\x32\x1c.knowledgebox.KnowledgeBoxID\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12!\n\x05\x66ield\x18\x03 \x01(\x0b\x32\x12.resources.FieldID\x12(\n\x08metadata\x18\x04 \x01(\x0b\x32\x16.train.EnabledMetadata\"\x83\x01\n\x08Sentence\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12!\n\x05\x66ield\x18\x02 \x01(\x0b\x32\x12.resources.FieldID\x12\x11\n\tparagraph\x18\x03 \x01(\t\x12\x10\n\x08sentence\x18\x04 \x01(\t\x12!\n\x08metadata\x18\x05 \x01(\x0b\x32\x0f.train.Metadata\"r\n\tParagraph\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12!\n\x05\x66ield\x18\x02 \x01(\x0b\x32\x12.resources.FieldID\x12\x11\n\tparagraph\x18\x03 \x01(\t\x12!\n\x08metadata\x18\x04 \x01(\x0b\x32\x0f.train.Metadata\"m\n\x05\x46ield\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12!\n\x05\x66ield\x18\x02 \x01(\x0b\x32\x12.resources.FieldID\x12\x10\n\x08subfield\x18\x03 \x01(\t\x12!\n\x08metadata\x18\x04 \x01(\x0b\x32\x0f.train.Metadata\"\xc1\x01\n\x08Resource\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04icon\x18\x03 \x01(\t\x12\x0c\n\x04slug\x18\x04 \x01(\t\x12+\n\x07\x63reated\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08modified\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12!\n\x08metadata\x18\x07 \x01(\x0b\x32\x0f.train.Metadata2\xff\x02\n\x05Train\x12?\n\x0cGetSentences\x12\x1a.train.GetSentencesRequest\x1a\x0f.train.Sentence\"\x00\x30\x01\x12\x42\n\rGetParagraphs\x12\x1b.train.GetParagraphsRequest\x1a\x10.train.Paragraph\"\x00\x30\x01\x12\x36\n\tGetFields\x12\x17.train.GetFieldsRequest\x1a\x0c.train.Field\"\x00\x30\x01\x12?\n\x0cGetResources\x12\x1a.train.GetResourcesRequest\x1a\x0f.train.Resource\"\x00\x30\x01\x12;\n\x0bGetOntology\x12\x19.train.GetOntologyRequest\x1a\x0f.train.Ontology\"\x00\x12;\n\x0bGetEntities\x12\x19.train.GetEntitiesRequest\x1a\x0f.train.Entities\"\x00P\x01P\x02\x62\x06proto3')
 
 
 
@@ -37,12 +37,12 @@ _LABELS = DESCRIPTOR.message_types_by_name['Labels']
 _METADATA = DESCRIPTOR.message_types_by_name['Metadata']
 _METADATA_ENTITIESENTRY = _METADATA.nested_types_by_name['EntitiesEntry']
 _GETRESOURCESREQUEST = DESCRIPTOR.message_types_by_name['GetResourcesRequest']
-_GETPARAGRAPHREQUEST = DESCRIPTOR.message_types_by_name['GetParagraphRequest']
-_GETSENTENCEREQUEST = DESCRIPTOR.message_types_by_name['GetSentenceRequest']
-_GETFIELDREQUEST = DESCRIPTOR.message_types_by_name['GetFieldRequest']
+_GETPARAGRAPHSREQUEST = DESCRIPTOR.message_types_by_name['GetParagraphsRequest']
+_GETSENTENCESREQUEST = DESCRIPTOR.message_types_by_name['GetSentencesRequest']
+_GETFIELDSREQUEST = DESCRIPTOR.message_types_by_name['GetFieldsRequest']
 _SENTENCE = DESCRIPTOR.message_types_by_name['Sentence']
 _PARAGRAPH = DESCRIPTOR.message_types_by_name['Paragraph']
-_FIELDS = DESCRIPTOR.message_types_by_name['Fields']
+_FIELD = DESCRIPTOR.message_types_by_name['Field']
 _RESOURCE = DESCRIPTOR.message_types_by_name['Resource']
 _ONTOLOGY_STATUS = _ONTOLOGY.enum_types_by_name['Status']
 _ENTITIES_STATUS = _ENTITIES.enum_types_by_name['Status']
@@ -118,26 +118,26 @@ GetResourcesRequest = _reflection.GeneratedProtocolMessageType('GetResourcesRequ
   })
 _sym_db.RegisterMessage(GetResourcesRequest)
 
-GetParagraphRequest = _reflection.GeneratedProtocolMessageType('GetParagraphRequest', (_message.Message,), {
-  'DESCRIPTOR' : _GETPARAGRAPHREQUEST,
+GetParagraphsRequest = _reflection.GeneratedProtocolMessageType('GetParagraphsRequest', (_message.Message,), {
+  'DESCRIPTOR' : _GETPARAGRAPHSREQUEST,
   '__module__' : 'nucliadb_protos.train_pb2'
-  # @@protoc_insertion_point(class_scope:train.GetParagraphRequest)
+  # @@protoc_insertion_point(class_scope:train.GetParagraphsRequest)
   })
-_sym_db.RegisterMessage(GetParagraphRequest)
+_sym_db.RegisterMessage(GetParagraphsRequest)
 
-GetSentenceRequest = _reflection.GeneratedProtocolMessageType('GetSentenceRequest', (_message.Message,), {
-  'DESCRIPTOR' : _GETSENTENCEREQUEST,
+GetSentencesRequest = _reflection.GeneratedProtocolMessageType('GetSentencesRequest', (_message.Message,), {
+  'DESCRIPTOR' : _GETSENTENCESREQUEST,
   '__module__' : 'nucliadb_protos.train_pb2'
-  # @@protoc_insertion_point(class_scope:train.GetSentenceRequest)
+  # @@protoc_insertion_point(class_scope:train.GetSentencesRequest)
   })
-_sym_db.RegisterMessage(GetSentenceRequest)
+_sym_db.RegisterMessage(GetSentencesRequest)
 
-GetFieldRequest = _reflection.GeneratedProtocolMessageType('GetFieldRequest', (_message.Message,), {
-  'DESCRIPTOR' : _GETFIELDREQUEST,
+GetFieldsRequest = _reflection.GeneratedProtocolMessageType('GetFieldsRequest', (_message.Message,), {
+  'DESCRIPTOR' : _GETFIELDSREQUEST,
   '__module__' : 'nucliadb_protos.train_pb2'
-  # @@protoc_insertion_point(class_scope:train.GetFieldRequest)
+  # @@protoc_insertion_point(class_scope:train.GetFieldsRequest)
   })
-_sym_db.RegisterMessage(GetFieldRequest)
+_sym_db.RegisterMessage(GetFieldsRequest)
 
 Sentence = _reflection.GeneratedProtocolMessageType('Sentence', (_message.Message,), {
   'DESCRIPTOR' : _SENTENCE,
@@ -153,12 +153,12 @@ Paragraph = _reflection.GeneratedProtocolMessageType('Paragraph', (_message.Mess
   })
 _sym_db.RegisterMessage(Paragraph)
 
-Fields = _reflection.GeneratedProtocolMessageType('Fields', (_message.Message,), {
-  'DESCRIPTOR' : _FIELDS,
+Field = _reflection.GeneratedProtocolMessageType('Field', (_message.Message,), {
+  'DESCRIPTOR' : _FIELD,
   '__module__' : 'nucliadb_protos.train_pb2'
-  # @@protoc_insertion_point(class_scope:train.Fields)
+  # @@protoc_insertion_point(class_scope:train.Field)
   })
-_sym_db.RegisterMessage(Fields)
+_sym_db.RegisterMessage(Field)
 
 Resource = _reflection.GeneratedProtocolMessageType('Resource', (_message.Message,), {
   'DESCRIPTOR' : _RESOURCE,
@@ -199,20 +199,20 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _METADATA_ENTITIESENTRY._serialized_end=1078
   _GETRESOURCESREQUEST._serialized_start=1080
   _GETRESOURCESREQUEST._serialized_end=1185
-  _GETPARAGRAPHREQUEST._serialized_start=1188
-  _GETPARAGRAPHREQUEST._serialized_end=1342
-  _GETSENTENCEREQUEST._serialized_start=1345
-  _GETSENTENCEREQUEST._serialized_end=1498
-  _GETFIELDREQUEST._serialized_start=1501
-  _GETFIELDREQUEST._serialized_end=1651
-  _SENTENCE._serialized_start=1654
-  _SENTENCE._serialized_end=1785
-  _PARAGRAPH._serialized_start=1787
-  _PARAGRAPH._serialized_end=1901
-  _FIELDS._serialized_start=1903
-  _FIELDS._serialized_end=1995
-  _RESOURCE._serialized_start=1998
-  _RESOURCE._serialized_end=2191
-  _TRAIN._serialized_start=2194
-  _TRAIN._serialized_end=2519
+  _GETPARAGRAPHSREQUEST._serialized_start=1188
+  _GETPARAGRAPHSREQUEST._serialized_end=1343
+  _GETSENTENCESREQUEST._serialized_start=1346
+  _GETSENTENCESREQUEST._serialized_end=1500
+  _GETFIELDSREQUEST._serialized_start=1503
+  _GETFIELDSREQUEST._serialized_end=1654
+  _SENTENCE._serialized_start=1657
+  _SENTENCE._serialized_end=1788
+  _PARAGRAPH._serialized_start=1790
+  _PARAGRAPH._serialized_end=1904
+  _FIELD._serialized_start=1906
+  _FIELD._serialized_end=2015
+  _RESOURCE._serialized_start=2018
+  _RESOURCE._serialized_end=2211
+  _TRAIN._serialized_start=2214
+  _TRAIN._serialized_end=2597
 # @@protoc_insertion_point(module_scope)

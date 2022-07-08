@@ -86,12 +86,16 @@ from nucliadb_protos.resources_pb2 import (
 class TrainStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetSentences: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.train_pb2.GetSentenceRequest,
+        nucliadb_protos.train_pb2.GetSentencesRequest,
         nucliadb_protos.train_pb2.Sentence]
 
     GetParagraphs: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.train_pb2.GetParagraphRequest,
+        nucliadb_protos.train_pb2.GetParagraphsRequest,
         nucliadb_protos.train_pb2.Paragraph]
+
+    GetFields: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.train_pb2.GetFieldsRequest,
+        nucliadb_protos.train_pb2.Field]
 
     GetResources: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.train_pb2.GetResourcesRequest,
@@ -109,15 +113,21 @@ class TrainStub:
 class TrainServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def GetSentences(self,
-        request: nucliadb_protos.train_pb2.GetSentenceRequest,
+        request: nucliadb_protos.train_pb2.GetSentencesRequest,
         context: grpc.ServicerContext,
     ) -> typing.Iterator[nucliadb_protos.train_pb2.Sentence]: ...
 
     @abc.abstractmethod
     def GetParagraphs(self,
-        request: nucliadb_protos.train_pb2.GetParagraphRequest,
+        request: nucliadb_protos.train_pb2.GetParagraphsRequest,
         context: grpc.ServicerContext,
     ) -> typing.Iterator[nucliadb_protos.train_pb2.Paragraph]: ...
+
+    @abc.abstractmethod
+    def GetFields(self,
+        request: nucliadb_protos.train_pb2.GetFieldsRequest,
+        context: grpc.ServicerContext,
+    ) -> typing.Iterator[nucliadb_protos.train_pb2.Field]: ...
 
     @abc.abstractmethod
     def GetResources(self,
