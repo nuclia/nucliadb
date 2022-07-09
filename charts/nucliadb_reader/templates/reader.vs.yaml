@@ -46,3 +46,7 @@ spec:
         allowMethods:
         - GET
         - OPTIONS
+        - POST
+        - PATCH
+        - PUT
+        - DELETE
