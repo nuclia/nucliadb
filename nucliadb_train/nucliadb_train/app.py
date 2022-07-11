@@ -29,9 +29,9 @@ from opentelemetry.propagators.b3 import B3MultiFormat
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_train import SERVICE_NAME, logger
 from nucliadb_train.sentry import SENTRY, set_sentry
-from nucliadb_train.server import start_grpc, start_tunnel_grpc
+from nucliadb_train.server import start_grpc
 from nucliadb_train.settings import settings
-from nucliadb_utils.settings import nuclia_settings, running_settings
+from nucliadb_utils.settings import running_settings
 
 
 async def main() -> List[Callable]:

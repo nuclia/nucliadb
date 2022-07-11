@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.train_pb2 import GetResourcesRequest
-
 import pytest
+from nucliadb_protos.train_pb2 import GetResourcesRequest
+from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
 @pytest.mark.asyncio
@@ -34,8 +33,7 @@ async def test_list_resource(
     req.metadata.text = True
     req.metadata.vector = True
     count = 0
-    async for resource in train_client.GetResources(req):
-        print(resource)
+    async for _ in train_client.GetResources(req):  # type: ignore
         count += 1
 
     assert count == 10

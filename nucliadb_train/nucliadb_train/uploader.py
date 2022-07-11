@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import aiohttp
 from typing import Optional
 
+import aiohttp
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
     EnabledMetadata,
@@ -34,11 +34,11 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
-from nucliadb_train.nucliadb_train.models import RequestData
 
-from nucliadb_train.settings import settings
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.utils import get_driver
+from nucliadb_train.models import RequestData
+from nucliadb_train.settings import settings
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
 
@@ -110,6 +110,10 @@ async def start_upload(request: str, kb: str):
     await us.initialize()
 
     url = settings.nuclia_learning_url
+
+    if settings.nuclia_learning_apikey is None:
+        raise AttributeError("API Key required for uploading")
+
     async with aiohttp.ClientSession(
         headers={
             "X-NUCLIA-LEARNING-APIKEY": settings.nuclia_learning_apikey,
@@ -120,54 +124,57 @@ async def start_upload(request: str, kb: str):
         req = await sess.get(f"{url}/request")
         request_data = RequestData.parse_raw(await req.read())
 
-        metadata = EnabledMetadata(**request_data.metadata)
+        metadata = EnabledMetadata(**request_data.metadata.dict())
 
         if request_data.sentences:
-            pb = GetSentencesRequest()
-            pb.kb.uuid = kb
-            pb.metadata.text = True
+            pbsr = GetSentencesRequest()
+            pbsr.kb.uuid = kb
+            pbsr.metadata.CopyFrom(metadata)
 
-            async for sentence in us.GetSentences(pb):
+            async for sentence in us.GetSentences(pbsr):
                 payload = sentence.SerializeToString()
                 await sess.post(f"{url}/sentence", data=payload)
 
         if request_data.paragraphs:
-            pb = GetParagraphsRequest()
-            pb.kb.uuid = kb
+            pbpr = GetParagraphsRequest()
+            pbpr.kb.uuid = kb
+            pbpr.metadata.CopyFrom(metadata)
 
-            async for paragraph in us.GetParagraphs(pb):
+            async for paragraph in us.GetParagraphs(pbpr):
                 payload = paragraph.SerializeToString()
                 await sess.post(f"{url}/paragraph", data=payload)
 
         if request_data.resources:
-            pb = GetResourcesRequest()
-            pb.kb.uuid = kb
+            pbrr = GetResourcesRequest()
+            pbrr.kb.uuid = kb
+            pbrr.metadata.CopyFrom(metadata)
 
-            async for resource in us.GetResources(pb):
+            async for resource in us.GetResources(pbrr):
                 payload = resource.SerializeToString()
                 await sess.post(f"{url}/resource", data=payload)
 
         if request_data.fields:
-            pb = GetFieldsRequest()
-            pb.kb.uuid = kb
+            pbfr = GetFieldsRequest()
+            pbfr.kb.uuid = kb
+            pbfr.metadata.CopyFrom(metadata)
 
-            async for field in us.GetFields(pb):
+            async for field in us.GetFields(pbfr):
                 payload = field.SerializeToString()
                 await sess.post(f"{url}/resource", data=payload)
 
         if request_data.entities:
-            pb = GetEntitiesRequest()
-            pb.kb.uuid = kb
+            pber = GetEntitiesRequest()
+            pber.kb.uuid = kb
 
-            entities = us.GetEntities(pb)
+            entities = await us.GetEntities(pber)
             payload = entities.SerializeToString()
             await sess.post(f"{url}/entities", data=payload)
 
         if request_data.labels:
-            pb = GetLabelsRequest()
-            pb.kb.uuid = kb
+            pblr = GetLabelsRequest()
+            pblr.kb.uuid = kb
 
-            ontology = us.GetOntology(pb)
+            ontology = await us.GetOntology(pblr)
             payload = ontology.SerializeToString()
             await sess.post(f"{url}/ontology", data=payload)
 

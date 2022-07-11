@@ -17,11 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.train_pb2 import GetEntitiesRequest
-from nucliadb_protos.writer_pb2 import GetEntitiesResponse
-
 import pytest
+from nucliadb_protos.train_pb2 import GetEntitiesRequest
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
 
 @pytest.mark.asyncio
@@ -30,5 +29,5 @@ async def test_get_entities(
 ) -> None:
     req = GetEntitiesRequest()
     req.kb.uuid = knowledgebox
-    entities: GetEntitiesResponse = await train_client.GetEntities(req)
+    entities: GetEntitiesResponse = await train_client.GetEntities(req)  # type: ignore
     assert entities.groups["group1"].entities["entity1"].value == "PERSON"

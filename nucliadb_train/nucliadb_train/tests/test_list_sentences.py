@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.train_pb2 import GetSentencesRequest
-
 import pytest
+from nucliadb_protos.train_pb2 import GetSentencesRequest
+from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
 @pytest.mark.asyncio
@@ -34,8 +33,7 @@ async def test_list_sentences(
     req.metadata.text = True
     req.metadata.vector = True
     count = 0
-    async for sentence in train_client.GetSentences(req):
-        print(sentence)
+    async for _ in train_client.GetSentences(req):  # type: ignore
         count += 1
 
     assert count == 40

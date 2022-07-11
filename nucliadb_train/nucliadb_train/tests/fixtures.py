@@ -20,30 +20,28 @@
 import asyncio
 import uuid
 from datetime import datetime
-from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
+
+import pytest
+from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
-    FieldComputedMetadataWrapper,
     ExtractedTextWrapper,
+    FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
     Paragraph,
     Sentence,
 )
-from nucliadb_protos.utils_pb2 import ExtractedText
-
-import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb_utils.utilities import (
     Utility,
+    clear_global_cache,
     get_storage,
     set_utility,
-    clear_global_cache,
 )
-
-from grpc import aio
 
 
 def free_port() -> int:
@@ -56,8 +54,8 @@ def free_port() -> int:
 
 @pytest.fixture(scope="function")
 def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
-    from nucliadb_utils.settings import running_settings, storage_settings
     from nucliadb_train.settings import settings
+    from nucliadb_utils.settings import running_settings, storage_settings
 
     running_settings.debug = False
     print(f"Redis ready at {redis_driver.url}")
@@ -84,6 +82,7 @@ async def train_api(test_settings_train: None, local_files, event_loop):  # type
 @pytest.fixture(scope="function")
 async def train_client(train_api):  # type: ignore
     from nucliadb_protos.train_pb2_grpc import TrainStub
+
     from nucliadb_train.settings import settings
 
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
@@ -112,7 +111,7 @@ def broker_simple_resource(knowledgebox, number):
     message1.basic.modified.FromDatetime(datetime.utcnow())
     message1.texts[
         "field1"
-    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."
+    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
     message1.source = BrokerMessage.MessageSource.WRITER
     return message1
 
@@ -138,7 +137,7 @@ def broker_processed_resource(knowledgebox, number, rid):
 
     etw = ExtractedTextWrapper()
     etw.field.CopyFrom(field1_if)
-    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."
+    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
     message2.extracted_text.append(etw)
 
     fcmw = FieldComputedMetadataWrapper()

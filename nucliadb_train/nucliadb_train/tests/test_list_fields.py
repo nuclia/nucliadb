@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.train_pb2 import GetFieldsRequest
-
 import pytest
+from nucliadb_protos.train_pb2 import GetFieldsRequest
+from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
 @pytest.mark.asyncio
@@ -34,8 +33,7 @@ async def test_list_fields(
     req.metadata.text = True
     req.metadata.vector = True
     count = 0
-    async for field in train_client.GetParagraphs(req):
-        print(field)
+    async for _ in train_client.GetParagraphs(req):  # type: ignore
         count += 1
 
     assert count == 30
