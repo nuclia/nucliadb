@@ -265,7 +265,9 @@ impl ShardReaderService {
         };
 
         let field_reader_service = self.field_reader_service.clone();
+        let span = tracing::Span::current();
         let text_task = task::spawn_blocking(move || {
+            let _span = span.entered();
             measure_time(
                 || field_reader_service.search(&field_request),
                 "field_reader search time",
@@ -288,7 +290,9 @@ impl ShardReaderService {
         };
 
         let paragraph_reader_service = self.paragraph_reader_service.clone();
+        let span = tracing::Span::current();
         let paragraph_task = task::spawn_blocking(move || {
+            let _span = span.entered();
             measure_time(
                 || paragraph_reader_service.search(&paragraph_request),
                 "paragraph_reader search time",
@@ -303,7 +307,9 @@ impl ShardReaderService {
             reload: search_request.reload,
         };
         let vector_reader_service = self.vector_reader_service.clone();
+        let span = tracing::Span::current();
         let vector_task = task::spawn_blocking(move || {
+            let _span = span.entered();
             measure_time(
                 || vector_reader_service.search(&vector_request),
                 "vector_reader search time",
@@ -329,7 +335,9 @@ impl ShardReaderService {
     ) -> InternalResult<ParagraphSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let paragraph_reader_service = self.paragraph_reader_service.clone();
+        let span = tracing::Span::current();
         task::spawn_blocking(move || {
+            let _span = span.entered();
             measure_time(
                 || paragraph_reader_service.search(&search_request),
                 "paragraph_reader search time",
@@ -346,7 +354,9 @@ impl ShardReaderService {
     ) -> InternalResult<DocumentSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let field_reader_service = self.field_reader_service.clone();
+        let span = tracing::Span::current();
         task::spawn_blocking(move || {
+            let _span = span.entered();
             measure_time(
                 || field_reader_service.search(&search_request),
                 "field reader search time",
@@ -363,7 +373,9 @@ impl ShardReaderService {
     ) -> InternalResult<VectorSearchResponse> {
         self.reload_policy(search_request.reload).await;
         let vector_reader_service = self.vector_reader_service.clone();
+        let span = tracing::Span::current();
         task::spawn_blocking(move || {
+            let _span = span.entered();
             measure_time(
                 || vector_reader_service.search(&search_request),
                 "vector reader search time",

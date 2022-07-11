@@ -27,7 +27,7 @@ use opentelemetry::propagation::Extractor;
 use tokio::net;
 use tokio::time::{sleep, Instant};
 use tonic::transport::Endpoint;
-use tracing::{info, Level};
+use tracing::{info, instrument, Level};
 
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {
@@ -85,19 +85,21 @@ pub fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
         .collect()
 }
 
-pub fn measure_time<T, F>(f: F, comment: &str) -> T
+pub fn measure_time<T, F>(target: F, comment: &str) -> T
 where
     T: Sized,
     F: FnOnce() -> T,
 {
     let now = Instant::now();
-    let result = f();
+    let result = target();
     info!("{comment} {}ms", now.elapsed().as_millis());
     result
 }
 
 pub async fn measure_time_async<T>(fut: impl Future<Output = T>, comment: &str) -> T
-where T: Sized {
+where
+    T: Sized,
+{
     let now = Instant::now();
     let result = fut.await;
     info!("{comment} {}ms", now.elapsed().as_millis());

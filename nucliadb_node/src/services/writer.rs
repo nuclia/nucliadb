@@ -170,8 +170,10 @@ impl ShardWriterService {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
         info!("Field service starts");
+        let span = tracing::Span::current();
         let text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
+            let _span = span.entered();
             measure_time(
                 || writer.set_resource(&field_resource),
                 "field_writer set_resource execution time",
@@ -181,8 +183,10 @@ impl ShardWriterService {
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer_service.clone();
         info!("Paragraph service starts");
+        let span = tracing::Span::current();
         let paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
+            let _span = span.entered();
             measure_time(
                 || writer.set_resource(&paragraph_resource),
                 "paragraph writer set_resource execution time",
@@ -192,8 +196,10 @@ impl ShardWriterService {
         let vector_writer_service = self.vector_writer_service.clone();
         let vector_resource = resource.clone();
         info!("Vector service starts");
+        let span = tracing::Span::current();
         let vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
+            let _span = span.entered();
             measure_time(
                 || writer.set_resource(&vector_resource),
                 "vector_writer set_resource execution time",
