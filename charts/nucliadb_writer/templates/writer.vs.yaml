@@ -15,9 +15,9 @@ spec:
       method:
         regex: 'POST|PATCH|PUT|DELETE|OPTIONS'
     - uri:
-        regex: '^/api/v\d+/kb/[^/]+/(resource|resources|entitiesgroup|labelset|widget)/.*'
+        regex: '^/api/v\d+/kb/[^/]+/(resource|resources|entitiesgroup|labelset|widget).*'
       method:
-        regex: 'PUT|DELETE|POST|PATCH|OPTIONS'
+        regex: 'POST|PATCH|PUT|DELETE|OPTIONS'
     route:
     - destination:
         port:
