@@ -17,10 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import aiohttp
 from typing import Optional
 
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
+    EnabledMetadata,
     GetFieldsRequest,
     GetParagraphsRequest,
     GetResourcesRequest,
@@ -32,14 +34,15 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
+from nucliadb_train.nucliadb_train.models import RequestData
 
+from nucliadb_train.settings import settings
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.utils import get_driver
-from nucliadb_protos import train_pb2_grpc
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
 
-class TrainServicer(train_pb2_grpc.TrainServicer):
+class UploadServicer:
     async def initialize(self):
         storage = await get_storage()
         audit = get_audit()
@@ -64,7 +67,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
             yield field
 
     async def GetResources(self, request: GetResourcesRequest, context=None):
-        async for resource in self.proc.kb_resources(request):
+        for resource in self.proc.kb_resources(request):
             yield resource
 
     async def GetEntities(  # type: ignore
@@ -100,3 +103,72 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
                 response.labels.CopyFrom(labels)
 
         return response
+
+
+async def start_upload(request: str, kb: str):
+    us = UploadServicer()
+    await us.initialize()
+
+    url = settings.nuclia_learning_url
+    async with aiohttp.ClientSession(
+        headers={
+            "X-NUCLIA-LEARNING-APIKEY": settings.nuclia_learning_apikey,
+            "X-NUCLIA-LEARNING-REQUEST": request,
+        }
+    ) as sess:
+
+        req = await sess.get(f"{url}/request")
+        request_data = RequestData.parse_raw(await req.read())
+
+        metadata = EnabledMetadata(**request_data.metadata)
+
+        if request_data.sentences:
+            pb = GetSentencesRequest()
+            pb.kb.uuid = kb
+            pb.metadata.text = True
+
+            async for sentence in us.GetSentences(pb):
+                payload = sentence.SerializeToString()
+                await sess.post(f"{url}/sentence", data=payload)
+
+        if request_data.paragraphs:
+            pb = GetParagraphsRequest()
+            pb.kb.uuid = kb
+
+            async for paragraph in us.GetParagraphs(pb):
+                payload = paragraph.SerializeToString()
+                await sess.post(f"{url}/paragraph", data=payload)
+
+        if request_data.resources:
+            pb = GetResourcesRequest()
+            pb.kb.uuid = kb
+
+            async for resource in us.GetResources(pb):
+                payload = resource.SerializeToString()
+                await sess.post(f"{url}/resource", data=payload)
+
+        if request_data.fields:
+            pb = GetFieldsRequest()
+            pb.kb.uuid = kb
+
+            async for field in us.GetFields(pb):
+                payload = field.SerializeToString()
+                await sess.post(f"{url}/resource", data=payload)
+
+        if request_data.entities:
+            pb = GetEntitiesRequest()
+            pb.kb.uuid = kb
+
+            entities = us.GetEntities(pb)
+            payload = entities.SerializeToString()
+            await sess.post(f"{url}/entities", data=payload)
+
+        if request_data.labels:
+            pb = GetLabelsRequest()
+            pb.kb.uuid = kb
+
+            ontology = us.GetOntology(pb)
+            payload = ontology.SerializeToString()
+            await sess.post(f"{url}/ontology", data=payload)
+
+    await us.finalize()

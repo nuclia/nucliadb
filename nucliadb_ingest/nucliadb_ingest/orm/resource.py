@@ -572,9 +572,6 @@ class Resource:
     async def iterate_sentences(
         self, enabled_metadata: EnabledMetadata
     ) -> AsyncIterator[TrainSentence]:
-        import pdb
-
-        pdb.set_trace()
 
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()

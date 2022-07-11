@@ -99,39 +99,3 @@ service Train {
     rpc GetOntology(fdbwriter.GetLabelsRequest) returns (fdbwriter.GetLabelsResponse) {}
     rpc GetEntities(fdbwriter.GetEntitiesRequest) returns (fdbwriter.GetEntitiesResponse) {}
 }
-
-message RegisterRequest { string key = 1; }
-message RegisterResponse { bool status = 1;}
-
-message CloseRequest {}
-
-message MessageToServer {
-    oneof MessageBody {
-        RegisterRequest register_request = 1;
-        CloseRequest close_request = 2;
-        TrainResource resource = 3;
-        TrainField field = 4;
-        TrainParagraph paragraph = 5;
-        TrainSentence sentence = 6;
-        bool end_of_stream = 7;
-        fdbwriter.GetLabelsResponse labels = 8;
-        fdbwriter.GetEntitiesResponse entities = 9;
-    }
-}
-
-message MessageFromServer {
-    oneof MessageBody {
-        RegisterResponse register_response = 1;
-        GetSentencesRequest get_sentences_request = 2;
-        GetParagraphsRequest get_paragraphs_request = 3;
-        GetFieldsRequest get_fields_request = 4;
-        GetResourcesRequest get_resources_request = 5;
-        fdbwriter.GetLabelsRequest get_labels_request = 6;
-        fdbwriter.GetEntitiesRequest get_entities_request = 7;
-        CloseRequest close_request = 8;
-    }
-}
-
-service Tunnel {
-    rpc Tunnel(stream MessageToServer) returns (stream MessageFromServer);
-}

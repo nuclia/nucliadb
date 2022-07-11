@@ -17,34 +17,37 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import argparse
 import asyncio
 import logging
 import sys
 from asyncio import tasks
 from typing import Callable, List
 
-from opentelemetry.propagate import set_global_textmap
-from opentelemetry.propagators.b3 import B3MultiFormat
-
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
-from nucliadb_train import SERVICE_NAME, logger
+from nucliadb_train import logger
+from nucliadb_train.nucliadb_train.uploader import start_upload
 from nucliadb_train.sentry import SENTRY, set_sentry
-from nucliadb_train.server import start_grpc, start_tunnel_grpc
 from nucliadb_train.settings import settings
-from nucliadb_utils.settings import nuclia_settings, running_settings
+from nucliadb_utils.settings import running_settings
+
+
+def arg_parse():
+
+    parser = argparse.ArgumentParser(description="Upload data to Nuclia Learning API.")
+
+    parser.add_argument(
+        "-r", "--request", dest="request", help="Request UUID", required=True
+    )
+
+    parser.add_argument("-k", "--kb", dest="kb", help="Knowledge Box", required=True)
 
 
 async def main() -> List[Callable]:
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:
-        set_global_textmap(B3MultiFormat())
-        await init_telemetry(tracer_provider)  # To start asyncio task
 
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
-    logger.info(f"======= Train finished starting ======")
-    finalizers = [
-        grpc_finalizer,
-    ]
+    parser = arg_parse()
+
+    await start_upload(parser.request, parser.kb)
+    finalizers = []
 
     return finalizers
 

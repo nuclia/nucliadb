@@ -29,7 +29,6 @@ from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_train import logger
 from nucliadb_train.servicer import TrainServicer
 from nucliadb_train.settings import settings
-from nucliadb_train.tunnel import TunnelServicer
 
 
 async def start_grpc(service_name: Optional[str] = None):
@@ -60,45 +59,5 @@ async def start_grpc(service_name: Optional[str] = None):
     def finalizer():
         asyncio.create_task(servicer.finalize())
         asyncio.create_task(server.stop(grace=False))
-
-    return finalizer
-
-
-async def start_tunnel_grpc(service_name: str):
-
-    aio.init_grpc_aio()
-
-    root_certificates = None
-    if settings.root_certificates_file is not None:
-        with open(settings.root_certificates_file, "rb") as f:
-            root_certificates = f.read()
-
-    private_key = None
-    if settings.private_key_file is not None:
-        with open(settings.private_key_file, "rb") as f:
-            private_key = f.read()
-
-    certificate_chain = None
-    if settings.certificate_chain_file is not None:
-        with open(settings.certificate_chain_file, "rb") as f:
-            certificate_chain = f.read()
-
-    if settings.train_grpc_address is None:
-        raise AttributeError("GRPC address needed")
-
-    if settings.training_key is None:
-        raise AttributeError("Invalid Training Key")
-
-    servicer = TunnelServicer(
-        service_name=service_name,
-        grpc_address=settings.train_grpc_address,
-        root_certificates=root_certificates,
-        private_key=private_key,
-        certificate_chain=certificate_chain,
-    )
-    await servicer.connect(settings.training_key)
-
-    def finalizer():
-        asyncio.create_task(servicer.disconnect())
 
     return finalizer

@@ -33,11 +33,9 @@ async def test_list_sentences(
     req.metadata.labels = True
     req.metadata.text = True
     req.metadata.vector = True
+    count = 0
     async for sentence in train_client.GetSentences(req):
         print(sentence)
+        count += 1
 
-    import pdb
-
-    pdb.set_trace()
-
-    pass
+    assert count == 40

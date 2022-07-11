@@ -17,14 +17,32 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import uuid
 from datetime import datetime
+from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
+from nucliadb_protos.resources_pb2 import (
+    FieldComputedMetadataWrapper,
+    ExtractedTextWrapper,
+    FieldID,
+    FieldType,
+    Paragraph,
+    Sentence,
+)
+from nucliadb_protos.utils_pb2 import ExtractedText
 
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import (
+    Utility,
+    get_storage,
+    set_utility,
+    clear_global_cache,
+)
+
 from grpc import aio
 
 
@@ -46,7 +64,7 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
 
     storage_settings.gcs_endpoint_url = gcs
     storage_settings.file_backend = "gcs"
-    storage_settings.gcs_bucket = "test"
+    storage_settings.gcs_bucket = "test_{kbid}"
     settings.grpc_port = free_port()
 
     set_utility(Utility.CACHE, cache)
@@ -70,6 +88,7 @@ async def train_client(train_api):  # type: ignore
 
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
     yield TrainStub(channel)
+    clear_global_cache()
 
 
 def broker_simple_resource(knowledgebox, number):
@@ -81,8 +100,9 @@ def broker_simple_resource(knowledgebox, number):
         type=BrokerMessage.AUTOCOMMIT,
     )
 
+    message1.basic.slug = str(number)
     message1.basic.icon = "text/plain"
-    message1.basic.title = str(number)
+    message1.basic.title = f"MY TITLE {number}"
     message1.basic.summary = "Summary of document"
     message1.basic.thumbnail = "doc"
     message1.basic.layout = "default"
@@ -90,11 +110,80 @@ def broker_simple_resource(knowledgebox, number):
     message1.basic.metadata.language = "es"
     message1.basic.created.FromDatetime(datetime.utcnow())
     message1.basic.modified.FromDatetime(datetime.utcnow())
+    message1.texts[
+        "field1"
+    ].body = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."
     message1.source = BrokerMessage.MessageSource.WRITER
-    FieldComputedMetadataWrapper()
-    message1.field_metadata.append()
-
     return message1
+
+
+def broker_processed_resource(knowledgebox, number, rid):
+    message2: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug=str(number),
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+    message2.basic.metadata.useful = True
+    message2.basic.metadata.language = "es"
+    message2.source = BrokerMessage.MessageSource.PROCESSOR
+
+    field1_if = FieldID()
+    field1_if.field = "field1"
+    field1_if.field_type = FieldType.TEXT
+
+    title_if = FieldID()
+    title_if.field = "title"
+    title_if.field_type = FieldType.GENERIC
+
+    etw = ExtractedTextWrapper()
+    etw.field.CopyFrom(field1_if)
+    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."
+    message2.extracted_text.append(etw)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field1_if)
+    p1 = Paragraph()
+    p1.start = 0
+    p1.end = 82
+    s1 = Sentence()
+    s1.start = 0
+    s1.end = 52
+    p1.sentences.append(s1)
+    s1 = Sentence()
+    s1.start = 53
+    s1.end = 82
+    p1.sentences.append(s1)
+    p2 = Paragraph()
+    p2.start = 84
+    p2.end = 103
+    s1 = Sentence()
+    s1.start = 84
+    s1.end = 103
+    p2.sentences.append(s1)
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    fcmw.metadata.metadata.paragraphs.append(p2)
+    message2.field_metadata.append(fcmw)
+
+    etw = ExtractedTextWrapper()
+    etw.field.CopyFrom(title_if)
+    etw.body.text = f"MY TITLE {number}"
+    message2.extracted_text.append(etw)
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(title_if)
+    p1 = Paragraph()
+    p1.start = 0
+    p1.end = len(etw.body.text)
+    s1 = Sentence()
+    s1.start = 0
+    s1.end = len(etw.body.text)
+    p1.sentences.append(s1)
+    fcmw.metadata.metadata.paragraphs.append(p1)
+    message2.field_metadata.append(fcmw)
+    message2.basic.metadata.language = "es"
+
+    return message2
 
 
 @pytest.fixture(scope="function")
@@ -106,7 +195,10 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     amount = 10
     for i in range(1, 10 + 1):
         message = broker_simple_resource(knowledgebox, i)
-        await processor.process(message=message, seqid=i)
+        await processor.process(message=message, seqid=-1, transaction_check=False)
+
+        message = broker_processed_resource(knowledgebox, i, message.uuid)
+        await processor.process(message=message, seqid=-1, transaction_check=False)
         # Give processed data some time to reach the node
 
     from time import time
@@ -129,5 +221,23 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
         if count == amount:
             break
         print(f"got {count}, retrying")
+        await asyncio.sleep(2)
+
+    # Add entities
+    storage = await get_storage()
+    txn = await driver.begin()
+    kb = KnowledgeBox(txn, storage, kbid=knowledgebox, cache=None)
+    entities = EntitiesGroup()
+    entities.entities["entity1"].value = "PERSON"
+    await kb.set_entities_force("group1", entities)
+
+    # Add ontology
+    labelset = LabelSet()
+    labelset.title = "ls1"
+    label = Label()
+    label.title = "label1"
+    labelset.labels.append(label)
+    await kb.set_labelset("label1", labelset)
+    await txn.commit(resource=False)
 
     yield knowledgebox

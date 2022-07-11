@@ -48,6 +48,7 @@ setup(
     entry_points={
         "console_scripts": [
             "ndb_train = nucliadb_train.app:run",
+            "nuclia_dataset_upload = nucliadb_train.upload:run",
         ]
     },
     install_requires=requirements,

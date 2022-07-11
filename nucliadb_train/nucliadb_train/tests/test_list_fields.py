@@ -17,22 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Dict, List, Optional
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.train_pb2 import GetFieldsRequest
 
-from pydantic import BaseSettings
-
-
-class Settings(BaseSettings):
-    grpc_port: int = 8030
-    train_grpc_address: Optional[str] = None
-
-    nuclia_learning_url: Optional[str] = "https://nuclia.cloud/api/v1/learning/"
-    nuclia_learning_apikey: Optional[str] = None
-
-    driver: str = "redis"  # redis | tikv
-    driver_redis_url: Optional[str] = None
-    driver_tikv_url: Optional[List[str]] = []
-    driver_local_url: Optional[str] = None
+import pytest
 
 
-settings = Settings()
+@pytest.mark.asyncio
+async def test_list_fields(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetFieldsRequest()
+    req.kb.uuid = knowledgebox
+    req.metadata.entities = True
+    req.metadata.labels = True
+    req.metadata.text = True
+    req.metadata.vector = True
+    count = 0
+    async for field in train_client.GetParagraphs(req):
+        print(field)
+        count += 1
+
+    assert count == 30

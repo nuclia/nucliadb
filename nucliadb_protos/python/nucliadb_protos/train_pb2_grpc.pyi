@@ -189,20 +189,3 @@ class TrainServicer(metaclass=abc.ABCMeta):
 
 
 def add_TrainServicer_to_server(servicer: TrainServicer, server: grpc.Server) -> None: ...
-
-class TunnelStub:
-    def __init__(self, channel: grpc.Channel) -> None: ...
-    Tunnel: grpc.StreamStreamMultiCallable[
-        nucliadb_protos.train_pb2.MessageToServer,
-        nucliadb_protos.train_pb2.MessageFromServer]
-
-
-class TunnelServicer(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def Tunnel(self,
-        request_iterator: typing.Iterator[nucliadb_protos.train_pb2.MessageToServer],
-        context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.train_pb2.MessageFromServer]: ...
-
-
-def add_TunnelServicer_to_server(servicer: TunnelServicer, server: grpc.Server) -> None: ...
