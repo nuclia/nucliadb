@@ -15,6 +15,9 @@ spec:
   ports:
     - name: grpc-ingest
       port: {{ .Values.serving.grpc }}
+      protocol: TCP
       appProtocol: grpc
     - name: cluster-monitor
       port: {{ .Values.chitchat.cluster_manager.port }}
+      protocol: TCP
+      appProtocol: tcp

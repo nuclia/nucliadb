@@ -20,8 +20,8 @@ spec:
     metadata:
       name: search
       annotations:
-        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.chitchat.cluster_manager.port }},{{ .Values.chitchat.node.chitchat_port}},{{ .Values.services.nats }},{{ .Values.services.maindb }}"
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.chitchat.cluster_manager.port }},{{ .Values.chitchat.node.chitchat_port}},{{ .Values.serving.metricsPort }}"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{ .Values.services.nats }},{{ .Values.services.maindb }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
       labels:
         app: search
         version: "{{ .Chart.Version | replace "+" "_" }}"
