@@ -248,7 +248,7 @@ impl ShardReaderService {
         })
     }
 
-    #[tracing::instrument(name = "ShardReaderService::search", skip(self))]
+    #[tracing::instrument(name = "ShardReaderService::search", skip(self, search_request))]
     pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload).await;
         let field_request = DocumentSearchRequest {
@@ -267,11 +267,8 @@ impl ShardReaderService {
         let field_reader_service = self.field_reader_service.clone();
         let span = tracing::Span::current();
         let text_task = task::spawn_blocking(move || {
-            let _span = span.entered();
-            measure_time(
-                || field_reader_service.search(&field_request),
-                "field_reader search time",
-            )
+            let span = span.entered();
+            span.in_scope(|| field_reader_service.search(&field_request))
         });
         info!("{}:{}", line!(), file!());
 
@@ -292,11 +289,8 @@ impl ShardReaderService {
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         let span = tracing::Span::current();
         let paragraph_task = task::spawn_blocking(move || {
-            let _span = span.entered();
-            measure_time(
-                || paragraph_reader_service.search(&paragraph_request),
-                "paragraph_reader search time",
-            )
+            let span = span.entered();
+            span.in_scope(|| paragraph_reader_service.search(&paragraph_request))
         });
         info!("{}:{}", line!(), file!());
 
@@ -309,11 +303,8 @@ impl ShardReaderService {
         let vector_reader_service = self.vector_reader_service.clone();
         let span = tracing::Span::current();
         let vector_task = task::spawn_blocking(move || {
-            let _span = span.entered();
-            measure_time(
-                || vector_reader_service.search(&vector_request),
-                "vector_reader search time",
-            )
+            let span = span.entered();
+            span.in_scope(|| vector_reader_service.search(&vector_request))
         });
         info!("{}:{}", line!(), file!());
 
@@ -328,7 +319,10 @@ impl ShardReaderService {
         })
     }
 
-    #[tracing::instrument(name = "ShardReaderService::paragraph_search", skip(self))]
+    #[tracing::instrument(
+        name = "ShardReaderService::paragraph_search",
+        skip(self, search_request)
+    )]
     pub async fn paragraph_search(
         &self,
         search_request: ParagraphSearchRequest,
@@ -337,17 +331,17 @@ impl ShardReaderService {
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         let span = tracing::Span::current();
         task::spawn_blocking(move || {
-            let _span = span.entered();
-            measure_time(
-                || paragraph_reader_service.search(&search_request),
-                "paragraph_reader search time",
-            )
+            let span = span.entered();
+            span.in_scope(|| paragraph_reader_service.search(&search_request))
         })
         .await
         .unwrap()
     }
 
-    #[tracing::instrument(name = "ShardReaderService::document_search", skip(self))]
+    #[tracing::instrument(
+        name = "ShardReaderService::document_search",
+        skip(self, search_request)
+    )]
     pub async fn document_search(
         &self,
         search_request: DocumentSearchRequest,
@@ -356,17 +350,14 @@ impl ShardReaderService {
         let field_reader_service = self.field_reader_service.clone();
         let span = tracing::Span::current();
         task::spawn_blocking(move || {
-            let _span = span.entered();
-            measure_time(
-                || field_reader_service.search(&search_request),
-                "field reader search time",
-            )
+            let span = span.entered();
+            span.in_scope(|| field_reader_service.search(&search_request))
         })
         .await
         .unwrap()
     }
 
-    #[tracing::instrument(name = "ShardReaderService::vector_search", skip(self))]
+    #[tracing::instrument(name = "ShardReaderService::vector_search", skip(self, search_request))]
     pub async fn vector_search(
         &self,
         search_request: VectorSearchRequest,
@@ -375,11 +366,8 @@ impl ShardReaderService {
         let vector_reader_service = self.vector_reader_service.clone();
         let span = tracing::Span::current();
         task::spawn_blocking(move || {
-            let _span = span.entered();
-            measure_time(
-                || vector_reader_service.search(&search_request),
-                "vector reader search time",
-            )
+            let span = span.entered();
+            span.in_scope(|| vector_reader_service.search(&search_request))
         })
         .await
         .unwrap()

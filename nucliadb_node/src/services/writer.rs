@@ -165,7 +165,7 @@ impl ShardWriterService {
         }
     }
 
-    #[tracing::instrument(name = "ShardWriterService::set_resource", skip(self))]
+    #[tracing::instrument(name = "ShardWriterService::set_resource", skip(self, resource))]
     pub async fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
@@ -173,11 +173,8 @@ impl ShardWriterService {
         let span = tracing::Span::current();
         let text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
-            let _span = span.entered();
-            measure_time(
-                || writer.set_resource(&field_resource),
-                "field_writer set_resource execution time",
-            )
+            let span = span.entered();
+            span.in_scope(|| writer.set_resource(&field_resource))
         });
         info!("Field service ends");
         let paragraph_resource = resource.clone();
@@ -186,11 +183,8 @@ impl ShardWriterService {
         let span = tracing::Span::current();
         let paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
-            let _span = span.entered();
-            measure_time(
-                || writer.set_resource(&paragraph_resource),
-                "paragraph writer set_resource execution time",
-            )
+            let span = span.entered();
+            span.in_scope(|| writer.set_resource(&paragraph_resource))
         });
         info!("Paragraph service ends");
         let vector_writer_service = self.vector_writer_service.clone();
@@ -199,11 +193,8 @@ impl ShardWriterService {
         let span = tracing::Span::current();
         let vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
-            let _span = span.entered();
-            measure_time(
-                || writer.set_resource(&vector_resource),
-                "vector_writer set_resource execution time",
-            )
+            let span = span.entered();
+            span.in_scope(|| writer.set_resource(&vector_resource))
         });
         info!("Vector service ends");
         let (rtext, rparagraph, rvector) =
