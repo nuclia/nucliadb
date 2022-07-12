@@ -75,6 +75,7 @@ impl NodeReaderService {
         Ok(())
     }
 
+    #[instrument(name = "NodeReaderService::load_shard", skip(self))]
     pub async fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_id = &shard_id.id;
         info!("{}: Loading shard", shard_id);
@@ -126,7 +127,6 @@ impl NodeReaderService {
             None
         }
     }
-    #[tracing::instrument(name = "NodeReaderService::search", skip(self))]
     pub async fn search(
         &mut self,
         shard_id: &ShardId,
@@ -139,7 +139,6 @@ impl NodeReaderService {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderService::vector_search", skip(self))]
     pub async fn vector_search(
         &mut self,
         shard_id: &ShardId,
@@ -152,7 +151,6 @@ impl NodeReaderService {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderService::paragraph_search", skip(self))]
     pub async fn paragraph_search(
         &mut self,
         shard_id: &ShardId,
@@ -165,7 +163,6 @@ impl NodeReaderService {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderService::document_search", skip(self))]
     pub async fn document_search(
         &mut self,
         shard_id: &ShardId,
