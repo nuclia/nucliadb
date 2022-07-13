@@ -17,8 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::collections::HashMap;
-
 use nucliadb_protos::order_by::OrderType;
 use nucliadb_protos::{
     FacetResult, FacetResults, OrderBy, ParagraphResult, ParagraphSearchResponse,
@@ -115,30 +113,29 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let mut facet_map = HashMap::new();
-        for facet in response.facets {
-            let count: Vec<_> = response
-                .facets_count
-                .top_k(facet.as_str(), 50)
+        let facets = response.facets;
+        let facets_count = response.facets_count;
+        let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
+            facets_count
+                .top_k(facet, 50)
                 .into_iter()
                 .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
                     total: count as i32,
                 })
-                .collect();
-            if !count.is_empty() {
-                facet_map.insert(
-                    facet,
-                    FacetResults {
-                        facetresults: count,
-                    },
-                );
-            }
-        }
+                .collect()
+        };
+        let facets = facets
+            .into_iter()
+            .map(|facet| (&facets_count, facet))
+            .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
+            .filter(|(r, _)| !r.is_empty())
+            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+            .collect();
         ParagraphSearchResponse {
-            total: total as i32,
             results,
-            facets: facet_map,
+            facets,
+            total: total as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
         }

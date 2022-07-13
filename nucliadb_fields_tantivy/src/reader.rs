@@ -275,32 +275,25 @@ impl FieldReaderService {
             }
         }
 
-        let mut facets = HashMap::new();
-        info!("Document query at {}:{}", line!(), file!());
-
-        for facet in response.facets {
-            info!("Document query at {}:{}", line!(), file!());
-            let count: Vec<_> = response
-                .facets_count
+        let facets = response.facets;
+        let facets_count = response.facets_count;
+        let do_count = |facets_count: &FacetCounts| -> Vec<FacetResult> {
+            facets_count
                 .top_k("/t", 50)
-                .iter()
+                .into_iter()
                 .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
-                    total: *count as i32,
+                    total: count as i32,
                 })
-                .collect();
-
-            if !count.is_empty() {
-                facets.insert(
-                    facet,
-                    FacetResults {
-                        facetresults: count,
-                    },
-                );
-            }
-            info!("Document query at {}:{}", line!(), file!());
-        }
-
+                .collect()
+        };
+        let facets = facets
+            .into_iter()
+            .map(|facet| (&facets_count, facet))
+            .map(|(facets_count, facet)| (do_count(facets_count), facet))
+            .filter(|(r, _)| !r.is_empty())
+            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+            .collect();
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
