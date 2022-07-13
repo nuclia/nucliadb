@@ -116,24 +116,24 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
         }
 
         let mut facet_map = HashMap::new();
-
         for facet in response.facets {
             let count: Vec<_> = response
                 .facets_count
                 .top_k(facet.as_str(), 50)
-                .iter()
+                .into_iter()
                 .map(|(facet, count)| FacetResult {
                     tag: facet.to_string(),
-                    total: *count as i32,
+                    total: count as i32,
                 })
                 .collect();
-
-            facet_map.insert(
-                facet,
-                FacetResults {
-                    facetresults: count,
-                },
-            );
+            if !count.is_empty() {
+                facet_map.insert(
+                    facet,
+                    FacetResults {
+                        facetresults: count,
+                    },
+                );
+            }
         }
         ParagraphSearchResponse {
             total: total as i32,

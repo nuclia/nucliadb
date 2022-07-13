@@ -290,12 +290,14 @@ impl FieldReaderService {
                 })
                 .collect();
 
-            facets.insert(
-                facet,
-                FacetResults {
-                    facetresults: count,
-                },
-            );
+            if !count.is_empty() {
+                facets.insert(
+                    facet,
+                    FacetResults {
+                        facetresults: count,
+                    },
+                );
+            }
             info!("Document query at {}:{}", line!(), file!());
         }
 
@@ -428,10 +430,7 @@ impl FieldReaderService {
             }
         }
         info!("Document search at {}:{}", line!(), file!());
-        let topdocs = match results {
-            0 => TopDocs::with_limit(20),
-            value => TopDocs::with_limit(value).and_offset(offset),
-        };
+        let topdocs = TopDocs::with_limit(results).and_offset(offset);
 
         info!("Document search at {}:{}", line!(), file!());
         let mut multicollector = MultiCollector::new();
