@@ -1,12 +1,8 @@
 # NucliaDB Writer Settings
-
-config:
-  dm_redis_host:
-  dm_redis_port:
-
 affinity: {}
 nodeSelector: {}
 tolerations: []
+topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
@@ -30,6 +26,10 @@ services:
 
 running:
   sentry_url:
+
+config:
+  dm_redis_host:
+  dm_redis_port:
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
