@@ -25,7 +25,6 @@ use tracing::*;
 
 use crate::config::Configuration;
 use crate::services::config::ShardConfig;
-use crate::utils::measure_time;
 
 #[derive(Debug)]
 pub struct ShardWriterService {

@@ -84,24 +84,3 @@ pub fn parse_log_level(levels: &str) -> Vec<(String, Level)> {
         .map(|v| (v[0].to_string(), Level::from_str(v[1]).unwrap()))
         .collect()
 }
-
-pub fn measure_time<T, F>(target: F, comment: &str) -> T
-where
-    T: Sized,
-    F: FnOnce() -> T,
-{
-    let now = Instant::now();
-    let result = target();
-    info!("{comment} {}ms", now.elapsed().as_millis());
-    result
-}
-
-pub async fn measure_time_async<T>(fut: impl Future<Output = T>, comment: &str) -> T
-where
-    T: Sized,
-{
-    let now = Instant::now();
-    let result = fut.await;
-    info!("{comment} {}ms", now.elapsed().as_millis());
-    result
-}

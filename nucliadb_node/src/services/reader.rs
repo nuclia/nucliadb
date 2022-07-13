@@ -35,7 +35,6 @@ use tracing::*;
 use crate::config::Configuration;
 use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
-use crate::utils::measure_time;
 
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;
