@@ -15,5 +15,9 @@ spec:
   ports:
     - name: http-reader
       port: {{ .Values.serving.port }}
+      protocol: TCP
+      appProtocol: http
     - name: metrics
       port: {{ .Values.serving.metricsPort}}
+      protocol: TCP
+      appProtocol: http
