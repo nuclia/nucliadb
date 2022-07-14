@@ -146,7 +146,4 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
             for label in labels["facetresults"]:
                 label_tag = "/".join(label["tag"].split("/")[3:])
                 res.labelsets[labelset].resources[label_tag] = label["total"]
-        import pdb
-
-        pdb.set_trace()
         return res
