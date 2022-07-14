@@ -25,8 +25,8 @@ use tracing::*;
 
 use crate::utils::{parse_log_level, reliable_lookup_host};
 
-const SENTRY_PROD: &str = "production";
-const SENTRY_DEV: &str = "development";
+const SENTRY_PROD: &str = "prod";
+const SENTRY_DEV: &str = "stage";
 /// Global configuration options
 pub struct Configuration {}
 
@@ -234,8 +234,8 @@ impl Configuration {
     pub fn get_sentry_env() -> &'static str {
         let default = SENTRY_DEV;
         match env::var("RUNNING_ENVIRONMENT") {
-            Ok(sentry_env) if sentry_env.eq("production") => SENTRY_PROD,
-            Ok(sentry_env) if sentry_env.eq("development") => SENTRY_DEV,
+            Ok(sentry_env) if sentry_env.eq("prod") => SENTRY_PROD,
+            Ok(sentry_env) if sentry_env.eq("stage") => SENTRY_DEV,
             Ok(_) => {
                 error!("RUNNING_ENVIRONMENT defined incorrectly. Defaulting to {default}");
                 default
