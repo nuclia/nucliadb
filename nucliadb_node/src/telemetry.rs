@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use opentelemetry::global;
+use sentry::ClientInitGuard;
 use tracing::{debug, error};
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
@@ -27,7 +28,7 @@ use tracing_subscriber::Layer;
 use crate::config::Configuration;
 use crate::result::{ServiceError, ServiceResult};
 
-pub fn init_telemetry() -> ServiceResult<()> {
+pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
     let agent_endpoint = Configuration::jaeger_agent_endp();
     debug!("{agent_endpoint}");
     let log_levels = Configuration::log_level();
@@ -73,6 +74,16 @@ pub fn init_telemetry() -> ServiceResult<()> {
         .boxed();
 
     layers.push(stdout_layer);
+
+    let sentry_env = Configuration::get_sentry_env();
+    let guard = sentry::init((
+        Configuration::sentry_url(),
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            environment: Some(sentry_env.into()),
+            ..Default::default()
+        },
+    ));
     layers.push(sentry_tracing::layer().boxed());
 
     tracing_subscriber::registry()
@@ -82,5 +93,5 @@ pub fn init_telemetry() -> ServiceResult<()> {
             error!("Try init error: {e}");
             ServiceError::GenericErr(Box::new(e))
         })?;
-    Ok(())
+    Ok(guard)
 }
