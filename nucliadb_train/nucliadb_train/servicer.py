@@ -18,13 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from typing import Optional
+import aiohttp
 
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
+    GetInfoRequest,
+    GetLabelsetsCountRequest,
     GetParagraphsRequest,
     GetResourcesRequest,
     GetSentencesRequest,
+    LabelsetsCount,
+    TrainInfo,
 )
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesRequest,
@@ -32,7 +37,9 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
+from nucliadb_protos.knowledgebox_pb2 import LabelSet
 
+from nucliadb_train.settings import settings
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.utils import get_driver
 from nucliadb_protos import train_pb2_grpc
@@ -67,6 +74,19 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         async for resource in self.proc.kb_resources(request):
             yield resource
 
+    async def GetInfo(self, request: GetInfoRequest, context=None):
+        result = TrainInfo()
+        url = settings.internal_counter_api.format(kbid=request.kb.uuid)
+        headers = {"X-NUCLIADB-ROLES": "READER"}
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(url, headers=headers) as resp:
+                data = await resp.json()
+        result.resources = data["resources"]
+        result.paragraphs = data["paragraphs"]
+        result.fields = data["fields"]
+        result.sentences = data["sentences"]
+        return result
+
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
@@ -89,7 +109,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         labels: Optional[Labels] = None
         if kbobj is not None:
-            labels = await kbobj.get_labels()
+            labels = await kbobj.get_labels(request.count)
         await txn.abort()
         response = GetLabelsResponse()
         if kbobj is None:
@@ -100,3 +120,33 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
                 response.labels.CopyFrom(labels)
 
         return response
+
+    async def GetOntologyCount(  # type: ignore
+        self, request: GetLabelsetsCountRequest, context=None
+    ) -> LabelsetsCount:
+        url = settings.internal_search_api.format(kbid=request.kb.uuid)
+        facets = [f"faceted=/p/{labelset}" for labelset in request.paragraph_labelsets]
+        facets.extend(
+            [f"faceted=/l/{labelset}" for labelset in request.resource_labelsets]
+        )
+        query = "&".join(facets)
+        headers = {"X-NUCLIADB-ROLES": "READER"}
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(f"{url}?{query}", headers=headers) as resp:
+                data = await resp.json()
+                data.get("paragraphs", {})
+
+        res = LabelsetsCount()
+        for labelset, labels in data["paragraphs"]["facets"].items():
+            for label in labels["facetresults"]:
+                label_tag = "/".join(label["tag"].split("/")[2:])
+                res.labelsets[labelset].paragraphs[label_tag] = label["total"]
+
+        for labelset, labels in data["fulltext"]["facets"].items():
+            for label in labels["facetresults"]:
+                label_tag = "/".join(label["tag"].split("/")[3:])
+                res.labelsets[labelset].resources[label_tag] = label["total"]
+        import pdb
+
+        pdb.set_trace()
+        return res

@@ -102,6 +102,8 @@ pub struct Label {
     pub text: ::prost::alloc::string::String,
     #[prost(string, tag="5")]
     pub uri: ::prost::alloc::string::String,
+    #[prost(uint64, tag="6")]
+    pub count: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LabelSet {

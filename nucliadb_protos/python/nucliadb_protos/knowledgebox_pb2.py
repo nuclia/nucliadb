@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\"nucliadb_protos/knowledgebox.proto\x12\x0cknowledgebox\",\n\x0eKnowledgeBoxID\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"\x96\x01\n\x0cKnowledgeBox\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x38\n\x06status\x18\x03 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\x12\x30\n\x06\x63onfig\x18\x04 \x01(\x0b\x32 .knowledgebox.KnowledgeBoxConfig\"\x92\x01\n\x12KnowledgeBoxConfig\x12\r\n\x05title\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x17\n\x0f\x65nabled_filters\x18\x03 \x03(\t\x12\x18\n\x10\x65nabled_insights\x18\x04 \x03(\t\x12\x0c\n\x04slug\x18\x05 \x01(\t\x12\x17\n\x0f\x64isable_vectors\x18\x06 \x01(\x08\"d\n\x0fKnowledgeBoxNew\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x30\n\x06\x63onfig\x18\x02 \x01(\x0b\x32 .knowledgebox.KnowledgeBoxConfig\x12\x11\n\tforceuuid\x18\x03 \x01(\t\"a\n\x17NewKnowledgeBoxResponse\x12\x38\n\x06status\x18\x01 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"$\n\x12KnowledgeBoxPrefix\x12\x0e\n\x06prefix\x18\x01 \x01(\t\"b\n\x12KnowledgeBoxUpdate\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x30\n\x06\x63onfig\x18\x03 \x01(\x0b\x32 .knowledgebox.KnowledgeBoxConfig\"d\n\x1aUpdateKnowledgeBoxResponse\x12\x38\n\x06status\x18\x01 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"\x18\n\x16GCKnowledgeBoxResponse\"V\n\x1a\x44\x65leteKnowledgeBoxResponse\x12\x38\n\x06status\x18\x01 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\"B\n\x05Label\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07related\x18\x03 \x01(\t\x12\x0c\n\x04text\x18\x04 \x01(\t\x12\x0b\n\x03uri\x18\x05 \x01(\t\"\xd0\x01\n\x08LabelSet\x12\r\n\x05title\x18\x01 \x01(\t\x12\r\n\x05\x63olor\x18\x02 \x01(\t\x12#\n\x06labels\x18\x03 \x03(\x0b\x32\x13.knowledgebox.Label\x12\x10\n\x08multiple\x18\x04 \x01(\x08\x12\x31\n\x04kind\x18\x05 \x03(\x0e\x32#.knowledgebox.LabelSet.LabelSetKind\"<\n\x0cLabelSetKind\x12\r\n\tRESOURCES\x10\x00\x12\x0e\n\nPARAGRAPHS\x10\x01\x12\r\n\tSENTENCES\x10\x02\"\x87\x01\n\x06Labels\x12\x34\n\x08labelset\x18\x01 \x03(\x0b\x32\".knowledgebox.Labels.LabelsetEntry\x1aG\n\rLabelsetEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.knowledgebox.LabelSet:\x02\x38\x01\";\n\x06\x45ntity\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0e\n\x06merged\x18\x03 \x01(\x08\x12\x12\n\nrepresents\x18\x04 \x03(\t\"\xb1\x01\n\rEntitiesGroup\x12;\n\x08\x65ntities\x18\x01 \x03(\x0b\x32).knowledgebox.EntitiesGroup.EntitiesEntry\x12\r\n\x05title\x18\x02 \x01(\t\x12\r\n\x05\x63olor\x18\x03 \x01(\t\x1a\x45\n\rEntitiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.knowledgebox.Entity:\x02\x38\x01\"\xb6\x03\n\x06Widget\x12\n\n\x02id\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12-\n\x04mode\x18\x03 \x01(\x0e\x32\x1f.knowledgebox.Widget.WidgetMode\x12\x35\n\x08\x66\x65\x61tures\x18\x04 \x01(\x0b\x32#.knowledgebox.Widget.WidgetFeatures\x12\x0f\n\x07\x66ilters\x18\x05 \x03(\t\x12\x13\n\x0btopEntities\x18\x06 \x03(\t\x12.\n\x05style\x18\x07 \x03(\x0b\x32\x1f.knowledgebox.Widget.StyleEntry\x1ar\n\x0eWidgetFeatures\x12\x12\n\nuseFilters\x18\x01 \x01(\x08\x12\x17\n\x0fsuggestEntities\x18\x02 \x01(\x08\x12\x18\n\x10suggestSentences\x18\x03 \x01(\x08\x12\x19\n\x11suggestParagraphs\x18\x04 \x01(\x08\x1a,\n\nStyleEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"-\n\nWidgetMode\x12\n\n\x06\x42UTTON\x10\x00\x12\t\n\x05INPUT\x10\x01\x12\x08\n\x04\x46ORM\x10\x02*K\n\x1aKnowledgeBoxResponseStatus\x12\x06\n\x02OK\x10\x00\x12\x0c\n\x08\x43ONFLICT\x10\x01\x12\x0c\n\x08NOTFOUND\x10\x02\x12\t\n\x05\x45RROR\x10\x03\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\"nucliadb_protos/knowledgebox.proto\x12\x0cknowledgebox\",\n\x0eKnowledgeBoxID\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"\x96\x01\n\x0cKnowledgeBox\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x38\n\x06status\x18\x03 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\x12\x30\n\x06\x63onfig\x18\x04 \x01(\x0b\x32 .knowledgebox.KnowledgeBoxConfig\"\x92\x01\n\x12KnowledgeBoxConfig\x12\r\n\x05title\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x17\n\x0f\x65nabled_filters\x18\x03 \x03(\t\x12\x18\n\x10\x65nabled_insights\x18\x04 \x03(\t\x12\x0c\n\x04slug\x18\x05 \x01(\t\x12\x17\n\x0f\x64isable_vectors\x18\x06 \x01(\x08\"d\n\x0fKnowledgeBoxNew\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x30\n\x06\x63onfig\x18\x02 \x01(\x0b\x32 .knowledgebox.KnowledgeBoxConfig\x12\x11\n\tforceuuid\x18\x03 \x01(\t\"a\n\x17NewKnowledgeBoxResponse\x12\x38\n\x06status\x18\x01 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"$\n\x12KnowledgeBoxPrefix\x12\x0e\n\x06prefix\x18\x01 \x01(\t\"b\n\x12KnowledgeBoxUpdate\x12\x0c\n\x04slug\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x30\n\x06\x63onfig\x18\x03 \x01(\x0b\x32 .knowledgebox.KnowledgeBoxConfig\"d\n\x1aUpdateKnowledgeBoxResponse\x12\x38\n\x06status\x18\x01 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\x12\x0c\n\x04uuid\x18\x02 \x01(\t\"\x18\n\x16GCKnowledgeBoxResponse\"V\n\x1a\x44\x65leteKnowledgeBoxResponse\x12\x38\n\x06status\x18\x01 \x01(\x0e\x32(.knowledgebox.KnowledgeBoxResponseStatus\"Q\n\x05Label\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07related\x18\x03 \x01(\t\x12\x0c\n\x04text\x18\x04 \x01(\t\x12\x0b\n\x03uri\x18\x05 \x01(\t\x12\r\n\x05\x63ount\x18\x06 \x01(\x04\"\xd0\x01\n\x08LabelSet\x12\r\n\x05title\x18\x01 \x01(\t\x12\r\n\x05\x63olor\x18\x02 \x01(\t\x12#\n\x06labels\x18\x03 \x03(\x0b\x32\x13.knowledgebox.Label\x12\x10\n\x08multiple\x18\x04 \x01(\x08\x12\x31\n\x04kind\x18\x05 \x03(\x0e\x32#.knowledgebox.LabelSet.LabelSetKind\"<\n\x0cLabelSetKind\x12\r\n\tRESOURCES\x10\x00\x12\x0e\n\nPARAGRAPHS\x10\x01\x12\r\n\tSENTENCES\x10\x02\"\x87\x01\n\x06Labels\x12\x34\n\x08labelset\x18\x01 \x03(\x0b\x32\".knowledgebox.Labels.LabelsetEntry\x1aG\n\rLabelsetEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.knowledgebox.LabelSet:\x02\x38\x01\";\n\x06\x45ntity\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0e\n\x06merged\x18\x03 \x01(\x08\x12\x12\n\nrepresents\x18\x04 \x03(\t\"\xb1\x01\n\rEntitiesGroup\x12;\n\x08\x65ntities\x18\x01 \x03(\x0b\x32).knowledgebox.EntitiesGroup.EntitiesEntry\x12\r\n\x05title\x18\x02 \x01(\t\x12\r\n\x05\x63olor\x18\x03 \x01(\t\x1a\x45\n\rEntitiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.knowledgebox.Entity:\x02\x38\x01\"\xb6\x03\n\x06Widget\x12\n\n\x02id\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12-\n\x04mode\x18\x03 \x01(\x0e\x32\x1f.knowledgebox.Widget.WidgetMode\x12\x35\n\x08\x66\x65\x61tures\x18\x04 \x01(\x0b\x32#.knowledgebox.Widget.WidgetFeatures\x12\x0f\n\x07\x66ilters\x18\x05 \x03(\t\x12\x13\n\x0btopEntities\x18\x06 \x03(\t\x12.\n\x05style\x18\x07 \x03(\x0b\x32\x1f.knowledgebox.Widget.StyleEntry\x1ar\n\x0eWidgetFeatures\x12\x12\n\nuseFilters\x18\x01 \x01(\x08\x12\x17\n\x0fsuggestEntities\x18\x02 \x01(\x08\x12\x18\n\x10suggestSentences\x18\x03 \x01(\x08\x12\x19\n\x11suggestParagraphs\x18\x04 \x01(\x08\x1a,\n\nStyleEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"-\n\nWidgetMode\x12\n\n\x06\x42UTTON\x10\x00\x12\t\n\x05INPUT\x10\x01\x12\x08\n\x04\x46ORM\x10\x02*K\n\x1aKnowledgeBoxResponseStatus\x12\x06\n\x02OK\x10\x00\x12\x0c\n\x08\x43ONFLICT\x10\x01\x12\x0c\n\x08NOTFOUND\x10\x02\x12\t\n\x05\x45RROR\x10\x03\x62\x06proto3')
 
 _KNOWLEDGEBOXRESPONSESTATUS = DESCRIPTOR.enum_types_by_name['KnowledgeBoxResponseStatus']
 KnowledgeBoxResponseStatus = enum_type_wrapper.EnumTypeWrapper(_KNOWLEDGEBOXRESPONSESTATUS)
@@ -200,8 +200,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _ENTITIESGROUP_ENTITIESENTRY._serialized_options = b'8\001'
   _WIDGET_STYLEENTRY._options = None
   _WIDGET_STYLEENTRY._serialized_options = b'8\001'
-  _KNOWLEDGEBOXRESPONSESTATUS._serialized_start=2054
-  _KNOWLEDGEBOXRESPONSESTATUS._serialized_end=2129
+  _KNOWLEDGEBOXRESPONSESTATUS._serialized_start=2069
+  _KNOWLEDGEBOXRESPONSESTATUS._serialized_end=2144
   _KNOWLEDGEBOXID._serialized_start=52
   _KNOWLEDGEBOXID._serialized_end=96
   _KNOWLEDGEBOX._serialized_start=99
@@ -223,27 +223,27 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _DELETEKNOWLEDGEBOXRESPONSE._serialized_start=867
   _DELETEKNOWLEDGEBOXRESPONSE._serialized_end=953
   _LABEL._serialized_start=955
-  _LABEL._serialized_end=1021
-  _LABELSET._serialized_start=1024
-  _LABELSET._serialized_end=1232
-  _LABELSET_LABELSETKIND._serialized_start=1172
-  _LABELSET_LABELSETKIND._serialized_end=1232
-  _LABELS._serialized_start=1235
-  _LABELS._serialized_end=1370
-  _LABELS_LABELSETENTRY._serialized_start=1299
-  _LABELS_LABELSETENTRY._serialized_end=1370
-  _ENTITY._serialized_start=1372
-  _ENTITY._serialized_end=1431
-  _ENTITIESGROUP._serialized_start=1434
-  _ENTITIESGROUP._serialized_end=1611
-  _ENTITIESGROUP_ENTITIESENTRY._serialized_start=1542
-  _ENTITIESGROUP_ENTITIESENTRY._serialized_end=1611
-  _WIDGET._serialized_start=1614
-  _WIDGET._serialized_end=2052
-  _WIDGET_WIDGETFEATURES._serialized_start=1845
-  _WIDGET_WIDGETFEATURES._serialized_end=1959
-  _WIDGET_STYLEENTRY._serialized_start=1961
-  _WIDGET_STYLEENTRY._serialized_end=2005
-  _WIDGET_WIDGETMODE._serialized_start=2007
-  _WIDGET_WIDGETMODE._serialized_end=2052
+  _LABEL._serialized_end=1036
+  _LABELSET._serialized_start=1039
+  _LABELSET._serialized_end=1247
+  _LABELSET_LABELSETKIND._serialized_start=1187
+  _LABELSET_LABELSETKIND._serialized_end=1247
+  _LABELS._serialized_start=1250
+  _LABELS._serialized_end=1385
+  _LABELS_LABELSETENTRY._serialized_start=1314
+  _LABELS_LABELSETENTRY._serialized_end=1385
+  _ENTITY._serialized_start=1387
+  _ENTITY._serialized_end=1446
+  _ENTITIESGROUP._serialized_start=1449
+  _ENTITIESGROUP._serialized_end=1626
+  _ENTITIESGROUP_ENTITIESENTRY._serialized_start=1557
+  _ENTITIESGROUP_ENTITIESENTRY._serialized_end=1626
+  _WIDGET._serialized_start=1629
+  _WIDGET._serialized_end=2067
+  _WIDGET_WIDGETFEATURES._serialized_start=1860
+  _WIDGET_WIDGETFEATURES._serialized_end=1974
+  _WIDGET_STYLEENTRY._serialized_start=1976
+  _WIDGET_STYLEENTRY._serialized_end=2020
+  _WIDGET_WIDGETMODE._serialized_start=2022
+  _WIDGET_WIDGETMODE._serialized_end=2067
 # @@protoc_insertion_point(module_scope)

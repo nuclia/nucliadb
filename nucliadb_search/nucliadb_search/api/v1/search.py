@@ -66,10 +66,10 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str,
-    fields: List[str] = [],
-    filters: List[str] = [],
-    faceted: List[str] = [],
+    query: str = Query(""),
+    fields: List[str] = Query([]),
+    filters: List[str] = Query([]),
+    faceted: List[str] = Query([]),
     sort: SortOption = SortOption.CREATED,
     page_number: int = 0,
     page_size: int = 20,
@@ -99,6 +99,13 @@ async def search_knowledgebox(
     nodemanager = get_nodes()
     audit = get_audit()
     timeit = time()
+
+    if query == "":
+        # If query is not defined we force to not return results
+        page_size = 1
+        page_number = 0
+        if SearchOptions.VECTOR in features:
+            features.remove(SearchOptions.VECTOR)
 
     try:
         shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)

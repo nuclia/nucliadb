@@ -59,8 +59,8 @@ async def global_query_to_pb(
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
-        request.page_number = 0
-        request.result_per_page = page_size * page_number
+        request.page_number = page_number
+        request.result_per_page = page_size
         request.fields.extend(fields)
 
     if SearchOptions.VECTOR in features:
@@ -121,8 +121,8 @@ async def paragraph_query_to_pb(
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
-        request.page_number = 0
-        request.result_per_page = page_size * page_number
+        request.page_number = page_number
+        request.result_per_page = page_size
         request.fields.extend(fields)
 
     # if SearchOptions.VECTOR in features:

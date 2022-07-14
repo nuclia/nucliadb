@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import OrderBy
@@ -67,11 +67,16 @@ class Sort(int, Enum):
     ASC = 1
 
 
+class FacetItem(BaseModel):
+    tag: str
+    total: int
+
+
 class Facet(BaseModel):
-    pass
+    facetresults: List[FacetItem]
 
 
-FacetsResult = Dict[str, Facet]
+FacetsResult = Dict[str, Any]
 
 
 class Sentence(BaseModel):
@@ -111,7 +116,7 @@ class ResourceResult(BaseModel):
 
 class Resources(BaseModel):
     results: List[ResourceResult]
-    facets: FacetsResult
+    facets: Optional[FacetsResult] = None
 
 
 class Relation(BaseModel):

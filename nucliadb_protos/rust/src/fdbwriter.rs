@@ -186,6 +186,8 @@ pub mod get_labels_response {
 pub struct GetLabelsRequest {
     #[prost(message, optional, tag="1")]
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(bool, tag="2")]
+    pub count: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetEntitiesRequest {

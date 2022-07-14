@@ -30,9 +30,21 @@ message TrainMetadata {
     repeated float vector = 4;
 }
 
+message GetInfoRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message GetLabelsetsCountRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    repeated string paragraph_labelsets = 2;
+    repeated string resource_labelsets = 3;
+}
+
 message GetResourcesRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
     EnabledMetadata metadata = 2;
+    uint64 size = 3;
+    bool random = 4;
 }
 
 message GetParagraphsRequest {
@@ -40,6 +52,8 @@ message GetParagraphsRequest {
     string uuid = 2;
     resources.FieldID field = 3;
     EnabledMetadata metadata = 4;
+    uint64 size = 5;
+    bool random = 6;
 }
 
 message GetSentencesRequest {
@@ -47,6 +61,8 @@ message GetSentencesRequest {
     string uuid = 2;
     resources.FieldID field = 3;
     EnabledMetadata metadata = 4;
+    uint64 size = 5;
+    bool random = 6;
 }
 
 message GetFieldsRequest {
@@ -54,8 +70,16 @@ message GetFieldsRequest {
     string uuid = 2;
     resources.FieldID field = 3;
     EnabledMetadata metadata = 4;
+    uint64 size = 5;
+    bool random = 6;
 }
 
+message TrainInfo {
+    uint64 resources = 1;
+    uint64 fields = 2;
+    uint64 paragraphs = 3;
+    uint64 sentences = 4;
+}
 
 message TrainSentence {
     string uuid = 1;
@@ -91,11 +115,23 @@ message TrainResource {
     TrainMetadata metadata = 7;
 }
 
+message LabelsetCount {
+    map<string, int64> paragraphs = 1;
+    map<string, int64> resources = 2;
+}
+
+message LabelsetsCount {
+    map<string, LabelsetCount> labelsets = 2;
+}
+
+
 service Train {
+    rpc GetInfo(GetInfoRequest) returns (TrainInfo) {}
     rpc GetSentences(GetSentencesRequest) returns (stream TrainSentence) {}
     rpc GetParagraphs(GetParagraphsRequest) returns (stream TrainParagraph) {}
     rpc GetFields(GetFieldsRequest) returns (stream TrainField) {}
     rpc GetResources(GetResourcesRequest) returns (stream TrainResource) {}
     rpc GetOntology(fdbwriter.GetLabelsRequest) returns (fdbwriter.GetLabelsResponse) {}
     rpc GetEntities(fdbwriter.GetEntitiesRequest) returns (fdbwriter.GetEntitiesResponse) {}
+    rpc GetOntologyCount(GetLabelsetsCountRequest) returns (LabelsetsCount) {}
 }

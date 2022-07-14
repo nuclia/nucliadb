@@ -125,6 +125,10 @@ from nucliadb_protos.writer_pb2 import (
 
 class TrainStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
+    GetInfo: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.train_pb2.GetInfoRequest,
+        nucliadb_protos.train_pb2.TrainInfo]
+
     GetSentences: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.train_pb2.GetSentencesRequest,
         nucliadb_protos.train_pb2.TrainSentence]
@@ -149,8 +153,18 @@ class TrainStub:
         nucliadb_protos.writer_pb2.GetEntitiesRequest,
         nucliadb_protos.writer_pb2.GetEntitiesResponse]
 
+    GetOntologyCount: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.train_pb2.GetLabelsetsCountRequest,
+        nucliadb_protos.train_pb2.LabelsetsCount]
+
 
 class TrainServicer(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def GetInfo(self,
+        request: nucliadb_protos.train_pb2.GetInfoRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.train_pb2.TrainInfo: ...
+
     @abc.abstractmethod
     def GetSentences(self,
         request: nucliadb_protos.train_pb2.GetSentencesRequest,
@@ -186,6 +200,12 @@ class TrainServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.GetEntitiesRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetEntitiesResponse: ...
+
+    @abc.abstractmethod
+    def GetOntologyCount(self,
+        request: nucliadb_protos.train_pb2.GetLabelsetsCountRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.train_pb2.LabelsetsCount: ...
 
 
 def add_TrainServicer_to_server(servicer: TrainServicer, server: grpc.Server) -> None: ...

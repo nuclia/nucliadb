@@ -146,6 +146,7 @@ message GetLabelsResponse {
 
 message GetLabelsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
+    bool count = 2;
 }
 
 message SetEntitiesRequest {

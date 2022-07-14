@@ -69,6 +69,8 @@ pub struct DocumentSearchRequest {
     pub timestamps: ::core::option::Option<Timestamps>,
     #[prost(bool, tag="10")]
     pub reload: bool,
+    #[prost(bool, tag="14")]
+    pub facet_query: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchRequest {
@@ -96,6 +98,8 @@ pub struct ParagraphSearchRequest {
     pub timestamps: ::core::option::Option<Timestamps>,
     #[prost(bool, tag="13")]
     pub reload: bool,
+    #[prost(bool, tag="14")]
+    pub facet_query: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentResult {

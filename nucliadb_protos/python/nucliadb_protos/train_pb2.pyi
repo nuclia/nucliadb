@@ -206,21 +206,61 @@ class TrainMetadata(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["entities",b"entities","labels",b"labels","text",b"text","vector",b"vector"]) -> None: ...
 global___TrainMetadata = TrainMetadata
 
+class GetInfoRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KB_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(self,
+        *,
+        kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb",b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb"]) -> None: ...
+global___GetInfoRequest = GetInfoRequest
+
+class GetLabelsetsCountRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KB_FIELD_NUMBER: builtins.int
+    PARAGRAPH_LABELSETS_FIELD_NUMBER: builtins.int
+    RESOURCE_LABELSETS_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    @property
+    def paragraph_labelsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    @property
+    def resource_labelsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def __init__(self,
+        *,
+        kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
+        paragraph_labelsets: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        resource_labelsets: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb",b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb","paragraph_labelsets",b"paragraph_labelsets","resource_labelsets",b"resource_labelsets"]) -> None: ...
+global___GetLabelsetsCountRequest = GetLabelsetsCountRequest
+
 class GetResourcesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
+    RANDOM_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     @property
     def metadata(self) -> global___EnabledMetadata: ...
+    size: builtins.int
+    random: builtins.bool
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
         metadata: typing.Optional[global___EnabledMetadata] = ...,
+        size: builtins.int = ...,
+        random: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb","metadata",b"metadata","random",b"random","size",b"size"]) -> None: ...
 global___GetResourcesRequest = GetResourcesRequest
 
 class GetParagraphsRequest(google.protobuf.message.Message):
@@ -229,6 +269,8 @@ class GetParagraphsRequest(google.protobuf.message.Message):
     UUID_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
+    RANDOM_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     uuid: typing.Text
@@ -236,15 +278,19 @@ class GetParagraphsRequest(google.protobuf.message.Message):
     def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     @property
     def metadata(self) -> global___EnabledMetadata: ...
+    size: builtins.int
+    random: builtins.bool
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
         uuid: typing.Text = ...,
         field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         metadata: typing.Optional[global___EnabledMetadata] = ...,
+        size: builtins.int = ...,
+        random: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","random",b"random","size",b"size","uuid",b"uuid"]) -> None: ...
 global___GetParagraphsRequest = GetParagraphsRequest
 
 class GetSentencesRequest(google.protobuf.message.Message):
@@ -253,6 +299,8 @@ class GetSentencesRequest(google.protobuf.message.Message):
     UUID_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
+    RANDOM_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     uuid: typing.Text
@@ -260,15 +308,19 @@ class GetSentencesRequest(google.protobuf.message.Message):
     def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     @property
     def metadata(self) -> global___EnabledMetadata: ...
+    size: builtins.int
+    random: builtins.bool
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
         uuid: typing.Text = ...,
         field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         metadata: typing.Optional[global___EnabledMetadata] = ...,
+        size: builtins.int = ...,
+        random: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","random",b"random","size",b"size","uuid",b"uuid"]) -> None: ...
 global___GetSentencesRequest = GetSentencesRequest
 
 class GetFieldsRequest(google.protobuf.message.Message):
@@ -277,6 +329,8 @@ class GetFieldsRequest(google.protobuf.message.Message):
     UUID_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    SIZE_FIELD_NUMBER: builtins.int
+    RANDOM_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
     uuid: typing.Text
@@ -284,16 +338,40 @@ class GetFieldsRequest(google.protobuf.message.Message):
     def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
     @property
     def metadata(self) -> global___EnabledMetadata: ...
+    size: builtins.int
+    random: builtins.bool
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
         uuid: typing.Text = ...,
         field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
         metadata: typing.Optional[global___EnabledMetadata] = ...,
+        size: builtins.int = ...,
+        random: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kb",b"kb","metadata",b"metadata","random",b"random","size",b"size","uuid",b"uuid"]) -> None: ...
 global___GetFieldsRequest = GetFieldsRequest
+
+class TrainInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    RESOURCES_FIELD_NUMBER: builtins.int
+    FIELDS_FIELD_NUMBER: builtins.int
+    PARAGRAPHS_FIELD_NUMBER: builtins.int
+    SENTENCES_FIELD_NUMBER: builtins.int
+    resources: builtins.int
+    fields: builtins.int
+    paragraphs: builtins.int
+    sentences: builtins.int
+    def __init__(self,
+        *,
+        resources: builtins.int = ...,
+        fields: builtins.int = ...,
+        paragraphs: builtins.int = ...,
+        sentences: builtins.int = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["fields",b"fields","paragraphs",b"paragraphs","resources",b"resources","sentences",b"sentences"]) -> None: ...
+global___TrainInfo = TrainInfo
 
 class TrainSentence(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -399,3 +477,72 @@ class TrainResource(google.protobuf.message.Message):
     def HasField(self, field_name: typing_extensions.Literal["created",b"created","metadata",b"metadata","modified",b"modified"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["created",b"created","icon",b"icon","metadata",b"metadata","modified",b"modified","slug",b"slug","title",b"title","uuid",b"uuid"]) -> None: ...
 global___TrainResource = TrainResource
+
+class LabelsetCount(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class ParagraphsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: typing.Text
+        value: builtins.int
+        def __init__(self,
+            *,
+            key: typing.Text = ...,
+            value: builtins.int = ...,
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
+
+    class ResourcesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: typing.Text
+        value: builtins.int
+        def __init__(self,
+            *,
+            key: typing.Text = ...,
+            value: builtins.int = ...,
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
+
+    PARAGRAPHS_FIELD_NUMBER: builtins.int
+    RESOURCES_FIELD_NUMBER: builtins.int
+    @property
+    def paragraphs(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, builtins.int]: ...
+    @property
+    def resources(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, builtins.int]: ...
+    def __init__(self,
+        *,
+        paragraphs: typing.Optional[typing.Mapping[typing.Text, builtins.int]] = ...,
+        resources: typing.Optional[typing.Mapping[typing.Text, builtins.int]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["paragraphs",b"paragraphs","resources",b"resources"]) -> None: ...
+global___LabelsetCount = LabelsetCount
+
+class LabelsetsCount(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class LabelsetsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: typing.Text
+        @property
+        def value(self) -> global___LabelsetCount: ...
+        def __init__(self,
+            *,
+            key: typing.Text = ...,
+            value: typing.Optional[global___LabelsetCount] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
+
+    LABELSETS_FIELD_NUMBER: builtins.int
+    @property
+    def labelsets(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___LabelsetCount]: ...
+    def __init__(self,
+        *,
+        labelsets: typing.Optional[typing.Mapping[typing.Text, global___LabelsetCount]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labelsets",b"labelsets"]) -> None: ...
+global___LabelsetsCount = LabelsetsCount

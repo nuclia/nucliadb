@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     nuclia_learning_url: Optional[str] = "https://nuclia.cloud/api/v1/learning/"
     nuclia_learning_apikey: Optional[str] = None
 
+    internal_counter_api: Optional[
+        str
+    ] = "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/counters"
+
+    internal_search_api: Optional[
+        str
+    ] = "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/search"
+
     driver: str = "redis"  # redis | tikv
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []

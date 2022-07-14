@@ -15,6 +15,11 @@ class TrainStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.GetInfo = channel.unary_unary(
+                '/train.Train/GetInfo',
+                request_serializer=nucliadb__protos_dot_train__pb2.GetInfoRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_train__pb2.TrainInfo.FromString,
+                )
         self.GetSentences = channel.unary_stream(
                 '/train.Train/GetSentences',
                 request_serializer=nucliadb__protos_dot_train__pb2.GetSentencesRequest.SerializeToString,
@@ -45,10 +50,21 @@ class TrainStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.GetEntitiesRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.GetEntitiesResponse.FromString,
                 )
+        self.GetOntologyCount = channel.unary_unary(
+                '/train.Train/GetOntologyCount',
+                request_serializer=nucliadb__protos_dot_train__pb2.GetLabelsetsCountRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_train__pb2.LabelsetsCount.FromString,
+                )
 
 
 class TrainServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def GetInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def GetSentences(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -86,9 +102,20 @@ class TrainServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetOntologyCount(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_TrainServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'GetInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetInfo,
+                    request_deserializer=nucliadb__protos_dot_train__pb2.GetInfoRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_train__pb2.TrainInfo.SerializeToString,
+            ),
             'GetSentences': grpc.unary_stream_rpc_method_handler(
                     servicer.GetSentences,
                     request_deserializer=nucliadb__protos_dot_train__pb2.GetSentencesRequest.FromString,
@@ -119,6 +146,11 @@ def add_TrainServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_writer__pb2.GetEntitiesRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.GetEntitiesResponse.SerializeToString,
             ),
+            'GetOntologyCount': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetOntologyCount,
+                    request_deserializer=nucliadb__protos_dot_train__pb2.GetLabelsetsCountRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_train__pb2.LabelsetsCount.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'train.Train', rpc_method_handlers)
@@ -128,6 +160,23 @@ def add_TrainServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class Train(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def GetInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/train.Train/GetInfo',
+            nucliadb__protos_dot_train__pb2.GetInfoRequest.SerializeToString,
+            nucliadb__protos_dot_train__pb2.TrainInfo.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def GetSentences(request,
@@ -228,5 +277,22 @@ class Train(object):
         return grpc.experimental.unary_unary(request, target, '/train.Train/GetEntities',
             nucliadb__protos_dot_writer__pb2.GetEntitiesRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.GetEntitiesResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetOntologyCount(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/train.Train/GetOntologyCount',
+            nucliadb__protos_dot_train__pb2.GetLabelsetsCountRequest.SerializeToString,
+            nucliadb__protos_dot_train__pb2.LabelsetsCount.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

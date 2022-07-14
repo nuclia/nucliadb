@@ -91,6 +91,7 @@ message Label {
     string related = 3;
     string text = 4;
     string uri = 5;
+    uint64 count = 6;
 }
 
 message LabelSet {
