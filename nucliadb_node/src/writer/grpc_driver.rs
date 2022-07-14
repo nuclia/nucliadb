@@ -28,7 +28,7 @@ use opentelemetry::global;
 use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::utils::{measure_time_async, MetadataMap};
+use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
 pub struct NodeWriterGRPCDriver(Arc<RwLock<NodeWriterService>>);

@@ -42,32 +42,32 @@ pub fn init_telemetry() -> ServiceResult<()> {
             .install_batch(opentelemetry::runtime::Tokio)
             .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
 
-        let filter = FilterFn::new(|metadata| {
-            let target = metadata.target();
-            match metadata.module_path() {
-                Some(module_path) if module_path.contains("nucliadb_node") => {
-                    target.contains("nucliadb_node::writer")
-                        || target.contains("nucliadb_node::reader")
+        let filter = FilterFn::new(|metadata| match metadata.file() {
+            Some(file) if file.contains("nucliadb_node") => {
+                if metadata.is_event() && metadata.fields().field("trace_marker").is_none() {
+                    return false;
                 }
-                _ => false,
+                true
             }
+            _ => false,
         });
         global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
         let jaeger_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
+            .with_filter(Targets::new().with_targets(log_levels.clone()))
             .with_filter(filter)
             .boxed();
         layers.push(jaeger_layer);
     }
 
     let stdout_layer = tracing_subscriber::fmt::layer()
-        .pretty()
         .with_level(true)
         .with_filter(Targets::new().with_targets(log_levels))
         .boxed();
 
     layers.push(stdout_layer);
+    layers.push(sentry_tracing::layer().boxed());
 
     tracing_subscriber::registry()
         .with(layers)
