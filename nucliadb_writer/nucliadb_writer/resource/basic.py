@@ -26,7 +26,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     Metadata,
 )
-from nucliadb_protos.utils_pb2 import Relation
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_models import RelationType
@@ -68,6 +68,7 @@ def parse_basic_modify(
     if item.icon:
         bm.basic.icon = item.icon
     if item.usermetadata is not None:
+
         bm.basic.usermetadata.classifications.extend(
             [
                 Classification(labelset=x.labelset, label=x.label)
@@ -75,45 +76,70 @@ def parse_basic_modify(
             ]
         )
 
+        relationnodedocument = RelationNode(
+            value=bm.uuid, ntype=RelationNode.NodeType.RESOURCE
+        )
         relations = []
         for relation in item.usermetadata.relations:
-            relation_type = Relation.RelationType.Value(relation.relation.name)
             if relation.relation == RelationType.CHILD and relation.resource:
+                relationnodedocument2 = RelationNode(
+                    value=relation.resource, ntype=RelationNode.NodeType.RESOURCE
+                )
                 relations.append(
                     Relation(
-                        relation=relation_type,
-                        resource=relation.resource,
+                        relation=Relation.RelationType.CHILD,
+                        source=relationnodedocument,
+                        to=relationnodedocument2,
                     )
                 )
             if relation.relation == RelationType.ABOUT and relation.label:
+                relationnodelabel = RelationNode(
+                    value=relation.label, ntype=RelationNode.NodeType.LABEL
+                )
                 relations.append(
                     Relation(
-                        relation=relation_type,
-                        label=relation.label,
+                        relation=Relation.RelationType.ABOUT,
+                        source=relationnodedocument,
+                        to=relationnodelabel,
                     )
                 )
 
             if relation.relation == RelationType.ENTITY and relation.entity:
-                rel = Relation(
-                    relation=relation_type,
+                relationnodeentity = RelationNode(
+                    value=relation.entity.entity,
+                    ntype=RelationNode.NodeType.ENTITY,
+                    subtype=relation.entity.entity_type,
                 )
-                rel.entity.entity = relation.entity.entity
-                rel.entity.entity_type = relation.entity.entity_type
-                relations.append(rel)
 
-            if relation.relation == RelationType.COLAB and relation.user:
                 relations.append(
                     Relation(
-                        relation=relation_type,
-                        user=relation.user,
+                        relation=Relation.RelationType.ENTITY,
+                        source=relationnodedocument,
+                        to=relationnodeentity,
+                    )
+                )
+
+            if relation.relation == RelationType.COLAB and relation.user:
+                relationnodeuser = RelationNode(
+                    value=relation.user, ntype=RelationNode.NodeType.USER
+                )
+                relations.append(
+                    Relation(
+                        relation=Relation.RelationType.COLAB,
+                        source=relationnodedocument,
+                        to=relationnodeuser,
                     )
                 )
 
             if relation.relation == RelationType.OTHER and relation.other:
+                relationnodeother = RelationNode(
+                    value=relation.other, ntype=RelationNode.NodeType.RESOURCE
+                )
                 relations.append(
                     Relation(
-                        relation=relation_type,
-                        other=relation.other,
+                        relation=Relation.RelationType.OTHER,
+                        source=relationnodedocument,
+                        to=relationnodeother,
                     )
                 )
 

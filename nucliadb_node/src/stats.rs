@@ -21,4 +21,5 @@ pub struct StatsData {
     pub resources: usize,
     pub paragraphs: usize,
     pub sentences: usize,
+    pub relations: usize,
 }

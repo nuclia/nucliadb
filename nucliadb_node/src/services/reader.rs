@@ -23,8 +23,9 @@ use std::time::SystemTime;
 // use crate::services::vector::config::Distance;
 // use crate::services::vector::config::VectorServiceConfiguration;
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, ParagraphSearchRequest, ParagraphSearchResponse,
-    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, VectorSearchRequest,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
+    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
+    SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
     VectorSearchResponse,
 };
 use nucliadb_services::*;
@@ -45,6 +46,7 @@ pub struct ShardReaderService {
     field_reader_service: fields::RFields,
     paragraph_reader_service: paragraphs::RParagraphs,
     vector_reader_service: vectors::RVectors,
+    relation_reader_service: relations::RRelations,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -57,13 +59,17 @@ impl ShardReaderService {
         let field_reader_service = self.field_reader_service.clone();
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         let vector_reader_service = self.vector_reader_service.clone();
-        tokio::task::spawn_blocking(move || StatsData {
-            resources: field_reader_service.count(),
-            paragraphs: paragraph_reader_service.count(),
-            sentences: vector_reader_service.count(),
-        })
-        .await
-        .unwrap()
+        let relation_reader_service = self.relation_reader_service.clone();
+        let resources = tokio::task::spawn_blocking(move || field_reader_service.count());
+        let paragraphs = tokio::task::spawn_blocking(move || paragraph_reader_service.count());
+        let sentences = tokio::task::spawn_blocking(move || vector_reader_service.count());
+        let relations = tokio::task::spawn_blocking(move || relation_reader_service.count());
+        StatsData {
+            resources: resources.await.unwrap(),
+            paragraphs: paragraphs.await.unwrap(),
+            sentences: sentences.await.unwrap(),
+            relations: relations.await.unwrap(),
+        }
     }
 
     pub async fn get_field_keys(&self) -> Vec<String> {
@@ -84,6 +90,27 @@ impl ShardReaderService {
         self.reload_policy(true).await;
         let vector_reader_service = self.vector_reader_service.clone();
         tokio::task::spawn_blocking(move || vector_reader_service.stored_ids())
+            .await
+            .unwrap()
+    }
+    pub async fn get_relations_keys(&self) -> Vec<String> {
+        self.reload_policy(true).await;
+        let relation_reader_service = self.relation_reader_service.clone();
+        tokio::task::spawn_blocking(move || relation_reader_service.stored_ids())
+            .await
+            .unwrap()
+    }
+    pub async fn get_relations_edges(&self) -> EdgeList {
+        self.reload_policy(true).await;
+        let relation_reader_service = self.relation_reader_service.clone();
+        tokio::task::spawn_blocking(move || relation_reader_service.get_edges())
+            .await
+            .unwrap()
+    }
+    pub async fn get_relations_types(&self) -> TypeList {
+        self.reload_policy(true).await;
+        let relation_reader_service = self.relation_reader_service.clone();
+        tokio::task::spawn_blocking(move || relation_reader_service.get_node_types())
             .await
             .unwrap()
     }
@@ -111,21 +138,32 @@ impl ShardReaderService {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
         };
-        let config = ShardConfig::new(&shard_path).await;
+        let rsc = RelationServiceConfiguration {
+            path: format!("{}/relations", shard_path),
+        };
+        let config = loop {
+            match ShardConfig::open(&shard_path).await {
+                None => task::yield_now().await,
+                Some(config) => break config,
+            }
+        };
         let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
         let paragraph_reader_service =
             paragraphs::create_reader(&psc, config.version_paragraphs).await?;
         let vector_reader_service = vectors::create_reader(&vsc, config.version_vectors).await?;
+        let relation_reader_service =
+            relations::create_reader(&rsc, config.version_relations).await?;
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
             field_reader_service,
             paragraph_reader_service,
             vector_reader_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
-            relation_service_version: 0,
+            relation_reader_service,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_vectors as i32,
+            relation_service_version: config.version_relations as i32,
         })
     }
 
@@ -148,21 +186,27 @@ impl ShardReaderService {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
         };
+        let rsc = RelationServiceConfiguration {
+            path: format!("{}/relations", shard_path),
+        };
         let config = ShardConfig::new(&shard_path).await;
         let field_reader_service = fields::open_reader(&fsc, config.version_fields).await?;
         let paragraph_reader_service =
             paragraphs::open_reader(&psc, config.version_paragraphs).await?;
         let vector_reader_service = vectors::open_reader(&vsc, config.version_vectors).await?;
+        let relation_reader_service =
+            relations::open_reader(&rsc, config.version_relations).await?;
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
             field_reader_service,
             paragraph_reader_service,
             vector_reader_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
-            relation_service_version: 0,
+            relation_reader_service,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_vectors as i32,
+            relation_service_version: config.version_relations as i32,
         })
     }
 
@@ -185,21 +229,27 @@ impl ShardReaderService {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
         };
+        let rsc = RelationServiceConfiguration {
+            path: format!("{}/relations", shard_path),
+        };
         let config = ShardConfig::new(&shard_path).await;
         let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
         let paragraph_reader_service =
             paragraphs::create_reader(&psc, config.version_paragraphs).await?;
         let vector_reader_service = vectors::create_reader(&vsc, config.version_vectors).await?;
+        let relation_reader_service =
+            relations::create_reader(&rsc, config.version_relations).await?;
         Ok(ShardReaderService {
             id: id.to_string(),
             creation_time: RwLock::new(SystemTime::now()),
             field_reader_service,
             paragraph_reader_service,
             vector_reader_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
-            relation_service_version: 0,
+            relation_reader_service,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_vectors as i32,
+            relation_service_version: config.version_relations as i32,
         })
     }
 
@@ -370,6 +420,17 @@ impl ShardReaderService {
         })
         .await
         .unwrap()
+    }
+
+    pub async fn relation_search(
+        &self,
+        search_request: RelationSearchRequest,
+    ) -> InternalResult<RelationSearchResponse> {
+        self.reload_policy(search_request.reload).await;
+        let relation_reader_service = self.relation_reader_service.clone();
+        task::spawn_blocking(move || relation_reader_service.search(&search_request))
+            .await
+            .unwrap()
     }
 
     async fn reload_policy(&self, trigger: bool) {

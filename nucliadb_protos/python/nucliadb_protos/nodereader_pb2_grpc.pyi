@@ -24,9 +24,9 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 
 from nucliadb_protos.utils_pb2 import (
-    EntityRelation as EntityRelation,
     ExtractedText as ExtractedText,
     Relation as Relation,
+    RelationNode as RelationNode,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -73,6 +73,18 @@ class NodeReaderStub:
     VectorIds: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodereader_pb2.IdCollection]
+
+    RelationIds: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.IdCollection]
+
+    RelationEdges: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.EdgeList]
+
+    RelationTypes: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.TypeList]
 
     Search: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.SearchRequest,
@@ -140,6 +152,24 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+
+    @abc.abstractmethod
+    def RelationIds(self,
+        request: nucliadb_protos.noderesources_pb2.ShardId,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.IdCollection: ...
+
+    @abc.abstractmethod
+    def RelationEdges(self,
+        request: nucliadb_protos.noderesources_pb2.ShardId,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.EdgeList: ...
+
+    @abc.abstractmethod
+    def RelationTypes(self,
+        request: nucliadb_protos.noderesources_pb2.ShardId,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodereader_pb2.TypeList: ...
 
     @abc.abstractmethod
     def Search(self,

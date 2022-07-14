@@ -17,7 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::service_interface::InternalError;
+use nucliadb_protos::*;
+
+use crate::service_interface::*;
 
 #[derive(Debug)]
 pub struct FieldError {
@@ -35,3 +37,16 @@ impl InternalError for FieldError {}
 pub struct FieldServiceConfiguration {
     pub path: String,
 }
+
+pub trait FieldReaderOnly {}
+pub trait FieldWriterOnly {}
+
+pub trait FieldServiceReader:
+    ServiceChild
+    + RService
+    + ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
+    + FieldReaderOnly
+{
+}
+
+pub trait FieldServiceWriter: WService + ServiceChild + WriterChild + FieldWriterOnly {}

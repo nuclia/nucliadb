@@ -2,35 +2,33 @@ syntax = "proto3";
 
 package utils;
 
-message EntityRelation {
-    string entity = 1;
-    string entity_type = 2;
-}
 
 message Relation {
     enum RelationType {
         CHILD = 0;  // Child resource
-        ABOUT = 2;  // related with label (GENERATED)
-        ENTITY = 3;  // related with an entity (GENERATED)
-        COLAB = 4;  // related with user (GENERATED)
+        ABOUT = 1;  // related with label (GENERATED)
+        ENTITY = 2;  // related with an entity (GENERATED)
+        COLAB = 3;  // related with user (GENERATED)
+        SYM = 4;  // Synonym relation
         OTHER = 5;  // related with something
     }
+    
+    RelationType relation = 5;
+    RelationNode source = 6;
+    RelationNode to = 7;
+    string relation_label = 8;
+}
 
-    RelationType relation = 1;
-
-    // Relations can be with a resource, label, user or entity
-    oneof target {
-        string resource = 2;
-        string label = 3;
-        string user = 4;
-        EntityRelation entity = 5;
-        string other = 6;
+message RelationNode {
+    enum NodeType {
+        ENTITY=0;
+        LABEL=1;
+        RESOURCE=2;
+        USER=3;
     }
-
-    map<string, string> properties = 7;
-    oneof source {
-        EntityRelation from_entity = 8;
-    }
+    string value = 4;
+    NodeType ntype = 5;
+    string subtype = 6;
 }
 
 message ExtractedText {

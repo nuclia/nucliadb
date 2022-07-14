@@ -19,6 +19,7 @@
 //
 pub mod fields;
 pub mod paragraphs;
+pub mod relations;
 pub mod vectors;
 pub extern crate nucliadb_service_interface;
 

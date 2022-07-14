@@ -72,8 +72,8 @@ impl InternalError for String {}
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
-pub trait WService: std::fmt::Debug + ServiceChild + WriterChild + Send + Sync {}
-pub trait RService: std::fmt::Debug + ServiceChild + ReaderChild + Send + Sync {}
+pub trait WService: std::fmt::Debug + Send + Sync {}
+pub trait RService: std::fmt::Debug + Send + Sync {}
 
 /// Start and stop
 #[async_trait]

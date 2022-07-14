@@ -12,20 +12,6 @@ import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-class EntityRelation(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    ENTITY_FIELD_NUMBER: builtins.int
-    ENTITY_TYPE_FIELD_NUMBER: builtins.int
-    entity: typing.Text
-    entity_type: typing.Text
-    def __init__(self,
-        *,
-        entity: typing.Text = ...,
-        entity_type: typing.Text = ...,
-        ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["entity",b"entity","entity_type",b"entity_type"]) -> None: ...
-global___EntityRelation = EntityRelation
-
 class Relation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class _RelationType:
@@ -36,14 +22,17 @@ class Relation(google.protobuf.message.Message):
         CHILD: Relation._RelationType.ValueType  # 0
         """Child resource"""
 
-        ABOUT: Relation._RelationType.ValueType  # 2
+        ABOUT: Relation._RelationType.ValueType  # 1
         """related with label (GENERATED)"""
 
-        ENTITY: Relation._RelationType.ValueType  # 3
+        ENTITY: Relation._RelationType.ValueType  # 2
         """related with an entity (GENERATED)"""
 
-        COLAB: Relation._RelationType.ValueType  # 4
+        COLAB: Relation._RelationType.ValueType  # 3
         """related with user (GENERATED)"""
+
+        SYM: Relation._RelationType.ValueType  # 4
+        """Synonym relation"""
 
         OTHER: Relation._RelationType.ValueType  # 5
         """related with something"""
@@ -54,69 +43,76 @@ class Relation(google.protobuf.message.Message):
     CHILD: Relation.RelationType.ValueType  # 0
     """Child resource"""
 
-    ABOUT: Relation.RelationType.ValueType  # 2
+    ABOUT: Relation.RelationType.ValueType  # 1
     """related with label (GENERATED)"""
 
-    ENTITY: Relation.RelationType.ValueType  # 3
+    ENTITY: Relation.RelationType.ValueType  # 2
     """related with an entity (GENERATED)"""
 
-    COLAB: Relation.RelationType.ValueType  # 4
+    COLAB: Relation.RelationType.ValueType  # 3
     """related with user (GENERATED)"""
+
+    SYM: Relation.RelationType.ValueType  # 4
+    """Synonym relation"""
 
     OTHER: Relation.RelationType.ValueType  # 5
     """related with something"""
 
 
-    class PropertiesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: typing.Text
-        value: typing.Text
-        def __init__(self,
-            *,
-            key: typing.Text = ...,
-            value: typing.Text = ...,
-            ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
-
     RELATION_FIELD_NUMBER: builtins.int
-    RESOURCE_FIELD_NUMBER: builtins.int
-    LABEL_FIELD_NUMBER: builtins.int
-    USER_FIELD_NUMBER: builtins.int
-    ENTITY_FIELD_NUMBER: builtins.int
-    OTHER_FIELD_NUMBER: builtins.int
-    PROPERTIES_FIELD_NUMBER: builtins.int
-    FROM_ENTITY_FIELD_NUMBER: builtins.int
+    SOURCE_FIELD_NUMBER: builtins.int
+    TO_FIELD_NUMBER: builtins.int
+    RELATION_LABEL_FIELD_NUMBER: builtins.int
     relation: global___Relation.RelationType.ValueType
-    resource: typing.Text
-    label: typing.Text
-    user: typing.Text
     @property
-    def entity(self) -> global___EntityRelation: ...
-    other: typing.Text
+    def source(self) -> global___RelationNode: ...
     @property
-    def properties(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]: ...
-    @property
-    def from_entity(self) -> global___EntityRelation: ...
+    def to(self) -> global___RelationNode: ...
+    relation_label: typing.Text
     def __init__(self,
         *,
         relation: global___Relation.RelationType.ValueType = ...,
-        resource: typing.Text = ...,
-        label: typing.Text = ...,
-        user: typing.Text = ...,
-        entity: typing.Optional[global___EntityRelation] = ...,
-        other: typing.Text = ...,
-        properties: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
-        from_entity: typing.Optional[global___EntityRelation] = ...,
+        source: typing.Optional[global___RelationNode] = ...,
+        to: typing.Optional[global___RelationNode] = ...,
+        relation_label: typing.Text = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["entity",b"entity","from_entity",b"from_entity","label",b"label","other",b"other","resource",b"resource","source",b"source","target",b"target","user",b"user"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["entity",b"entity","from_entity",b"from_entity","label",b"label","other",b"other","properties",b"properties","relation",b"relation","resource",b"resource","source",b"source","target",b"target","user",b"user"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["source",b"source"]) -> typing.Optional[typing_extensions.Literal["from_entity"]]: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["target",b"target"]) -> typing.Optional[typing_extensions.Literal["resource","label","user","entity","other"]]: ...
+    def HasField(self, field_name: typing_extensions.Literal["source",b"source","to",b"to"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["relation",b"relation","relation_label",b"relation_label","source",b"source","to",b"to"]) -> None: ...
 global___Relation = Relation
+
+class RelationNode(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class _NodeType:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+    class _NodeTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RelationNode._NodeType.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        ENTITY: RelationNode._NodeType.ValueType  # 0
+        LABEL: RelationNode._NodeType.ValueType  # 1
+        RESOURCE: RelationNode._NodeType.ValueType  # 2
+        USER: RelationNode._NodeType.ValueType  # 3
+    class NodeType(_NodeType, metaclass=_NodeTypeEnumTypeWrapper):
+        pass
+
+    ENTITY: RelationNode.NodeType.ValueType  # 0
+    LABEL: RelationNode.NodeType.ValueType  # 1
+    RESOURCE: RelationNode.NodeType.ValueType  # 2
+    USER: RelationNode.NodeType.ValueType  # 3
+
+    VALUE_FIELD_NUMBER: builtins.int
+    NTYPE_FIELD_NUMBER: builtins.int
+    SUBTYPE_FIELD_NUMBER: builtins.int
+    value: typing.Text
+    ntype: global___RelationNode.NodeType.ValueType
+    subtype: typing.Text
+    def __init__(self,
+        *,
+        value: typing.Text = ...,
+        ntype: global___RelationNode.NodeType.ValueType = ...,
+        subtype: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ntype",b"ntype","subtype",b"subtype","value",b"value"]) -> None: ...
+global___RelationNode = RelationNode
 
 class ExtractedText(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

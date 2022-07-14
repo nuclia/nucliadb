@@ -21,11 +21,10 @@ use crate::*;
 
 pub const MAX_VERSION: u32 = 0;
 
-type RParagraphT =
-    dyn RService<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>;
-pub type WParagraphT = dyn WService;
-pub type RParagraphs = Arc<RParagraphT>;
-pub type WParagraphs = Arc<RwLock<WParagraphT>>;
+type RServiceT = dyn ParagraphServiceReader;
+type WServiceT = dyn ParagraphServiceWriter;
+pub type RParagraphs = Arc<RServiceT>;
+pub type WParagraphs = Arc<RwLock<WServiceT>>;
 
 pub async fn open_reader(
     config: &ParagraphServiceConfiguration,

@@ -17,58 +17,59 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::*;
+use nucliadb_service_interface::relations_interface::*;
 
+use crate::*;
 pub const MAX_VERSION: u32 = 0;
 
-type RServiceT = dyn FieldServiceReader;
-type WServiceT = dyn FieldServiceWriter;
-pub type RFields = Arc<RServiceT>;
-pub type WFields = Arc<RwLock<WServiceT>>;
+type RServiceT = dyn RelationServiceReader;
+type WServiceT = dyn RelationServiceWriter;
+pub type RRelations = Arc<RServiceT>;
+pub type WRelations = Arc<RwLock<WServiceT>>;
 
 pub async fn open_reader(
-    config: &FieldServiceConfiguration,
+    config: &RelationServiceConfiguration,
     version: u32,
-) -> InternalResult<RFields> {
+) -> InternalResult<RRelations> {
     match version {
-        0 => nucliadb_fields_tantivy::reader::FieldReaderService::open(config)
+        0 => nucliadb_relations::service::RelationsReaderService::open(config)
             .await
-            .map(|v| Arc::new(v) as RFields),
+            .map(|v| Arc::new(v) as RRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
 pub async fn open_writer(
-    config: &FieldServiceConfiguration,
+    config: &RelationServiceConfiguration,
     version: u32,
-) -> InternalResult<WFields> {
+) -> InternalResult<WRelations> {
     match version {
-        0 => nucliadb_fields_tantivy::writer::FieldWriterService::open(config)
+        0 => nucliadb_relations::service::RelationsWriterService::open(config)
             .await
-            .map(|v| Arc::new(RwLock::new(v)) as WFields),
+            .map(|v| Arc::new(RwLock::new(v)) as WRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 pub async fn create_reader(
-    config: &FieldServiceConfiguration,
+    config: &RelationServiceConfiguration,
     version: u32,
-) -> InternalResult<RFields> {
+) -> InternalResult<RRelations> {
     match version {
-        0 => nucliadb_fields_tantivy::reader::FieldReaderService::new(config)
+        0 => nucliadb_relations::service::RelationsReaderService::new(config)
             .await
-            .map(|v| Arc::new(v) as RFields),
+            .map(|v| Arc::new(v) as RRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
 pub async fn create_writer(
-    config: &FieldServiceConfiguration,
+    config: &RelationServiceConfiguration,
     version: u32,
-) -> InternalResult<WFields> {
+) -> InternalResult<WRelations> {
     match version {
-        0 => nucliadb_fields_tantivy::writer::FieldWriterService::new(config)
+        0 => nucliadb_relations::service::RelationsWriterService::new(config)
             .await
-            .map(|v| Arc::new(RwLock::new(v)) as WFields),
+            .map(|v| Arc::new(RwLock::new(v)) as WRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }

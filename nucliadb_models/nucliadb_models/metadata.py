@@ -19,13 +19,13 @@
 #
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Type, TypeVar
+from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 from pydantic.class_validators import root_validator
 
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2, utils_pb2
 
 from .common import Classification, FieldID, Paragraph
 
@@ -59,6 +59,9 @@ class Relation(BaseModel):
     def check_relation_is_valid(cls, values):
         if values["relation"] == RelationType.CHILD.value:
             if "resource" not in values:
+                import pdb
+
+                pdb.set_trace()
                 raise ValueError(
                     "Missing 'resource' field containg the uuid of a resource"
                 )
@@ -129,13 +132,8 @@ class Relation(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.Relation) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
+        value = convert_pb_relation_to_api(message)
+        return cls(**value)
 
 
 class InputMetadata(BaseModel):
@@ -164,19 +162,43 @@ class Metadata(InputMetadata):
         )
 
 
+def convert_pb_relation_to_api(relation: utils_pb2.Relation):
+    result: Dict[str, Any] = {}
+    if relation.relation == utils_pb2.Relation.RelationType.OTHER:
+        result["relation"] = RelationType.OTHER.value
+        result["other"] = relation.to.value
+    elif relation.relation == utils_pb2.Relation.RelationType.CHILD:
+        result["relation"] = RelationType.CHILD.value
+        result["resource"] = relation.to.value
+    elif relation.relation == utils_pb2.Relation.RelationType.ABOUT:
+        result["relation"] = RelationType.ABOUT.value
+        result["label"] = relation.to.value
+    elif relation.relation == utils_pb2.Relation.RelationType.COLAB:
+        result["relation"] = RelationType.COLAB.value
+        result["user"] = relation.to.value
+    elif relation.relation == utils_pb2.Relation.RelationType.ENTITY:
+        result["relation"] = RelationType.ENTITY.value
+        result["entity"] = EntityRelation(
+            entity=relation.to.value, entity_type=relation.to.subtype
+        )
+    return result
+
+
 class UserMetadata(BaseModel):
     classifications: List[Classification] = []
     relations: List[Relation] = []
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.UserMetadata) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        value = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        value["relations"] = [
+            convert_pb_relation_to_api(relation) for relation in message.relations
+        ]
+        return cls(**value)
 
 
 class TokenSplit(BaseModel):

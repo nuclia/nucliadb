@@ -17,13 +17,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::service_interface::InternalError;
+use nucliadb_protos::*;
 
+use crate::service_interface::*;
 #[derive(Clone)]
 pub struct VectorServiceConfiguration {
     pub no_results: Option<usize>,
     pub path: String,
 }
+
+pub trait VectorReaderOnly {}
+pub trait VectorWriterOnly {}
+
+pub trait VectorServiceReader:
+    ServiceChild
+    + RService
+    + ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse>
+    + VectorReaderOnly
+{
+}
+
+pub trait VectorServiceWriter: WService + ServiceChild + WriterChild + VectorWriterOnly {}
 
 #[derive(Debug)]
 pub struct VectorError {

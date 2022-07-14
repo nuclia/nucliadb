@@ -14,13 +14,12 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bnucliadb_protos/utils.proto\x12\x05utils\"5\n\x0e\x45ntityRelation\x12\x0e\n\x06\x65ntity\x18\x01 \x01(\t\x12\x13\n\x0b\x65ntity_type\x18\x02 \x01(\t\"\x9b\x03\n\x08Relation\x12.\n\x08relation\x18\x01 \x01(\x0e\x32\x1c.utils.Relation.RelationType\x12\x12\n\x08resource\x18\x02 \x01(\tH\x00\x12\x0f\n\x05label\x18\x03 \x01(\tH\x00\x12\x0e\n\x04user\x18\x04 \x01(\tH\x00\x12\'\n\x06\x65ntity\x18\x05 \x01(\x0b\x32\x15.utils.EntityRelationH\x00\x12\x0f\n\x05other\x18\x06 \x01(\tH\x00\x12\x33\n\nproperties\x18\x07 \x03(\x0b\x32\x1f.utils.Relation.PropertiesEntry\x12,\n\x0b\x66rom_entity\x18\x08 \x01(\x0b\x32\x15.utils.EntityRelationH\x01\x1a\x31\n\x0fPropertiesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"F\n\x0cRelationType\x12\t\n\x05\x43HILD\x10\x00\x12\t\n\x05\x41\x42OUT\x10\x02\x12\n\n\x06\x45NTITY\x10\x03\x12\t\n\x05\x43OLAB\x10\x04\x12\t\n\x05OTHER\x10\x05\x42\x08\n\x06targetB\x08\n\x06source\"\xa0\x01\n\rExtractedText\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x37\n\nsplit_text\x18\x02 \x03(\x0b\x32#.utils.ExtractedText.SplitTextEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x30\n\x0eSplitTextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"d\n\x06Vector\x12\r\n\x05start\x18\x01 \x01(\x05\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x05\x12\x17\n\x0fstart_paragraph\x18\x03 \x01(\x05\x12\x15\n\rend_paragraph\x18\x04 \x01(\x05\x12\x0e\n\x06vector\x18\x05 \x03(\x02\")\n\x07Vectors\x12\x1e\n\x07vectors\x18\x01 \x03(\x0b\x32\r.utils.Vector\"\xca\x01\n\x0cVectorObject\x12\x1f\n\x07vectors\x18\x01 \x01(\x0b\x32\x0e.utils.Vectors\x12<\n\rsplit_vectors\x18\x02 \x03(\x0b\x32%.utils.VectorObject.SplitVectorsEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x43\n\x11SplitVectorsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.utils.Vectors:\x02\x38\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bnucliadb_protos/utils.proto\x12\x05utils\"\xe9\x01\n\x08Relation\x12.\n\x08relation\x18\x05 \x01(\x0e\x32\x1c.utils.Relation.RelationType\x12#\n\x06source\x18\x06 \x01(\x0b\x32\x13.utils.RelationNode\x12\x1f\n\x02to\x18\x07 \x01(\x0b\x32\x13.utils.RelationNode\x12\x16\n\x0erelation_label\x18\x08 \x01(\t\"O\n\x0cRelationType\x12\t\n\x05\x43HILD\x10\x00\x12\t\n\x05\x41\x42OUT\x10\x01\x12\n\n\x06\x45NTITY\x10\x02\x12\t\n\x05\x43OLAB\x10\x03\x12\x07\n\x03SYM\x10\x04\x12\t\n\x05OTHER\x10\x05\"\x96\x01\n\x0cRelationNode\x12\r\n\x05value\x18\x04 \x01(\t\x12+\n\x05ntype\x18\x05 \x01(\x0e\x32\x1c.utils.RelationNode.NodeType\x12\x0f\n\x07subtype\x18\x06 \x01(\t\"9\n\x08NodeType\x12\n\n\x06\x45NTITY\x10\x00\x12\t\n\x05LABEL\x10\x01\x12\x0c\n\x08RESOURCE\x10\x02\x12\x08\n\x04USER\x10\x03\"\xa0\x01\n\rExtractedText\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x37\n\nsplit_text\x18\x02 \x03(\x0b\x32#.utils.ExtractedText.SplitTextEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x30\n\x0eSplitTextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"d\n\x06Vector\x12\r\n\x05start\x18\x01 \x01(\x05\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x05\x12\x17\n\x0fstart_paragraph\x18\x03 \x01(\x05\x12\x15\n\rend_paragraph\x18\x04 \x01(\x05\x12\x0e\n\x06vector\x18\x05 \x03(\x02\")\n\x07Vectors\x12\x1e\n\x07vectors\x18\x01 \x03(\x0b\x32\r.utils.Vector\"\xca\x01\n\x0cVectorObject\x12\x1f\n\x07vectors\x18\x01 \x01(\x0b\x32\x0e.utils.Vectors\x12<\n\rsplit_vectors\x18\x02 \x03(\x0b\x32%.utils.VectorObject.SplitVectorsEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x43\n\x11SplitVectorsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.utils.Vectors:\x02\x38\x01\x62\x06proto3')
 
 
 
-_ENTITYRELATION = DESCRIPTOR.message_types_by_name['EntityRelation']
 _RELATION = DESCRIPTOR.message_types_by_name['Relation']
-_RELATION_PROPERTIESENTRY = _RELATION.nested_types_by_name['PropertiesEntry']
+_RELATIONNODE = DESCRIPTOR.message_types_by_name['RelationNode']
 _EXTRACTEDTEXT = DESCRIPTOR.message_types_by_name['ExtractedText']
 _EXTRACTEDTEXT_SPLITTEXTENTRY = _EXTRACTEDTEXT.nested_types_by_name['SplitTextEntry']
 _VECTOR = DESCRIPTOR.message_types_by_name['Vector']
@@ -28,27 +27,20 @@ _VECTORS = DESCRIPTOR.message_types_by_name['Vectors']
 _VECTOROBJECT = DESCRIPTOR.message_types_by_name['VectorObject']
 _VECTOROBJECT_SPLITVECTORSENTRY = _VECTOROBJECT.nested_types_by_name['SplitVectorsEntry']
 _RELATION_RELATIONTYPE = _RELATION.enum_types_by_name['RelationType']
-EntityRelation = _reflection.GeneratedProtocolMessageType('EntityRelation', (_message.Message,), {
-  'DESCRIPTOR' : _ENTITYRELATION,
-  '__module__' : 'nucliadb_protos.utils_pb2'
-  # @@protoc_insertion_point(class_scope:utils.EntityRelation)
-  })
-_sym_db.RegisterMessage(EntityRelation)
-
+_RELATIONNODE_NODETYPE = _RELATIONNODE.enum_types_by_name['NodeType']
 Relation = _reflection.GeneratedProtocolMessageType('Relation', (_message.Message,), {
-
-  'PropertiesEntry' : _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), {
-    'DESCRIPTOR' : _RELATION_PROPERTIESENTRY,
-    '__module__' : 'nucliadb_protos.utils_pb2'
-    # @@protoc_insertion_point(class_scope:utils.Relation.PropertiesEntry)
-    })
-  ,
   'DESCRIPTOR' : _RELATION,
   '__module__' : 'nucliadb_protos.utils_pb2'
   # @@protoc_insertion_point(class_scope:utils.Relation)
   })
 _sym_db.RegisterMessage(Relation)
-_sym_db.RegisterMessage(Relation.PropertiesEntry)
+
+RelationNode = _reflection.GeneratedProtocolMessageType('RelationNode', (_message.Message,), {
+  'DESCRIPTOR' : _RELATIONNODE,
+  '__module__' : 'nucliadb_protos.utils_pb2'
+  # @@protoc_insertion_point(class_scope:utils.RelationNode)
+  })
+_sym_db.RegisterMessage(RelationNode)
 
 ExtractedText = _reflection.GeneratedProtocolMessageType('ExtractedText', (_message.Message,), {
 
@@ -97,30 +89,28 @@ _sym_db.RegisterMessage(VectorObject.SplitVectorsEntry)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _RELATION_PROPERTIESENTRY._options = None
-  _RELATION_PROPERTIESENTRY._serialized_options = b'8\001'
   _EXTRACTEDTEXT_SPLITTEXTENTRY._options = None
   _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_options = b'8\001'
   _VECTOROBJECT_SPLITVECTORSENTRY._options = None
   _VECTOROBJECT_SPLITVECTORSENTRY._serialized_options = b'8\001'
-  _ENTITYRELATION._serialized_start=38
-  _ENTITYRELATION._serialized_end=91
-  _RELATION._serialized_start=94
-  _RELATION._serialized_end=505
-  _RELATION_PROPERTIESENTRY._serialized_start=364
-  _RELATION_PROPERTIESENTRY._serialized_end=413
-  _RELATION_RELATIONTYPE._serialized_start=415
-  _RELATION_RELATIONTYPE._serialized_end=485
-  _EXTRACTEDTEXT._serialized_start=508
-  _EXTRACTEDTEXT._serialized_end=668
-  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_start=620
-  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_end=668
-  _VECTOR._serialized_start=670
-  _VECTOR._serialized_end=770
-  _VECTORS._serialized_start=772
-  _VECTORS._serialized_end=813
-  _VECTOROBJECT._serialized_start=816
-  _VECTOROBJECT._serialized_end=1018
-  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_start=951
-  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_end=1018
+  _RELATION._serialized_start=39
+  _RELATION._serialized_end=272
+  _RELATION_RELATIONTYPE._serialized_start=193
+  _RELATION_RELATIONTYPE._serialized_end=272
+  _RELATIONNODE._serialized_start=275
+  _RELATIONNODE._serialized_end=425
+  _RELATIONNODE_NODETYPE._serialized_start=368
+  _RELATIONNODE_NODETYPE._serialized_end=425
+  _EXTRACTEDTEXT._serialized_start=428
+  _EXTRACTEDTEXT._serialized_end=588
+  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_start=540
+  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_end=588
+  _VECTOR._serialized_start=590
+  _VECTOR._serialized_end=690
+  _VECTORS._serialized_start=692
+  _VECTORS._serialized_end=733
+  _VECTOROBJECT._serialized_start=736
+  _VECTOROBJECT._serialized_end=938
+  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_start=871
+  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_end=938
 # @@protoc_insertion_point(module_scope)

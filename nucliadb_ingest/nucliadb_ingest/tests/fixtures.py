@@ -830,9 +830,9 @@ async def create_resource(storage, driver, cache, knowledgebox):
 
     r1 = upb.Relation(
         relation=upb.Relation.CHILD,
-        resource="000001",
+        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
     )
-    r1.properties["prop1"] = "prop2"
 
     basic.usermetadata.relations.append(r1)
 
@@ -852,9 +852,9 @@ async def create_resource(storage, driver, cache, knowledgebox):
     rels = []
     r1 = upb.Relation(
         relation=upb.Relation.CHILD,
-        resource="000001",
+        source=upb.RelationNode(value=rid, ntype=upb.RelationNode.NodeType.RESOURCE),
+        to=upb.RelationNode(value="000001", ntype=upb.RelationNode.NodeType.RESOURCE),
     )
-    r1.properties["prop1"] = "prop2"
 
     rels.append(r1)
     await test_resource.set_relations(rels)

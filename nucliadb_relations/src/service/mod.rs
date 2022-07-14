@@ -19,4 +19,10 @@
 //
 
 pub mod reader;
+#[cfg(test)]
+mod tests;
+mod utils;
 pub mod writer;
+
+pub use reader::*;
+pub use writer::*;

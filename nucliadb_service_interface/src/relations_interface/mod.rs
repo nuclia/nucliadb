@@ -17,16 +17,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::service_interface::InternalError;
+use nucliadb_protos::*;
+
+use crate::service_interface::*;
 
 #[derive(Clone)]
-pub struct RelationsServiceConfiguration {
+pub struct RelationServiceConfiguration {
     pub path: String,
 }
 
 #[derive(Debug)]
 pub struct RelationError {
     pub msg: String,
+}
+
+pub trait RelationReaderOnly {
+    fn get_edges(&self) -> EdgeList;
+    fn get_node_types(&self) -> TypeList;
+}
+
+pub trait RelationWriterOnly {}
+
+pub trait RelationServiceReader:
+    ServiceChild
+    + RService
+    + ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse>
+    + RelationReaderOnly
+{
+}
+
+pub trait RelationServiceWriter:
+    WService + ServiceChild + WriterChild + RelationWriterOnly
+{
 }
 
 impl std::fmt::Display for RelationError {

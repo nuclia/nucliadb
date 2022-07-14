@@ -26,26 +26,25 @@ use heed::{Database, Env, EnvOpenOptions, RoIter, RoPrefix, RoTxn, RwTxn};
 use nucliadb_byte_rpr::*;
 
 use crate::edge::*;
-use crate::identifier::*;
 use crate::node::*;
 
-const LMDB_ENV: &str = "ENV_lmdb";
-const KEYS_DB: &str = "KEYS_LMDB";
-const RESOURCES_DB: &str = "RESOURCES_LMDB";
-const ENTITIES_DB: &str = "ENTITIES_LMDB";
-const LABELS_DB: &str = "LABELS_LMDB";
-const COLABORATORS_DB: &str = "COLABS_LMDB";
-const EDGE_DB: &str = "EDGE_LMDB";
-const STATE_DB: &str = "STATE_LMDB";
-const STAMP: &str = "stamp.nuclia";
-const MAP_SIZE: usize = 1048576 * 100000;
-const MAX_DBS: u32 = 3000;
+mod db_name {
+    pub const KEYS: &str = "KEYS_LMDB";
+    pub const INVERSE_KEYS: &str = "INVERSE_KEYS_LMDB";
+    pub const EDGES: &str = "EDGES_LMDB";
+    pub const INVERSE_EDGES: &str = "INVERSE_EDGES_LMDB";
+    pub const STATE: &str = "STATE_LMDB";
+}
 
-mod storage_state {
-    pub const FRESH_RESOURCE: &str = "fresh_resource";
-    pub const FRESH_ENTITY: &str = "fresh_entity";
-    pub const FRESH_LABEL: &str = "fresh_label";
-    pub const FRESH_COLABORATOR: &str = "fresh_colaborator";
+mod env_config {
+    pub const ENV: &str = "ENV_lmdb";
+    pub const STAMP: &str = "stamp.nuclia";
+    pub const MAP_SIZE: usize = 1048576 * 100000;
+    pub const MAX_DBS: u32 = 3000;
+}
+
+mod state_fields {
+    pub const FRESH_NODE: &str = "fresh_node";
 }
 
 pub struct RoToken<'a>(RoTxn<'a>);
@@ -92,10 +91,10 @@ impl<'a> std::ops::DerefMut for RwToken<'a> {
     }
 }
 
-pub struct EdgeIter<'a> {
+pub struct QueryIter<'a> {
     iter: RoPrefix<'a, Str, Unit>,
 }
-impl<'a> Iterator for EdgeIter<'a> {
+impl<'a> Iterator for QueryIter<'a> {
     type Item = Edge;
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
@@ -106,10 +105,10 @@ impl<'a> Iterator for EdgeIter<'a> {
     }
 }
 
-pub struct KeyIter<'a> {
+pub struct NodeIter<'a> {
     iter: RoIter<'a, Str, ByteSlice>,
 }
-impl<'a> Iterator for KeyIter<'a> {
+impl<'a> Iterator for NodeIter<'a> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
@@ -120,106 +119,51 @@ impl<'a> Iterator for KeyIter<'a> {
     }
 }
 
-#[derive(Clone, Debug, Copy)]
-enum NodeId {
-    Resource(ResourceID),
-    Entity(EntityID),
-    Label(LabelID),
-    Colaborator(ColaboratorID),
-}
-
-impl ByteRpr for NodeId {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut buff = vec![];
-        match self {
-            NodeId::Resource(id) => {
-                buff.append(&mut 0u64.as_byte_rpr());
-                buff.append(&mut id.as_byte_rpr());
-            }
-            NodeId::Entity(id) => {
-                buff.append(&mut 1u64.as_byte_rpr());
-                buff.append(&mut id.as_byte_rpr());
-            }
-            NodeId::Label(id) => {
-                buff.append(&mut 2u64.as_byte_rpr());
-                buff.append(&mut id.as_byte_rpr());
-            }
-            NodeId::Colaborator(id) => {
-                buff.append(&mut 3u64.as_byte_rpr());
-                buff.append(&mut id.as_byte_rpr());
-            }
-        }
-        buff
-    }
-
-    fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let discriminant_start = 0;
-        let discriminant_end = discriminant_start + u64::segment_len();
-        let id_start = discriminant_end;
-        let id_end = discriminant_end + ResourceID::segment_len();
-        let id = &bytes[id_start..id_end];
-        match u64::from_byte_rpr(&bytes[discriminant_start..discriminant_end]) {
-            0 => NodeId::Resource(ResourceID::from_byte_rpr(id)),
-            1 => NodeId::Entity(EntityID::from_byte_rpr(id)),
-            2 => NodeId::Label(LabelID::from_byte_rpr(id)),
-            3 => NodeId::Colaborator(ColaboratorID::from_byte_rpr(id)),
-            _ => panic!("Invalid node id"),
-        }
-    }
-}
-
-impl FixedByteLen for NodeId {
-    fn segment_len() -> usize {
-        ResourceID::segment_len() + u64::segment_len()
-    }
-}
-
 pub struct StorageSystem {
     env: Env,
     // key -> NodeId
     keys: Database<Str, ByteSlice>,
-    // ResourceID -> ResourceData
-    resources: Database<ByteSlice, ByteSlice>,
-    // EntityID -> EntityData
-    entities: Database<ByteSlice, ByteSlice>,
-    // LabelID -> LabelData
-    labels: Database<ByteSlice, ByteSlice>,
-    // ColaboratorID -> ColabData
-    colaborators: Database<ByteSlice, ByteSlice>,
+    // NodeID -> key
+    inv_keys: Database<ByteSlice, Str>,
     // Edges of the graph
     edges: Database<Str, Unit>,
+    // In edges of the graph
+    in_edges: Database<Str, Unit>,
     // Name of the field -> current value
     state: Database<Str, ByteSlice>,
 }
 
 impl StorageSystem {
+    pub fn start(path: &Path) -> StorageSystem {
+        if !path.join(env_config::STAMP).exists() {
+            StorageSystem::create(path)
+        } else {
+            StorageSystem::open(path)
+        }
+    }
     pub fn create(path: &Path) -> StorageSystem {
-        let env_path = path.join(LMDB_ENV);
-        if !env_path.exists() {
+        if !path.join(env_config::STAMP).exists() {
+            let env_path = path.join(env_config::ENV);
             std::fs::create_dir_all(&env_path).unwrap();
             let mut env_builder = EnvOpenOptions::new();
-            env_builder.max_dbs(MAX_DBS);
-            env_builder.map_size(MAP_SIZE);
+            env_builder.max_dbs(env_config::MAX_DBS);
+            env_builder.map_size(env_config::MAP_SIZE);
             unsafe {
                 env_builder.flag(Flags::MdbNoLock);
             }
             let env = env_builder.open(&env_path).unwrap();
-            let keys = env.create_database(Some(KEYS_DB)).unwrap();
-            let resources = env.create_database(Some(RESOURCES_DB)).unwrap();
-            let entities = env.create_database(Some(ENTITIES_DB)).unwrap();
-            let labels = env.create_database(Some(LABELS_DB)).unwrap();
-            let colaborators = env.create_database(Some(COLABORATORS_DB)).unwrap();
-            let edges = env.create_database(Some(EDGE_DB)).unwrap();
-            let state = env.create_database(Some(STATE_DB)).unwrap();
-            std::fs::File::create(path.join(STAMP)).unwrap();
+            let keys = env.create_database(Some(db_name::KEYS)).unwrap();
+            let inv_keys = env.create_database(Some(db_name::INVERSE_KEYS)).unwrap();
+            let edges = env.create_database(Some(db_name::EDGES)).unwrap();
+            let in_edges = env.create_database(Some(db_name::INVERSE_EDGES)).unwrap();
+            let state = env.create_database(Some(db_name::STATE)).unwrap();
+            std::fs::File::create(path.join(env_config::STAMP)).unwrap();
             StorageSystem {
                 env,
                 keys,
-                resources,
-                entities,
-                labels,
-                colaborators,
+                inv_keys,
                 edges,
+                in_edges,
                 state,
             }
         } else {
@@ -228,34 +172,34 @@ impl StorageSystem {
     }
 
     pub fn open(path: &Path) -> StorageSystem {
-        let sleep_time = std::time::Duration::from_millis(20);
-        let env_path = path.join(LMDB_ENV);
-        let stamp_path = path.join(STAMP);
-        while !stamp_path.exists() {
-            std::thread::sleep(sleep_time);
+        let env_path = path.join(env_config::ENV);
+        if !path.join(env_config::STAMP).exists() {
+            panic!("{:?} is not a valid index", path);
         }
         let mut env_builder = EnvOpenOptions::new();
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
         }
-        env_builder.max_dbs(MAX_DBS);
-        env_builder.map_size(MAP_SIZE);
+        env_builder.max_dbs(env_config::MAX_DBS);
+        env_builder.map_size(env_config::MAP_SIZE);
         let env = env_builder.open(&env_path).unwrap();
-        let keys = env.open_database(Some(KEYS_DB)).unwrap().unwrap();
-        let resources = env.open_database(Some(RESOURCES_DB)).unwrap().unwrap();
-        let entities = env.open_database(Some(ENTITIES_DB)).unwrap().unwrap();
-        let labels = env.open_database(Some(LABELS_DB)).unwrap().unwrap();
-        let colaborators = env.open_database(Some(COLABORATORS_DB)).unwrap().unwrap();
-        let edges = env.open_database(Some(EDGE_DB)).unwrap().unwrap();
-        let state = env.open_database(Some(STATE_DB)).unwrap().unwrap();
+        let keys = env.open_database(Some(db_name::KEYS)).unwrap().unwrap();
+        let inv_keys = env
+            .open_database(Some(db_name::INVERSE_KEYS))
+            .unwrap()
+            .unwrap();
+        let edges = env.open_database(Some(db_name::EDGES)).unwrap().unwrap();
+        let in_edges = env
+            .open_database(Some(db_name::INVERSE_EDGES))
+            .unwrap()
+            .unwrap();
+        let state = env.open_database(Some(db_name::STATE)).unwrap().unwrap();
         StorageSystem {
             env,
             keys,
-            resources,
-            entities,
-            labels,
-            colaborators,
+            inv_keys,
             edges,
+            in_edges,
             state,
         }
     }
@@ -266,187 +210,99 @@ impl StorageSystem {
     pub fn ro_txn(&self) -> RoToken<'_> {
         RoToken(self.env.read_txn().unwrap())
     }
-    pub fn add_resource(&self, txn: &mut RwTxn, data: ResourceData) -> bool {
+    pub fn add_node(&self, txn: &mut RwTxn, value: String) -> bool {
         let mut had_effect = false;
-        if self.keys.get(txn, &data.name).unwrap().is_none() {
-            let resource_id = self.get_fresh_resource_id(txn);
-            let node_id = NodeId::Resource(resource_id);
-            self.keys
-                .put(txn, &data.name, &node_id.as_byte_rpr())
-                .unwrap();
-            self.resources
-                .put(txn, &resource_id.as_byte_rpr(), &data.as_byte_rpr())
+        if self.keys.get(txn, &value).unwrap().is_none() {
+            let node_id = self.get_fresh_node_id(txn);
+            self.keys.put(txn, &value, &node_id.as_byte_rpr()).unwrap();
+            self.inv_keys
+                .put(txn, &node_id.as_byte_rpr(), &value)
                 .unwrap();
             had_effect = true;
         }
         had_effect
     }
-    pub fn get_resource_id(&self, txn: &RoTxn, name: &str) -> Option<ResourceID> {
-        match self.keys.get(txn, name).unwrap().map(NodeId::from_byte_rpr) {
-            Some(NodeId::Resource(id)) => Some(id),
-            _ => None,
+    pub fn delete_node(&self, txn: &mut RwTxn, id: NodeId) {
+        let node_value = self.get_node(txn, id).unwrap();
+        let delete_query = PartialEdge::all(id);
+        self.keys.delete(txn, &node_value).unwrap();
+        self.inv_keys.delete(txn, &id.as_byte_rpr()).unwrap();
+        self.delete_matches(txn, delete_query.clone());
+        let to_delete: Vec<_> = self
+            .match_edges_with_db(&self.in_edges, txn, delete_query)
+            .map(|edge| (edge.clone(), edge.inverse()))
+            .collect();
+        for (inverse, original) in to_delete {
+            self.edges.delete(txn, &original.to_string()).unwrap();
+            self.in_edges.delete(txn, &inverse.to_string()).unwrap();
         }
-    }
-    pub fn get_resource(&self, txn: &RoTxn, id: ResourceID) -> Option<ResourceData> {
-        self.resources
-            .get(txn, &id.as_byte_rpr())
-            .unwrap()
-            .map(ResourceData::from_byte_rpr)
-    }
-    pub fn add_entity(&self, txn: &mut RwTxn, data: EntityData) -> bool {
-        let mut had_effect = false;
-        if self.keys.get(txn, &data.name).unwrap().is_none() {
-            let entity_id = self.get_fresh_entity_id(txn);
-            let node_id = NodeId::Entity(entity_id);
-            self.keys
-                .put(txn, &data.name, &node_id.as_byte_rpr())
-                .unwrap();
-            self.entities
-                .put(txn, &entity_id.as_byte_rpr(), &data.as_byte_rpr())
-                .unwrap();
-            had_effect = true;
-        }
-        had_effect
-    }
-    pub fn get_entity_id(&self, txn: &RoTxn, name: &str) -> Option<EntityID> {
-        match self.keys.get(txn, name).unwrap().map(NodeId::from_byte_rpr) {
-            Some(NodeId::Entity(id)) => Some(id),
-            _ => None,
-        }
-    }
-    pub fn get_entity(&self, txn: &RoTxn, id: EntityID) -> Option<EntityData> {
-        self.entities
-            .get(txn, &id.as_byte_rpr())
-            .unwrap()
-            .map(EntityData::from_byte_rpr)
-    }
-    pub fn add_label(&self, txn: &mut RwTxn, data: LabelData) -> bool {
-        let mut had_effect = false;
-        if self.keys.get(txn, &data.name).unwrap().is_none() {
-            let label_id = self.get_fresh_label_id(txn);
-            let node_id = NodeId::Label(label_id);
-            self.keys
-                .put(txn, &data.name, &node_id.as_byte_rpr())
-                .unwrap();
-            self.labels
-                .put(txn, &label_id.as_byte_rpr(), &data.as_byte_rpr())
-                .unwrap();
-            had_effect = true;
-        }
-        had_effect
-    }
-    pub fn get_label_id(&self, txn: &RoTxn, name: &str) -> Option<LabelID> {
-        match self.keys.get(txn, name).unwrap().map(NodeId::from_byte_rpr) {
-            Some(NodeId::Label(id)) => Some(id),
-            _ => None,
-        }
-    }
-    pub fn get_label(&self, txn: &RoTxn, id: LabelID) -> Option<LabelData> {
-        self.labels
-            .get(txn, &id.as_byte_rpr())
-            .unwrap()
-            .map(LabelData::from_byte_rpr)
-    }
-    pub fn add_colaborator(&self, txn: &mut RwTxn, data: ColabData) -> bool {
-        let mut had_effect = false;
-        if self.keys.get(txn, &data.name).unwrap().is_none() {
-            let colab_id = self.get_fresh_colaborator_id(txn);
-            let node_id = NodeId::Colaborator(colab_id);
-            self.keys
-                .put(txn, &data.name, &node_id.as_byte_rpr())
-                .unwrap();
-            self.colaborators
-                .put(txn, &colab_id.as_byte_rpr(), &data.as_byte_rpr())
-                .unwrap();
-            had_effect = true;
-        }
-        had_effect
-    }
-    pub fn get_colaborator_id(&self, txn: &RoTxn, name: &str) -> Option<ColaboratorID> {
-        match self.keys.get(txn, name).unwrap().map(NodeId::from_byte_rpr) {
-            Some(NodeId::Colaborator(id)) => Some(id),
-            _ => None,
-        }
-    }
-    pub fn get_colaborator(&self, txn: &RoTxn, id: ColaboratorID) -> Option<ColabData> {
-        self.colaborators
-            .get(txn, &id.as_byte_rpr())
-            .unwrap()
-            .map(ColabData::from_byte_rpr)
     }
     pub fn add_edge(&self, txn: &mut RwTxn, edge: Edge) -> bool {
         let edge_fmt = edge.to_string();
+        let in_edge_fmt = edge.inverse().to_string();
         let mut had_effect = false;
         if self.edges.get(txn, &edge_fmt).unwrap().is_none() {
-            self.edges.put(txn, &edge.to_string(), &()).unwrap();
+            self.edges.put(txn, &edge_fmt, &()).unwrap();
+            self.in_edges.put(txn, &in_edge_fmt, &()).unwrap();
             had_effect = true;
         }
         had_effect
     }
-    pub fn process_query<'a>(&self, txn: &'a RoTxn, query: Query) -> EdgeIter<'a> {
-        let query_formated = query.to_string();
-        let iter = self.edges.prefix_iter(txn, &query_formated).unwrap();
-        EdgeIter { iter }
+    pub fn get_id(&self, txn: &RoTxn, value: &str) -> Option<NodeId> {
+        self.keys
+            .get(txn, value)
+            .unwrap()
+            .map(NodeId::from_byte_rpr)
     }
-    pub fn get_keys<'a>(&self, txn: &'a RoTxn) -> KeyIter<'a> {
-        KeyIter {
+    pub fn get_node(&self, txn: &RoTxn, id: NodeId) -> Option<String> {
+        self.inv_keys
+            .get(txn, &id.as_byte_rpr())
+            .unwrap()
+            .map(String::from)
+    }
+    pub fn match_edges<'a>(&'a self, txn: &'a RoTxn, query: PartialEdge) -> QueryIter<'a> {
+        self.match_edges_with_db(&self.edges, txn, query)
+    }
+    pub fn delete_matches(&self, txn: &mut RwTxn, query: PartialEdge) {
+        let edges: Vec<_> = self
+            .match_edges(txn, query)
+            .map(|edge| (edge.clone(), edge.inverse()))
+            .collect();
+        for (edge, inverse) in edges {
+            self.edges.delete(txn, &edge.to_string()).unwrap();
+            self.in_edges.delete(txn, &inverse.to_string()).unwrap();
+        }
+    }
+    pub fn get_keys<'a>(&self, txn: &'a RoTxn) -> NodeIter<'a> {
+        NodeIter {
             iter: self.keys.iter(txn).unwrap(),
         }
     }
     pub fn no_nodes(&self, txn: &RoTxn) -> u64 {
         self.keys.len(txn).unwrap()
     }
-    fn get_fresh_resource_id(&self, txn: &mut RwTxn) -> ResourceID {
+    fn get_fresh_node_id(&self, txn: &mut RwTxn) -> NodeId {
         let mut fresh = self
             .state
-            .get(txn, storage_state::FRESH_RESOURCE)
+            .get(txn, state_fields::FRESH_NODE)
             .unwrap()
-            .map(ResourceID::from_byte_rpr)
-            .unwrap_or_else(ResourceID::new);
+            .map(NodeId::from_byte_rpr)
+            .unwrap_or_else(NodeId::new);
         let current = fresh.next();
         self.state
-            .put(txn, storage_state::FRESH_RESOURCE, &fresh.as_byte_rpr())
+            .put(txn, state_fields::FRESH_NODE, &fresh.as_byte_rpr())
             .unwrap();
         current
     }
-    fn get_fresh_entity_id(&self, txn: &mut RwTxn) -> EntityID {
-        let mut fresh = self
-            .state
-            .get(txn, storage_state::FRESH_ENTITY)
-            .unwrap()
-            .map(EntityID::from_byte_rpr)
-            .unwrap_or_else(EntityID::new);
-        let current = fresh.next();
-        self.state
-            .put(txn, storage_state::FRESH_ENTITY, &fresh.as_byte_rpr())
-            .unwrap();
-        current
-    }
-    fn get_fresh_label_id(&self, txn: &mut RwTxn) -> LabelID {
-        let mut fresh = self
-            .state
-            .get(txn, storage_state::FRESH_LABEL)
-            .unwrap()
-            .map(LabelID::from_byte_rpr)
-            .unwrap_or_else(LabelID::new);
-        let current = fresh.next();
-        self.state
-            .put(txn, storage_state::FRESH_LABEL, &fresh.as_byte_rpr())
-            .unwrap();
-        current
-    }
-    fn get_fresh_colaborator_id(&self, txn: &mut RwTxn) -> ColaboratorID {
-        let mut fresh = self
-            .state
-            .get(txn, storage_state::FRESH_COLABORATOR)
-            .unwrap()
-            .map(ColaboratorID::from_byte_rpr)
-            .unwrap_or_else(ColaboratorID::new);
-        let current = fresh.next();
-        self.state
-            .put(txn, storage_state::FRESH_COLABORATOR, &fresh.as_byte_rpr())
-            .unwrap();
-        current
+    fn match_edges_with_db<'a>(
+        &self,
+        db: &'a Database<Str, Unit>,
+        txn: &'a RoTxn,
+        query: PartialEdge,
+    ) -> QueryIter<'a> {
+        let query_formated = query.to_string();
+        let iter = db.prefix_iter(txn, &query_formated).unwrap();
+        QueryIter { iter }
     }
 }
 
@@ -504,342 +360,196 @@ mod tests {
         assert!(!system.add_resource(&mut txn, resource1));
         txn.commit().unwrap();
     }
+
+    const CHILD: &str = "child";
+    const ABOUT: &str = "about";
+
+    fn child(from: NodeId, to: NodeId) -> Edge {
+        Edge::new(from, EdgeType::from(CHILD), to)
+    }
+    fn about(from: NodeId, to: NodeId) -> Edge {
+        Edge::new(from, EdgeType::from(ABOUT), to)
+    }
+    fn par_child(from: NodeId, to: Option<NodeId>) -> PartialEdge {
+        PartialEdge::with_type(from, EdgeType::from(CHILD), to)
+    }
+    fn par_about(from: NodeId, to: Option<NodeId>) -> PartialEdge {
+        PartialEdge::with_type(from, EdgeType::from(ABOUT), to)
+    }
+
+    #[test]
+    fn add_resource() {
+        let system = initialize_storage_system();
+        let mut txn = system.rw_txn();
+        let resource = "Name".to_string();
+        assert!(system.add_node(&mut txn, resource));
+        txn.commit().unwrap();
+        let txn = system.ro_txn();
+        assert!(system.get_id(&txn, "Name").is_some());
+        assert!(system.get_id(&txn, "Nonexistent").is_none());
+        assert!(system
+            .get_node(&txn, system.get_id(&txn, "Name").unwrap())
+            .is_some());
+        assert_eq!(
+            system
+                .get_node(&txn, system.get_id(&txn, "Name").unwrap())
+                .unwrap(),
+            "Name"
+        );
+        txn.abort().unwrap();
+    }
+    #[test]
+    fn same_resource_same_id() {
+        let system = initialize_storage_system();
+        let mut txn = system.rw_txn();
+        let resource0 = "Name".to_string();
+        let resource1 = "Name".to_string();
+        assert!(system.add_node(&mut txn, resource0));
+        assert!(!system.add_node(&mut txn, resource1));
+        txn.commit().unwrap();
+    }
     #[test]
     fn different_resource_different_id() {
         let system = initialize_storage_system();
         let mut txn = system.rw_txn();
-        let resource0 = ResourceData {
-            name: "Name0".to_string(),
-        };
-        let resource1 = ResourceData {
-            name: "Name1".to_string(),
-        };
-        assert!(system.add_resource(&mut txn, resource0));
-        assert!(system.add_resource(&mut txn, resource1));
-        assert!(system.get_resource_id(&txn, "Name0").is_some());
-        assert!(system.get_resource_id(&txn, "Name1").is_some());
+        let resource0 = "Name0".to_string();
+        let resource1 = "Name1".to_string();
+        assert!(system.add_node(&mut txn, resource0));
+        assert!(system.add_node(&mut txn, resource1));
+        assert!(system.get_id(&txn, "Name0").is_some());
+        assert!(system.get_id(&txn, "Name1").is_some());
         txn.commit().unwrap();
         let txn = system.ro_txn();
         assert_ne!(
-            system.get_resource_id(&txn, "Name0").unwrap(),
-            system.get_resource_id(&txn, "Name1").unwrap()
+            system.get_id(&txn, "Name0").unwrap(),
+            system.get_id(&txn, "Name1").unwrap()
         );
         assert_ne!(
             system
-                .get_resource(&txn, system.get_resource_id(&txn, "Name0").unwrap())
-                .unwrap()
-                .name,
+                .get_node(&txn, system.get_id(&txn, "Name0").unwrap())
+                .unwrap(),
             system
-                .get_resource(&txn, system.get_resource_id(&txn, "Name1").unwrap())
+                .get_node(&txn, system.get_id(&txn, "Name1").unwrap())
                 .unwrap()
-                .name,
         );
         txn.abort().unwrap();
     }
-    #[test]
-    fn add_entity() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let entity = EntityData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_entity(&mut txn, entity));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-        assert!(system.get_entity_id(&txn, "Name").is_some());
-        assert!(system.get_entity_id(&txn, "Nonexistent").is_none());
-        assert!(system
-            .get_entity(&txn, system.get_entity_id(&txn, "Name").unwrap())
-            .is_some());
-        assert_eq!(
-            system
-                .get_entity(&txn, system.get_entity_id(&txn, "Name").unwrap())
-                .unwrap()
-                .name,
-            "Name"
-        );
-        txn.abort().unwrap();
-    }
-    #[test]
-    fn same_entity_same_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let entity0 = EntityData {
-            name: "Name".to_string(),
-        };
-        let entity1 = EntityData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_entity(&mut txn, entity0));
-        assert!(!system.add_entity(&mut txn, entity1));
-        txn.commit().unwrap();
-    }
-    #[test]
-    fn different_entity_different_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let entity0 = EntityData {
-            name: "Name0".to_string(),
-        };
-        let entity1 = EntityData {
-            name: "Name1".to_string(),
-        };
-        assert!(system.add_entity(&mut txn, entity0));
-        assert!(system.add_entity(&mut txn, entity1));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-        assert!(system.get_entity_id(&txn, "Name0").is_some());
-        assert!(system.get_entity_id(&txn, "Name1").is_some());
-        assert_ne!(
-            system.get_entity_id(&txn, "Name0").unwrap(),
-            system.get_entity_id(&txn, "Name1").unwrap()
-        );
-        assert_ne!(
-            system
-                .get_entity(&txn, system.get_entity_id(&txn, "Name0").unwrap())
-                .unwrap()
-                .name,
-            system
-                .get_entity(&txn, system.get_entity_id(&txn, "Name1").unwrap())
-                .unwrap()
-                .name,
-        );
-        txn.abort().unwrap();
-    }
-    #[test]
-    fn add_label() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let label = LabelData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_label(&mut txn, label));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-
-        assert!(system.get_label_id(&txn, "Name").is_some());
-        assert!(system.get_label_id(&txn, "Nonexistent").is_none());
-        assert!(system
-            .get_label(&txn, system.get_label_id(&txn, "Name").unwrap())
-            .is_some());
-        assert_eq!(
-            system
-                .get_label(&txn, system.get_label_id(&txn, "Name").unwrap())
-                .unwrap()
-                .name,
-            "Name"
-        );
-        txn.abort().unwrap();
-    }
-    #[test]
-    fn same_label_same_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let label0 = LabelData {
-            name: "Name".to_string(),
-        };
-        let label1 = LabelData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_label(&mut txn, label0));
-        assert!(!system.add_label(&mut txn, label1));
-        txn.commit().unwrap();
-    }
-    #[test]
-    fn different_label_different_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let label0 = LabelData {
-            name: "Name0".to_string(),
-        };
-        let label1 = LabelData {
-            name: "Name1".to_string(),
-        };
-        assert!(system.add_label(&mut txn, label0));
-        assert!(system.add_label(&mut txn, label1));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-        assert!(system.get_label_id(&txn, "Name0").is_some());
-        assert!(system.get_label_id(&txn, "Name1").is_some());
-        assert_ne!(
-            system.get_label_id(&txn, "Name0").unwrap(),
-            system.get_label_id(&txn, "Name1").unwrap()
-        );
-        assert_ne!(
-            system
-                .get_label(&txn, system.get_label_id(&txn, "Name0").unwrap())
-                .unwrap()
-                .name,
-            system
-                .get_label(&txn, system.get_label_id(&txn, "Name1").unwrap())
-                .unwrap()
-                .name,
-        );
-        txn.abort().unwrap();
-    }
-    #[test]
-    fn add_colaborator() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let colaborator = ColabData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_colaborator(&mut txn, colaborator));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-        assert!(system.get_colaborator_id(&txn, "Name").is_some());
-        assert!(system.get_colaborator_id(&txn, "Nonexistent").is_none());
-        assert!(system
-            .get_colaborator(&txn, system.get_colaborator_id(&txn, "Name").unwrap())
-            .is_some());
-        assert_eq!(
-            system
-                .get_colaborator(&txn, system.get_colaborator_id(&txn, "Name").unwrap())
-                .unwrap()
-                .name,
-            "Name"
-        );
-        txn.abort().unwrap();
-    }
-    #[test]
-    fn same_colaborator_same_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let colaborator0 = ColabData {
-            name: "Name".to_string(),
-        };
-        let colaborator1 = ColabData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_colaborator(&mut txn, colaborator0));
-        assert!(!system.add_colaborator(&mut txn, colaborator1));
-        txn.commit().unwrap();
-    }
-    #[test]
-    fn different_colaborator_different_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let colaborator0 = ColabData {
-            name: "Name0".to_string(),
-        };
-        let colaborator1 = ColabData {
-            name: "Name1".to_string(),
-        };
-        assert!(system.add_colaborator(&mut txn, colaborator0));
-        assert!(system.add_colaborator(&mut txn, colaborator1));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-        assert!(system.get_colaborator_id(&txn, "Name0").is_some());
-        assert!(system.get_colaborator_id(&txn, "Name1").is_some());
-        assert_ne!(
-            system.get_colaborator_id(&txn, "Name0").unwrap(),
-            system.get_colaborator_id(&txn, "Name1").unwrap()
-        );
-        assert_ne!(
-            system
-                .get_colaborator(&txn, system.get_colaborator_id(&txn, "Name0").unwrap())
-                .unwrap()
-                .name,
-            system
-                .get_colaborator(&txn, system.get_colaborator_id(&txn, "Name1").unwrap())
-                .unwrap()
-                .name,
-        );
-        txn.abort().unwrap();
-    }
-
     #[test]
     fn graph_querying() {
         use std::collections::HashSet;
         let system = initialize_storage_system();
         let mut txn = system.rw_txn();
-        let r0 = ResourceData {
-            name: "R0".to_string(),
-        };
-        let r1 = ResourceData {
-            name: "R1".to_string(),
-        };
-        let l0 = LabelData {
-            name: "L0".to_string(),
-        };
-        let l1 = LabelData {
-            name: "L1".to_string(),
-        };
-        system.add_resource(&mut txn, r0);
-        system.add_resource(&mut txn, r1);
-        system.add_label(&mut txn, l0);
-        system.add_label(&mut txn, l1);
-        let r0 = system.get_resource_id(&txn, "R0").unwrap();
-        let r1 = system.get_resource_id(&txn, "R1").unwrap();
-        let l0 = system.get_label_id(&txn, "L0").unwrap();
-        let l1 = system.get_label_id(&txn, "L1").unwrap();
+        let r0 = "R0".to_string();
+        let r1 = "R1".to_string();
+        let l0 = "L0".to_string();
+        let l1 = "L1".to_string();
+        system.add_node(&mut txn, r0);
+        system.add_node(&mut txn, r1);
+        system.add_node(&mut txn, l0);
+        system.add_node(&mut txn, l1);
+        let r0 = system.get_id(&txn, "R0").unwrap();
+        let r1 = system.get_id(&txn, "R1").unwrap();
+        let l0 = system.get_id(&txn, "L0").unwrap();
+        let l1 = system.get_id(&txn, "L1").unwrap();
         assert_eq!(system.no_nodes(&txn), 4);
 
         // Edges
-        let edges_r0 = HashSet::from([Edge::Child(r0, r1), Edge::About(r0, l0)]);
-        let edges_r1 = HashSet::from([Edge::About(r1, l0), Edge::About(r1, l1)]);
-        assert!(edges_r0.iter().all(|edge| system.add_edge(&mut txn, *edge)));
-        assert!(edges_r1.iter().all(|edge| system.add_edge(&mut txn, *edge)));
+        let edges_r0 = HashSet::from([child(r0, r1), about(r0, l0)]);
+        let edges_r1 = HashSet::from([about(r1, l0), about(r1, l1)]);
         assert!(edges_r0
             .iter()
-            .all(|edge| !system.add_edge(&mut txn, *edge)));
+            .cloned()
+            .all(|edge| system.add_edge(&mut txn, edge)));
         assert!(edges_r1
             .iter()
-            .all(|edge| !system.add_edge(&mut txn, *edge)));
+            .cloned()
+            .all(|edge| system.add_edge(&mut txn, edge)));
+        assert!(edges_r0
+            .iter()
+            .cloned()
+            .all(|edge| !system.add_edge(&mut txn, edge)));
+        assert!(edges_r1
+            .iter()
+            .cloned()
+            .all(|edge| !system.add_edge(&mut txn, edge)));
         txn.commit().unwrap();
         let txn = system.ro_txn();
         {
-            let result: HashSet<_> = system.process_query(&txn, Query::AllR(r0)).collect();
+            let result: HashSet<_> = system.match_edges(&txn, PartialEdge::all(r0)).collect();
             assert_eq!(result, edges_r0);
-            let result: HashSet<_> = system.process_query(&txn, Query::AllR(r1)).collect();
+            let result: HashSet<_> = system.match_edges(&txn, PartialEdge::all(r1)).collect();
             assert_eq!(result, edges_r1);
         }
         {
-            let result: HashSet<_> = system
-                .process_query(&txn, Query::ChildQ(r0, None))
-                .collect();
-            assert_eq!(result, HashSet::from([Edge::Child(r0, r1)]));
-            let result: HashSet<_> = system
-                .process_query(&txn, Query::ChildQ(r1, None))
-                .collect();
+            let result: HashSet<_> = system.match_edges(&txn, par_child(r0, None)).collect();
+            assert_eq!(result, HashSet::from([child(r0, r1)]));
+            let result: HashSet<_> = system.match_edges(&txn, par_child(r1, None)).collect();
             assert_eq!(result, HashSet::from([]));
         }
         {
-            let result: HashSet<_> = system
-                .process_query(&txn, Query::ChildQ(r0, None))
-                .collect();
-            assert_eq!(result, HashSet::from([Edge::Child(r0, r1)]));
-            let result: HashSet<_> = system
-                .process_query(&txn, Query::ChildQ(r1, None))
-                .collect();
+            let result: HashSet<_> = system.match_edges(&txn, par_child(r0, None)).collect();
+            assert_eq!(result, HashSet::from([child(r0, r1)]));
+            let result: HashSet<_> = system.match_edges(&txn, par_child(r1, None)).collect();
             assert_eq!(result, HashSet::from([]));
         }
         {
-            let result: HashSet<_> = system
-                .process_query(&txn, Query::AboutQ(r0, None))
-                .collect();
-            assert_eq!(result, HashSet::from([Edge::About(r0, l0)]));
-            let result: HashSet<_> = system
-                .process_query(&txn, Query::AboutQ(r1, None))
-                .collect();
-            assert_eq!(
-                result,
-                HashSet::from([Edge::About(r1, l0), Edge::About(r1, l1)])
-            )
+            let result: HashSet<_> = system.match_edges(&txn, par_about(r0, None)).collect();
+            assert_eq!(result, HashSet::from([about(r0, l0)]));
+            let result: HashSet<_> = system.match_edges(&txn, par_about(r1, None)).collect();
+            assert_eq!(result, HashSet::from([about(r1, l0), about(r1, l1)]))
         }
         {
             let results_r0: HashSet<_> = system
-                .process_query(&txn, Query::AboutQ(r0, None))
+                .match_edges(&txn, par_about(r0, None))
+                .map(|edge| edge.to)
                 .collect();
             let results_r1: HashSet<_> = system
-                .process_query(&txn, Query::AboutQ(r0, None))
+                .match_edges(&txn, par_about(r1, None))
+                .map(|edge| edge.to)
                 .collect();
-            let intersection = HashSet::from([Edge::About(r0, l0)]);
+            let intersection = HashSet::from([l0]);
             assert_eq!(results_r0.intersection(&results_r1).count(), 1);
             assert!(results_r0
                 .intersection(&results_r1)
                 .all(|e| intersection.contains(e)));
         }
+        {
+            let all_edges: HashSet<_> = edges_r0.union(&edges_r1).cloned().collect();
+            let matches: HashSet<_> = system.match_edges(&txn, PartialEdge::wildcard()).collect();
+            assert_eq!(all_edges, matches);
+        }
         txn.abort().unwrap();
+    }
+    #[test]
+    fn query_delete() {
+        let system = initialize_storage_system();
+        let mut txn = system.rw_txn();
+        let r0 = "R0".to_string();
+        let r1 = "R1".to_string();
+        system.add_node(&mut txn, r0);
+        system.add_node(&mut txn, r1);
+        let r0_id = system.get_id(&txn, "R0").unwrap();
+        let r1_id = system.get_id(&txn, "R1").unwrap();
+        system.add_edge(&mut txn, child(r0_id, r1_id));
+        system.add_edge(&mut txn, child(r1_id, r0_id));
+        system.delete_matches(&mut txn, PartialEdge::all(r0_id));
+        assert_eq!(system.match_edges(&txn, PartialEdge::all(r0_id)).count(), 0);
+        assert_eq!(system.match_edges(&txn, PartialEdge::all(r1_id)).count(), 1);
+    }
+    #[test]
+    fn delete_full_node() {
+        let system = initialize_storage_system();
+        let mut txn = system.rw_txn();
+        let r0 = "R0".to_string();
+        let r1 = "R1".to_string();
+        system.add_node(&mut txn, r0);
+        system.add_node(&mut txn, r1);
+        let r0_id = system.get_id(&txn, "R0").unwrap();
+        let r1_id = system.get_id(&txn, "R1").unwrap();
+        system.add_edge(&mut txn, child(r0_id, r1_id));
+        system.add_edge(&mut txn, child(r1_id, r0_id));
+        system.delete_node(&mut txn, r0_id);
+        assert_eq!(system.match_edges(&txn, PartialEdge::all(r0_id)).count(), 0);
+        assert_eq!(system.match_edges(&txn, PartialEdge::all(r1_id)).count(), 0);
     }
 }

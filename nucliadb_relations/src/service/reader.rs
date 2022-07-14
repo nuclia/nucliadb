@@ -21,24 +21,28 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
-use nucliadb_protos::{RelationSearchRequest, RelationSearchResponse};
+use nucliadb_protos::relation::RelationType;
+use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
 use crate::graph::*;
+use crate::search_engine::*;
+use crate::service::utils::*;
 
-pub struct RelationReaderService {
+pub struct RelationsReaderService {
     index: StorageSystem,
 }
-impl RService for RelationReaderService {}
-impl Debug for RelationReaderService {
+impl RService for RelationsReaderService {}
+impl RelationServiceReader for RelationsReaderService {}
+impl Debug for RelationsReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RelationReaderService").finish()
     }
 }
 
 #[async_trait]
-impl ServiceChild for RelationReaderService {
+impl ServiceChild for RelationsReaderService {
     async fn stop(&self) -> InternalResult<()> {
         info!("Stopping relation reader Service");
         Ok(())
@@ -50,11 +54,50 @@ impl ServiceChild for RelationReaderService {
         count as usize
     }
 }
-impl ReaderChild for RelationReaderService {
+impl ReaderChild for RelationsReaderService {
     type Request = RelationSearchRequest;
     type Response = RelationSearchResponse;
-    fn search(&self, _: &Self::Request) -> InternalResult<Self::Response> {
-        Ok(RelationSearchResponse {})
+    fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        use std::collections::HashSet;
+        let txn = self.index.ro_txn();
+        let entry_points: Vec<_> = request
+            .entry_points
+            .iter()
+            .map(|node| {
+                NodeBuilder::new()
+                    .with_value(node.value.clone())
+                    .with_type(node_type_parsing(node.ntype()))
+                    .with_subtype(node.subtype.clone())
+                    .build()
+                    .to_string()
+            })
+            .map(|node| self.index.get_id(&txn, &node))
+            .filter(|n| n.is_some())
+            .flatten()
+            .collect();
+        let mut query = QueryConstructor::default()
+            .depth(request.depth as u32)
+            .prefixed(request.prefix.clone())
+            .always_jump(HashSet::from([rtype_parsing(RelationType::Sym, "")]))
+            .build()
+            .unwrap();
+        request
+            .type_filters
+            .iter()
+            .cloned()
+            .for_each(|tf| query.add_types(node_type_parsing(tf.ntype()), tf.subtype));
+        Ok(RelationSearchResponse {
+            neighbours: process_query(&entry_points, &self.index, query)
+                .matches
+                .into_iter()
+                .map(|id| Node::from(self.index.get_node(&txn, id).unwrap()))
+                .map(|node| RelationNode {
+                    value: node.get_value().to_string(),
+                    ntype: string_to_node_type(node.get_type()) as i32,
+                    subtype: node.get_subtype().to_string(),
+                })
+                .collect(),
+        })
     }
     fn stored_ids(&self) -> Vec<String> {
         let txn = self.index.ro_txn();
@@ -65,36 +108,60 @@ impl ReaderChild for RelationReaderService {
     fn reload(&self) {}
 }
 
-impl RelationReaderService {
-    pub async fn start(config: &RelationsServiceConfiguration) -> InternalResult<Self> {
+impl RelationsReaderService {
+    pub async fn start(config: &RelationServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            Ok(RelationReaderService::new(config).await.unwrap())
+            Ok(RelationsReaderService::new(config).await.unwrap())
         } else {
-            Ok(RelationReaderService::open(config).await.unwrap())
+            Ok(RelationsReaderService::open(config).await.unwrap())
         }
     }
-    pub async fn new(config: &RelationsServiceConfiguration) -> InternalResult<Self> {
+    pub async fn new(config: &RelationServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
             tokio::fs::create_dir_all(path).await.unwrap();
 
-            Ok(RelationReaderService {
+            Ok(RelationsReaderService {
                 index: StorageSystem::create(path),
             })
         }
     }
 
-    pub async fn open(config: &RelationsServiceConfiguration) -> InternalResult<Self> {
+    pub async fn open(config: &RelationServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
-            Ok(RelationReaderService {
+            Ok(RelationsReaderService {
                 index: StorageSystem::open(path),
             })
         }
+    }
+}
+
+impl RelationReaderOnly for RelationsReaderService {
+    fn get_edges(&self) -> EdgeList {
+        let list: Vec<_> = get_edge_types(&self.index)
+            .into_iter()
+            .map(|rtype| string_to_rtype(&rtype))
+            .map(|(etype, property)| RelationEdge {
+                property,
+                edge_type: etype as i32,
+            })
+            .collect();
+        EdgeList { list }
+    }
+    fn get_node_types(&self) -> TypeList {
+        let list: Vec<_> = get_node_types(&self.index)
+            .into_iter()
+            .map(|(node_type, subtype)| RelationTypeListMember {
+                with_type: string_to_node_type(&node_type) as i32,
+                with_subtype: subtype,
+            })
+            .collect();
+        TypeList { list }
     }
 }

@@ -23,9 +23,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, IdCollection, ParagraphSearchRequest,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
     ParagraphSearchResponse, SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList,
-    SuggestRequest, SuggestResponse, VectorSearchRequest, VectorSearchResponse,
+    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_services::*;
 use tracing::*;
@@ -139,6 +139,18 @@ impl NodeReaderService {
         }
     }
 
+    pub async fn relation_search(
+        &mut self,
+        shard_id: &ShardId,
+        request: RelationSearchRequest,
+    ) -> Option<ServiceResult<RelationSearchResponse>> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            Some(shard.relation_search(request).await.map_err(|e| e.into()))
+        } else {
+            None
+        }
+    }
+
     pub async fn vector_search(
         &mut self,
         shard_id: &ShardId,
@@ -194,6 +206,32 @@ impl NodeReaderService {
         if let Some(shard) = self.get_shard(shard_id).await {
             let ids = shard.get_vectors_keys().await;
             Some(IdCollection { ids })
+        } else {
+            None
+        }
+    }
+    pub async fn relation_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            let ids = shard.get_relations_keys().await;
+            Some(IdCollection { ids })
+        } else {
+            None
+        }
+    }
+
+    pub async fn relation_edges(&mut self, shard_id: &ShardId) -> Option<EdgeList> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            let edges = shard.get_relations_edges().await;
+            Some(edges)
+        } else {
+            None
+        }
+    }
+
+    pub async fn relation_types(&mut self, shard_id: &ShardId) -> Option<TypeList> {
+        if let Some(shard) = self.get_shard(shard_id).await {
+            let types = shard.get_relations_types().await;
+            Some(types)
         } else {
             None
         }

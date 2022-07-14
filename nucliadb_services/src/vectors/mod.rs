@@ -17,12 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::*;
+use nucliadb_service_interface::vectos_interface::*;
 
+use crate::*;
 pub const MAX_VERSION: u32 = 0;
 
-type RServiceT = dyn RService<Request = VectorSearchRequest, Response = VectorSearchResponse>;
-type WServiceT = dyn WService;
+type RServiceT = dyn VectorServiceReader;
+type WServiceT = dyn VectorServiceWriter;
 pub type RVectors = Arc<RServiceT>;
 pub type WVectors = Arc<RwLock<WServiceT>>;
 

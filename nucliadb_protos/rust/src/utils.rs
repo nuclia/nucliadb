@@ -1,21 +1,13 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EntityRelation {
-    #[prost(string, tag="1")]
-    pub entity: ::prost::alloc::string::String,
-    #[prost(string, tag="2")]
-    pub entity_type: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Relation {
-    #[prost(enumeration="relation::RelationType", tag="1")]
+    #[prost(enumeration="relation::RelationType", tag="5")]
     pub relation: i32,
-    #[prost(map="string, string", tag="7")]
-    pub properties: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
-    /// Relations can be with a resource, label, user or entity
-    #[prost(oneof="relation::Target", tags="2, 3, 4, 5, 6")]
-    pub target: ::core::option::Option<relation::Target>,
-    #[prost(oneof="relation::Source", tags="8")]
-    pub source: ::core::option::Option<relation::Source>,
+    #[prost(message, optional, tag="6")]
+    pub source: ::core::option::Option<RelationNode>,
+    #[prost(message, optional, tag="7")]
+    pub to: ::core::option::Option<RelationNode>,
+    #[prost(string, tag="8")]
+    pub relation_label: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `Relation`.
 pub mod relation {
@@ -25,32 +17,35 @@ pub mod relation {
         /// Child resource
         Child = 0,
         /// related with label (GENERATED)
-        About = 2,
+        About = 1,
         /// related with an entity (GENERATED)
-        Entity = 3,
+        Entity = 2,
         /// related with user (GENERATED)
-        Colab = 4,
+        Colab = 3,
+        /// Synonym relation
+        Sym = 4,
         /// related with something
         Other = 5,
     }
-    /// Relations can be with a resource, label, user or entity
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Target {
-        #[prost(string, tag="2")]
-        Resource(::prost::alloc::string::String),
-        #[prost(string, tag="3")]
-        Label(::prost::alloc::string::String),
-        #[prost(string, tag="4")]
-        User(::prost::alloc::string::String),
-        #[prost(message, tag="5")]
-        Entity(super::EntityRelation),
-        #[prost(string, tag="6")]
-        Other(::prost::alloc::string::String),
-    }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Source {
-        #[prost(message, tag="8")]
-        FromEntity(super::EntityRelation),
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelationNode {
+    #[prost(string, tag="4")]
+    pub value: ::prost::alloc::string::String,
+    #[prost(enumeration="relation_node::NodeType", tag="5")]
+    pub ntype: i32,
+    #[prost(string, tag="6")]
+    pub subtype: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `RelationNode`.
+pub mod relation_node {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum NodeType {
+        Entity = 0,
+        Label = 1,
+        Resource = 2,
+        User = 3,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -33,6 +33,7 @@ pub struct ShardWriterService {
     field_writer_service: fields::WFields,
     paragraph_writer_service: paragraphs::WParagraphs,
     vector_writer_service: vectors::WVectors,
+    relation_writer_service: relations::WRelations,
     pub document_service_version: i32,
     pub paragraph_service_version: i32,
     pub vector_service_version: i32,
@@ -60,21 +61,27 @@ impl ShardWriterService {
             no_results: None,
             path: format!("{}/vectors", shard_path),
         };
+        let rsc = RelationServiceConfiguration {
+            path: format!("{}/relations", shard_path),
+        };
         let config = ShardConfig::new(&shard_path).await;
         let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
         let paragraph_writer_service =
             paragraphs::create_writer(&psc, config.version_paragraphs).await?;
         let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
+        let relation_writer_service =
+            relations::create_writer(&rsc, config.version_relations).await?;
 
         Ok(ShardWriterService {
             id: id.to_string(),
             field_writer_service,
             paragraph_writer_service,
             vector_writer_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
-            relation_service_version: 0,
+            relation_writer_service,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_vectors as i32,
+            relation_service_version: config.version_relations as i32,
         })
     }
     pub async fn new(id: &str) -> InternalResult<ShardWriterService> {
@@ -96,21 +103,27 @@ impl ShardWriterService {
             no_results: None,
             path: format!("{}/vectors", shard_path),
         };
+        let rsc = RelationServiceConfiguration {
+            path: format!("{}/relations", shard_path),
+        };
         let config = ShardConfig::new(&shard_path).await;
         let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
         let paragraph_writer_service =
             paragraphs::create_writer(&psc, config.version_paragraphs).await?;
         let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
+        let relation_writer_service =
+            relations::create_writer(&rsc, config.version_relations).await?;
 
         Ok(ShardWriterService {
             field_writer_service,
             paragraph_writer_service,
             vector_writer_service,
+            relation_writer_service,
             id: id.to_string(),
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
-            relation_service_version: 0,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_vectors as i32,
+            relation_service_version: config.version_relations as i32,
         })
     }
     pub async fn open(id: &str) -> InternalResult<ShardWriterService> {
@@ -132,21 +145,27 @@ impl ShardWriterService {
             no_results: None,
             path: format!("{}/vectors", shard_path),
         };
+        let rsc = RelationServiceConfiguration {
+            path: format!("{}/relations", shard_path),
+        };
         let config = ShardConfig::new(&shard_path).await;
         let field_writer_service = fields::open_writer(&fsc, config.version_fields).await?;
         let paragraph_writer_service =
             paragraphs::open_writer(&psc, config.version_paragraphs).await?;
         let vector_writer_service = vectors::open_writer(&vsc, config.version_vectors).await?;
+        let relation_writer_service =
+            relations::open_writer(&rsc, config.version_relations).await?;
 
         Ok(ShardWriterService {
             id: id.to_string(),
             field_writer_service,
             paragraph_writer_service,
             vector_writer_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
-            relation_service_version: 0,
+            relation_writer_service,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_vectors as i32,
+            relation_service_version: config.version_relations as i32,
         })
     }
 
@@ -196,11 +215,19 @@ impl ShardWriterService {
             span.in_scope(|| writer.set_resource(&vector_resource))
         });
         info!("Vector service ends");
-        let (rtext, rparagraph, rvector) =
-            try_join!(text_task, paragraph_task, vector_task).unwrap();
-        rtext?;
-        rparagraph?;
-        rvector?;
+
+        let relation_writer_service = self.relation_writer_service.clone();
+        let relation_resource = resource.clone();
+        let relation_task = tokio::task::spawn_blocking(move || {
+            let mut writer = relation_writer_service.write().unwrap();
+            writer.set_resource(&relation_resource)
+        });
+        let (text_result, paragraph_result, vector_result, relation_result) =
+            try_join!(text_task, paragraph_task, vector_task, relation_task).unwrap();
+        text_result?;
+        paragraph_result?;
+        vector_result?;
+        relation_result?;
         Ok(())
     }
 
@@ -223,11 +250,18 @@ impl ShardWriterService {
             let mut writer = vector_writer_service.write().unwrap();
             writer.delete_resource(&vector_resource)
         });
-        let (rtext, rparagraph, rvector) =
-            try_join!(text_task, paragraph_task, vector_task).unwrap();
-        rtext?;
-        rparagraph?;
-        rvector?;
+        let relation_writer_service = self.relation_writer_service.clone();
+        let relation_resource = resource.clone();
+        let relation_task = tokio::task::spawn_blocking(move || {
+            let mut writer = relation_writer_service.write().unwrap();
+            writer.delete_resource(&relation_resource)
+        });
+        let (text_result, paragraph_result, vector_result, relation_result) =
+            try_join!(text_task, paragraph_task, vector_task, relation_task).unwrap();
+        text_result?;
+        paragraph_result?;
+        vector_result?;
+        relation_result?;
         Ok(())
     }
     pub async fn delete(&self) -> Result<(), std::io::Error> {

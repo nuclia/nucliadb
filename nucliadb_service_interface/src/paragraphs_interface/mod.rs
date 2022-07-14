@@ -17,7 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use crate::service_interface::InternalError;
+use nucliadb_protos::*;
+
+use crate::service_interface::*;
+
 pub struct ParagraphServiceConfiguration {
     pub path: String,
 }
@@ -33,3 +36,19 @@ impl std::fmt::Display for ParagraphError {
 }
 
 impl InternalError for ParagraphError {}
+
+pub trait ParagraphReaderOnly {}
+pub trait ParagraphWriterOnly {}
+
+pub trait ParagraphServiceReader:
+    ServiceChild
+    + RService
+    + ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
+    + ParagraphReaderOnly
+{
+}
+
+pub trait ParagraphServiceWriter:
+    WService + ServiceChild + WriterChild + ParagraphWriterOnly
+{
+}

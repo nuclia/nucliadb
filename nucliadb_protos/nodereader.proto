@@ -154,12 +154,22 @@ message VectorSearchResponse {
     repeated DocumentScored documents = 1;
 }
 
+message RelationFilter {
+    utils.RelationNode.NodeType ntype=1;
+    string subtype=2;
+}
+
 message RelationSearchRequest {
-    
+    string id = 1; //Shard ID
+    repeated utils.RelationNode entry_points = 2;
+    repeated RelationFilter type_filters = 3;
+    int32 depth = 4;
+    string prefix = 5;
+    bool reload = 13;
 }
 
 message RelationSearchResponse {
-    
+    repeated utils.RelationNode neighbours = 1;
 }
 
 message SearchRequest {
@@ -217,6 +227,25 @@ message IdCollection {
     repeated string ids = 1;
 }
 
+message RelationEdge {
+    utils.Relation.RelationType edge_type = 1;
+    string property = 2;   
+}
+
+message EdgeList {
+    repeated RelationEdge list = 1;
+}
+
+message RelationTypeListMember {
+    utils.RelationNode.NodeType with_type = 1;
+    string with_subtype = 2;
+}
+
+message TypeList {
+    repeated RelationTypeListMember list = 1;
+}
+
+
 // Implemented at nucliadb_object_storage
 
 service NodeReader {
@@ -231,6 +260,10 @@ service NodeReader {
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
+    rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
+
+    rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
+    rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
 
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}

@@ -23,7 +23,7 @@ from nucliadb_protos import utils_pb2 as nucliadb__protos_dot_utils__pb2
 from nucliadb_protos.noderesources_pb2 import *
 from nucliadb_protos.utils_pb2 import *
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n nucliadb_protos/nodereader.proto\x12\nnodereader\x1a#nucliadb_protos/noderesources.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnucliadb_protos/utils.proto\"\x16\n\x06\x46ilter\x12\x0c\n\x04tags\x18\x01 \x03(\t\"\x17\n\x07\x46\x61\x63\x65ted\x12\x0c\n\x04tags\x18\x01 \x03(\t\"e\n\x07OrderBy\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12+\n\x04type\x18\x02 \x01(\x0e\x32\x1d.nodereader.OrderBy.OrderType\"\x1e\n\tOrderType\x12\x08\n\x04\x44\x45SC\x10\x00\x12\x07\n\x03\x41SC\x10\x01\"\xd2\x01\n\nTimestamps\x12\x31\n\rfrom_modified\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0bto_modified\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x66rom_created\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nto_created\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\")\n\x0b\x46\x61\x63\x65tResult\x12\x0b\n\x03tag\x18\x01 \x01(\t\x12\r\n\x05total\x18\x02 \x01(\x05\"=\n\x0c\x46\x61\x63\x65tResults\x12-\n\x0c\x66\x61\x63\x65tresults\x18\x01 \x03(\x0b\x32\x17.nodereader.FacetResult\"\x99\x02\n\x15\x44ocumentSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\n \x01(\x08\"\xa8\x02\n\x16ParagraphSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\"\n\x06\x66ilter\x18\x05 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x07 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x08 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\n \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x0b \x01(\x05\x12*\n\ntimestamps\x18\x0c \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\r \x01(\x08\"P\n\x0e\x44ocumentResult\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x04\x12\x12\n\nscore_bm25\x18\x03 \x01(\x02\x12\r\n\x05\x66ield\x18\x04 \x01(\t\"\x8b\x02\n\x16\x44ocumentSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12+\n\x07results\x18\x02 \x03(\x0b\x32\x1a.nodereader.DocumentResult\x12>\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32..nodereader.DocumentSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aG\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.nodereader.FacetResults:\x02\x38\x01\"\x8a\x01\n\x0fParagraphResult\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x02\x12\r\n\x05\x66ield\x18\x03 \x01(\t\x12\r\n\x05start\x18\x04 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x05 \x01(\x04\x12\x11\n\tparagraph\x18\x06 \x01(\t\x12\r\n\x05split\x18\x07 \x01(\t\x12\r\n\x05index\x18\x08 \x01(\x04\"\x8e\x02\n\x17ParagraphSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12,\n\x07results\x18\x02 \x03(\x0b\x32\x1b.nodereader.ParagraphResult\x12?\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32/.nodereader.ParagraphSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aG\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.nodereader.FacetResults:\x02\x38\x01\"O\n\x13VectorSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06vector\x18\x02 \x03(\x02\x12\x0c\n\x04tags\x18\x03 \x03(\t\x12\x0e\n\x06reload\x18\r \x01(\x08\"&\n\x18\x44ocumentVectorIdentifier\x12\n\n\x02id\x18\x01 \x01(\t\"U\n\x0e\x44ocumentScored\x12\x34\n\x06\x64oc_id\x18\x01 \x01(\x0b\x32$.nodereader.DocumentVectorIdentifier\x12\r\n\x05score\x18\x02 \x01(\x02\"E\n\x14VectorSearchResponse\x12-\n\tdocuments\x18\x01 \x03(\x0b\x32\x1a.nodereader.DocumentScored\"\x17\n\x15RelationSearchRequest\"\x18\n\x16RelationSearchResponse\"\xa4\x02\n\rSearchRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0e\n\x06\x66ields\x18\x02 \x03(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06vector\x18\n \x03(\x02\x12\x0e\n\x06reload\x18\x0b \x01(\x08\"}\n\x0eSuggestRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\"\n\x06\x66ilter\x18\x03 \x01(\x0b\x32\x12.nodereader.Filter\x12*\n\ntimestamps\x18\x04 \x01(\x0b\x32\x16.nodereader.Timestamps\"N\n\x0fSuggestResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12,\n\x07results\x18\x02 \x03(\x0b\x32\x1b.nodereader.ParagraphResult\"\xb0\x01\n\x0eSearchResponse\x12\x34\n\x08\x64ocument\x18\x01 \x01(\x0b\x32\".nodereader.DocumentSearchResponse\x12\x36\n\tparagraph\x18\x02 \x01(\x0b\x32#.nodereader.ParagraphSearchResponse\x12\x30\n\x06vector\x18\x03 \x01(\x0b\x32 .nodereader.VectorSearchResponse\"\x1b\n\x0cIdCollection\x12\x0b\n\x03ids\x18\x01 \x03(\t2\xc6\x06\n\nNodeReader\x12:\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x14.noderesources.Shard\"\x00\x12\x42\n\tGetShards\x12\x19.noderesources.EmptyQuery\x1a\x18.noderesources.ShardList\"\x00\x12Y\n\x0e\x44ocumentSearch\x12!.nodereader.DocumentSearchRequest\x1a\".nodereader.DocumentSearchResponse\"\x00\x12\\\n\x0fParagraphSearch\x12\".nodereader.ParagraphSearchRequest\x1a#.nodereader.ParagraphSearchResponse\"\x00\x12S\n\x0cVectorSearch\x12\x1f.nodereader.VectorSearchRequest\x1a .nodereader.VectorSearchResponse\"\x00\x12Y\n\x0eRelationSearch\x12!.nodereader.RelationSearchRequest\x1a\".nodereader.RelationSearchResponse\"\x00\x12\x41\n\x0b\x44ocumentIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12\x42\n\x0cParagraphIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12?\n\tVectorIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12\x41\n\x06Search\x12\x19.nodereader.SearchRequest\x1a\x1a.nodereader.SearchResponse\"\x00\x12\x44\n\x07Suggest\x12\x1a.nodereader.SuggestRequest\x1a\x1b.nodereader.SuggestResponse\"\x00P\x00P\x02\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n nucliadb_protos/nodereader.proto\x12\nnodereader\x1a#nucliadb_protos/noderesources.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bnucliadb_protos/utils.proto\"\x16\n\x06\x46ilter\x12\x0c\n\x04tags\x18\x01 \x03(\t\"\x17\n\x07\x46\x61\x63\x65ted\x12\x0c\n\x04tags\x18\x01 \x03(\t\"e\n\x07OrderBy\x12\r\n\x05\x66ield\x18\x01 \x01(\t\x12+\n\x04type\x18\x02 \x01(\x0e\x32\x1d.nodereader.OrderBy.OrderType\"\x1e\n\tOrderType\x12\x08\n\x04\x44\x45SC\x10\x00\x12\x07\n\x03\x41SC\x10\x01\"\xd2\x01\n\nTimestamps\x12\x31\n\rfrom_modified\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0bto_modified\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x66rom_created\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nto_created\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\")\n\x0b\x46\x61\x63\x65tResult\x12\x0b\n\x03tag\x18\x01 \x01(\t\x12\r\n\x05total\x18\x02 \x01(\x05\"=\n\x0c\x46\x61\x63\x65tResults\x12-\n\x0c\x66\x61\x63\x65tresults\x18\x01 \x03(\x0b\x32\x17.nodereader.FacetResult\"\x99\x02\n\x15\x44ocumentSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\n \x01(\x08\"\xa8\x02\n\x16ParagraphSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04uuid\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x03(\t\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\x12\"\n\x06\x66ilter\x18\x05 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x07 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x08 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\n \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x0b \x01(\x05\x12*\n\ntimestamps\x18\x0c \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06reload\x18\r \x01(\x08\"P\n\x0e\x44ocumentResult\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x04\x12\x12\n\nscore_bm25\x18\x03 \x01(\x02\x12\r\n\x05\x66ield\x18\x04 \x01(\t\"\x8b\x02\n\x16\x44ocumentSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12+\n\x07results\x18\x02 \x03(\x0b\x32\x1a.nodereader.DocumentResult\x12>\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32..nodereader.DocumentSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aG\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.nodereader.FacetResults:\x02\x38\x01\"\x8a\x01\n\x0fParagraphResult\x12\x0c\n\x04uuid\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x02\x12\r\n\x05\x66ield\x18\x03 \x01(\t\x12\r\n\x05start\x18\x04 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x05 \x01(\x04\x12\x11\n\tparagraph\x18\x06 \x01(\t\x12\r\n\x05split\x18\x07 \x01(\t\x12\r\n\x05index\x18\x08 \x01(\x04\"\x8e\x02\n\x17ParagraphSearchResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12,\n\x07results\x18\x02 \x03(\x0b\x32\x1b.nodereader.ParagraphResult\x12?\n\x06\x66\x61\x63\x65ts\x18\x03 \x03(\x0b\x32/.nodereader.ParagraphSearchResponse.FacetsEntry\x12\x13\n\x0bpage_number\x18\x04 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x05 \x01(\x05\x1aG\n\x0b\x46\x61\x63\x65tsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.nodereader.FacetResults:\x02\x38\x01\"O\n\x13VectorSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06vector\x18\x02 \x03(\x02\x12\x0c\n\x04tags\x18\x03 \x03(\t\x12\x0e\n\x06reload\x18\r \x01(\x08\"&\n\x18\x44ocumentVectorIdentifier\x12\n\n\x02id\x18\x01 \x01(\t\"U\n\x0e\x44ocumentScored\x12\x34\n\x06\x64oc_id\x18\x01 \x01(\x0b\x32$.nodereader.DocumentVectorIdentifier\x12\r\n\x05score\x18\x02 \x01(\x02\"E\n\x14VectorSearchResponse\x12-\n\tdocuments\x18\x01 \x03(\x0b\x32\x1a.nodereader.DocumentScored\"N\n\x0eRelationFilter\x12+\n\x05ntype\x18\x01 \x01(\x0e\x32\x1c.utils.RelationNode.NodeType\x12\x0f\n\x07subtype\x18\x02 \x01(\t\"\xaf\x01\n\x15RelationSearchRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12)\n\x0c\x65ntry_points\x18\x02 \x03(\x0b\x32\x13.utils.RelationNode\x12\x30\n\x0ctype_filters\x18\x03 \x03(\x0b\x32\x1a.nodereader.RelationFilter\x12\r\n\x05\x64\x65pth\x18\x04 \x01(\x05\x12\x0e\n\x06prefix\x18\x05 \x01(\t\x12\x0e\n\x06reload\x18\r \x01(\x08\"A\n\x16RelationSearchResponse\x12\'\n\nneighbours\x18\x01 \x03(\x0b\x32\x13.utils.RelationNode\"\xa4\x02\n\rSearchRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0e\n\x06\x66ields\x18\x02 \x03(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\"\n\x06\x66ilter\x18\x04 \x01(\x0b\x32\x12.nodereader.Filter\x12\"\n\x05order\x18\x05 \x01(\x0b\x32\x13.nodereader.OrderBy\x12$\n\x07\x66\x61\x63\x65ted\x18\x06 \x01(\x0b\x32\x13.nodereader.Faceted\x12\x13\n\x0bpage_number\x18\x07 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x08 \x01(\x05\x12*\n\ntimestamps\x18\t \x01(\x0b\x32\x16.nodereader.Timestamps\x12\x0e\n\x06vector\x18\n \x03(\x02\x12\x0e\n\x06reload\x18\x0b \x01(\x08\"}\n\x0eSuggestRequest\x12\r\n\x05shard\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\"\n\x06\x66ilter\x18\x03 \x01(\x0b\x32\x12.nodereader.Filter\x12*\n\ntimestamps\x18\x04 \x01(\x0b\x32\x16.nodereader.Timestamps\"N\n\x0fSuggestResponse\x12\r\n\x05total\x18\x01 \x01(\x05\x12,\n\x07results\x18\x02 \x03(\x0b\x32\x1b.nodereader.ParagraphResult\"\xb0\x01\n\x0eSearchResponse\x12\x34\n\x08\x64ocument\x18\x01 \x01(\x0b\x32\".nodereader.DocumentSearchResponse\x12\x36\n\tparagraph\x18\x02 \x01(\x0b\x32#.nodereader.ParagraphSearchResponse\x12\x30\n\x06vector\x18\x03 \x01(\x0b\x32 .nodereader.VectorSearchResponse\"\x1b\n\x0cIdCollection\x12\x0b\n\x03ids\x18\x01 \x03(\t\"Q\n\x0cRelationEdge\x12/\n\tedge_type\x18\x01 \x01(\x0e\x32\x1c.utils.Relation.RelationType\x12\x10\n\x08property\x18\x02 \x01(\t\"2\n\x08\x45\x64geList\x12&\n\x04list\x18\x01 \x03(\x0b\x32\x18.nodereader.RelationEdge\"_\n\x16RelationTypeListMember\x12/\n\twith_type\x18\x01 \x01(\x0e\x32\x1c.utils.RelationNode.NodeType\x12\x14\n\x0cwith_subtype\x18\x02 \x01(\t\"<\n\x08TypeList\x12\x30\n\x04list\x18\x01 \x03(\x0b\x32\".nodereader.RelationTypeListMember2\x8b\x08\n\nNodeReader\x12:\n\x08GetShard\x12\x16.noderesources.ShardId\x1a\x14.noderesources.Shard\"\x00\x12\x42\n\tGetShards\x12\x19.noderesources.EmptyQuery\x1a\x18.noderesources.ShardList\"\x00\x12Y\n\x0e\x44ocumentSearch\x12!.nodereader.DocumentSearchRequest\x1a\".nodereader.DocumentSearchResponse\"\x00\x12\\\n\x0fParagraphSearch\x12\".nodereader.ParagraphSearchRequest\x1a#.nodereader.ParagraphSearchResponse\"\x00\x12S\n\x0cVectorSearch\x12\x1f.nodereader.VectorSearchRequest\x1a .nodereader.VectorSearchResponse\"\x00\x12Y\n\x0eRelationSearch\x12!.nodereader.RelationSearchRequest\x1a\".nodereader.RelationSearchResponse\"\x00\x12\x41\n\x0b\x44ocumentIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12\x42\n\x0cParagraphIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12?\n\tVectorIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12\x41\n\x0bRelationIds\x12\x16.noderesources.ShardId\x1a\x18.nodereader.IdCollection\"\x00\x12?\n\rRelationEdges\x12\x16.noderesources.ShardId\x1a\x14.nodereader.EdgeList\"\x00\x12?\n\rRelationTypes\x12\x16.noderesources.ShardId\x1a\x14.nodereader.TypeList\"\x00\x12\x41\n\x06Search\x12\x19.nodereader.SearchRequest\x1a\x1a.nodereader.SearchResponse\"\x00\x12\x44\n\x07Suggest\x12\x1a.nodereader.SuggestRequest\x1a\x1b.nodereader.SuggestResponse\"\x00P\x00P\x02\x62\x06proto3')
 
 
 
@@ -45,6 +45,7 @@ _VECTORSEARCHREQUEST = DESCRIPTOR.message_types_by_name['VectorSearchRequest']
 _DOCUMENTVECTORIDENTIFIER = DESCRIPTOR.message_types_by_name['DocumentVectorIdentifier']
 _DOCUMENTSCORED = DESCRIPTOR.message_types_by_name['DocumentScored']
 _VECTORSEARCHRESPONSE = DESCRIPTOR.message_types_by_name['VectorSearchResponse']
+_RELATIONFILTER = DESCRIPTOR.message_types_by_name['RelationFilter']
 _RELATIONSEARCHREQUEST = DESCRIPTOR.message_types_by_name['RelationSearchRequest']
 _RELATIONSEARCHRESPONSE = DESCRIPTOR.message_types_by_name['RelationSearchResponse']
 _SEARCHREQUEST = DESCRIPTOR.message_types_by_name['SearchRequest']
@@ -52,6 +53,10 @@ _SUGGESTREQUEST = DESCRIPTOR.message_types_by_name['SuggestRequest']
 _SUGGESTRESPONSE = DESCRIPTOR.message_types_by_name['SuggestResponse']
 _SEARCHRESPONSE = DESCRIPTOR.message_types_by_name['SearchResponse']
 _IDCOLLECTION = DESCRIPTOR.message_types_by_name['IdCollection']
+_RELATIONEDGE = DESCRIPTOR.message_types_by_name['RelationEdge']
+_EDGELIST = DESCRIPTOR.message_types_by_name['EdgeList']
+_RELATIONTYPELISTMEMBER = DESCRIPTOR.message_types_by_name['RelationTypeListMember']
+_TYPELIST = DESCRIPTOR.message_types_by_name['TypeList']
 _ORDERBY_ORDERTYPE = _ORDERBY.enum_types_by_name['OrderType']
 Filter = _reflection.GeneratedProtocolMessageType('Filter', (_message.Message,), {
   'DESCRIPTOR' : _FILTER,
@@ -181,6 +186,13 @@ VectorSearchResponse = _reflection.GeneratedProtocolMessageType('VectorSearchRes
   })
 _sym_db.RegisterMessage(VectorSearchResponse)
 
+RelationFilter = _reflection.GeneratedProtocolMessageType('RelationFilter', (_message.Message,), {
+  'DESCRIPTOR' : _RELATIONFILTER,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.RelationFilter)
+  })
+_sym_db.RegisterMessage(RelationFilter)
+
 RelationSearchRequest = _reflection.GeneratedProtocolMessageType('RelationSearchRequest', (_message.Message,), {
   'DESCRIPTOR' : _RELATIONSEARCHREQUEST,
   '__module__' : 'nucliadb_protos.nodereader_pb2'
@@ -230,6 +242,34 @@ IdCollection = _reflection.GeneratedProtocolMessageType('IdCollection', (_messag
   })
 _sym_db.RegisterMessage(IdCollection)
 
+RelationEdge = _reflection.GeneratedProtocolMessageType('RelationEdge', (_message.Message,), {
+  'DESCRIPTOR' : _RELATIONEDGE,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.RelationEdge)
+  })
+_sym_db.RegisterMessage(RelationEdge)
+
+EdgeList = _reflection.GeneratedProtocolMessageType('EdgeList', (_message.Message,), {
+  'DESCRIPTOR' : _EDGELIST,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.EdgeList)
+  })
+_sym_db.RegisterMessage(EdgeList)
+
+RelationTypeListMember = _reflection.GeneratedProtocolMessageType('RelationTypeListMember', (_message.Message,), {
+  'DESCRIPTOR' : _RELATIONTYPELISTMEMBER,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.RelationTypeListMember)
+  })
+_sym_db.RegisterMessage(RelationTypeListMember)
+
+TypeList = _reflection.GeneratedProtocolMessageType('TypeList', (_message.Message,), {
+  'DESCRIPTOR' : _TYPELIST,
+  '__module__' : 'nucliadb_protos.nodereader_pb2'
+  # @@protoc_insertion_point(class_scope:nodereader.TypeList)
+  })
+_sym_db.RegisterMessage(TypeList)
+
 _NODEREADER = DESCRIPTOR.services_by_name['NodeReader']
 if _descriptor._USE_C_DESCRIPTORS == False:
 
@@ -276,20 +316,30 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _DOCUMENTSCORED._serialized_end=2173
   _VECTORSEARCHRESPONSE._serialized_start=2175
   _VECTORSEARCHRESPONSE._serialized_end=2244
-  _RELATIONSEARCHREQUEST._serialized_start=2246
-  _RELATIONSEARCHREQUEST._serialized_end=2269
-  _RELATIONSEARCHRESPONSE._serialized_start=2271
-  _RELATIONSEARCHRESPONSE._serialized_end=2295
-  _SEARCHREQUEST._serialized_start=2298
-  _SEARCHREQUEST._serialized_end=2590
-  _SUGGESTREQUEST._serialized_start=2592
-  _SUGGESTREQUEST._serialized_end=2717
-  _SUGGESTRESPONSE._serialized_start=2719
-  _SUGGESTRESPONSE._serialized_end=2797
-  _SEARCHRESPONSE._serialized_start=2800
-  _SEARCHRESPONSE._serialized_end=2976
-  _IDCOLLECTION._serialized_start=2978
-  _IDCOLLECTION._serialized_end=3005
-  _NODEREADER._serialized_start=3008
-  _NODEREADER._serialized_end=3846
+  _RELATIONFILTER._serialized_start=2246
+  _RELATIONFILTER._serialized_end=2324
+  _RELATIONSEARCHREQUEST._serialized_start=2327
+  _RELATIONSEARCHREQUEST._serialized_end=2502
+  _RELATIONSEARCHRESPONSE._serialized_start=2504
+  _RELATIONSEARCHRESPONSE._serialized_end=2569
+  _SEARCHREQUEST._serialized_start=2572
+  _SEARCHREQUEST._serialized_end=2864
+  _SUGGESTREQUEST._serialized_start=2866
+  _SUGGESTREQUEST._serialized_end=2991
+  _SUGGESTRESPONSE._serialized_start=2993
+  _SUGGESTRESPONSE._serialized_end=3071
+  _SEARCHRESPONSE._serialized_start=3074
+  _SEARCHRESPONSE._serialized_end=3250
+  _IDCOLLECTION._serialized_start=3252
+  _IDCOLLECTION._serialized_end=3279
+  _RELATIONEDGE._serialized_start=3281
+  _RELATIONEDGE._serialized_end=3362
+  _EDGELIST._serialized_start=3364
+  _EDGELIST._serialized_end=3414
+  _RELATIONTYPELISTMEMBER._serialized_start=3416
+  _RELATIONTYPELISTMEMBER._serialized_end=3511
+  _TYPELIST._serialized_start=3513
+  _TYPELIST._serialized_end=3573
+  _NODEREADER._serialized_start=3576
+  _NODEREADER._serialized_end=4611
 # @@protoc_insertion_point(module_scope)

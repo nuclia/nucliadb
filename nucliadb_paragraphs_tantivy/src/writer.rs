@@ -56,6 +56,8 @@ impl Debug for ParagraphWriterService {
 }
 
 impl WService for ParagraphWriterService {}
+impl ParagraphServiceWriter for ParagraphWriterService {}
+impl ParagraphWriterOnly for ParagraphWriterService {}
 
 #[async_trait]
 impl ServiceChild for ParagraphWriterService {

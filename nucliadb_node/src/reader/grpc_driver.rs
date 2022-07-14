@@ -20,15 +20,11 @@
 
 use async_std::sync::{Arc, RwLock};
 use nucliadb_protos::node_reader_server::NodeReader;
-use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EmptyQuery, IdCollection,
-    ParagraphSearchRequest, ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse,
-    SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList, SuggestRequest,
-    SuggestResponse, VectorSearchRequest, VectorSearchResponse,
-};
+use nucliadb_protos::*;
 use opentelemetry::global;
 use tracing::{instrument, Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use Shard as ShardPB;
 
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
@@ -122,11 +118,29 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<RelationSearchRequest>,
     ) -> Result<tonic::Response<RelationSearchResponse>, tonic::Status> {
+        info!("Relation search starts");
         let parent_cx =
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
-        let _relation_search = request.into_inner();
-        todo!()
+        let relation_request = request.into_inner();
+        let shard_id = ShardId {
+            id: relation_request.id.clone(),
+        };
+        let mut writer = self.0.write().await;
+        match writer.relation_search(&shard_id, relation_request).await {
+            Some(Ok(response)) => {
+                info!("Relation search ended correctly");
+                Ok(tonic::Response::new(response))
+            }
+            Some(Err(e)) => {
+                info!("Relation search ended incorrectly");
+                Err(tonic::Status::internal(e.to_string()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
     }
 
     #[tracing::instrument(name = "NodeReaderGRPCDriver::search", skip(self, request))]
@@ -295,6 +309,62 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
         match writer.vector_ids(&shard_id).await {
+            Some(ids) => Ok(tonic::Response::new(ids)),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
+        }
+    }
+    async fn relation_ids(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        info!("{:?}: gRPC get_shard", request);
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.relation_ids(&shard_id).await {
+            Some(ids) => Ok(tonic::Response::new(ids)),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
+        }
+    }
+
+    async fn relation_edges(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<EdgeList>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        info!("{:?}: gRPC get_shard", request);
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.relation_edges(&shard_id).await {
+            Some(ids) => Ok(tonic::Response::new(ids)),
+            None => Err(tonic::Status::not_found(format!(
+                "Shard not found {:?}",
+                shard_id
+            ))),
+        }
+    }
+
+    async fn relation_types(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<TypeList>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+        info!("{:?}: gRPC get_shard", request);
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.relation_types(&shard_id).await {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
