@@ -21,10 +21,10 @@ import functools
 from collections import OrderedDict
 from concurrent import futures
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, MutableMapping
+from typing import Any, Awaitable, Callable, MutableMapping, Optional
 
 import grpc
-from grpc import ClientCallDetails, aio  # type: ignore
+from grpc import ChannelCredentials, ClientCallDetails, aio  # type: ignore
 from grpc.experimental import wrap_server_method_handler  # type: ignore
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract, inject
@@ -346,21 +346,40 @@ class OpenTelemetryGRPC:
         self.service_name = service_name
         self.tracer_provider = tracer_provider
 
-    def init_client(self, server_addr: str, max_receive_message: int = 100):
+    def init_client(
+        self,
+        server_addr: str,
+        max_receive_message: int = 100,
+        credentials: Optional[ChannelCredentials] = None,
+    ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_client")
         options = [
             ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
         ]
-        channel = aio.insecure_channel(
-            server_addr,
-            options=options,
-            interceptors=[
-                UnaryUnaryClientInterceptor(tracer=tracer),
-                UnaryStreamClientInterceptor(tracer=tracer),
-                StreamStreamClientInterceptor(tracer=tracer),
-                StreamUnaryClientInterceptor(tracer=tracer),
-            ],
-        )
+        if credentials is not None:
+            channel = aio.secure_channel(
+                server_addr,
+                options=options,
+                credentials=credentials,
+                interceptors=[
+                    UnaryUnaryClientInterceptor(tracer=tracer),
+                    UnaryStreamClientInterceptor(tracer=tracer),
+                    StreamStreamClientInterceptor(tracer=tracer),
+                    StreamUnaryClientInterceptor(tracer=tracer),
+                ],
+            )
+
+        else:
+            channel = aio.insecure_channel(
+                server_addr,
+                options=options,
+                interceptors=[
+                    UnaryUnaryClientInterceptor(tracer=tracer),
+                    UnaryStreamClientInterceptor(tracer=tracer),
+                    StreamStreamClientInterceptor(tracer=tracer),
+                    StreamUnaryClientInterceptor(tracer=tracer),
+                ],
+            )
         return channel
 
     def init_server(self, concurrency: int = 4, max_send_message: int = 100):

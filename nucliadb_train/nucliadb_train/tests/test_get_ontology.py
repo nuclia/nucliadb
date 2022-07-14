@@ -17,29 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_ingest.fields.base import Field
+import pytest
+from nucliadb_protos.train_pb2 import GetLabelsRequest
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.writer_pb2 import GetLabelsResponse
 
-VALID_GLOBAL = ("title", "summary")
 
+@pytest.mark.asyncio
+async def test_get_ontology(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetLabelsRequest()
+    req.kb.uuid = knowledgebox
 
-class Generic(Field):
-    pbklass = str
-    value: str
-    type: str = "a"
-
-    async def set_value(self, payload: str):
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
-
-        if self.resource.basic is None:
-            await self.resource.get_basic()
-
-        setattr(self.resource.basic, self.id, payload)
-
-    async def get_value(self) -> str:
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
-        if self.resource.basic is None:
-            await self.resource.get_basic()
-
-        return getattr(self.resource.basic, self.id)
+    labels: GetLabelsResponse = await train_client.GetOntology(req)  # type: ignore
+    assert labels.labels.labelset["label1"].labels[0].title == "label1"

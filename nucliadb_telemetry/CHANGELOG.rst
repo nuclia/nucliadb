@@ -23,7 +23,7 @@ CHANGELOG
 1.1.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Remove python 3.9 restriction
 
 
 1.1.1 (2022-07-01)

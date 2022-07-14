@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: train
+  labels:
+    app: train
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      app: train
+      release: "{{ .Release.Name }}"
+      heritage: "{{ .Release.Service }}"
+  template:
+    metadata:
+      name: train
+      annotations:
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{ .Values.serving.metricsPort }}"
+      labels:
+        app: train
+        version: "{{ .Chart.Version | replace "+" "_" }}"
+        chart: "{{ .Chart.Name }}"
+        release: "{{ .Release.Name }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      dnsPolicy: ClusterFirst
+      containers:
+      - name: train
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.port }}"]
+          initialDelaySeconds: 2
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.port }}"]
+          initialDelaySeconds: 2
+        command: [
+          "ndb_train"
+        ]
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: train-config
+        ports:
+        - name: grpc-train
+          containerPort: {{ .Values.serving.port }}
+        - name: metrics
+          containerPort: {{ .Values.serving.metricsPort }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+{{- if .Values.nats.secretName }}
+        volumeMounts:
+          - name: nats-creds
+            readOnly: true
+            mountPath: /appsecrets
+{{- end }}
+{{- if .Values.tracing.enabled }}
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 5775
+            name: zk-compact-trft
+            protocol: UDP
+          - containerPort: 5778
+            name: config-rest
+            protocol: TCP
+          - containerPort: 6831
+            name: jg-compact-trft
+            protocol: UDP
+          - containerPort: 6832
+            name: jg-binary-trft
+            protocol: UDP
+          - containerPort: 14271
+            name: admin-http
+            protocol: TCP
+        args:
+          - --reporter.grpc.host-port=dns:///{{ .Values.tracing.jaegerCollectorHost }}:{{ .Values.tracing.jaegerCollectorGrpcPort }}
+          - --reporter.type=grpc
+{{- end }}
+{{- if .Values.nats.secretName }}
+      volumes:
+      - name: nats-creds
+        secret:
+          secretName: {{ .Values.nats.secretName }}
+{{- end }}

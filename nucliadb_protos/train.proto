@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package train;
+
+import "google/protobuf/timestamp.proto";
+
+import public "nucliadb_protos/knowledgebox.proto";
+import public "nucliadb_protos/resources.proto";
+import public "nucliadb_protos/writer.proto";
+
+
+message EnabledMetadata {
+    bool text = 1;
+    bool entities = 2;
+    bool labels = 3;
+    bool vector = 4;
+}
+
+
+message TrainLabels {
+    repeated resources.Classification resource = 1;
+    repeated resources.Classification field = 2;
+    repeated resources.Classification paragraph = 3;
+}
+
+message TrainMetadata {
+    string text = 1;
+    map<string, string> entities = 2;
+    TrainLabels labels = 3;
+    repeated float vector = 4;
+}
+
+message GetInfoRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message GetLabelsetsCountRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    repeated string paragraph_labelsets = 2;
+    repeated string resource_labelsets = 3;
+}
+
+message GetResourcesRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    EnabledMetadata metadata = 2;
+    uint64 size = 3;
+    bool random = 4;
+}
+
+message GetParagraphsRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string uuid = 2;
+    resources.FieldID field = 3;
+    EnabledMetadata metadata = 4;
+    uint64 size = 5;
+    bool random = 6;
+}
+
+message GetSentencesRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string uuid = 2;
+    resources.FieldID field = 3;
+    EnabledMetadata metadata = 4;
+    uint64 size = 5;
+    bool random = 6;
+}
+
+message GetFieldsRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string uuid = 2;
+    resources.FieldID field = 3;
+    EnabledMetadata metadata = 4;
+    uint64 size = 5;
+    bool random = 6;
+}
+
+message TrainInfo {
+    uint64 resources = 1;
+    uint64 fields = 2;
+    uint64 paragraphs = 3;
+    uint64 sentences = 4;
+}
+
+message TrainSentence {
+    string uuid = 1;
+    resources.FieldID field = 2;
+    string paragraph = 3;
+    string sentence = 4;
+    TrainMetadata metadata = 5;
+}
+
+
+message TrainParagraph {
+    string uuid = 1;
+    resources.FieldID field = 2;
+    string paragraph = 3;
+    TrainMetadata metadata = 4;
+}
+
+message TrainField {
+    string uuid = 1;
+    resources.FieldID field = 2;
+    string subfield = 3;
+    TrainMetadata metadata = 4;
+}
+
+
+message TrainResource {
+    string uuid = 1;
+    string title = 2;
+    string icon = 3;
+    string slug = 4;
+    google.protobuf.Timestamp created = 5;
+    google.protobuf.Timestamp modified = 6;
+    TrainMetadata metadata = 7;
+}
+
+message LabelsetCount {
+    map<string, int64> paragraphs = 1;
+    map<string, int64> resources = 2;
+}
+
+message LabelsetsCount {
+    map<string, LabelsetCount> labelsets = 2;
+}
+
+
+service Train {
+    rpc GetInfo(GetInfoRequest) returns (TrainInfo) {}
+    rpc GetSentences(GetSentencesRequest) returns (stream TrainSentence) {}
+    rpc GetParagraphs(GetParagraphsRequest) returns (stream TrainParagraph) {}
+    rpc GetFields(GetFieldsRequest) returns (stream TrainField) {}
+    rpc GetResources(GetResourcesRequest) returns (stream TrainResource) {}
+    rpc GetOntology(fdbwriter.GetLabelsRequest) returns (fdbwriter.GetLabelsResponse) {}
+    rpc GetEntities(fdbwriter.GetEntitiesRequest) returns (fdbwriter.GetEntitiesResponse) {}
+    rpc GetOntologyCount(GetLabelsetsCountRequest) returns (LabelsetsCount) {}
+}

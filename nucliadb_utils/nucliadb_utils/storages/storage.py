@@ -117,6 +117,8 @@ class Storage:
     ) -> IndexMessage:
         if self.indexing_bucket is None:
             raise AttributeError()
+        if txid < 0:
+            txid = 0
         key = INDEXING.format(node=node, shard=shard, txid=txid)
         await self.uploadbytes(self.indexing_bucket, key, message.SerializeToString())
         response = IndexMessage()

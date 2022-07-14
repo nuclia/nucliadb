@@ -17,29 +17,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_ingest.fields.base import Field
+import pytest
+from nucliadb_protos.train_pb2 import GetResourcesRequest
+from nucliadb_protos.train_pb2_grpc import TrainStub
 
-VALID_GLOBAL = ("title", "summary")
 
+@pytest.mark.asyncio
+async def test_list_resource(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetResourcesRequest()
+    req.kb.uuid = knowledgebox
+    req.metadata.entities = True
+    req.metadata.labels = True
+    req.metadata.text = True
+    req.metadata.vector = True
+    count = 0
+    async for _ in train_client.GetResources(req):  # type: ignore
+        count += 1
 
-class Generic(Field):
-    pbklass = str
-    value: str
-    type: str = "a"
-
-    async def set_value(self, payload: str):
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
-
-        if self.resource.basic is None:
-            await self.resource.get_basic()
-
-        setattr(self.resource.basic, self.id, payload)
-
-    async def get_value(self) -> str:
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
-        if self.resource.basic is None:
-            await self.resource.get_basic()
-
-        return getattr(self.resource.basic, self.id)
+    assert count == 10

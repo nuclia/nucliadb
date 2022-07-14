@@ -1,0 +1,23 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: train-monitor
+  labels:
+    app: train
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  namespaceSelector:
+    matchNames:
+    - "{{ .Release.Namespace }}"
+  selector:
+    matchLabels:
+      app: train
+  endpoints:
+  - targetPort: {{ .Values.serving.metricsPort }}
+    interval: 10s
+    path: /metrics
+{{- end }}

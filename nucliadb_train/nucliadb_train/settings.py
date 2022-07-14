@@ -17,29 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_ingest.fields.base import Field
+from typing import List, Optional
 
-VALID_GLOBAL = ("title", "summary")
+from pydantic import BaseSettings
 
 
-class Generic(Field):
-    pbklass = str
-    value: str
-    type: str = "a"
+class Settings(BaseSettings):
+    grpc_port: int = 8030
+    train_grpc_address: Optional[str] = None
 
-    async def set_value(self, payload: str):
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
+    nuclia_learning_url: Optional[str] = "https://nuclia.cloud/api/v1/learning/"
+    nuclia_learning_apikey: Optional[str] = None
 
-        if self.resource.basic is None:
-            await self.resource.get_basic()
+    internal_counter_api: str = (
+        "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/counters"
+    )
 
-        setattr(self.resource.basic, self.id, payload)
+    internal_search_api: str = (
+        "http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{kbid}/search"
+    )
 
-    async def get_value(self) -> str:
-        if self.id not in VALID_GLOBAL:
-            raise AttributeError(self.id)
-        if self.resource.basic is None:
-            await self.resource.get_basic()
+    driver: str = "redis"  # redis | tikv
+    driver_redis_url: Optional[str] = None
+    driver_tikv_url: Optional[List[str]] = []
+    driver_local_url: Optional[str] = None
 
-        return getattr(self.resource.basic, self.id)
+
+settings = Settings()

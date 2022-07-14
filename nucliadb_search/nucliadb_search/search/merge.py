@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import math
 from typing import Any, Dict, List
 
+from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchResponse,
     ParagraphSearchResponse,
@@ -60,7 +62,10 @@ async def merge_documents_results(
     raw_resource_list: List[ResourceResult] = []
     facets: Dict[str, Any] = {}
     for document_response in documents:
-        facets.update(document_response.facets)
+        if document_response.facets:
+            for key, value in document_response.facets.items():
+                facets[key] = MessageToDict(value)
+
         for result in document_response.results:
             # /f/file
             _, field_type, field = result.field.split("/")
@@ -129,9 +134,12 @@ async def merge_vectors_results(
 ):
     results: List[Sentence] = []
     facets: Dict[str, Any] = {}
+
     for vector in vectors:
         for document in vector.documents:
             if document.score < max_score:
+                continue
+            if math.isnan(document.score):
                 continue
             count = document.doc_id.id.count("/")
             if count == 4:
@@ -187,7 +195,9 @@ async def merge_paragraph_results(
     raw_paragraph_list: List[Paragraph] = []
     facets: Dict[str, Any] = {}
     for paragraph_response in paragraphs:
-        facets.update(paragraph_response.facets)
+        if paragraph_response.facets:
+            for key, value in paragraph_response.facets.items():
+                facets[key] = MessageToDict(value)
         for result in paragraph_response.results:
             _, field_type, field = result.field.split("/")
             text = await get_text_paragraph(result, kbid)
@@ -216,7 +226,6 @@ async def merge_paragraph_results(
     for paragraph in paragraph_list:
         if paragraph.rid not in resources:
             resources.append(paragraph.rid)
-
     return Paragraphs(results=paragraph_list, facets=facets)
 
 
