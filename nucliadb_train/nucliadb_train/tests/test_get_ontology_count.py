@@ -18,10 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from nucliadb_protos.train_pb2 import GetLabelsetsCountRequest
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.train_pb2 import LabelsetsCount
 from aioresponses import aioresponses
+from nucliadb_protos.train_pb2 import GetLabelsetsCountRequest, LabelsetsCount
+from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
 @pytest.mark.asyncio

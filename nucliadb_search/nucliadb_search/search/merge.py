@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import math
 from typing import Any, Dict, List
 
+from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchResponse,
     ParagraphSearchResponse,
@@ -26,7 +28,7 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
     VectorSearchResponse,
 )
-from google.protobuf.json_format import MessageToDict
+
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search.api.models import (
@@ -48,7 +50,6 @@ from nucliadb_search.search.fetch import (
     get_text_paragraph,
     get_text_sentence,
 )
-import math
 
 
 async def merge_documents_results(

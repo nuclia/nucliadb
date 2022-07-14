@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from typing import Optional
-import aiohttp
 
+import aiohttp
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
@@ -37,12 +37,11 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
-from nucliadb_protos.knowledgebox_pb2 import LabelSet
 
-from nucliadb_train.settings import settings
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.utils import get_driver
 from nucliadb_protos import train_pb2_grpc
+from nucliadb_train.settings import settings
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
 
@@ -74,7 +73,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         async for resource in self.proc.kb_resources(request):
             yield resource
 
-    async def GetInfo(self, request: GetInfoRequest, context=None):
+    async def GetInfo(self, request: GetInfoRequest, context=None):  # type: ignore
         result = TrainInfo()
         url = settings.internal_counter_api.format(kbid=request.kb.uuid)
         headers = {"X-NUCLIADB-ROLES": "READER"}
