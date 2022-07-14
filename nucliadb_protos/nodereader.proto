@@ -57,8 +57,6 @@ message DocumentSearchRequest {
 
     bool reload = 10;
 
-    bool facet_query = 14;
-
 }
 
 
@@ -83,8 +81,6 @@ message ParagraphSearchRequest {
     Timestamps timestamps = 12;
 
     bool reload = 13;
-
-    bool facet_query = 14;
 
 }
 

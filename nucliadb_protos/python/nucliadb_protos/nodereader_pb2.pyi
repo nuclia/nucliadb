@@ -153,7 +153,6 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
-    FACET_QUERY_FIELD_NUMBER: builtins.int
     id: typing.Text
     body: typing.Text
     @property
@@ -169,7 +168,6 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     @property
     def timestamps(self) -> global___Timestamps: ...
     reload: builtins.bool
-    facet_query: builtins.bool
     def __init__(self,
         *,
         id: typing.Text = ...,
@@ -182,10 +180,9 @@ class DocumentSearchRequest(google.protobuf.message.Message):
         result_per_page: builtins.int = ...,
         timestamps: typing.Optional[global___Timestamps] = ...,
         reload: builtins.bool = ...,
-        facet_query: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["faceted",b"faceted","filter",b"filter","order",b"order","timestamps",b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","facet_query",b"facet_query","faceted",b"faceted","fields",b"fields","filter",b"filter","id",b"id","order",b"order","page_number",b"page_number","reload",b"reload","result_per_page",b"result_per_page","timestamps",b"timestamps"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","faceted",b"faceted","fields",b"fields","filter",b"filter","id",b"id","order",b"order","page_number",b"page_number","reload",b"reload","result_per_page",b"result_per_page","timestamps",b"timestamps"]) -> None: ...
 global___DocumentSearchRequest = DocumentSearchRequest
 
 class ParagraphSearchRequest(google.protobuf.message.Message):
@@ -201,7 +198,6 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
-    FACET_QUERY_FIELD_NUMBER: builtins.int
     id: typing.Text
     uuid: typing.Text
     @property
@@ -222,7 +218,6 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     @property
     def timestamps(self) -> global___Timestamps: ...
     reload: builtins.bool
-    facet_query: builtins.bool
     def __init__(self,
         *,
         id: typing.Text = ...,
@@ -236,10 +231,9 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
         result_per_page: builtins.int = ...,
         timestamps: typing.Optional[global___Timestamps] = ...,
         reload: builtins.bool = ...,
-        facet_query: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["faceted",b"faceted","filter",b"filter","order",b"order","timestamps",b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","facet_query",b"facet_query","faceted",b"faceted","fields",b"fields","filter",b"filter","id",b"id","order",b"order","page_number",b"page_number","reload",b"reload","result_per_page",b"result_per_page","timestamps",b"timestamps","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","faceted",b"faceted","fields",b"fields","filter",b"filter","id",b"id","order",b"order","page_number",b"page_number","reload",b"reload","result_per_page",b"result_per_page","timestamps",b"timestamps","uuid",b"uuid"]) -> None: ...
 global___ParagraphSearchRequest = ParagraphSearchRequest
 
 class DocumentResult(google.protobuf.message.Message):

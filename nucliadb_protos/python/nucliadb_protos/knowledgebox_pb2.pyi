@@ -219,21 +219,18 @@ class Label(google.protobuf.message.Message):
     RELATED_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
     URI_FIELD_NUMBER: builtins.int
-    COUNT_FIELD_NUMBER: builtins.int
     title: typing.Text
     related: typing.Text
     text: typing.Text
     uri: typing.Text
-    count: builtins.int
     def __init__(self,
         *,
         title: typing.Text = ...,
         related: typing.Text = ...,
         text: typing.Text = ...,
         uri: typing.Text = ...,
-        count: builtins.int = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["count",b"count","related",b"related","text",b"text","title",b"title","uri",b"uri"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["related",b"related","text",b"text","title",b"title","uri",b"uri"]) -> None: ...
 global___Label = Label
 
 class LabelSet(google.protobuf.message.Message):
