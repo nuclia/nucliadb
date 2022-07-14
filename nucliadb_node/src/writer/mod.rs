@@ -70,6 +70,8 @@ impl NodeWriterService {
         }
         Ok(())
     }
+
+    #[instrument(name = "NodeWriterService::load_shard", skip(self))]
     async fn load_shard(&mut self, shard_id: &ShardId) {
         info!("{}: Loading shard", shard_id.id);
         let in_memory = self.shards.contains_key(&shard_id.id);
@@ -78,7 +80,10 @@ impl NodeWriterService {
             let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id.id);
-                let shard = ShardWriterService::open(&shard_id.id).await.unwrap();
+                let shard = ShardWriterService::open(&shard_id.id)
+                    .instrument(trace_span!("ShardWriterService::open"))
+                    .await
+                    .unwrap();
                 info!("{}: Loaded shard", shard_id.id);
                 self.shards.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
@@ -97,7 +102,6 @@ impl NodeWriterService {
         self.shards.get_mut(&shard_id.id)
     }
 
-    #[tracing::instrument(name = "NodeWriterService::new_shard", skip(self))]
     pub async fn new_shard(&mut self) -> ShardCreated {
         let new_id = Uuid::new_v4().to_string();
         let new_shard = ShardWriterService::new(&new_id).await.unwrap();
@@ -122,7 +126,6 @@ impl NodeWriterService {
         }
     }
 
-    #[tracing::instrument(name = "set_resource", skip(self))]
     pub async fn set_resource(
         &mut self,
         shard_id: &ShardId,

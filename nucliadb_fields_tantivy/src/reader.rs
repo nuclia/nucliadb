@@ -19,7 +19,6 @@
 //
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
-use std::panic;
 
 use async_std::fs;
 use async_trait::async_trait;
@@ -95,7 +94,10 @@ impl ReaderChild for FieldReaderService {
     type Response = DocumentSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         info!("Document search at {}:{}", line!(), file!());
-        self.do_search(request)
+        let body = &request.body;
+        let results = request.result_per_page;
+        let multic_flag = results > 0 && !body.is_empty();
+        self.do_search(request, multic_flag)
             .map_err(|e| Box::new(TError(e)) as Box<dyn InternalError>)
     }
 
@@ -381,65 +383,54 @@ impl FieldReaderService {
     fn do_search(
         &self,
         request: &DocumentSearchRequest,
+        multic_flag: bool,
     ) -> tantivy::Result<DocumentSearchResponse> {
-        info!("Document search starts {}:{}", line!(), file!());
         let query = if !request.body.is_empty() {
-            info!("Body was not empty document search {}:{}", line!(), file!());
             let extended_query = SearchQuery::document(request).unwrap();
             info!("{}", extended_query);
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
-            info!("Request parsed {}:{}", line!(), file!());
             query_parser.parse_query(&extended_query)
         } else {
-            info!("Document search at {}:{}", line!(), file!());
             Ok(Box::new(AllQuery) as Box<dyn Query>)
         }?;
-        info!("Document search at {}:{}", line!(), file!());
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-
-        info!("Document search at {}:{}", line!(), file!());
         let order_field = self.get_order_field(&request.order);
         let facets = request
             .faceted
             .as_ref()
             .map(|v| v.tags.clone())
             .unwrap_or_default();
-
-        // let facets = match &request.faceted {
-        //     Some(faceted) => faceted.tags.clone(),
-        //     None => Vec::new(),
-        // };
-        info!("Document search at {}:{}", line!(), file!());
         let mut facet_collector = FacetCollector::for_field(self.schema.facets);
-        info!("Document search at {}:{}", line!(), file!());
         for facet in &facets {
-            match panic::catch_unwind(|| Facet::from(facet.as_str())) {
+            match Facet::from_text(facet) {
                 Ok(facet) => facet_collector.add_facet(facet),
-                Err(_e) => {
-                    error!("Invalid facet: {}", facet);
-                }
+                Err(_) => error!("Invalid facet: {}", facet),
             }
         }
-        info!("Document search at {}:{}", line!(), file!());
-        let topdocs = TopDocs::with_limit(results).and_offset(offset);
-
-        info!("Document search at {}:{}", line!(), file!());
-        let mut multicollector = MultiCollector::new();
-        let facet_handler = multicollector.add_collector(facet_collector);
+        let searcher = self.reader.searcher();
         match order_field {
+            _ if !multic_flag => Ok(self.convert_bm25_order(
+                SearchResponse {
+                    facets,
+                    top_docs: vec![],
+                    facets_count: searcher.search(&query, &facet_collector).unwrap(),
+                    order_by: request.order.clone(),
+                    page_number: request.page_number,
+                    results_per_page: results as i32,
+                },
+                &searcher,
+            )),
             Some(order_field) => {
-                info!("Document search at {}:{}", line!(), file!());
+                let mut multicollector = MultiCollector::new();
+                let facet_handler = multicollector.add_collector(facet_collector);
+                let topdocs = TopDocs::with_limit(results).and_offset(offset);
                 let topdocs_collector = topdocs.order_by_u64_field(order_field);
                 let topdocs_handler = multicollector.add_collector(topdocs_collector);
-                info!("Document search at {}:{}", line!(), file!());
-                let searcher = self.reader.searcher();
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                info!("Document search at {}:{}", line!(), file!());
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                info!("Document search at {}:{}", line!(), file!());
                 Ok(self.convert_int_order(
                     SearchResponse {
                         facets_count,
@@ -453,15 +444,13 @@ impl FieldReaderService {
                 ))
             }
             None => {
-                info!("Document search at {}:{}", line!(), file!());
+                let mut multicollector = MultiCollector::new();
+                let facet_handler = multicollector.add_collector(facet_collector);
+                let topdocs = TopDocs::with_limit(results).and_offset(offset);
                 let topdocs_handler = multicollector.add_collector(topdocs);
-                info!("Document search at {}:{}", line!(), file!());
-                let searcher = self.reader.searcher();
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                info!("Document search at {}:{}", line!(), file!());
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                info!("Document search at {}:{}", line!(), file!());
                 Ok(self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
@@ -659,7 +648,7 @@ mod tests {
 
         let result = field_reader_service.search(&search).unwrap();
 
-        assert_eq!(result.total, 2);
+        assert_eq!(result.total, 0);
         Ok(())
     }
 }

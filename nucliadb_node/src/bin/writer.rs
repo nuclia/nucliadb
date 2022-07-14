@@ -35,16 +35,7 @@ use tracing::*;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Writer Node starting...");
-
-    init_telemetry()?;
-
-    let _guard = sentry::init((
-        Configuration::sentry_url(),
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            ..Default::default()
-        },
-    ));
+    let _guard = init_telemetry()?;
 
     let start_bootstrap = Instant::now();
 
