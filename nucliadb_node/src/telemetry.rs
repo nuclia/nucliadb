@@ -42,18 +42,20 @@ pub fn init_telemetry() -> ServiceResult<()> {
             .install_batch(opentelemetry::runtime::Tokio)
             .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
 
-        /// This filter is needed because we want to keep logs in stdout and attach logs to jaeger spans in really rare cases
-        /// So, basically it checks the source of event (allowed only from nucliadb_node crate) and filter out all events without special field
-        /// For attaching log to jaeger span use this:
-        /// tracing::event!(Level::INFO, trace_marker = true, "your logs for jaeger here: {}", foo = bar);
-        let filter = FilterFn::new(|metadata| match metadata.file() {
-            Some(file) if file.contains("nucliadb_node") => {
-                if metadata.is_event() && metadata.fields().field("trace_marker").is_none() {
-                    return false;
-                }
-                true
-            }
-            _ => false,
+        // This filter is needed because we want to keep logs in stdout and attach logs to jaeger
+        // spans in really rare cases So, basically it checks the source of event (allowed
+        // only from nucliadb_node crate) and filter out all events without special field
+        // For attaching log to jaeger span use this:
+        // tracing::event!(Level::INFO, trace_marker = true, "your logs for jaeger here: {}", foo =
+        // bar);
+        let filter = FilterFn::new(|metadata| {
+            metadata
+                .file()
+                .filter(|file| file.contains("nucliadb_node"))
+                .map(|_| metadata.is_event())
+                .map(|state| state && metadata.fields().field("trace_marker").is_none())
+                .map(|state| !state)
+                .unwrap_or_default()
         });
         global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 

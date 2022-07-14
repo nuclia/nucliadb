@@ -77,14 +77,14 @@ fn test_tracing_init() {
         .install_simple()
         .unwrap();
 
-    let filter = FilterFn::new(|metadata| match metadata.file() {
-        Some(file) if file.contains("nucliadb_node") => {
-            if metadata.is_event() && metadata.fields().field("trace_marker").is_none() {
-                return false;
-            }
-            true
-        }
-        _ => false,
+    let filter = FilterFn::new(|metadata| {
+        metadata
+            .file()
+            .filter(|file| file.contains("nucliadb_node"))
+            .map(|_| metadata.is_event())
+            .map(|state| state && metadata.fields().field("trace_marker").is_none())
+            .map(|state| !state)
+            .unwrap_or_default()
     });
 
     let log_levels = Configuration::log_level();
@@ -122,23 +122,3 @@ async fn send_request() -> String {
     let id = response.get_ref().id.clone();
     id
 }
-
-//#[ignore]
-//#[tokio::test]
-// pub async fn set_and_search_vectors() {
-//    let mut writer_client = NodeWriterClient::connect("http://127.0.0.1:4446")
-//        .await
-//        .expect("Error creating NodeWriter client");
-//    writer_client.set_resource(Resource {});
-//
-//    let mut reader_client = NodeReaderClient::connect("http://127.0.0.1:4445")
-//        .await
-//        .expect("Error creating NodeWriter client");
-//
-//    reader_client.vector_search(Request::new(VectorSearchRequest {
-//        id: todo!(),
-//        vector: todo!(),
-//        tags: todo!(),
-//        reload: todo!(),
-//    }))
-//}
