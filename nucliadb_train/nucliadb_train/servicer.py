@@ -108,7 +108,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         labels: Optional[Labels] = None
         if kbobj is not None:
-            labels = await kbobj.get_labels(request.count)
+            labels = await kbobj.get_labels()
         await txn.abort()
         response = GetLabelsResponse()
         if kbobj is None:
@@ -138,7 +138,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         res = LabelsetsCount()
         for labelset, labels in data["paragraphs"]["facets"].items():
             for label in labels["facetresults"]:
-                label_tag = "/".join(label["tag"].split("/")[2:])
+                label_tag = "/".join(label["tag"].split("/")[3:])
                 res.labelsets[labelset].paragraphs[label_tag] = label["total"]
 
         for labelset, labels in data["fulltext"]["facets"].items():

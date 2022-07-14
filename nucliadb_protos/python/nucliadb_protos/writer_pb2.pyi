@@ -577,17 +577,14 @@ global___GetLabelsResponse = GetLabelsResponse
 class GetLabelsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KB_FIELD_NUMBER: builtins.int
-    COUNT_FIELD_NUMBER: builtins.int
     @property
     def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
-    count: builtins.bool
     def __init__(self,
         *,
         kb: typing.Optional[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID] = ...,
-        count: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["kb",b"kb"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["count",b"count","kb",b"kb"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb",b"kb"]) -> None: ...
 global___GetLabelsRequest = GetLabelsRequest
 
 class SetEntitiesRequest(google.protobuf.message.Message):
