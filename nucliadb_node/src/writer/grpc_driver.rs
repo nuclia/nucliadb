@@ -28,7 +28,7 @@ use opentelemetry::global;
 use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::utils::{measure_time_async, MetadataMap};
+use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
 pub struct NodeWriterGRPCDriver(Arc<RwLock<NodeWriterService>>);
@@ -64,7 +64,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterService::new_shard", skip(self))]
     async fn new_shard(
         &self,
         request: tonic::Request<EmptyQuery>,
@@ -74,7 +73,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("Creating new shard");
         let mut writer = self.0.write().await;
-        let response = measure_time_async(writer.new_shard(), "Execution time").await;
+        let response = writer.new_shard().await;
 
         Ok(tonic::Response::new(response))
     }
@@ -120,7 +119,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     // Incremental call that can be call multiple times for the same resource
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::set_resource", skip(self))]
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::set_resource", skip(self, request))]
     async fn set_resource(
         &self,
         request: tonic::Request<Resource>,

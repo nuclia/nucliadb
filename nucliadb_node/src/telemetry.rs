@@ -18,7 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use opentelemetry::global;
+use sentry::ClientInitGuard;
 use tracing::{debug, error};
+use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
@@ -26,10 +28,10 @@ use tracing_subscriber::Layer;
 use crate::config::Configuration;
 use crate::result::{ServiceError, ServiceResult};
 
-pub fn init_telemetry() -> ServiceResult<()> {
+pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
     let agent_endpoint = Configuration::jaeger_agent_endp();
     debug!("{agent_endpoint}");
-    let _log_levels = Configuration::log_level();
+    let log_levels = Configuration::log_level();
 
     let mut layers = Vec::new();
 
@@ -41,35 +43,48 @@ pub fn init_telemetry() -> ServiceResult<()> {
             .install_batch(opentelemetry::runtime::Tokio)
             .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
 
-        // let filter = FilterFn::new(|metadata| {
-        //    let target = metadata.target();
-        //    match metadata.module_path() {
-        //        Some(module_path) if module_path.contains("nucliadb_node") => {
-        //            target.contains("nucliadb_node::writer")
-        //                || target.contains("nucliadb_node::reader")
-        //        }
-        //        _ => false,
-        //    }
-        //});
-        let filter = tracing_subscriber::EnvFilter::from_default_env();
+        // This filter is needed because we want to keep logs in stdout and attach logs to jaeger
+        // spans in really rare cases So, basically it checks the source of event (allowed
+        // only from nucliadb_node crate) and filter out all events without special field
+        // For attaching log to jaeger span use this:
+        // tracing::event!(Level::INFO, trace_marker = true, "your logs for jaeger here: {}", foo =
+        // bar);
+        let filter = FilterFn::new(|metadata| {
+            metadata
+                .file()
+                .filter(|file| file.contains("nucliadb_node"))
+                .map(|_| metadata.is_event())
+                .map(|state| state && metadata.fields().field("trace_marker").is_none())
+                .map(|state| !state)
+                .unwrap_or_default()
+        });
         global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
         let jaeger_layer = tracing_opentelemetry::layer()
             .with_tracer(tracer)
+            .with_filter(Targets::new().with_targets(log_levels.clone()))
             .with_filter(filter)
             .boxed();
         layers.push(jaeger_layer);
     }
 
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
     let stdout_layer = tracing_subscriber::fmt::layer()
-        .pretty()
         .with_level(true)
-        .with_filter(filter)
-        //.with_filter(Targets::new().with_targets(log_levels))
+        .with_filter(Targets::new().with_targets(log_levels))
         .boxed();
 
     layers.push(stdout_layer);
+
+    let sentry_env = Configuration::get_sentry_env();
+    let guard = sentry::init((
+        Configuration::sentry_url(),
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            environment: Some(sentry_env.into()),
+            ..Default::default()
+        },
+    ));
+    layers.push(sentry_tracing::layer().boxed());
 
     tracing_subscriber::registry()
         .with(layers)
@@ -78,5 +93,5 @@ pub fn init_telemetry() -> ServiceResult<()> {
             error!("Try init error: {e}");
             ServiceError::GenericErr(Box::new(e))
         })?;
-    Ok(())
+    Ok(guard)
 }

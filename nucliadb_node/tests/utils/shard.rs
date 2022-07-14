@@ -25,10 +25,12 @@ use opentelemetry::global;
 use opentelemetry::global::shutdown_tracer_provider;
 use opentelemetry::propagation::Injector;
 use tonic::Request;
-use tracing::info_span;
+use tracing::{event, info_span, Instrument, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 struct TestMetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
 
@@ -55,30 +57,52 @@ pub fn create_shard() {
         .build()
         .unwrap();
 
-    let id = rt.block_on(send_request());
+    let id = rt.block_on(async {
+        test_tracing_init();
+        let result = send_request()
+            .instrument(info_span!("send request instr - app root span"))
+            .await;
+        shutdown_tracer_provider();
+        result
+    });
     println!("response id {id}");
 }
 
-fn tracing_init() {
+fn test_tracing_init() {
     let agent_endpoint = Configuration::jaeger_agent_endp();
-    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+    global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
         .with_service_name("grpc-client")
         .install_simple()
         .unwrap();
+
+    let filter = FilterFn::new(|metadata| {
+        metadata
+            .file()
+            .filter(|file| file.contains("nucliadb_node"))
+            .map(|_| metadata.is_event())
+            .map(|state| state && metadata.fields().field("trace_marker").is_none())
+            .map(|state| !state)
+            .unwrap_or_default()
+    });
+
+    let log_levels = Configuration::log_level();
     tracing_subscriber::registry()
-        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .with(
+            tracing_opentelemetry::layer()
+                .with_tracer(tracer)
+                .with_filter(Targets::new().with_targets(log_levels))
+                .with_filter(filter),
+        )
         .try_init()
         .unwrap();
 }
 
 async fn send_request() -> String {
-    tracing_init();
-    let span = info_span!("test parent link");
-    let _guard = span.enter();
-
+    event!(Level::INFO, trace_marker = true, "test event for jaeger",);
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
+        .instrument(info_span!("client creation"))
         .await
         .expect("Error creating NodeWriter client");
 
@@ -92,29 +116,9 @@ async fn send_request() -> String {
 
     let response = client
         .new_shard(req)
+        .instrument(info_span!("new shard request send"))
         .await
         .expect("Error in new_shard request");
     let id = response.get_ref().id.clone();
-    shutdown_tracer_provider();
     id
 }
-
-//#[ignore]
-//#[tokio::test]
-// pub async fn set_and_search_vectors() {
-//    let mut writer_client = NodeWriterClient::connect("http://127.0.0.1:4446")
-//        .await
-//        .expect("Error creating NodeWriter client");
-//    writer_client.set_resource(Resource {});
-//
-//    let mut reader_client = NodeReaderClient::connect("http://127.0.0.1:4445")
-//        .await
-//        .expect("Error creating NodeWriter client");
-//
-//    reader_client.vector_search(Request::new(VectorSearchRequest {
-//        id: todo!(),
-//        vector: todo!(),
-//        tags: todo!(),
-//        reload: todo!(),
-//    }))
-//}
