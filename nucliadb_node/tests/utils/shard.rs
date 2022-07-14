@@ -19,20 +19,18 @@
 //
 
 use nucliadb_node::config::Configuration;
-use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::utils::measure_time;
 use nucliadb_protos::node_writer_client::NodeWriterClient;
 use nucliadb_protos::EmptyQuery;
 use opentelemetry::global;
 use opentelemetry::global::shutdown_tracer_provider;
 use opentelemetry::propagation::Injector;
-use tokio::task::spawn_blocking;
 use tonic::Request;
-use tracing::{error_span, info, info_span, instrument, Instrument};
+use tracing::{event, info_span, Instrument, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{EnvFilter, Layer};
+use tracing_subscriber::Layer;
 
 struct TestMetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
 
@@ -60,16 +58,17 @@ pub fn create_shard() {
         .unwrap();
 
     let id = rt.block_on(async {
-        tracing_init();
-        let app_root = info_span!("app root span");
-        let result = send_request().instrument(app_root).await;
+        test_tracing_init();
+        let result = send_request()
+            .instrument(info_span!("send request instr - app root span"))
+            .await;
         shutdown_tracer_provider();
         result
     });
     println!("response id {id}");
 }
 
-fn tracing_init() {
+fn test_tracing_init() {
     let agent_endpoint = Configuration::jaeger_agent_endp();
     global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
     let tracer = opentelemetry_jaeger::new_pipeline()
@@ -77,40 +76,43 @@ fn tracing_init() {
         .with_service_name("grpc-client")
         .install_simple()
         .unwrap();
+
+    let filter = FilterFn::new(|metadata| match metadata.file() {
+        Some(file) if file.contains("nucliadb_node") => {
+            if metadata.is_event() && metadata.fields().field("trace_marker").is_none() {
+                return false;
+            }
+            true
+        }
+        _ => false,
+    });
+
+    let log_levels = Configuration::log_level();
     tracing_subscriber::registry()
         .with(
             tracing_opentelemetry::layer()
                 .with_tracer(tracer)
-                .with_filter(EnvFilter::from_default_env()),
+                .with_filter(Targets::new().with_targets(log_levels))
+                .with_filter(filter),
         )
         .try_init()
         .unwrap();
 }
 
-#[instrument]
 async fn send_request() -> String {
+    event!(Level::INFO, trace_marker = true, "test event for jaeger",);
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
         .instrument(info_span!("client creation"))
         .await
         .expect("Error creating NodeWriter client");
 
-    let req = spawn_blocking(|| {
-        measure_time(
-            || {
-                let mut req = Request::new(EmptyQuery {});
-                global::get_text_map_propagator(|prop| {
-                    prop.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut TestMetadataMap(req.metadata_mut()),
-                    )
-                });
-                req
-            },
-            "injecting context to request headers",
+    let mut req = Request::new(EmptyQuery {});
+    global::get_text_map_propagator(|prop| {
+        prop.inject_context(
+            &tracing::Span::current().context(),
+            &mut TestMetadataMap(req.metadata_mut()),
         )
-    })
-    .await
-    .unwrap();
+    });
 
     let response = client
         .new_shard(req)
