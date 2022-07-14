@@ -15,7 +15,13 @@ spec:
   ports:
     - name: http-search
       port: {{ .Values.serving.port }}
+      protocol: TCP
+      appProtocol: http
     - name: metrics
       port: {{ .Values.serving.metricsPort}}
+      protocol: TCP
+      appProtocol: http
     - name: cluster-monitor
       port: {{ .Values.chitchat.cluster_manager.port }}
+      protocol: TCP
+      appProtocol: tcp

@@ -25,8 +25,6 @@ spec:
   template:
     metadata:
       name: node
-      annotations:
-        sidecar.istio.io/inject: "false"
       labels:
         app: node
         app.kubernetes.io/name: node
@@ -37,6 +35,8 @@ spec:
     spec:
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
+      topologySpreadConstraints:
+{{ toYaml .Values.topologySpreadConstraints | indent 8 }}
       affinity:
 {{ toYaml .Values.affinity | indent 8 }}
       tolerations:

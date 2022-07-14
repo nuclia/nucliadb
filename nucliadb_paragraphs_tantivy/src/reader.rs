@@ -246,10 +246,8 @@ impl ParagraphReaderService {
             }
         }
 
-        let topdocs = match results {
-            0 => TopDocs::with_limit(20),
-            value => TopDocs::with_limit(value).and_offset(offset),
-        };
+        let topdocs = TopDocs::with_limit(results).and_offset(offset);
+
         let mut multicollector = MultiCollector::new();
         let facet_handler = multicollector.add_collector(facet_collector);
         let topdocs_handler = multicollector.add_collector(topdocs);
