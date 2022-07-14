@@ -47,7 +47,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Topic :: System :: Monitoring",
     ],
-    python_requires="~=3.9",
+    python_requires=">=3.7",
     include_package_data=True,
     packages=find_packages(),
     install_requires=requirements,
