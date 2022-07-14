@@ -605,7 +605,7 @@ class Resource:
 
             for subfield, field_metadata in field_metadatas:
                 if enabled_metadata.labels:
-                    metadata.labels.field.clear()  # type: ignore
+                    metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
 
                 entities: Dict[str, str] = {}
@@ -641,7 +641,7 @@ class Resource:
                         )
 
                     if enabled_metadata.labels:
-                        metadata.labels.field.clear()  # type: ignore
+                        metadata.labels.ClearField("field")
                         metadata.labels.paragraph.extend(paragraph.classifications)
 
                     for index, sentence in enumerate(paragraph.sentences):
@@ -651,7 +651,7 @@ class Resource:
                             sentence_key = f"{self.uuid}/{field_key}/{index}/{sentence.start}-{sentence.end}"
 
                         if vo is not None:
-                            metadata.vector.clear()  # type: ignore
+                            metadata.ClearField("vector")
                             vector_tmp = precomputed_vectors.get(sentence_key)
                             if vector_tmp:
                                 metadata.vector.extend(vector_tmp)
@@ -705,7 +705,7 @@ class Resource:
             for subfield, field_metadata in field_metadatas:
 
                 if enabled_metadata.labels:
-                    metadata.labels.field.clear()  # type: ignore
+                    metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
 
                 entities: Dict[str, str] = {}
@@ -727,7 +727,7 @@ class Resource:
                         )
 
                     if enabled_metadata.labels:
-                        metadata.labels.field.clear()  # type: ignore
+                        metadata.labels.ClearField("field")
                         metadata.labels.paragraph.extend(paragraph.classifications)
 
                         if extracted_text is not None and text is not None:
@@ -777,7 +777,7 @@ class Resource:
             for subfield, splitted_metadata in field_metadatas:
 
                 if enabled_metadata.labels:
-                    metadata.labels.field.clear()  # type: ignore
+                    metadata.labels.ClearField("field")
                     metadata.labels.field.extend(splitted_metadata.classifications)
 
                 if extracted_text is not None:
@@ -787,7 +787,7 @@ class Resource:
                         metadata.text = extracted_text.text
 
                 if enabled_metadata.entities:
-                    metadata.entities.clear()
+                    metadata.ClearField("entities")
                     metadata.entities.update(splitted_metadata.ner)
 
                 pb_field = TrainField()
@@ -805,8 +805,8 @@ class Resource:
             if self.basic is not None:
                 metadata.labels.resource.extend(self.basic.usermetadata.classifications)
 
-        metadata.labels.field.clear()  # type: ignore
-        metadata.entities.clear()
+        metadata.labels.ClearField("field")
+        metadata.ClearField("entities")
 
         for ((_, _), field) in fields.items():
             extracted_text = None
