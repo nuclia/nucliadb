@@ -19,7 +19,6 @@
 //
 
 use std::fmt::Debug;
-use std::panic;
 
 use async_std::fs;
 use async_trait::async_trait;
@@ -83,14 +82,15 @@ impl ReaderChild for ParagraphReaderService {
         };
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-
+        let text = &request.body;
+        let multi_flag = results > 0 && !text.is_empty();
         let facets = request
             .faceted
             .as_ref()
             .map(|v| v.tags.clone())
             .unwrap_or_default();
 
-        let (top_docs, facets_count) = self.do_search(query, results, offset, &facets);
+        let (top_docs, facets_count) = self.do_search(query, results, offset, &facets, multi_flag);
         Ok(ParagraphSearchResponse::from(SearchResponse {
             text_service: self,
             facets_count,
@@ -235,32 +235,32 @@ impl ParagraphReaderService {
         results: usize,
         offset: usize,
         facets: &[String],
+        multic_flag: bool,
     ) -> (Vec<(f32, DocAddress)>, FacetCounts) {
-        let mut facet_collector = FacetCollector::for_field(self.schema.facets);
-        for facet in facets {
-            match panic::catch_unwind(|| Facet::from(facet.as_str())) {
-                Ok(facet) => facet_collector.add_facet(facet),
-                Err(_e) => {
-                    error!("Invalid facet: {}", facet);
-                }
-            }
-        }
-
-        let topdocs = TopDocs::with_limit(results).and_offset(offset);
-
-        let mut multicollector = MultiCollector::new();
-        let facet_handler = multicollector.add_collector(facet_collector);
-        let topdocs_handler = multicollector.add_collector(topdocs);
-
         let query = BooleanQuery::new(query);
         let searcher = self.reader.searcher();
-        debug!("{:?}", query);
-        let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-        let facets_count = facet_handler.extract(&mut multi_fruit);
-        let top_docs = topdocs_handler.extract(&mut multi_fruit);
-        debug!("{:?}", top_docs);
-        // top_docs.retain(|(v, _)| *v > 0.2f32);
-        (top_docs, facets_count)
+        let mut facet_collector = FacetCollector::for_field(self.schema.facets);
+        for facet in facets {
+            match Facet::from_text(facet) {
+                Ok(facet) => facet_collector.add_facet(facet),
+                Err(_) => error!("Invalid facet: {}", facet),
+            }
+        }
+        if multic_flag {
+            let topdocs = TopDocs::with_limit(results).and_offset(offset);
+            let mut multicollector = MultiCollector::new();
+            let facet_handler = multicollector.add_collector(facet_collector);
+            let topdocs_handler = multicollector.add_collector(topdocs);
+            debug!("{:?}", query);
+            let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
+            let facets_count = facet_handler.extract(&mut multi_fruit);
+            let top_docs = topdocs_handler.extract(&mut multi_fruit);
+            debug!("{:?}", top_docs);
+            (top_docs, facets_count)
+        } else {
+            let facet_counts = searcher.search(&query, &facet_collector).unwrap();
+            (vec![], facet_counts)
+        }
     }
     fn keys(&self) -> Vec<String> {
         let searcher = self.reader.searcher();
@@ -514,7 +514,7 @@ mod tests {
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 4);
+        assert_eq!(result.total, 0);
 
         // Search on all paragraphs without fields
         let search = ParagraphSearchRequest {
@@ -531,7 +531,7 @@ mod tests {
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 4);
+        assert_eq!(result.total, 0);
 
         // Search on all paragraphs in resource with typo
         let search = ParagraphSearchRequest {

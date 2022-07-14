@@ -250,6 +250,7 @@ impl ShardReaderService {
     #[tracing::instrument(name = "ShardReaderService::search", skip(self, search_request))]
     pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload).await;
+        let skip_vectors = search_request.body.is_empty() || search_request.result_per_page == 0;
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
             body: search_request.body.clone(),
@@ -292,30 +293,37 @@ impl ShardReaderService {
             span.in_scope(|| paragraph_reader_service.search(&paragraph_request))
         });
         info!("{}:{}", line!(), file!());
-
-        let vector_request = VectorSearchRequest {
-            id: "".to_string(),
-            vector: search_request.vector.clone(),
-            tags: search_request.fields.clone(),
-            reload: search_request.reload,
-        };
-        let vector_reader_service = self.vector_reader_service.clone();
-        let span = tracing::Span::current();
-        let vector_task = task::spawn_blocking(move || {
-            let span = span.entered();
-            span.in_scope(|| vector_reader_service.search(&vector_request))
-        });
-        info!("{}:{}", line!(), file!());
-
-        let (rtext, rparagraph, rvector) =
-            try_join!(text_task, paragraph_task, vector_task,).unwrap();
-        info!("{}:{}", line!(), file!());
-
-        Ok(SearchResponse {
-            document: Some(rtext?),
-            paragraph: Some(rparagraph?),
-            vector: Some(rvector?),
-        })
+        if skip_vectors {
+            let (rtext, rparagraph) = try_join!(text_task, paragraph_task).unwrap();
+            info!("{}:{}", line!(), file!());
+            Ok(SearchResponse {
+                document: Some(rtext?),
+                paragraph: Some(rparagraph?),
+                vector: None,
+            })
+        } else {
+            let vector_request = VectorSearchRequest {
+                id: "".to_string(),
+                vector: search_request.vector.clone(),
+                tags: search_request.fields.clone(),
+                reload: search_request.reload,
+            };
+            let vector_reader_service = self.vector_reader_service.clone();
+            let span = tracing::Span::current();
+            let vector_task = task::spawn_blocking(move || {
+                let span = span.entered();
+                span.in_scope(|| vector_reader_service.search(&vector_request))
+            });
+            info!("{}:{}", line!(), file!());
+            let (rtext, rparagraph, rvector) =
+                try_join!(text_task, paragraph_task, vector_task,).unwrap();
+            info!("{}:{}", line!(), file!());
+            Ok(SearchResponse {
+                document: Some(rtext?),
+                paragraph: Some(rparagraph?),
+                vector: Some(rvector?),
+            })
+        }
     }
 
     #[tracing::instrument(
