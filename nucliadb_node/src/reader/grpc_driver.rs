@@ -159,6 +159,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[instrument(name = "NodeReaderGRPCDriver::suggest", skip(self, request))]
     async fn suggest(
         &self,
         request: tonic::Request<SuggestRequest>,
@@ -248,6 +249,8 @@ impl NodeReader for NodeReaderGRPCDriver {
             }
         }
     }
+
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::document_ids", skip(self, request))]
     async fn document_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -266,6 +269,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             ))),
         }
     }
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::paragraph_ids", skip(self, request))]
     async fn paragraph_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -284,6 +288,8 @@ impl NodeReader for NodeReaderGRPCDriver {
             ))),
         }
     }
+
+    #[tracing::instrument(name = "NodeReaderGRPCDriver::vector_ids", skip(self, request))]
     async fn vector_ids(
         &self,
         request: tonic::Request<ShardId>,

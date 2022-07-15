@@ -25,7 +25,7 @@ use opentelemetry::global;
 use opentelemetry::global::shutdown_tracer_provider;
 use opentelemetry::propagation::Injector;
 use tonic::Request;
-use tracing::{event, info_span, Instrument, Level};
+use tracing::{event, info_span, instrument, span, Instrument, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
@@ -59,9 +59,9 @@ pub fn create_shard() {
 
     let id = rt.block_on(async {
         test_tracing_init();
-        let result = send_request()
-            .instrument(info_span!("send request instr - app root span"))
-            .await;
+        let span = info_span!("send request instr - app root span");
+        let result = send_request().await;
+        drop(span);
         shutdown_tracer_provider();
         result
     });
@@ -99,6 +99,7 @@ fn test_tracing_init() {
         .unwrap();
 }
 
+#[instrument(name = "send_reques")]
 async fn send_request() -> String {
     event!(Level::INFO, trace_marker = true, "test event for jaeger",);
     let mut client = NodeWriterClient::connect("http://127.0.0.1:4446")
@@ -106,13 +107,21 @@ async fn send_request() -> String {
         .await
         .expect("Error creating NodeWriter client");
 
-    let mut req = Request::new(EmptyQuery {});
-    global::get_text_map_propagator(|prop| {
-        prop.inject_context(
-            &tracing::Span::current().context(),
-            &mut TestMetadataMap(req.metadata_mut()),
-        )
-    });
+    let span = tracing::Span::current();
+    let req = tokio::task::spawn_blocking(move || {
+        span!(parent: &span, Level::INFO, "internal inject").in_scope(|| {
+            let mut req = Request::new(EmptyQuery {});
+            global::get_text_map_propagator(|prop| {
+                prop.inject_context(
+                    &tracing::Span::current().context(),
+                    &mut TestMetadataMap(req.metadata_mut()),
+                )
+            });
+            req
+        })
+    })
+    .await
+    .unwrap();
 
     let response = client
         .new_shard(req)

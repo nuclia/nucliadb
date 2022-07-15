@@ -172,8 +172,8 @@ impl ShardWriterService {
         let span = tracing::Span::current();
         let text_task = tokio::task::spawn_blocking(move || {
             let mut writer = field_writer_service.write().unwrap();
-            let span = span.entered();
-            span.in_scope(|| writer.set_resource(&field_resource))
+            span!(parent: &span, Level::INFO, "field writer set resource")
+                .in_scope(|| writer.set_resource(&field_resource))
         });
         info!("Field service ends");
         let paragraph_resource = resource.clone();
@@ -182,8 +182,8 @@ impl ShardWriterService {
         let span = tracing::Span::current();
         let paragraph_task = tokio::task::spawn_blocking(move || {
             let mut writer = paragraph_writer_service.write().unwrap();
-            let span = span.entered();
-            span.in_scope(|| writer.set_resource(&paragraph_resource))
+            span!(parent: &span, Level::INFO, "paragraph writer set resource")
+                .in_scope(|| writer.set_resource(&paragraph_resource))
         });
         info!("Paragraph service ends");
         let vector_writer_service = self.vector_writer_service.clone();
@@ -192,8 +192,8 @@ impl ShardWriterService {
         let span = tracing::Span::current();
         let vector_task = tokio::task::spawn_blocking(move || {
             let mut writer = vector_writer_service.write().unwrap();
-            let span = span.entered();
-            span.in_scope(|| writer.set_resource(&vector_resource))
+            span!(parent: &span, Level::INFO, "vector writer set resource")
+                .in_scope(|| writer.set_resource(&vector_resource))
         });
         info!("Vector service ends");
         let (rtext, rparagraph, rvector) =
