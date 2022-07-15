@@ -40,6 +40,7 @@ impl From<NodeWriterService> for NodeWriterGRPCDriver {
 
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::get_shard", skip(self, request))]
     async fn get_shard(
         &self,
         request: tonic::Request<ShardId>,
@@ -64,6 +65,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::new_shard", skip(self, request))]
     async fn new_shard(
         &self,
         request: tonic::Request<EmptyQuery>,
@@ -78,6 +80,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Ok(tonic::Response::new(response))
     }
 
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::delete_shard", skip(self, request))]
     async fn delete_shard(
         &self,
         request: tonic::Request<ShardId>,
@@ -163,6 +166,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::remove_resource", skip(self, request))]
     async fn remove_resource(
         &self,
         request: tonic::Request<ResourceId>,
@@ -204,6 +208,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::gc", skip(self, request))]
     async fn gc(
         &self,
         request: tonic::Request<ShardId>,
