@@ -60,8 +60,7 @@ pub fn create_shard() {
     let id = rt.block_on(async {
         test_tracing_init();
         let span = info_span!("send request instr - app root span");
-        let result = send_request()
-            .await;
+        let result = send_request().await;
         drop(span);
         shutdown_tracer_provider();
         result
