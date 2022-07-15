@@ -5,6 +5,9 @@ members = [
   "nucliadb_cluster",
   "nucliadb_cluster/binding",
   "nucliadb_node",
+  "nucliadb_paragraphs_tantivy",
+  "nucliadb_fields_tantivy",
+  "nucliadb_vectors",
   "nucliadb_node/binding",
   "nucliadb_services",
 ]
