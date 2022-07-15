@@ -91,11 +91,6 @@ def run():
 
     logging.getLogger("asyncio").setLevel(logging.ERROR)
 
-    if settings.logging_config:
-        logging.config.fileConfig(
-            settings.logging_config, disable_existing_loggers=True
-        )
-
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")
 
