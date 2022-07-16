@@ -18,8 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use opentelemetry::global;
+use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
-use tracing::{debug, error};
+use tracing::{debug, error, Span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -27,6 +29,8 @@ use tracing_subscriber::Layer;
 
 use crate::config::Configuration;
 use crate::result::{ServiceError, ServiceResult};
+
+pub(crate) const TRACE_ID: &str = "trace-id";
 
 pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
     let agent_endpoint = Configuration::jaeger_agent_endp();
@@ -94,4 +98,10 @@ pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
             ServiceError::GenericErr(Box::new(e))
         })?;
     Ok(guard)
+}
+
+pub(crate) fn run_with_telemetry<F, R>(current: Span, f: F) -> R
+where F: FnOnce() -> R {
+    let tid = current.context().span().span_context().trace_id();
+    sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }

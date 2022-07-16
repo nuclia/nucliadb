@@ -57,7 +57,7 @@ http = "0.2"
 tracing = { version = "0.1.29" }
 thiserror = "1"
 mockall = "0.11"
-opentelemetry = { version = "0.17", features = ["rt-tokio"] }
+opentelemetry = { version = "0.17", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.17.2"
 unicode-segmentation = "1.9.0"
 # Test dependencies
