@@ -20,7 +20,7 @@
 use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
-use tracing::{debug, error, Span};
+use tracing::{error, Level, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
@@ -33,14 +33,12 @@ use crate::result::{ServiceError, ServiceResult};
 const TRACE_ID: &str = "trace-id";
 
 pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
-    let agent_endpoint = Configuration::jaeger_agent_endp();
-    debug!("{agent_endpoint}");
     let log_levels = Configuration::log_level();
 
     let mut layers = Vec::new();
 
     if Configuration::jaeger_enabled() {
-        layers.push(init_jaeger()?);
+        layers.push(init_jaeger(log_levels.clone())?);
     }
 
     let stdout_layer = tracing_subscriber::fmt::layer()
@@ -77,10 +75,10 @@ where F: FnOnce() -> R {
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
 
-fn init_jaeger() -> ServiceResult<Box<dyn Layer<Registry> + Send + Sync>> {
+fn init_jaeger(
+    log_levels: Vec<(String, Level)>,
+) -> ServiceResult<Box<dyn Layer<Registry> + Send + Sync>> {
     let agent_endpoint = Configuration::jaeger_agent_endp();
-    let log_levels = Configuration::log_level();
-    debug!("{agent_endpoint}");
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
         .with_service_name("nucliadb_node")
@@ -107,7 +105,7 @@ fn init_jaeger() -> ServiceResult<Box<dyn Layer<Registry> + Send + Sync>> {
 
     Ok(tracing_opentelemetry::layer()
         .with_tracer(tracer)
-        .with_filter(Targets::new().with_targets(log_levels.clone()))
+        .with_filter(Targets::new().with_targets(log_levels))
         .with_filter(filter)
         .boxed())
 }
