@@ -35,7 +35,7 @@ use tantivy::{
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::search_query::{self, Distance};
+use crate::search_query;
 use crate::search_response::SearchResponse;
 pub struct ParagraphReaderService {
     index: Index,
@@ -70,16 +70,7 @@ impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        let query = {
-            let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
-            let first_attemp =
-                search_query::process(&parser, request, &self.schema, Distance::Low).unwrap();
-            if first_attemp.is_empty() {
-                search_query::process(&parser, request, &self.schema, Distance::High).unwrap()
-            } else {
-                first_attemp
-            }
-        };
+        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
         let text = &request.body;
@@ -90,7 +81,15 @@ impl ReaderChild for ParagraphReaderService {
             .map(|v| v.tags.clone())
             .unwrap_or_default();
 
-        let (top_docs, facets_count) = self.do_search(query, results, offset, &facets, multi_flag);
+        let mut dist = 1;
+        let query = search_query::process(&parser, request, &self.schema, dist).unwrap();
+        let (mut top_docs, mut facets_count) =
+            self.do_search(query, results, offset, &facets, multi_flag);
+        while multi_flag && top_docs.is_empty() && dist < 2 {
+            dist += 1;
+            let query = search_query::process(&parser, request, &self.schema, dist).unwrap();
+            (top_docs, facets_count) = self.do_search(query, results, offset, &facets, multi_flag);
+        }
         Ok(ParagraphSearchResponse::from(SearchResponse {
             text_service: self,
             facets_count,
@@ -600,14 +599,6 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 2);
-        // for (key, facet) in result.facets {
-        //     println!("KEY {}", key);
-        //     for facetresult in facet.facetresults {
-        //         println!("{}", facetresult.tag);
-        //     }
-        // }
-        // task::sleep(Duration::from_secs(1)).await;
-        // Search typo on all paragraph
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
