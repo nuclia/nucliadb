@@ -4,15 +4,15 @@ type Len = u64;
 type Unit = f32;
 type Dist = f32;
 
-pub const FORMAT: &str = "vectors";
+
 fn encode_length(mut buff: Vec<u8>, vec: &[Unit]) -> Vec<u8> {
     let len = vec.len() as Len;
-    buff.write_all(&mut len.to_le_bytes()).unwrap();
+    buff.write_all(&len.to_le_bytes()).unwrap();
     buff.flush().unwrap();
     buff
 }
 fn encode_unit(mut buff: Vec<u8>, unit: Unit) -> Vec<u8> {
-    buff.write_all(&mut unit.to_le_bytes()).unwrap();
+    buff.write_all(&unit.to_le_bytes()).unwrap();
     buff.flush().unwrap();
     buff
 }

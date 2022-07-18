@@ -19,16 +19,19 @@
 //
 
 use crate::database::LMBDStorage;
-use crate::segment::Segment;
 use crate::hnsw::Hnsw;
+use crate::segment::Segment;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 
 #[derive(Default, Deserialize, Serialize)]
-pub struct TransactionLog;
+pub struct TransactionLog {
+    entries: Vec<usize>,
+}
+
 pub struct Index {
+    segments: HashMap<usize, Segment>,
     database: LMBDStorage,
-    segments: HashMap<u64, Segment>,
     hnsw: Hnsw,
 }

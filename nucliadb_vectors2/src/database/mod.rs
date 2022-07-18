@@ -113,7 +113,7 @@ impl LMBDStorage {
     pub fn get_keys<'a>(&'a self, txn: &'a RoTxn) -> RoIter<Str, SerdeBincode<Node>> {
         self.node_db.iter(txn).unwrap()
     }
-    pub fn get_prefixed<'a>(
+    pub fn get_prefixed_nodes<'a>(
         &'a self,
         txn: &'a RoTxn,
         prefix: &str,
