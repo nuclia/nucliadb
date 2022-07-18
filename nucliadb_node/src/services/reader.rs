@@ -35,6 +35,7 @@ use tracing::*;
 use crate::config::Configuration;
 use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
+use crate::telemetry::run_with_telemetry;
 
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;
@@ -267,8 +268,9 @@ impl ShardReaderService {
         let field_reader_service = self.field_reader_service.clone();
         let span = tracing::Span::current();
         let text_task = task::spawn_blocking(move || {
-            span!(parent: &span, Level::INFO, "field reader search")
-                .in_scope(|| field_reader_service.search(&field_request))
+            run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
+                field_reader_service.search(&field_request)
+            })
         });
         info!("{}:{}", line!(), file!());
 
@@ -289,8 +291,9 @@ impl ShardReaderService {
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         let span = tracing::Span::current();
         let paragraph_task = task::spawn_blocking(move || {
-            span!(parent: &span, Level::INFO, "paragraph reader search")
-                .in_scope(|| paragraph_reader_service.search(&paragraph_request))
+            run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
+                paragraph_reader_service.search(&paragraph_request)
+            })
         });
         info!("{}:{}", line!(), file!());
         if skip_vectors {
@@ -311,8 +314,9 @@ impl ShardReaderService {
             let vector_reader_service = self.vector_reader_service.clone();
             let span = tracing::Span::current();
             let vector_task = task::spawn_blocking(move || {
-                span!(parent: &span, Level::INFO, "vector reader search")
-                    .in_scope(|| vector_reader_service.search(&vector_request))
+                run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
+                    vector_reader_service.search(&vector_request)
+                })
             });
             info!("{}:{}", line!(), file!());
             let (rtext, rparagraph, rvector) =
@@ -338,8 +342,9 @@ impl ShardReaderService {
         let paragraph_reader_service = self.paragraph_reader_service.clone();
         let span = tracing::Span::current();
         task::spawn_blocking(move || {
-            span!(parent: &span, Level::INFO, "paragraph reader search")
-                .in_scope(|| paragraph_reader_service.search(&search_request))
+            run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
+                paragraph_reader_service.search(&search_request)
+            })
         })
         .await
         .unwrap()
@@ -357,8 +362,9 @@ impl ShardReaderService {
         let field_reader_service = self.field_reader_service.clone();
         let span = tracing::Span::current();
         task::spawn_blocking(move || {
-            span!(parent: &span, Level::INFO, "field reader search")
-                .in_scope(|| field_reader_service.search(&search_request))
+            run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
+                field_reader_service.search(&search_request)
+            })
         })
         .await
         .unwrap()
@@ -373,8 +379,9 @@ impl ShardReaderService {
         let vector_reader_service = self.vector_reader_service.clone();
         let span = tracing::Span::current();
         task::spawn_blocking(move || {
-            span!(parent: &span, Level::INFO, "vector reader search")
-                .in_scope(|| vector_reader_service.search(&search_request))
+            run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
+                vector_reader_service.search(&search_request)
+            })
         })
         .await
         .unwrap()

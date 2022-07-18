@@ -59,9 +59,6 @@ ignore = [
 #severity-threshold =
 
 
-
-
-
 # This section is considered when running `cargo deny check licenses`
 # More documentation for the licenses section can be found here:
 # https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html
@@ -74,6 +71,7 @@ unlicensed = "allow"
 allow = [
     "MIT",
     "Apache-2.0",
+    "Unicode-DFS-2016",
     # "Apache-2.0 WITH LLVM-exception",
     "OpenSSL",
     "zlib-acknowledgement",
@@ -114,11 +112,21 @@ confidence-threshold = 0.8
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
-{name = "nucliadb-node", allow=["AGPL-3.0"], version = "*"},
-{name = "nucliadb-swim", allow=["MIT"], version = "*"},
-{name = "nucliadb-cluster", allow=["AGPL-3.0"], version = "*"},
-{name = "nucliadb_cluster_rust", allow=["Apache-2.0 WITH LLVM-exception"], version = "*"},
-{name = "target-lexicon", allow=["Apache-2.0 WITH LLVM-exception"], version = "*"},
+    { name = "nucliadb-node", allow = [
+        "AGPL-3.0",
+    ], version = "*" },
+    { name = "nucliadb-swim", allow = [
+        "MIT",
+    ], version = "*" },
+    { name = "nucliadb-cluster", allow = [
+        "AGPL-3.0",
+    ], version = "*" },
+    { name = "nucliadb_cluster_rust", allow = [
+        "Apache-2.0 WITH LLVM-exception",
+    ], version = "*" },
+    { name = "target-lexicon", allow = [
+        "Apache-2.0 WITH LLVM-exception",
+    ], version = "*" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
@@ -139,9 +147,8 @@ expression = "OpenSSL"
 license-files = [
     # Each entry is a crate relative path, and the (opaque) hash of its contents
     { path = "LICENSE", hash = 0xbd0eed23 },
-    { path = "LICENSE.txt", hash = 0xbd0eed23 }
+    { path = "LICENSE.txt", hash = 0xbd0eed23 },
 ]
-
 
 
 [licenses.private]
@@ -154,9 +161,6 @@ ignore = false
 registries = [
     #"https://sekretz.com/registry
 ]
-
-
-
 
 
 # This section is considered when running `cargo deny check bans`.
@@ -174,9 +178,7 @@ wildcards = "allow"
 # * all - Both lowest-version and simplest-path are used
 highlight = "all"
 # List of crates that are allowed. Use with care!
-allow = [
-    { name = "stream-vbyte", version = ">=0.1.0" },
-]
+allow = [{ name = "stream-vbyte", version = ">=0.1.0" }]
 # List of crates to deny
 deny = [
     # Each entry the name of a crate and a version range. If version is
@@ -198,10 +200,6 @@ skip = [
 skip-tree = [
     #{ name = "ansi_term", version = "=0.11.0", depth = 20 },
 ]
-
-
-
-
 
 
 # This section is considered when running `cargo deny check sources`.

@@ -25,6 +25,7 @@ use tracing::*;
 
 use crate::config::Configuration;
 use crate::services::config::ShardConfig;
+use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug)]
 pub struct ShardWriterService {
@@ -171,9 +172,13 @@ impl ShardWriterService {
         info!("Field service starts");
         let span = tracing::Span::current();
         let text_task = tokio::task::spawn_blocking(move || {
-            let mut writer = field_writer_service.write().unwrap();
-            span!(parent: &span, Level::INFO, "field writer set resource")
-                .in_scope(|| writer.set_resource(&field_resource))
+            run_with_telemetry(
+                info_span!(parent: &span, "field writer set resource"),
+                || {
+                    let mut writer = field_writer_service.write().unwrap();
+                    writer.set_resource(&field_resource)
+                },
+            )
         });
         info!("Field service ends");
         let paragraph_resource = resource.clone();
@@ -181,9 +186,13 @@ impl ShardWriterService {
         info!("Paragraph service starts");
         let span = tracing::Span::current();
         let paragraph_task = tokio::task::spawn_blocking(move || {
-            let mut writer = paragraph_writer_service.write().unwrap();
-            span!(parent: &span, Level::INFO, "paragraph writer set resource")
-                .in_scope(|| writer.set_resource(&paragraph_resource))
+            run_with_telemetry(
+                info_span!(parent: &span, "paragraph writer set resource"),
+                || {
+                    let mut writer = paragraph_writer_service.write().unwrap();
+                    writer.set_resource(&paragraph_resource)
+                },
+            )
         });
         info!("Paragraph service ends");
         let vector_writer_service = self.vector_writer_service.clone();
@@ -191,9 +200,13 @@ impl ShardWriterService {
         info!("Vector service starts");
         let span = tracing::Span::current();
         let vector_task = tokio::task::spawn_blocking(move || {
-            let mut writer = vector_writer_service.write().unwrap();
-            span!(parent: &span, Level::INFO, "vector writer set resource")
-                .in_scope(|| writer.set_resource(&vector_resource))
+            run_with_telemetry(
+                info_span!(parent: &span, "vector writer set resource"),
+                || {
+                    let mut writer = vector_writer_service.write().unwrap();
+                    writer.set_resource(&vector_resource)
+                },
+            )
         });
         info!("Vector service ends");
         let (rtext, rparagraph, rvector) =
