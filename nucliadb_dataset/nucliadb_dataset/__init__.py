@@ -1,0 +1,3 @@
+NUCLIA_GLOBAL = {}
+
+CLIENT_ID = "CLIENT"

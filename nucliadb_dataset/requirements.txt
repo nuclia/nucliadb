@@ -1,0 +1,9 @@
+protobuf==3.20.1
+types-protobuf==3.19.20
+grpcio==1.44.0
+grpcio-health-checking==1.44.0
+grpcio-channelz==1.44.0
+grpcio-status==1.44.0
+grpcio-tools==1.44.0
+grpcio-testing==1.44.0
+grpcio-reflection==1.44.0
