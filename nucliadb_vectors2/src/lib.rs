@@ -18,16 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-// mod heuristics;
-pub mod memory_system;
-// mod query;
-// mod query_delete;
-// mod query_insert;
-// mod query_post_search;
-// mod query_search;
-// pub mod hnsw;
-// pub mod service;
-// pub mod sic;
-// #[cfg(test)]
-// mod tests;
-// mod utils;
+pub mod database;
+pub mod lock;
+pub mod delete_log;
+pub mod hnsw;
+pub mod index;
+pub mod vector;
+pub mod segment;
+pub mod disk_structure;

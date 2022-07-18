@@ -4,9 +4,6 @@ use std::path::Path;
 
 use fs2::FileExt;
 
-mod file_names {
-    pub const LOCK: &str = "lock.nuclia";
-}
 struct Locked;
 struct Unlocked;
 
@@ -21,7 +18,7 @@ impl Lock<Unlocked> {
             .read(true)
             .write(true)
             .create(true)
-            .open(&path.join(file_names::LOCK))
+            .open(path)
             .unwrap();
         Lock {
             file,
@@ -53,7 +50,7 @@ mod tests {
     #[test]
     fn lock_unlock() {
         let dir = tempfile::tempdir().unwrap();
-        let lock = Lock::new(dir.path());
+        let lock = Lock::new(&dir.path().join("state.lock"));
         let locked = lock.lock();
         let _unlocked = locked.unlock();
     }

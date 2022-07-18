@@ -18,11 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod database;
-pub mod dtxn_dag_persistence;
-pub mod elements;
-pub mod layer_persistence;
-pub mod lock;
-pub mod log;
-pub mod transaction_persistence;
-// pub mod index;
+use crate::database::LMBDStorage;
+use crate::segment::Segment;
+use crate::hnsw::Hnsw;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Deserialize, Serialize)]
+pub struct TransactionLog;
+pub struct Index {
+    database: LMBDStorage,
+    segments: HashMap<u64, Segment>,
+    hnsw: Hnsw,
+}

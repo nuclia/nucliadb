@@ -18,108 +18,159 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fmt::Debug;
-use std::path::Path;
+use crate::segment::SegmentSlice;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 
-use tracing::*;
+pub mod params {
+    pub fn level_factor() -> f64 {
+        1.0 / (m() as f64).ln()
+    }
+    pub const fn m_max() -> usize {
+        30
+    }
+    pub const fn m() -> usize {
+        30
+    }
+    pub const fn ef_construction() -> usize {
+        100
+    }
+    pub const fn k_neighbours() -> usize {
+        10
+    }
+}
 
-use crate::memory_system::index::*;
-use crate::memory_system::elements::*;
-use crate::query::Query;
-use crate::query_delete::DeleteQuery;
-use crate::query_insert::InsertQuery;
-use crate::query_post_search::{PostSearchQuery, PostSearchValue};
-use crate::query_search::{SearchQuery, SearchValue};
 
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct EntryPoint {
+    pub node: Node,
+    pub layer: u64,
+}
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub struct Node {
+    pub segment: u64,
+    pub vector: SegmentSlice,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct Edge {
+    pub from: Node,
+    pub to: Node,
+    pub dist: f32,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct GraphLayer {
+    pub cnx: HashMap<Node, BTreeMap<Node, Edge>>,
+}
+
+impl Default for GraphLayer {
+    fn default() -> Self {
+        GraphLayer::new()
+    }
+}
+
+impl std::ops::Index<Node> for GraphLayer {
+    type Output = BTreeMap<Node, Edge>;
+    fn index(&self, from: Node) -> &Self::Output {
+        &self.cnx[&from]
+    }
+}
+impl std::ops::Index<(Node, Node)> for GraphLayer {
+    type Output = Edge;
+    fn index(&self, (from, to): (Node, Node)) -> &Self::Output {
+        &self.cnx[&from][&to]
+    }
+}
+
+impl GraphLayer {
+    const INITIAL_CAPACITY: usize = 1000;
+    const OCCUPANCY_MIN: usize = 70;
+    const OCCUPANCY_MAX: usize = 90;
+    const OCCUPANCY_MID: usize = 80;
+    const fn should_increase(len: usize, cap: usize) -> bool {
+        let occupancy = (len / cap) * 100;
+        occupancy > GraphLayer::OCCUPANCY_MAX
+    }
+    const fn should_decrease(len: usize, cap: usize) -> bool {
+        let occupancy = (len / cap) * 100;
+        cap > GraphLayer::INITIAL_CAPACITY && occupancy < GraphLayer::OCCUPANCY_MIN
+    }
+    const fn resize_by(len: usize, cap: usize) -> i64 {
+        let len = len as i64;
+        let cap = cap as i64;
+        let ocup = GraphLayer::OCCUPANCY_MID as i64;
+        ((100 * len) - (ocup * cap)) / ocup
+    }
+
+    pub fn new() -> GraphLayer {
+        GraphLayer {
+            cnx: HashMap::with_capacity(GraphLayer::INITIAL_CAPACITY),
+        }
+    }
+    pub fn has_node(&self, node: Node) -> bool {
+        self.cnx.contains_key(&node)
+    }
+    pub fn add_node(&mut self, node: Node) {
+        self.cnx.insert(node, BTreeMap::new());
+        self.increase_policy();
+    }
+    pub fn add_edge(&mut self, node: Node, edge: Edge) {
+        let edges = self.cnx.entry(node).or_insert_with(BTreeMap::new);
+        edges.insert(edge.to, edge);
+    }
+    pub fn remove_node(&mut self, node: Node) {
+        self.cnx.remove(&node);
+        self.decrease_policy();
+    }
+    pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
+        self.cnx[&from].clone().into_iter().collect()
+    }
+    #[allow(unused)]
+    #[cfg(test)]
+    pub fn no_edges(&self, node: Node) -> Option<usize> {
+        self.cnx.get(&node).map(|v| v.len())
+    }
+    pub fn no_nodes(&self) -> usize {
+        self.cnx.len()
+    }
+    pub fn remove_edge(&mut self, from: Node, to: Node) {
+        let edges = self.cnx.get_mut(&from).unwrap();
+        edges.remove(&to);
+    }
+    pub fn some_node(&self) -> Option<Node> {
+        self.cnx.keys().next().cloned()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.cnx.len() == 0
+    }
+    fn increase_policy(&mut self) {
+        if let Some(factor) = self.check_policy(GraphLayer::should_increase) {
+            self.cnx.reserve(factor as usize);
+        }
+    }
+    fn decrease_policy(&mut self) {
+        if let Some(factor) = self.check_policy(GraphLayer::should_decrease) {
+            let cap = ((self.cnx.capacity() as i64) + factor) as usize;
+            self.cnx.shrink_to(cap);
+        }
+    }
+    fn check_policy(&self, policy: fn(_: usize, _: usize) -> bool) -> Option<i64> {
+        let len = self.cnx.len();
+        let cap = self.cnx.capacity();
+        if policy(self.cnx.len(), self.cnx.capacity()) {
+            Some(GraphLayer::resize_by(len, cap))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Default, Serialize, Deserialize)]
 pub struct Hnsw {
-    index: Index,
-}
-
-impl Debug for Hnsw {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("VectorReader")
-            .field("index", &self.index)
-            .finish()
-    }
-}
-
-impl Hnsw {
-    pub fn new(path: &str) -> Hnsw {
-        Hnsw {
-            index: Index::new(Path::new(path)),
-        }
-    }
-    pub fn open(path: &str) -> Hnsw {
-        Hnsw {
-            index: Index::open(Path::new(path)),
-        }
-    }
-    pub fn search(
-        &self,
-        elem: Vec<f32>,
-        labels: Vec<String>,
-        no_results: usize,
-    ) -> Vec<(String, f32)> {
-        let SearchValue { neighbours } = SearchQuery {
-            elem: Vector::from(elem),
-            k_neighbours: hnsw_params::k_neighbours(),
-            index: &self.index,
-            with_filter: &labels,
-        }
-        .run();
-        debug!("Neighbours {}", neighbours.len());
-        let PostSearchValue { filtered } = PostSearchQuery {
-            up_to: no_results,
-            pre_filter: neighbours,
-            with_filter: labels,
-            index: &self.index,
-        }
-        .run();
-        filtered
-    }
-    pub fn insert(&mut self, key: String, element: Vec<f32>, labels: Vec<String>) {
-        InsertQuery {
-            key,
-            element,
-            labels,
-            m: hnsw_params::m(),
-            m_max: hnsw_params::m_max(),
-            ef_construction: hnsw_params::ef_construction(),
-            index: &mut self.index,
-        }
-        .run();
-    }
-    pub fn delete_document(&mut self, doc: String) {
-        for key in self.index.get_prefixed(&doc) {
-            self.delete_vector(key)
-        }
-    }
-    pub fn delete_vector(&mut self, key: String) {
-        DeleteQuery {
-            delete: key,
-            m: hnsw_params::m(),
-            m_max: hnsw_params::m_max(),
-            ef_construction: hnsw_params::ef_construction(),
-            index: &mut self.index,
-        }
-        .run();
-    }
-    pub fn commit(&mut self) {
-        self.index.commit()
-    }
-    pub fn run_garbage_collection(&mut self) {
-        self.index.run_garbage_collection()
-    }
-    pub fn reload(&mut self) {
-        self.index.reload();
-    }
-    pub fn no_vectors(&self) -> usize {
-        self.index.no_nodes() as usize
-    }
-    pub fn stats(&self) -> Stats {
-        self.index.stats()
-    }
-    pub fn keys(&self) -> Vec<String> {
-        self.index.get_keys()
-    }
+    pub max_layer: usize,
+    pub entry_point: Option<EntryPoint>,
+    pub layers_out: Vec<GraphLayer>,
+    pub layers_in: Vec<GraphLayer>,
 }
