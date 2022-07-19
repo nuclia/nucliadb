@@ -100,12 +100,18 @@ impl Index {
     }
     pub fn has_labels(&self, node: Node, labels: &[String]) -> bool {
         let txn = self.lmdb_driver.ro_txn();
-        let key = self.lmdb_driver.get_node_key(&txn, node).unwrap();
-        let all = labels
-            .iter()
-            .all(|label| self.lmdb_driver.has_label(&txn, key, label));
-        txn.abort().unwrap();
-        all
+        if let Some(key) = self.lmdb_driver.get_node_key(&txn, node) {
+            let all = labels
+                .iter()
+                .all(|label| self.lmdb_driver.has_label(&txn, key, label));
+            txn.abort().unwrap();
+            all
+        } else {
+            tracing::error!(
+                "Inconsistency detected. Node key not found in lmdb, but exist in memory."
+            );
+            false
+        }
     }
     pub fn has_node(&self, key: &str) -> bool {
         self.get_node(key).is_some()
