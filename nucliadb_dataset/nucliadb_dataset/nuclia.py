@@ -11,6 +11,7 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainField,
 )
+from nucliadb_protos.writer_pb2 import GetLabelsRequest, GetLabelsResponse
 
 
 class NucliaDriver:
@@ -64,11 +65,7 @@ class NucliaDriver:
         for field in self.stub.GetFields(request):
             yield field
 
-    def get_labels(self, kbid: str) -> TrainField:
-        request = GetFieldsRequest()
+    def get_labels(self, kbid: str) -> GetLabelsResponse:
+        request = GetLabelsRequest()
         request.kb.uuid = kbid
-        request.metadata.labels = labels
-        request.metadata.entities = entities
-        request.metadata.text = text
-        for field in self.stub.GetFields(request):
-            yield field
+        return self.stub.GetOntology(request)
