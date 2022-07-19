@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::io::ErrorKind;
+
 use nucliadb_protos::ParagraphSearchRequest;
 use nucliadb_service_interface::prelude::*;
 use tantivy::query::*;
@@ -89,9 +91,12 @@ fn flat_and_adapt(query: Box<dyn Query>, distance: u8) -> Vec<QueryP> {
     queryp_map(queries, distance, as_prefix)
 }
 
-fn parse_query(parser: &QueryParser, text: &str, distance: u8) -> Vec<QueryP> {
-    let query = parser.parse_query(text).unwrap();
-    flat_and_adapt(query, distance)
+fn parse_query(parser: &QueryParser, text: &str, distance: u8) -> ServiceResult<Vec<QueryP>> {
+    let query = parser.parse_query(text).map_err(|e| {
+        tracing::error!("Error during parsing query: {e}. Input query: {text}");
+        std::io::Error::new(ErrorKind::Other, "error during query parsing")
+    })?;
+    Ok(flat_and_adapt(query, distance))
 }
 
 pub fn process(
@@ -99,10 +104,10 @@ pub fn process(
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
-) -> Result<Vec<QueryP>, String> {
+) -> ServiceResult<Vec<QueryP>> {
     // Parse basic search by tokens
     let mut boolean_vec: Vec<_> = if !search.body.is_empty() {
-        parse_query(parser, &search.body.to_string(), distance)
+        parse_query(parser, &search.body.to_string(), distance)?
     } else {
         vec![(Occur::Should, Box::new(AllQuery) as Box<dyn Query>)]
     };
@@ -136,11 +141,11 @@ pub fn process(
     Ok(boolean_vec)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tantivy::schema::Field;
+
+    use super::*;
     fn dummy_term_query() -> Box<dyn Query> {
         let field = Field::from_field_id(0);
         let term = Term::from_field_u64(field, 0);
@@ -161,7 +166,9 @@ mod tests {
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
         let adapted = flat_and_adapt(Box::new(nested), 2);
         assert_eq!(adapted.len(), 24);
-        assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must ));
-        assert!(adapted.iter().all(|(_, query)| query.is::<FuzzyTermQuery>()));
+        assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must));
+        assert!(adapted
+            .iter()
+            .all(|(_, query)| query.is::<FuzzyTermQuery>()));
     }
 }
