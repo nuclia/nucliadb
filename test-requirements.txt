@@ -1,4 +1,4 @@
-codecov==2.0.15
+codecov==2.0.16
 mypy==0.950
 pytest==6.2.5
 pytest-asyncio==0.16.0
