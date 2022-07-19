@@ -97,8 +97,7 @@ impl ReaderChild for FieldReaderService {
         let body = &request.body;
         let results = request.result_per_page;
         let multic_flag = results > 0 && !body.is_empty();
-        self.do_search(request, multic_flag)
-            .map_err(|e| Box::new(TError(e)) as Box<dyn InternalError>)
+        Ok(self.do_search(request, multic_flag))
     }
 
     fn reload(&self) {
@@ -303,6 +302,7 @@ impl FieldReaderService {
             facets,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
+            was_a_query: true,
         }
     }
 
@@ -377,6 +377,7 @@ impl FieldReaderService {
             facets,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
+            was_a_query: true,
         }
     }
 
@@ -384,16 +385,24 @@ impl FieldReaderService {
         &self,
         request: &DocumentSearchRequest,
         multic_flag: bool,
-    ) -> tantivy::Result<DocumentSearchResponse> {
+    ) -> DocumentSearchResponse {
+        let text = &request.body;
         let query = if !request.body.is_empty() {
-            let extended_query = SearchQuery::document(request).unwrap();
+            let extended_query = SearchQuery::document(request, text).unwrap();
             info!("{}", extended_query);
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
-            query_parser.parse_query(&extended_query)
+            query_parser
+                .parse_query(&extended_query)
+                .unwrap_or_else(|e| {
+                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
+                    let body = format!("\"{text}\"");
+                    let extended_query = SearchQuery::document(request, &body).unwrap();
+                    query_parser.parse_query(&extended_query).unwrap()
+                })
         } else {
-            Ok(Box::new(AllQuery) as Box<dyn Query>)
-        }?;
+            Box::new(AllQuery) as Box<dyn Query>
+        };
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
         let order_field = self.get_order_field(&request.order);
@@ -411,7 +420,7 @@ impl FieldReaderService {
         }
         let searcher = self.reader.searcher();
         match order_field {
-            _ if !multic_flag => Ok(self.convert_bm25_order(
+            _ if !multic_flag => self.convert_bm25_order(
                 SearchResponse {
                     facets,
                     top_docs: vec![],
@@ -421,7 +430,7 @@ impl FieldReaderService {
                     results_per_page: results as i32,
                 },
                 &searcher,
-            )),
+            ),
             Some(order_field) => {
                 let mut multicollector = MultiCollector::new();
                 let facet_handler = multicollector.add_collector(facet_collector);
@@ -431,7 +440,7 @@ impl FieldReaderService {
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                Ok(self.convert_int_order(
+                self.convert_int_order(
                     SearchResponse {
                         facets_count,
                         facets,
@@ -441,7 +450,7 @@ impl FieldReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
-                ))
+                )
             }
             None => {
                 let mut multicollector = MultiCollector::new();
@@ -451,7 +460,7 @@ impl FieldReaderService {
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                Ok(self.convert_bm25_order(
+                self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
                         facets,
@@ -461,7 +470,7 @@ impl FieldReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
-                ))
+                )
             }
         }
     }
@@ -632,6 +641,21 @@ mod tests {
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
+
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
+            body: "enough - test".to_string(),
+            fields: vec!["body".to_string()],
+            filter: Some(filter.clone()),
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+        };
+        let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 0);
 
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),

@@ -66,6 +66,16 @@ impl ServiceChild for ParagraphReaderService {
     }
 }
 
+fn adapt_text(parser: &QueryParser, text: &str) -> Result<String, String> {
+    parser
+        .parse_query(text)
+        .map(|_| text.to_string())
+        .map_err(|e| {
+            tracing::error!("Error during parsing query: {e}. Input query: {text}");
+            format!("\"{text}\"")
+        })
+}
+
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
@@ -81,20 +91,27 @@ impl ReaderChild for ParagraphReaderService {
             .map(|v| v.tags.clone())
             .unwrap_or_default();
 
-        let mut dist = 1;
-        let query = search_query::process(&parser, request, &self.schema, dist).unwrap();
+        let (was_successful, text) = match adapt_text(&parser, &request.body) {
+            Ok(text) => (true, text),
+            Err(text) => (false, text),
+        };
+        let mut distance = 1;
+        let queries = search_query::create_query(&parser, &text, request, &self.schema, distance);
         let (mut top_docs, mut facets_count) =
-            self.do_search(query, results, offset, &facets, multi_flag);
-        while multi_flag && top_docs.is_empty() && dist < 2 {
-            dist += 1;
-            let query = search_query::process(&parser, request, &self.schema, dist).unwrap();
-            (top_docs, facets_count) = self.do_search(query, results, offset, &facets, multi_flag);
+            self.do_search(queries, results, offset, &facets, multi_flag);
+        while multi_flag && top_docs.is_empty() && distance < 2 {
+            distance += 1;
+            let queries =
+                search_query::create_query(&parser, &text, request, &self.schema, distance);
+            (top_docs, facets_count) =
+                self.do_search(queries, results, offset, &facets, multi_flag);
         }
         Ok(ParagraphSearchResponse::from(SearchResponse {
             text_service: self,
             facets_count,
             facets,
             top_docs,
+            was_successful,
             order_by: request.order.clone(),
             page_number: request.page_number,
             results_per_page: results as i32,
@@ -582,6 +599,23 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
+
+        // Search invalid grammar
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: "".to_string(),
+            body: "shoupd + enaugh".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 0);
 
         // Search filter all paragraphs
         let search = ParagraphSearchRequest {

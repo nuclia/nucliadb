@@ -37,6 +37,7 @@ pub struct SearchResponse<'a> {
     pub order_by: Option<OrderBy>,
     pub page_number: i32,
     pub results_per_page: i32,
+    pub was_successful: bool,
 }
 
 impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
@@ -138,6 +139,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
             total: total as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
+            was_a_query: response.was_successful,
         }
     }
 }

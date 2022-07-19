@@ -120,6 +120,8 @@ pub struct DocumentSearchResponse {
     pub page_number: i32,
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
+    #[prost(bool, tag="6")]
+    pub was_a_query: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphResult {
@@ -156,6 +158,9 @@ pub struct ParagraphSearchResponse {
     /// How many results are in this page.
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
+    /// The given text was a valid search query
+    #[prost(bool, tag="6")]
+    pub was_a_query: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSearchRequest {
