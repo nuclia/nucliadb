@@ -82,7 +82,7 @@ impl ReaderChild for ParagraphReaderService {
             .map(|v| v.tags.clone())
             .unwrap_or_default();
 
-        let text = self.adapt_text(&parser, &request.body);
+        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
         let (top_docs, facets_count) = {
             let queries = create_query(&parser, &text, request, &self.schema, 1);
             let dist_1 = self.do_search(queries, results, offset, &facets, multi_flag);
@@ -232,7 +232,7 @@ impl ParagraphReaderService {
         })
     }
 
-    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
+    fn adapt_text(parser: &QueryParser, text: &str) -> String {
         match text {
             "" => text.to_string(),
             text => parser

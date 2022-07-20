@@ -382,7 +382,7 @@ impl FieldReaderService {
         }
     }
 
-    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
+    fn adapt_text(parser: &QueryParser, text: &str) -> String {
         match text {
             "" => text.to_string(),
             text => parser
@@ -405,7 +405,7 @@ impl FieldReaderService {
             query_parser.set_conjunction_by_default();
             query_parser
         };
-        let text = self.adapt_text(&query_parser, &request.body);
+        let text = FieldReaderService::adapt_text(&query_parser, &request.body);
         let query = if !request.body.is_empty() {
             let extended_query = SearchQuery::document(request, &text).unwrap();
             info!("{}", extended_query);
