@@ -15,6 +15,7 @@ def load_reqs(filename):
             )
         ]
 
+
 requirements = load_reqs("requirements.txt")
 
 setup(
