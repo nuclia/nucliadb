@@ -246,6 +246,9 @@ pub struct SuggestResponse {
     pub total: i32,
     #[prost(message, repeated, tag="2")]
     pub results: ::prost::alloc::vec::Vec<ParagraphResult>,
+    /// The text that lead to this results
+    #[prost(string, tag="3")]
+    pub query: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {

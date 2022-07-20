@@ -67,9 +67,10 @@ impl SearchQuery {
     }
 
     fn add_filter(filter: &Option<Filter>, query: &mut String) {
+        use std::fmt::Write;
         if let Some(filter) = filter {
             for value in &filter.tags {
-                query.push_str(&format!(" facets:\"{}\"", value));
+                write!(query, " facets:\"{}\"", value).unwrap();
             }
         }
     }
