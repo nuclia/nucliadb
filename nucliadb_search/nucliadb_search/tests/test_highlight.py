@@ -1,3 +1,22 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 from nucliadb_search.search.fetch import highlight, split_text
 
 
@@ -10,7 +29,7 @@ def test_highlight():
     )
     assert (
         res[0]
-        == "Query whatever you want <b>my</b> to make it work <b>my</b> <b>query</b> with <b>this</b>"
+        == "Query whatever you want my to make it work my <b>query</b> with <b>this</b>"
     )
 
     res = highlight(
@@ -32,13 +51,23 @@ def test_highlight():
 
     assert (
         res[0]
-        == "Query whatever you red<b>is</b> want to make it work <b>my query</b> with <b>this</b>"
+        == "Query whatever you redis want to make it work <b>my query</b> with <b>this</b>"
     )
 
 
-TEXT1 = """Explanation: the methods based on + (including the implied use in sum) are, of necessity, O(T**2) when there are T sublists -- as the intermediate result list keeps getting longer, at each step a new intermediate result list object gets allocated, and all the items in the previous intermediate result must be copied over (as well as a few new ones added at the end). So, for simplicity and without actual loss of generality, say you have T sublists of k items each: the first k items are copied back and forth T-1 times, the second k items T-2 times, and so on; total number of copies is k times the sum of x for x from 1 to T excluded, i.e., k * (T**2)/2.
+TEXT1 = """
+Explanation: the methods based on + (including the implied use in sum) are, of necessity,
+O(T**2) when there are T sublists -- as the intermediate result list keeps getting longer,
+at each step a new intermediate result list object gets allocated,
+and all the items in the previous intermediate result must be copied over
+(as well as a few new ones added at the end).
+So, for simplicity and without actual loss of generality, say you have T sublists of k items each:
+the first k items are copied back and forth T-1 times, the second k items T-2 times, and so on;
+total number of copies is k times the sum of x for x from 1 to T excluded, i.e., k * (T**2)/2.
 
-The list comprehension just generates one list, once, and copies each item over (from its original place of residence to the result list) also exactly once"""
+The list comprehension just generates one list, once, and copies each item over
+(from its original place of residence to the result list) also exactly once
+"""
 
 
 def test_split_text():
@@ -48,13 +77,9 @@ def test_split_text():
         "including copies",
         True,
     )
-
-    import pdb
-
-    pdb.set_trace()
     assert (
         res[0]
-        == "Query whatever you want <b>my</b> to make it work <b>my</b> <b>query</b> with <b>this</b>"
+        == " ...methods based on + (<b>including</b> the implied use in ... ...on; total number of <b>copies</b> is k times the sum ... ...one list, once, and <b>copies</b> each item over (fro..."  # noqa
     )
 
     res = split_text(
@@ -63,10 +88,6 @@ def test_split_text():
         True,
     )
 
-    import pdb
-
-    pdb.set_trace()
     assert (
-        res[0]
-        == "Query whatever you want to make it work <b>my query</b> with <b>this</b>"
+        res[0] == " ...t, once, and copies <b>each item over</b> (from its original ..."
     )

@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from contextvars import ContextVar
-from typing import Dict, List, Optional
 import re
+from contextvars import ContextVar
+from typing import Dict, List, Optional, Tuple
 
-from nucliadb_protos.nodereader_pb2 import ParagraphResult
+from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -36,7 +36,6 @@ from nucliadb_models.serialize import (
     serialize,
 )
 from nucliadb_search import logger
-from nucliadb_search.api.models import ResourceResult
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
@@ -185,10 +184,17 @@ async def get_labels_sentence(
 
 
 async def get_text_resource(
-    result: ResourceResult, kbid: str, query: Optional[str] = None
+    result: DocumentResult,
+    kbid: str,
+    query: Optional[str] = None,
+    highlight_split: Optional[bool] = False,
+    split: Optional[bool] = False,
 ) -> str:
 
     if query is None:
+        return ""
+
+    if split is False:
         return ""
 
     resouce_cache = get_resource_cache()
@@ -197,14 +203,14 @@ async def get_text_resource(
         storage = await get_storage()
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(result.rid)
+        orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
         if orm_resource is not None:
-            resouce_cache[result.rid] = orm_resource
+            resouce_cache[result.uuid] = orm_resource
     else:
-        orm_resource = resouce_cache.get(result.rid)
+        orm_resource = resouce_cache.get(result.uuid)
 
     if orm_resource is None:
-        logger.error(f"{result.rid} does not exist on DB")
+        logger.error(f"{result.uuid} does not exist on DB")
         return ""
 
     _, field_type, field = result.field.split("/")
@@ -213,17 +219,21 @@ async def get_text_resource(
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
         logger.warn(
-            f"{result.rid} {field} {field_type_int} extracted_text does not exist on DB"
+            f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
         )
         return ""
 
-    splitted_text = split_text(extracted_text.text, query)
+    splitted_text, positions = split_text(extracted_text.text, query)
 
     return splitted_text
 
 
 async def get_text_paragraph(
-    result: ParagraphResult, kbid: str, query: Optional[str] = None
+    result: ParagraphResult,
+    kbid: str,
+    query: Optional[str] = None,
+    highlight_split: bool = False,
+    split: bool = False,
 ) -> str:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
@@ -257,16 +267,18 @@ async def get_text_paragraph(
     else:
         splitted_text = extracted_text.text[result.start : result.end]
 
-    if query:
-        splitted_text = highlight(splitted_text, query)
+    if query and split:
+        splitted_text, positions = highlight(
+            splitted_text, query, highlight=highlight_split
+        )
 
     return splitted_text
 
 
-def split_text(text: str, query: str, highlight: bool = False):
+def split_text(text: str, query: str, highlight: bool = False, margin: int = 20):
     quoted = re.findall('"([^"]*)"', query)
     cleaned = query
-    positions = {}
+    positions: Dict[str, List[Tuple[int, int]]] = {}
     for quote in quoted:
         cleaned = cleaned.replace(f'"{quote}"', "")
         found = [x.span() for x in re.finditer(quote, text)]
@@ -275,9 +287,10 @@ def split_text(text: str, query: str, highlight: bool = False):
 
     query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
     for word in query_words:
-        found = [x.span() for x in re.finditer(word, text)]
-        if len(found):
-            positions.setdefault(word, []).extend(found)
+        if len(word) > 2:
+            found = [x.span() for x in re.finditer(word, text)]
+            if len(found):
+                positions.setdefault(word, []).extend(found)
 
     new_text = ""
     ordered = [x for xs in positions.values() for x in xs]
@@ -286,16 +299,16 @@ def split_text(text: str, query: str, highlight: bool = False):
     for order in ordered:
         if order[0] < last:
             continue
-        if order[0] - 15 > last and last > 0:
-            new_text += text[last : last + 15]
+        if order[0] - margin > last and last > 0:
+            new_text += text[last : last + margin]
             new_text += "..."
-            last += 15
+            last += margin
 
-        if last > order[0] - 15:
+        if last > order[0] - margin:
             new_text += text[last : order[0]]
         else:
             new_text += " ..."
-            new_text += text[order[0] - 15 : order[0]]
+            new_text += text[order[0] - margin : order[0]]
 
         if highlight:
             new_text += "<b>"
@@ -303,14 +316,17 @@ def split_text(text: str, query: str, highlight: bool = False):
         if highlight:
             new_text += "</b>"
         last = order[1]
-    new_text += text[last : min(len(text), last + 15)]
+    if len(new_text) > 0:
+        new_text += text[last : min(len(text), last + margin)]
+        new_text += "..."
+
     return new_text, positions
 
 
 def highlight(text: str, query: str, highlight: bool = False):
     quoted = re.findall('"([^"]*)"', query)
     cleaned = query
-    positions = {}
+    positions: Dict[str, List[Tuple[int, int]]] = {}
     for quote in quoted:
         cleaned = cleaned.replace(f'"{quote}"', "")
         found = [x.span() for x in re.finditer(quote, text)]
@@ -319,9 +335,10 @@ def highlight(text: str, query: str, highlight: bool = False):
 
     query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
     for word in query_words:
-        found = [x.span() for x in re.finditer(word, text)]
-        if len(found):
-            positions.setdefault(word, []).extend(found)
+        if len(word) > 2:
+            found = [x.span() for x in re.finditer(word, text)]
+            if len(found):
+                positions.setdefault(word, []).extend(found)
 
     if highlight:
         new_text = ""
@@ -341,7 +358,7 @@ def highlight(text: str, query: str, highlight: bool = False):
     return text, positions
 
 
-async def get_labels_resource(result: ResourceResult, kbid: str) -> List[str]:
+async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
@@ -363,22 +380,6 @@ async def get_labels_resource(result: ResourceResult, kbid: str) -> List[str]:
     if basic is not None:
         for classification in basic.usermetadata.classifications:
             labels.append(f"{classification.labelset}/{classification.label}")
-
-    _, field_type, field = result.field.split("/")
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    field_metadata = await field_obj.get_field_metadata()
-    if field_metadata:
-        paragraph = None
-        if result.split not in (None, ""):
-            metadata = field_metadata.split_metadata[result.split]
-            paragraph = metadata.paragraphs[result.index]
-        elif len(field_metadata.metadata.paragraphs) > result.index:
-            paragraph = field_metadata.metadata.paragraphs[result.index]
-
-        if paragraph is not None:
-            for classification in paragraph.classifications:
-                labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels
 

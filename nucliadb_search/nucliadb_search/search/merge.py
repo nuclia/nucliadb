@@ -60,6 +60,8 @@ async def merge_documents_results(
     count: int,
     page: int,
     kbid: str,
+    highlight_split: bool = False,
+    split: bool = False,
 ) -> Resources:
 
     query = None
@@ -74,8 +76,14 @@ async def merge_documents_results(
 
         for result in document_response.results:
             # /f/file
-            text = await get_text_resource(result, kbid, document_response.query)
-            labels = await get_labels_resource(result, kbid, document_response.query)
+            text = await get_text_resource(
+                result,
+                kbid,
+                document_response.query,
+                highlight_split=highlight_split,
+                split=split,
+            )
+            labels = await get_labels_resource(result, kbid)
             _, field_type, field = result.field.split("/")
             if result.score == 0:
                 score = result.score_bm25
@@ -112,6 +120,8 @@ async def merge_documents_results(
 async def merge_suggest_paragraph_results(
     suggest_responses: List[SuggestResponse],
     kbid: str,
+    highlight_split: bool,
+    split: bool,
 ):
 
     raw_paragraph_list: List[Paragraph] = []
@@ -121,7 +131,13 @@ async def merge_suggest_paragraph_results(
             query = suggest_response.query
         for result in suggest_response.results:
             _, field_type, field = result.field.split("/")
-            text = await get_text_paragraph(result, kbid, suggest_response.query)
+            text = await get_text_paragraph(
+                result,
+                kbid,
+                suggest_response.query,
+                highlight_split=highlight_split,
+                split=split,
+            )
             labels = await get_labels_paragraph(result, kbid)
             raw_paragraph_list.append(
                 Paragraph(
@@ -203,6 +219,8 @@ async def merge_paragraph_results(
     kbid: str,
     count: int,
     page: int,
+    highlight_split: bool,
+    split: bool,
 ):
 
     raw_paragraph_list: List[Paragraph] = []
@@ -216,7 +234,9 @@ async def merge_paragraph_results(
                 facets[key] = MessageToDict(value)
         for result in paragraph_response.results:
             _, field_type, field = result.field.split("/")
-            text = await get_text_paragraph(result, kbid, paragraph_response.query)
+            text = await get_text_paragraph(
+                result, kbid, paragraph_response.query, highlight_split, split
+            )
             labels = await get_labels_paragraph(result, kbid)
             raw_paragraph_list.append(
                 Paragraph(
@@ -254,6 +274,8 @@ async def merge_results(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     max_score: float = 0.85,
+    highlight: bool = False,
+    split: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
@@ -270,11 +292,11 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid
+        documents, resources, count, page, kbid, highlight, split
     )
 
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page
+        paragraphs, resources, kbid, count, page, highlight_split=highlight, split=split
     )
 
     api_results.sentences = await merge_vectors_results(
@@ -295,6 +317,8 @@ async def merge_paragraphs_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
+    highlight_split: bool,
+    split: bool,
 ) -> ResourceSearchResults:
     paragraphs = []
     for result in results:
@@ -304,7 +328,7 @@ async def merge_paragraphs_results(
 
     resources: List[str] = list()
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page
+        paragraphs, resources, kbid, count, page, highlight_split, split
     )
     return api_results
 
@@ -314,9 +338,13 @@ async def merge_suggest_results(
     kbid: str,
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
+    highlight_split: bool = False,
+    split: bool = False,
 ) -> KnowledgeboxSuggestResults:
 
     api_results = KnowledgeboxSuggestResults()
 
-    api_results.paragraphs = await merge_suggest_paragraph_results(results, kbid)
+    api_results.paragraphs = await merge_suggest_paragraph_results(
+        results, kbid, highlight_split=highlight_split, split=split
+    )
     return api_results
