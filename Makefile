@@ -120,6 +120,7 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb_writer
 	pip install -e ./nucliadb_search
 	pip install -e ./nucliadb_telemetry
+	pip install -e ./nucliadb_train
 	pip install -r test-requirements.txt
 
 base-node-image:
