@@ -207,7 +207,7 @@ class Resource(BaseModel):
     layout: Optional[str]
     thumbnail: Optional[str]
     metadata: Optional[Metadata]
-    user_metadata: Optional[UserMetadata]
+    usermetadata: Optional[UserMetadata]
     created: Optional[datetime]
     modified: Optional[datetime]
 
