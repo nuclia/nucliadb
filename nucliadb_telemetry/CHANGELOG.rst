@@ -23,7 +23,7 @@ CHANGELOG
 1.1.3 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix flushing of telemetry
 
 
 1.1.2 (2022-07-15)
