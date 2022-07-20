@@ -11,7 +11,6 @@ def load_reqs(filename):
             if not (
                 re.match(r"\s*#", line)  # noqa
                 or re.match("-e", line)
-                or re.match("..", line)
                 or re.match("-r", line)
             )
         ]

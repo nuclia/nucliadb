@@ -179,7 +179,7 @@ async def serialize(
             resource.metadata = models.Metadata.from_message(
                 orm_resource.basic.metadata
             )
-            resource.user_metadata = models.UserMetadata.from_message(
+            resource.usermetadata = models.UserMetadata.from_message(
                 orm_resource.basic.usermetadata
             )
 

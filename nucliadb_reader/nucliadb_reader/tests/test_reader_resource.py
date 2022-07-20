@@ -34,7 +34,7 @@ BASIC = (
     "layout",
     "thumbnail",
     "metadata",
-    "user_metadata",
+    "usermetadata",
     "created",
     "modified",
 )
