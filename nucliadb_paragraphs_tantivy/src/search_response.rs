@@ -31,6 +31,7 @@ use crate::reader::ParagraphReaderService;
 
 pub struct SearchResponse<'a> {
     pub text_service: &'a ParagraphReaderService,
+    pub query: &'a str,
     pub facets_count: FacetCounts,
     pub facets: Vec<String>,
     pub top_docs: Vec<(f32, DocAddress)>,
@@ -138,6 +139,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
             total: total as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
+            query: response.query.to_string(),
         }
     }
 }

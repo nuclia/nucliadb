@@ -120,6 +120,9 @@ pub struct DocumentSearchResponse {
     pub page_number: i32,
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
+    /// The text that lead to this results
+    #[prost(string, tag="6")]
+    pub query: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphResult {
@@ -156,6 +159,9 @@ pub struct ParagraphSearchResponse {
     /// How many results are in this page.
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
+    /// The text that lead to this results
+    #[prost(string, tag="6")]
+    pub query: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSearchRequest {

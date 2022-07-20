@@ -101,6 +101,9 @@ message DocumentSearchResponse {
     
     int32 page_number = 4;
     int32 result_per_page = 5;
+
+    // The text that lead to this results
+    string query = 6;
 }
 
 
@@ -130,6 +133,9 @@ message ParagraphSearchResponse {
 
     // How many results are in this page.
     int32 result_per_page = 5;
+
+    // The text that lead to this results
+    string query = 6;
 }
 
 message VectorSearchRequest {

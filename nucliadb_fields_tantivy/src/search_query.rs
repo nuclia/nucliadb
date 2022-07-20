@@ -28,9 +28,8 @@ pub struct SearchQuery {
 }
 
 impl SearchQuery {
-    fn create(search: &DocumentSearchRequest) -> String {
+    fn create(search: &DocumentSearchRequest, body: &str) -> String {
         let fields = &search.fields;
-        let body = &search.body;
         let filter = &search.filter;
 
         let mut query = String::from("");
@@ -75,8 +74,8 @@ impl SearchQuery {
         }
     }
 
-    pub fn document(search: &DocumentSearchRequest) -> tantivy::Result<String> {
-        let query: String = SearchQuery::create(search);
+    pub fn document(search: &DocumentSearchRequest, body: &str) -> tantivy::Result<String> {
+        let query: String = SearchQuery::create(search, body);
 
         Ok(query)
     }
@@ -99,7 +98,7 @@ mod test {
             timestamps: None,
             reload: false,
         };
-        let query = SearchQuery::document(&request).unwrap();
+        let query = SearchQuery::document(&request, &request.body).unwrap();
         println!("{}", query);
     }
 }
