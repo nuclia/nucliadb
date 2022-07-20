@@ -13,4 +13,4 @@ httpx==0.23.0
 types-orjson
 types-aiofiles
 types-setuptools
-aiohttp==3.7.4
+aiohttp==3.8.1
