@@ -185,7 +185,7 @@ class BatchSpanProcessor(SpanProcessor):
             shutdown_flush_request = self._get_and_unset_flush_request()
 
         # be sure that all spans are sent
-        self._drain_queue()
+        await self._drain_queue()
         self._notify_flush_request_finished(flush_request)
         self._notify_flush_request_finished(shutdown_flush_request)
 
