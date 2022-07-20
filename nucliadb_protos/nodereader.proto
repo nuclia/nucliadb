@@ -208,8 +208,9 @@ message SuggestRequest {
 message SuggestResponse {
 
     int32 total = 1;
-
     repeated ParagraphResult results = 2;
+    // The text that lead to this results
+    string query = 3;
 
 }
 

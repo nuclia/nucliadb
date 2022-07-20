@@ -243,6 +243,7 @@ impl ShardReaderService {
         let rparagraph = paragraph_task.await.unwrap()?;
         info!("{}:{}", line!(), file!());
         Ok(SuggestResponse {
+            query: rparagraph.query,
             total: rparagraph.total,
             results: rparagraph.results,
         })

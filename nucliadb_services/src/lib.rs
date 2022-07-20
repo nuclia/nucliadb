@@ -23,6 +23,5 @@ pub mod vectors;
 pub extern crate nucliadb_service_interface;
 
 use std::sync::{Arc, RwLock};
-
 pub use nucliadb_protos::*;
 pub use nucliadb_service_interface::prelude::*;
