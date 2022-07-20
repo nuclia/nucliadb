@@ -68,6 +68,10 @@ def parse_basic_modify(
     if item.icon:
         bm.basic.icon = item.icon
     if item.usermetadata is not None:
+        # protobuferrs repeated fields don't support assignment so
+        # in order to replace classifications, we need to clear them first
+
+        bm.basic.usermetadata.ClearField("classifications")
         bm.basic.usermetadata.classifications.extend(
             [
                 Classification(labelset=x.labelset, label=x.label)
@@ -117,6 +121,10 @@ def parse_basic_modify(
                     )
                 )
 
+        # protobuferrs repeated fields don't support assignment so
+        # in order to replace relations, we need to clear them first
+
+        bm.basic.usermetadata.ClearField("relations")
         bm.basic.usermetadata.relations.extend(relations)
 
 
