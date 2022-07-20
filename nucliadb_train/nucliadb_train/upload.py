@@ -26,7 +26,6 @@ from typing import Callable, List
 
 from nucliadb_train import logger
 from nucliadb_train.sentry import SENTRY, set_sentry
-from nucliadb_train.settings import settings
 from nucliadb_train.uploader import start_upload
 from nucliadb_utils.settings import running_settings
 

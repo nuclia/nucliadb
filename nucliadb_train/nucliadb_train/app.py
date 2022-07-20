@@ -30,7 +30,6 @@ from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_train import SERVICE_NAME, logger
 from nucliadb_train.sentry import SENTRY, set_sentry
 from nucliadb_train.server import start_grpc
-from nucliadb_train.settings import settings
 from nucliadb_utils.settings import running_settings
 
 
