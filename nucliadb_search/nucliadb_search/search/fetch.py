@@ -19,6 +19,7 @@
 #
 from contextvars import ContextVar
 from typing import Dict, List, Optional
+import re
 
 from nucliadb_protos.nodereader_pb2 import ParagraphResult
 
@@ -35,6 +36,7 @@ from nucliadb_models.serialize import (
     serialize,
 )
 from nucliadb_search import logger
+from nucliadb_search.api.models import ResourceResult
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
@@ -182,7 +184,47 @@ async def get_labels_sentence(
     return labels
 
 
-async def get_text_paragraph(result: ParagraphResult, kbid: str) -> str:
+async def get_text_resource(
+    result: ResourceResult, kbid: str, query: Optional[str] = None
+) -> str:
+
+    if query is None:
+        return ""
+
+    resouce_cache = get_resource_cache()
+    if result.uuid not in resouce_cache:
+        transaction = await get_transaction()
+        storage = await get_storage()
+        cache = await get_cache()
+        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+        orm_resource: Optional[ResourceORM] = await kb.get(result.rid)
+        if orm_resource is not None:
+            resouce_cache[result.rid] = orm_resource
+    else:
+        orm_resource = resouce_cache.get(result.rid)
+
+    if orm_resource is None:
+        logger.error(f"{result.rid} does not exist on DB")
+        return ""
+
+    _, field_type, field = result.field.split("/")
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    extracted_text = await field_obj.get_extracted_text()
+    if extracted_text is None:
+        logger.warn(
+            f"{result.rid} {field} {field_type_int} extracted_text does not exist on DB"
+        )
+        return ""
+
+    splitted_text = split_text(extracted_text.text, query)
+
+    return splitted_text
+
+
+async def get_text_paragraph(
+    result: ParagraphResult, kbid: str, query: Optional[str] = None
+) -> str:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
@@ -214,7 +256,131 @@ async def get_text_paragraph(result: ParagraphResult, kbid: str) -> str:
         splitted_text = text[result.start : result.end]
     else:
         splitted_text = extracted_text.text[result.start : result.end]
+
+    if query:
+        splitted_text = highlight(splitted_text, query)
+
     return splitted_text
+
+
+def split_text(text: str, query: str, highlight: bool = False):
+    quoted = re.findall('"([^"]*)"', query)
+    cleaned = query
+    positions = {}
+    for quote in quoted:
+        cleaned = cleaned.replace(f'"{quote}"', "")
+        found = [x.span() for x in re.finditer(quote, text)]
+        if len(found):
+            positions.setdefault(quote, []).extend(found)
+
+    query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
+    for word in query_words:
+        found = [x.span() for x in re.finditer(word, text)]
+        if len(found):
+            positions.setdefault(word, []).extend(found)
+
+    new_text = ""
+    ordered = [x for xs in positions.values() for x in xs]
+    ordered.sort()
+    last = 0
+    for order in ordered:
+        if order[0] < last:
+            continue
+        if order[0] - 15 > last and last > 0:
+            new_text += text[last : last + 15]
+            new_text += "..."
+            last += 15
+
+        if last > order[0] - 15:
+            new_text += text[last : order[0]]
+        else:
+            new_text += " ..."
+            new_text += text[order[0] - 15 : order[0]]
+
+        if highlight:
+            new_text += "<b>"
+        new_text += text[order[0] : order[1]]
+        if highlight:
+            new_text += "</b>"
+        last = order[1]
+    new_text += text[last : min(len(text), last + 15)]
+    return new_text, positions
+
+
+def highlight(text: str, query: str, highlight: bool = False):
+    quoted = re.findall('"([^"]*)"', query)
+    cleaned = query
+    positions = {}
+    for quote in quoted:
+        cleaned = cleaned.replace(f'"{quote}"', "")
+        found = [x.span() for x in re.finditer(quote, text)]
+        if len(found):
+            positions.setdefault(quote, []).extend(found)
+
+    query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
+    for word in query_words:
+        found = [x.span() for x in re.finditer(word, text)]
+        if len(found):
+            positions.setdefault(word, []).extend(found)
+
+    if highlight:
+        new_text = ""
+        ordered = [x for xs in positions.values() for x in xs]
+        ordered.sort()
+        last = 0
+        for order in ordered:
+            if order[0] < last:
+                continue
+            new_text += text[last : order[0]]
+            new_text += "<b>"
+            new_text += text[order[0] : order[1]]
+            new_text += "</b>"
+            last = order[1]
+        new_text += text[last:]
+        return new_text, positions
+    return text, positions
+
+
+async def get_labels_resource(result: ResourceResult, kbid: str) -> List[str]:
+    resouce_cache = get_resource_cache()
+    if result.uuid not in resouce_cache:
+        transaction = await get_transaction()
+        storage = await get_storage()
+        cache = await get_cache()
+        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+        orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
+        if orm_resource is not None:
+            resouce_cache[result.uuid] = orm_resource
+    else:
+        orm_resource = resouce_cache.get(result.uuid)
+
+    if orm_resource is None:
+        logger.error(f"{result.uuid} does not exist on DB")
+        return []
+
+    labels: List[str] = []
+    basic = await orm_resource.get_basic()
+    if basic is not None:
+        for classification in basic.usermetadata.classifications:
+            labels.append(f"{classification.labelset}/{classification.label}")
+
+    _, field_type, field = result.field.split("/")
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_metadata = await field_obj.get_field_metadata()
+    if field_metadata:
+        paragraph = None
+        if result.split not in (None, ""):
+            metadata = field_metadata.split_metadata[result.split]
+            paragraph = metadata.paragraphs[result.index]
+        elif len(field_metadata.metadata.paragraphs) > result.index:
+            paragraph = field_metadata.metadata.paragraphs[result.index]
+
+        if paragraph is not None:
+            for classification in paragraph.classifications:
+                labels.append(f"{classification.labelset}/{classification.label}")
+
+    return labels
 
 
 async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:

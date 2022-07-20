@@ -45,9 +45,11 @@ from nucliadb_search.api.models import (
 from nucliadb_search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
+    get_labels_resource,
     get_labels_sentence,
     get_resource_cache,
     get_text_paragraph,
+    get_text_resource,
     get_text_sentence,
 )
 
@@ -57,17 +59,23 @@ async def merge_documents_results(
     resources: List[str],
     count: int,
     page: int,
+    kbid: str,
 ) -> Resources:
 
+    query = None
     raw_resource_list: List[ResourceResult] = []
     facets: Dict[str, Any] = {}
     for document_response in documents:
+        if query is None:
+            query = document_response.query
         if document_response.facets:
             for key, value in document_response.facets.items():
                 facets[key] = MessageToDict(value)
 
         for result in document_response.results:
             # /f/file
+            text = await get_text_resource(result, kbid, document_response.query)
+            labels = await get_labels_resource(result, kbid, document_response.query)
             _, field_type, field = result.field.split("/")
             if result.score == 0:
                 score = result.score_bm25
@@ -79,6 +87,8 @@ async def merge_documents_results(
                     rid=result.uuid,
                     field=field,
                     field_type=field_type,
+                    text=text,
+                    labels=labels,
                 )
             )
 
@@ -96,7 +106,7 @@ async def merge_documents_results(
         if resource.rid not in resources:
             resources.append(resource.rid)
 
-    return Resources(facets=facets, results=resource_list)
+    return Resources(facets=facets, results=resource_list, query=query)
 
 
 async def merge_suggest_paragraph_results(
@@ -105,10 +115,13 @@ async def merge_suggest_paragraph_results(
 ):
 
     raw_paragraph_list: List[Paragraph] = []
+    query = None
     for suggest_response in suggest_responses:
+        if query is None:
+            query = suggest_response.query
         for result in suggest_response.results:
             _, field_type, field = result.field.split("/")
-            text = await get_text_paragraph(result, kbid)
+            text = await get_text_paragraph(result, kbid, suggest_response.query)
             labels = await get_labels_paragraph(result, kbid)
             raw_paragraph_list.append(
                 Paragraph(
@@ -121,7 +134,7 @@ async def merge_suggest_paragraph_results(
                 )
             )
 
-    return Paragraphs(results=raw_paragraph_list)
+    return Paragraphs(results=raw_paragraph_list, query=query)
 
 
 async def merge_vectors_results(
@@ -194,13 +207,16 @@ async def merge_paragraph_results(
 
     raw_paragraph_list: List[Paragraph] = []
     facets: Dict[str, Any] = {}
+    query = None
     for paragraph_response in paragraphs:
+        if query is None:
+            query = paragraph_response.query
         if paragraph_response.facets:
             for key, value in paragraph_response.facets.items():
                 facets[key] = MessageToDict(value)
         for result in paragraph_response.results:
             _, field_type, field = result.field.split("/")
-            text = await get_text_paragraph(result, kbid)
+            text = await get_text_paragraph(result, kbid, paragraph_response.query)
             labels = await get_labels_paragraph(result, kbid)
             raw_paragraph_list.append(
                 Paragraph(
@@ -254,7 +270,7 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page
+        documents, resources, count, page, kbid
     )
 
     api_results.paragraphs = await merge_paragraph_results(

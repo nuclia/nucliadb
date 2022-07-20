@@ -105,6 +105,7 @@ class Paragraph(BaseModel):
 class Paragraphs(BaseModel):
     results: List[Paragraph] = []
     facets: Optional[FacetsResult] = None
+    query: Optional[str] = None
 
 
 class ResourceResult(BaseModel):
@@ -117,6 +118,7 @@ class ResourceResult(BaseModel):
 class Resources(BaseModel):
     results: List[ResourceResult]
     facets: Optional[FacetsResult] = None
+    query: Optional[str] = None
 
 
 class Relation(BaseModel):
