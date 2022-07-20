@@ -66,20 +66,11 @@ impl ServiceChild for ParagraphReaderService {
     }
 }
 
-fn adapt_text(parser: &QueryParser, text: &str) -> Result<String, String> {
-    parser
-        .parse_query(text)
-        .map(|_| text.to_string())
-        .map_err(|e| {
-            tracing::error!("Error during parsing query: {e}. Input query: {text}");
-            format!("\"{text}\"")
-        })
-}
-
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        use search_query::create_query;
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
@@ -91,27 +82,23 @@ impl ReaderChild for ParagraphReaderService {
             .map(|v| v.tags.clone())
             .unwrap_or_default();
 
-        let (was_successful, text) = match adapt_text(&parser, &request.body) {
-            Ok(text) => (true, text),
-            Err(text) => (false, text),
+        let text = self.adapt_text(&parser, &request.body);
+        let (top_docs, facets_count) = {
+            let queries = create_query(&parser, &text, request, &self.schema, 1);
+            let dist_1 = self.do_search(queries, results, offset, &facets, multi_flag);
+            if multi_flag && dist_1.0.is_empty() {
+                let queries = create_query(&parser, &text, request, &self.schema, 2);
+                self.do_search(queries, results, offset, &facets, multi_flag)
+            } else {
+                dist_1
+            }
         };
-        let mut distance = 1;
-        let queries = search_query::create_query(&parser, &text, request, &self.schema, distance);
-        let (mut top_docs, mut facets_count) =
-            self.do_search(queries, results, offset, &facets, multi_flag);
-        while multi_flag && top_docs.is_empty() && distance < 2 {
-            distance += 1;
-            let queries =
-                search_query::create_query(&parser, &text, request, &self.schema, distance);
-            (top_docs, facets_count) =
-                self.do_search(queries, results, offset, &facets, multi_flag);
-        }
         Ok(ParagraphSearchResponse::from(SearchResponse {
-            text_service: self,
             facets_count,
             facets,
             top_docs,
-            was_successful,
+            text_service: self,
+            query: &text,
             order_by: request.order.clone(),
             page_number: request.page_number,
             results_per_page: results as i32,
@@ -243,6 +230,19 @@ impl ParagraphReaderService {
             reader,
             schema: paragraph_schema,
         })
+    }
+
+    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
+        match text {
+            "" => text.to_string(),
+            text => parser
+                .parse_query(text)
+                .map(|_| text.to_string())
+                .unwrap_or_else(|e| {
+                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
+                    format!("\"{text}\"")
+                }),
+        }
     }
 
     fn do_search(
@@ -600,7 +600,7 @@ mod tests {
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
 
-        // Search invalid grammar
+        // Search with invalid grammar
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
@@ -615,6 +615,7 @@ mod tests {
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.query, "\"shoupd + enaugh\"");
         assert_eq!(result.total, 0);
 
         // Search filter all paragraphs

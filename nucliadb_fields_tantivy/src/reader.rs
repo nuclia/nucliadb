@@ -50,7 +50,8 @@ impl Display for TError {
     }
 }
 
-pub struct SearchResponse<S> {
+pub struct SearchResponse<'a, S> {
+    pub query: &'a str,
     pub facets_count: FacetCounts,
     pub facets: Vec<String>,
     pub top_docs: Vec<(S, DocAddress)>,
@@ -302,7 +303,7 @@ impl FieldReaderService {
             facets,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
-            was_a_query: true,
+            query: response.query.to_string(),
         }
     }
 
@@ -377,7 +378,20 @@ impl FieldReaderService {
             facets,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
-            was_a_query: true,
+            query: response.query.to_string(),
+        }
+    }
+
+    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
+        match text {
+            "" => text.to_string(),
+            text => parser
+                .parse_query(text)
+                .map(|_| text.to_string())
+                .unwrap_or_else(|e| {
+                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
+                    format!("\"{text}\"")
+                }),
         }
     }
 
@@ -386,20 +400,16 @@ impl FieldReaderService {
         request: &DocumentSearchRequest,
         multic_flag: bool,
     ) -> DocumentSearchResponse {
-        let text = &request.body;
-        let query = if !request.body.is_empty() {
-            let extended_query = SearchQuery::document(request, text).unwrap();
-            info!("{}", extended_query);
+        let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
             query_parser
-                .parse_query(&extended_query)
-                .unwrap_or_else(|e| {
-                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
-                    let body = format!("\"{text}\"");
-                    let extended_query = SearchQuery::document(request, &body).unwrap();
-                    query_parser.parse_query(&extended_query).unwrap()
-                })
+        };
+        let text = self.adapt_text(&query_parser, &request.body);
+        let query = if !request.body.is_empty() {
+            let extended_query = SearchQuery::document(request, &text).unwrap();
+            info!("{}", extended_query);
+            query_parser.parse_query(&extended_query).unwrap()
         } else {
             Box::new(AllQuery) as Box<dyn Query>
         };
@@ -423,6 +433,7 @@ impl FieldReaderService {
             _ if !multic_flag => self.convert_bm25_order(
                 SearchResponse {
                     facets,
+                    query: &text,
                     top_docs: vec![],
                     facets_count: searcher.search(&query, &facet_collector).unwrap(),
                     order_by: request.order.clone(),
@@ -445,6 +456,7 @@ impl FieldReaderService {
                         facets_count,
                         facets,
                         top_docs,
+                        query: &text,
                         order_by: request.order.clone(),
                         page_number: request.page_number,
                         results_per_page: results as i32,
@@ -465,6 +477,7 @@ impl FieldReaderService {
                         facets_count,
                         facets,
                         top_docs,
+                        query: &text,
                         order_by: request.order.clone(),
                         page_number: request.page_number,
                         results_per_page: results as i32,
@@ -655,6 +668,7 @@ mod tests {
             reload: false,
         };
         let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.query, "\"enough - test\"");
         assert_eq!(result.total, 0);
 
         let search = DocumentSearchRequest {
