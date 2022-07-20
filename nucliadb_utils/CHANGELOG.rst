@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.8 (unreleased)
+1.0.8 (2022-07-20)
 ------------------
 
 - Upgrade aiohttp
