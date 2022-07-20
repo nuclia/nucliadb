@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.1.3 (unreleased)
+1.1.3 (2022-07-20)
 ------------------
 
 - Fix flushing of telemetry
