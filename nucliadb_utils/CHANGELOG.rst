@@ -4,7 +4,7 @@ CHANGELOG
 1.0.8 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Upgrade aiohttp
 
 
 1.0.7 (2022-07-08)
