@@ -246,7 +246,7 @@ impl ParagraphReaderService {
                 .map(|_| text.to_string())
                 .unwrap_or_else(|e| {
                     tracing::error!("Error during parsing query: {e}. Input query: {text}");
-                    format!("\"{text}\"")
+                    format!("\"{}\"", text.replace('"', ""))
                 }),
         }
     }
@@ -615,6 +615,24 @@ mod tests {
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
 
+        // Search with invalid and unbalanced grammar
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: "".to_string(),
+            body: "shoupd + enaugh\"".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.query, "\"shoupd + enaugh\"");
+        assert_eq!(result.total, 0);
+
         // Search with invalid grammar
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
@@ -631,6 +649,23 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
+        assert_eq!(result.total, 0);
+
+        // Empty search
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: "".to_string(),
+            body: "".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
 
         // Search filter all paragraphs

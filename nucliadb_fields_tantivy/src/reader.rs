@@ -390,7 +390,7 @@ impl FieldReaderService {
                 .map(|_| text.to_string())
                 .unwrap_or_else(|e| {
                     tracing::error!("Error during parsing query: {e}. Input query: {text}");
-                    format!("\"{text}\"")
+                    format!("\"{}\"", text.replace('"', ""))
                 }),
         }
     }
@@ -658,6 +658,22 @@ mod tests {
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
             body: "enough - test".to_string(),
+            fields: vec!["body".to_string()],
+            filter: Some(filter.clone()),
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+        };
+        let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.query, "\"enough - test\"");
+        assert_eq!(result.total, 0);
+
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
+            body: "enough - test\"".to_string(),
             fields: vec!["body".to_string()],
             filter: Some(filter.clone()),
             faceted: Some(faceted.clone()),
