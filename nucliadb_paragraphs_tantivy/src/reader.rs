@@ -250,11 +250,6 @@ impl ParagraphReaderService {
                 }),
         }
     }
-    fn is_valid_facet(maybe_facet: &str) -> bool {
-        Facet::from_text(maybe_facet)
-            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
-            .is_ok()
-    }
     fn do_search(
         &self,
         query: Vec<(Occur, Box<dyn Query>)>,
@@ -305,6 +300,11 @@ impl ParagraphReaderService {
                     .to_string()
             })
             .collect()
+    }
+    fn is_valid_facet(maybe_facet: &str) -> bool {
+        Facet::from_text(maybe_facet)
+            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
+            .is_ok()
     }
 }
 
