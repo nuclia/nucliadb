@@ -18,11 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::hnsw::*;
+use std::path::Path;
+
 use heed::flags::Flags;
 use heed::types::{SerdeBincode, Str, Unit};
-use heed::{Database, Env, EnvOpenOptions, RoIter, RoPrefix, RoTxn, RwTxn};
-use std::path::Path;
+use heed::{Database, Env, EnvOpenOptions};
+pub use heed::{RoIter, RoPrefix, RoTxn, RwTxn};
+
+use crate::hnsw::*;
 
 mod db_names {
     pub const DB_NODES: &str = "NODES_lmdb";
@@ -36,7 +39,7 @@ mod env_params {
     pub const MAX_DBS: u32 = 3000;
 }
 
-pub struct LMBDStorage {
+pub struct VectorDB {
     env: Env,
     // (String, ())
     label_db: Database<Str, Unit>,
@@ -46,8 +49,8 @@ pub struct LMBDStorage {
     node_inv_db: Database<SerdeBincode<Node>, Str>,
 }
 
-impl LMBDStorage {
-    pub fn create(path: &Path) -> LMBDStorage {
+impl VectorDB {
+    pub fn create(path: &Path) -> VectorDB {
         let env_path = path.join(env_params::LMDB_ENV);
         let mut env_builder = EnvOpenOptions::new();
         env_builder.max_dbs(env_params::MAX_DBS);
@@ -59,14 +62,14 @@ impl LMBDStorage {
         let label_db = env.create_database(Some(db_names::DB_LABELS)).unwrap();
         let node_db = env.create_database(Some(db_names::DB_NODES)).unwrap();
         let node_inv_db = env.create_database(Some(db_names::DB_NODES_INV)).unwrap();
-        LMBDStorage {
+        VectorDB {
             env,
             label_db,
             node_db,
             node_inv_db,
         }
     }
-    pub fn open(path: &Path) -> LMBDStorage {
+    pub fn open(path: &Path) -> VectorDB {
         let mut env_builder = EnvOpenOptions::new();
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
@@ -75,49 +78,61 @@ impl LMBDStorage {
         env_builder.map_size(env_params::MAP_SIZE);
         let env_path = path.join(env_params::LMDB_ENV);
         let env = env_builder.open(&env_path).unwrap();
-        let label_db = env.open_database(Some(db_names::DB_LABELS)).unwrap().unwrap();
-        let node_db = env.open_database(Some(db_names::DB_NODES)).unwrap().unwrap();
-        let node_inv_db = env.open_database(Some(db_names::DB_NODES_INV)).unwrap().unwrap();
-        LMBDStorage {
+        let label_db = env
+            .open_database(Some(db_names::DB_LABELS))
+            .unwrap()
+            .unwrap();
+        let node_db = env
+            .open_database(Some(db_names::DB_NODES))
+            .unwrap()
+            .unwrap();
+        let node_inv_db = env
+            .open_database(Some(db_names::DB_NODES_INV))
+            .unwrap()
+            .unwrap();
+        VectorDB {
             env,
             label_db,
             node_db,
             node_inv_db,
         }
     }
-    pub fn ro_txn(&self) -> RoTxn<'_> {
+    pub fn ro_txn(&self) -> RoTxn {
         self.env.read_txn().unwrap()
     }
-    pub fn rw_txn(&self) -> RwTxn<'_, '_> {
+    pub fn rw_txn(&self) -> RwTxn {
         self.env.write_txn().unwrap()
     }
-    pub fn get_node(&self, txn: &RoTxn<'_>, vector: &str) -> Option<Node> {
+    pub fn get_node(&self, txn: &RoTxn, vector: &str) -> Option<Node> {
         self.node_db.get(txn, vector).unwrap()
     }
     pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Node) -> Option<&'a str> {
         self.node_inv_db.get(txn, &node).unwrap()
     }
-    pub fn has_label(&self, txn: &RoTxn<'_>, key: &str, label: &str) -> bool {
-        let path = format!("[{}/{}]", key, label);
+    pub fn has_label(&self, txn: &RoTxn, key: &str, label: &str) -> bool {
+        let path = VectorDB::create_label_entry(key, label);
         let exist = self.label_db.get(txn, path.as_str()).unwrap();
         exist.is_some()
     }
-    pub fn add_node(&self, txn: &mut RwTxn<'_, '_>, key: &str, node: Node) {
+    pub fn add_node(&self, txn: &mut RwTxn, key: &str, node: Node) {
         self.node_db.put(txn, key, &node).unwrap();
         self.node_inv_db.put(txn, &node, key).unwrap();
     }
-    pub fn add_label(&self, txn: &mut RwTxn<'_, '_>, key: &str, label: &str) {
-        let path = format!("[{}/{}]", key, label);
+    pub fn add_label(&self, txn: &mut RwTxn, key: &str, label: &str) {
+        let path = VectorDB::create_label_entry(key, label);
         self.label_db.put(txn, path.as_str(), &()).unwrap();
     }
     pub fn get_keys<'a>(&'a self, txn: &'a RoTxn) -> RoIter<Str, SerdeBincode<Node>> {
         self.node_db.iter(txn).unwrap()
     }
-    pub fn get_prefixed_nodes<'a>(
+    pub fn nodes_prefixed_with<'a>(
         &'a self,
         txn: &'a RoTxn,
         prefix: &str,
     ) -> RoPrefix<Str, SerdeBincode<Node>> {
         self.node_db.prefix_iter(txn, prefix).unwrap()
+    }
+    fn create_label_entry(key: &str, label: &str) -> String {
+        format!("[{}/{}]", key, label)
     }
 }

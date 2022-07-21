@@ -18,12 +18,27 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::database::LMBDStorage;
-use crate::hnsw::Hnsw;
-use crate::segment::Segment;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+
+use crate::database::VectorDB;
+use crate::hnsw::{Hnsw, Node};
+use crate::segment::Segment;
+
+pub struct NodeTracker {
+    temp: Vec<u8>,
+    segments: HashMap<usize, Segment>,
+}
+impl NodeTracker {
+    pub fn find(&self, node: Node) -> &[u8] {
+        self.segments
+            .get(&node.segment)
+            .and_then(|segment| segment.get_vector(node.vector))
+            .unwrap_or(&self.temp)
+    }
+}
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct TransactionLog {
@@ -31,7 +46,7 @@ pub struct TransactionLog {
 }
 
 pub struct Index {
-    segments: HashMap<usize, Segment>,
-    database: LMBDStorage,
+    tracker: NodeTracker,
+    database: VectorDB,
     hnsw: Hnsw,
 }

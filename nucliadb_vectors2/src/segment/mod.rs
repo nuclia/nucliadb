@@ -1,7 +1,8 @@
-use memmap2::Mmap;
-use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::path::Path;
+
+use memmap2::Mmap;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SegmentSlice {

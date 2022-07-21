@@ -19,10 +19,10 @@
 //
 
 pub mod database;
-pub mod lock;
 pub mod delete_log;
+pub mod disk_structure;
 pub mod hnsw;
 pub mod index;
-pub mod vector;
+pub mod lock;
 pub mod segment;
-pub mod disk_structure;
+pub mod vector;

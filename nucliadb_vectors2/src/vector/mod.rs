@@ -4,7 +4,6 @@ type Len = u64;
 type Unit = f32;
 type Dist = f32;
 
-
 fn encode_length(mut buff: Vec<u8>, vec: &[Unit]) -> Vec<u8> {
     let len = vec.len() as Len;
     buff.write_all(&len.to_le_bytes()).unwrap();
