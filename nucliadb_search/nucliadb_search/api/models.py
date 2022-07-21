@@ -35,6 +35,10 @@ else:
 _T = TypeVar("_T")
 
 
+POSITIONS = Dict[str, List[Tuple[int, int]]]
+EXTRACTED_POSITIONS = Tuple[str, POSITIONS]
+
+
 class NucliaDBRoles(str, Enum):
     MANAGER = "MANAGER"
     READER = "READER"
@@ -100,7 +104,7 @@ class Paragraph(BaseModel):
     field: str
     text: str
     labels: List[str] = []
-    positions: Dict[str, List[Tuple[int, int]]] = {}
+    positions: POSITIONS = {}
 
 
 class Paragraphs(BaseModel):
@@ -115,7 +119,7 @@ class ResourceResult(BaseModel):
     field_type: str
     field: str
     text: str
-    positions: Dict[str, List[Tuple[int, int]]] = {}
+    positions: POSITIONS = {}
 
 
 class Resources(BaseModel):

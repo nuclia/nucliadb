@@ -36,6 +36,7 @@ from nucliadb_models.serialize import (
     serialize,
 )
 from nucliadb_search import logger
+from nucliadb_search.api.models import EXTRACTED_POSITIONS, POSITIONS
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
@@ -189,7 +190,7 @@ async def get_text_resource(
     query: Optional[str] = None,
     highlight_split: bool = False,
     split: bool = False,
-) -> Tuple[str, Dict[str, List[Tuple[int, int]]]]:
+) -> EXTRACTED_POSITIONS:
 
     if query is None:
         return "", {}
@@ -236,7 +237,7 @@ async def get_text_paragraph(
     query: Optional[str] = None,
     highlight_split: bool = False,
     split: bool = False,
-) -> Tuple[str, Dict[str, List[Tuple[int, int]]]]:
+) -> EXTRACTED_POSITIONS:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
@@ -281,7 +282,7 @@ async def get_text_paragraph(
 def split_text(text: str, query: str, highlight: bool = False, margin: int = 20):
     quoted = re.findall('"([^"]*)"', query)
     cleaned = query
-    positions: Dict[str, List[Tuple[int, int]]] = {}
+    positions: POSITIONS = {}
     for quote in quoted:
         cleaned = cleaned.replace(f'"{quote}"', "")
         found = [x.span() for x in re.finditer(quote, text)]
@@ -329,7 +330,7 @@ def split_text(text: str, query: str, highlight: bool = False, margin: int = 20)
 def highlight(text: str, query: str, highlight: bool = False):
     quoted = re.findall('"([^"]*)"', query)
     cleaned = query
-    positions: Dict[str, List[Tuple[int, int]]] = {}
+    positions: POSITIONS = {}
     for quote in quoted:
         cleaned = cleaned.replace(f'"{quote}"', "")
         found = [x.span() for x in re.finditer(quote, text)]
