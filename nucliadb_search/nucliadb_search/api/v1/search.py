@@ -88,6 +88,8 @@ async def search_knowledgebox(
     ),
     reload: bool = Query(True),
     debug: bool = Query(False),
+    highlight: bool = Query(False),
+    split: bool = Query(False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -197,6 +199,8 @@ async def search_knowledgebox(
         field_type_filter=field_type_filter,
         extracted=extracted,
         max_score=max_score,
+        highlight=highlight,
+        split=split,
     )
     await abort_transaction()
 

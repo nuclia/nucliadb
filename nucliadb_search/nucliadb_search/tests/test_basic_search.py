@@ -54,9 +54,19 @@ async def test_search_resource_all(
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text",
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true",
         )
         assert resp.status_code == 200
+        assert resp.json()["fulltext"]["query"] == "own text"
+        assert resp.json()["paragraphs"]["query"] == "own text"
+        assert (
+            resp.json()["fulltext"]["results"][0]["text"]
+            == "My <mark>own</mark> <mark>text</mark> Ramon. This is grea…"
+        )
+        assert (
+            resp.json()["paragraphs"]["results"][0]["text"]
+            == "My <mark>own</mark> <mark>text</mark> Ramon. This is great to be here. "
+        )
         assert len(resp.json()["resources"]) == 1
         assert len(resp.json()["sentences"]) == 2
 
