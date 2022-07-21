@@ -76,10 +76,16 @@ impl ReaderChild for ParagraphReaderService {
         let offset = results * request.page_number as usize;
         let text = &request.body;
         let multi_flag = results > 0 && !text.is_empty();
-        let facets = request
+        let facets: Vec<_> = request
             .faceted
             .as_ref()
-            .map(|v| v.tags.clone())
+            .map(|v| {
+                v.tags
+                    .iter()
+                    .filter(|s| ParagraphReaderService::is_valid_facet(*s))
+                    .cloned()
+                    .collect()
+            })
             .unwrap_or_default();
 
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
@@ -244,7 +250,6 @@ impl ParagraphReaderService {
                 }),
         }
     }
-
     fn do_search(
         &self,
         query: Vec<(Occur, Box<dyn Query>)>,
@@ -255,13 +260,13 @@ impl ParagraphReaderService {
     ) -> (Vec<(f32, DocAddress)>, FacetCounts) {
         let query = BooleanQuery::new(query);
         let searcher = self.reader.searcher();
-        let mut facet_collector = FacetCollector::for_field(self.schema.facets);
-        for facet in facets {
-            match Facet::from_text(facet) {
-                Ok(facet) => facet_collector.add_facet(facet),
-                Err(_) => error!("Invalid facet: {}", facet),
-            }
-        }
+        let facet_collector = facets.iter().fold(
+            FacetCollector::for_field(self.schema.facets),
+            |mut collector, facet| {
+                collector.add_facet(Facet::from(facet));
+                collector
+            },
+        );
         if multic_flag {
             let topdocs = TopDocs::with_limit(results).and_offset(offset);
             let mut multicollector = MultiCollector::new();
@@ -295,6 +300,11 @@ impl ParagraphReaderService {
                     .to_string()
             })
             .collect()
+    }
+    fn is_valid_facet(maybe_facet: &str) -> bool {
+        Facet::from_text(maybe_facet)
+            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
+            .is_ok()
     }
 }
 
@@ -486,7 +496,12 @@ mod tests {
         };
 
         let faceted = Faceted {
-            tags: vec!["/l".to_string(), "/e".to_string(), "/c".to_string()],
+            tags: vec![
+                "".to_string(),
+                "/l".to_string(),
+                "/e".to_string(),
+                "/c".to_string(),
+            ],
         };
 
         let now = SystemTime::now()

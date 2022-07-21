@@ -597,7 +597,7 @@ mod tests {
         };
 
         let faceted = Faceted {
-            tags: vec!["/l".to_string(), "/t".to_string()],
+            tags: vec!["".to_string(), "/l".to_string(), "/t".to_string()],
         };
 
         let now = SystemTime::now()
