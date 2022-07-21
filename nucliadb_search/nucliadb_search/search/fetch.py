@@ -189,13 +189,13 @@ async def get_text_resource(
     query: Optional[str] = None,
     highlight_split: Optional[bool] = False,
     split: Optional[bool] = False,
-) -> str:
+) -> Tuple[str, Dict[str, List[Tuple[int, int]]]]:
 
     if query is None:
-        return ""
+        return "", {}
 
     if split is False:
-        return ""
+        return "", {}
 
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
@@ -211,7 +211,7 @@ async def get_text_resource(
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
-        return ""
+        return "", {}
 
     _, field_type, field = result.field.split("/")
     field_type_int = KB_REVERSE[field_type]
@@ -221,11 +221,13 @@ async def get_text_resource(
         logger.warn(
             f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
         )
-        return ""
+        return "", {}
 
-    splitted_text, positions = split_text(extracted_text.text, query)
+    splitted_text, positions = split_text(
+        extracted_text.text, query, highlight=highlight_split
+    )
 
-    return splitted_text
+    return splitted_text, positions
 
 
 async def get_text_paragraph(
@@ -234,7 +236,7 @@ async def get_text_paragraph(
     query: Optional[str] = None,
     highlight_split: bool = False,
     split: bool = False,
-) -> str:
+) -> Tuple[str, Dict[str, List[Tuple[int, int]]]]:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
@@ -249,7 +251,7 @@ async def get_text_paragraph(
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
-        return ""
+        return "", {}
 
     _, field_type, field = result.field.split("/")
     field_type_int = KB_REVERSE[field_type]
@@ -259,8 +261,9 @@ async def get_text_paragraph(
         logger.warn(
             f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
         )
-        return ""
+        return "", {}
 
+    positions: Dict[str, List[Tuple[int, int]]] = {}
     if result.split not in (None, ""):
         text = extracted_text.split_text[result.split]
         splitted_text = text[result.start : result.end]
@@ -272,7 +275,7 @@ async def get_text_paragraph(
             splitted_text, query, highlight=highlight_split
         )
 
-    return splitted_text
+    return splitted_text, positions
 
 
 def split_text(text: str, query: str, highlight: bool = False, margin: int = 20):

@@ -100,6 +100,7 @@ class Paragraph(BaseModel):
     field: str
     text: str
     labels: List[str] = []
+    positions: Dict[str, List[Tuple[int, int]]] = {}
 
 
 class Paragraphs(BaseModel):
@@ -113,6 +114,8 @@ class ResourceResult(BaseModel):
     rid: str
     field_type: str
     field: str
+    text: str
+    positions: Dict[str, List[Tuple[int, int]]] = {}
 
 
 class Resources(BaseModel):

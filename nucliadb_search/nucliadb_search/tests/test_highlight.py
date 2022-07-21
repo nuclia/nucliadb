@@ -79,7 +79,7 @@ def test_split_text():
     )
     assert (
         res[0]
-        == " ...methods based on + (<b>including</b> the implied use in ... ...on; total number of <b>copies</b> is k times the sum ... ...one list, once, and <b>copies</b> each item over (fro..."  # noqa
+        == " ...methods based on + (<b>including</b> the implied use in ... ...on;\ntotal number of <b>copies</b> is k times the sum ... ...one list, once, and <b>copies</b> each item over\n(fro..."
     )
 
     res = split_text(
@@ -87,7 +87,7 @@ def test_split_text():
         'this is "each item over"',
         True,
     )
-
     assert (
-        res[0] == " ...t, once, and copies <b>each item over</b> (from its original ..."
+        res[0]
+        == " ...t, once, and copies <b>each item over</b>\n(from its original ..."
     )

@@ -76,7 +76,7 @@ async def merge_documents_results(
 
         for result in document_response.results:
             # /f/file
-            text = await get_text_resource(
+            text, positions = await get_text_resource(
                 result,
                 kbid,
                 document_response.query,
@@ -96,6 +96,7 @@ async def merge_documents_results(
                     field=field,
                     field_type=field_type,
                     text=text,
+                    positions=positions,
                     labels=labels,
                 )
             )
@@ -131,7 +132,7 @@ async def merge_suggest_paragraph_results(
             query = suggest_response.query
         for result in suggest_response.results:
             _, field_type, field = result.field.split("/")
-            text = await get_text_paragraph(
+            text, positions = await get_text_paragraph(
                 result,
                 kbid,
                 suggest_response.query,
@@ -146,6 +147,7 @@ async def merge_suggest_paragraph_results(
                     field_type=field_type,
                     field=field,
                     text=text,
+                    positions=positions,
                     labels=labels,
                 )
             )
@@ -234,7 +236,7 @@ async def merge_paragraph_results(
                 facets[key] = MessageToDict(value)
         for result in paragraph_response.results:
             _, field_type, field = result.field.split("/")
-            text = await get_text_paragraph(
+            text, positions = await get_text_paragraph(
                 result, kbid, paragraph_response.query, highlight_split, split
             )
             labels = await get_labels_paragraph(result, kbid)
@@ -245,6 +247,7 @@ async def merge_paragraph_results(
                     field_type=field_type,
                     field=field,
                     text=text,
+                    positions=positions,
                     labels=labels,
                 )
             )
@@ -262,7 +265,7 @@ async def merge_paragraph_results(
     for paragraph in paragraph_list:
         if paragraph.rid not in resources:
             resources.append(paragraph.rid)
-    return Paragraphs(results=paragraph_list, facets=facets)
+    return Paragraphs(results=paragraph_list, facets=facets, query=query)
 
 
 async def merge_results(
