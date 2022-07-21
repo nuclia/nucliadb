@@ -29,7 +29,7 @@ def test_highlight():
     )
     assert (
         res[0]
-        == "Query whatever you want my to make it work my <b>query</b> with <b>this</b>"
+        == "Query whatever you want my to make it work my <mark>query</mark> with <mark>this</mark>"
     )
 
     res = highlight(
@@ -40,7 +40,7 @@ def test_highlight():
 
     assert (
         res[0]
-        == "Query whatever you want to make it work <b>my query</b> with <b>this</b>"
+        == "Query whatever you want to make it work <mark>my query</mark> with <mark>this</mark>"
     )
 
     res = highlight(
@@ -51,7 +51,7 @@ def test_highlight():
 
     assert (
         res[0]
-        == "Query whatever you redis want to make it work <b>my query</b> with <b>this</b>"
+        == "Query whatever you redis want to make it work <mark>my query</mark> with <mark>this</mark>"
     )
 
 
@@ -79,7 +79,7 @@ def test_split_text():
     )
     assert (
         res[0]
-        == " ...methods based on + (<b>including</b> the implied use in ... ...on;\ntotal number of <b>copies</b> is k times the sum ... ...one list, once, and <b>copies</b> each item over\n(fro..."
+        == " …methods based on + (<mark>including</mark> the implied use in … …on;\ntotal number of <mark>copies</mark> is k times the sum … …one list, once, and <mark>copies</mark> each item over\n(fro…"  # noqa
     )
 
     res = split_text(
@@ -89,5 +89,5 @@ def test_split_text():
     )
     assert (
         res[0]
-        == " ...t, once, and copies <b>each item over</b>\n(from its original ..."
+        == " …t, once, and copies <mark>each item over</mark>\n(from its original …"
     )

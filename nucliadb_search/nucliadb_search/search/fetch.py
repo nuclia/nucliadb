@@ -187,8 +187,8 @@ async def get_text_resource(
     result: DocumentResult,
     kbid: str,
     query: Optional[str] = None,
-    highlight_split: Optional[bool] = False,
-    split: Optional[bool] = False,
+    highlight_split: bool = False,
+    split: bool = False,
 ) -> Tuple[str, Dict[str, List[Tuple[int, int]]]]:
 
     if query is None:
@@ -304,24 +304,24 @@ def split_text(text: str, query: str, highlight: bool = False, margin: int = 20)
             continue
         if order[0] - margin > last and last > 0:
             new_text += text[last : last + margin]
-            new_text += "..."
+            new_text += "…"
             last += margin
 
         if last > order[0] - margin:
             new_text += text[last : order[0]]
         else:
-            new_text += " ..."
+            new_text += " …"
             new_text += text[order[0] - margin : order[0]]
 
         if highlight:
-            new_text += "<b>"
+            new_text += "<mark>"
         new_text += text[order[0] : order[1]]
         if highlight:
-            new_text += "</b>"
+            new_text += "</mark>"
         last = order[1]
     if len(new_text) > 0:
         new_text += text[last : min(len(text), last + margin)]
-        new_text += "..."
+        new_text += "…"
 
     return new_text, positions
 
@@ -352,9 +352,9 @@ def highlight(text: str, query: str, highlight: bool = False):
             if order[0] < last:
                 continue
             new_text += text[last : order[0]]
-            new_text += "<b>"
+            new_text += "<mark>"
             new_text += text[order[0] : order[1]]
-            new_text += "</b>"
+            new_text += "</mark>"
             last = order[1]
         new_text += text[last:]
         return new_text, positions
