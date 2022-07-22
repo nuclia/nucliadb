@@ -39,7 +39,7 @@ mod env_params {
     pub const MAX_DBS: u32 = 3000;
 }
 
-pub struct VectorDB {
+pub struct LMDBStorage {
     env: Env,
     // (String, ())
     label_db: Database<Str, Unit>,
@@ -49,8 +49,8 @@ pub struct VectorDB {
     node_inv_db: Database<SerdeBincode<Node>, Str>,
 }
 
-impl VectorDB {
-    pub fn create(path: &Path) -> VectorDB {
+impl LMDBStorage {
+    pub fn create(path: &Path) -> LMDBStorage {
         let env_path = path.join(env_params::LMDB_ENV);
         let mut env_builder = EnvOpenOptions::new();
         env_builder.max_dbs(env_params::MAX_DBS);
@@ -62,14 +62,14 @@ impl VectorDB {
         let label_db = env.create_database(Some(db_names::DB_LABELS)).unwrap();
         let node_db = env.create_database(Some(db_names::DB_NODES)).unwrap();
         let node_inv_db = env.create_database(Some(db_names::DB_NODES_INV)).unwrap();
-        VectorDB {
+        LMDBStorage {
             env,
             label_db,
             node_db,
             node_inv_db,
         }
     }
-    pub fn open(path: &Path) -> VectorDB {
+    pub fn open(path: &Path) -> LMDBStorage {
         let mut env_builder = EnvOpenOptions::new();
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
@@ -90,7 +90,7 @@ impl VectorDB {
             .open_database(Some(db_names::DB_NODES_INV))
             .unwrap()
             .unwrap();
-        VectorDB {
+        LMDBStorage {
             env,
             label_db,
             node_db,

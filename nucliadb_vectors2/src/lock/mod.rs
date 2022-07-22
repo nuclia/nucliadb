@@ -4,43 +4,20 @@ use std::path::Path;
 
 use fs2::FileExt;
 
-struct Locked;
-struct Unlocked;
-
-pub struct Lock<State> {
+pub struct Lock {
     file: File,
-    state: PhantomData<State>,
 }
 
-impl Lock<Unlocked> {
-    pub fn new(path: &Path) -> Lock<Unlocked> {
+impl Lock {
+    pub fn new(path: &Path) -> Lock {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(path)
             .unwrap();
-        Lock {
-            file,
-            state: PhantomData,
-        }
-    }
-    pub fn lock(self) -> Lock<Locked> {
-        self.file.lock_exclusive().unwrap();
-        Lock {
-            file: self.file,
-            state: PhantomData,
-        }
-    }
-}
-
-impl Lock<Locked> {
-    pub fn unlock(self) -> Lock<Unlocked> {
-        self.file.unlock().unwrap();
-        Lock {
-            file: self.file,
-            state: PhantomData,
-        }
+        file.lock_exclusive().unwrap();
+        Lock { file }
     }
 }
 
@@ -51,7 +28,6 @@ mod tests {
     fn lock_unlock() {
         let dir = tempfile::tempdir().unwrap();
         let lock = Lock::new(&dir.path().join("state.lock"));
-        let locked = lock.lock();
-        let _unlocked = locked.unlock();
+        std::mem::drop(lock);
     }
 }

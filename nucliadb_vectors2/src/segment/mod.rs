@@ -10,6 +10,7 @@ pub struct SegmentSlice {
     pub end: u64,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Segment {
     mmaped: Mmap,
 }

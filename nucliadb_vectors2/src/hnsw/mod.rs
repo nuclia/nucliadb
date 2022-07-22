@@ -18,10 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod ops;
 use std::collections::HashMap;
 
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::segment::SegmentSlice;
