@@ -20,6 +20,7 @@ tracing = "0.1.29"
 rayon = "1.5.2"
 memmap2 = "0.5.3"
 fs2 = "0.4.3"
+thiserror = "1.0.31"
 nucliadb_service_interface = { path = "../nucliadb_service_interface" }
 nucliadb_byte_rpr = { path = "../nucliadb_byte_rpr" }
 clap = { version = "3.1.18", features = ["derive"] }

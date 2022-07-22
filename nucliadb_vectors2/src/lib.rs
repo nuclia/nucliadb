@@ -22,5 +22,4 @@ pub mod database;
 pub mod disk_structure;
 pub mod hnsw;
 pub mod index;
-pub mod lock;
 pub mod vector;

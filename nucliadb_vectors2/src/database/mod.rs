@@ -18,25 +18,24 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::path::Path;
-
+use crate::hnsw::*;
 use heed::flags::Flags;
 use heed::types::{SerdeBincode, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions};
 pub use heed::{RoIter, RoPrefix, RoTxn, RwTxn};
+use std::path::Path;
 
-use crate::hnsw::*;
+pub use heed::Error as DBErr;
 
 mod db_names {
-    pub const DB_NODES: &str = "NODES_lmdb";
-    pub const DB_NODES_INV: &str = "NODES_INV_lmdb";
-    pub const DB_LABELS: &str = "LABELS_lmdb";
+    pub const DB_NODES: &str = "NODES";
+    pub const DB_NODES_INV: &str = "NODES_INV";
+    pub const DB_LABELS: &str = "LABELS";
 }
 
 mod env_params {
-    pub const LMDB_ENV: &str = "ENV_lmdb";
     pub const MAP_SIZE: usize = 1048576 * 100000;
-    pub const MAX_DBS: u32 = 3000;
+    pub const MAX_DBS: u32 = 3;
 }
 
 pub struct VectorDB {
@@ -50,52 +49,23 @@ pub struct VectorDB {
 }
 
 impl VectorDB {
-    pub fn create(path: &Path) -> VectorDB {
-        let env_path = path.join(env_params::LMDB_ENV);
+    pub fn new<P: AsRef<Path>>(env_path: P) -> Result<VectorDB, DBErr> {
         let mut env_builder = EnvOpenOptions::new();
         env_builder.max_dbs(env_params::MAX_DBS);
         env_builder.map_size(env_params::MAP_SIZE);
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
         }
-        let env = env_builder.open(&env_path).unwrap();
-        let label_db = env.create_database(Some(db_names::DB_LABELS)).unwrap();
-        let node_db = env.create_database(Some(db_names::DB_NODES)).unwrap();
-        let node_inv_db = env.create_database(Some(db_names::DB_NODES_INV)).unwrap();
-        VectorDB {
+        let env = env_builder.open(&env_path)?;
+        let label_db = env.create_database(Some(db_names::DB_LABELS))?;
+        let node_db = env.create_database(Some(db_names::DB_NODES))?;
+        let node_inv_db = env.create_database(Some(db_names::DB_NODES_INV))?;
+        Ok(VectorDB {
             env,
             label_db,
             node_db,
             node_inv_db,
-        }
-    }
-    pub fn open(path: &Path) -> VectorDB {
-        let mut env_builder = EnvOpenOptions::new();
-        unsafe {
-            env_builder.flag(Flags::MdbNoLock);
-        }
-        env_builder.max_dbs(env_params::MAX_DBS);
-        env_builder.map_size(env_params::MAP_SIZE);
-        let env_path = path.join(env_params::LMDB_ENV);
-        let env = env_builder.open(&env_path).unwrap();
-        let label_db = env
-            .open_database(Some(db_names::DB_LABELS))
-            .unwrap()
-            .unwrap();
-        let node_db = env
-            .open_database(Some(db_names::DB_NODES))
-            .unwrap()
-            .unwrap();
-        let node_inv_db = env
-            .open_database(Some(db_names::DB_NODES_INV))
-            .unwrap()
-            .unwrap();
-        VectorDB {
-            env,
-            label_db,
-            node_db,
-            node_inv_db,
-        }
+        })
     }
     pub fn ro_txn(&self) -> RoTxn {
         self.env.read_txn().unwrap()
