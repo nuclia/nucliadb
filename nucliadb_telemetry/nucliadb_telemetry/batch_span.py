@@ -259,8 +259,10 @@ class BatchSpanProcessor(SpanProcessor):
             # Ignore type b/c the Optional[None]+slicing is too "clever"
             # for mypy
             await self.span_exporter.export(self.spans_list[:idx])  # type: ignore
+        except (asyncio.CancelledError):
+            logger.exception("Task was canceled while exporting Span batch")
         except Exception:  # pylint: disable=broad-except
-            logger.exception("Exception while exporting Span batch.")
+            logger.exception("Exception while exporting Span batch)")
         detach(token)
 
         # clean up list

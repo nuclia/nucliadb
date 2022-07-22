@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import os
 from typing import Dict, Optional, Sequence, Union
 
@@ -62,6 +63,8 @@ async def clean_telemetry(service_name: str):
     if service_name in GLOBAL_PROVIDER and service_name:
         tracer_provider = GLOBAL_PROVIDER[service_name]
         await tracer_provider.force_flush()
+        # Without this sleep, force_flush fails on exporting pending spans
+        await asyncio.sleep(1)
         tracer_provider.shutdown()
         del GLOBAL_PROVIDER[service_name]
 
