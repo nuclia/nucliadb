@@ -1,15 +1,13 @@
-use std::{
-    fs::File,
-    io::{BufReader, BufWriter},
-    path::Path,
-};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+use std::path::Path;
 
 use nucliadb_service_interface::prelude::async_std::fs::DirBuilder;
 
-use super::{
-    errors::DiskStructResult, DiskReadable, DiskWritable, DELETE_LOG, SEGMENT, TRANSACTIONS,
-};
-use crate::{delete_log::DeleteLog, segment::Segment};
+use super::errors::DiskStructResult;
+use super::{DiskReadable, DiskWritable, DELETE_LOG, SEGMENT, TRANSACTIONS};
+use crate::delete_log::DeleteLog;
+use crate::segment::Segment;
 
 pub(crate) struct TxnEntity<'a> {
     pub base_path: &'a Path,

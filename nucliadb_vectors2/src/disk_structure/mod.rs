@@ -26,7 +26,8 @@
 // -> /* Only if a locked lock is provided */ given a txn id, get the delete log
 // -> /* Only if a locked lock is provided */ given a txn id, get the mmaped segment
 // -> /* Only if a locked lock is provided */ given a txn id and the delete log, write it
-// -> /* Only if a locked lock is provided */ given a txn id, create a new txn with a given id and return segment and delete_log files ready to be writen to.
+// -> /* Only if a locked lock is provided */ given a txn id, create a new txn with a given id and
+// return segment and delete_log files ready to be writen to.
 //
 //
 // types:
@@ -40,19 +41,18 @@ mod errors;
 mod locked_struct;
 mod txn_entity;
 
+use std::fs::{DirBuilder, File};
+use std::path::{Path, PathBuf};
+
 use errors::DiskStructResult;
 use heed::Database;
 use locked_struct::LockedDiskStructure;
 use nucliadb_service_interface::prelude::ServiceResult;
-use std::{
-    fs::{DirBuilder, File},
-    path::{Path, PathBuf},
-};
 use txn_entity::TxnEntity;
 
-use crate::{database::VectorDB, lock::Lock};
-
 use self::errors::DiskStructError;
+use crate::database::VectorDB;
+use crate::lock::Lock;
 
 pub(in crate::disk_structure) const LOCK_FILE: &str = "dir.lock";
 pub(in crate::disk_structure) const HNSW: &str = "hnsw.bincode";
@@ -108,11 +108,9 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{DiskReadable, DiskStructure, DiskWritable};
-    use crate::{
-        delete_log::DeleteLog,
-        disk_structure::{DATABASE, HNSW, LOCK_FILE, STAMP, TRANSACTIONS, TXN_LOG},
-        hnsw::Hnsw,
-    };
+    use crate::delete_log::DeleteLog;
+    use crate::disk_structure::{DATABASE, HNSW, LOCK_FILE, STAMP, TRANSACTIONS, TXN_LOG};
+    use crate::hnsw::Hnsw;
 
     #[test]
     fn check_init() {
