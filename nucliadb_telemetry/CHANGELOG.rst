@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.1.4 (unreleased)
+1.1.4 (2022-07-22)
 ------------------
 
 - Make sure flush is done
