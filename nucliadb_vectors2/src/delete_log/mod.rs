@@ -20,3 +20,9 @@
 use serde::{Deserialize, Serialize};
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeleteLog;
+
+impl DeleteLog {
+    pub fn new(path: &Path) -> DeleteLog {
+        DeleteLog {}
+    }
+}

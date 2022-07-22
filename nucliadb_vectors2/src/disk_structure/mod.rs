@@ -59,7 +59,7 @@ pub(in crate::disk_structure) const HNSW: &str = "hnsw.bincode";
 pub(in crate::disk_structure) const STAMP: &str = "stamp.nuclia";
 pub(in crate::disk_structure) const TXN_LOG: &str = "log.bincode";
 pub(in crate::disk_structure) const TRANSACTIONS: &str = "transactions";
-pub(in crate::disk_structure) const SEGMENT: &str = "segment.bincode";
+pub(in crate::disk_structure) const SEGMENT: &str = "segment.vectors";
 pub(in crate::disk_structure) const DELETE_LOG: &str = "delete_log.bincode";
 pub(in crate::disk_structure) const DATABASE: &str = "database";
 

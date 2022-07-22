@@ -4,7 +4,11 @@ use std::{
     path::Path,
 };
 
-use super::{errors::DiskStructResult, DiskReadable, DiskWritable, DELETE_LOG, SEGMENT};
+use nucliadb_service_interface::prelude::async_std::fs::DirBuilder;
+
+use super::{
+    errors::DiskStructResult, DiskReadable, DiskWritable, DELETE_LOG, SEGMENT, TRANSACTIONS,
+};
 use crate::{delete_log::DeleteLog, segment::Segment};
 
 pub(crate) struct TxnEntity<'a> {
@@ -13,8 +17,14 @@ pub(crate) struct TxnEntity<'a> {
 }
 
 impl<'a> TxnEntity<'a> {
-    pub fn create(txn_id: usize) -> DiskStructResult<()> {
-        Ok(())
+    pub fn create(txn_id: usize) -> DiskStructResult<(Segment, DeleteLog)> {
+        let txn_path = format!("txn_{}", self.txn_id);
+        let seg_path = path.join(TRANSACTIONS).join(txn_path).join(SEGMENT);
+        let del_log_path = path.join(TRANSACTIONS).join(txn_path).join(DELETE_LOG);
+        DirBuilder::new().create(self.base_path.join(TRANSACTIONS).join(txn_path))?;
+        File::create(seg_path)?;
+        File::create(del_log_path)?;
+        Ok((Segment::new(seg_path), DeleteLog::new(del_log_path)))
     }
 }
 
