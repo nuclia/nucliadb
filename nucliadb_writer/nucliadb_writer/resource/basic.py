@@ -30,13 +30,13 @@ from nucliadb_protos.utils_pb2 import Relation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_models import RelationType
+from nucliadb_models.processing import PushPayload
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_writer.api.models import (
     ComminResourcePayload,
     CreateResourcePayload,
     UpdateResourcePayload,
 )
-from nucliadb_writer.processing import PushPayload
 
 
 def parse_basic_modify(

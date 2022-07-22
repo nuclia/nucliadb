@@ -40,6 +40,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request as StarletteRequest
 
+from nucliadb_models.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
@@ -58,7 +59,6 @@ from nucliadb_writer.exceptions import (
     LimitsExceededError,
     ResourceNotFound,
 )
-from nucliadb_writer.processing import PushPayload, Source
 from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.basic import parse_basic
 from nucliadb_writer.resource.field import parse_fields

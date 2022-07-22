@@ -28,6 +28,7 @@ from starlette.requests import Request
 
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.utils import get_driver
+from nucliadb_models.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
@@ -51,7 +52,6 @@ from nucliadb_writer.api.v1.router import (
     api,
 )
 from nucliadb_writer.exceptions import LimitsExceededError
-from nucliadb_writer.processing import PushPayload, Source
 from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.basic import (
     parse_basic,

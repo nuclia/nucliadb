@@ -155,7 +155,12 @@ async def test_search_resource(
     Create a resource that has every possible bit of information
     """
     message1 = broker_resource(knowledgebox)
-    await processor.process(message=message1, seqid=1)
+
+    return await inject_message(processor, knowledgebox, message1)
+
+
+async def inject_message(processor, knowledgebox, message):
+    await processor.process(message=message, seqid=1)
 
     # Make sure is indexed
     driver = await get_driver()
