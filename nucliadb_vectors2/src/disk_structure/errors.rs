@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub(crate) enum DiskStructError {
     IOErr(std::io::Error),
     BincodeErr(Box<bincode::ErrorKind>),

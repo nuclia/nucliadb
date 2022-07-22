@@ -103,6 +103,7 @@ impl<'a> DiskStructure {
 }
 
 mod tests {
+    use std::fs::File;
     use std::path::Path;
 
     use tempfile::tempdir;
@@ -117,7 +118,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
 
-        let _ = DiskStructure::new(dir_path.to_owned()).unwrap();
+        let _ = DiskStructure::new(&dir_path.to_owned()).unwrap();
 
         assert!(Path::new(&dir_path.join(DATABASE)).exists());
         assert!(Path::new(&dir_path.join(TRANSACTIONS)).exists());
@@ -132,10 +133,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
 
-        let create_struct = DiskStructure::new(dir_path.to_owned()).unwrap();
+        let create_struct = DiskStructure::new(dir_path).unwrap();
         drop(create_struct);
 
-        assert!(DiskStructure::new(dir_path.to_owned()).is_ok())
+        assert!(DiskStructure::new(dir_path).is_ok())
     }
 
     #[test]
@@ -143,31 +144,31 @@ mod tests {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
 
-        let create_struct = DiskStructure::new(dir_path.to_owned()).unwrap();
+        let create_struct = DiskStructure::new(dir_path).unwrap();
         drop(create_struct);
 
         std::fs::remove_file(dir_path.join(LOCK_FILE)).unwrap();
-        assert!(DiskStructure::new(dir_path.to_owned()).is_err());
+        assert!(DiskStructure::new(dir_path).is_err());
         let _ = std::fs::File::create(dir_path.join(LOCK_FILE)).unwrap();
 
         std::fs::remove_file(dir_path.join(STAMP)).unwrap();
-        assert!(DiskStructure::new(dir_path.to_owned()).is_err());
+        assert!(DiskStructure::new(dir_path).is_err());
         let _ = std::fs::File::create(dir_path.join(STAMP)).unwrap();
 
         std::fs::remove_file(dir_path.join(HNSW)).unwrap();
-        assert!(DiskStructure::new(dir_path.to_owned()).is_err());
+        assert!(DiskStructure::new(dir_path).is_err());
         let _ = std::fs::File::create(dir_path.join(HNSW)).unwrap();
 
         std::fs::remove_dir_all(dir_path.join(TRANSACTIONS)).unwrap();
-        assert!(DiskStructure::new(dir_path.to_owned()).is_err());
+        assert!(DiskStructure::new(dir_path).is_err());
         std::fs::DirBuilder::new()
             .create(dir_path.join(TRANSACTIONS))
             .unwrap();
-        assert!(DiskStructure::new(dir_path.to_owned()).is_err());
+        assert!(DiskStructure::new(dir_path).is_err());
         let _ = std::fs::File::create(dir_path.join(TRANSACTIONS).join(TXN_LOG)).unwrap();
 
         std::fs::remove_dir_all(dir_path.join(DATABASE)).unwrap();
-        assert!(DiskStructure::new(dir_path.to_owned()).is_err());
+        assert!(DiskStructure::new(dir_path).is_err());
     }
 
     #[test]
@@ -175,7 +176,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
 
-        let disk_struct = DiskStructure::new(dir_path.to_owned()).unwrap();
+        let disk_struct = DiskStructure::new(dir_path).unwrap();
         assert!(File::open(dir_path.join(LOCK_FILE)).is_err());
         std::mem::drop(disk_struct);
         assert!(File::open(dir_path.join(LOCK_FILE)).is_ok());
