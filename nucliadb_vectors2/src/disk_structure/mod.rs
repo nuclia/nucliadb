@@ -8,7 +8,7 @@
 // -> transactions/ $directory where the transactions are stored
 // -> txn_0/ $transaction with id 0
 // -> delete_log.bincode $file with the vectors deleted in this transaction
-// -> segment.bincode, $file with the vectors added in this transaction
+// -> segment.vectors, $file with the vectors added in this transaction
 // -> txn_1/
 // -> ...
 // -> log.bincode $file that will be used to identify which transactions where processed.
@@ -26,9 +26,7 @@
 // -> /* Only if a locked lock is provided */ given a txn id, get the delete log
 // -> /* Only if a locked lock is provided */ given a txn id, get the mmaped segment
 // -> /* Only if a locked lock is provided */ given a txn id and the delete log, write it
-// -> /* Only if a locked lock is provided */ given a txn id, create a new txn with a given id and return segment
-
-// and delete_log files ready to be writen to.
+// -> /* Only if a locked lock is provided */ given a txn id, create a new txn with a given id and return segment and delete_log files ready to be writen to.
 //
 //
 // types:
@@ -52,12 +50,7 @@ use std::{
 };
 use txn_entity::TxnEntity;
 
-use crate::database::LMDBStorage;
-use crate::delete_log::DeleteLog;
-use crate::hnsw::Hnsw;
-use crate::index::TransactionLog;
-use crate::lock::Lock;
-use crate::segment::Segment;
+use crate::{database::VectorDB, lock::Lock};
 
 use self::errors::DiskStructError;
 
@@ -80,7 +73,7 @@ pub(crate) trait DiskReadable<T> {
 pub(crate) struct DiskStructure {}
 
 impl<'a> DiskStructure {
-    pub fn new(path: PathBuf) -> DiskStructResult<LockedDiskStructure<'a>> {
+    pub fn new(path: &'a Path) -> DiskStructResult<LockedDiskStructure<'a>> {
         let lockfile = if path.exists() {
             if !(path.join(STAMP).exists()
                 && path.join(TRANSACTIONS).exists()
@@ -98,13 +91,13 @@ impl<'a> DiskStructure {
             DirBuilder::new().create(path.join(DATABASE))?;
             File::create(path.join(TXN_LOG))?;
             File::create(path.join(HNSW))?;
-            LMDBStorage::create(path.join(DATABASE).as_path());
+            VectorDB::create(path.join(DATABASE).as_path());
             File::create(path.join(STAMP))?;
             Lock::new(path.join(LOCK_FILE).as_path())
         };
         Ok(LockedDiskStructure {
             lockfile,
-            base_path: path.as_path(),
+            base_path: path,
         })
     }
 }

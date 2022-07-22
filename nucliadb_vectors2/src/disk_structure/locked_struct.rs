@@ -5,14 +5,14 @@ use std::path::Path;
 use super::errors::DiskStructResult;
 use super::txn_entity::TxnEntity;
 use super::{DiskReadable, DiskWritable, DATABASE, HNSW, TXN_LOG};
-use crate::database::LMDBStorage;
+use crate::database::VectorDB;
 use crate::hnsw::Hnsw;
 use crate::index::TransactionLog;
 use crate::lock::Lock;
 
 pub(crate) struct LockedDiskStructure<'a> {
-    lockfile: Lock,
-    base_path: &'a Path,
+    pub lockfile: Lock,
+    pub base_path: &'a Path,
 }
 
 impl<'a> LockedDiskStructure<'a> {
@@ -52,8 +52,8 @@ impl<'a> DiskWritable<TransactionLog> for LockedDiskStructure<'a> {
     }
 }
 
-impl<'a> DiskReadable<LMDBStorage> for LockedDiskStructure<'a> {
-    fn read(&self) -> DiskStructResult<LMDBStorage> {
-        Ok(LMDBStorage::open(self.base_path.join(DATABASE).as_path()))
+impl<'a> DiskReadable<VectorDB> for LockedDiskStructure<'a> {
+    fn read(&self) -> DiskStructResult<VectorDB> {
+        Ok(VectorDB::open(self.base_path.join(DATABASE).as_path()))
     }
 }

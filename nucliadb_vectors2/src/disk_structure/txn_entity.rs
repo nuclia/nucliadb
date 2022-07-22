@@ -1,22 +1,29 @@
-use std::{io::BufReader, path::Path};
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter},
+    path::Path,
+};
 
 use super::{errors::DiskStructResult, DiskReadable, DiskWritable, DELETE_LOG, SEGMENT};
 use crate::{delete_log::DeleteLog, segment::Segment};
 
 pub(crate) struct TxnEntity<'a> {
-    base_path: &'a Path,
-    txn_id: usize,
+    pub base_path: &'a Path,
+    pub txn_id: usize,
 }
 
 impl<'a> TxnEntity<'a> {
-    pub fn create() -> Segment {}
+    pub fn create(txn_id: usize) -> DiskStructResult<()> {
+        Ok(())
+    }
 }
 
 impl<'a> DiskReadable<Segment> for TxnEntity<'a> {
     fn read(&self) -> DiskStructResult<Segment> {
         let txn_path = format!("txn_{}", self.txn_id);
-        let reader = BufReader::new(File::open(self.base_path.join(SEGMENT).join(txn_path))?);
-        Ok(bincode::deserialize_from(reader)?)
+        Ok(Segment::new(
+            self.base_path.join(SEGMENT).join(txn_path).as_path(),
+        ))
     }
 }
 
