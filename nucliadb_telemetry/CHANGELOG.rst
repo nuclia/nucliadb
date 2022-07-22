@@ -23,7 +23,7 @@ CHANGELOG
 1.1.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Make sure flush is done
 
 
 1.1.3 (2022-07-20)
