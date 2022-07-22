@@ -19,25 +19,30 @@
 //
 
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
+use memmap2::Mmap;
 use serde::{Deserialize, Serialize};
 
 use crate::database::VectorDB;
-use crate::hnsw::{Hnsw, Node};
-use crate::segment::Segment;
+use crate::hnsw::Hnsw;
 
-pub struct NodeTracker {
-    temp: Vec<u8>,
-    segments: HashMap<usize, Segment>,
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub struct Location {
+    txn_id: usize,
+    slice: SegmentSlice,
 }
-impl NodeTracker {
-    pub fn find(&self, node: Node) -> &[u8] {
-        self.segments
-            .get(&node.segment)
-            .and_then(|segment| segment.get_vector(node.vector))
-            .unwrap_or(&self.temp)
-    }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct SegmentSlice {
+    pub start: u64,
+    pub end: u64,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub struct DeleteLog {
+    log: Vec<Location>,
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -45,8 +50,37 @@ pub struct TransactionLog {
     entries: Vec<usize>,
 }
 
+pub struct DataRetriever {
+    temp: Vec<u8>,
+    segments: HashMap<usize, Segment>,
+}
+impl DataRetriever {
+    pub fn find(&self, x: Location) -> &[u8] {
+        self.segments
+            .get(&x.txn_id)
+            .and_then(|segment| segment.get_vector(x.slice))
+            .unwrap_or(&self.temp)
+    }
+}
+
+pub struct Segment {
+    mmaped: Mmap,
+}
+impl Segment {
+    pub fn new(path: &Path) -> Segment {
+        let file = OpenOptions::new().read(true).open(path).unwrap();
+        Segment {
+            mmaped: unsafe { Mmap::map(&file).unwrap() },
+        }
+    }
+    pub fn get_vector(&self, slice: SegmentSlice) -> Option<&[u8]> {
+        let range = (slice.start as usize)..(slice.end as usize);
+        self.mmaped.get(range)
+    }
+}
+
 pub struct Index {
-    tracker: NodeTracker,
+    tracker: DataRetriever,
     database: VectorDB,
     hnsw: Hnsw,
 }

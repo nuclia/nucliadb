@@ -19,12 +19,10 @@
 //
 
 pub mod ops;
-use std::collections::HashMap;
-
+use crate::index::Location;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-
-use crate::segment::SegmentSlice;
+use std::collections::HashMap;
 
 pub mod params {
     pub fn level_factor() -> f64 {
@@ -51,8 +49,7 @@ pub struct EntryPoint {
 }
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
 pub struct Node {
-    pub segment: usize,
-    pub vector: SegmentSlice,
+    pub location: Location,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -67,14 +64,14 @@ pub struct GraphLayer {
 }
 
 impl GraphLayer {
-    pub fn new() -> GraphLayer {
+    fn new() -> GraphLayer {
         GraphLayer::default()
     }
-    pub fn add_node(&mut self, node: Node) {
+    fn add_node(&mut self, node: Node) {
         self.lout.entry(node).or_insert_with(HashMap::new);
         self.lin.entry(node).or_insert_with(HashMap::new);
     }
-    pub fn add_edge(&mut self, from: Node, edge: Edge, to: Node) {
+    fn add_edge(&mut self, from: Node, edge: Edge, to: Node) {
         self.lout
             .get_mut(&from)
             .and_then(|edges| edges.insert(to, edge));
@@ -82,37 +79,64 @@ impl GraphLayer {
             .get_mut(&to)
             .and_then(|edges| edges.insert(from, edge));
     }
-    pub fn remove_edge(&mut self, from: Node, to: Node) {
-        self.lout.get_mut(&from).and_then(|edges| edges.remove(&to));
-        self.lin.get_mut(&to).and_then(|edges| edges.remove(&from));
+    fn take_out_edges(&mut self, x: Node) -> Vec<(Node, f32)> {
+        self.lout
+            .get_mut(&x)
+            .map(std::mem::take)
+            .unwrap_or_default()
+            .into_iter()
+            .fold(vec![], |mut collector, (y, edge)| {
+                self.lin.get_mut(&y).and_then(|edges| edges.remove(&x));
+                collector.push((y, edge.dist));
+                collector
+            })
     }
-    pub fn has_node(&self, node: Node) -> bool {
+    fn take_in_edges(&mut self, x: Node) -> Vec<(Node, f32)> {
+        self.lin
+            .get_mut(&x)
+            .map(std::mem::take)
+            .unwrap_or_default()
+            .into_iter()
+            .fold(vec![], |mut collector, (y, edge)| {
+                self.lout.get_mut(&y).and_then(|edges| edges.remove(&x));
+                collector.push((y, edge.dist));
+                collector
+            })
+    }
+    fn has_node(&self, node: Node) -> bool {
         debug_assert_eq!(self.lout.contains_key(&node), self.lin.contains_key(&node));
         self.lout.contains_key(&node)
     }
-    pub fn get_out_edges(&self, node: Node) -> impl Iterator<Item = (&Node, &Edge)> {
+    fn get_out_edges(&self, node: Node) -> impl Iterator<Item = (&Node, &Edge)> {
         self.lout[&node].iter()
     }
-    pub fn get_in_edges(&self, node: Node) -> impl Iterator<Item = (&Node, &Edge)> {
+    fn no_out_edges(&self, node: Node) -> usize {
+        self.lout.get(&node).map_or(0, |v| v.len())
+    }
+    fn no_nodes(&self) -> usize {
+        self.lout.len()
+    }
+    fn first(&self) -> Option<Node> {
+        self.lout.keys().next().cloned()
+    }
+    fn is_empty(&self) -> bool {
+        self.lout.len() == 0
+    }
+    #[cfg(test)]
+    fn remove_edge(&mut self, from: Node, to: Node) {
+        self.lout.get_mut(&from).and_then(|edges| edges.remove(&to));
+        self.lin.get_mut(&to).and_then(|edges| edges.remove(&from));
+    }
+    #[cfg(test)]
+    fn get_in_edges(&self, node: Node) -> impl Iterator<Item = (&Node, &Edge)> {
         self.lin[&node].iter()
     }
-    pub fn get_edge(&self, from: Node, to: Node) -> Option<Edge> {
+    #[cfg(test)]
+    fn get_edge(&self, from: Node, to: Node) -> Option<Edge> {
         self.lout
             .get(&from)
             .and_then(|edges| edges.get(&to))
             .copied()
-    }
-    pub fn no_out_edges(&self, node: Node) -> usize {
-        self.lout.get(&node).map_or(0, |v| v.len())
-    }
-    pub fn no_nodes(&self) -> usize {
-        self.lout.len()
-    }
-    pub fn first(&self) -> Option<Node> {
-        self.lout.keys().next().cloned()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.lout.len() == 0
     }
 }
 
@@ -120,4 +144,32 @@ impl GraphLayer {
 pub struct Hnsw {
     pub entry_point: Option<EntryPoint>,
     pub layers: Vec<GraphLayer>,
+}
+
+impl Hnsw {
+    pub fn new() -> Hnsw {
+        Hnsw::default()
+    }
+    fn increase_layers_with(&mut self, x: Node, level: usize) -> &mut Self {
+        while self.layers.len() < level {
+            let mut new_layer = GraphLayer::new();
+            new_layer.add_node(x);
+            self.layers.push(new_layer);
+        }
+        self
+    }
+    fn remove_empty_layers(&mut self) -> &mut Self {
+        while self.layers.last().map(|l| l.is_empty()).unwrap_or_default() {
+            self.layers.pop();
+        }
+        self
+    }
+    fn update_entry_point(&mut self) -> &mut Self {
+        self.entry_point = self
+            .layers
+            .last()
+            .and_then(|l| l.first().map(|node| (node, self.layers.len())))
+            .map(|(node, layer)| EntryPoint { node, layer });
+        self
+    }
 }

@@ -17,6 +17,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use crate::segment::SegmentSlice;
 use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub struct Location {
+    txn_id: usize,
+    slice: SegmentSlice,
+}
+
 #[derive(Default, Serialize, Deserialize)]
-pub struct DeleteLog;
+pub struct DeleteLog {
+    log: Vec<Location>,
+}

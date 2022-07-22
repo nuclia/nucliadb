@@ -19,10 +19,8 @@
 //
 
 pub mod database;
-pub mod delete_log;
 pub mod disk_structure;
 pub mod hnsw;
 pub mod index;
 pub mod lock;
-pub mod segment;
 pub mod vector;
