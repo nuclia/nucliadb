@@ -1177,25 +1177,62 @@ global___FieldDatetime = FieldDatetime
 
 class FieldFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    class HeadersEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: typing.Text
+        value: typing.Text
+        def __init__(self,
+            *,
+            key: typing.Text = ...,
+            value: typing.Text = ...,
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
+
+    class CookiesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: typing.Text
+        value: typing.Text
+        def __init__(self,
+            *,
+            key: typing.Text = ...,
+            value: typing.Text = ...,
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
+
     ADDED_FIELD_NUMBER: builtins.int
     FILE_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
     PASSWORD_FIELD_NUMBER: builtins.int
+    URL_FIELD_NUMBER: builtins.int
+    HEADERS_FIELD_NUMBER: builtins.int
+    COOKIES_FIELD_NUMBER: builtins.int
     @property
     def added(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
     def file(self) -> global___CloudFile: ...
     language: typing.Text
     password: typing.Text
+    url: typing.Text
+    @property
+    def headers(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]: ...
+    @property
+    def cookies(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]: ...
     def __init__(self,
         *,
         added: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
         file: typing.Optional[global___CloudFile] = ...,
         language: typing.Text = ...,
         password: typing.Text = ...,
+        url: typing.Text = ...,
+        headers: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
+        cookies: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["added",b"added","file",b"file"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added",b"added","file",b"file","language",b"language","password",b"password"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["added",b"added","cookies",b"cookies","file",b"file","headers",b"headers","language",b"language","password",b"password","url",b"url"]) -> None: ...
 global___FieldFile = FieldFile
 
 class Entity(google.protobuf.message.Message):

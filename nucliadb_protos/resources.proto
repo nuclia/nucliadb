@@ -323,6 +323,9 @@ message FieldFile {
     CloudFile file = 2;
     string language = 3;
     string password = 4;
+    string url = 5;
+    map<string, string> headers = 6;
+    map<string, string> cookies = 7;
 }
 
 
