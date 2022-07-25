@@ -22,7 +22,7 @@ from typing import Dict, Optional, Union
 from pydantic import BaseModel, validator
 
 import nucliadb_models as models
-from nucliadb_utils.processing import PushProcessingOptions
+from nucliadb_ingest.processing import PushProcessingOptions
 
 
 class CreateResourcePayload(BaseModel):

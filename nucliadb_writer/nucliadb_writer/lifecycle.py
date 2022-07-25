@@ -20,10 +20,10 @@
 import logging
 import sys
 
+from nucliadb_ingest.processing import ProcessingEngine
 from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.partition import PartitionUtility
-from nucliadb_utils.processing import ProcessingEngine
 from nucliadb_utils.settings import (
     nuclia_settings,
     running_settings,

@@ -27,11 +27,11 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
 import nucliadb_models as models
+from nucliadb_ingest.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
-from nucliadb_utils.processing import PushPayload, Source
 from nucliadb_utils.utilities import get_partitioning, get_transaction
 from nucliadb_writer.api.models import ResourceFieldAdded
 from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
