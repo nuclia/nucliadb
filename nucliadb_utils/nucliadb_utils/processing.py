@@ -29,9 +29,9 @@ from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 
 from nucliadb_models.file import FileField
 from nucliadb_models.processing import PushPayload
+from nucliadb_utils import logger
+from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_writer import logger
-from nucliadb_writer.exceptions import LimitsExceededError, SendToProcessError
 
 
 class ProcessingEngine:

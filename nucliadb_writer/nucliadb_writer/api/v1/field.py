@@ -31,10 +31,10 @@ from nucliadb_models.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_partitioning, get_transaction
 from nucliadb_writer.api.models import ResourceFieldAdded
 from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
-from nucliadb_writer.exceptions import LimitsExceededError
 from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.field import (
     parse_conversation_field,

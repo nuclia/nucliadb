@@ -40,10 +40,12 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request as StarletteRequest
 
+from nucliadb_ingest.orm.utils import set_title
 from nucliadb_models.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
+from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_ingest,
@@ -56,7 +58,6 @@ from nucliadb_writer.api.models import CreateResourcePayload
 from nucliadb_writer.exceptions import (
     ConflictError,
     IngestNotAvailable,
-    LimitsExceededError,
     ResourceNotFound,
 )
 from nucliadb_writer.resource.audit import parse_audit
@@ -653,7 +654,7 @@ async def store_file_on_nuclia_db(
         )
 
     if override_resource_title and filename is not None:
-        writer.basic.title = filename
+        set_title(writer, toprocess, filename)
     writer.basic.icon = content_type
     writer.basic.created.FromDatetime(datetime.now())
 
