@@ -34,6 +34,8 @@ class WidgetFeatures(BaseModel):
     suggestEntities: bool = False
     suggestSentences: bool = False
     suggestParagraphs: bool = False
+    suggestLabels: bool = False
+    editLabels: bool = False
 
 
 class Widget(BaseModel):
