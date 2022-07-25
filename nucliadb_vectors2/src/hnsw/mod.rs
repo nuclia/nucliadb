@@ -19,10 +19,12 @@
 //
 
 pub mod ops;
-use crate::index::Location;
+use std::collections::HashMap;
+
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use crate::index::Location;
 
 pub mod params {
     pub fn level_factor() -> f64 {

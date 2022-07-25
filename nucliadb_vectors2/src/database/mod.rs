@@ -18,14 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use crate::hnsw::*;
+use std::path::Path;
+
 use heed::flags::Flags;
 use heed::types::{SerdeBincode, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions};
-pub use heed::{RoIter, RoPrefix, RoTxn, RwTxn};
-use std::path::Path;
+pub use heed::{Error as DBErr, RoIter, RoPrefix, RoTxn, RwTxn};
 
-pub use heed::Error as DBErr;
+use crate::hnsw::*;
 
 mod db_names {
     pub const DB_NODES: &str = "NODES";

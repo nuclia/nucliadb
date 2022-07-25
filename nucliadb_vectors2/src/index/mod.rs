@@ -28,26 +28,32 @@ use serde::{Deserialize, Serialize};
 use crate::database::VectorDB;
 use crate::hnsw::Hnsw;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
-pub struct Location {
-    txn_id: usize,
-    slice: SegmentSlice,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SegmentSlice {
     pub start: u64,
     pub end: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
+pub struct Location {
+    pub txn_id: usize,
+    pub slice: SegmentSlice,
+}
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeleteLog {
-    log: Vec<Location>,
+    pub log: Vec<Location>,
 }
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct TransactionLog {
-    entries: Vec<usize>,
+    pub entries: Vec<usize>,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+pub struct State {
+    transaction_log: TransactionLog,
+    hnsw: Hnsw,
 }
 
 pub struct DataRetriever {
@@ -67,11 +73,10 @@ pub struct Segment {
     mmaped: Mmap,
 }
 impl Segment {
-    pub fn new(path: &Path) -> Segment {
-        let file = OpenOptions::new().read(true).open(path).unwrap();
-        Segment {
-            mmaped: unsafe { Mmap::map(&file).unwrap() },
-        }
+    pub fn new<T: AsRef<Path>>(path: T) -> std::io::Result<Segment> {
+        let file = OpenOptions::new().read(true).open(path)?;
+        let mmaped = unsafe { Mmap::map(&file)? };
+        Ok(Segment { mmaped })
     }
     pub fn get_vector(&self, slice: SegmentSlice) -> Option<&[u8]> {
         let range = (slice.start as usize)..(slice.end as usize);

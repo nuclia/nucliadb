@@ -1,33 +1,31 @@
-/*
-    TODO: 
-        -> Segment writing
-        -> txn_creation
-        -> workflow tests
-*/
+// TODO:
+// -> workflow tests
 
-use crate::database::{DBErr, VectorDB};
-use crate::hnsw::Hnsw;
-use crate::index::*;
-use fs2::FileExt;
 use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
+
+use fs2::FileExt;
 use thiserror::Error;
+use tracing::*;
+
+use crate::database::{DBErr, VectorDB};
+use crate::index::*;
 
 const LOCK_FILE: &str = "dir.lock";
-const HNSW: &str = "hnsw.bincode";
+const STATE: &str = "state.bincode";
+const TEMP_STATE: &str = "temp.bincode";
 const STAMP: &str = "stamp.nuclia";
-const TXN_LOG: &str = "log.bincode";
 const TRANSACTIONS: &str = "transactions";
+const DATABASE: &str = "database";
 const SEGMENT: &str = "segment.vectors";
 const DELETE_LOG: &str = "delete_log.bincode";
-const DATABASE: &str = "database";
 
 pub type DiskResult<T> = Result<T, DiskError>;
-pub trait DiskWritable<T> {
+pub trait DiskWriter<T> {
     fn write(&self, data: &T) -> DiskResult<()>;
 }
-pub trait DiskReadable<T> {
+pub trait DiskReader<T> {
     fn read(&self) -> DiskResult<T>;
 }
 
@@ -57,151 +55,229 @@ impl Lock {
     }
 }
 
-pub struct TxnEntity<'a> {
-    pub base_path: &'a Path,
-    pub txn_id: usize,
+pub struct TxnFiles {
+    pub segment: File,
+    pub delete_log: File,
 }
 
-impl<'a> TxnEntity<'a> {
-    pub fn create(base_path: &Path, txn_id: usize) -> DiskResult<TxnEntity> {
-        let txn_ent = TxnEntity { base_path, txn_id };
-        let txn_path = format!("txn_{}", txn_id);
-        let seg_path = base_path
-            .join(TRANSACTIONS)
-            .join(txn_path.clone())
-            .join(SEGMENT);
-        let del_log_path = base_path
-            .join(TRANSACTIONS)
-            .join(txn_path.clone())
-            .join(DELETE_LOG);
-        DirBuilder::new().create(base_path.join(TRANSACTIONS).join(txn_path))?;
-        File::create(seg_path)?;
-        File::create(del_log_path)?;
-        txn_ent.write(&DeleteLog::default())?;
-        Ok(txn_ent)
+pub struct WToken<'a> {
+    disk: DiskStructure<'a>,
+}
+
+impl<'a> WToken<'a> {
+    fn borrow_abort(&self) -> DiskResult<()> {
+        let temp = self.disk.base_path.join(TEMP_STATE);
+        if temp.exists() {
+            std::fs::remove_file(&temp)?;
+        }
+        Ok(())
     }
-}
-
-impl<'a> DiskReadable<Segment> for TxnEntity<'a> {
-    fn read(&self) -> DiskResult<Segment> {
-        let txn_path = format!("txn_{}", self.txn_id);
-        Ok(Segment::new(
-            self.base_path.join(SEGMENT).join(txn_path).as_path(),
-        ))
+    fn borrow_flush(&self) -> DiskResult<()> {
+        let new = self.disk.base_path.join(TEMP_STATE);
+        let old = self.disk.base_path.join(STATE);
+        if new.exists() {
+            std::fs::remove_file(&old)?;
+            std::fs::rename(&new, &old)?;
+        }
+        Ok(())
     }
-}
-
-impl<'a> DiskReadable<DeleteLog> for TxnEntity<'a> {
-    fn read(&self) -> DiskResult<DeleteLog> {
-        let txn_path = format!("txn_{}", self.txn_id);
-        let reader = BufReader::new(File::open(self.base_path.join(DELETE_LOG).join(txn_path))?);
-        Ok(bincode::deserialize_from(reader)?)
-    }
-}
-
-impl<'a> DiskWritable<DeleteLog> for TxnEntity<'a> {
-    fn write(&self, data: &DeleteLog) -> DiskResult<()> {
-        let txn_path = format!("txn_{}", self.txn_id);
-        let writer = BufWriter::new(File::open(self.base_path.join(DELETE_LOG).join(txn_path))?);
+    pub fn write_state(&self, data: &State) -> DiskResult<()> {
+        let writer = BufWriter::new(File::create(self.disk.base_path.join(TEMP_STATE))?);
         bincode::serialize_into(writer, &data)?;
         Ok(())
     }
+    pub fn abort(self) -> DiskResult<DiskStructure<'a>> {
+        self.borrow_abort()?;
+        Ok(self.disk)
+    }
+    pub fn flush(self) -> DiskResult<DiskStructure<'a>> {
+        self.borrow_flush()?;
+        Ok(self.disk)
+    }
 }
+
 pub struct DiskStructure<'a> {
-    pub lock: Lock,
-    pub base_path: &'a Path,
+    lock: Lock,
+    base_path: &'a Path,
 }
 
 impl<'a> DiskStructure<'a> {
-    pub fn new(path: &'a Path) -> DiskResult<DiskStructure<'a>> {
-        let lock = if !path.join(STAMP).exists() {
-            DirBuilder::new().create(path.join(TRANSACTIONS))?;
-            DirBuilder::new().create(path.join(DATABASE))?;
-            File::create(path.join(TXN_LOG))?;
-            File::create(path.join(HNSW))?;
-            VectorDB::new(path.join(DATABASE))?;
-            File::create(path.join(STAMP))?;
-            Lock::new(path.join(LOCK_FILE))?
-        } else {
-            Lock::new(path.join(LOCK_FILE).as_path())?
-        };
-        Ok(DiskStructure {
-            lock,
-            base_path: path,
-        })
+    fn transaction_path(&self, id: usize) -> PathBuf {
+        self.base_path.join(TRANSACTIONS).join(&format!("txn_{id}"))
     }
-    pub fn get_txn(&self, txn_id: usize) -> TxnEntity {
-        TxnEntity {
-            txn_id,
-            base_path: self.base_path,
+
+    pub fn new(path: &'a Path) -> DiskResult<DiskStructure<'a>> {
+        use std::io::{Error, ErrorKind};
+        let base_path = path;
+        if path.join(TEMP_STATE).exists() {
+            Err(Error::new(ErrorKind::InvalidData, "temporal file exits").into())
+        } else if path.join(STAMP).exists() {
+            let lock = Lock::new(base_path.join(LOCK_FILE).as_path())?;
+            Ok(DiskStructure { lock, base_path })
+        } else {
+            DirBuilder::new().create(base_path.join(TRANSACTIONS))?;
+            DirBuilder::new().create(base_path.join(DATABASE))?;
+            let lock = Lock::new(base_path.join(LOCK_FILE))?;
+            let _db = VectorDB::new(base_path.join(DATABASE))?;
+            let _stamp = File::create(base_path.join(STAMP))?;
+            let _state = File::create(base_path.join(STATE))?;
+            let disk = DiskStructure { lock, base_path };
+            let wtoken = disk.wtoken();
+            wtoken.write_state(&State::default())?;
+            Ok(wtoken.flush()?)
         }
     }
-}
-
-impl<'a> DiskReadable<Hnsw> for DiskStructure<'a> {
-    fn read(&self) -> DiskResult<Hnsw> {
-        let reader = BufReader::new(File::open(self.base_path.join(HNSW))?);
+    pub fn create_txn(&self, txn_id: usize) -> DiskResult<TxnFiles> {
+        let base_path = self.transaction_path(txn_id);
+        DirBuilder::new().create(&base_path)?;
+        let seg_path = base_path.join(SEGMENT);
+        let del_log_path = base_path.join(DELETE_LOG);
+        let segment = File::create(seg_path)?;
+        let delete_log = File::create(del_log_path)?;
+        Ok(TxnFiles {
+            segment,
+            delete_log,
+        })
+    }
+    pub fn get_segment(&self, txn_id: usize) -> DiskResult<Segment> {
+        let path = self.transaction_path(txn_id).join(SEGMENT);
+        Ok(Segment::new(path)?)
+    }
+    pub fn get_delete_log(&self, txn_id: usize) -> DiskResult<DeleteLog> {
+        let path = self.transaction_path(txn_id).join(DELETE_LOG);
+        let reader = BufReader::new(File::open(path)?);
         Ok(bincode::deserialize_from(reader)?)
     }
-}
-
-impl<'a> DiskWritable<Hnsw> for DiskStructure<'a> {
-    fn write(&self, data: &Hnsw) -> DiskResult<()> {
-        let writer = BufWriter::new(File::open(self.base_path.join(HNSW))?);
-        bincode::serialize_into(writer, &data)?;
-        Ok(())
-    }
-}
-
-impl<'a> DiskReadable<TransactionLog> for DiskStructure<'a> {
-    fn read(&self) -> DiskResult<TransactionLog> {
-        let reader = BufReader::new(File::open(self.base_path.join(TXN_LOG))?);
-        Ok(bincode::deserialize_from(reader)?)
-    }
-}
-
-impl<'a> DiskWritable<TransactionLog> for DiskStructure<'a> {
-    fn write(&self, data: &TransactionLog) -> DiskResult<()> {
-        let writer = BufWriter::new(File::open(self.base_path.join(TXN_LOG))?);
-        bincode::serialize_into(writer, &data)?;
-        Ok(())
-    }
-}
-
-impl<'a> DiskReadable<VectorDB> for DiskStructure<'a> {
-    fn read(&self) -> DiskResult<VectorDB> {
+    pub fn get_db(&self) -> DiskResult<VectorDB> {
         Ok(VectorDB::new(self.base_path.join(DATABASE))?)
+    }
+    pub fn get_state(&self) -> DiskResult<State> {
+        let reader = BufReader::new(File::open(self.base_path.join(STATE))?);
+        Ok(bincode::deserialize_from(reader)?)
+    }
+    pub fn wtoken(self) -> WToken<'a> {
+        WToken { disk: self }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{DiskReadable, DiskStructure, DiskWritable, Lock};
-    use crate::disk_structure::{DATABASE, HNSW, LOCK_FILE, STAMP, TRANSACTIONS, TXN_LOG};
-    use crate::hnsw::Hnsw;
-    use crate::index::DeleteLog;
     use std::fs::File;
     use std::path::Path;
+
     use tempfile::tempdir;
+
+    use super::*;
+    use crate::hnsw::Hnsw;
+    use crate::index::DeleteLog;
 
     #[test]
     fn create() {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
-        let _ = DiskStructure::new(dir_path).unwrap();
-        assert!(Path::new(&dir_path.join(DATABASE)).exists());
-        assert!(Path::new(&dir_path.join(TRANSACTIONS)).exists());
-        assert!(Path::new(&dir_path.join(TXN_LOG)).exists());
-        assert!(Path::new(&dir_path.join(HNSW)).exists());
-        assert!(Path::new(&dir_path.join(LOCK_FILE)).exists());
-        assert!(Path::new(&dir_path.join(STAMP)).exists());
+        let disk = DiskStructure::new(dir_path).unwrap();
+        assert!(dir_path.join(DATABASE).is_dir());
+        assert!(dir_path.join(TRANSACTIONS).is_dir());
+        assert!(dir_path.join(STATE).is_file());
+        assert!(dir_path.join(STATE).is_file());
+        assert!(dir_path.join(LOCK_FILE).is_file());
+        assert!(dir_path.join(STAMP).is_file());
+        disk.get_state().unwrap();
+        disk.get_db().unwrap();
+        assert!(disk.get_segment(0).is_err());
+        assert!(disk.get_delete_log(0).is_err());
     }
     #[test]
-    fn open() {
+    fn open_new() {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
-        let create_struct = DiskStructure::new(dir_path).unwrap();
-        drop(create_struct);
-        assert!(DiskStructure::new(dir_path).is_ok())
+        DiskStructure::new(dir_path).unwrap();
+        DiskStructure::new(dir_path).unwrap();
+    }
+    #[test]
+    fn create_txn() {
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
+        let disk = DiskStructure::new(dir_path).unwrap();
+        let mut wtxn = disk.create_txn(0).unwrap();
+        bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
+        drop(wtxn);
+        let mut wtxn = disk.create_txn(1).unwrap();
+        bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
+        drop(wtxn);
+
+        assert!(disk.transaction_path(0).is_dir());
+        assert!(disk.transaction_path(0).join(SEGMENT).is_file());
+        assert!(disk.transaction_path(0).join(DELETE_LOG).is_file());
+        disk.get_segment(0).unwrap();
+        disk.get_delete_log(0).unwrap();
+
+        assert!(disk.transaction_path(1).is_dir());
+        assert!(disk.transaction_path(1).join(SEGMENT).is_file());
+        assert!(disk.transaction_path(1).join(DELETE_LOG).is_file());
+        disk.get_segment(1).unwrap();
+        disk.get_delete_log(1).unwrap();
+    }
+    #[test]
+    fn abort_write_token() {
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
+        let disk = DiskStructure::new(dir_path).unwrap();
+        let state = std::fs::metadata(disk.base_path.join(STATE)).unwrap();
+        let start = state.modified().unwrap();
+        let token = disk.wtoken();
+
+        token.write_state(&State::default()).unwrap();
+        assert!(dir_path.join(TEMP_STATE).is_file());
+        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
+        let mod1 = state.modified().unwrap();
+        assert_eq!(start, mod1);
+
+        token.write_state(&State::default()).unwrap();
+        assert!(dir_path.join(TEMP_STATE).is_file());
+        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
+        let mod2 = state.modified().unwrap();
+        assert_eq!(start, mod2);
+
+        token.abort().unwrap();
+        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
+        let abort = state.modified().unwrap();
+        assert_eq!(abort, mod1);
+        assert!(!dir_path.join(TEMP_STATE).exists());
+    }
+
+    #[test]
+    fn flush_write_token() {
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
+        let disk = DiskStructure::new(dir_path).unwrap();
+        let state = std::fs::metadata(disk.base_path.join(STATE)).unwrap();
+        let start = state.modified().unwrap();
+        let token = disk.wtoken();
+
+        token.write_state(&State::default()).unwrap();
+        token.flush().unwrap();
+        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
+        let mod1 = state.modified().unwrap();
+        assert!(!dir_path.join(TEMP_STATE).exists());
+        assert!(start < mod1);
+    }
+
+    #[test]
+    fn sudden_abort() {
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
+        let disk = DiskStructure::new(dir_path).unwrap();
+        let token = disk.wtoken();
+        token.write_state(&State::default()).unwrap();
+        std::mem::drop(token); // leaves inconsistent state
+        assert!(dir_path.join(TEMP_STATE).is_file());
+        assert!(dir_path.join(STATE).is_file());
+        match DiskStructure::new(dir_path) {
+            Err(DiskError::IOErr(err)) => {
+                assert_eq!(err.kind(), std::io::ErrorKind::InvalidData)
+            }
+            _ => panic!(),
+        }
     }
 }
