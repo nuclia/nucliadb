@@ -23,7 +23,7 @@ from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional
 
 import aiohttp
-import jwt
+import jwt  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 
