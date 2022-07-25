@@ -26,8 +26,8 @@ from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.orm.node import Node
 from nucliadb_ingest.settings import settings as ingest_settings
-from nucliadb_models.processing import PushPayload
 from nucliadb_models.text import PushTextFormat, Text
+from nucliadb_utils.processing import PushPayload
 from nucliadb_utils.settings import indexing_settings
 
 KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver

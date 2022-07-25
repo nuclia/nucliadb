@@ -28,9 +28,9 @@ from nucliadb_ingest.fields.conversation import Conversation
 from nucliadb_ingest.orm.resource import Resource as ORMResource
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import PushConversation
-from nucliadb_models.processing import PushPayload
 from nucliadb_models.resource import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2
+from nucliadb_utils.processing import PushPayload
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
 from nucliadb_writer.api.models import CreateResourcePayload, UpdateResourcePayload

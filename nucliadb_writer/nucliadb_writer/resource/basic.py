@@ -31,8 +31,8 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest.orm.utils import set_title
 from nucliadb_models import RelationType
-from nucliadb_models.processing import PushPayload
 from nucliadb_models.text import PushTextFormat, Text
+from nucliadb_utils.processing import PushPayload
 from nucliadb_writer.api.models import (
     ComminResourcePayload,
     CreateResourcePayload,

@@ -41,11 +41,11 @@ from nucliadb_protos.writer_pb2 import (
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb_ingest.orm.utils import set_title
-from nucliadb_models.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError
+from nucliadb_utils.processing import PushPayload, Source
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_ingest,
