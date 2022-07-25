@@ -27,7 +27,8 @@ import jwt
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 
-import nucliadb_models as models
+from nucliadb_models.file import FileField
+from nucliadb_models.processing import PushPayload
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_writer import logger
 from nucliadb_writer.exceptions import LimitsExceededError, SendToProcessError
@@ -146,7 +147,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
-    async def convert_filefield_to_str(self, file: models.FileField) -> str:
+    async def convert_filefield_to_str(self, file: FileField) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
         headers["X-PASSWORD"] = file.password
@@ -212,7 +213,7 @@ class ProcessingEngine:
 
         return jwt
 
-    async def send_to_process(self, item: models.PushPayload, partition: int) -> int:
+    async def send_to_process(self, item: PushPayload, partition: int) -> int:
         if self.dummy:
             self.calls.append(item.dict())
             return 1
