@@ -212,9 +212,7 @@ class ProcessingEngine:
 
         return jwt
 
-    async def send_to_process(
-        self, item: models.processing.PushPayload, partition: int
-    ) -> int:
+    async def send_to_process(self, item: models.PushPayload, partition: int) -> int:
         if self.dummy:
             self.calls.append(item.dict())
             return 1

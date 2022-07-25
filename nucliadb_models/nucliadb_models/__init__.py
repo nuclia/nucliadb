@@ -31,6 +31,7 @@ from .keywordset import *  # noqa
 from .layout import *  # noqa
 from .link import *  # noqa
 from .metadata import *  # noqa
+from .processing import PushPayload  # noqa
 from .text import *  # noqa
 
 logger = logging.getLogger("nucliadb_models")
