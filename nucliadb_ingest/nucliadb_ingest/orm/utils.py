@@ -19,12 +19,15 @@
 
 from typing import Optional
 
-from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.orm.node import Node
+from nucliadb_ingest.processing import PushPayload
 from nucliadb_ingest.settings import settings as ingest_settings
+from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_utils.settings import indexing_settings
 
 KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
@@ -57,3 +60,13 @@ async def get_basic(txn: Transaction, kbid: str, uuid: str) -> Optional[bytes]:
     else:
         raw_basic = await txn.get(KB_RESOURCE_BASIC.format(kbid=kbid, uuid=uuid))
     return raw_basic
+
+
+def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
+    writer.basic.title = title
+    etw = ExtractedTextWrapper()
+    etw.field.field = "title"
+    etw.field.field_type = FieldType.GENERIC
+    etw.body.text = title
+    writer.extracted_text.append(etw)
+    toprocess.genericfield["title"] = Text(body=title, format=PushTextFormat.PLAIN)

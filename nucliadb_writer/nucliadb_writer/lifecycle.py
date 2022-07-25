@@ -20,6 +20,7 @@
 import logging
 import sys
 
+from nucliadb_ingest.processing import ProcessingEngine
 from nucliadb_ingest.utils import start_ingest, stop_ingest
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.partition import PartitionUtility
@@ -32,7 +33,6 @@ from nucliadb_utils.settings import (
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import Utility, get_transaction, set_utility
 from nucliadb_writer import SERVICE_NAME, logger
-from nucliadb_writer.processing import ProcessingEngine
 from nucliadb_writer.tus import finalize as storage_finalize
 from nucliadb_writer.tus import initialize as storage_initialize
 from nucliadb_writer.utilities import get_processing

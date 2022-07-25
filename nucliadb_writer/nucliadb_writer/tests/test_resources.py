@@ -26,7 +26,7 @@ from httpx import AsyncClient
 
 import nucliadb_models
 from nucliadb_ingest.orm.resource import Resource
-from nucliadb_models.processing import PushPayload
+from nucliadb_ingest.processing import PushPayload
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb_writer.tests.test_fields import (

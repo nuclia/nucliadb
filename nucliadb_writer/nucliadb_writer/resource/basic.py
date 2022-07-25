@@ -29,8 +29,9 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Relation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_ingest.orm.utils import set_title
+from nucliadb_ingest.processing import PushPayload
 from nucliadb_models import RelationType
-from nucliadb_models.processing import PushPayload
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_writer.api.models import (
     ComminResourcePayload,
@@ -44,15 +45,7 @@ def parse_basic_modify(
 ):
     bm.basic.modified.FromDatetime(datetime.now())
     if item.title:
-        bm.basic.title = item.title
-        etw = ExtractedTextWrapper()
-        etw.field.field = "title"
-        etw.field.field_type = FieldType.GENERIC
-        etw.body.text = item.title
-        bm.extracted_text.append(etw)
-        toprocess.genericfield["title"] = Text(
-            body=item.title, format=PushTextFormat.PLAIN
-        )
+        set_title(bm, toprocess, item.title)
     if item.summary:
         bm.basic.summary = item.summary
         etw = ExtractedTextWrapper()

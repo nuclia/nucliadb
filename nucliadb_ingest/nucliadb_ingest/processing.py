@@ -20,18 +20,72 @@
 import datetime
 import uuid
 from contextlib import AsyncExitStack
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import aiohttp
-import jwt
+import jwt  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
+from pydantic import BaseModel, Field
 
-from nucliadb_models.file import FileField
-from nucliadb_models.processing import PushPayload
+import nucliadb_models as models
+from nucliadb_utils import logger
+from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_writer import logger
-from nucliadb_writer.exceptions import LimitsExceededError, SendToProcessError
+
+if TYPE_CHECKING:
+    SourceValue = CloudFile.Source.V
+else:
+    SourceValue = int
+
+
+class Source(SourceValue, Enum):  # type: ignore
+    HTTP = 0
+    INGEST = 1
+
+
+class PushProcessingOptions(BaseModel):
+    # Enable ML processing
+    ml_text: Optional[bool] = True
+
+
+class PushPayload(BaseModel):
+    # There are multiple options of payload
+    uuid: str
+    slug: Optional[str] = None
+    kbid: str
+    source: Optional[Source] = None
+    userid: str
+
+    genericfield: Dict[str, models.Text] = {}
+
+    # New File
+    filefield: Dict[str, str] = {}
+
+    # New Link
+    linkfield: Dict[str, models.LinkUpload] = {}
+
+    # Diff on Text Field
+    textfield: Dict[str, models.Text] = {}
+
+    # Diff on a Layout Field
+    layoutfield: Dict[str, models.LayoutDiff] = {}
+
+    # New conversations to process
+    conversationfield: Dict[str, models.PushConversation] = {}
+
+    # Only internal
+    partition: int
+
+    # List of available processing options (with default values)
+    processing_options: Optional[PushProcessingOptions] = Field(
+        default_factory=PushProcessingOptions
+    )
+
+
+class PushResponse(BaseModel):
+    seqid: Optional[int] = None
 
 
 class ProcessingEngine:
@@ -147,7 +201,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
-    async def convert_filefield_to_str(self, file: FileField) -> str:
+    async def convert_filefield_to_str(self, file: models.FileField) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
         headers["X-PASSWORD"] = file.password

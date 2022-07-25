@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_ingest.processing import ProcessingEngine
 from nucliadb_utils.utilities import Utility, get_utility
-from nucliadb_writer.processing import ProcessingEngine
 
 
 def get_processing() -> ProcessingEngine:
