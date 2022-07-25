@@ -180,6 +180,10 @@ pub mod widget {
         pub suggest_sentences: bool,
         #[prost(bool, tag="4")]
         pub suggest_paragraphs: bool,
+        #[prost(bool, tag="5")]
+        pub suggest_labels: bool,
+        #[prost(bool, tag="6")]
+        pub edit_labels: bool,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]

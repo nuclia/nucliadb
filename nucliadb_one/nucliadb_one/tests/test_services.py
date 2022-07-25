@@ -42,6 +42,8 @@ async def test_widget_service(
                 "suggestEntities": True,
                 "suggestSentences": True,
                 "suggestParagraphs": True,
+                "suggestLabels": True,
+                "editLabels": True,
             },
             "filters": ["filter1"],
             "topEntities": ["entity1"],
