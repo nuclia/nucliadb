@@ -27,7 +27,7 @@ from pydantic.class_validators import root_validator
 
 from nucliadb_protos import resources_pb2
 
-from .common import Classification, FieldID, Paragraph
+from .common import Classification, FieldID
 
 _T = TypeVar("_T")
 
@@ -184,9 +184,14 @@ class TokenSplit(BaseModel):
     klass: Optional[str]
 
 
+class ParagraphAnnotation(BaseModel):
+    classifications: List[Classification] = []
+    key: str
+
+
 class UserFieldMetadata(BaseModel):
     token: Optional[List[TokenSplit]]
-    paragraphs: Optional[List[Paragraph]]
+    paragraphs: Optional[List[ParagraphAnnotation]]
     field: Optional[FieldID]
 
 

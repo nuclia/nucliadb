@@ -57,6 +57,20 @@ async def test_resource_crud(writer_api, knowledgebox_writer):
                     "language": "en",
                     "metadata": {"key1": "value1", "key2": "value2"},
                 },
+                "fieldmetadata": [
+                    {
+                        "paragraphs": [
+                            {
+                                "key": "paragraph1",
+                                "classifications": [
+                                    {"labelset": "ls1", "label": "label1"}
+                                ],
+                            }
+                        ],
+                        "token": [{"token": "token1", "klass": "klass1"}],
+                        "field": {"field": "text1", "field_type": "text"},
+                    }
+                ],
                 "usermetadata": {
                     "classifications": [{"labelset": "ls1", "label": "label1"}],
                     "relations": [

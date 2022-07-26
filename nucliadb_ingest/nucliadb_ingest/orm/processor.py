@@ -194,7 +194,7 @@ class Processor:
         txn = await self.driver.begin()
         kbid = messages[0].kbid
         if not await KnowledgeBox.exist_kb(txn, kbid):
-            logger.warn(f"KB {kbid} is deleted: skiping txn")
+            logger.warning(f"KB {kbid} is deleted: skiping txn")
             await txn.commit(partition, seqid)
             return None
 

@@ -45,14 +45,14 @@ DOWNLOAD_URI = (
 
 class FieldID(BaseModel):
     class FieldType(Enum):
-        FILE = "FILE"
-        LINK = "LINK"
-        DATETIME = "DATETIME"
-        KEYWORDSET = "KEYWORDSET"
-        TEXT = "TEXT"
-        LAYOUT = "LAYOUT"
-        GENERIC = "GENERIC"
-        CONVERSATION = "CONVERSATION"
+        FILE = "file"
+        LINK = "link"
+        DATETIME = "datetime"
+        KEYWORDSET = "keywordset"
+        TEXT = "text"
+        LAYOUT = "layout"
+        GENERIC = "generic"
+        CONVERSATION = "conversation"
 
     field_type: Optional[FieldType]
     field: Optional[str]
