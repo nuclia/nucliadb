@@ -143,6 +143,13 @@ impl<'a> DiskStructure<'a> {
             delete_log,
         })
     }
+
+    pub fn txn_exists(&self, txn_id: usize) -> bool {
+        self.transaction_path(txn_id).is_dir()
+            && self.transaction_path(txn_id).join(SEGMENT).is_file()
+            && self.transaction_path(txn_id).join(DELETE_LOG).is_file()
+    }
+
     pub fn get_segment(&self, txn_id: usize) -> DiskResult<Segment> {
         let path = self.transaction_path(txn_id).join(SEGMENT);
         Ok(Segment::new(path)?)
@@ -210,15 +217,11 @@ mod tests {
         bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
         drop(wtxn);
 
-        assert!(disk.transaction_path(0).is_dir());
-        assert!(disk.transaction_path(0).join(SEGMENT).is_file());
-        assert!(disk.transaction_path(0).join(DELETE_LOG).is_file());
+        assert!(disk.txn_exists(0));
         disk.get_segment(0).unwrap();
         disk.get_delete_log(0).unwrap();
 
-        assert!(disk.transaction_path(1).is_dir());
-        assert!(disk.transaction_path(1).join(SEGMENT).is_file());
-        assert!(disk.transaction_path(1).join(DELETE_LOG).is_file());
+        assert!(disk.txn_exists(1));
         disk.get_segment(1).unwrap();
         disk.get_delete_log(1).unwrap();
     }
@@ -233,10 +236,10 @@ mod tests {
         bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
         drop(wtxn);
         disk.delete_txn(0).unwrap();
+        assert!(!disk.txn_exists(0));
         assert!(disk.get_segment(0).is_err());
         assert!(disk.get_delete_log(0).is_err());
         assert!(!disk.transaction_path(0).exists());
- 
     }
     #[test]
     fn abort_write_token() {
