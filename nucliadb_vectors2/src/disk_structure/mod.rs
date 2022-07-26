@@ -127,6 +127,10 @@ impl<'a> DiskStructure<'a> {
             Ok(wtoken.flush()?)
         }
     }
+    pub fn delete_txn(&self, txn_id: usize) -> DiskResult<()> {
+        let base_path = self.transaction_path(txn_id);
+        Ok(std::fs::remove_dir_all(base_path)?)
+    }
     pub fn create_txn(&self, txn_id: usize) -> DiskResult<TxnFiles> {
         let base_path = self.transaction_path(txn_id);
         DirBuilder::new().create(&base_path)?;
@@ -217,6 +221,22 @@ mod tests {
         assert!(disk.transaction_path(1).join(DELETE_LOG).is_file());
         disk.get_segment(1).unwrap();
         disk.get_delete_log(1).unwrap();
+    }
+    #[test]
+    fn delete_txn() {
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
+        let disk = DiskStructure::new(dir_path).unwrap();
+        assert!(disk.delete_txn(0).is_err());
+
+        let mut wtxn = disk.create_txn(0).unwrap();
+        bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
+        drop(wtxn);
+        disk.delete_txn(0).unwrap();
+        assert!(disk.get_segment(0).is_err());
+        assert!(disk.get_delete_log(0).is_err());
+        assert!(!disk.transaction_path(0).exists());
+ 
     }
     #[test]
     fn abort_write_token() {

@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+mod garbage_collector;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -47,7 +48,7 @@ pub struct DeleteLog {
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct TransactionLog {
-    pub entries: Vec<usize>,
+    pub entries: Vec<(usize, bool)>,
 }
 
 #[derive(Default, Deserialize, Serialize)]
