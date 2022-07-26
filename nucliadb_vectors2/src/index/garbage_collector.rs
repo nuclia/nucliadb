@@ -11,9 +11,6 @@ where
             disk.delete_txn(*txn_id)?;
         }
     }
-
-    // todo!("Delete also delete logs from database");
-
     Ok(())
 }
 

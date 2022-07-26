@@ -11,7 +11,7 @@ use crate::vector;
 
 const NO_FILTER: &[String] = &[];
 #[derive(Clone, Copy)]
-struct StandardElem(pub Node, pub f32);
+struct StandardElem(pub Location, pub f32);
 impl Eq for StandardElem {}
 impl Ord for StandardElem {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -31,7 +31,7 @@ impl PartialOrd for StandardElem {
 
 #[derive(Default, Clone)]
 pub struct SearchValue {
-    pub neighbours: Vec<(Node, f32)>,
+    pub neighbours: Vec<(Location, f32)>,
 }
 
 pub struct HnswOps<'a> {
@@ -44,8 +44,8 @@ impl<'a> HnswOps<'a> {
     fn select_neighbours_heuristic(
         &self,
         k_neighbours: usize,
-        mut candidates: Vec<(Node, f32)>,
-    ) -> Vec<(Node, f32)> {
+        mut candidates: Vec<(Location, f32)>,
+    ) -> Vec<(Location, f32)> {
         candidates.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(StandardElem(*n, *d)));
         candidates.truncate(k_neighbours);
         candidates
@@ -59,11 +59,11 @@ impl<'a> HnswOps<'a> {
     }
     fn layer_search(
         &self,
-        x: Node,
+        x: Location,
         layer: &GraphLayer,
         k_neighbours: usize,
         with_filter: &[String],
-        entry_points: &[Node],
+        entry_points: &[Location],
     ) -> SearchValue {
         use vector::consine_similarity;
         let mut visited = HashSet::new();
@@ -71,10 +71,7 @@ impl<'a> HnswOps<'a> {
         let mut ms_neighbours = BinaryHeap::new();
         for ep in entry_points.iter().copied() {
             visited.insert(ep);
-            let similarity = consine_similarity(
-                self.tracker.find(x.location),
-                self.tracker.find(ep.location),
-            );
+            let similarity = consine_similarity(self.tracker.find(x), self.tracker.find(ep));
             candidates.push(StandardElem(ep, similarity));
             ms_neighbours.push(Reverse(StandardElem(ep, similarity)));
         }
@@ -86,10 +83,8 @@ impl<'a> HnswOps<'a> {
                     for (y, _) in layer.get_out_edges(cn).map(|(n, e)| (*n, *e)) {
                         if !visited.contains(&y) {
                             visited.insert(y);
-                            let similarity = consine_similarity(
-                                self.tracker.find(x.location),
-                                self.tracker.find(y.location),
-                            );
+                            let similarity =
+                                consine_similarity(self.tracker.find(x), self.tracker.find(y));
                             if similarity > ws || ms_neighbours.len() < k_neighbours {
                                 candidates.push(StandardElem(y, similarity));
                                 ms_neighbours.push(Reverse(StandardElem(y, similarity)));
@@ -108,15 +103,20 @@ impl<'a> HnswOps<'a> {
             .into_par_iter()
             .map(|Reverse(StandardElem(n, d))| (n, d))
             .filter(|(node, _)| {
-                let key = self.vector_db.get_node_key(self.txn, *node).unwrap();
+                let key = self
+                    .vector_db
+                    .get_node_key(self.txn, *node)
+                    .ok()
+                    .flatten()
+                    .unwrap();
                 with_filter
                     .iter()
-                    .all(|label| self.vector_db.has_label(self.txn, key, label))
+                    .all(|label| self.vector_db.has_label(self.txn, key, label).unwrap())
             })
             .collect();
         SearchValue { neighbours }
     }
-    fn layer_insert(&self, x: Node, layer: &mut GraphLayer, entry_points: &[Node]) -> Vec<Node> {
+    fn layer_insert(&self, x: Location, layer: &mut GraphLayer, entry_points: &[Location]) -> Vec<Location> {
         use params::*;
         let s_result = self.layer_search(x, layer, ef_construction(), NO_FILTER, entry_points);
         let neighbours = s_result.neighbours;
@@ -140,7 +140,7 @@ impl<'a> HnswOps<'a> {
         }
         result
     }
-    fn layer_delete(&self, x: Node, layer: &mut GraphLayer) {
+    fn layer_delete(&self, x: Location, layer: &mut GraphLayer) {
         use params::*;
         let _out_edges = layer.take_out_edges(x);
         let in_edges = layer.take_in_edges(x);
@@ -159,14 +159,14 @@ impl<'a> HnswOps<'a> {
             }
         }
     }
-    pub fn delete(&self, x: Node, hnsw: &mut Hnsw) {
+    pub fn delete(&self, x: Location, hnsw: &mut Hnsw) {
         hnsw.layers
             .iter_mut()
             .filter(|layer| layer.has_node(x))
             .for_each(|layer| self.layer_delete(x, layer));
         hnsw.remove_empty_layers().update_entry_point();
     }
-    pub fn insert(&self, x: Node, hnsw: &mut Hnsw) {
+    pub fn insert(&self, x: Location, hnsw: &mut Hnsw) {
         match hnsw.entry_point {
             None => {
                 let top_level = self.get_random_layer();
@@ -188,7 +188,7 @@ impl<'a> HnswOps<'a> {
     }
     pub fn search(
         &self,
-        x: Node,
+        x: Location,
         hnsw: &Hnsw,
         k_neighbours: usize,
         with_filter: &[String],

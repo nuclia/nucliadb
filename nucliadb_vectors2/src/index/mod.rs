@@ -19,20 +19,21 @@
 //
 
 mod garbage_collector;
-use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
-
+use crate::database::{DBErr, VectorDB};
+use crate::disk_structure::{DiskError, DiskStructure, TxnFiles};
+use crate::hnsw::Hnsw;
 use memmap2::Mmap;
 use serde::{Deserialize, Serialize};
-
-use crate::database::VectorDB;
-use crate::hnsw::Hnsw;
+use std::collections::HashMap;
+use std::fs::{File, OpenOptions};
+use std::io::BufWriter;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SegmentSlice {
-    pub start: u64,
-    pub end: u64,
+    pub start: usize,
+    pub end: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
@@ -48,6 +49,7 @@ pub struct DeleteLog {
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct TransactionLog {
+    pub fresh: usize,
     pub entries: Vec<(usize, bool)>,
 }
 
@@ -85,8 +87,93 @@ impl Segment {
     }
 }
 
+#[derive(Default)]
+pub struct Batch {
+    add_keys: Vec<String>,
+    add_vectors: Vec<Vec<f32>>,
+    add_labels: Vec<Vec<String>>,
+    rmv_keys: Vec<String>,
+}
+impl Batch {
+    pub fn new() -> Batch {
+        Batch::default()
+    }
+    pub fn add_vector(&mut self, key: String, vector: Vec<f32>, labels: Vec<String>) {
+        self.add_keys.push(key);
+        self.add_vectors.push(vector);
+        self.add_labels.push(labels);
+    }
+    pub fn rmv_vector(&mut self, key: String) {
+        self.rmv_keys.push(key);
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum IndexError {
+    #[error("Error in disk: {0}")]
+    Disk(#[from] DiskError),
+    #[error("Error in database {0}")]
+    DB(#[from] DBErr),
+    #[error("Error during IO {0}")]
+    IO(#[from] std::io::Error),
+}
+type IndexResult<T> = Result<T, IndexError>;
+
 pub struct Index {
+    address: PathBuf,
     tracker: DataRetriever,
     database: VectorDB,
+    txn_log: TransactionLog,
     hnsw: Hnsw,
 }
+
+// impl Index {
+//     fn store_vectors(
+//         &self,
+//         mut buff: BufWriter<File>,
+//         txn_id: usize,
+//         vectors: &[Vec<f32>],
+//     ) -> IndexResult<Vec<Location>> {
+//         use crate::vector::encode_vector;
+//         use std::io::Write;
+//         let mut start = 0;
+//         let mut locations = Vec::with_capacity(vectors.len());
+//         for vector in vectors {
+//             let encoded = encode_vector(vector);
+//             let end = start + encoded.len();
+//             let location = Location {
+//                 txn_id,
+//                 slice: SegmentSlice { start, end },
+//             };
+//             buff.write_all(&encoded)?;
+//             locations.push(location);
+//             start = end;
+//         }
+//         buff.flush()?;
+//         Ok(locations)
+//     }
+
+//     fn store_delete_log(&self, _: BufWriter<File>, _: &[String]) {
+//         todo!()
+//     }
+
+//     pub fn record_txn(&mut self, txn: Batch) -> IndexResult<()> {
+//         let txn_id = self.txn_log.fresh;
+//         self.txn_log.fresh += 1;
+//         let disk = DiskStructure::new(&self.address)?;
+//         let TxnFiles {
+//             mut segment,
+//             mut delete_log,
+//         } = disk.create_txn(txn_id)?;
+//         let locations = self.store_vectors(segment, txn_id, &txn.add_vectors)?;
+//         // let mut rw_db = self.database.rw_txn()?;
+//         // // txn
+//         // //     .add_keys
+//         // //     .into_iter()
+//         // //     .zip(txn.add_vectors.into_iter())
+//         // //     .zip(txn.add_labels.into_iter());
+//         // rw_db.commit()?;
+//         self.txn_log.entries.push((txn_id, true));
+//         Ok(())
+//     }
+// }

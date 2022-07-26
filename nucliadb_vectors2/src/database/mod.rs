@@ -20,12 +20,11 @@
 
 use std::path::Path;
 
+use crate::index::Location;
 use heed::flags::Flags;
 use heed::types::{SerdeBincode, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions};
-pub use heed::{Error as DBErr, RoIter, RoPrefix, RoTxn, RwTxn};
-
-use crate::hnsw::*;
+pub use heed::{Error as DBErr, Result as DBResult, RoIter, RoPrefix, RoTxn, RwTxn};
 
 mod db_names {
     pub const DB_NODES: &str = "NODES";
@@ -42,14 +41,14 @@ pub struct VectorDB {
     env: Env,
     // (String, ())
     label_db: Database<Str, Unit>,
-    // (String, Node)
-    node_db: Database<Str, SerdeBincode<Node>>,
-    // (Node, String)
-    node_inv_db: Database<SerdeBincode<Node>, Str>,
+    // (String, Location)
+    node_db: Database<Str, SerdeBincode<Location>>,
+    // (Location, String)
+    node_inv_db: Database<SerdeBincode<Location>, Str>,
 }
 
 impl VectorDB {
-    pub fn new<P: AsRef<Path>>(env_path: P) -> Result<VectorDB, DBErr> {
+    pub fn new<P: AsRef<Path>>(env_path: P) -> DBResult<VectorDB> {
         let mut env_builder = EnvOpenOptions::new();
         env_builder.max_dbs(env_params::MAX_DBS);
         env_builder.map_size(env_params::MAP_SIZE);
@@ -67,42 +66,58 @@ impl VectorDB {
             node_inv_db,
         })
     }
-    pub fn ro_txn(&self) -> RoTxn {
-        self.env.read_txn().unwrap()
+    pub fn ro_txn(&self) -> DBResult<RoTxn> {
+        self.env.read_txn()
     }
-    pub fn rw_txn(&self) -> RwTxn {
-        self.env.write_txn().unwrap()
+    pub fn rw_txn(&self) -> DBResult<RwTxn> {
+        self.env.write_txn()
     }
-    pub fn get_node(&self, txn: &RoTxn, vector: &str) -> Option<Node> {
-        self.node_db.get(txn, vector).unwrap()
+    pub fn get_node(&self, txn: &RoTxn, vector: &str) -> DBResult<Option<Location>> {
+        self.node_db.get(txn, vector)
     }
-    pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Node) -> Option<&'a str> {
-        self.node_inv_db.get(txn, &node).unwrap()
+    pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Location) -> DBResult<Option<&'a str>> {
+        self.node_inv_db.get(txn, &node)
     }
-    pub fn has_label(&self, txn: &RoTxn, key: &str, label: &str) -> bool {
-        let path = VectorDB::create_label_entry(key, label);
-        let exist = self.label_db.get(txn, path.as_str()).unwrap();
-        exist.is_some()
+    pub fn has_label(&self, txn: &RoTxn, key: &str, label: &str) -> DBResult<bool> {
+        let path = self.label_entry(key, label);
+        self.label_db.get(txn, path.as_str()).map(|v| v.is_some())
     }
-    pub fn add_node(&self, txn: &mut RwTxn, key: &str, node: Node) {
-        self.node_db.put(txn, key, &node).unwrap();
-        self.node_inv_db.put(txn, &node, key).unwrap();
+    pub fn add_node(&self, txn: &mut RwTxn, key: &str, node: Location) -> DBResult<()> {
+        self.node_db.put(txn, key, &node)?;
+        self.node_inv_db.put(txn, &node, key)?;
+        Ok(())
     }
-    pub fn add_label(&self, txn: &mut RwTxn, key: &str, label: &str) {
-        let path = VectorDB::create_label_entry(key, label);
-        self.label_db.put(txn, path.as_str(), &()).unwrap();
+    pub fn rmv_node(&self, txn: &mut RwTxn, key: &str) -> DBResult<()> {
+        if let Some(node) = self.node_db.get(txn, key)? {
+            self.node_db.delete(txn, key)?;
+            self.node_inv_db.delete(txn, &node)?;
+            let labels_prefix = self.labels_prefix(key);
+            let mut iter = self.label_db.prefix_iter_mut(txn, &labels_prefix)?;
+            while let Some(_) = iter.next().transpose()? {
+                iter.del_current()?;
+            }
+        }
+        Ok(())
     }
-    pub fn get_keys<'a>(&'a self, txn: &'a RoTxn) -> RoIter<Str, SerdeBincode<Node>> {
-        self.node_db.iter(txn).unwrap()
+    pub fn add_label(&self, txn: &mut RwTxn, key: &str, label: &str) -> DBResult<()> {
+        let path = self.label_entry(key, label);
+        self.label_db.put(txn, path.as_str(), &())
+    }
+    pub fn get_keys<'a>(&'a self, txn: &'a RoTxn) -> DBResult<RoIter<Str, SerdeBincode<Location>>> {
+        self.node_db.iter(txn)
     }
     pub fn nodes_prefixed_with<'a>(
         &'a self,
         txn: &'a RoTxn,
         prefix: &str,
-    ) -> RoPrefix<Str, SerdeBincode<Node>> {
-        self.node_db.prefix_iter(txn, prefix).unwrap()
+    ) -> DBResult<RoPrefix<Str, SerdeBincode<Location>>> {
+        self.node_db.prefix_iter(txn, prefix)
     }
-    fn create_label_entry(key: &str, label: &str) -> String {
-        format!("[{}/{}]", key, label)
+
+    fn labels_prefix(&self, key: &str) -> String {
+        format!("[{key}/]")
+    }
+    fn label_entry(&self, key: &str, label: &str) -> String {
+        format!("[{key}/{label}]")
     }
 }

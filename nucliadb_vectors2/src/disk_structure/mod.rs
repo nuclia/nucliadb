@@ -56,8 +56,8 @@ impl Lock {
 }
 
 pub struct TxnFiles {
-    pub segment: File,
-    pub delete_log: File,
+    pub segment: BufWriter<File>,
+    pub delete_log: BufWriter<File>,
 }
 
 pub struct WToken<'a> {
@@ -136,8 +136,8 @@ impl<'a> DiskStructure<'a> {
         DirBuilder::new().create(&base_path)?;
         let seg_path = base_path.join(SEGMENT);
         let del_log_path = base_path.join(DELETE_LOG);
-        let segment = File::create(seg_path)?;
-        let delete_log = File::create(del_log_path)?;
+        let segment = BufWriter::new(File::create(seg_path)?);
+        let delete_log = BufWriter::new(File::create(del_log_path)?);
         Ok(TxnFiles {
             segment,
             delete_log,
