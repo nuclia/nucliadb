@@ -56,8 +56,34 @@ impl Lock {
 }
 
 pub struct TxnFiles {
-    pub segment: BufWriter<File>,
-    pub delete_log: BufWriter<File>,
+    base_path: PathBuf,
+    segment: BufWriter<File>,
+}
+impl TxnFiles {
+    pub fn write_segment(&mut self, buf: &[u8]) -> DiskResult<(usize, usize)> {
+        use std::io::Write;
+        let start = {
+            let meta = std::fs::metadata(self.base_path.join(SEGMENT))?;
+            meta.len() as usize
+        };
+        self.segment.write_all(buf)?;
+        self.segment.flush()?;
+        let end = {
+            let meta = std::fs::metadata(self.base_path.join(SEGMENT))?;
+            meta.len() as usize
+        };
+        Ok((start, end))
+    }
+
+    pub fn write_delete_log(&mut self, data: &DeleteLog) -> DiskResult<()> {
+        let dlog = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(self.base_path.join(TEMP_STATE))?;
+        let writer = BufWriter::new(dlog);
+        bincode::serialize_into(writer, &data)?;
+        Ok(())
+    }
 }
 
 pub struct WToken<'a> {
@@ -134,14 +160,10 @@ impl<'a> DiskStructure<'a> {
     pub fn create_txn(&self, txn_id: usize) -> DiskResult<TxnFiles> {
         let base_path = self.transaction_path(txn_id);
         DirBuilder::new().create(&base_path)?;
-        let seg_path = base_path.join(SEGMENT);
-        let del_log_path = base_path.join(DELETE_LOG);
-        let segment = BufWriter::new(File::create(seg_path)?);
-        let delete_log = BufWriter::new(File::create(del_log_path)?);
-        Ok(TxnFiles {
-            segment,
-            delete_log,
-        })
+        let segment = File::create(base_path.join(SEGMENT))?;
+        let dlog = File::create(base_path.join(DELETE_LOG))?;
+        let segment = BufWriter::new(segment);
+        Ok(TxnFiles { base_path, segment })
     }
 
     pub fn txn_exists(&self, txn_id: usize) -> bool {
