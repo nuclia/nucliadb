@@ -93,7 +93,7 @@ impl VectorDB {
             self.node_inv_db.delete(txn, &node)?;
             let labels_prefix = self.labels_prefix(key);
             let mut iter = self.label_db.prefix_iter_mut(txn, &labels_prefix)?;
-            while let Some(_) = iter.next().transpose()? {
+            while (iter.next().transpose()?).is_some() {
                 iter.del_current()?;
             }
         }
