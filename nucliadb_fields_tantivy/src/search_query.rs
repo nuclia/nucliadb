@@ -48,7 +48,7 @@ pub fn create_query(
         let facet = Facet::from(facet_key.as_str());
         let facet_term = Term::from_facet(schema.field, &facet);
         let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-        queries.push((Occur::Should, Box::new(facet_term_query)));
+        queries.push((Occur::Must, Box::new(facet_term_query)));
     });
 
     // Add filter
