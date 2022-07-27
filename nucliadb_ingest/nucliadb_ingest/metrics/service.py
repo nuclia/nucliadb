@@ -34,7 +34,7 @@ async def handler(request):
         output = prometheus_client.exposition.generate_latest()
         return output.decode("utf8")
     else:
-        return web.Response(text="OK")
+        return web.Response(text=f"OK {request.url}")
 
 
 class MetricsService:
