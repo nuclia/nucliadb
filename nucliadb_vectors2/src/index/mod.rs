@@ -20,7 +20,7 @@
 
 mod garbage_collector;
 use crate::database::{DBErr, VectorDB};
-use crate::disk_structure::{DiskError, DiskStructure, TxnFiles};
+use crate::disk_structure::{DiskError, DiskStructure};
 use crate::hnsw::Hnsw;
 use memmap2::Mmap;
 use serde::{Deserialize, Serialize};

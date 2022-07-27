@@ -22,13 +22,6 @@ const SEGMENT: &str = "segment.vectors";
 const DELETE_LOG: &str = "delete_log.bincode";
 
 pub type DiskResult<T> = Result<T, DiskError>;
-pub trait DiskWriter<T> {
-    fn write(&self, data: &T) -> DiskResult<()>;
-}
-pub trait DiskReader<T> {
-    fn read(&self) -> DiskResult<T>;
-}
-
 #[derive(Error, Debug)]
 pub enum DiskError {
     #[error("IOErr: {0}")]
@@ -55,16 +48,39 @@ impl Lock {
     }
 }
 
-pub struct TxnFiles {
-    pub segment: BufWriter<File>,
-    pub delete_log: BufWriter<File>,
+pub struct WSegment {
+    len: usize,
+    handle: BufWriter<File>,
+}
+impl WSegment {
+    fn new(handle: BufWriter<File>) -> WSegment {
+        WSegment { len: 0, handle }
+    }
+    pub fn write(&mut self, buf: &[u8]) -> DiskResult<(usize, usize)> {
+        use std::io::Write;
+        let result = (self.len, self.len + buf.len());
+        self.handle.write_all(buf)?;
+        self.handle.flush()?;
+        self.len += buf.len();
+        Ok(result)
+    }
 }
 
-pub struct WToken<'a> {
+pub struct WDeletelog(BufWriter<File>);
+impl WDeletelog {
+    pub fn write(mut self, data: &DeleteLog) -> DiskResult<()> {
+        use std::io::Write;
+        bincode::serialize_into(&mut self.0, data)?;
+        self.0.flush()?;
+        Ok(())
+    }
+}
+
+pub struct WState<'a> {
     disk: DiskStructure<'a>,
 }
 
-impl<'a> WToken<'a> {
+impl<'a> WState<'a> {
     fn borrow_abort(&self) -> DiskResult<()> {
         let temp = self.disk.base_path.join(TEMP_STATE);
         if temp.exists() {
@@ -122,7 +138,7 @@ impl<'a> DiskStructure<'a> {
             let _stamp = File::create(base_path.join(STAMP))?;
             let _state = File::create(base_path.join(STATE))?;
             let disk = DiskStructure { lock, base_path };
-            let wtoken = disk.wtoken();
+            let wtoken = disk.into_wstate();
             wtoken.write_state(&State::default())?;
             Ok(wtoken.flush()?)
         }
@@ -131,23 +147,18 @@ impl<'a> DiskStructure<'a> {
         let base_path = self.transaction_path(txn_id);
         Ok(std::fs::remove_dir_all(base_path)?)
     }
-    pub fn create_txn(&self, txn_id: usize) -> DiskResult<TxnFiles> {
+    pub fn create_txn(&self, txn_id: usize) -> DiskResult<(WSegment, WDeletelog)> {
         let base_path = self.transaction_path(txn_id);
         DirBuilder::new().create(&base_path)?;
-        let seg_path = base_path.join(SEGMENT);
-        let del_log_path = base_path.join(DELETE_LOG);
-        let segment = BufWriter::new(File::create(seg_path)?);
-        let delete_log = BufWriter::new(File::create(del_log_path)?);
-        Ok(TxnFiles {
-            segment,
-            delete_log,
-        })
+        let dlog_handle = BufWriter::new(File::create(base_path.join(DELETE_LOG))?);
+        let segment_handle = BufWriter::new(File::create(base_path.join(SEGMENT))?);
+        let wdlog = WDeletelog(dlog_handle);
+        let wsegment = WSegment::new(segment_handle);
+        Ok((wsegment, wdlog))
     }
 
     pub fn txn_exists(&self, txn_id: usize) -> bool {
         self.transaction_path(txn_id).is_dir()
-            && self.transaction_path(txn_id).join(SEGMENT).is_file()
-            && self.transaction_path(txn_id).join(DELETE_LOG).is_file()
     }
 
     pub fn get_segment(&self, txn_id: usize) -> DiskResult<Segment> {
@@ -166,8 +177,8 @@ impl<'a> DiskStructure<'a> {
         let reader = BufReader::new(File::open(self.base_path.join(STATE))?);
         Ok(bincode::deserialize_from(reader)?)
     }
-    pub fn wtoken(self) -> WToken<'a> {
-        WToken { disk: self }
+    pub fn into_wstate(self) -> WState<'a> {
+        WState { disk: self }
     }
 }
 
@@ -210,12 +221,25 @@ mod tests {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
         let disk = DiskStructure::new(dir_path).unwrap();
-        let mut wtxn = disk.create_txn(0).unwrap();
-        bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
-        drop(wtxn);
-        let mut wtxn = disk.create_txn(1).unwrap();
-        bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
-        drop(wtxn);
+        let (wsegment, wdlog) = disk.create_txn(0).unwrap();
+        wdlog.write(&DeleteLog::default()).unwrap();
+        let metadata = std::fs::metadata(&disk.transaction_path(0).join(SEGMENT)).unwrap();
+        assert_eq!(metadata.len(), 0);
+        drop(wsegment);
+
+        let (mut wsegment, wdlog) = disk.create_txn(1).unwrap();
+        wdlog.write(&DeleteLog::default()).unwrap();
+        let (s0, e0) = wsegment.write(&[1; 12]).unwrap();
+        assert_eq!(s0, 0);
+        assert_eq!(e0, 12);
+        let metadata = std::fs::metadata(&disk.transaction_path(1).join(SEGMENT)).unwrap();
+        assert_eq!(metadata.len(), 12);
+        let (s1, e1) = wsegment.write(&[2; 12]).unwrap();
+        assert_eq!(s1, e0);
+        assert_eq!(e1, 24);
+        let metadata = std::fs::metadata(&disk.transaction_path(1).join(SEGMENT)).unwrap();
+        assert_eq!(metadata.len(), 24);
+        drop(wsegment);
 
         assert!(disk.txn_exists(0));
         disk.get_segment(0).unwrap();
@@ -224,7 +248,13 @@ mod tests {
         assert!(disk.txn_exists(1));
         disk.get_segment(1).unwrap();
         disk.get_delete_log(1).unwrap();
+        let segment = disk.get_segment(1).unwrap();
+        let slice0 = segment.get_vector(SegmentSlice { start: s0, end: e0 });
+        let slice1 = segment.get_vector(SegmentSlice { start: s1, end: e1 });
+        assert_eq!(slice0, Some([1; 12].as_slice()));
+        assert_eq!(slice1, Some([2; 12].as_slice()));
     }
+
     #[test]
     fn delete_txn() {
         let dir = tempdir().unwrap();
@@ -232,9 +262,9 @@ mod tests {
         let disk = DiskStructure::new(dir_path).unwrap();
         assert!(disk.delete_txn(0).is_err());
 
-        let mut wtxn = disk.create_txn(0).unwrap();
-        bincode::serialize_into(&mut wtxn.delete_log, &DeleteLog::default()).unwrap();
-        drop(wtxn);
+        let (wsegment, wdlog) = disk.create_txn(0).unwrap();
+        wdlog.write(&DeleteLog::default()).unwrap();
+        drop(wsegment);
         disk.delete_txn(0).unwrap();
         assert!(!disk.txn_exists(0));
         assert!(disk.get_segment(0).is_err());
@@ -242,13 +272,13 @@ mod tests {
         assert!(!disk.transaction_path(0).exists());
     }
     #[test]
-    fn abort_write_token() {
+    fn abort_write_state() {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
         let disk = DiskStructure::new(dir_path).unwrap();
         let state = std::fs::metadata(disk.base_path.join(STATE)).unwrap();
         let start = state.modified().unwrap();
-        let token = disk.wtoken();
+        let token = disk.into_wstate();
 
         token.write_state(&State::default()).unwrap();
         assert!(dir_path.join(TEMP_STATE).is_file());
@@ -270,13 +300,13 @@ mod tests {
     }
 
     #[test]
-    fn flush_write_token() {
+    fn flush_write_state() {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
         let disk = DiskStructure::new(dir_path).unwrap();
         let state = std::fs::metadata(disk.base_path.join(STATE)).unwrap();
         let start = state.modified().unwrap();
-        let token = disk.wtoken();
+        let token = disk.into_wstate();
 
         token.write_state(&State::default()).unwrap();
         token.flush().unwrap();
@@ -291,7 +321,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let dir_path = dir.path();
         let disk = DiskStructure::new(dir_path).unwrap();
-        let token = disk.wtoken();
+        let token = disk.into_wstate();
         token.write_state(&State::default()).unwrap();
         std::mem::drop(token); // leaves inconsistent state
         assert!(dir_path.join(TEMP_STATE).is_file());
