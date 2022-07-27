@@ -280,19 +280,20 @@ async def get_text_paragraph(
 
 
 def split_text(text: str, query: str, highlight: bool = False, margin: int = 20):
-    quoted = re.findall('"([^"]*)"', query)
+    quoted: List[str] = re.findall('"([^"]*)"', query)
+    text_lower = text.lower()
     cleaned = query
     positions: POSITIONS = {}
     for quote in quoted:
         cleaned = cleaned.replace(f'"{quote}"', "")
-        found = [x.span() for x in re.finditer(quote, text)]
+        found = [x.span() for x in re.finditer(quote.lower(), text_lower)]
         if len(found):
             positions.setdefault(quote, []).extend(found)
 
     query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
     for word in query_words:
         if len(word) > 2:
-            found = [x.span() for x in re.finditer(word, text)]
+            found = [x.span() for x in re.finditer(word.lower(), text_lower)]
             if len(found):
                 positions.setdefault(word, []).extend(found)
 
@@ -328,19 +329,20 @@ def split_text(text: str, query: str, highlight: bool = False, margin: int = 20)
 
 
 def highlight(text: str, query: str, highlight: bool = False):
-    quoted = re.findall('"([^"]*)"', query)
+    quoted: List[str] = re.findall('"([^"]*)"', query)
+    text_lower = text.lower()
     cleaned = query
     positions: POSITIONS = {}
     for quote in quoted:
         cleaned = cleaned.replace(f'"{quote}"', "")
-        found = [x.span() for x in re.finditer(quote, text)]
+        found = [x.span() for x in re.finditer(quote.lower(), text_lower)]
         if len(found):
             positions.setdefault(quote, []).extend(found)
 
     query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
     for word in query_words:
         if len(word) > 2:
-            found = [x.span() for x in re.finditer(word, text)]
+            found = [x.span() for x in re.finditer(word.lower(), text_lower)]
             if len(found):
                 positions.setdefault(word, []).extend(found)
 
