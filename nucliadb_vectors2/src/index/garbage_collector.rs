@@ -3,9 +3,7 @@ use crate::disk_structure::{DiskResult, DiskStructure};
 /// Remove from disk all transactions that are no longer up.
 /// Return an error if any of the disk operations fail
 pub fn collect_garbage<'a, T>(disk: &'a DiskStructure<'a>, txn_log: T) -> DiskResult<()>
-where
-    T: Iterator<Item = &'a (usize, bool)>, // (txn_id, is_up)
-{
+where T: Iterator<Item = &'a (usize, bool)> /* (txn_id, is_up) */ {
     for (txn_id, is_up) in txn_log {
         if !is_up {
             disk.delete_txn(*txn_id)?;

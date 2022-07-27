@@ -18,57 +18,62 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod garbage_collector;
-use crate::database::{DBErr, VectorDB};
-use crate::disk_structure::{DiskError, DiskStructure};
-use crate::hnsw::Hnsw;
+// mod garbage_collector;
+use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::path::{Path, PathBuf};
+
 use memmap2::Mmap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::BufWriter;
-use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+use crate::database::{DBErr, VectorDB};
+use crate::disk_structure::*;
+use crate::hnsw::Hnsw;
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub struct SegmentSlice {
     pub start: usize,
     pub end: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize)]
-pub struct Location {
+#[derive(
+    Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize, Deserialize, Default,
+)]
+pub struct Address {
     pub txn_id: usize,
     pub slice: SegmentSlice,
 }
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeleteLog {
-    pub log: Vec<Location>,
+    pub log: Vec<Address>,
 }
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct TransactionLog {
     pub fresh: usize,
-    pub entries: Vec<(usize, bool)>,
+    pub entries: Vec<usize>,
 }
 
 #[derive(Default, Deserialize, Serialize)]
 pub struct State {
-    transaction_log: TransactionLog,
+    txn_log: TransactionLog,
     hnsw: Hnsw,
 }
 
-pub struct DataRetriever {
-    temp: Vec<u8>,
-    segments: HashMap<usize, Segment>,
+pub struct DataRetriever<'a> {
+    temp: &'a [u8],
+    segments: &'a HashMap<usize, Segment>,
 }
-impl DataRetriever {
-    pub fn find(&self, x: Location) -> &[u8] {
+impl<'a> DataRetriever<'a> {
+    pub fn find(&self, x: Address) -> &[u8] {
         self.segments
             .get(&x.txn_id)
             .and_then(|segment| segment.get_vector(x.slice))
-            .unwrap_or(&self.temp)
+            .unwrap_or(self.temp)
     }
 }
 
@@ -109,71 +114,180 @@ impl Batch {
 }
 
 #[derive(Error, Debug)]
-pub enum IndexError {
+pub enum IdxError {
     #[error("Error in disk: {0}")]
     Disk(#[from] DiskError),
     #[error("Error in database {0}")]
     DB(#[from] DBErr),
-    #[error("Error during IO {0}")]
-    IO(#[from] std::io::Error),
 }
-type IndexResult<T> = Result<T, IndexError>;
+type IdxResult<T> = Result<T, IdxError>;
 
 pub struct Index {
     address: PathBuf,
-    tracker: DataRetriever,
+    segments: HashMap<usize, Segment>,
     database: VectorDB,
     txn_log: TransactionLog,
     hnsw: Hnsw,
 }
 
-// impl Index {
-//     fn store_vectors(
-//         &self,
-//         mut buff: BufWriter<File>,
-//         txn_id: usize,
-//         vectors: &[Vec<f32>],
-//     ) -> IndexResult<Vec<Location>> {
-//         use crate::vector::encode_vector;
-//         use std::io::Write;
-//         let mut start = 0;
-//         let mut locations = Vec::with_capacity(vectors.len());
-//         for vector in vectors {
-//             let encoded = encode_vector(vector);
-//             let end = start + encoded.len();
-//             let location = Location {
-//                 txn_id,
-//                 slice: SegmentSlice { start, end },
-//             };
-//             buff.write_all(&encoded)?;
-//             locations.push(location);
-//             start = end;
-//         }
-//         buff.flush()?;
-//         Ok(locations)
-//     }
+impl Index {
+    fn store_vectors(
+        &self,
+        mut wsegment: WSegment,
+        vectors: &[Vec<f32>],
+    ) -> IdxResult<Vec<Address>> {
+        use crate::vector::encode_vector;
+        vectors
+            .iter()
+            .map(|v| encode_vector(v))
+            .map(|buf| wsegment.write(&buf).map_err(|e| e.into()))
+            .collect()
+    }
 
-//     fn store_delete_log(&self, _: BufWriter<File>, _: &[String]) {
-//         todo!()
-//     }
+    fn store_delete_log(
+        &self,
+        wdlog: WDeletelog,
+        to_delelte: &[String],
+    ) -> IdxResult<Vec<Address>> {
+        let txn = self.database.ro_txn()?;
+        let log = to_delelte
+            .iter()
+            .map_while(|v| self.database.get_address(&txn, v).transpose())
+            .collect::<Result<Vec<_>, _>>()?;
+        let dlog = DeleteLog { log };
+        wdlog.write(&dlog)?;
+        Ok(dlog.log)
+    }
 
-//     pub fn record_txn(&mut self, txn: Batch) -> IndexResult<()> {
-//         let txn_id = self.txn_log.fresh;
-//         self.txn_log.fresh += 1;
-//         let disk = DiskStructure::new(&self.address)?;
-//         let TxnFiles {
-//             mut segment,
-//             mut delete_log,
-//         } = disk.create_txn(txn_id)?;
-//         let locations = self.store_vectors(segment, txn_id, &txn.add_vectors)?;
-//         // let mut rw_db = self.database.rw_txn()?;
-//         // // txn
-//         // //     .add_keys
-//         // //     .into_iter()
-//         // //     .zip(txn.add_vectors.into_iter())
-//         // //     .zip(txn.add_labels.into_iter());
-//         // rw_db.commit()?;
-//         self.txn_log.entries.push((txn_id, true));
-//         Ok(())
-//     }
-// }
+    fn hnsw_update(&self, hnsw: &mut Hnsw, add: &[Address], rmv: &[Address]) -> IdxResult<()> {
+        use crate::hnsw::ops::HnswOps;
+        let ro = self.database.ro_txn()?;
+        let ops = HnswOps {
+            txn: &ro,
+            vector_db: &self.database,
+            tracker: &DataRetriever {
+                temp: &[],
+                segments: &self.segments,
+            },
+        };
+        add.iter().copied().for_each(|x| ops.insert(x, hnsw));
+        rmv.iter().copied().for_each(|x| ops.delete(x, hnsw));
+        Ok(())
+    }
+
+    fn txn_log_store(&self, txn_log: &mut TransactionLog, id: usize) -> IdxResult<()> {
+        txn_log.entries.push(id);
+        Ok(())
+    }
+
+    fn record_txn(&mut self, bch: Batch) -> IdxResult<()> {
+        // Taking txn_log and hnsw from the state to be updated
+        let mut txn_log = std::mem::take(&mut self.txn_log);
+        let mut hnsw = std::mem::take(&mut self.hnsw);
+
+        // bch is stored in a new txn on disk
+        let txn_id = txn_log.fresh;
+        txn_log.fresh += 1;
+        let disk = DiskStructure::new(&self.address)?;
+        let (wsegment, wdlog) = disk.create_txn(txn_id)?;
+        let additions = self.store_vectors(wsegment, &bch.add_vectors)?;
+        let deletions = self.store_delete_log(wdlog, &bch.rmv_keys)?;
+
+        // The hnsw and the txn_log are updated
+        self.hnsw_update(&mut hnsw, &additions, &deletions)?;
+        self.txn_log_store(&mut txn_log, txn_id)?;
+
+        // Database and disk state update
+        let state = State { txn_log, hnsw };
+        let mut rw = self.database.rw_txn()?;
+        let wstate = disk.into_wstate();
+        bch.add_keys
+            .into_iter()
+            .zip(additions.into_iter())
+            .zip(bch.add_labels.into_iter())
+            .map(|((i, j), k)| self.database.add_address(&mut rw, &i, j, &k))
+            .collect::<Result<Vec<_>, _>>()?;
+        wstate.write_state(&state)?;
+        rw.commit()
+            .map_err(IdxError::from)
+            .and_then(|_| wstate.flush().map_err(IdxError::from))?;
+
+        // Update the state in the index
+        self.hnsw = state.hnsw;
+        self.txn_log = state.txn_log;
+        Ok(())
+    }
+
+    pub fn write(&mut self, bch: Batch) -> IdxResult<()> {
+        match self.record_txn(bch) {
+            err @ Err(_) => {
+                // Memory status may be corrupted,
+                // Changes are forgotten in favor of disk.
+                std::mem::take(&mut self.txn_log);
+                std::mem::take(&mut self.hnsw);
+                // Disk recovery may fail
+                let disk = DiskStructure::new(&self.address).unwrap();
+                let state = disk.get_state().unwrap();
+                // going back to a safe state
+                self.txn_log = state.txn_log;
+                self.hnsw = state.hnsw;
+                err
+            }
+            v => v,
+        }
+    }
+    pub fn search(
+        &self,
+        k_neighbours: usize,
+        x: &[f32],
+        with_filter: &[String],
+    ) -> IdxResult<Vec<(String, f32)>> {
+        use crate::hnsw::ops::HnswOps;
+        use crate::vector::encode_vector;
+        let ro = self.database.ro_txn()?;
+        let encoded = encode_vector(x);
+        let temp_address = Address {
+            txn_id: self.txn_log.fresh,
+            slice: SegmentSlice { start: 0, end: 0 },
+        };
+        let ops = HnswOps {
+            txn: &ro,
+            vector_db: &self.database,
+            tracker: &DataRetriever {
+                temp: &encoded,
+                segments: &self.segments,
+            },
+        };
+        ops.search(temp_address, &self.hnsw, k_neighbours, with_filter)
+            .neighbours
+            .into_iter()
+            .map_while(|(addr, dist)| {
+                self.database
+                    .get_address_key(&ro, addr)
+                    .map_err(IdxError::from)
+                    .map(|key| key.map(|key| (key.to_string(), dist)))
+                    .transpose()
+            })
+            .collect()
+    }
+    pub fn new<P: AsRef<Path>>(path: P) -> IdxResult<Index> {
+        let disk = DiskStructure::new(path.as_ref())?;
+        let state = disk.get_state()?;
+        let database = disk.get_db()?;
+        let segments = state
+            .txn_log
+            .entries
+            .iter()
+            .copied()
+            .map(|id| disk.get_segment(id).map(|s| (id, s)))
+            .collect::<Result<HashMap<_, _>, _>>()?;
+        std::mem::drop(disk);
+        Ok(Index {
+            address: path.as_ref().to_path_buf(),
+            hnsw: state.hnsw,
+            txn_log: state.txn_log,
+            database,
+            segments,
+        })
+    }
+}

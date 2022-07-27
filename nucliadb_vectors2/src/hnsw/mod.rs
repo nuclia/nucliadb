@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::index::Location;
+use crate::index::Address;
 
 pub mod params {
     pub fn level_factor() -> f64 {
@@ -46,7 +46,7 @@ pub mod params {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EntryPoint {
-    pub node: Location,
+    pub node: Address,
     pub layer: usize,
 }
 
@@ -57,19 +57,19 @@ pub struct Edge {
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct GraphLayer {
-    pub lout: HashMap<Location, HashMap<Location, Edge>>,
-    pub lin: HashMap<Location, HashMap<Location, Edge>>,
+    pub lout: HashMap<Address, HashMap<Address, Edge>>,
+    pub lin: HashMap<Address, HashMap<Address, Edge>>,
 }
 
 impl GraphLayer {
     fn new() -> GraphLayer {
         GraphLayer::default()
     }
-    fn add_node(&mut self, node: Location) {
+    fn add_node(&mut self, node: Address) {
         self.lout.entry(node).or_insert_with(HashMap::new);
         self.lin.entry(node).or_insert_with(HashMap::new);
     }
-    fn add_edge(&mut self, from: Location, edge: Edge, to: Location) {
+    fn add_edge(&mut self, from: Address, edge: Edge, to: Address) {
         self.lout
             .get_mut(&from)
             .and_then(|edges| edges.insert(to, edge));
@@ -77,7 +77,7 @@ impl GraphLayer {
             .get_mut(&to)
             .and_then(|edges| edges.insert(from, edge));
     }
-    fn take_out_edges(&mut self, x: Location) -> Vec<(Location, f32)> {
+    fn take_out_edges(&mut self, x: Address) -> Vec<(Address, f32)> {
         self.lout
             .get_mut(&x)
             .map(std::mem::take)
@@ -89,7 +89,7 @@ impl GraphLayer {
                 collector
             })
     }
-    fn take_in_edges(&mut self, x: Location) -> Vec<(Location, f32)> {
+    fn take_in_edges(&mut self, x: Address) -> Vec<(Address, f32)> {
         self.lin
             .get_mut(&x)
             .map(std::mem::take)
@@ -101,36 +101,36 @@ impl GraphLayer {
                 collector
             })
     }
-    fn has_node(&self, node: Location) -> bool {
+    fn has_node(&self, node: Address) -> bool {
         debug_assert_eq!(self.lout.contains_key(&node), self.lin.contains_key(&node));
         self.lout.contains_key(&node)
     }
-    fn get_out_edges(&self, node: Location) -> impl Iterator<Item = (&Location, &Edge)> {
+    fn get_out_edges(&self, node: Address) -> impl Iterator<Item = (&Address, &Edge)> {
         self.lout[&node].iter()
     }
-    fn no_out_edges(&self, node: Location) -> usize {
+    fn no_out_edges(&self, node: Address) -> usize {
         self.lout.get(&node).map_or(0, |v| v.len())
     }
     fn no_nodes(&self) -> usize {
         self.lout.len()
     }
-    fn first(&self) -> Option<Location> {
+    fn first(&self) -> Option<Address> {
         self.lout.keys().next().cloned()
     }
     fn is_empty(&self) -> bool {
         self.lout.len() == 0
     }
     #[cfg(test)]
-    fn remove_edge(&mut self, from: Location, to: Location) {
+    fn remove_edge(&mut self, from: Address, to: Address) {
         self.lout.get_mut(&from).and_then(|edges| edges.remove(&to));
         self.lin.get_mut(&to).and_then(|edges| edges.remove(&from));
     }
     #[cfg(test)]
-    fn get_in_edges(&self, node: Location) -> impl Iterator<Item = (&Location, &Edge)> {
+    fn get_in_edges(&self, node: Address) -> impl Iterator<Item = (&Address, &Edge)> {
         self.lin[&node].iter()
     }
     #[cfg(test)]
-    fn get_edge(&self, from: Location, to: Location) -> Option<Edge> {
+    fn get_edge(&self, from: Address, to: Address) -> Option<Edge> {
         self.lout
             .get(&from)
             .and_then(|edges| edges.get(&to))
@@ -148,7 +148,7 @@ impl Hnsw {
     pub fn new() -> Hnsw {
         Hnsw::default()
     }
-    fn increase_layers_with(&mut self, x: Location, level: usize) -> &mut Self {
+    fn increase_layers_with(&mut self, x: Address, level: usize) -> &mut Self {
         while self.layers.len() < level {
             let mut new_layer = GraphLayer::new();
             new_layer.add_node(x);

@@ -49,20 +49,28 @@ impl Lock {
 }
 
 pub struct WSegment {
+    txn_id: usize,
     len: usize,
     handle: BufWriter<File>,
 }
 impl WSegment {
-    fn new(handle: BufWriter<File>) -> WSegment {
-        WSegment { len: 0, handle }
+    fn new(txn_id: usize, handle: BufWriter<File>) -> WSegment {
+        WSegment {
+            len: 0,
+            handle,
+            txn_id,
+        }
     }
-    pub fn write(&mut self, buf: &[u8]) -> DiskResult<(usize, usize)> {
+    pub fn write(&mut self, buf: &[u8]) -> DiskResult<Address> {
         use std::io::Write;
-        let result = (self.len, self.len + buf.len());
+        let (start, end) = (self.len, self.len + buf.len());
         self.handle.write_all(buf)?;
         self.handle.flush()?;
         self.len += buf.len();
-        Ok(result)
+        Ok(Address {
+            txn_id: self.txn_id,
+            slice: SegmentSlice { start, end },
+        })
     }
 }
 
@@ -81,13 +89,6 @@ pub struct WState<'a> {
 }
 
 impl<'a> WState<'a> {
-    fn borrow_abort(&self) -> DiskResult<()> {
-        let temp = self.disk.base_path.join(TEMP_STATE);
-        if temp.exists() {
-            std::fs::remove_file(&temp)?;
-        }
-        Ok(())
-    }
     fn borrow_flush(&self) -> DiskResult<()> {
         let new = self.disk.base_path.join(TEMP_STATE);
         let old = self.disk.base_path.join(STATE);
@@ -101,10 +102,6 @@ impl<'a> WState<'a> {
         let writer = BufWriter::new(File::create(self.disk.base_path.join(TEMP_STATE))?);
         bincode::serialize_into(writer, &data)?;
         Ok(())
-    }
-    pub fn abort(self) -> DiskResult<DiskStructure<'a>> {
-        self.borrow_abort()?;
-        Ok(self.disk)
     }
     pub fn flush(self) -> DiskResult<DiskStructure<'a>> {
         self.borrow_flush()?;
@@ -121,14 +118,28 @@ impl<'a> DiskStructure<'a> {
     fn transaction_path(&self, id: usize) -> PathBuf {
         self.base_path.join(TRANSACTIONS).join(&format!("txn_{id}"))
     }
-
+    fn is_healthy(path: &Path) -> bool {
+        !path.join(STAMP).is_file()
+            || (path.join(DATABASE).is_dir()
+                && path.join(TRANSACTIONS).is_dir()
+                && path.join(STATE).is_file()
+                && path.join(LOCK_FILE).is_file()
+                && path.join(STAMP).is_file())
+    }
+    fn clean_garbage(path: &Path) -> DiskResult<()> {
+        if path.join(TEMP_STATE).exists() {
+            std::fs::remove_file(path.join(TEMP_STATE))?;
+        }
+        Ok(())
+    }
     pub fn new(path: &'a Path) -> DiskResult<DiskStructure<'a>> {
         use std::io::{Error, ErrorKind};
         let base_path = path;
-        if path.join(TEMP_STATE).exists() {
-            Err(Error::new(ErrorKind::InvalidData, "temporal file exits").into())
+        if !DiskStructure::is_healthy(base_path) {
+            Err(Error::new(ErrorKind::InvalidData, "Corrupted disk").into())
         } else if path.join(STAMP).exists() {
             let lock = Lock::new(base_path.join(LOCK_FILE).as_path())?;
+            DiskStructure::clean_garbage(base_path)?;
             Ok(DiskStructure { lock, base_path })
         } else {
             DirBuilder::new().create(base_path.join(TRANSACTIONS))?;
@@ -153,7 +164,7 @@ impl<'a> DiskStructure<'a> {
         let dlog_handle = BufWriter::new(File::create(base_path.join(DELETE_LOG))?);
         let segment_handle = BufWriter::new(File::create(base_path.join(SEGMENT))?);
         let wdlog = WDeletelog(dlog_handle);
-        let wsegment = WSegment::new(segment_handle);
+        let wsegment = WSegment::new(txn_id, segment_handle);
         Ok((wsegment, wdlog))
     }
 
@@ -201,11 +212,11 @@ mod tests {
         assert!(dir_path.join(DATABASE).is_dir());
         assert!(dir_path.join(TRANSACTIONS).is_dir());
         assert!(dir_path.join(STATE).is_file());
-        assert!(dir_path.join(STATE).is_file());
         assert!(dir_path.join(LOCK_FILE).is_file());
         assert!(dir_path.join(STAMP).is_file());
         disk.get_state().unwrap();
         disk.get_db().unwrap();
+        assert!(!disk.txn_exists(0));
         assert!(disk.get_segment(0).is_err());
         assert!(disk.get_delete_log(0).is_err());
     }
@@ -229,12 +240,18 @@ mod tests {
 
         let (mut wsegment, wdlog) = disk.create_txn(1).unwrap();
         wdlog.write(&DeleteLog::default()).unwrap();
-        let (s0, e0) = wsegment.write(&[1; 12]).unwrap();
+        let Address {
+            slice: slice0 @ SegmentSlice { start: s0, end: e0 },
+            ..
+        } = wsegment.write(&[1; 12]).unwrap();
         assert_eq!(s0, 0);
         assert_eq!(e0, 12);
         let metadata = std::fs::metadata(&disk.transaction_path(1).join(SEGMENT)).unwrap();
         assert_eq!(metadata.len(), 12);
-        let (s1, e1) = wsegment.write(&[2; 12]).unwrap();
+        let Address {
+            slice: slice1 @ SegmentSlice { start: s1, end: e1 },
+            ..
+        } = wsegment.write(&[2; 12]).unwrap();
         assert_eq!(s1, e0);
         assert_eq!(e1, 24);
         let metadata = std::fs::metadata(&disk.transaction_path(1).join(SEGMENT)).unwrap();
@@ -249,8 +266,8 @@ mod tests {
         disk.get_segment(1).unwrap();
         disk.get_delete_log(1).unwrap();
         let segment = disk.get_segment(1).unwrap();
-        let slice0 = segment.get_vector(SegmentSlice { start: s0, end: e0 });
-        let slice1 = segment.get_vector(SegmentSlice { start: s1, end: e1 });
+        let slice0 = segment.get_vector(slice0);
+        let slice1 = segment.get_vector(slice1);
         assert_eq!(slice0, Some([1; 12].as_slice()));
         assert_eq!(slice1, Some([2; 12].as_slice()));
     }
@@ -271,33 +288,6 @@ mod tests {
         assert!(disk.get_delete_log(0).is_err());
         assert!(!disk.transaction_path(0).exists());
     }
-    #[test]
-    fn abort_write_state() {
-        let dir = tempdir().unwrap();
-        let dir_path = dir.path();
-        let disk = DiskStructure::new(dir_path).unwrap();
-        let state = std::fs::metadata(disk.base_path.join(STATE)).unwrap();
-        let start = state.modified().unwrap();
-        let token = disk.into_wstate();
-
-        token.write_state(&State::default()).unwrap();
-        assert!(dir_path.join(TEMP_STATE).is_file());
-        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
-        let mod1 = state.modified().unwrap();
-        assert_eq!(start, mod1);
-
-        token.write_state(&State::default()).unwrap();
-        assert!(dir_path.join(TEMP_STATE).is_file());
-        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
-        let mod2 = state.modified().unwrap();
-        assert_eq!(start, mod2);
-
-        token.abort().unwrap();
-        let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
-        let abort = state.modified().unwrap();
-        assert_eq!(abort, mod1);
-        assert!(!dir_path.join(TEMP_STATE).exists());
-    }
 
     #[test]
     fn flush_write_state() {
@@ -309,6 +299,9 @@ mod tests {
         let token = disk.into_wstate();
 
         token.write_state(&State::default()).unwrap();
+        assert!(dir_path.join(TEMP_STATE).exists());
+        assert!(dir_path.join(STATE).exists());
+
         token.flush().unwrap();
         let state = std::fs::metadata(dir_path.join(STATE)).unwrap();
         let mod1 = state.modified().unwrap();
@@ -323,14 +316,32 @@ mod tests {
         let disk = DiskStructure::new(dir_path).unwrap();
         let token = disk.into_wstate();
         token.write_state(&State::default()).unwrap();
-        std::mem::drop(token); // leaves inconsistent state
+        std::mem::drop(token); // leaves garbage
         assert!(dir_path.join(TEMP_STATE).is_file());
         assert!(dir_path.join(STATE).is_file());
-        match DiskStructure::new(dir_path) {
-            Err(DiskError::IOErr(err)) => {
-                assert_eq!(err.kind(), std::io::ErrorKind::InvalidData)
-            }
-            _ => panic!(),
+
+        // Opening a new disk collects garbage
+        let _ = DiskStructure::new(dir_path).unwrap();
+        assert!(!dir_path.join(TEMP_STATE).exists());
+        assert!(dir_path.join(STATE).is_file());
+    }
+
+    #[test]
+    fn invalid_state() {
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
+        let disk = DiskStructure::new(dir_path).unwrap();
+        let token = disk.into_wstate();
+        token.write_state(&State::default()).unwrap();
+        std::mem::drop(token);
+        std::fs::remove_file(dir_path.join(STATE)).unwrap();
+        assert!(dir_path.join(TEMP_STATE).is_file());
+        if let Err(DiskError::IOErr(err)) = DiskStructure::new(dir_path) {
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidData)
+        } else {
+            panic!("Expecting an error")
         }
+        std::fs::rename(dir_path.join(TEMP_STATE), dir_path.join(STATE)).unwrap();
+        assert!(DiskStructure::new(dir_path).is_ok());
     }
 }

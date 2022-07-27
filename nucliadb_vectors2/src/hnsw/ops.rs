@@ -11,7 +11,7 @@ use crate::vector;
 
 const NO_FILTER: &[String] = &[];
 #[derive(Clone, Copy)]
-struct StandardElem(pub Location, pub f32);
+struct StandardElem(pub Address, pub f32);
 impl Eq for StandardElem {}
 impl Ord for StandardElem {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -31,12 +31,12 @@ impl PartialOrd for StandardElem {
 
 #[derive(Default, Clone)]
 pub struct SearchValue {
-    pub neighbours: Vec<(Location, f32)>,
+    pub neighbours: Vec<(Address, f32)>,
 }
 
 pub struct HnswOps<'a> {
     pub txn: &'a RoTxn<'a>,
-    pub tracker: &'a DataRetriever,
+    pub tracker: &'a DataRetriever<'a>,
     pub vector_db: &'a VectorDB,
 }
 
@@ -44,8 +44,8 @@ impl<'a> HnswOps<'a> {
     fn select_neighbours_heuristic(
         &self,
         k_neighbours: usize,
-        mut candidates: Vec<(Location, f32)>,
-    ) -> Vec<(Location, f32)> {
+        mut candidates: Vec<(Address, f32)>,
+    ) -> Vec<(Address, f32)> {
         candidates.sort_unstable_by_key(|(n, d)| std::cmp::Reverse(StandardElem(*n, *d)));
         candidates.truncate(k_neighbours);
         candidates
@@ -59,11 +59,11 @@ impl<'a> HnswOps<'a> {
     }
     fn layer_search(
         &self,
-        x: Location,
+        x: Address,
         layer: &GraphLayer,
         k_neighbours: usize,
         with_filter: &[String],
-        entry_points: &[Location],
+        entry_points: &[Address],
     ) -> SearchValue {
         use vector::consine_similarity;
         let mut visited = HashSet::new();
@@ -105,7 +105,7 @@ impl<'a> HnswOps<'a> {
             .filter(|(node, _)| {
                 let key = self
                     .vector_db
-                    .get_node_key(self.txn, *node)
+                    .get_address_key(self.txn, *node)
                     .ok()
                     .flatten()
                     .unwrap();
@@ -116,7 +116,12 @@ impl<'a> HnswOps<'a> {
             .collect();
         SearchValue { neighbours }
     }
-    fn layer_insert(&self, x: Location, layer: &mut GraphLayer, entry_points: &[Location]) -> Vec<Location> {
+    fn layer_insert(
+        &self,
+        x: Address,
+        layer: &mut GraphLayer,
+        entry_points: &[Address],
+    ) -> Vec<Address> {
         use params::*;
         let s_result = self.layer_search(x, layer, ef_construction(), NO_FILTER, entry_points);
         let neighbours = s_result.neighbours;
@@ -140,7 +145,7 @@ impl<'a> HnswOps<'a> {
         }
         result
     }
-    fn layer_delete(&self, x: Location, layer: &mut GraphLayer) {
+    fn layer_delete(&self, x: Address, layer: &mut GraphLayer) {
         use params::*;
         let _out_edges = layer.take_out_edges(x);
         let in_edges = layer.take_in_edges(x);
@@ -159,14 +164,14 @@ impl<'a> HnswOps<'a> {
             }
         }
     }
-    pub fn delete(&self, x: Location, hnsw: &mut Hnsw) {
+    pub fn delete(&self, x: Address, hnsw: &mut Hnsw) {
         hnsw.layers
             .iter_mut()
             .filter(|layer| layer.has_node(x))
             .for_each(|layer| self.layer_delete(x, layer));
         hnsw.remove_empty_layers().update_entry_point();
     }
-    pub fn insert(&self, x: Location, hnsw: &mut Hnsw) {
+    pub fn insert(&self, x: Address, hnsw: &mut Hnsw) {
         match hnsw.entry_point {
             None => {
                 let top_level = self.get_random_layer();
@@ -188,7 +193,7 @@ impl<'a> HnswOps<'a> {
     }
     pub fn search(
         &self,
-        x: Location,
+        x: Address,
         hnsw: &Hnsw,
         k_neighbours: usize,
         with_filter: &[String],
@@ -201,7 +206,7 @@ impl<'a> HnswOps<'a> {
                 let SearchValue {
                     neighbours: layer_res,
                     ..
-                } = self.layer_search(x, &hnsw.layers[crnt_layer], 1, with_filter, &entry_points);
+                } = self.layer_search(x, &hnsw.layers[crnt_layer], 1, NO_FILTER, &entry_points);
                 neighbours = layer_res;
                 crnt_layer -= 1;
             }
