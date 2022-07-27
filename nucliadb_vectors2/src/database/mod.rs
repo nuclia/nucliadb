@@ -66,27 +66,37 @@ impl VectorDB {
             node_inv_db,
         })
     }
+
+    // Transactions
+
+    /// Return a new read-only transaction that can be used to perform
+    /// read operation on the database.
     pub fn ro_txn(&self) -> DBResult<RoTxn> {
         self.env.read_txn()
     }
+
+    /// Return a new read-write transaction that can be used to
+    /// perform write operations on the database.
     pub fn rw_txn(&self) -> DBResult<RwTxn> {
         self.env.write_txn()
     }
+
+    // Operations
+
     pub fn get_node(&self, txn: &RoTxn, vector: &str) -> DBResult<Option<Location>> {
         self.node_db.get(txn, vector)
     }
+
     pub fn get_node_key<'a>(&self, txn: &'a RoTxn, node: Location) -> DBResult<Option<&'a str>> {
         self.node_inv_db.get(txn, &node)
     }
-    pub fn has_label(&self, txn: &RoTxn, key: &str, label: &str) -> DBResult<bool> {
-        let path = self.label_entry(key, label);
-        self.label_db.get(txn, path.as_str()).map(|v| v.is_some())
-    }
+
     pub fn add_node(&self, txn: &mut RwTxn, key: &str, node: Location) -> DBResult<()> {
         self.node_db.put(txn, key, &node)?;
         self.node_inv_db.put(txn, &node, key)?;
         Ok(())
     }
+
     pub fn rmv_node(&self, txn: &mut RwTxn, key: &str) -> DBResult<()> {
         if let Some(node) = self.node_db.get(txn, key)? {
             self.node_db.delete(txn, key)?;
@@ -99,13 +109,21 @@ impl VectorDB {
         }
         Ok(())
     }
+
     pub fn add_label(&self, txn: &mut RwTxn, key: &str, label: &str) -> DBResult<()> {
         let path = self.label_entry(key, label);
         self.label_db.put(txn, path.as_str(), &())
     }
+
+    pub fn has_label(&self, txn: &RoTxn, key: &str, label: &str) -> DBResult<bool> {
+        let path = self.label_entry(key, label);
+        self.label_db.get(txn, path.as_str()).map(|v| v.is_some())
+    }
+
     pub fn get_keys<'a>(&'a self, txn: &'a RoTxn) -> DBResult<RoIter<Str, SerdeBincode<Location>>> {
         self.node_db.iter(txn)
     }
+
     pub fn nodes_prefixed_with<'a>(
         &'a self,
         txn: &'a RoTxn,
@@ -117,7 +135,199 @@ impl VectorDB {
     fn labels_prefix(&self, key: &str) -> String {
         format!("[{key}/]")
     }
+
     fn label_entry(&self, key: &str, label: &str) -> String {
         format!("[{key}/{label}]")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use tempfile::tempdir;
+
+    use crate::index::SegmentSlice;
+
+    use super::*;
+
+    #[test]
+    fn test_vectordb_nodes() {
+        let dir = tempdir().unwrap();
+        let vectordb = VectorDB::new(dir.path()).unwrap();
+
+        let node_1 = Location {
+            txn_id: 1,
+            slice: SegmentSlice { start: 0, end: 99 },
+        };
+
+        let node_2 = Location {
+            txn_id: 2,
+            slice: SegmentSlice {
+                start: 100,
+                end: 199,
+            },
+        };
+
+        let unsaved_node = Location {
+            txn_id: 3,
+            slice: SegmentSlice {
+                start: 200,
+                end: 299,
+            },
+        };
+
+        {
+            let mut rw_txn = vectordb.rw_txn().unwrap();
+            vectordb.add_node(&mut rw_txn, "node_1", node_1).unwrap();
+            vectordb.add_node(&mut rw_txn, "node_2", node_2).unwrap();
+            rw_txn.commit().unwrap();
+        }
+
+        let ro_txn = vectordb.ro_txn().unwrap();
+        assert_eq!(
+            node_1,
+            vectordb.get_node(&ro_txn, "node_1").unwrap().unwrap()
+        );
+        assert_eq!(
+            node_2,
+            vectordb.get_node(&ro_txn, "node_2").unwrap().unwrap()
+        );
+        assert!(vectordb.get_node(&ro_txn, "inexistent").unwrap().is_none());
+
+        assert_eq!(
+            "node_1",
+            vectordb.get_node_key(&ro_txn, node_1).unwrap().unwrap()
+        );
+        assert!(vectordb
+            .get_node_key(&ro_txn, unsaved_node)
+            .unwrap()
+            .is_none());
+
+        let keys = vectordb
+            .get_keys(&ro_txn)
+            .unwrap()
+            .map(|item| {
+                let (key, _) = item.unwrap();
+                key
+            })
+            .collect::<HashSet<&str>>();
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains("node_1"));
+        assert!(keys.contains("node_2"));
+        assert!(!keys.contains("inexistent"));
+
+        {
+            let mut rw_txn = vectordb.rw_txn().unwrap();
+            vectordb.rmv_node(&mut rw_txn, "node_1").unwrap();
+            rw_txn.commit().unwrap();
+        }
+
+        // As LMDB uses MVCC, the open read-only transaction will
+        // continue returning the deleted value
+        assert!(vectordb.get_node(&ro_txn, "node_1").unwrap().is_some());
+        // Starting a new transaction will give the updated view
+        drop(ro_txn);
+        let ro_txn = vectordb.ro_txn().unwrap();
+        assert!(vectordb.get_node(&ro_txn, "node_1").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_vectordb_labels() {
+        let dir = tempdir().unwrap();
+        let vectordb = VectorDB::new(dir.path()).unwrap();
+
+        let node = Location {
+            txn_id: 1,
+            slice: SegmentSlice { start: 0, end: 100 },
+        };
+
+        let key = "key_1";
+        let label = "label_1";
+
+        {
+            let mut rw_txn = vectordb.rw_txn().unwrap();
+            vectordb.add_node(&mut rw_txn, "node", node).unwrap();
+            rw_txn.commit().unwrap();
+        }
+
+        {
+            let ro_txn = vectordb.ro_txn().unwrap();
+            assert!(!vectordb.has_label(&ro_txn, key, label).unwrap());
+        }
+
+        {
+            let mut rw_txn = vectordb.rw_txn().unwrap();
+            vectordb.add_label(&mut rw_txn, key, label).unwrap();
+            rw_txn.commit().unwrap();
+        }
+
+        {
+            let ro_txn = vectordb.ro_txn().unwrap();
+            assert!(vectordb.has_label(&ro_txn, key, label).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_vectordb_iter_by_node_prefix() {
+        let dir = tempdir().unwrap();
+        let vectordb = VectorDB::new(dir.path()).unwrap();
+
+        let node_a1 = Location {
+            txn_id: 1,
+            slice: SegmentSlice { start: 0, end: 49 },
+        };
+
+        let node_a2 = Location {
+            txn_id: 2,
+            slice: SegmentSlice {
+                start: 50,
+                end: 149,
+            },
+        };
+
+        let node_b = Location {
+            txn_id: 3,
+            slice: SegmentSlice {
+                start: 150,
+                end: 300,
+            },
+        };
+
+        let mut rw_txn = vectordb.rw_txn().unwrap();
+        vectordb.add_node(&mut rw_txn, "node_A1", node_a1).unwrap();
+        vectordb.add_node(&mut rw_txn, "node_A2", node_a2).unwrap();
+        vectordb.add_node(&mut rw_txn, "node_B1", node_b).unwrap();
+        rw_txn.commit().unwrap();
+
+        let ro_txn = vectordb.ro_txn().unwrap();
+        assert_eq!(
+            vectordb
+                .nodes_prefixed_with(&ro_txn, "node")
+                .unwrap()
+                .count(),
+            3
+        );
+        assert_eq!(
+            vectordb
+                .nodes_prefixed_with(&ro_txn, "node_A")
+                .unwrap()
+                .count(),
+            2
+        );
+        assert_eq!(
+            vectordb
+                .nodes_prefixed_with(&ro_txn, "node_B")
+                .unwrap()
+                .count(),
+            1
+        );
+        assert_eq!(
+            vectordb
+                .nodes_prefixed_with(&ro_txn, "abc")
+                .unwrap()
+                .count(),
+            0
+        );
     }
 }
