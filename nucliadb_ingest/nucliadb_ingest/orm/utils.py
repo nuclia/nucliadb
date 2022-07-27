@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Optional
+import urllib.parse
 
 from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -63,10 +64,12 @@ async def get_basic(txn: Transaction, kbid: str, uuid: str) -> Optional[bytes]:
 
 
 def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
+    title = urllib.parse.unquote(title)
     writer.basic.title = title
     etw = ExtractedTextWrapper()
     etw.field.field = "title"
     etw.field.field_type = FieldType.GENERIC
     etw.body.text = title
     writer.extracted_text.append(etw)
+
     toprocess.genericfield["title"] = Text(body=title, format=PushTextFormat.PLAIN)
