@@ -53,7 +53,7 @@ impl<'a> Query for SearchQuery<'a> {
             };
             while down_step.layer != 0 {
                 let result = down_step.run();
-                down_step.entry_points[0] = result.neighbours[0].0;
+                down_step.entry_points = result.neighbours.into_iter().map(|(n, _)| n).collect();
                 down_step.layer -= 1;
             }
             let mut final_search = down_step;
