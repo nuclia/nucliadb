@@ -39,7 +39,6 @@ use tantivy::{
 use tracing::*;
 
 use super::schema::FieldSchema;
-use crate::search_query::SearchQuery;
 
 #[derive(Debug)]
 struct TError(TantivyError);
@@ -400,6 +399,7 @@ impl FieldReaderService {
         request: &DocumentSearchRequest,
         multic_flag: bool,
     ) -> DocumentSearchResponse {
+        use crate::search_query::create_query;
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
@@ -407,9 +407,7 @@ impl FieldReaderService {
         };
         let text = FieldReaderService::adapt_text(&query_parser, &request.body);
         let query = if !request.body.is_empty() {
-            let extended_query = SearchQuery::document(request, &text).unwrap();
-            info!("{}", extended_query);
-            query_parser.parse_query(&extended_query).unwrap()
+            create_query(&query_parser, request, &self.schema, &text)
         } else {
             Box::new(AllQuery) as Box<dyn Query>
         };

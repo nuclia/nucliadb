@@ -20,86 +20,47 @@
 // use std::convert::TryFrom;
 // use std::time::SystemTime;
 
-use nucliadb_protos::{DocumentSearchRequest, Filter};
+use nucliadb_protos::DocumentSearchRequest;
 use nucliadb_service_interface::dependencies::*;
+use tantivy::query::*;
+use tantivy::schema::{Facet, IndexRecordOption};
+use tantivy::Term;
 
-pub struct SearchQuery {
-    pub query: String,
-}
+use crate::schema::FieldSchema;
 
-impl SearchQuery {
-    fn create(search: &DocumentSearchRequest, body: &str) -> String {
-        let fields = &search.fields;
-        let filter = &search.filter;
+pub fn create_query(
+    parser: &QueryParser,
+    search: &DocumentSearchRequest,
+    schema: &FieldSchema,
+    text: &str,
+) -> Box<dyn Query> {
+    let mut queries = vec![];
+    let main_q = if text.is_empty() {
+        Box::new(AllQuery)
+    } else {
+        parser.parse_query(text).unwrap()
+    };
 
-        let mut query = String::from("");
-        if !body.is_empty() {
-            query.push_str(body);
-        }
+    queries.push((Occur::Must, main_q));
+    // Fields
+    search.fields.iter().for_each(|value| {
+        let facet_key: String = format!("/{}", value);
+        let facet = Facet::from(facet_key.as_str());
+        let facet_term = Term::from_facet(schema.field, &facet);
+        let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+        queries.push((Occur::Must, Box::new(facet_term_query)));
+    });
 
-        if !fields.is_empty() {
-            query.push_str(" ( ")
-        }
-
-        let mut first: bool = true;
-
-        for field in fields {
-            if first {
-                let t = format!(" field:\"/{}\" ", field);
-                query.push_str(&t);
-                first = false;
-            } else {
-                let t = format!("OR field:\"/{}\" ", field);
-                query.push_str(&t);
-            }
-        }
-
-        if !fields.is_empty() {
-            query.push_str(" ) ")
-        }
-
-        SearchQuery::add_filter(filter, &mut query);
-
-        // if let Some(timestamps) = &search.timestamps {
-        //     SearchQuery::add_date_filters(timestamps, &mut query);
-        // }
-        query
-    }
-
-    fn add_filter(filter: &Option<Filter>, query: &mut String) {
-        use std::fmt::Write;
-        if let Some(filter) = filter {
-            for value in &filter.tags {
-                write!(query, " facets:\"{}\"", value).unwrap();
-            }
-        }
-    }
-
-    pub fn document(search: &DocumentSearchRequest, body: &str) -> tantivy::Result<String> {
-        let query: String = SearchQuery::create(search, body);
-
-        Ok(query)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_document_creation() {
-        let request = DocumentSearchRequest {
-            body: "test".to_string(),
-            page_number: 0,
-            result_per_page: 10,
-            id: "".to_string(),
-            filter: None,
-            order: None,
-            faceted: None,
-            fields: vec![],
-            timestamps: None,
-            reload: false,
-        };
-        let query = SearchQuery::document(&request, &request.body).unwrap();
-        println!("{}", query);
-    }
+    // Add filter
+    search
+        .filter
+        .iter()
+        .flat_map(|f| f.tags.iter())
+        .for_each(|value| {
+            let facet = Facet::from(value.as_str());
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            queries.push((Occur::Should, Box::new(facet_term_query)));
+        });
+    Box::new(BooleanQuery::new(queries))
 }
