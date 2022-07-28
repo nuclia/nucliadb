@@ -18,16 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import argparse
 import asyncio
 import logging
-import argparse
+import os
 from typing import Optional
+
+import uvicorn  # type: ignore
+
 from nucliadb_ingest.orm import NODE_CLUSTER
 from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.purge import main
-
-import uvicorn
-import os
 
 logger = logging.getLogger("nucliadb")
 
@@ -165,19 +166,18 @@ def run():
 def config_nucliadb(nucliadb_args: Settings):
     from nucliadb_ingest.settings import settings as ingest_settings
     from nucliadb_train.settings import settings as train_settings
-    from nucliadb_search.settings import settings as search_settings
-    from nucliadb_writer.settings import settings as writer_settings
+    from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
-        running_settings,
+        audit_settings,
         http_settings,
-        storage_settings,
+        indexing_settings,
         nuclia_settings,
         nucliadb_settings,
+        running_settings,
+        storage_settings,
         transaction_settings,
-        audit_settings,
-        indexing_settings,
     )
-    from nucliadb_utils.cache.settings import settings as cache_settings
+    from nucliadb_writer.settings import settings as writer_settings
 
     running_settings.log_level = nucliadb_args.log.upper()
     train_settings.grpc_port = nucliadb_args.train
@@ -194,7 +194,8 @@ def config_nucliadb(nucliadb_args: Settings):
     else:
         nuclia_settings.nuclia_service_account = nucliadb_args.key
     nuclia_settings.onprem = True
-    nuclia_settings.nuclia_zone = nucliadb_args.zone
+    if nucliadb_args.zone is not None:
+        nuclia_settings.nuclia_zone = nucliadb_args.zone
     if nucliadb_args.host:
         nuclia_settings.nuclia_public_url = nucliadb_args.host
     nucliadb_settings.nucliadb_ingest = None
@@ -245,17 +246,17 @@ async def run_async_nucliadb(nucliadb_args: Settings):
 
 def purge():
     from nucliadb_ingest.settings import settings as ingest_settings
-    from nucliadb_writer.settings import settings as writer_settings
+    from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
-        running_settings,
-        storage_settings,
-        nuclia_settings,
-        nucliadb_settings,
-        transaction_settings,
         audit_settings,
         indexing_settings,
+        nuclia_settings,
+        nucliadb_settings,
+        running_settings,
+        storage_settings,
+        transaction_settings,
     )
-    from nucliadb_utils.cache.settings import settings as cache_settings
+    from nucliadb_writer.settings import settings as writer_settings
 
     nucliadb_args = arg_parse()
 

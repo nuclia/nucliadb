@@ -17,14 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb import Settings, config_nucliadb, run_async_nucliadb
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_protos.train_pb2_grpc import TrainStub
-from httpx import AsyncClient
-from nucliadb_writer import API_PREFIX
-import pytest
 import tempfile
+
+import pytest
 from grpc import aio
+from httpx import AsyncClient
+from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+
+from nucliadb import Settings, config_nucliadb, run_async_nucliadb
+from nucliadb_writer import API_PREFIX
 
 
 def free_port() -> int:

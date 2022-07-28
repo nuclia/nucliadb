@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, List
+import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -29,7 +29,6 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-import pytest
 
 
 @pytest.mark.asyncio
@@ -84,7 +83,7 @@ async def test_creation(
     async def iterate(value: BrokerMessage):
         yield value
 
-    await nucliadb_grpc.ProcessMessage(iterate(bm))
+    await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata"
@@ -126,6 +125,6 @@ async def test_creation(
     request.metadata.labels = True
     request.metadata.text = True
     paragraph: TrainParagraph
-    async for paragraph in nucliadb_train.GetParagraphs(request):
+    async for paragraph in nucliadb_train.GetParagraphs(request):  # type: ignore
         assert paragraph.metadata.text == "My text"
         assert paragraph.metadata.labels.paragraph[0].label == "title"

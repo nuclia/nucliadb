@@ -1,15 +1,16 @@
 from typing import Iterator
+
 from nucliadb_protos.train_pb2 import (
     TrainField,
     TrainParagraph,
     TrainResource,
     TrainSentence,
 )
-from nucliadb_dataset import CLIENT_ID
-from nucliadb_dataset import NUCLIA_GLOBAL
+from nucliadb_protos.writer_pb2 import GetLabelsResponse
+
+from nucliadb_dataset import CLIENT_ID, NUCLIA_GLOBAL
 from nucliadb_dataset.nuclia import NucliaDriver
 from nucliadb_dataset.settings import settings
-from nucliadb_protos.writer_pb2 import GetLabelsResponse
 
 
 def get_nuclia_client() -> NucliaDriver:
