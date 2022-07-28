@@ -515,7 +515,6 @@ class GCSStorage(Storage):
             labels["kbid"] = kbid.lower()
         await self._create_bucket(url, headers, bucket_name, labels)
 
-    @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     async def _create_bucket(self, url, headers, bucket_name, labels):
 
         async with self.session.post(
@@ -533,7 +532,7 @@ class GCSStorage(Storage):
                 },
             },
         ) as resp:
-            if resp.status != 200:
+            if resp.status not in [200, 409]:
                 logger.info(f"Creation of bucket error: {resp.status}")
                 text = await resp.text()
                 logger.info(f"Bucket : {bucket_name}")
