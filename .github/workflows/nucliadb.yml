@@ -1,7 +1,7 @@
-name: nucliadb One (py)
+name: nucliadb (py)
 env:
   API_VERSION: 1
-  COMPONENT: nucliadb-one
+  COMPONENT: nucliadb
 on:
   pull_request:
     branches:
@@ -126,4 +126,4 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
-          flags: one
+          flags: nucliadb
