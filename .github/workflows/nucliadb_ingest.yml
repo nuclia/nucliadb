@@ -58,7 +58,7 @@ jobs:
       - name: Run pre-checks
         run: |
           flake8 nucliadb_ingest --config=nucliadb_ingest/setup.cfg
-          isort -c --profile black nucliadb_ingest/
+          # isort -c --profile black nucliadb_ingest/
           black --check --verbose nucliadb_ingest
 
   # Job to run tests
