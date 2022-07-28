@@ -430,7 +430,7 @@ class KnowledgeBox:
                 await txn.delete(key)
             await txn.commit(resource=False)
 
-    async def get_resource_shard(self, shard_id: str) -> Optional[Shard]:
+    async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
 
         key = KB_SHARDS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
@@ -440,7 +440,7 @@ class KnowledgeBox:
         pb.ParseFromString(payload)
         for shard in pb.shards:
             if shard.shard == shard_id:
-                return Shard(shard_id, shard)
+                return node_klass.create_shard_klass(shard_id, shard)
         return None
 
     async def get(self, uuid: str) -> Optional[Resource]:

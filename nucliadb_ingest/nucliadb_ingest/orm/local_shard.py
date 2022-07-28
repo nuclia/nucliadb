@@ -19,17 +19,19 @@
 #
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
+from nucliadb_ingest.orm.abc import AbstractShard
+
 if TYPE_CHECKING:
     from nucliadb_ingest.orm.local_node import LocalNode
 
 
-class LocalShard:
+class LocalShard(AbstractShard):
     def __init__(self, sharduuid: str, shard: PBShard, node: LocalNode):
         self.shard = shard
         self.sharduuid = sharduuid
@@ -41,6 +43,8 @@ class LocalShard:
         req.shard_id = self.sharduuid
         await self.node.delete_resource(req)
 
-    async def add_resource(self, resource: PBBrainResource, txid: int) -> int:
+    async def add_resource(
+        self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
+    ) -> int:
         res = await self.node.add_resource(resource)
         return res.count

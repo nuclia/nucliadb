@@ -54,8 +54,8 @@ class FieldID(BaseModel):
         GENERIC = "generic"
         CONVERSATION = "conversation"
 
-    field_type: Optional[FieldType]
-    field: Optional[str]
+    field_type: FieldType
+    field: str
 
 
 class FileB64(BaseModel):

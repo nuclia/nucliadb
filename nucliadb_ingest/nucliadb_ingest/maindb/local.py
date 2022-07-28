@@ -175,8 +175,10 @@ class LocalTransaction(Transaction):
         total_count = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
         real_count = 0
         path = self.compute_path(match)
-        for str_key in glob.glob(path + "*", recursive=True):
+        for str_key in glob.glob(path + "**", recursive=True):
             if str_key in self.deleted_keys:
+                continue
+            if os.path.isdir(str_key):
                 continue
             for new_key in self.modified_keys.keys():
                 if (
@@ -185,9 +187,9 @@ class LocalTransaction(Transaction):
                     and prev_key < new_key
                     and new_key < str_key
                 ):
-                    yield new_key
+                    yield new_key.replace(self.url, "")
 
-            yield str_key
+            yield str_key.replace(self.url, "")
             if real_count >= total_count:
                 break
             real_count += 1
@@ -195,11 +197,11 @@ class LocalTransaction(Transaction):
         if prev_key is None:
             for new_key in self.modified_keys.keys():
                 if match in new_key:
-                    yield new_key
+                    yield new_key.replace(self.url, "")
 
 
 class LocalDriver(Driver):
-    url = None
+    url: str
 
     def __init__(self, url: str):
         self.url = os.path.abspath(url.rstrip("/"))
@@ -222,8 +224,11 @@ class LocalDriver(Driver):
     ):
         path = f"{self.url}/{match}"
         actual_count = 0
-        for str_key in glob.glob(path + "*", recursive=True):
-            yield str_key
+        for str_key in glob.glob(path + "**", recursive=True):
+            if os.path.isdir(str_key):
+                continue
+
+            yield str_key.replace(self.url, "")
             if actual_count >= count:
                 break
             actual_count += 1

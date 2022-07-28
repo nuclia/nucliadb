@@ -170,7 +170,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         async for message in request_stream:
-            await self.proc.process(message, -1, 0)
+            await self.proc.process(message, -1, 0, transaction_check=False)
+        response = OpStatusWriter()
+        response.status = OpStatusWriter.Status.OK
+        return response
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
         txn = await self.proc.driver.begin()
@@ -469,9 +472,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         brain = await resobj.generate_index_message()
         shard_id = await kbobj.get_resource_shard_id(request.rid)
         shard: Optional[Shard] = None
-        if shard_id is not None:
-            shard = await kbobj.get_resource_shard(shard_id)
         node_klass = get_node_klass()
+        if shard_id is not None:
+            shard = await kbobj.get_resource_shard(shard_id, node_klass)
         if shard is None:
             # Its a new resource
             # Check if we have enough resource to create a new shard

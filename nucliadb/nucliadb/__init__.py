@@ -1,6 +1,27 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 import asyncio
 import logging
 import argparse
+from typing import Optional
 from nucliadb_ingest.orm import NODE_CLUSTER
 from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.purge import main
@@ -76,6 +97,19 @@ log_config = {
 }
 
 
+class Settings:
+    maindb: str
+    blob: str
+    key: Optional[str] = None
+    node: str
+    host: Optional[str] = None
+    zone: Optional[str] = None
+    http: int
+    grpc: int
+    train: int
+    log: str
+
+
 def arg_parse():
 
     parser = argparse.ArgumentParser(description="Process some integers.")
@@ -103,6 +137,15 @@ def arg_parse():
     )
 
     parser.add_argument(
+        "-t",
+        "--train",
+        dest="train",
+        default=8060,
+        help="NucliaDB Train Port",
+        type=int,
+    )
+
+    parser.add_argument(
         "-s", "--http", dest="http", default=8080, help="NucliaDB HTTP Port", type=int
     )
 
@@ -113,7 +156,15 @@ def arg_parse():
 
 
 def run():
+
+    nucliadb_args = arg_parse()
+    config_nucliadb(nucliadb_args)
+    run_nucliadb(nucliadb_args)
+
+
+def config_nucliadb(nucliadb_args: Settings):
     from nucliadb_ingest.settings import settings as ingest_settings
+    from nucliadb_train.settings import settings as train_settings
     from nucliadb_search.settings import settings as search_settings
     from nucliadb_writer.settings import settings as writer_settings
     from nucliadb_utils.settings import (
@@ -127,20 +178,21 @@ def run():
         indexing_settings,
     )
     from nucliadb_utils.cache.settings import settings as cache_settings
-    from nucliadb_one.app import application
-
-    nucliadb_args = arg_parse()
 
     running_settings.log_level = nucliadb_args.log.upper()
+    train_settings.grpc_port = nucliadb_args.train
     ingest_settings.driver = "local"
     ingest_settings.driver_local_url = nucliadb_args.maindb
     ingest_settings.chitchat_enabled = False
-    search_settings.chitchat_enabled = False
     running_settings.debug = True
     http_settings.cors_origins = ["*"]
     storage_settings.file_backend = "local"
     storage_settings.local_files = nucliadb_args.blob
-    nuclia_settings.nuclia_service_account = nucliadb_args.key
+    if nucliadb_args.key is None:
+        ingest_settings.pull_time = 0
+        nuclia_settings.disable_send_to_process = True
+    else:
+        nuclia_settings.nuclia_service_account = nucliadb_args.key
     nuclia_settings.onprem = True
     nuclia_settings.nuclia_zone = nucliadb_args.zone
     if nucliadb_args.host:
@@ -157,25 +209,45 @@ def run():
 
     local_node = LocalNode()
     NODE_CLUSTER.local_node = local_node
+
+
+def run_nucliadb(nucliadb_args: Settings):
+    from nucliadb_one.app import application
+    from nucliadb_utils.settings import running_settings
+
     uvicorn.run(
         application,
         host="0.0.0.0",
         port=nucliadb_args.http,
         log_config=log_config,
-        log_level=logging.getLevelName("INFO"),
+        log_level=logging.getLevelName(running_settings.log_level),
         debug=True,
         reload=False,
     )
     logger.info(f"======= REST API on http://0.0.0.0:{nucliadb_args.http}/ ======")
 
 
+async def run_async_nucliadb(nucliadb_args: Settings):
+    from nucliadb_one.app import application
+    from nucliadb_utils.settings import running_settings
+
+    config = uvicorn.Config(
+        application,
+        port=nucliadb_args.http,
+        log_level=logging.getLevelName(running_settings.log_level),
+    )
+    server = uvicorn.Server(config)
+    config.load()
+    server.lifespan = config.lifespan_class(config)
+    await server.startup()
+    return server
+
+
 def purge():
     from nucliadb_ingest.settings import settings as ingest_settings
-    from nucliadb_search.settings import settings as search_settings
     from nucliadb_writer.settings import settings as writer_settings
     from nucliadb_utils.settings import (
         running_settings,
-        http_settings,
         storage_settings,
         nuclia_settings,
         nucliadb_settings,

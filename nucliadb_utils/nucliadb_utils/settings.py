@@ -82,6 +82,7 @@ class NucliaSettings(BaseSettings):
     nuclia_partitions: int = 1
 
     dummy_processing: bool = False
+    disable_send_to_process: bool = False
 
     @root_validator(pre=True)
     def check_relation_is_valid(cls, values):

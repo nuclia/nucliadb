@@ -239,6 +239,6 @@ FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
     resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
 }
 
-FIELD_TYPES_MAP_REVERSE: Dict[FieldTypeName, int] = {
-    y.value: x for x, y in FIELD_TYPES_MAP.items()
+FIELD_TYPES_MAP_REVERSE: Dict[str, int] = {
+    y.value: x for x, y in FIELD_TYPES_MAP.items()  # type: ignore
 }

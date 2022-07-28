@@ -164,7 +164,8 @@ class Processor:
         if shard_id is None:
             logger.warn(f"Resource {uuid} does not exist")
         else:
-            shard: Optional[Shard] = await kb.get_resource_shard(shard_id)
+            node_klass = get_node_klass()
+            shard: Optional[Shard] = await kb.get_resource_shard(shard_id, node_klass)
             if shard is None:
                 raise AttributeError("Shard not available")
             await shard.delete_resource(message.uuid, seqid)
@@ -211,7 +212,6 @@ class Processor:
             for message in messages:
                 if resource is not None:
                     assert resource.uuid == message.uuid
-
                 resource = await self.apply_resource(message, kb, resource)
 
             if resource:
@@ -221,10 +221,11 @@ class Processor:
             if resource and resource.modified:
                 shard_id = await kb.get_resource_shard_id(uuid)
                 shard: Optional[Shard] = None
-                if shard_id is not None:
-                    shard = await kb.get_resource_shard(shard_id)
-
                 node_klass = get_node_klass()
+
+                if shard_id is not None:
+                    shard = await kb.get_resource_shard(shard_id, node_klass)
+
                 if shard is None:
                     # Its a new resource
                     # Check if we have enough resource to create a new shard

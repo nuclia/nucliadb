@@ -180,8 +180,8 @@ class UserMetadata(BaseModel):
 
 
 class TokenSplit(BaseModel):
-    token: Optional[str]
-    klass: Optional[str]
+    token: str
+    klass: str
 
 
 class ParagraphAnnotation(BaseModel):
@@ -190,9 +190,9 @@ class ParagraphAnnotation(BaseModel):
 
 
 class UserFieldMetadata(BaseModel):
-    token: Optional[List[TokenSplit]]
-    paragraphs: Optional[List[ParagraphAnnotation]]
-    field: Optional[FieldID]
+    token: List[TokenSplit] = []
+    paragraphs: List[ParagraphAnnotation] = []
+    field: FieldID
 
 
 class Basic(BaseModel):

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from nucliadb_models.resource import FIELD_TYPES_MAP_REVERSE
 
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -36,6 +35,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_ingest.orm.utils import set_title
 from nucliadb_ingest.processing import PushPayload
 from nucliadb_models import RelationType
+from nucliadb_models.resource import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_writer.api.models import (
     ComminResourcePayload,
@@ -76,13 +76,14 @@ def parse_basic_modify(
                 for classification in paragraph.classifications:
                     paragraphpb.classifications.append(
                         Classification(
-                            labelset=classification.labelset, label=classification.label
+                            labelset=classification.labelset,
+                            label=classification.label,
                         )
                     )
                 userfieldmetadata.paragraphs.append(paragraphpb)
 
             userfieldmetadata.field.field = fieldmetadata.field.field
-            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[
+            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[  # type: ignore
                 fieldmetadata.field.field_type.value
             ]
 
