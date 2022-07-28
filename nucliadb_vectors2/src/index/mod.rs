@@ -19,6 +19,7 @@
 //
 
 // mod garbage_collector;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -27,8 +28,8 @@ use memmap2::Mmap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::database::{DBErr, VectorDB};
-use crate::disk_structure::*;
+use crate::database::{DBErr, RoTxn, VectorDB};
+use crate::disk_structure::{self, DiskError, Lock, WDeletelog, WSegment};
 use crate::hnsw::Hnsw;
 
 #[derive(
@@ -123,14 +124,29 @@ pub enum IdxError {
 type IdxResult<T> = Result<T, IdxError>;
 
 pub struct Index {
+    version: disk_structure::Version,
     address: PathBuf,
-    segments: HashMap<usize, Segment>,
     database: VectorDB,
-    txn_log: TransactionLog,
-    hnsw: Hnsw,
+    segments: RefCell<HashMap<usize, Segment>>,
+    txn_log: RefCell<TransactionLog>,
+    hnsw: RefCell<Hnsw>,
 }
 
 impl Index {
+    fn update(&self, lock: &Lock) -> IdxResult<()> {
+        let state = State {
+            txn_log: self.txn_log.take(),
+            hnsw: self.hnsw.take(),
+        };
+        let (version, state) = disk_structure::update(lock, self.version, state)?;
+        if version > self.version {
+            self.segments
+                .replace(Index::map_segments(lock, &state.txn_log)?);
+        }
+        self.txn_log.replace(state.txn_log);
+        self.hnsw.replace(state.hnsw);
+        Ok(())
+    }
     fn store_vectors(
         &self,
         mut wsegment: WSegment,
@@ -159,15 +175,20 @@ impl Index {
         Ok(dlog.log)
     }
 
-    fn hnsw_update(&self, hnsw: &mut Hnsw, add: &[Address], rmv: &[Address]) -> IdxResult<()> {
+    fn hnsw_update(
+        &self,
+        txn: &RoTxn,
+        hnsw: &mut Hnsw,
+        add: &[Address],
+        rmv: &[Address],
+    ) -> IdxResult<()> {
         use crate::hnsw::ops::HnswOps;
-        let ro = self.database.ro_txn()?;
         let ops = HnswOps {
-            txn: &ro,
+            txn,
             vector_db: &self.database,
             tracker: &DataRetriever {
                 temp: &[],
-                segments: &self.segments,
+                segments: &self.segments.borrow(),
             },
         };
         add.iter().copied().for_each(|x| ops.insert(x, hnsw));
@@ -175,49 +196,50 @@ impl Index {
         Ok(())
     }
 
-    fn txn_log_store(&self, txn_log: &mut TransactionLog, id: usize) -> IdxResult<()> {
-        txn_log.entries.push(id);
+    fn segment_store(&mut self, id: usize, segment: Segment) -> IdxResult<()> {
+        self.txn_log.get_mut().entries.push(id);
+        self.segments.get_mut().insert(id, segment);
         Ok(())
     }
 
     fn record_txn(&mut self, bch: Batch) -> IdxResult<()> {
-        // Taking txn_log and hnsw from the state to be updated
-        let mut txn_log = std::mem::take(&mut self.txn_log);
-        let mut hnsw = std::mem::take(&mut self.hnsw);
+        // Exclusive lock scope starts
+        let lock = disk_structure::exclusive_lock(&self.address)?;
 
-        // bch is stored in a new txn on disk
-        let txn_id = txn_log.fresh;
-        txn_log.fresh += 1;
-        let disk = DiskStructure::new(&self.address)?;
-        let (wsegment, wdlog) = disk.create_txn(txn_id)?;
+        // bch is stored in a new txn on disk, recorded in memory
+        let txn_id = self.txn_log.borrow().fresh;
+        self.txn_log.get_mut().fresh += 1;
+        let (wsegment, wdlog) = disk_structure::create_txn(&lock, txn_id)?;
         let additions = self.store_vectors(wsegment, &bch.add_vectors)?;
         let deletions = self.store_delete_log(wdlog, &bch.rmv_keys)?;
-
-        // The hnsw and the txn_log are updated
-        self.hnsw_update(&mut hnsw, &additions, &deletions)?;
-        self.txn_log_store(&mut txn_log, txn_id)?;
+        let new_segment = disk_structure::read_segment(&lock, txn_id)?;
+        self.segment_store(txn_id, new_segment)?;
 
         // Database and disk state update
-        let state = State { txn_log, hnsw };
+        // Taking txn_log and hnsw from the state to be updated
         let mut rw = self.database.rw_txn()?;
-        let wstate = disk.into_wstate();
         bch.add_keys
-            .into_iter()
-            .zip(additions.into_iter())
-            .zip(bch.add_labels.into_iter())
-            .map(|((i, j), k)| self.database.add_address(&mut rw, &i, j, &k))
+            .iter()
+            .zip(additions.iter().copied())
+            .zip(bch.add_labels.iter())
+            .map(|((i, j), k)| self.database.add_address(&mut rw, i, j, k))
             .collect::<Result<Vec<_>, _>>()?;
-        wstate.write_state(&state)?;
+
+        // The hnsw index is updated
+        let mut hnsw = self.hnsw.take();
+        self.hnsw_update(&rw, &mut hnsw, &additions, &deletions)?;
+        let txn_log = self.txn_log.take();
+        let state = State { txn_log, hnsw };
+        disk_structure::write_state(&lock, &state)?;
+        self.hnsw = state.hnsw.into();
+        self.txn_log = state.txn_log.into();
+        // Trying to end the transaction
         rw.commit()
             .map_err(IdxError::from)
-            .and_then(|_| wstate.flush().map_err(IdxError::from))?;
-
-        // Update the state in the index
-        self.hnsw = state.hnsw;
-        self.txn_log = state.txn_log;
+            .and_then(|_| lock.commit().map_err(IdxError::from))?;
+        // Exclusive lock scope ends
         Ok(())
     }
-
     pub fn write(&mut self, bch: Batch) -> IdxResult<()> {
         match self.record_txn(bch) {
             err @ Err(_) => {
@@ -226,15 +248,27 @@ impl Index {
                 std::mem::take(&mut self.txn_log);
                 std::mem::take(&mut self.hnsw);
                 // Disk recovery may fail
-                let disk = DiskStructure::new(&self.address).unwrap();
-                let state = disk.get_state().unwrap();
+                let lock = disk_structure::shared_lock(&self.address).unwrap();
+                disk_structure::init_env(&lock).unwrap();
+                let (version, state) = disk_structure::read_state(&lock).unwrap();
                 // going back to a safe state
-                self.txn_log = state.txn_log;
-                self.hnsw = state.hnsw;
+                self.segments = Index::map_segments(&lock, &state.txn_log).unwrap().into();
+                self.version = version;
+                self.txn_log = state.txn_log.into();
+                self.hnsw = state.hnsw.into();
                 err
             }
             v => v,
         }
+    }
+    fn map_segments(lock: &Lock, txn_log: &TransactionLog) -> IdxResult<HashMap<usize, Segment>> {
+        txn_log
+            .entries
+            .iter()
+            .copied()
+            .map(|id| disk_structure::read_segment(lock, id).map(|s| (id, s)))
+            .map(|v| v.map_err(IdxError::from))
+            .collect::<IdxResult<HashMap<_, _>>>()
     }
     pub fn search(
         &self,
@@ -245,9 +279,11 @@ impl Index {
         use crate::hnsw::ops::HnswOps;
         use crate::vector::encode_vector;
         let ro = self.database.ro_txn()?;
+        let lock = disk_structure::shared_lock(&self.address)?;
+        self.update(&lock)?;
         let encoded = encode_vector(x);
         let temp_address = Address {
-            txn_id: self.txn_log.fresh,
+            txn_id: self.txn_log.borrow().fresh,
             slice: SegmentSlice { start: 0, end: 0 },
         };
         let ops = HnswOps {
@@ -255,10 +291,10 @@ impl Index {
             vector_db: &self.database,
             tracker: &DataRetriever {
                 temp: &encoded,
-                segments: &self.segments,
+                segments: &self.segments.borrow(),
             },
         };
-        ops.search(temp_address, &self.hnsw, k_neighbours, with_filter)
+        ops.search(temp_address, &self.hnsw.borrow(), k_neighbours, with_filter)
             .neighbours
             .into_iter()
             .map_while(|(addr, dist)| {
@@ -271,23 +307,19 @@ impl Index {
             .collect()
     }
     pub fn new<P: AsRef<Path>>(path: P) -> IdxResult<Index> {
-        let disk = DiskStructure::new(path.as_ref())?;
-        let state = disk.get_state()?;
-        let database = disk.get_db()?;
-        let segments = state
-            .txn_log
-            .entries
-            .iter()
-            .copied()
-            .map(|id| disk.get_segment(id).map(|s| (id, s)))
-            .collect::<Result<HashMap<_, _>, _>>()?;
-        std::mem::drop(disk);
+        let lock = disk_structure::shared_lock(path.as_ref())?;
+        disk_structure::init_env(&lock)?;
+        let (version, state) = disk_structure::read_state(&lock)?;
+        let database = disk_structure::open_db(&lock)?;
+        let segments = Index::map_segments(&lock, &state.txn_log)?;
+        std::mem::drop(lock);
         Ok(Index {
-            address: path.as_ref().to_path_buf(),
-            hnsw: state.hnsw,
-            txn_log: state.txn_log,
+            version,
             database,
-            segments,
+            address: path.as_ref().to_path_buf(),
+            hnsw: RefCell::new(state.hnsw),
+            txn_log: RefCell::new(state.txn_log),
+            segments: RefCell::new(segments),
         })
     }
 }

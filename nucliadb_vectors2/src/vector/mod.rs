@@ -71,5 +71,9 @@ mod test {
             naive_cosine_similatiry(&v0, &v1),
             consine_similarity(&v0_r, &v1_r)
         );
+        assert_eq!(
+            naive_cosine_similatiry(&v0, &v0),
+            consine_similarity(&v0_r, &v0_r)
+        );
     }
 }

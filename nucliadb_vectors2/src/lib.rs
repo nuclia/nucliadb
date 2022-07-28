@@ -22,4 +22,6 @@ pub mod database;
 pub mod disk_structure;
 pub mod hnsw;
 pub mod index;
+#[cfg(test)]
+mod tests;
 pub mod vector;

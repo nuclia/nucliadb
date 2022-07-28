@@ -172,17 +172,17 @@ impl<'a> HnswOps<'a> {
         hnsw.remove_empty_layers().update_entry_point();
     }
     pub fn insert(&self, x: Address, hnsw: &mut Hnsw) {
+        println!("INSERTING");
         match hnsw.entry_point {
             None => {
                 let top_level = self.get_random_layer();
                 hnsw.increase_layers_with(x, top_level).update_entry_point();
             }
             Some(entry_point) => {
-                let searchv = self.search(x, hnsw, 1, &[]);
-                let (ep, _) = searchv.neighbours[0];
                 let level = self.get_random_layer();
                 hnsw.increase_layers_with(x, level);
                 let top_layer = std::cmp::min(entry_point.layer, level);
+                let ep = entry_point.node;
                 hnsw.layers[0..=top_layer]
                     .iter_mut()
                     .rev()

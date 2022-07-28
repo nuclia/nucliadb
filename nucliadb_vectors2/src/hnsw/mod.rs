@@ -149,7 +149,7 @@ impl Hnsw {
         Hnsw::default()
     }
     fn increase_layers_with(&mut self, x: Address, level: usize) -> &mut Self {
-        while self.layers.len() < level {
+        while self.layers.len() <= level {
             let mut new_layer = GraphLayer::new();
             new_layer.add_node(x);
             self.layers.push(new_layer);
@@ -165,8 +165,10 @@ impl Hnsw {
     fn update_entry_point(&mut self) -> &mut Self {
         self.entry_point = self
             .layers
+            .iter()
+            .enumerate()
             .last()
-            .and_then(|l| l.first().map(|node| (node, self.layers.len())))
+            .and_then(|(index, l)| l.first().map(|node| (node, index)))
             .map(|(node, layer)| EntryPoint { node, layer });
         self
     }
