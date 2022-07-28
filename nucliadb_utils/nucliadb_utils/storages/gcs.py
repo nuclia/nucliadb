@@ -532,7 +532,7 @@ class GCSStorage(Storage):
                 },
             },
         ) as resp:
-            if resp.status not in [200, 409]:
+            if resp.status != 200:
                 logger.info(f"Creation of bucket error: {resp.status}")
                 text = await resp.text()
                 logger.info(f"Bucket : {bucket_name}")
