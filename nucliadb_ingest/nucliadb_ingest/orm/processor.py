@@ -447,6 +447,7 @@ class Processor:
 
         if failed:
             await txn.abort()
+            raise Exception("Failed to create KB")
         else:
             await txn.commit(resource=False)
         return uuid
