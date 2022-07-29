@@ -40,6 +40,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_ingest import logger
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm import NODE_CLUSTER, NODES
+from nucliadb_ingest.orm.abc import AbstractNode  # type: ignore
 from nucliadb_ingest.orm.exceptions import NodesUnsync  # type: ignore
 from nucliadb_ingest.orm.shard import Shard
 from nucliadb_ingest.settings import settings
@@ -104,7 +105,7 @@ class ClusterMember:
     is_self: bool
 
 
-class Node:
+class Node(AbstractNode):
     _writer: Optional[NodeWriterStub] = None
     _reader: Optional[NodeReaderStub] = None
     _sidecar: Optional[NodeSidecarStub] = None
@@ -113,6 +114,10 @@ class Node:
         self.address = address
         self.label = label
         self.dummy = dummy
+
+    @classmethod
+    def create_shard_klass(cls, shard_id: str, pbshard: PBShard):
+        return Shard(sharduuid=shard_id, shard=pbshard)
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:

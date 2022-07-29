@@ -1,7 +1,10 @@
 -e ./nucliadb_reader
+-e ./nucliadb_search
 -e ./nucliadb_writer
 -e ./nucliadb_ingest
 -e ./nucliadb_protos/python
 -e ./nucliadb_utils[storages,fastapi,cache]
--e ./nucliadb_cluster
 -e ./nucliadb_models
+-e ./nucliadb_train
+-e ./nucliadb_one
+-e ./nucliadb_telemetry

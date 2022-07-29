@@ -291,9 +291,16 @@ message TokenSplit {
     string klass = 2;
 }
 
+
+message ParagraphAnnotation {
+    string key = 1;
+    repeated Classification classifications = 2;
+}
+
+
 message UserFieldMetadata {
     repeated TokenSplit token = 1;
-    repeated Paragraph paragraphs = 2;
+    repeated ParagraphAnnotation paragraphs = 2;
     FieldID field = 3;
 }
 

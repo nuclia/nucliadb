@@ -1,1 +1,2 @@
-nucliadb_one
+uvicorn
+pydantic_argparse

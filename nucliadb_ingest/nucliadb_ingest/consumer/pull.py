@@ -171,7 +171,7 @@ class PullWorker:
                 logger.info(
                     f"Subscribed to {self.target.format(partition=self.partition)} on stream {self.stream} from {last_seqid}"
                 )
-            self.initialized = True
+        self.initialized = True
 
     async def finalize(self):
         for subscription in self.subscriptions:

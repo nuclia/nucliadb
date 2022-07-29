@@ -19,23 +19,27 @@
 #
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from lru import LRU  # type: ignore
-from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
+from nucliadb_protos.noderesources_pb2 import (
+    Resource as PBBrainResource,  # type: ignore
+)
 from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb_ingest.orm import NODES
+from nucliadb_ingest.orm.abc import AbstractShard
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 SHARDS = LRU(100)
 
 
-class Shard:
-    def __init__(self, sharduuid: str, shard: PBShard):
+class Shard(AbstractShard):
+    def __init__(self, sharduuid: str, shard: PBShard, node: Optional[Any] = None):
         self.shard = shard
         self.sharduuid = sharduuid
+        self.node = node
 
     async def delete_resource(self, uuid: str, txid: int):
 

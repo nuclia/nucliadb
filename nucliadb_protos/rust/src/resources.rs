@@ -458,11 +458,18 @@ pub struct TokenSplit {
     pub klass: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ParagraphAnnotation {
+    #[prost(string, tag="1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag="2")]
+    pub classifications: ::prost::alloc::vec::Vec<Classification>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserFieldMetadata {
     #[prost(message, repeated, tag="1")]
     pub token: ::prost::alloc::vec::Vec<TokenSplit>,
     #[prost(message, repeated, tag="2")]
-    pub paragraphs: ::prost::alloc::vec::Vec<Paragraph>,
+    pub paragraphs: ::prost::alloc::vec::Vec<ParagraphAnnotation>,
     #[prost(message, optional, tag="3")]
     pub field: ::core::option::Option<FieldId>,
 }

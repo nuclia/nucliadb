@@ -44,6 +44,7 @@ async def initialize():
         await init_telemetry(tracer_provider)
 
     await start_ingest(SERVICE_NAME)
+
     processing_engine = ProcessingEngine(
         nuclia_service_account=nuclia_settings.nuclia_service_account,
         nuclia_zone=nuclia_settings.nuclia_zone,
@@ -53,6 +54,7 @@ async def initialize():
         nuclia_public_url=nuclia_settings.nuclia_public_url,
         driver=storage_settings.file_backend,
         dummy=nuclia_settings.dummy_processing,
+        disable_send_to_process=nuclia_settings.disable_send_to_process,
     )
     await processing_engine.initialize()
     set_utility(Utility.PROCESSING, processing_engine)

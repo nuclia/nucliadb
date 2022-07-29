@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from typing import Optional
 
 from grpc import aio  # type: ignore
@@ -56,8 +55,8 @@ async def start_grpc(service_name: Optional[str] = None):
         f"======= Train GRPC serving on http://0.0.0.0:{settings.grpc_port}/ ======"
     )
 
-    def finalizer():
-        asyncio.create_task(servicer.finalize())
-        asyncio.create_task(server.stop(grace=False))
+    async def finalizer():
+        await servicer.finalize()
+        await server.stop(grace=False)
 
     return finalizer
