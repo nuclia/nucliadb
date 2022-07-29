@@ -84,7 +84,8 @@ impl GraphLayer {
             .unwrap_or_default()
             .into_iter()
             .fold(vec![], |mut collector, (y, edge)| {
-                self.lin.get_mut(&y).and_then(|edges| edges.remove(&x));
+                let r = self.lin.get_mut(&y).and_then(|edges| edges.remove(&x));
+                assert!(r.is_some());
                 collector.push((y, edge.dist));
                 collector
             })
@@ -96,7 +97,8 @@ impl GraphLayer {
             .unwrap_or_default()
             .into_iter()
             .fold(vec![], |mut collector, (y, edge)| {
-                self.lout.get_mut(&y).and_then(|edges| edges.remove(&x));
+                let r = self.lout.get_mut(&y).and_then(|edges| edges.remove(&x));
+                assert!(r.is_some());
                 collector.push((y, edge.dist));
                 collector
             })
@@ -111,6 +113,8 @@ impl GraphLayer {
     fn no_out_edges(&self, node: Address) -> usize {
         self.lout.get(&node).map_or(0, |v| v.len())
     }
+    #[cfg(test)]
+    #[allow(unused)]
     fn no_nodes(&self) -> usize {
         self.lout.len()
     }
@@ -121,15 +125,18 @@ impl GraphLayer {
         self.lout.len() == 0
     }
     #[cfg(test)]
+    #[allow(unused)]
     fn remove_edge(&mut self, from: Address, to: Address) {
         self.lout.get_mut(&from).and_then(|edges| edges.remove(&to));
         self.lin.get_mut(&to).and_then(|edges| edges.remove(&from));
     }
     #[cfg(test)]
+    #[allow(unused)]
     fn get_in_edges(&self, node: Address) -> impl Iterator<Item = (&Address, &Edge)> {
         self.lin[&node].iter()
     }
     #[cfg(test)]
+    #[allow(unused)]
     fn get_edge(&self, from: Address, to: Address) -> Option<Edge> {
         self.lout
             .get(&from)
@@ -163,6 +170,7 @@ impl Hnsw {
         self
     }
     fn update_entry_point(&mut self) -> &mut Self {
+        self.remove_empty_layers();
         self.entry_point = self
             .layers
             .iter()

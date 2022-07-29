@@ -109,6 +109,8 @@ impl Batch {
         self.add_vectors.push(vector);
         self.add_labels.push(labels);
     }
+    // Must refer to a vector already in the index.
+    // Deleting a key that is going to be added in this batch is like just adding the key.
     pub fn rmv_vector(&mut self, key: String) {
         self.rmv_keys.push(key);
     }
@@ -124,9 +126,9 @@ pub enum IdxError {
 type IdxResult<T> = Result<T, IdxError>;
 
 pub struct Index {
-    version: disk_structure::Version,
     address: PathBuf,
     database: VectorDB,
+    version: RefCell<disk_structure::Version>,
     segments: RefCell<HashMap<usize, Segment>>,
     txn_log: RefCell<TransactionLog>,
     hnsw: RefCell<Hnsw>,
@@ -134,17 +136,15 @@ pub struct Index {
 
 impl Index {
     fn update(&self, lock: &Lock) -> IdxResult<()> {
-        let state = State {
-            txn_log: self.txn_log.take(),
-            hnsw: self.hnsw.take(),
-        };
-        let (version, state) = disk_structure::update(lock, self.version, state)?;
-        if version > self.version {
+        let version = disk_structure::state_version(lock)?;
+        if version > *self.version.borrow() {
+            let (version, state) = disk_structure::read_state(lock)?;
             self.segments
                 .replace(Index::map_segments(lock, &state.txn_log)?);
+            self.txn_log.replace(state.txn_log);
+            self.hnsw.replace(state.hnsw);
+            self.version.replace(version);
         }
-        self.txn_log.replace(state.txn_log);
-        self.hnsw.replace(state.hnsw);
         Ok(())
     }
     fn store_vectors(
@@ -215,10 +215,19 @@ impl Index {
         let new_segment = disk_structure::read_segment(&lock, txn_id)?;
         self.segment_store(txn_id, new_segment)?;
 
-        // Database and disk state update
-        // Taking txn_log and hnsw from the state to be updated
-        // First we add the nodes to the db
+        // Database and memory state update
         let mut rw = self.database.rw_txn()?;
+
+        // The hnsw index is updated with the deletions
+        let mut hnsw = self.hnsw.take();
+        self.hnsw_update(&rw, &mut hnsw, &[], &deletions)?;
+
+        // Is safe to remove from the db
+        bch.rmv_keys
+            .iter()
+            .try_for_each(|x| self.database.rmv_address(&mut rw, x))?;
+
+        // Additions are inserted in the db
         bch.add_keys
             .iter()
             .zip(additions.iter().copied())
@@ -226,16 +235,8 @@ impl Index {
             .map(|((i, j), k)| self.database.add_address(&mut rw, i, j, k))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Now the hnsw index is updated
-        let mut hnsw = self.hnsw.take();
-        self.hnsw_update(&rw, &mut hnsw, &additions, &deletions)?;
-
-        // Once the hnsw is updated, we can remove from the db
-
-        // --- Something is wrong while deleting, should look at it.
-        // bch.rmv_keys
-        //     .iter()
-        //     .try_for_each(|x| self.database.rmv_address(&mut rw, x))?;
+        // Is safe to add to the index
+        self.hnsw_update(&rw, &mut hnsw, &additions, &[])?;
 
         // To conclude we store the state
         let txn_log = self.txn_log.take();
@@ -268,12 +269,17 @@ impl Index {
                 let (version, state) = disk_structure::read_state(&lock).unwrap();
                 // going back to a safe state
                 self.segments = Index::map_segments(&lock, &state.txn_log).unwrap().into();
-                self.version = version;
+                self.version = version.into();
                 self.txn_log = state.txn_log.into();
                 self.hnsw = state.hnsw.into();
                 err
             }
-            v => v,
+            ok @ Ok(_) => {
+                let lock = disk_structure::shared_lock(&self.address)?;
+                let version = disk_structure::state_version(&lock)?;
+                self.version.replace(version);
+                ok
+            }
         }
     }
     fn map_segments(lock: &Lock, txn_log: &TransactionLog) -> IdxResult<HashMap<usize, Segment>> {
@@ -293,8 +299,8 @@ impl Index {
     ) -> IdxResult<Vec<(String, f32)>> {
         use crate::hnsw::ops::HnswOps;
         use crate::vector::encode_vector;
-        let ro = self.database.ro_txn()?;
         let lock = disk_structure::shared_lock(&self.address)?;
+        let ro = self.database.ro_txn()?;
         self.update(&lock)?;
         let encoded = encode_vector(x);
         let temp_address = Address {
@@ -329,9 +335,9 @@ impl Index {
         let segments = Index::map_segments(&lock, &state.txn_log)?;
         std::mem::drop(lock);
         Ok(Index {
-            version,
             database,
             address: path.as_ref().to_path_buf(),
+            version: RefCell::new(version),
             hnsw: RefCell::new(state.hnsw),
             txn_log: RefCell::new(state.txn_log),
             segments: RefCell::new(segments),
