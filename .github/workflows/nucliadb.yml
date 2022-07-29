@@ -111,6 +111,7 @@ jobs:
           pip install -e nucliadb_writer
           pip install -r nucliadb_reader/requirements.txt
           pip install -e nucliadb_reader
+          pip install -e nucliadb_one
           pip install -r nucliadb/requirements.txt
           pip install -e nucliadb
 

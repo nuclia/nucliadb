@@ -18,6 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from enum import Enum
+import pydantic
+import pydantic_argparse
 import argparse
 import asyncio
 import logging
@@ -98,67 +101,35 @@ log_config = {
 }
 
 
-class Settings:
-    maindb: str
-    blob: str
-    key: Optional[str] = None
-    node: str
-    host: Optional[str] = None
-    zone: Optional[str] = None
-    http: int
-    grpc: int
-    train: int
-    log: str
+class LogLevel(str, Enum):
+    INFO = "INFO"
+    ERROR = "ERROR"
 
 
-def arg_parse():
+class Settings(pydantic.BaseModel):
 
-    parser = argparse.ArgumentParser(description="Process some integers.")
-
-    parser.add_argument(
-        "-p", "--maindb", dest="maindb", help="MainDB data folder", required=True
+    maindb: str = pydantic.Field(description="Main DB Path string")
+    blob: str = pydantic.Field(description="Blob Path string")
+    key: Optional[str] = pydantic.Field(
+        description="Nuclia Understanding API Key string"
     )
-
-    parser.add_argument(
-        "-b", "--blobstorage", dest="blob", help="Blob data folder", required=True
-    )
-
-    parser.add_argument("-k", "--key", dest="key", help="Understanding API Key")
-
-    parser.add_argument(
-        "-n", "--node", dest="node", help="Node data folder", required=True
-    )
-
-    parser.add_argument("-u", "--host", dest="host", help="Overwride host API")
-
-    parser.add_argument("-z", "--zone", dest="zone", help="Understanding API Zone")
-
-    parser.add_argument(
-        "-g", "--grpc", dest="grpc", default=8030, help="NucliaDB GRPC Port", type=int
-    )
-
-    parser.add_argument(
-        "-t",
-        "--train",
-        dest="train",
-        default=8060,
-        help="NucliaDB Train Port",
-        type=int,
-    )
-
-    parser.add_argument(
-        "-s", "--http", dest="http", default=8080, help="NucliaDB HTTP Port", type=int
-    )
-
-    parser.add_argument("--log", dest="log", default="INFO", help="LOG LEVEL")
-
-    args = parser.parse_args()
-    return args
+    node: str = pydantic.Field(description="Node Path string")
+    zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
+    http: int = pydantic.Field(description="HTTP Port int")
+    grpc: int = pydantic.Field(description="GRPC Port int")
+    train: int = pydantic.Field(description="Train GRPC Port int")
+    log: LogLevel = pydantic.Field(description="Log level [INFO,ERROR] string")
 
 
 def run():
 
-    nucliadb_args = arg_parse()
+    parser = pydantic_argparse.ArgumentParser(
+        model=Settings,
+        prog="NucliaDB",
+        description="NucliaDB Starting script",
+    )
+    nucliadb_args = parser.parse_typed_args()
+
     config_nucliadb(nucliadb_args)
     run_nucliadb(nucliadb_args)
 
@@ -196,8 +167,6 @@ def config_nucliadb(nucliadb_args: Settings):
     nuclia_settings.onprem = True
     if nucliadb_args.zone is not None:
         nuclia_settings.nuclia_zone = nucliadb_args.zone
-    if nucliadb_args.host:
-        nuclia_settings.nuclia_public_url = nucliadb_args.host
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"

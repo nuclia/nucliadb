@@ -40,14 +40,15 @@ def free_port() -> int:
 @pytest.fixture(scope="function")
 async def nucliadb():
     with tempfile.TemporaryDirectory() as tmpdir:
-        settings = Settings()
-        settings.blob = f"{tmpdir}/blob"
-        settings.maindb = f"{tmpdir}/main"
-        settings.node = f"{tmpdir}/node"
-        settings.http = free_port()
-        settings.grpc = free_port()
-        settings.train = free_port()
-        settings.log = "INFO"
+        settings = Settings(
+            blob=f"{tmpdir}/blob",
+            maindb=f"{tmpdir}/main",
+            node=f"{tmpdir}/node",
+            http=free_port(),
+            grpc=free_port(),
+            train=free_port(),
+            log="INFO",
+        )
         config_nucliadb(settings)
         server = await run_async_nucliadb(settings)
         yield settings
