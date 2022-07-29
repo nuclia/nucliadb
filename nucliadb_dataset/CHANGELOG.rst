@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.0a2 (unreleased)
+1.0.0a2 (2022-07-29)
 --------------------
 
 - Added get_info and get_ontology_count
