@@ -1,0 +1,37 @@
+The elements at play in nucliadb_vectors2 are:
+    -> Segment: mmapped file containing vectors.
+    -> Hnsw: index used to search vectors by similarity.
+    -> Heed: database used to store properties of the vectors. (keys and labels).
+    -> Transaction: represents a searchable set of vectors in nucliadb_vectors2, contains the following data:
+        --> segments: {Segment}, set of segments
+        --> indexes: [Hnsw], list of Hnsw, where each Hnsw is formed by vectors in segments
+        --> labels: {String}, set of the labels that may be found in the indexes. If a label 'l' is not in labels then this transaction is not a candidate for the search.
+
+The state of the index is formed by:
+    -> database: Heed, the database where the properties of all the vectors are stored.
+    -> transactions: {txnId}, set of Transaction identifiers (so they can be retrieved from disk).
+
+Inserting: receives a set V of pairs (vector, key) and their labels L.
+    1. A new segment with the vectors in V is created: s.
+    2. The keys in V are inserted in the database.
+    3. The labels in L are inserted in the database.
+    4. A new Hnsw, h, is created for the segment s.
+    5. A new Transaction (t) is created with ({s}, [h], L).
+    6. The transaction is persisted on disk.
+
+Searching: receives the query (q), filter labels (f) and the number of results (k).
+    1. valid: set of transactions where there is at least one vector for each label in f.
+    2. results: for each t in valid, load t and do a Transaction Search with t, q, f and k.
+    3. return the best k neighbours in results.
+
+Transaction Search: receives a transaction (t), the query (q), filter labels (f) and the number of results (k) .
+    1. In parallel for each hnsw in t.indexes do a hnsw search with q, f and k.
+    2. Return the best k neighbours.
+
+Merging: receives two transactions t1 and t2.
+    1. append t2.segments into t1.segments.
+    2. append t2.indexes into t1.indexes.
+    3. t1.labels = t1.labels U t2.labels.
+    4. delete t2.
+
+Deletion: TODO.
