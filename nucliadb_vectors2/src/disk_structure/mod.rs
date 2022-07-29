@@ -189,7 +189,7 @@ pub fn delete_txn(lock: &ELock, txn_id: usize) -> DiskResult<()> {
     let base_path = transaction_path(lock.as_ref(), txn_id);
     Ok(std::fs::remove_dir_all(base_path)?)
 }
-pub fn write_state(lock: &ELock, data: &State) -> DiskResult<()> {
+pub fn write_state(lock: &Lock, data: &State) -> DiskResult<()> {
     let writer = BufWriter::new(File::create(lock.as_ref().join(TEMP_STATE))?);
     bincode::serialize_into(writer, &data)?;
     Ok(())

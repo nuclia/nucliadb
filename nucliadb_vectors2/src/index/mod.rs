@@ -203,8 +203,8 @@ impl Index {
     }
 
     fn record_txn(&mut self, bch: Batch) -> IdxResult<()> {
-        // Exclusive lock scope starts
-        let lock = disk_structure::exclusive_lock(&self.address)?;
+        // Shared lock scope starts
+        let lock = disk_structure::shared_lock(&self.address)?;
 
         // bch is stored in a new txn on disk, recorded in memory
         let txn_id = self.txn_log.borrow().fresh;
@@ -217,6 +217,7 @@ impl Index {
 
         // Database and disk state update
         // Taking txn_log and hnsw from the state to be updated
+        // First we add the nodes to the db
         let mut rw = self.database.rw_txn()?;
         bch.add_keys
             .iter()
@@ -225,15 +226,29 @@ impl Index {
             .map(|((i, j), k)| self.database.add_address(&mut rw, i, j, k))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // The hnsw index is updated
+        // Now the hnsw index is updated
         let mut hnsw = self.hnsw.take();
         self.hnsw_update(&rw, &mut hnsw, &additions, &deletions)?;
+
+        // Once the hnsw is updated, we can remove from the db
+
+        // --- Something is wrong while deleting, should look at it.
+        // bch.rmv_keys
+        //     .iter()
+        //     .try_for_each(|x| self.database.rmv_address(&mut rw, x))?;
+
+        // To conclude we store the state
         let txn_log = self.txn_log.take();
         let state = State { txn_log, hnsw };
         disk_structure::write_state(&lock, &state)?;
         self.hnsw = state.hnsw.into();
         self.txn_log = state.txn_log.into();
+        std::mem::drop(lock);
+        // Shared lock scope ends
+
         // Trying to end the transaction
+        // Exclusive lock scope starts
+        let lock = disk_structure::exclusive_lock(&self.address)?;
         rw.commit()
             .map_err(IdxError::from)
             .and_then(|_| lock.commit().map_err(IdxError::from))?;
