@@ -1,11 +1,15 @@
-from typing import Iterator
+from typing import Iterator, List
 import grpc
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.train_pb2 import (
+    GetInfoRequest,
+    GetLabelsetsCountRequest,
     GetSentencesRequest,
     GetParagraphsRequest,
     GetResourcesRequest,
     GetFieldsRequest,
+    LabelsetsCount,
+    TrainInfo,
     TrainSentence,
     TrainParagraph,
     TrainResource,
@@ -69,3 +73,15 @@ class NucliaDriver:
         request = GetLabelsRequest()
         request.kb.uuid = kbid
         return self.stub.GetOntology(request)
+
+    def get_info(self, kbid: str) -> TrainInfo:
+        request = GetInfoRequest()
+        request.kb.uuid = kbid
+        return self.stub.GetInfo(request)
+
+    def get_ontology_count(
+        self, kbid: str, paragraph_labelsets: List[str], resource_labelsets: List[str]
+    ) -> LabelsetsCount:
+        request = GetLabelsetsCountRequest()
+        request.kb.uuid = kbid
+        return self.stub.GetOntologyCount(request)
