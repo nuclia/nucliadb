@@ -18,15 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from enum import Enum
-import pydantic
-import pydantic_argparse
-import argparse
 import asyncio
 import logging
 import os
+from enum import Enum
 from typing import Optional
 
+import pydantic
+import pydantic_argparse
 import uvicorn  # type: ignore
 
 from nucliadb_ingest.orm import NODE_CLUSTER
@@ -227,7 +226,12 @@ def purge():
     )
     from nucliadb_writer.settings import settings as writer_settings
 
-    nucliadb_args = arg_parse()
+    parser = pydantic_argparse.ArgumentParser(
+        model=Settings,
+        prog="NucliaDB",
+        description="NucliaDB Starting script",
+    )
+    nucliadb_args = parser.parse_typed_args()
 
     ingest_settings.driver = "local"
     ingest_settings.driver_local_url = nucliadb_args.maindb
