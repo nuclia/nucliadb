@@ -62,3 +62,17 @@ key3
 .DS_Store
 regional-user.creds
 tmp/nucliadb
+
+
+#
+#
+#
+#
+# emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+.\#*
+.projectile
+.dir-locals.el
