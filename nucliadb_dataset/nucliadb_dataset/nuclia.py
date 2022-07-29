@@ -1,15 +1,16 @@
 from typing import Iterator, List
+
 import grpc
 from nucliadb_protos.train_pb2 import (
+    GetFieldsRequest,
     GetInfoRequest,
     GetLabelsetsCountRequest,
-    GetSentencesRequest,
     GetParagraphsRequest,
     GetResourcesRequest,
-    GetFieldsRequest,
+    GetSentencesRequest,
     LabelsetsCount,
+    TrainField,
     TrainInfo,
-    TrainSentence,
     TrainParagraph,
     TrainResource,
     TrainSentence,

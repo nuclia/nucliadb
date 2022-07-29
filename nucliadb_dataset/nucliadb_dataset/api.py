@@ -1,4 +1,5 @@
 from typing import Iterator, List
+
 from nucliadb_protos.train_pb2 import (
     TrainField,
     TrainInfo,
