@@ -147,11 +147,13 @@ class KnowledgeBox:
             slug = pbconfig.slug
 
         # Delete main anchor
+        subtxn = await txn.driver.begin()
         key_match = KB_SLUGS.format(slug=slug)
-        await txn.delete(key_match)
+        await subtxn.delete(key_match)
 
         when = datetime.now().isoformat()
-        await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
+        await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
+        await subtxn.commit(resource=False)
         return kbid
 
     @classmethod

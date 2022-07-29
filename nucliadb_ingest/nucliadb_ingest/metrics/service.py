@@ -30,11 +30,11 @@ except ImportError:
 
 
 async def handler(request):
-    if request.url == "/metrics" and PROMETHEUS:
+    if PROMETHEUS:
         output = prometheus_client.exposition.generate_latest()
         return output.decode("utf8")
     else:
-        return web.Response(text="OK")
+        return web.Response(text=f"OK")
 
 
 class MetricsService:

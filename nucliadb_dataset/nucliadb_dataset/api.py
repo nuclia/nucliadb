@@ -1,7 +1,7 @@
-from typing import Iterator
-
+from typing import Iterator, List
 from nucliadb_protos.train_pb2 import (
     TrainField,
+    TrainInfo,
     TrainParagraph,
     TrainResource,
     TrainSentence,
@@ -55,4 +55,18 @@ def iterate_resources(
 def get_labels(kbid: str) -> GetLabelsResponse:
     client = get_nuclia_client()
     labels = client.get_labels(kbid)
+    return labels
+
+
+def get_info(kbid: str) -> TrainInfo:
+    client = get_nuclia_client()
+    info = client.get_info(kbid)
+    return info
+
+
+def get_ontology_count(
+    kbid: str, paragraph_labelsets: List[str], resource_labelset: List[str]
+):
+    client = get_nuclia_client()
+    labels = client.get_ontology_count(kbid, paragraph_labelsets, resource_labelset)
     return labels

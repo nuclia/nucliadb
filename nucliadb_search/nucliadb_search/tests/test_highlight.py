@@ -29,7 +29,7 @@ def test_highlight():
     )
     assert (
         res[0]
-        == "Query whatever you want my to make it work my <mark>query</mark> with <mark>this</mark>"
+        == "<mark>Query</mark> whatever you want my to make it work my <mark>query</mark> with <mark>this</mark>"
     )
 
     res = highlight(

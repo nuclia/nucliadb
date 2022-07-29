@@ -93,7 +93,7 @@ impl<'a> Query for InsertQuery<'a> {
                     with_filter: &vec![],
                 }
                 .run();
-                ep = neighbours.pop().unwrap().0;
+                ep = neighbours.pop().map(|n| n.0).unwrap_or(ep);
                 let node_level = get_random_layer();
                 let node = self.index.add_node(key, vector.clone(), node_level);
                 let mut current_layer = std::cmp::min(ep_level, node_level);

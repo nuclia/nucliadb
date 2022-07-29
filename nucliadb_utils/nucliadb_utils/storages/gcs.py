@@ -71,6 +71,7 @@ RETRIABLE_EXCEPTIONS = (
     aiohttp.client_exceptions.ClientPayloadError,
     aiohttp.client_exceptions.ClientConnectorError,
     aiohttp.client_exceptions.ClientOSError,
+    CouldNotCreateBucket,
 )
 
 
@@ -512,6 +513,9 @@ class GCSStorage(Storage):
         labels = deepcopy(self._bucket_labels)
         if kbid is not None:
             labels["kbid"] = kbid.lower()
+        await self._create_bucket(url, headers, bucket_name, labels)
+
+    async def _create_bucket(self, url, headers, bucket_name, labels):
 
         async with self.session.post(
             url,
@@ -520,7 +524,12 @@ class GCSStorage(Storage):
                 "name": bucket_name,
                 "location": self._location,
                 "labels": labels,
-                "iamConfiguration.uniformBucketLevelAccess.enabled": True,
+                "iamConfiguration": {
+                    "publicAccessPrevention": "enforced",
+                    "uniformBucketLevelAccess": {
+                        "enabled": True,
+                    },
+                },
             },
         ) as resp:
             if resp.status != 200:
@@ -529,6 +538,7 @@ class GCSStorage(Storage):
                 logger.info(f"Bucket : {bucket_name}")
                 logger.info(f"Location : {self._location}")
                 logger.info(f"Labels : {labels}")
+                logger.info(f"URL : {url}")
                 logger.info(text)
 
                 raise CouldNotCreateBucket(text)
@@ -589,9 +599,13 @@ class GCSStorage(Storage):
         conflict = False
         async with self.session.delete(url, headers=headers) as resp:
             if resp.status == 200:
+                logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
             if resp.status == 409:
+                logger.info(f"Conflict on deleting: {bucket_name}")
                 conflict = True
+            if resp.status == 404:
+                logger.info(f"Does not exit on deleting: {bucket_name}")
         return deleted, conflict
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
