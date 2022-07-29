@@ -99,6 +99,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.60.0
+          profile: default
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+
       - name: Install the package
         run: |
           pip install -r test-requirements.txt
@@ -114,6 +122,11 @@ jobs:
           pip install -e nucliadb_one
           pip install -r nucliadb/requirements.txt
           pip install -e nucliadb
+
+      - name: Install rust binding for testing
+        run: |
+          maturin build -m nucliadb_node/binding/Cargo.toml
+          pip install target/wheels/*cp39-cp39-manylinux_2_31_x86_64.whl
 
       - name: Check mypy
         run: |
