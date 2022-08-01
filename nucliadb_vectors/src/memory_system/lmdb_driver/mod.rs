@@ -238,15 +238,16 @@ impl LMBDStorage {
         }
     }
     pub fn remove_vector(&self, txn: &mut RwTxn<'_, '_>, node: Node) {
-        let key = self.get_node_key(txn, node).unwrap().to_string();
-        self.node_db.delete(txn, &key).unwrap();
-        self.node_inv_db
-            .delete(txn, &node.alloc_byte_rpr())
-            .unwrap();
-        let label_query = format!("{}/", key);
-        let mut iter = self.label_db.prefix_iter_mut(txn, &label_query).unwrap();
-        while iter.next().transpose().unwrap().is_some() {
-            iter.del_current().unwrap();
+        if let Some(key) = self.get_node_key(txn, node).map(|s| s.to_string()) {
+            self.node_db.delete(txn, &key).unwrap();
+            self.node_inv_db
+                .delete(txn, &node.alloc_byte_rpr())
+                .unwrap();
+            let label_query = format!("{}/", key);
+            let mut iter = self.label_db.prefix_iter_mut(txn, &label_query).unwrap();
+            while iter.next().transpose().unwrap().is_some() {
+                iter.del_current().unwrap();
+            }
         }
     }
     pub fn get_log(&self, txn: &RoTxn<'_>) -> GraphLog {
