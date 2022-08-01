@@ -23,7 +23,7 @@ from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-    grpc_port: int = 8030
+    grpc_port: int = 8031
     train_grpc_address: Optional[str] = None
 
     nuclia_learning_url: Optional[str] = "https://nuclia.cloud/api/v1/learning/"
