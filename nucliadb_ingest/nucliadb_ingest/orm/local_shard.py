@@ -46,5 +46,7 @@ class LocalShard(AbstractShard):
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> int:
-        res = await self.node.add_resource(resource)
+        for shardreplica in self.shard.replicas:
+            resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
+            res = await self.node.add_resource(resource)
         return res.count
