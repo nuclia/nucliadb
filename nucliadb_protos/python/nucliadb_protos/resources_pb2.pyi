@@ -1048,6 +1048,21 @@ class TokenSplit(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["klass",b"klass","token",b"token"]) -> None: ...
 global___TokenSplit = TokenSplit
 
+class ParagraphAnnotation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KEY_FIELD_NUMBER: builtins.int
+    CLASSIFICATIONS_FIELD_NUMBER: builtins.int
+    key: typing.Text
+    @property
+    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def __init__(self,
+        *,
+        key: typing.Text = ...,
+        classifications: typing.Optional[typing.Iterable[global___Classification]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications",b"classifications","key",b"key"]) -> None: ...
+global___ParagraphAnnotation = ParagraphAnnotation
+
 class UserFieldMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     TOKEN_FIELD_NUMBER: builtins.int
@@ -1056,13 +1071,13 @@ class UserFieldMetadata(google.protobuf.message.Message):
     @property
     def token(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TokenSplit]: ...
     @property
-    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Paragraph]: ...
+    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphAnnotation]: ...
     @property
     def field(self) -> global___FieldID: ...
     def __init__(self,
         *,
         token: typing.Optional[typing.Iterable[global___TokenSplit]] = ...,
-        paragraphs: typing.Optional[typing.Iterable[global___Paragraph]] = ...,
+        paragraphs: typing.Optional[typing.Iterable[global___ParagraphAnnotation]] = ...,
         field: typing.Optional[global___FieldID] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["field",b"field"]) -> builtins.bool: ...

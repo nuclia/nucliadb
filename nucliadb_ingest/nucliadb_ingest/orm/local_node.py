@@ -32,6 +32,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm import NODE_CLUSTER
+from nucliadb_ingest.orm.abc import AbstractNode
 from nucliadb_ingest.orm.local_shard import LocalShard
 from nucliadb_utils.keys import KB_SHARDS
 
@@ -43,7 +44,7 @@ except ImportError:
     NodeReader = None
 
 
-class LocalNode:
+class LocalNode(AbstractNode):
     writer: NodeWriter
     reader: NodeReader
 
@@ -79,6 +80,11 @@ class LocalNode:
         await txn.set(key, kb_shards.SerializeToString())
 
         return LocalShard(sharduuid=sharduuid, shard=shard, node=node)
+
+    @classmethod
+    def create_shard_klass(cls, shard_id: str, pbshard: PBShard):
+        node = NODE_CLUSTER.get_local_node()
+        return LocalShard(sharduuid=shard_id, shard=pbshard, node=node)
 
     @classmethod
     async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[LocalShard]:

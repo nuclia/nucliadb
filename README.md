@@ -83,7 +83,7 @@ TODO
 ```bash
 curl http://localhost:8080/v1/kb \
   -X POST \
-  -H "X-NUCLIADB-ROLE: MANAGER" \
+  -H "X-NUCLIADB-ROLES: MANAGER" \
 ```
 
 ### Upload a file
@@ -93,7 +93,7 @@ After starting NucliaDB and creating a Knowledge Box you can upload a file:
 ```bash
 curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/upload \
   -X POST \
-  -H "X-NUCLIADB-ROLE: WRITER" \
+  -H "X-NUCLIADB-ROLES: WRITER" \
   -T /path/to/file
 ```
 
@@ -104,7 +104,7 @@ After starting NucliaDB and creating a Knowledge Box you can upload a file:
 ```bash
 curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
   -X GET \
-  -H "X-NUCLIADB-ROLE: READER" \
+  -H "X-NUCLIADB-ROLES: READER" \
 ```
 
 ## API Tutorials

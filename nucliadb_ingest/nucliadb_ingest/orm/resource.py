@@ -33,6 +33,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
+from nucliadb_protos.resources_pb2 import ParagraphAnnotation
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.train_pb2 import (
     EnabledMetadata,
@@ -575,11 +576,18 @@ class Resource:
 
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
+        userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
         if enabled_metadata.labels:
             if self.basic is None:
                 self.basic = await self.get_basic()
             if self.basic is not None:
                 metadata.labels.resource.extend(self.basic.usermetadata.classifications)
+                for fieldmetadata in self.basic.fieldmetadata:
+                    field_id = self.generate_field_id(fieldmetadata.field)
+                    for annotationparagraph in fieldmetadata.paragraphs:
+                        userdefinedparagraphclass[
+                            annotationparagraph.key
+                        ] = annotationparagraph
 
         for ((type_id, field_id), field) in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -643,6 +651,10 @@ class Resource:
                     if enabled_metadata.labels:
                         metadata.labels.ClearField("field")
                         metadata.labels.paragraph.extend(paragraph.classifications)
+                        if paragraph_key in userdefinedparagraphclass:
+                            metadata.labels.paragraph.extend(
+                                userdefinedparagraphclass[paragraph_key].classifications
+                            )
 
                     for index, sentence in enumerate(paragraph.sentences):
                         if subfield is not None:
@@ -678,11 +690,18 @@ class Resource:
     ) -> AsyncIterator[TrainParagraph]:
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
+        userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
         if enabled_metadata.labels:
             if self.basic is None:
                 self.basic = await self.get_basic()
             if self.basic is not None:
                 metadata.labels.resource.extend(self.basic.usermetadata.classifications)
+                for fieldmetadata in self.basic.fieldmetadata:
+                    field_id = self.generate_field_id(fieldmetadata.field)
+                    for annotationparagraph in fieldmetadata.paragraphs:
+                        userdefinedparagraphclass[
+                            annotationparagraph.key
+                        ] = annotationparagraph
 
         for ((type_id, field_id), field) in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
@@ -739,11 +758,17 @@ class Resource:
                                 if entity_key in local_text:
                                     metadata.entities[entity_key] = entity_value
 
+                        if paragraph_key in userdefinedparagraphclass:
+                            metadata.labels.paragraph.extend(
+                                userdefinedparagraphclass[paragraph_key].classifications
+                            )
+
                         pb_paragraph = TrainParagraph()
                         pb_paragraph.uuid = self.uuid
                         pb_paragraph.field.CopyFrom(fieldid)
                         pb_paragraph.paragraph = paragraph_key
                         pb_paragraph.metadata.CopyFrom(metadata)
+
                         yield pb_paragraph
 
     async def iterate_fields(

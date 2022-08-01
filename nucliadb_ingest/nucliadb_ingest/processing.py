@@ -100,7 +100,9 @@ class ProcessingEngine:
         days_to_keep: int = 3,
         driver: str = "gcs",
         dummy: bool = False,
+        disable_send_to_process: bool = False,
     ):
+        self.disable_send_to_process = disable_send_to_process
         self.nuclia_service_account = nuclia_service_account
         self.nuclia_zone = nuclia_zone
         if nuclia_public_url is not None:
@@ -268,6 +270,9 @@ class ProcessingEngine:
         return jwt
 
     async def send_to_process(self, item: PushPayload, partition: int) -> int:
+        if self.disable_send_to_process:
+            return 0
+
         if self.dummy:
             self.calls.append(item.dict())
             return 1
@@ -288,6 +293,7 @@ class ProcessingEngine:
             else:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         else:
+
             headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
             # Upload the payload
             resp = await self.session.post(

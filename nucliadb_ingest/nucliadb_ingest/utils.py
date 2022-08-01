@@ -74,7 +74,7 @@ async def get_driver() -> Driver:
     elif (
         settings.driver == "local"
         and FILES
-        and "local" not in MAIN
+        and "driver" not in MAIN
         and settings.driver_local_url is not None
     ):
         local_driver = LocalDriver(settings.driver_local_url)

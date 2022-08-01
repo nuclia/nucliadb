@@ -25,6 +25,9 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldType,
     Metadata,
+    ParagraphAnnotation,
+    TokenSplit,
+    UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import Relation
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -32,6 +35,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_ingest.orm.utils import set_title
 from nucliadb_ingest.processing import PushPayload
 from nucliadb_models import RelationType
+from nucliadb_models.resource import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_writer.api.models import (
     ComminResourcePayload,
@@ -60,11 +64,34 @@ def parse_basic_modify(
         bm.basic.layout = item.layout
     if item.icon:
         bm.basic.icon = item.icon
-    if item.usermetadata is not None:
-        # protobuferrs repeated fields don't support assignment so
-        # in order to replace classifications, we need to clear them first
+    if item.fieldmetadata is not None:
+        for fieldmetadata in item.fieldmetadata:
+            userfieldmetadata = UserFieldMetadata()
+            for token in fieldmetadata.token:
+                userfieldmetadata.token.append(
+                    TokenSplit(token=token.token, klass=token.klass)
+                )
+            for paragraph in fieldmetadata.paragraphs:
+                paragraphpb = ParagraphAnnotation(key=paragraph.key)
+                for classification in paragraph.classifications:
+                    paragraphpb.classifications.append(
+                        Classification(
+                            labelset=classification.labelset,
+                            label=classification.label,
+                        )
+                    )
+                userfieldmetadata.paragraphs.append(paragraphpb)
 
-        bm.basic.usermetadata.ClearField("classifications")
+            userfieldmetadata.field.field = fieldmetadata.field.field
+            userfieldmetadata.field.field_type = FIELD_TYPES_MAP_REVERSE[  # type: ignore
+                fieldmetadata.field.field_type.value
+            ]
+
+            bm.basic.fieldmetadata.append(userfieldmetadata)
+    if item.usermetadata is not None:
+        # protobuferrs repeated fields don't support assignment
+        # will allways be a clean basic
+
         bm.basic.usermetadata.classifications.extend(
             [
                 Classification(labelset=x.labelset, label=x.label)

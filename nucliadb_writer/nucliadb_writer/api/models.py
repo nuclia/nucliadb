@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
@@ -33,6 +33,7 @@ class CreateResourcePayload(BaseModel):
     layout: Optional[str] = None
     metadata: Optional[models.InputMetadata] = None
     usermetadata: Optional[models.UserMetadata] = None
+    fieldmetadata: Optional[List[models.UserFieldMetadata]] = None
     origin: Optional[models.Origin] = None
 
     files: Dict[str, models.FileField] = {}
@@ -65,6 +66,7 @@ class UpdateResourcePayload(BaseModel):
     icon: Optional[str] = None
     layout: Optional[str] = None
     usermetadata: Optional[models.UserMetadata] = None
+    fieldmetadata: Optional[List[models.UserFieldMetadata]] = None
 
     files: Dict[str, models.FileField] = {}
     links: Dict[str, models.LinkField] = {}

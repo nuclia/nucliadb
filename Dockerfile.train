@@ -50,4 +50,4 @@ RUN pip install -r nucliadb_train/requirements-sources.txt
 RUN pip install --no-deps -e /usr/src/app/nucliadb_train
 
 # GRPC
-EXPOSE 8030/tcp
+EXPOSE 8031/tcp

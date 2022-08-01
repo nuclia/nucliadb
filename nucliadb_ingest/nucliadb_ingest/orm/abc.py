@@ -16,37 +16,37 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import Any, Optional
 
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
-from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
-from nucliadb_ingest.orm.abc import AbstractShard
-
-if TYPE_CHECKING:
-    from nucliadb_ingest.orm.local_node import LocalNode
+from nucliadb_ingest.maindb.driver import Transaction
 
 
-class LocalShard(AbstractShard):
-    def __init__(self, sharduuid: str, shard: PBShard, node: LocalNode):
-        self.shard = shard
-        self.sharduuid = sharduuid
-        self.node = node
+class AbstractShard:
+    def __init__(self, sharduuid: str, shard: PBShard, node: Optional[Any] = None):
+        pass
 
     async def delete_resource(self, uuid: str, txid: int):
-        req = ResourceID()
-        req.uuid = uuid
-        req.shard_id = self.sharduuid
-        await self.node.delete_resource(req)
+        pass
 
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> int:
-        for shardreplica in self.shard.replicas:
-            resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
-            res = await self.node.add_resource(resource)
-        return res.count
+        pass
+
+
+class AbstractNode:
+    @classmethod
+    def create_shard_klass(cls, shard_id: str, pbshard: PBShard) -> AbstractShard:
+        pass
+
+    @classmethod
+    async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> AbstractShard:
+        pass
+
+    @classmethod
+    async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[AbstractShard]:
+        pass
