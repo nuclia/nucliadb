@@ -60,7 +60,7 @@ DEFAULT_WIDGET.features.useFilters = True
 DEFAULT_WIDGET.features.suggestEntities = True
 DEFAULT_WIDGET.features.suggestSentences = True
 DEFAULT_WIDGET.features.suggestParagraphs = True
-DEFAULT_WIDGET.features.suggestLabels = True
+DEFAULT_WIDGET.features.suggestLabels = False
 DEFAULT_WIDGET.features.editLabels = True
 
 
