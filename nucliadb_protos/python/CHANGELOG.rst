@@ -4,7 +4,7 @@ CHANGELOG
 0.0.26 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Train interface
 
 
 0.0.25 (2022-06-29)
