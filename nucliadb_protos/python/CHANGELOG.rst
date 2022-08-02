@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.0.26 (unreleased)
+0.0.26 (2022-08-02)
 -------------------
 
 - Train interface
