@@ -167,6 +167,9 @@ class Resource:
         await self.get_basic()
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
+            # We force the usermetadata classification to be the one defined
+            if payload.HasField("usermetadata"):
+                self.basic.usermetadata.CopyFrom(payload.usermetadata)
         else:
             self.basic = payload
         if slug is not None and slug != "":
