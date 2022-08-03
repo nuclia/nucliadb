@@ -24,7 +24,7 @@ from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb_ingest.maindb.driver import Driver
-from nucliadb_ingest.orm import NODES
+from nucliadb_ingest.orm import NODE_CLUSTER, NODES
 from nucliadb_ingest.orm.node import Node
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.keys import KB_SHARDS
@@ -54,6 +54,12 @@ class NodesManager:
         return [x for x in shards.shards]
 
     def choose_node(self, shard: ShardObject) -> Tuple[Node, Optional[str], str]:
+        if NODE_CLUSTER.local_node:
+            return (
+                NODE_CLUSTER.get_local_node(),
+                shard.replicas[0].shard.id,
+                shard.replicas[0].node,
+            )
         nodes = [x for x in range(len(shard.replicas))]
         random.shuffle(nodes)
         node_obj = None

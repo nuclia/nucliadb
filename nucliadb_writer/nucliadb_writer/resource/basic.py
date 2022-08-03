@@ -23,8 +23,10 @@ from nucliadb_protos.resources_pb2 import (
     Basic,
     Classification,
     ExtractedTextWrapper,
+    FieldComputedMetadataWrapper,
     FieldType,
     Metadata,
+    Paragraph,
     ParagraphAnnotation,
     TokenSplit,
     UserFieldMetadata,
@@ -57,6 +59,14 @@ def parse_basic_modify(
         etw.field.field_type = FieldType.GENERIC
         etw.body.text = item.summary
         bm.extracted_text.append(etw)
+        fmw = FieldComputedMetadataWrapper()
+        basic_paragraph = Paragraph(
+            start=0, end=len(item.summary), kind=Paragraph.TypeParagraph.DESCRIPTION
+        )
+        fmw.metadata.metadata.paragraphs.append(basic_paragraph)
+        fmw.field.field = "summary"
+        fmw.field.field_type = FieldType.GENERIC
+        bm.field_metadata.append(fmw)
         toprocess.genericfield["summary"] = Text(
             body=item.summary, format=PushTextFormat.PLAIN
         )

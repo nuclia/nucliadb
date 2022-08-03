@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import Optional
 from uuid import uuid4
 
+from nucliadb_protos.nodereader_pb2 import SearchRequest, SearchResponse
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import ShardCreated, ShardId, ShardIds
@@ -44,13 +45,35 @@ except ImportError:
     NodeReader = None
 
 
-class LocalNode(AbstractNode):
-    writer: NodeWriter
+class LocalReaderWrapper:
     reader: NodeReader
 
     def __init__(self):
-        self.writer = NodeWriter.new()
         self.reader = NodeReader.new()
+
+    async def Search(self, request: SearchRequest) -> SearchResponse:
+        result = await self.reader.search(request.SerializeToString())
+        pb_bytes = bytes(result)
+        pb = SearchResponse()
+        pb.ParseFromString(pb_bytes)
+        return pb
+
+    async def GetShard(self, request: ShardId) -> NodeResourcesShard:
+        result = await self.reader.get_shard(request.SerializeToString())
+        pb_bytes = bytes(result)
+        shard = NodeResourcesShard()
+        shard.ParseFromString(pb_bytes)
+        return shard
+
+
+class LocalNode(AbstractNode):
+    writer: NodeWriter
+    reader: LocalReaderWrapper
+    label: str = "local"
+
+    def __init__(self):
+        self.writer = NodeWriter.new()
+        self.reader = LocalReaderWrapper()
         self.address = "local"
 
     @classmethod
@@ -110,12 +133,7 @@ class LocalNode(AbstractNode):
 
     async def get_reader_shard(self, id: str) -> NodeResourcesShard:
         req = ShardId(id=id)
-        resp = await self.reader.get_shard(req)  # type: ignore
-        pb_bytes = bytes(resp)
-        shard = NodeResourcesShard()
-        shard.ParseFromString(pb_bytes)
-
-        return shard
+        return await self.reader.GetShard(req)  # type: ignore
 
     async def new_shard(self) -> ShardCreated:
         resp = await self.writer.new_shard()  # type: ignore
