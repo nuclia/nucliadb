@@ -40,6 +40,7 @@ class ClusterObject:
     local_node: Any
 
     def __init__(self):
+        self.local_node = None
         self.date = datetime.now()
 
     def get_local_node(self):
