@@ -178,7 +178,7 @@ class LocalTransaction(Transaction):
         for str_key in glob.glob(path + "**", recursive=True):
             if str_key in self.deleted_keys:
                 continue
-            if os.path.isdir(str_key):
+            if os.path.isdir(str_key) or not os.path.exists(str_key):
                 continue
             for new_key in self.modified_keys.keys():
                 if (
@@ -225,7 +225,7 @@ class LocalDriver(Driver):
         path = f"{self.url}/{match}"
         actual_count = 0
         for str_key in glob.glob(path + "**", recursive=True):
-            if os.path.isdir(str_key):
+            if os.path.isdir(str_key) or not os.path.exists(str_key):
                 continue
 
             yield str_key.replace(self.url, "")
