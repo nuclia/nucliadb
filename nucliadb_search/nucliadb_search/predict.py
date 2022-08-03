@@ -22,6 +22,7 @@ from typing import List, Optional
 import aiohttp
 
 from nucliadb_ingest.tests.vectors import Q
+from nucliadb_search import logger
 
 
 class SendToPredictError(Exception):
@@ -74,6 +75,11 @@ class PredictEngine:
             else:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
+            if self.nuclia_service_account is None:
+                logger.warning(
+                    "Nuclia Service account is not defined so could not retrieve vectors for the query"
+                )
+                return []
             # Upload the payload
             headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.get(

@@ -20,7 +20,13 @@
 import urllib.parse
 from typing import Optional
 
-from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper, FieldType
+from nucliadb_protos.resources_pb2 import (
+    Basic,
+    ExtractedTextWrapper,
+    FieldComputedMetadataWrapper,
+    FieldType,
+    Paragraph,
+)
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest.maindb.driver import Transaction
@@ -71,5 +77,11 @@ def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
     etw.field.field_type = FieldType.GENERIC
     etw.body.text = title
     writer.extracted_text.append(etw)
+    fmw = FieldComputedMetadataWrapper()
+    paragraph = Paragraph(start=0, end=len(title), kind=Paragraph.TypeParagraph.TITLE)
+    fmw.metadata.metadata.paragraphs.append(paragraph)
+    fmw.field.field = "title"
+    fmw.field.field_type = FieldType.GENERIC
+    writer.field_metadata.append(fmw)
 
     toprocess.genericfield["title"] = Text(body=title, format=PushTextFormat.PLAIN)
