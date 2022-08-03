@@ -180,6 +180,7 @@ message Paragraph {
         INCEPTION = 2;
         DESCRIPTION = 3;
         TRANSCRIPT = 4;
+        TITLE = 5;
     }
     TypeParagraph kind = 5;
 

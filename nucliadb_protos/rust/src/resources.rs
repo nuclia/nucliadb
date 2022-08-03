@@ -292,6 +292,7 @@ pub mod paragraph {
         Inception = 2,
         Description = 3,
         Transcript = 4,
+        Title = 5,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

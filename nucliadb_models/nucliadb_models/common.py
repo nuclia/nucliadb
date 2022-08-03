@@ -150,6 +150,7 @@ class Paragraph(BaseModel):
         INCEPTION = "INCEPTION"
         DESCRIPTION = "DESCRIPTION"
         TRANSCRIPT = "TRANSCRIPT"
+        TITLE = "TITLE"
 
     kind: Optional[TypeParagraph]
     classifications: Optional[List[Classification]]
