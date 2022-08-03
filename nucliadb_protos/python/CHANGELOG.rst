@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.0.27 (unreleased)
+0.0.27 (2022-08-03)
 -------------------
 
 - Paragraph can be from a title
