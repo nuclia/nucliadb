@@ -4,7 +4,7 @@ CHANGELOG
 0.0.27 (unreleased)
 -------------------
 
-- Nothing changed yet.
+- Paragraph can be from a title
 
 
 0.0.26 (2022-08-02)
