@@ -249,6 +249,8 @@ class Storage:
         cf = CloudFile()
         cf.filename = filename
         cf.content_type = content_type
+        cf.size = len(payload)
+
         if md5 is None:
             md5hash = hashlib.md5(payload).digest()
             cf.md5 = md5hash.decode()
