@@ -254,8 +254,10 @@ class GCSStorageField(StorageField):
         if self.storage.session is None:
             raise AttributeError()
 
-        if cf.size is not None:
-            size = cf.size
+        # size = 0 ==> size may be unset, as 0 is the default protobuffer value
+        # Makes no sense to assume a file with size = 0 in upload
+        if cf.size > 0:
+            size = str(cf.size)
         else:
             # assuming size will come eventually
             size = "*"
