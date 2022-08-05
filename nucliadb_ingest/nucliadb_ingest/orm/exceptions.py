@@ -47,3 +47,7 @@ class NodeError(Exception):
 
 class DeadletteredError(Exception):
     pass
+
+
+class ReallyStopPulling(Exception):
+    pass

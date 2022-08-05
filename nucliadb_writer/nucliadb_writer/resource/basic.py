@@ -67,6 +67,9 @@ def parse_basic_modify(
         fmw.field.field = "summary"
         fmw.field.field_type = FieldType.GENERIC
         bm.field_metadata.append(fmw)
+        bm.basic.metadata.useful = True
+        bm.basic.metadata.status = Metadata.Status.PENDING
+
         toprocess.genericfield["summary"] = Text(
             body=item.summary, format=PushTextFormat.PLAIN
         )

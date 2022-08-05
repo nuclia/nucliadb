@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
 import datetime
 import uuid
 from contextlib import AsyncExitStack
@@ -208,15 +209,16 @@ class ProcessingEngine:
         headers = {}
         headers["X-PASSWORD"] = file.password
         headers["X-LANGUAGE"] = file.language
-        headers["X-FILENAME"] = file.file.filename
+        headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()
         headers["X-MD5"] = file.file.md5
         headers["CONTENT_TYPE"] = file.file.content_type
-        headers["AUTHORIZATION"] = f"Bearer {self.nuclia_service_account}"
+        headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
         headers["X-STF_ROLES"] = "WRITER"
         with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
-            jwt = resp
+            assert resp.status == 200
+            jwt = await resp.text()
         return jwt
 
     async def convert_internal_filefield_to_str(
@@ -230,10 +232,12 @@ class ProcessingEngine:
             headers = {}
             headers["X-PASSWORD"] = file.password
             headers["X-LANGUAGE"] = file.language
-            headers["X-FILENAME"] = file.file.filename
+            headers["X-FILENAME"] = base64.b64encode(
+                file.file.filename.encode()
+            ).decode()
             headers["X-MD5"] = file.file.md5
             headers["CONTENT_TYPE"] = file.file.content_type
-            headers["AUTHORIZATION"] = f"Bearer {self.nuclia_service_account}"
+            headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
             headers["X-STF_ROLES"] = "WRITER"
             if self.dummy:
                 self.uploads.append(headers)
@@ -243,7 +247,8 @@ class ProcessingEngine:
             async with self.session.post(
                 self.nuclia_upload_url, data=iterator, headers=headers
             ) as resp:
-                jwt = resp
+                assert resp.status == 200
+                jwt = await resp.text()
         return jwt
 
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
@@ -252,10 +257,10 @@ class ProcessingEngine:
             jwt = self.generate_file_token_from_cloudfile(cf)
         else:
             headers = {}
-            headers["X-FILENAME"] = cf.filename
+            headers["X-FILENAME"] = base64.b64encode(cf.filename.encode()).decode()
             headers["X-MD5"] = cf.md5
             headers["CONTENT_TYPE"] = cf.content_type
-            headers["AUTHORIZATION"] = f"Bearer {self.nuclia_service_account}"
+            headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
             headers["X-STF_ROLES"] = "WRITER"
             if self.dummy:
                 self.uploads.append(headers)
@@ -265,7 +270,8 @@ class ProcessingEngine:
             with self.session.post(
                 self.nuclia_upload_url, data=iterator, headers=headers
             ) as resp:
-                jwt = resp
+                assert resp.status == 200
+                jwt = await resp.text()
 
         return jwt
 
@@ -294,7 +300,7 @@ class ProcessingEngine:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         else:
 
-            headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             # Upload the payload
             resp = await self.session.post(
                 url=self.nuclia_external_push + "?partition=" + str(partition),

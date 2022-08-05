@@ -193,7 +193,6 @@ def run_nucliadb(nucliadb_args: Settings):
         debug=True,
         reload=False,
     )
-    logger.info(f"======= REST API on http://0.0.0.0:{nucliadb_args.http}/ ======")
 
 
 async def run_async_nucliadb(nucliadb_args: Settings):
@@ -204,6 +203,7 @@ async def run_async_nucliadb(nucliadb_args: Settings):
         application,
         port=nucliadb_args.http,
         log_level=logging.getLevelName(running_settings.log_level),
+        log_config=log_config,
     )
     server = uvicorn.Server(config)
     config.load()

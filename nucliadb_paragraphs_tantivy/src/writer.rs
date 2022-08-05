@@ -243,6 +243,7 @@ impl ParagraphWriterService {
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
+                debug!("Paragraph added {}", text);
                 doc.add_text(self.schema.text, &text);
                 doc.add_u64(self.schema.start_pos, start_pos);
                 doc.add_u64(self.schema.end_pos, end_pos);
@@ -255,6 +256,10 @@ impl ParagraphWriterService {
                     self.writer.write().unwrap().commit().unwrap();
                 }
             }
+        }
+        if paragraph_counter > 0 {
+            debug!("Commited End");
+            self.writer.write().unwrap().commit().unwrap();
         }
 
         Ok(())

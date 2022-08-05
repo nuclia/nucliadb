@@ -145,3 +145,9 @@ build-local-cluster-manager:
 build-local-sidecar:
 	docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
 	
+debug-test-nucliadb:
+	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/nucliadb -k test_counters -s
+
+build-node-binding:
+	maturin build -m nucliadb_node/binding/Cargo.toml
+	pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-macosx_11_0_arm64.whl --force

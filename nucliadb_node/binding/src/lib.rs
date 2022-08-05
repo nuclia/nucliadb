@@ -17,8 +17,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use nucliadb_node::config::Configuration;
 use std::io::Cursor;
 use std::sync::Arc;
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
@@ -30,6 +35,7 @@ use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 use tokio::sync::RwLock;
+use tracing::*;
 type RawProtos = Vec<u8>;
 
 #[pyclass]
@@ -319,6 +325,23 @@ impl NodeWriter {
 
 #[pymodule]
 fn nucliadb_node_binding(_py: Python, m: &PyModule) -> PyResult<()> {
+    pyo3_log::init();
+    let log_levels = Configuration::log_level();
+
+    let mut layers = Vec::new();
+    let stdout_layer = tracing_subscriber::fmt::layer()
+        .with_level(true)
+        .with_filter(Targets::new().with_targets(log_levels))
+        .boxed();
+
+    layers.push(stdout_layer);
+
+    let _reg = tracing_subscriber::registry()
+        .with(layers)
+        .try_init()
+        .map_err(|e| {
+            error!("Try init error: {e}");
+        });
     m.add_class::<NodeWriter>()?;
     m.add_class::<NodeReader>()?;
     Ok(())

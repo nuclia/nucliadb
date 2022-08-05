@@ -81,7 +81,7 @@ class PredictEngine:
                 )
                 return []
             # Upload the payload
-            headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.get(
                 url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
                 headers=headers,
