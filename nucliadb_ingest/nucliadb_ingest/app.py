@@ -102,6 +102,7 @@ async def stop_indexing_utility():
 
 
 async def main() -> List[Callable]:
+    set_logging()
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider is not None:
         set_global_textmap(B3MultiFormat())
@@ -164,13 +165,7 @@ def _cancel_all_tasks(loop):
             )
 
 
-def run():
-    if running_settings.sentry_url and SENTRY:
-        set_sentry(
-            running_settings.sentry_url,
-            running_settings.running_environment,
-            running_settings.logging_integration,
-        )
+def set_logging():
 
     logging.basicConfig(
         level=logging.INFO,
@@ -196,6 +191,15 @@ def run():
         )
 
     assign_partitions(settings)
+
+
+def run():
+    if running_settings.sentry_url and SENTRY:
+        set_sentry(
+            running_settings.sentry_url,
+            running_settings.running_environment,
+            running_settings.logging_integration,
+        )
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")

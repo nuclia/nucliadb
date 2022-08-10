@@ -55,10 +55,8 @@ async def test_counters(
     assert resp.status_code == 201
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/counters")
-    assert resp.status_code == 200
-    import pdb
 
-    pdb.set_trace()
-    pass
+    assert resp.status_code == 200
     assert resp.json()["resources"] == 3
     assert resp.json()["paragraphs"] == 2
+    assert resp.json()["fields"] == 2

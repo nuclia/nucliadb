@@ -67,7 +67,6 @@ if TYPE_CHECKING:
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
 KB_RESOURCE_METADATA = "/kbs/{kbid}/r/{uuid}/metadata"
 KB_RESOURCE_RELATIONS = "/kbs/{kbid}/r/{uuid}/relations"
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
 KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
 KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"

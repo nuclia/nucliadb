@@ -475,6 +475,7 @@ async def upload(
     # - content-type set by the user in the upload request header
     # - if not set, we'll set it to a generic binary content type
     content_type = request.headers.get("content-type", "application/octet-stream")
+
     if x_filename and len(x_filename):
         filename = base64.b64decode(x_filename[0]).decode()
     else:
@@ -495,21 +496,18 @@ async def upload(
         buf = BytesIO()
         async for chunk in request.stream():
             buf.write(chunk)
-            if buf.tell() > storage_manager.chunk_size:
+            while buf.tell() > storage_manager.chunk_size:
                 buf.seek(0)
                 data = buf.read(storage_manager.chunk_size)
-                yield data
+                if len(data):
+                    yield data
                 old_data = buf.read()
                 buf = BytesIO()
                 buf.write(old_data)
-        while buf.tell() > storage_manager.chunk_size:
-            data = buf.read(storage_manager.chunk_size)
-            yield data
-            old_data = buf.read()
-            buf = BytesIO()
-            buf.write(old_data)
         buf.seek(0)
-        yield buf.read()
+        data = buf.read()
+        if len(data):
+            yield data
 
     size = await storage_manager.append(
         dm, generate_buffer(storage_manager=storage_manager, request=request), 0

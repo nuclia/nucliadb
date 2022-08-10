@@ -286,7 +286,7 @@ class PullWorker:
         while True:
             try:
                 await self._loop()
-            except ReallyStopPulling as e:
+            except ReallyStopPulling:
                 logger.info("Exiting...")
                 break
             except Exception as e:
@@ -328,7 +328,6 @@ class PullWorker:
                             text = await resp.text()
                             logger.exception(f"Wrong status {resp.status}:{text}")
                             continue
-
                         try:
                             data = await resp.json()
                         except Exception:
@@ -355,6 +354,9 @@ class PullWorker:
                                     # Temporal setter until next version of processing where the source will be
                                     # correctly set from the processor
                                     pb.source = BrokerMessage.MessageSource.PROCESSOR
+                                    logger.debug(
+                                        f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}"
+                                    )
 
                                     if self.nats_subscriber:
                                         await transaction_utility.commit(

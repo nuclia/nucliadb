@@ -42,12 +42,12 @@ log_config = {
     "formatters": {
         "default": {
             "()": "uvicorn.logging.DefaultFormatter",
-            "fmt": "%(levelprefix)s %(message)s",
+            "fmt": "%(asctime)s %(levelprefix)s %(message)s",
             "use_colors": None,
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
-            "fmt": '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            "fmt": '%(asctime)s %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
         },
     },
     "handlers": {
@@ -79,7 +79,7 @@ log_config = {
         "nucliadb_ingest": {
             "level": "INFO",
             "handlers": ["default"],
-            "propagate": True,
+            "propagate": False,
         },
         "nucliadb_search": {
             "level": "INFO",
@@ -103,10 +103,17 @@ log_config = {
 class LogLevel(str, Enum):
     INFO = "INFO"
     ERROR = "ERROR"
+    DEBUG = "DEBUG"
+
+
+class Driver(str, Enum):
+    REDIS = "REDIS"
+    LOCAL = "LOCAL"
 
 
 class Settings(pydantic.BaseModel):
 
+    driver: Driver = pydantic.Field(Driver.LOCAL, description="Main DB Path string")
     maindb: str = pydantic.Field(description="Main DB Path string")
     blob: str = pydantic.Field(description="Blob Path string")
     key: Optional[str] = pydantic.Field(
@@ -114,10 +121,12 @@ class Settings(pydantic.BaseModel):
     )
     node: str = pydantic.Field(description="Node Path string")
     zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
-    http: int = pydantic.Field(description="HTTP Port int")
-    grpc: int = pydantic.Field(description="GRPC Port int")
-    train: int = pydantic.Field(description="Train GRPC Port int")
-    log: LogLevel = pydantic.Field(description="Log level [INFO,ERROR] string")
+    http: int = pydantic.Field(8080, description="HTTP Port int")
+    grpc: int = pydantic.Field(8030, description="GRPC Port int")
+    train: int = pydantic.Field(8031, description="Train GRPC Port int")
+    log: LogLevel = pydantic.Field(
+        LogLevel.ERROR, description="Log level [DEBUG,INFO,ERROR] string"
+    )
 
 
 def run():
@@ -149,32 +158,54 @@ def config_nucliadb(nucliadb_args: Settings):
     )
     from nucliadb_writer.settings import settings as writer_settings
 
-    running_settings.log_level = nucliadb_args.log.upper()
-    train_settings.grpc_port = nucliadb_args.train
-    ingest_settings.driver = "local"
-    ingest_settings.driver_local_url = nucliadb_args.maindb
     ingest_settings.chitchat_enabled = False
+    ingest_settings.nuclia_partitions = 1
+    ingest_settings.total_replicas = 1
+    ingest_settings.replica_number = 0
+    ingest_settings.partitions = ["1"]
     running_settings.debug = True
-    http_settings.cors_origins = ["*"]
-    storage_settings.file_backend = "local"
-    storage_settings.local_files = nucliadb_args.blob
-    if nucliadb_args.key is None:
-        ingest_settings.pull_time = 0
-        nuclia_settings.disable_send_to_process = True
-    else:
-        nuclia_settings.nuclia_service_account = nucliadb_args.key
     nuclia_settings.onprem = True
-    if nucliadb_args.zone is not None:
-        nuclia_settings.nuclia_zone = nucliadb_args.zone
+    http_settings.cors_origins = ["*"]
     nucliadb_settings.nucliadb_ingest = None
     transaction_settings.transaction_local = True
     audit_settings.audit_driver = "basic"
     indexing_settings.index_local = True
     cache_settings.cache_enabled = False
     writer_settings.dm_enabled = False
+
+    running_settings.log_level = nucliadb_args.log.upper()
+    running_settings.activity_log_level = nucliadb_args.log.upper()
+    train_settings.grpc_port = nucliadb_args.train
     ingest_settings.grpc_port = nucliadb_args.grpc
 
+    if nucliadb_args.driver == Driver.LOCAL:
+        ingest_settings.driver = "local"
+        ingest_settings.driver_local_url = nucliadb_args.maindb
+    elif nucliadb_args.driver == Driver.REDIS:
+        ingest_settings.driver = "redis"
+        ingest_settings.driver_redis_url = nucliadb_args.maindb
+
+    storage_settings.file_backend = "local"
+    storage_settings.local_files = nucliadb_args.blob
+
     os.environ["DATA_PATH"] = nucliadb_args.node
+
+    if nucliadb_args.key is None:
+        if os.environ.get("NUA_API_KEY"):
+            nuclia_settings.nuclia_service_account = os.environ.get("NUA_API_KEY")
+            nuclia_settings.disable_send_to_process = False
+            ingest_settings.pull_time = 60
+
+        else:
+            ingest_settings.pull_time = 0
+            nuclia_settings.disable_send_to_process = True
+    else:
+        nuclia_settings.nuclia_service_account = nucliadb_args.key
+
+    if nucliadb_args.zone is not None:
+        nuclia_settings.nuclia_zone = nucliadb_args.zone
+    elif os.environ.get("NUA_ZONE"):
+        nuclia_settings.nuclia_zone = os.environ.get("NUA_ZONE", "dev")
 
     local_node = LocalNode()
     NODE_CLUSTER.local_node = local_node

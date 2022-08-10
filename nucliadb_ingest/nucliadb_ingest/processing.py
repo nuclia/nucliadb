@@ -212,14 +212,14 @@ class ProcessingEngine:
         headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()
         headers["X-MD5"] = file.file.md5
         headers["CONTENT_TYPE"] = file.file.content_type
+        headers["CONTENT-LENGTH"] = str(len(file.file.payload))
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
-        headers["X-STF_ROLES"] = "WRITER"
         with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
             assert resp.status == 200
-            jwt = await resp.text()
-        return jwt
+            jwttoken = await resp.text()
+        return jwttoken
 
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
@@ -227,7 +227,7 @@ class ProcessingEngine:
         """ITs already an internal file that needs to be uploaded"""
         if self.onprem is False:
             # Upload the file to processing upload
-            jwt = self.generate_file_token_from_fieldfile(file)
+            jwttoken = self.generate_file_token_from_fieldfile(file)
         else:
             headers = {}
             headers["X-PASSWORD"] = file.password
@@ -236,9 +236,10 @@ class ProcessingEngine:
                 file.file.filename.encode()
             ).decode()
             headers["X-MD5"] = file.file.md5
-            headers["CONTENT_TYPE"] = file.file.content_type
+            headers["CONTENT-TYPE"] = file.file.content_type
+            if file.file.size:
+                headers["CONTENT-LENGTH"] = str(file.file.size)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
-            headers["X-STF_ROLES"] = "WRITER"
             if self.dummy:
                 self.uploads.append(headers)
                 return "DUMMYJWT"
@@ -247,21 +248,27 @@ class ProcessingEngine:
             async with self.session.post(
                 self.nuclia_upload_url, data=iterator, headers=headers
             ) as resp:
-                assert resp.status == 200
-                jwt = await resp.text()
-        return jwt
+                if resp.status == 200:
+                    jwttoken = await resp.text()
+                else:
+                    text = await resp.text()
+                    raise Exception(f"STATUS: {resp.status} - {text}")
+        return jwttoken
 
     async def convert_internal_cf_to_str(self, cf: CloudFile, storage: Storage) -> str:
         if self.onprem is False:
             # Upload the file to processing upload
-            jwt = self.generate_file_token_from_cloudfile(cf)
+            jwttoken = self.generate_file_token_from_cloudfile(cf)
+        elif self.disable_send_to_process:
+            return ""
         else:
             headers = {}
             headers["X-FILENAME"] = base64.b64encode(cf.filename.encode()).decode()
             headers["X-MD5"] = cf.md5
-            headers["CONTENT_TYPE"] = cf.content_type
+            headers["CONTENT-TYPE"] = cf.content_type
+            if cf.size:
+                headers["CONTENT-LENGTH"] = str(cf.size)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
-            headers["X-STF_ROLES"] = "WRITER"
             if self.dummy:
                 self.uploads.append(headers)
                 return "DUMMYJWT"
@@ -270,10 +277,13 @@ class ProcessingEngine:
             with self.session.post(
                 self.nuclia_upload_url, data=iterator, headers=headers
             ) as resp:
-                assert resp.status == 200
-                jwt = await resp.text()
+                if resp.status == 200:
+                    jwttoken = await resp.text()
+                else:
+                    text = await resp.text()
+                    raise Exception(f"STATUS: {resp.status} - {text}")
 
-        return jwt
+        return jwttoken
 
     async def send_to_process(self, item: PushPayload, partition: int) -> int:
         if self.disable_send_to_process:

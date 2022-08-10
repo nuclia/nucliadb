@@ -26,26 +26,31 @@ from nucliadb_utils.storages import CHUNK_SIZE
 
 
 class NucliaStorage:
-    def __init__(self, service_account: Optional[str] = None):
+    def __init__(
+        self,
+        nuclia_public_url: str,
+        nuclia_zone: str,
+        service_account: Optional[str] = None,
+    ):
         self.service_account = service_account
+        self.nuclia_public_url = nuclia_public_url.format(zone=nuclia_zone)
+        self.nuclia_zone = nuclia_zone
+        self._session = None
 
     async def download(self, cf: CloudFile):
         assert CloudFile.FLAPS == cf.source
         if self.service_account is None:
             raise AttributeError("Invalid service account")
+        url = f"{self.nuclia_public_url}/api/v1/processing/download?token={cf.uri}"
         async with self.session.get(
-            cf.uri,
+            url,
             headers={
-                "Authorization": f"Bearer {self.service_account}",
+                "X-STF-NUAKEY": f"Bearer {self.service_account}",
             },
         ) as resp:
             assert resp.status == 200
-            while True:
-                body = await resp.read(CHUNK_SIZE)
-                if body is None:
-                    break
-                else:
-                    yield body
+            async for chunk in resp.content.iter_chunked(CHUNK_SIZE):
+                yield chunk
 
     async def initialize(self):
         self.session = aiohttp.ClientSession()
