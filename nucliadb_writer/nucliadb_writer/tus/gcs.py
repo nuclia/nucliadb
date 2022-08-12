@@ -264,8 +264,6 @@ class GCloudFileStorageManager(FileStorageManager):
         else:
             # assuming size will come eventually
             size = "*"
-            if len(data) < CHUNK_SIZE:
-                size = offset + len(data)
         content_range = "bytes {init}-{chunk}/{total}".format(
             init=offset, chunk=offset + len(data) - 1, total=size
         )
