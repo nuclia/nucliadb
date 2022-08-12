@@ -253,6 +253,9 @@ impl ShardReaderService {
     pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload).await;
         let skip_vectors = search_request.body.is_empty() || search_request.result_per_page == 0;
+        let skip_paragraphs = !search_request.paragraph;
+        let skip_fields = !search_request.document;
+
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
             body: search_request.body.clone(),
@@ -270,7 +273,11 @@ impl ShardReaderService {
         let span = tracing::Span::current();
         let text_task = task::spawn_blocking(move || {
             run_with_telemetry(info_span!(parent: &span, "field reader search"), || {
-                field_reader_service.search(&field_request)
+                if !skip_fields {
+                    Some(field_reader_service.search(&field_request))
+                } else {
+                    None
+                }
             })
         });
         info!("{}:{}", line!(), file!());
@@ -293,42 +300,41 @@ impl ShardReaderService {
         let span = tracing::Span::current();
         let paragraph_task = task::spawn_blocking(move || {
             run_with_telemetry(info_span!(parent: &span, "paragraph reader search"), || {
-                paragraph_reader_service.search(&paragraph_request)
+                if !skip_paragraphs {
+                    Some(paragraph_reader_service.search(&paragraph_request))
+                } else {
+                    None
+                }
             })
         });
         info!("{}:{}", line!(), file!());
-        if skip_vectors {
-            let (rtext, rparagraph) = try_join!(text_task, paragraph_task).unwrap();
-            info!("{}:{}", line!(), file!());
-            Ok(SearchResponse {
-                document: Some(rtext?),
-                paragraph: Some(rparagraph?),
-                vector: None,
+
+        let vector_request = VectorSearchRequest {
+            id: "".to_string(),
+            vector: search_request.vector.clone(),
+            tags: search_request.fields.clone(),
+            reload: search_request.reload,
+        };
+        let vector_reader_service = self.vector_reader_service.clone();
+        let span = tracing::Span::current();
+        let vector_task = task::spawn_blocking(move || {
+            run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
+                if !skip_vectors {
+                    Some(vector_reader_service.search(&vector_request))
+                } else {
+                    None
+                }
             })
-        } else {
-            let vector_request = VectorSearchRequest {
-                id: "".to_string(),
-                vector: search_request.vector.clone(),
-                tags: search_request.fields.clone(),
-                reload: search_request.reload,
-            };
-            let vector_reader_service = self.vector_reader_service.clone();
-            let span = tracing::Span::current();
-            let vector_task = task::spawn_blocking(move || {
-                run_with_telemetry(info_span!(parent: &span, "vector reader search"), || {
-                    vector_reader_service.search(&vector_request)
-                })
-            });
-            info!("{}:{}", line!(), file!());
-            let (rtext, rparagraph, rvector) =
-                try_join!(text_task, paragraph_task, vector_task,).unwrap();
-            info!("{}:{}", line!(), file!());
-            Ok(SearchResponse {
-                document: Some(rtext?),
-                paragraph: Some(rparagraph?),
-                vector: Some(rvector?),
-            })
-        }
+        });
+        info!("{}:{}", line!(), file!());
+        let (rtext, rparagraph, rvector) =
+            try_join!(text_task, paragraph_task, vector_task,).unwrap();
+        info!("{}:{}", line!(), file!());
+        Ok(SearchResponse {
+            document: rtext.transpose()?,
+            paragraph: rparagraph.transpose()?,
+            vector: rvector.transpose()?,
+        })
     }
 
     #[tracing::instrument(

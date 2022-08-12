@@ -190,6 +190,8 @@ message SearchRequest {
     repeated float vector = 10; // Embedded vector search.
 
     bool reload = 11;
+    bool paragraph = 12;
+    bool document = 13;
 
 }
 

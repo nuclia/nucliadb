@@ -20,10 +20,12 @@
 import logging
 import os
 
+from nucliadb_ingest.settings import Settings
+
 logger = logging.getLogger("nucliadb_ingest")
 
 
-def assign_partitions(settings):
+def assign_partitions(settings: Settings):
     # partitions start from 1, instead of 0
     all_partitions = [str(part + 1) for part in range(settings.nuclia_partitions)]
 

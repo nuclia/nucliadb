@@ -96,24 +96,36 @@ class LocalFileStorageManager(FileStorageManager):
                 count += len(data)
                 data = await resp.read(CHUNK_SIZE)
 
-    async def _append(self, dm: FileDataMangaer, data, offset):
-        bucket_path = self.storage.get_bucket_path(dm.get("bucket"))
-
-        init_url = f"{bucket_path}/{dm.get('upload_file_id')}"
-        async with aiofiles.open(init_url, "wb") as resp:
-            await resp.seek(offset)
-            await resp.write(data)
+    async def _append(self, data, offset, aiofi):
+        await aiofi.seek(offset)
+        await aiofi.write(data)
+        await aiofi.flush()
 
     async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
         count = 0
-        async for chunk in iterable:
-            await self._append(dm, chunk, offset)
-            size = len(chunk)
-            count += size
+        bucket_path = self.storage.get_bucket_path(dm.get("bucket"))
+
+        init_url = f"{bucket_path}/{dm.get('upload_file_id')}"
+        async with aiofiles.open(init_url, "wb") as aiofi:
+            async for chunk in iterable:
+                await self._append(chunk, offset, aiofi)
+                size = len(chunk)
+                count += size
+                offset += size
         return count
 
     async def finish(self, dm: FileDataMangaer):
+        # Move from old to new
+        bucket = dm.get("bucket")
+        bucket_path = self.storage.get_bucket_path(bucket)
+        upload_file_id = dm.get("upload_file_id")
+        from_url = f"{bucket_path}/{upload_file_id}"
         path = dm.get("path")
+        to_url = f"{bucket_path}/{path}"
+        to_url_dirs = os.path.dirname(to_url)
+        os.makedirs(to_url_dirs, exist_ok=True)
+        os.rename(from_url, to_url)
+
         await dm.finish()
         return path
 

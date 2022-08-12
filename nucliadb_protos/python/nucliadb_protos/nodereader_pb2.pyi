@@ -480,6 +480,8 @@ class SearchRequest(google.protobuf.message.Message):
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
+    PARAGRAPH_FIELD_NUMBER: builtins.int
+    DOCUMENT_FIELD_NUMBER: builtins.int
     shard: typing.Text
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
@@ -503,6 +505,8 @@ class SearchRequest(google.protobuf.message.Message):
         """Embedded vector search."""
         pass
     reload: builtins.bool
+    paragraph: builtins.bool
+    document: builtins.bool
     def __init__(self,
         *,
         shard: typing.Text = ...,
@@ -516,9 +520,11 @@ class SearchRequest(google.protobuf.message.Message):
         timestamps: typing.Optional[global___Timestamps] = ...,
         vector: typing.Optional[typing.Iterable[builtins.float]] = ...,
         reload: builtins.bool = ...,
+        paragraph: builtins.bool = ...,
+        document: builtins.bool = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["faceted",b"faceted","filter",b"filter","order",b"order","timestamps",b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","faceted",b"faceted","fields",b"fields","filter",b"filter","order",b"order","page_number",b"page_number","reload",b"reload","result_per_page",b"result_per_page","shard",b"shard","timestamps",b"timestamps","vector",b"vector"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","document",b"document","faceted",b"faceted","fields",b"fields","filter",b"filter","order",b"order","page_number",b"page_number","paragraph",b"paragraph","reload",b"reload","result_per_page",b"result_per_page","shard",b"shard","timestamps",b"timestamps","vector",b"vector"]) -> None: ...
 global___SearchRequest = SearchRequest
 
 class SuggestRequest(google.protobuf.message.Message):

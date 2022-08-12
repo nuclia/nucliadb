@@ -187,7 +187,7 @@ class Storage:
             return file
 
         elif file.source == CloudFile.FLAPS:
-            flaps_storage = get_nuclia_storage()
+            flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.LOCAL:
@@ -323,7 +323,7 @@ class Storage:
                 if data is not None:
                     result.write(data)
         elif cf.source == CloudFile.FLAPS:
-            flaps_storage = get_nuclia_storage()
+            flaps_storage = await get_nuclia_storage()
             async for data in flaps_storage.download(cf):
                 if data is not None:
                     result.write(data)
@@ -344,7 +344,7 @@ class Storage:
                 if data is not None:
                     yield data
         elif cf.source == CloudFile.FLAPS:
-            flaps_storage = get_nuclia_storage()
+            flaps_storage = await get_nuclia_storage()
             async for data in flaps_storage.download(cf):
                 if data is not None:
                     yield data

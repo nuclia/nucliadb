@@ -17,19 +17,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use nucliadb_node::config::Configuration;
 use std::io::Cursor;
 use std::sync::Arc;
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
     op_status, DocumentSearchRequest, OpStatus, ParagraphSearchRequest, RelationSearchRequest,
-    Resource, ResourceId, SearchRequest, ShardId, VectorSearchRequest,
+    Resource, ResourceId, SearchRequest, Shard as ShardPB, ShardId, VectorSearchRequest,
 };
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 use tokio::sync::RwLock;
+use tracing::*;
 type RawProtos = Vec<u8>;
 
 #[pyclass]
@@ -54,11 +60,18 @@ impl NodeReader {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-
             let mut lock = reader.write().await;
-            match lock.get_shard(&shard_id).await {
-                Some(_) => Ok(shard_id.encode_to_vec()),
-                None => Err(exceptions::PyTypeError::new_err("Not found")),
+            if let Some(shard) = lock.get_shard(&shard_id).await {
+                let stats = shard.get_info().await;
+                let shard_pb = ShardPB {
+                    shard_id: String::from(&shard.id),
+                    resources: stats.resources as u64,
+                    paragraphs: stats.paragraphs as u64,
+                    sentences: stats.sentences as u64,
+                };
+                Ok(shard_pb.encode_to_vec())
+            } else {
+                Err(exceptions::PyTypeError::new_err("Not found"))
             }
         })
     }
@@ -319,6 +332,23 @@ impl NodeWriter {
 
 #[pymodule]
 fn nucliadb_node_binding(_py: Python, m: &PyModule) -> PyResult<()> {
+    pyo3_log::init();
+    let log_levels = Configuration::log_level();
+
+    let mut layers = Vec::new();
+    let stdout_layer = tracing_subscriber::fmt::layer()
+        .with_level(true)
+        .with_filter(Targets::new().with_targets(log_levels))
+        .boxed();
+
+    layers.push(stdout_layer);
+
+    let _reg = tracing_subscriber::registry()
+        .with(layers)
+        .try_init()
+        .map_err(|e| {
+            error!("Try init error: {e}");
+        });
     m.add_class::<NodeWriter>()?;
     m.add_class::<NodeReader>()?;
     Ok(())

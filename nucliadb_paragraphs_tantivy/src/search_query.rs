@@ -104,7 +104,25 @@ pub fn create_query(
     schema: &ParagraphSchema,
     distance: u8,
 ) -> Vec<QueryP> {
-    let mut queries = parse_query(parser, text, distance);
+    let (quotes, reg) =
+        text.split(' ')
+            .into_iter()
+            .fold((vec![], String::new()), |(mut quotes, mut reg), crnt| {
+                if crnt.starts_with('"') && crnt.ends_with('"') {
+                    quotes.push(crnt);
+                } else {
+                    reg.push(' ');
+                    reg.push_str(crnt);
+                }
+                (quotes, reg)
+            });
+    let mut queries = parse_query(parser, &reg, distance);
+
+    for quote in quotes {
+        let query = parser.parse_query(quote).unwrap();
+        queries.push((Occur::Must, query));
+    }
+
     if !search.uuid.is_empty() {
         let term = Term::from_field_text(schema.uuid, &search.uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);

@@ -148,14 +148,17 @@ def get_local_storage() -> LocalStorage:
     return MAIN.get("local_storage", None)
 
 
-def get_nuclia_storage() -> NucliaStorage:
+async def get_nuclia_storage() -> NucliaStorage:
     if "nuclia_storage" not in MAIN:
         from nucliadb_utils.storages.nuclia import NucliaStorage
 
         MAIN["nuclia_storage"] = NucliaStorage(
-            service_account=nuclia_settings.nuclia_service_account
+            nuclia_public_url=nuclia_settings.nuclia_public_url,
+            nuclia_zone=nuclia_settings.nuclia_zone,
+            service_account=nuclia_settings.nuclia_service_account,
         )
         logger.info("Configuring Nuclia Storage")
+        await MAIN["nuclia_storage"].initialize()
     return MAIN.get("nuclia_storage", None)
 
 

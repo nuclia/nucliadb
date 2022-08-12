@@ -29,7 +29,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb_ingest.maindb.driver import Driver
-from nucliadb_ingest.orm.exceptions import DeadletteredError
+from nucliadb_ingest.orm.exceptions import DeadletteredError, ReallyStopPulling
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
@@ -286,6 +286,9 @@ class PullWorker:
         while True:
             try:
                 await self._loop()
+            except ReallyStopPulling:
+                logger.info("Exiting...")
+                break
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
@@ -296,7 +299,7 @@ class PullWorker:
 
         headers = {}
         if self.creds is not None:
-            headers["X-STF-ZONEKEY"] = f"Bearer {self.creds}"
+            headers["X-STF-NUAKEY"] = f"Bearer {self.creds}"
 
         if self.onprem:
             url = (
@@ -312,6 +315,7 @@ class PullWorker:
             )
         async with aiohttp.ClientSession() as session:
             logger.info(f"Collecting from NucliaDB Cloud {self.partition} partition")
+            logger.info(f"{url}")
 
             while True:
                 try:
@@ -324,7 +328,6 @@ class PullWorker:
                             text = await resp.text()
                             logger.exception(f"Wrong status {resp.status}:{text}")
                             continue
-
                         try:
                             data = await resp.json()
                         except Exception:
@@ -351,6 +354,9 @@ class PullWorker:
                                     # Temporal setter until next version of processing where the source will be
                                     # correctly set from the processor
                                     pb.source = BrokerMessage.MessageSource.PROCESSOR
+                                    logger.debug(
+                                        f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}"
+                                    )
 
                                     if self.nats_subscriber:
                                         await transaction_utility.commit(
@@ -383,7 +389,8 @@ class PullWorker:
                     logger.info(
                         f"Pull task for partition #{self.partition} was canceled, exiting"
                     )
-                    break
+                    raise ReallyStopPulling()
+
                 except Exception:
                     logger.exception("Gathering changes")
                     await asyncio.sleep(self.pull_time)

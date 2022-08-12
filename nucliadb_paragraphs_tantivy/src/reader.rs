@@ -585,7 +585,7 @@ mod tests {
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
-            body: "\"shoupd\" enaugh".to_string(),
+            body: "\"should\" enaugh".to_string(),
             fields: vec![],
             filter: None,
             faceted: None,
@@ -699,6 +699,23 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
+
+        // Search typo on all paragraph
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: "".to_string(),
+            body: "\"shoupd\"".to_string(),
+            fields: vec![],
+            filter: None,
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 0);
         Ok(())
     }
 }

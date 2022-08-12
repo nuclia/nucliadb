@@ -25,6 +25,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
     FieldType,
+    Metadata,
     Paragraph,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -83,5 +84,7 @@ def set_title(writer: BrokerMessage, toprocess: PushPayload, title: str):
     fmw.field.field = "title"
     fmw.field.field_type = FieldType.GENERIC
     writer.field_metadata.append(fmw)
+    writer.basic.metadata.useful = True
+    writer.basic.metadata.status = Metadata.Status.PENDING
 
     toprocess.genericfield["title"] = Text(body=title, format=PushTextFormat.PLAIN)

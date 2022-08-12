@@ -46,7 +46,10 @@ class PredictEngine:
     ):
         self.nuclia_service_account = nuclia_service_account
         self.cluster_url = cluster_url
-        self.public_url = public_url
+        if public_url is not None:
+            self.public_url: Optional[str] = public_url.format(zone=zone)
+        else:
+            self.public_url = None
         self.zone = zone
         self.onprem = onprem
         self.dummy = dummy
@@ -81,7 +84,7 @@ class PredictEngine:
                 )
                 return []
             # Upload the payload
-            headers = {"Authorization": f"Bearer {self.nuclia_service_account}"}
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.get(
                 url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
                 headers=headers,

@@ -63,6 +63,9 @@ async def global_query_to_pb(
         request.result_per_page = page_size
         request.fields.extend(fields)
 
+    request.document = SearchOptions.DOCUMENT in features
+    request.paragraph = SearchOptions.PARAGRAPH in features
+
     if SearchOptions.VECTOR in features:
         request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
 

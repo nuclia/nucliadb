@@ -112,5 +112,15 @@ WORKDIR /usr/src/app
 RUN pip install -r nucliadb/requirements-sources.txt
 RUN pip install --no-deps -e /usr/src/app/nucliadb
 
+ENV NUA_ZONE=europe-1
+ENV NUA_API_KEY=
+ENV NUCLIA_PUBLIC_URL=https://{zone}.nuclia.cloud
+
 # HTTP
 EXPOSE 8080/tcp
+# GRPC
+EXPOSE 8030/tcp
+# GRPC - TRAIN
+EXPOSE 8031/tcp
+
+CMD ["nucliadb"]
