@@ -86,9 +86,9 @@ spec:
           mountPath: /appsecrets
 {{- end }}
 {{- if .Values.nats.regionalSecretName }}
-          - name: regional-nats-creds
-            readOnly: true
-            mountPath: /regioncreds
+        - name: regional-nats-creds
+          readOnly: true
+          mountPath: /regioncreds
 {{- end }}
       - name: writer
         securityContext:
