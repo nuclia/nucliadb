@@ -22,7 +22,7 @@ serving:
 
 services:
   # This must match the redis or tikv driver on nucliadb_shared
-  maindb: 2379  # redis: 6379 | tikv: 2379
+  maindb: 2379 # redis: 6379 | tikv: 2379
   nats: 4222
 
 running:
@@ -35,6 +35,7 @@ running:
 ##   .Values.cache.cache_pubsub_nats_auth
 nats:
   secretName: nats-creds
+  regionalSecretName: regional-nats-creds
 
 serviceMonitor:
   enabled: False

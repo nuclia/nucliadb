@@ -39,6 +39,7 @@ vs:
 ##   .Values.cache.cache_pubsub_nats_auth
 nats:
   secretName: nats-creds
+  regionalSecretName: regional-nats-creds
 
 zone:
 

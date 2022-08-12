@@ -81,6 +81,11 @@ spec:
             readOnly: true
             mountPath: /appsecrets
 {{- end }}
+{{- if .Values.nats.regionalSecretName }}
+          - name: regional-nats-creds
+            readOnly: true
+            mountPath: /regioncreds
+{{- end }}
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
@@ -110,4 +115,9 @@ spec:
       - name: nats-creds
         secret:
           secretName: {{ .Values.nats.secretName }}
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
+      - name: regional-nats-creds
+        secret:
+          secretName: {{ .Values.nats.regionalSecretName }}
 {{- end }}

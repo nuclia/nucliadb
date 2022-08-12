@@ -85,6 +85,11 @@ spec:
             readOnly: true
             mountPath: /appsecrets
 {{- end }}
+{{- if .Values.nats.regionalSecretName }}
+          - name: regional-nats-creds
+            readOnly: true
+            mountPath: /regioncreds
+{{- end }}
       - name: cluster-manager
         image: "{{ .Values.containerRegistry }}/{{ .Values.image_other }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -128,4 +133,9 @@ spec:
       - name: nats-creds
         secret:
           secretName: {{ .Values.nats.secretName }}
+{{- end }}
+{{- if .Values.nats.regionalSecretName }}
+      - name: regional-nats-creds
+        secret:
+          secretName: {{ .Values.nats.regionalSecretName }}
 {{- end }}
