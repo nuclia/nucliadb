@@ -33,6 +33,7 @@ import backoff  # type: ignore
 import google.auth.transport.requests  # type: ignore
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
+from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
 
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import (
@@ -42,6 +43,9 @@ from nucliadb_utils.storages.exceptions import (
     ResumableUploadGone,
 )
 from nucliadb_utils.storages.storage import Storage, StorageField
+
+# Enable instrumentation
+AioHttpClientInstrumentor().instrument()
 
 MAX_SIZE = 1073741824
 

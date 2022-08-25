@@ -20,6 +20,7 @@ types-setuptools
 pydantic
 sentry-sdk==1.5.12
 prometheus-client==0.12.0
+opentelemetry-instrumentation-aiohttp-client==0.30b1
 aioredis==2.0.1
 aiobotocore==2.1.1
 botocore

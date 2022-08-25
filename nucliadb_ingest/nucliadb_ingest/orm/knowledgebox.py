@@ -207,6 +207,7 @@ class KnowledgeBox:
         )
         # Create Storage
         storage = await get_storage()
+
         created = await storage.create_kb(uuid)
         if created is False:
             logger.error(f"{uuid} KB could not be created")
