@@ -40,6 +40,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_ingest import SERVICE_NAME
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -141,7 +142,7 @@ async def test_ingest_messages_autocommit(
     await processor.process(message=message1, seqid=1)
 
     index = get_indexing()
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     pb = await storage.get_indexing(index._calls[0][1])
     assert pb.texts["a/summary"].text == "My summary"  # type: ignore

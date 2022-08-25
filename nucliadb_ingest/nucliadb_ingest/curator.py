@@ -40,6 +40,7 @@ from nucliadb_protos.resources_pb2 import FieldComputedMetadata, FieldID
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 from sentry_sdk import capture_exception
 
+from nucliadb_ingest import SERVICE_NAME
 from nucliadb_ingest.fields.base import FIELD_METADATA
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.orm.processor import Processor
@@ -339,7 +340,7 @@ class Nats:
 async def main(arguments):
     consumers: List[Consumer] = []
     driver = await get_driver()
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     logger.info("STARTING CURATOR")
     nc = Nats()

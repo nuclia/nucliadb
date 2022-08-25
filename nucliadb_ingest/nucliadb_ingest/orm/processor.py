@@ -41,7 +41,7 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from sentry_sdk import capture_exception
 
-from nucliadb_ingest import logger
+from nucliadb_ingest import SERVICE_NAME, logger
 from nucliadb_ingest.maindb.driver import Driver, Transaction
 from nucliadb_ingest.orm.exceptions import DeadletteredError
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
@@ -388,7 +388,7 @@ class Processor:
         if not (await KnowledgeBox.exist_kb(txn, uuid)):
             return None
 
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kbobj = KnowledgeBox(txn, storage, cache, uuid)
         return kbobj
@@ -442,7 +442,7 @@ class Processor:
             raise e
 
         if not failed:
-            storage = await get_storage()
+            storage = await get_storage(service_name=SERVICE_NAME)
             cache = await get_cache()
             kb = KnowledgeBox(txn, storage, cache, uuid)
             await kb.set_widgets(DEFAULT_WIDGET)

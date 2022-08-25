@@ -53,7 +53,7 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction,
 )
-from nucliadb_writer import logger
+from nucliadb_writer import SERVICE_NAME, logger
 from nucliadb_writer.api.models import CreateResourcePayload
 from nucliadb_writer.exceptions import (
     ConflictError,
@@ -611,7 +611,7 @@ async def store_file_on_nuclia_db(
     partitioning = get_partitioning()
     transaction = get_transaction()
     processing = get_processing()
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     partition = partitioning.generate_partition(kbid, rid)
 

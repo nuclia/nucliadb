@@ -28,6 +28,7 @@ from nucliadb_protos.noderesources_pb2 import (
 from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
+from nucliadb_ingest import SERVICE_NAME  # type: ignore
 from nucliadb_ingest.orm import NODES
 from nucliadb_ingest.orm.abc import AbstractShard
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -58,7 +59,7 @@ class Shard(AbstractShard):
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> int:
 
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         indexing = get_indexing()
 
         count: int = -1

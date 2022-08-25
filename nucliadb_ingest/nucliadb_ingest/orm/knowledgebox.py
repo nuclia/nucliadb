@@ -41,7 +41,7 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb_ingest import logger
+from nucliadb_ingest import SERVICE_NAME, logger
 from nucliadb_ingest.maindb.driver import Driver, Transaction
 from nucliadb_ingest.orm.exceptions import (
     KnowledgeBoxConflict,
@@ -206,7 +206,7 @@ class KnowledgeBox:
             config.SerializeToString(),
         )
         # Create Storage
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
 
         created = await storage.create_kb(uuid)
         if created is False:
@@ -375,7 +375,7 @@ class KnowledgeBox:
         KB_TO_DELETE_STORAGE key, so theb purge cronshjon will keep trying
         to delete once the emptying have been completed.
         """
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         exists = await storage.schedule_delete_kb(kbid)
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")

@@ -21,7 +21,7 @@ from typing import List, Literal, Union
 from typing import get_args as typing_get_args
 
 from fastapi import Header, HTTPException, Query, Request, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from sentry_sdk import capture_exception
 
 import nucliadb_models as models
@@ -46,6 +46,7 @@ from nucliadb_models.serialize import (
     set_resource_field_extracted_data,
 )
 from nucliadb_protos import resources_pb2
+from nucliadb_reader import SERVICE_NAME  # type: ignore
 from nucliadb_reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb_reader.api.models import (
     FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP,
@@ -109,7 +110,12 @@ async def list_resources(
             rid = await txn.get(key)
             if rid is not None:
                 result = await serialize(
-                    kbid, rid.decode(), show, field_types, extracted
+                    kbid,
+                    rid.decode(),
+                    show,
+                    field_types,
+                    extracted,
+                    service_name=SERVICE_NAME,
                 )
                 if result is not None:
                     resources.append(result)
@@ -163,7 +169,9 @@ async def get_resource(
     if audit is not None:
         await audit.visited(kbid, rid, x_nucliadb_user, x_forwarded_for)
 
-    result = await serialize(kbid, rid, show, field_type_filter, extracted)
+    result = await serialize(
+        kbid, rid, show, field_type_filter, extracted, service_name=SERVICE_NAME
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Resource does not exist")
     return result
@@ -200,7 +208,7 @@ async def get_resource_field(
     ),
     page: Union[Literal["last", "first"], int] = Query("last"),
 ) -> Response:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     cache = await get_cache()
     driver = await get_driver()
 

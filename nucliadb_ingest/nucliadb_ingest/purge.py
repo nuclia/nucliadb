@@ -23,6 +23,7 @@ import sys
 
 from sentry_sdk import capture_exception
 
+from nucliadb_ingest import SERVICE_NAME
 from nucliadb_ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb_ingest.orm.knowledgebox import (
     KB_TO_DELETE,
@@ -45,7 +46,8 @@ async def main():
     # Clean up all kb marked to delete
     driver = await get_driver()
     storage = await get_storage(
-        gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"]
+        gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
+        service_name=SERVICE_NAME,
     )
     async for key in driver.keys(match=KB_TO_DELETE_BASE, count=-1):
         logger.info(f"Purging kb {key}")

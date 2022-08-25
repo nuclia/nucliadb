@@ -439,10 +439,10 @@ class GCSStorage(Storage):
             self._creation_access_token = datetime.now()
         return self._credentials.token
 
-    async def initialize(self):
+    async def initialize(self, service_name: Optional[str] = "GCS_SERVICE"):
         loop = asyncio.get_event_loop()
 
-        tracer_provider = get_telemetry("GCS_SERVICE")
+        tracer_provider = get_telemetry(service_name)
         if tracer_provider:
             logger.info("Initializing Telemetry on GCS Driver")
             self.session = aiohttp.ClientSession(
@@ -462,7 +462,7 @@ class GCSStorage(Storage):
             )
 
         try:
-            if self.deadletter_bucket not in ("", None):
+            if self.deadletter_bucket is not None and self.deadletter_bucket != "":
                 await self.create_bucket(self.deadletter_bucket)
         except Exception:
             logger.exception(
@@ -470,7 +470,7 @@ class GCSStorage(Storage):
             )
 
         try:
-            if self.indexing_bucket not in ("", None):
+            if self.indexing_bucket is not None and self.indexing_bucket != "":
                 await self.create_bucket(self.indexing_bucket)
         except Exception:
             logger.exception(

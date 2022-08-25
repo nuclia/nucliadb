@@ -66,7 +66,7 @@ from nucliadb_protos.writer_pb2 import (
     WriterStatusResponse,
 )
 
-from nucliadb_ingest import logger
+from nucliadb_ingest import SERVICE_NAME, logger
 from nucliadb_ingest.maindb.driver import TXNID
 from nucliadb_ingest.orm import NODES
 from nucliadb_ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
@@ -97,7 +97,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.partitions = settings.partitions
 
     async def initialize(self):
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         audit = get_audit()
         driver = await get_driver()
         cache = await get_cache()
@@ -411,7 +411,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response.found = False
         resobj = None
         txn = await self.proc.driver.begin()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
 
         kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
@@ -448,7 +448,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
 
         kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
@@ -464,7 +464,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         txn = await self.proc.driver.begin()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
 
         kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)

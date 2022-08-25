@@ -20,7 +20,7 @@
 import asyncio
 from typing import Dict, List, Optional
 
-from nucliadb_ingest import logger
+from nucliadb_ingest import SERVICE_NAME, logger
 from nucliadb_ingest.consumer.pull import PullWorker
 from nucliadb_ingest.maindb.driver import Driver
 from nucliadb_ingest.settings import settings
@@ -148,7 +148,7 @@ class ConsumerService:
     async def start(self, service_name: Optional[str] = None):
         self.driver = await get_driver()
         self.cache = await get_cache()
-        self.storage = await get_storage()
+        self.storage = await get_storage(service_name=SERVICE_NAME)
 
         # Start consummer coroutine
         await self.run(service_name)

@@ -25,6 +25,7 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 
+from nucliadb_node import SERVICE_NAME
 from nucliadb_node.app import App
 from nucliadb_node.settings import settings
 from nucliadb_utils.settings import indexing_settings
@@ -54,7 +55,7 @@ async def test_indexing(sidecar: App, shard: str):
     ].vector.extend([1.0] * 768)
 
     # Create the message
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     assert settings.force_host_id is not None
     index: IndexMessage = await storage.indexing(pb, settings.force_host_id, shard, 1)
 
@@ -85,7 +86,7 @@ async def test_indexing(sidecar: App, shard: str):
     assert response == 2
     await asyncio.sleep(1)
 
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     with pytest.raises(KeyError):
         await storage.get_indexing(index)
 
@@ -113,7 +114,7 @@ async def test_indexing_not_found(sidecar: App):
     ].vector.extend([1.0] * 768)
 
     # Create the message
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     assert settings.force_host_id is not None
     index: IndexMessage = await storage.indexing(pb, settings.force_host_id, "shard", 1)
 

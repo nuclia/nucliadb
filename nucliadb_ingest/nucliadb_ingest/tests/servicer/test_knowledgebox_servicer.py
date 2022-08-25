@@ -18,14 +18,25 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+
 import pytest
+from httpx import AsyncClient
 
 from nucliadb_ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
 
 @pytest.mark.asyncio
-async def test_create_knowledgebox(grpc_servicer: IngestFixture):
+async def test_create_knowledgebox(
+    set_telemetry_settings, grpc_servicer: IngestFixture
+):
+    tracer_provider = get_telemetry("GCS_SERVICE")
+    assert tracer_provider is not None
+    await init_telemetry(tracer_provider)
+
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     pb_prefix = knowledgebox_pb2.KnowledgeBoxPrefix(prefix="")
 
@@ -60,3 +71,19 @@ async def test_create_knowledgebox(grpc_servicer: IngestFixture):
 
     pbid = knowledgebox_pb2.KnowledgeBoxID(slug="test")
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
+
+    await tracer_provider.force_flush()
+
+    expected_spans = 4
+
+    client = AsyncClient()
+    for _ in range(10):
+        resp = await client.get(
+            f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces?service=GCS_SERVICE",
+            headers={"Accept": "application/json"},
+        )
+        if resp.status_code != 200 or len(resp.json()["data"]) < expected_spans:
+            await asyncio.sleep(2)
+        else:
+            break
+    assert len(resp.json()["data"]) == expected_spans

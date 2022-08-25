@@ -40,6 +40,7 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction,
 )
+from nucliadb_writer import SERVICE_NAME
 from nucliadb_writer.api.models import (
     CreateResourcePayload,
     ResourceCreated,
@@ -227,7 +228,7 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     cache = await get_cache()
     driver = await get_driver()
 

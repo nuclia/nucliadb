@@ -35,7 +35,7 @@ from nucliadb_models.serialize import (
     ResourceProperties,
     serialize,
 )
-from nucliadb_search import logger
+from nucliadb_search import SERVICE_NAME, logger
 from nucliadb_search.api.models import EXTRACTED_POSITIONS, POSITIONS
 from nucliadb_utils.utilities import get_cache, get_storage
 
@@ -83,6 +83,7 @@ async def fetch_resources(
             show,
             field_type_filter=field_type_filter,
             extracted=extracted,
+            service_name=SERVICE_NAME,
         )
         if serialization is not None:
             result[resource] = serialization
@@ -102,7 +103,7 @@ async def get_text_sentence(
     resouce_cache = get_resource_cache()
     if rid not in resouce_cache:
         transaction = await get_transaction()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
         orm_resource: Optional[ResourceORM] = await kb.get(rid)
@@ -147,7 +148,7 @@ async def get_labels_sentence(
     resouce_cache = get_resource_cache()
     if rid not in resouce_cache:
         transaction = await get_transaction()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
         orm_resource: Optional[ResourceORM] = await kb.get(rid)
@@ -201,7 +202,7 @@ async def get_text_resource(
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
         orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
@@ -241,7 +242,7 @@ async def get_text_paragraph(
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
         orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
@@ -368,7 +369,7 @@ async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
         orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
@@ -394,7 +395,7 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
     resouce_cache = get_resource_cache()
     if result.uuid not in resouce_cache:
         transaction = await get_transaction()
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
         kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
         orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)

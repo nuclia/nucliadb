@@ -33,6 +33,7 @@ from nucliadb_models.resource import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
+from nucliadb_writer import SERVICE_NAME
 from nucliadb_writer.api.models import CreateResourcePayload, UpdateResourcePayload
 from nucliadb_writer.layouts import serialize_blocks
 from nucliadb_writer.utilities import get_processing
@@ -40,7 +41,7 @@ from nucliadb_writer.utilities import get_processing
 
 async def extract_fields(resource: ORMResource, toprocess: PushPayload):
     processing = get_processing()
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     await resource.get_fields()
     for (field_type, field_id), field in resource.fields.items():
         field_type_name = FIELD_TYPES_MAP[field_type]
@@ -198,7 +199,7 @@ async def parse_internal_file_field(
     if file_field.password:
         writer.files[key].password = file_field.password
 
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
 
     sf: StorageField = storage.file_field(kbid, uuid, field=key)
@@ -299,7 +300,7 @@ async def parse_layout_field(
     kbid: str,
     uuid: str,
 ) -> None:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
 
     lc: resources_pb2.FieldLayout = await serialize_blocks(
@@ -345,7 +346,7 @@ async def parse_conversation_field(
     kbid: str,
     uuid: str,
 ) -> None:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
 
     convs = models.PushConversation()

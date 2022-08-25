@@ -135,8 +135,9 @@ async def serialize(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
+    service_name: Optional[str] = None,
 ) -> Optional[Resource]:
-    storage = await get_storage()
+    storage = await get_storage(service_name=service_name)
     cache = await get_cache()
     driver = await get_driver()
 

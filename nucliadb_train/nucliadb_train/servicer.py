@@ -41,13 +41,14 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_ingest.orm.processor import Processor
 from nucliadb_ingest.utils import get_driver
 from nucliadb_protos import train_pb2_grpc
+from nucliadb_train import SERVICE_NAME
 from nucliadb_train.settings import settings
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
     async def initialize(self):
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         audit = get_audit()
         driver = await get_driver()
         cache = await get_cache()

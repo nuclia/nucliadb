@@ -29,7 +29,7 @@ from starlette.responses import StreamingResponse
 from nucliadb_ingest.orm.resource import KB_REVERSE_REVERSE
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_reader import logger
+from nucliadb_reader import SERVICE_NAME, logger
 from nucliadb_reader.api.models import FIELD_NAMES_TO_PB_TYPE_MAP
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import StorageField  # type: ignore
@@ -59,7 +59,7 @@ async def download_extract_file(
     field_id: str,
     download_field: str,
 ) -> Response:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     pb_field_type = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
     field_type_letter = KB_REVERSE_REVERSE[pb_field_type]
@@ -80,7 +80,7 @@ async def download_extract_file(
 async def download_field_file(
     request: Request, kbid: str, rid: str, field_id: str
 ) -> Response:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     sf = storage.file_field(kbid, rid, field_id)
 
@@ -98,7 +98,7 @@ async def download_field_file(
 async def download_field_layout(
     request: Request, kbid: str, rid: str, field_id: str, download_field: str
 ) -> Response:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     sf = storage.layout_field(kbid, rid, field_id, download_field)
 
@@ -121,7 +121,7 @@ async def download_field_conversation(
     message_id: str,
     file_num: int,
 ) -> Response:
-    storage = await get_storage()
+    storage = await get_storage(service_name=SERVICE_NAME)
 
     sf = storage.conversation_field(kbid, rid, field_id, message_id, file_num)
 

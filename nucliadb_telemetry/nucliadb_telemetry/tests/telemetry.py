@@ -92,7 +92,7 @@ async def jaeger_server():
 
 
 @pytest.fixture(scope="function")
-async def settings(jaeger_server: Jaeger):
+async def set_telemetry_settings(jaeger_server: Jaeger):
     telemetry_settings.jaeger_enabled = True
     telemetry_settings.jaeger_agent_host = "127.0.0.1"
     telemetry_settings.jaeger_agent_port = jaeger_server.get_port()
@@ -100,7 +100,7 @@ async def settings(jaeger_server: Jaeger):
 
 
 @pytest.fixture(scope="function")
-async def telemetry_grpc(settings):
+async def telemetry_grpc(set_telemetry_settings):
     tracer_provider = get_telemetry("GRPC_SERVICE")
     await init_telemetry(tracer_provider)
     util = OpenTelemetryGRPC("test_telemetry", tracer_provider)
@@ -276,7 +276,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
 
 @pytest.fixture(scope="function")
-async def greeter(settings, natsd: str):
+async def greeter(set_telemetry_settings, natsd: str):
     obj = Greeter(natsd)
     await obj.initialize()
     yield obj
@@ -284,7 +284,7 @@ async def greeter(settings, natsd: str):
 
 
 @pytest.fixture(scope="function")
-async def greeter_streaming(settings, natsd: str):
+async def greeter_streaming(set_telemetry_settings, natsd: str):
     obj = GreeterStreaming(natsd)
     await obj.initialize()
     yield obj
@@ -309,7 +309,9 @@ async def grpc_service(
 
 
 @pytest.fixture(scope="function")
-async def http_service(settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service: int):
+async def http_service(
+    set_telemetry_settings, telemetry_grpc: OpenTelemetryGRPC, grpc_service: int
+):
     tracer_provider = get_telemetry("HTTP_SERVICE")
     await init_telemetry(tracer_provider)
     app = FastAPI(title="Test API")  # type: ignore

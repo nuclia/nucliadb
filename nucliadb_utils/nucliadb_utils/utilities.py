@@ -77,7 +77,9 @@ def clean_utility(ident: Utility):
     del MAIN[ident]
 
 
-async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
+async def get_storage(
+    gcs_scopes: Optional[List[str]] = None, service_name: Optional[str] = None
+) -> Storage:
 
     if storage_settings.file_backend == "s3" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.s3 import S3Storage
@@ -114,7 +116,7 @@ async def get_storage(gcs_scopes: Optional[List[str]] = None) -> Storage:
             scopes=gcs_scopes,
         )
         set_utility(Utility.STORAGE, gcsutil)
-        await gcsutil.initialize()
+        await gcsutil.initialize(service_name)
         logger.info("Configuring GCS Storage")
 
     elif (

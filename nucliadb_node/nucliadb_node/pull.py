@@ -163,7 +163,7 @@ class Worker:
         logger.info(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
-        storage = await get_storage()
+        storage = await get_storage(service_name=SERVICE_NAME)
         self.event.clear()
         async with self.lock:
             try:

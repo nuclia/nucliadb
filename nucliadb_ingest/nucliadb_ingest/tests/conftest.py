@@ -24,4 +24,5 @@ pytest_plugins = [
     "nucliadb_ingest.tests.tikv",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
+    "nucliadb_telemetry.tests.telemetry",
 ]
