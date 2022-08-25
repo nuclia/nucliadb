@@ -36,7 +36,7 @@ from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
 from opentelemetry.instrumentation.aiohttp_client import create_trace_config
 
-from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import (
     CouldNotCopyNotFound,
@@ -444,6 +444,7 @@ class GCSStorage(Storage):
 
         tracer_provider = get_telemetry(service_name)
         if tracer_provider:
+            await init_telemetry(tracer_provider)
             logger.info("Initializing Telemetry on GCS Driver")
             self.session = aiohttp.ClientSession(
                 loop=loop,
