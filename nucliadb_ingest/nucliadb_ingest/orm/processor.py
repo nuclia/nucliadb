@@ -429,6 +429,7 @@ class Processor:
         config: Optional[KnowledgeBoxConfig],
         forceuuid: Optional[str] = None,
     ) -> str:
+        logger.info(f"Creating new kb: {slug} - {forceuuid}")
         txn = await self.driver.begin()
         try:
             uuid, failed = await KnowledgeBox.create(
@@ -451,6 +452,7 @@ class Processor:
             raise Exception("Failed to create KB")
         else:
             await txn.commit(resource=False)
+        logger.info(f"Done")
         return uuid
 
     async def update_kb(
@@ -472,9 +474,11 @@ class Processor:
         await txn.abort()
 
     async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
+        logger.info(f"Deleting kb: {slug} - {kbid}")
         txn = await self.driver.begin()
         uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
         await txn.commit(resource=False)
+        logger.info("Done")
         return uuid
 
     async def notify(self, channel, payload: bytes):

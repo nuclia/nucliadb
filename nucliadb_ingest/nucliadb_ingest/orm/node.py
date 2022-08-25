@@ -37,13 +37,15 @@ from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb_ingest import logger
+from nucliadb_ingest import SERVICE_NAME, logger
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm import NODE_CLUSTER, NODES
 from nucliadb_ingest.orm.abc import AbstractNode  # type: ignore
 from nucliadb_ingest.orm.exceptions import NodesUnsync  # type: ignore
 from nucliadb_ingest.orm.shard import Shard
 from nucliadb_ingest.settings import settings
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
 
 READ_CONNECTIONS = LRU(50)
@@ -214,9 +216,17 @@ class Node(AbstractNode):
                 grpc_address = f"localhost:{sidecar_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_sidecar_port}"
-            SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(
-                aio.insecure_channel(grpc_address)
-            )
+
+            tracer_provider = get_telemetry(SERVICE_NAME)
+            if tracer_provider is not None:
+                telemetry_grpc = OpenTelemetryGRPC(
+                    f"{SERVICE_NAME}_grpc_sidecar", tracer_provider
+                )
+                channel = telemetry_grpc.init_client(grpc_address)
+            else:
+                channel = aio.insecure_channel(grpc_address)
+
+            SIDECAR_CONNECTIONS[self.address] = NodeSidecarStub(channel)
         if (
             self._sidecar is None
             and self.address not in SIDECAR_CONNECTIONS
@@ -241,9 +251,17 @@ class Node(AbstractNode):
                 grpc_address = f"localhost:{writer_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_writer_port}"
-            WRITE_CONNECTIONS[self.address] = NodeWriterStub(
-                aio.insecure_channel(grpc_address)
-            )
+
+            tracer_provider = get_telemetry(SERVICE_NAME)
+            if tracer_provider is not None:
+                telemetry_grpc = OpenTelemetryGRPC(
+                    f"{SERVICE_NAME}_grpc_writer", tracer_provider
+                )
+                channel = telemetry_grpc.init_client(grpc_address)
+            else:
+                channel = aio.insecure_channel(grpc_address)
+
+            WRITE_CONNECTIONS[self.address] = NodeWriterStub(channel)
         if (
             self._writer is None
             and self.address not in WRITE_CONNECTIONS
@@ -268,9 +286,17 @@ class Node(AbstractNode):
                 grpc_address = f"localhost:{reader_port}"
             else:
                 grpc_address = f"{hostname}:{settings.node_reader_port}"
-            READ_CONNECTIONS[self.address] = NodeReaderStub(
-                aio.insecure_channel(grpc_address)
-            )
+
+            tracer_provider = get_telemetry(SERVICE_NAME)
+            if tracer_provider is not None:
+                telemetry_grpc = OpenTelemetryGRPC(
+                    f"{SERVICE_NAME}_grpc_reader", tracer_provider
+                )
+                channel = telemetry_grpc.init_client(grpc_address)
+            else:
+                channel = aio.insecure_channel(grpc_address)
+
+            READ_CONNECTIONS[self.address] = NodeReaderStub(channel)
         if (
             self._reader is None
             and self.address not in READ_CONNECTIONS

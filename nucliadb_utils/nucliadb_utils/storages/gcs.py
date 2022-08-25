@@ -31,10 +31,12 @@ from urllib.parse import quote_plus
 import aiohttp
 import backoff  # type: ignore
 import google.auth.transport.requests  # type: ignore
+import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
-from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+from opentelemetry.instrumentation.aiohttp_client import create_trace_config
 
+from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages.exceptions import (
     CouldNotCopyNotFound,
@@ -44,8 +46,10 @@ from nucliadb_utils.storages.exceptions import (
 )
 from nucliadb_utils.storages.storage import Storage, StorageField
 
-# Enable instrumentation
-AioHttpClientInstrumentor().instrument()
+
+def strip_query_params(url: yarl.URL) -> str:
+    return str(url.with_query(None))
+
 
 MAX_SIZE = 1073741824
 
@@ -437,7 +441,26 @@ class GCSStorage(Storage):
 
     async def initialize(self):
         loop = asyncio.get_event_loop()
-        self.session = aiohttp.ClientSession(loop=loop)
+
+        tracer_provider = get_telemetry("GCS_SERVICE")
+        if tracer_provider:
+            logger.info("Initializing Telemetry on GCS Driver")
+            self.session = aiohttp.ClientSession(
+                loop=loop,
+                trace_configs=[
+                    create_trace_config(
+                        # Remove all query params from the URL attribute on the span.
+                        url_filter=strip_query_params,
+                        tracer_provider=tracer_provider,
+                    )
+                ],
+            )
+        else:
+            logger.info("Initializing GCS Driver without Telemetry")
+            self.session = aiohttp.ClientSession(
+                loop=loop,
+            )
+
         try:
             if self.deadletter_bucket not in ("", None):
                 await self.create_bucket(self.deadletter_bucket)
