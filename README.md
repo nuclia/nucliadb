@@ -11,6 +11,7 @@
 [![Discord](https://img.shields.io/discord/911636727150575649?logo=Discord&logoColor=%23FFFFFF&style=plastic)](https://discord.gg/6wMQ8a3bHX)
 ![Rust](https://img.shields.io/badge/Rust-black?logo=rust&style=plastic)
 ![Python](https://img.shields.io/badge/Python-black?logo=python&style=plastic)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnuclia%2Fnucliadb.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnuclia%2Fnucliadb?ref=badge_shield)
 
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
@@ -126,6 +127,9 @@ The core difference and advantage of NucliaDB is its architecture built from the
 ### What license does NucliaDB use?
 
 NucliaDB is open-source under the GNU Affero General Public License Version 3 - AGPLv3. Fundamentally, this means that you are free to use Quickwit for your project, as long as you don't modify NucliaDB. If you do, you have to make the modifications public.
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnuclia%2Fnucliadb.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnuclia%2Fnucliadb?ref=badge_large)
 
 ### What is Nuclia's business model?
 
