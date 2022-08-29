@@ -72,9 +72,9 @@ impl ShardWriterService {
             field_writer_service,
             paragraph_writer_service,
             vector_writer_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_paragraphs as i32,
             relation_service_version: 0,
         })
     }
@@ -101,6 +101,7 @@ impl ShardWriterService {
         let field_writer_service = fields::create_writer(&fsc, config.version_fields).await?;
         let paragraph_writer_service =
             paragraphs::create_writer(&psc, config.version_paragraphs).await?;
+
         let vector_writer_service = vectors::create_writer(&vsc, config.version_vectors).await?;
 
         Ok(ShardWriterService {
@@ -108,9 +109,9 @@ impl ShardWriterService {
             paragraph_writer_service,
             vector_writer_service,
             id: id.to_string(),
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_paragraphs as i32,
             relation_service_version: 0,
         })
     }
@@ -144,9 +145,9 @@ impl ShardWriterService {
             field_writer_service,
             paragraph_writer_service,
             vector_writer_service,
-            document_service_version: 0,
-            paragraph_service_version: 0,
-            vector_service_version: 0,
+            document_service_version: config.version_fields as i32,
+            paragraph_service_version: config.version_paragraphs as i32,
+            vector_service_version: config.version_paragraphs as i32,
             relation_service_version: 0,
         })
     }

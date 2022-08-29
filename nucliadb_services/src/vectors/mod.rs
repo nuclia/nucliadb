@@ -19,7 +19,7 @@
 //
 use crate::*;
 
-pub const MAX_VERSION: u32 = 0;
+pub const MAX_VERSION: u32 = 1;
 
 type RServiceT = dyn RService<Request = VectorSearchRequest, Response = VectorSearchResponse>;
 type WServiceT = dyn WService;
@@ -34,6 +34,9 @@ pub async fn open_reader(
         0 => nucliadb_vectors::service::VectorReaderService::open(config)
             .await
             .map(|v| Arc::new(v) as RVectors),
+        1 => nucliadb_vectors2::service::VectorReaderService::open(config)
+            .await
+            .map(|v| Arc::new(v) as RVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
@@ -44,6 +47,9 @@ pub async fn open_writer(
 ) -> InternalResult<WVectors> {
     match version {
         0 => nucliadb_vectors::service::VectorWriterService::open(config)
+            .await
+            .map(|v| Arc::new(RwLock::new(v)) as WVectors),
+        1 => nucliadb_vectors2::service::VectorWriterService::open(config)
             .await
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
@@ -57,6 +63,9 @@ pub async fn create_reader(
         0 => nucliadb_vectors::service::VectorReaderService::new(config)
             .await
             .map(|v| Arc::new(v) as RVectors),
+        1 => nucliadb_vectors2::service::VectorReaderService::new(config)
+            .await
+            .map(|v| Arc::new(v) as RVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
@@ -67,6 +76,9 @@ pub async fn create_writer(
 ) -> InternalResult<WVectors> {
     match version {
         0 => nucliadb_vectors::service::VectorWriterService::new(config)
+            .await
+            .map(|v| Arc::new(RwLock::new(v)) as WVectors),
+        1 => nucliadb_vectors2::service::VectorWriterService::new(config)
             .await
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
