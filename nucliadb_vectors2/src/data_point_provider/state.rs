@@ -20,15 +20,15 @@
 
 use std::collections::{HashMap, LinkedList};
 use std::mem;
-use std::path::Path;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
 use super::{SearchRequest, VectorR};
 use crate::data_point::{DataPoint, DeleteLog, DpId, Journal};
+use crate::data_point_provider::merger;
 use crate::utils::dtrie::DTrie;
-
 const BUFFER_CAP: usize = 5;
 
 #[derive(Serialize, Deserialize)]
@@ -110,8 +110,9 @@ impl Fssc {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct State {
+    location: PathBuf,
     no_nodes: usize,
     current: WorkUnit,
     delete_log: DTrie<SystemTime>,
@@ -120,6 +121,25 @@ pub struct State {
     resources: HashMap<String, usize>,
 }
 impl State {
+    pub fn new(at: PathBuf) -> State {
+        State {
+            location: at,
+            no_nodes: usize::default(),
+            current: WorkUnit::default(),
+            delete_log: DTrie::default(),
+            work_stack: LinkedList::default(),
+            data_points: HashMap::default(),
+            resources: HashMap::default(),
+        }
+    }
+    pub fn work_sanity_check(&self) {
+        for _ in self.work_stack.iter() {
+            let notifier = merger::get_notifier();
+            if let Err(e) = notifier.send(self.location.clone()) {
+                tracing::info!("Could not request merge: {}", e);
+            }
+        }
+    }
     pub fn get_no_nodes(&self) -> usize {
         self.no_nodes
     }
@@ -132,7 +152,7 @@ impl State {
     pub fn get_delete_log(&self) -> impl Copy + DeleteLog + '_ {
         &self.delete_log
     }
-    pub fn search(&self, at: &Path, request: &dyn SearchRequest) -> VectorR<Vec<(String, f32)>> {
+    pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<(String, f32)>> {
         let mut ffsv = Fssc::new(request.no_results());
         let mut delete_log = TimeSensitiveDLog {
             dlog: &self.delete_log,
@@ -140,7 +160,7 @@ impl State {
         };
         for (dp_id, time) in self.data_points.iter() {
             delete_log.time = *time;
-            let data_point = DataPoint::open(at, *dp_id)?;
+            let data_point = DataPoint::open(&self.location, *dp_id)?;
             let results = data_point.search(
                 &delete_log,
                 request.get_query(),
@@ -174,6 +194,10 @@ impl State {
         if self.current.size() == BUFFER_CAP {
             let prev = mem::replace(&mut self.current, WorkUnit::new());
             self.work_stack.push_front(prev);
+            let notifier = merger::get_notifier();
+            if let Err(e) = notifier.send(self.location.clone()) {
+                tracing::info!("Could not request merge: {}", e);
+            }
         }
     }
     pub fn replace_work_unit(&mut self, new: DataPoint) {
@@ -198,6 +222,8 @@ impl State {
 
 #[cfg(test)]
 mod test {
+    use std::path::Path;
+
     use rand::random;
     use uuid::Uuid;
 
@@ -258,7 +284,7 @@ mod test {
     #[test]
     fn state_test() {
         let dir = tempfile::TempDir::new().unwrap();
-        let mut state = State::default();
+        let mut state = State::new(dir.path().to_path_buf());
         let no_nodes = DataPointProducer::new(dir.path())
             .take(5)
             .map(|dp| {

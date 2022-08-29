@@ -54,7 +54,7 @@ fn read_state(path: &Path) -> VectorR<State> {
 
 fn initialize_disk(path: &Path) -> VectorR<()> {
     if !path.join(names::STATE).is_file() {
-        write_state(path, &State::default())?;
+        write_state(path, &State::new(path.to_path_buf()))?;
     }
     Ok(())
 }
@@ -166,7 +166,7 @@ mod tests {
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
         assert_eq!(v0, crnt_version(&lock).unwrap());
-        write_state(dir.path(), &State::default()).unwrap();
+        write_state(dir.path(), &State::new(dir.path().to_path_buf())).unwrap();
         let new_version = crnt_version(&lock).unwrap();
         assert!(v0 < new_version);
     }

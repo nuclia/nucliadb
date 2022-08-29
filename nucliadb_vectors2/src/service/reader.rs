@@ -111,7 +111,7 @@ impl VectorReaderService {
         } else {
             Ok(VectorReaderService {
                 no_results: config.no_results.unwrap(),
-                index: RwLock::new(Index::new(path)?),
+                index: RwLock::new(Index::reader(path)?),
             })
         }
     }
@@ -122,7 +122,7 @@ impl VectorReaderService {
         } else {
             Ok(VectorReaderService {
                 no_results: config.no_results.unwrap(),
-                index: RwLock::new(Index::new(path)?),
+                index: RwLock::new(Index::reader(path)?),
             })
         }
     }

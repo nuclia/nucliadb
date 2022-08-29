@@ -110,7 +110,7 @@ impl VectorWriterService {
         } else {
             tokio::fs::create_dir_all(&path).await.unwrap();
             Ok(VectorWriterService {
-                index: RwLock::new(Index::new(path)?),
+                index: RwLock::new(Index::writer(path)?),
             })
         }
     }
@@ -120,7 +120,7 @@ impl VectorWriterService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: RwLock::new(Index::new(path)?),
+                index: RwLock::new(Index::writer(path)?),
             })
         }
     }

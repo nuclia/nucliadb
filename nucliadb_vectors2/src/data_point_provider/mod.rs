@@ -70,11 +70,22 @@ impl Index {
         }
         Ok(())
     }
-    pub fn new(at: &Path) -> VectorR<Index> {
+    pub fn reader(at: &Path) -> VectorR<Index> {
         let lock = disk_handler::shared_lock(at)?;
         let state = disk_handler::load_state(&lock)?;
         let date = disk_handler::crnt_version(&lock)?;
-        merger::subscribe(at.to_path_buf());
+        mem::drop(lock);
+        Ok(Index {
+            state: RwLock::new(state),
+            date: RwLock::new(date),
+            location: at.to_path_buf(),
+        })
+    }
+    pub fn writer(at: &Path) -> VectorR<Index> {
+        let lock = disk_handler::shared_lock(at)?;
+        let state = disk_handler::load_state(&lock)?;
+        let date = disk_handler::crnt_version(&lock)?;
+        state.work_sanity_check();
         mem::drop(lock);
         Ok(Index {
             state: RwLock::new(state),
@@ -104,7 +115,7 @@ impl Index {
     }
     pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<(String, f32)>> {
         let state = self.state.read().unwrap();
-        state.search(&self.location, request)
+        state.search(request)
     }
     pub fn no_nodes(&self, _: &Lock) -> usize {
         let state = self.state.read().unwrap();
