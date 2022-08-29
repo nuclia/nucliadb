@@ -48,6 +48,5 @@ async fn main() -> anyhow::Result<()> {
         println!("Paragraphs {}", info.paragraphs);
         println!("resources {}", info.resources);
     }
-
     Ok(())
 }
