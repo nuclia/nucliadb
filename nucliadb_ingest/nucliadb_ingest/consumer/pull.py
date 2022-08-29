@@ -22,8 +22,8 @@ import base64
 from typing import List, Optional
 
 import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError
 import nats
+from aiohttp.client_exceptions import ClientConnectorError
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nucliadb_protos.writer_pb2 import BrokerMessage
