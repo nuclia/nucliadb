@@ -65,9 +65,6 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     ingest_settings.pull_time = 0
     ingest_settings.driver = "redis"
     ingest_settings.driver_redis_url = url
-    ingest_settings.chitchat_binding_host = "0.0.0.0"
-    ingest_settings.chitchat_binding_port = 31337
-    ingest_settings.chitchat_enabled = True
 
     nuclia_settings.dummy_processing = True
 

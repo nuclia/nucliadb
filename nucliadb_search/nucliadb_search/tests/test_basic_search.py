@@ -47,6 +47,17 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
 
 
 @pytest.mark.asyncio
+async def test_search_sc_2104(
+    search_api: Callable[..., AsyncClient], test_search_resource: str
+) -> None:
+    kbid = test_search_resource
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/{KB_PREFIX}/{kbid}/search?queri=own+text")
+        assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:

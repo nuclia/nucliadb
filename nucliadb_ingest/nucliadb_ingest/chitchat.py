@@ -59,39 +59,41 @@ class ChitchatNucliaDB:
         self.chitchat_update_srv = None
 
     async def start(self):
-        print("enter chitchat.start()")
+        logger.info(f"enter chitchat.start() at {self.host}:{self.port}")
         self.chitchat_update_srv = await asyncio.start_server(
             self.socket_reader, host=self.host, port=self.port
         )
-        print("tcp server created ")
+        logger.info(f"tcp server created")
         async with self.chitchat_update_srv:
-            print("awaiting connections from rust part of cluster")
+            logger.info("awaiting connections from rust part of cluster")
             await asyncio.create_task(self.chitchat_update_srv.serve_forever())
 
     async def socket_reader(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
-        print("new connection accepted")
+        logger.info("new connection accepted")
         while True:
             try:
-                print("wait data in socket")
+                logger.info("wait data in socket")
                 mgr_message = await reader.read(
                     4096
                 )  # TODO: add message types enum with proper deserialization
                 if len(mgr_message) == 0:
-                    print("empty message received")
+                    logger.info("empty message received")
+                    # TODO: Improve communication
+                    await asyncio.sleep(1)
                     continue
                 if len(mgr_message) == 4:
-                    print("check message received: {}".format(mgr_message.hex()))
+                    logger.info("check message received: {}".format(mgr_message.hex()))
                     hash = binascii.crc32(mgr_message)
-                    print(f"calculated hash: {hash}")
+                    logger.info(f"calculated hash: {hash}")
                     response = hash.to_bytes(4, byteorder="big")
-                    print("Hash response: {!r}".format(response))
+                    logger.info("Hash response: {!r}".format(response))
                     writer.write(response)
                     await writer.drain()
                     continue
                 else:
-                    print("update message received: {!r}".format(mgr_message))
+                    logger.info("update message received: {!r}".format(mgr_message))
                     members: List[ClusterMember] = list(
                         map(
                             lambda x: ClusterMember(
@@ -104,16 +106,16 @@ class ChitchatNucliaDB:
                             json.loads(mgr_message.decode("utf8").replace("'", '"')),
                         )
                     )
-                    print(f"updated members: {members}")
+                    logger.info(f"updated members: {members}")
                     if len(members) != 0:
                         await chitchat_update_node(members)
                         writer.write(len(members).to_bytes(4, byteorder="big"))
                         await writer.drain()
                     else:
-                        print("connection closed by writer")
+                        logger.info("connection closed by writer")
                         break
             except IOError as e:
-                print(f"exception: {e}")
+                logger.exception("Failed on chitchat", stack_info=True)
                 if SENTRY:
                     capture_exception(e)
                 logger.exception(f"error while reading update from unix socket: {e}")

@@ -144,6 +144,14 @@ images.settings["nucliadb_cluster_manager"] = {
 }
 
 
+def free_port() -> int:
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("", 0))
+    return sock.getsockname()[1]
+
+
 def get_chitchat_port(container_obj, port):
     network = container_obj.attrs["NetworkSettings"]
     service_port = "{0}/udp".format(port)
@@ -402,9 +410,13 @@ def node(natsd: str, gcs: str):
     volume_node_1 = docker_client.volumes.create(driver="local")
     volume_node_2 = docker_client.volumes.create(driver="local")
 
+    settings.chitchat_binding_host = "0.0.0.0"
+    settings.chitchat_binding_port = free_port()
+    settings.chitchat_enabled = True
+
     images.settings["nucliadb_cluster_manager"]["env"][
         "MONITOR_ADDR"
-    ] = f"{docker_internal_host}:31337"
+    ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
     cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
 
     cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)

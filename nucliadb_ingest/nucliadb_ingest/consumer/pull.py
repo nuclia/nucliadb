@@ -22,6 +22,7 @@ import base64
 from typing import List, Optional
 
 import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
 import nats
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
@@ -390,6 +391,12 @@ class PullWorker:
                         f"Pull task for partition #{self.partition} was canceled, exiting"
                     )
                     raise ReallyStopPulling()
+
+                except ClientConnectorError:
+                    logger.error(
+                        f"Could not connect to {url}, verify your internet connection"
+                    )
+                    await asyncio.sleep(self.pull_time)
 
                 except Exception:
                     logger.exception("Gathering changes")
