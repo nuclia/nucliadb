@@ -22,6 +22,7 @@ from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
+from nucliadb_protos.resources_pb2 import Paragraph
 
 from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -90,6 +91,39 @@ async def fetch_resources(
     return result
 
 
+async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
+    resouce_cache = get_resource_cache()
+    orm_resource: Optional[ResourceORM] = None
+    if uuid not in resouce_cache:
+        transaction = await get_transaction()
+        storage = await get_storage(service_name=SERVICE_NAME)
+        cache = await get_cache()
+        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+        orm_resource = await kb.get(uuid)
+        if orm_resource is not None:
+            resouce_cache[uuid] = orm_resource
+    else:
+        orm_resource = resouce_cache.get(uuid)
+    return orm_resource
+
+
+async def get_paragraph_from_resource(
+    orm_resource: ResourceORM, result: ParagraphResult
+) -> Optional[Paragraph]:
+    _, field_type, field = result.field.split("/")
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_metadata = await field_obj.get_field_metadata()
+    paragraph = None
+    if field_metadata:
+        if result.split not in (None, ""):
+            metadata = field_metadata.split_metadata[result.split]
+            paragraph = metadata.paragraphs[result.index]
+        elif len(field_metadata.metadata.paragraphs) > result.index:
+            paragraph = field_metadata.metadata.paragraphs[result.index]
+    return paragraph
+
+
 async def get_text_sentence(
     rid: str,
     field_type: str,
@@ -100,17 +134,7 @@ async def get_text_sentence(
     end: int,
     split: Optional[str] = None,
 ) -> str:
-    resouce_cache = get_resource_cache()
-    if rid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(rid)
-        if orm_resource is not None:
-            resouce_cache[rid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(rid)
+    orm_resource = await get_resource_from_cache(kbid, rid)
 
     if orm_resource is None:
         logger.warn(f"{rid} does not exist on DB")
@@ -145,17 +169,7 @@ async def get_labels_sentence(
     end: int,
     split: Optional[str] = None,
 ) -> List[str]:
-    resouce_cache = get_resource_cache()
-    if rid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(rid)
-        if orm_resource is not None:
-            resouce_cache[rid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(rid)
+    orm_resource = await get_resource_from_cache(kbid, rid)
 
     if orm_resource is None:
         logger.warn(f"{rid} does not exist on DB")
@@ -199,17 +213,7 @@ async def get_text_resource(
     if split is False:
         return "", {}
 
-    resouce_cache = get_resource_cache()
-    if result.uuid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
-        if orm_resource is not None:
-            resouce_cache[result.uuid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(result.uuid)
+    orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
@@ -239,17 +243,8 @@ async def get_text_paragraph(
     highlight_split: bool = False,
     split: bool = False,
 ) -> EXTRACTED_POSITIONS:
-    resouce_cache = get_resource_cache()
-    if result.uuid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
-        if orm_resource is not None:
-            resouce_cache[result.uuid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(result.uuid)
+
+    orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
@@ -366,17 +361,7 @@ def highlight(text: str, query: str, highlight: bool = False):
 
 
 async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
-    resouce_cache = get_resource_cache()
-    if result.uuid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
-        if orm_resource is not None:
-            resouce_cache[result.uuid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(result.uuid)
+    orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
@@ -392,17 +377,7 @@ async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:
 
 
 async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
-    resouce_cache = get_resource_cache()
-    if result.uuid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource: Optional[ResourceORM] = await kb.get(result.uuid)
-        if orm_resource is not None:
-            resouce_cache[result.uuid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(result.uuid)
+    orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
@@ -431,3 +406,26 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
                 labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels
+
+
+async def get_seconds_paragraph(
+    result: ParagraphResult, kbid: str
+) -> Optional[Tuple[List[int], List[int]]]:
+    orm_resource = await get_resource_from_cache(kbid, result.uuid)
+
+    if orm_resource is None:
+        logger.error(f"{result.uuid} does not exist on DB")
+        return None
+
+    paragraph = await get_paragraph_from_resource(
+        orm_resource=orm_resource, result=result
+    )
+
+    if (
+        paragraph is not None
+        and len(paragraph.end_seconds) > 0
+        and paragraph.end_seconds[0] > 0
+    ):
+        return (list(paragraph.start_seconds), list(paragraph.end_seconds))
+
+    return None

@@ -74,6 +74,8 @@ async def test_search_resource_all(
             resp.json()["fulltext"]["results"][0]["text"]
             == "My <mark>own</mark> <mark>text</mark> Ramon. This is grea…"
         )
+        assert resp.json()["paragraphs"]["results"][0]["start_seconds"] == [0]
+        assert resp.json()["paragraphs"]["results"][0]["end_seconds"] == [10]
         assert (
             resp.json()["paragraphs"]["results"][0]["text"]
             == "My <mark>own</mark> <mark>text</mark> Ramon. This is great to be here. "

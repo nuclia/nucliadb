@@ -48,6 +48,7 @@ from nucliadb_search.search.fetch import (
     get_labels_resource,
     get_labels_sentence,
     get_resource_cache,
+    get_seconds_paragraph,
     get_text_paragraph,
     get_text_resource,
     get_text_sentence,
@@ -140,17 +141,20 @@ async def merge_suggest_paragraph_results(
                 split=split,
             )
             labels = await get_labels_paragraph(result, kbid)
-            raw_paragraph_list.append(
-                Paragraph(
-                    score=result.score,
-                    rid=result.uuid,
-                    field_type=field_type,
-                    field=field,
-                    text=text,
-                    positions=positions,
-                    labels=labels,
-                )
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            new_paragraph = Paragraph(
+                score=result.score,
+                rid=result.uuid,
+                field_type=field_type,
+                field=field,
+                text=text,
+                positions=positions,
+                labels=labels,
             )
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
+            raw_paragraph_list.append(new_paragraph)
 
     return Paragraphs(results=raw_paragraph_list, query=query)
 
@@ -240,17 +244,20 @@ async def merge_paragraph_results(
                 result, kbid, paragraph_response.query, highlight_split, split
             )
             labels = await get_labels_paragraph(result, kbid)
-            raw_paragraph_list.append(
-                Paragraph(
-                    score=result.score,
-                    rid=result.uuid,
-                    field_type=field_type,
-                    field=field,
-                    text=text,
-                    positions=positions,
-                    labels=labels,
-                )
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            new_paragraph = Paragraph(
+                score=result.score,
+                rid=result.uuid,
+                field_type=field_type,
+                field=field,
+                text=text,
+                positions=positions,
+                labels=labels,
             )
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
+            raw_paragraph_list.append(new_paragraph)
 
     raw_paragraph_list.sort(key=lambda x: x.score)
 
