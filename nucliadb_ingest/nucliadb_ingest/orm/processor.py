@@ -276,7 +276,7 @@ class Processor:
             await self.rollback(message, seqid, partition)
 
         # There are some operations that doesn't require audit report by definition
-        # like rollback ol multi and others because there was no action executed for
+        # like rollback or multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
             await self.audit.report(message, audit_type, audit_fields=audit_fields)
@@ -433,11 +433,10 @@ class Processor:
         if message.multiid not in self.messages:
             # Error
             logger.error(f"Closed multi {message.multiid}")
-            await self.deadletter(self.messages[message.multiid], partition, seqid)
-            del self.messages[message.multiid]
+            await self.deadletter([message], partition, seqid)
             return
         else:
-            return await self.txn([message], seqid, partition)
+            return await self.txn(self.messages[message.multiid], seqid, partition)
 
     async def rollback(self, message: BrokerMessage, seqid: int, partition: str):
         # Error
