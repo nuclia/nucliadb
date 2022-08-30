@@ -105,6 +105,8 @@ class Paragraph(BaseModel):
     text: str
     labels: List[str] = []
     positions: POSITIONS = {}
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
 
 
 class Paragraphs(BaseModel):

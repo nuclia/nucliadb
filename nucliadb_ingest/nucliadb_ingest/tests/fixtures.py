@@ -764,10 +764,16 @@ def broker_resource(knowledgebox):
         start=0,
         end=45,
     )
+    p1.start_seconds.append(0)
+    p1.end_seconds.append(10)
     p2 = rpb.Paragraph(
         start=47,
         end=64,
     )
+    p2.start_seconds.append(10)
+    p2.end_seconds.append(20)
+    p2.start_seconds.append(20)
+    p2.end_seconds.append(30)
 
     fcm.metadata.metadata.paragraphs.append(p1)
     fcm.metadata.metadata.paragraphs.append(p2)
