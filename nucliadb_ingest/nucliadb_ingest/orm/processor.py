@@ -20,7 +20,7 @@
 from enum import Enum
 from typing import AsyncIterator, Dict, List, Optional
 
-from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_protos.audit_pb2 import AuditRequest, AuditField
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -38,7 +38,7 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, FieldType
 from sentry_sdk import capture_exception
 
 from nucliadb_ingest import SERVICE_NAME, logger
@@ -46,7 +46,9 @@ from nucliadb_ingest.maindb.driver import Driver, Transaction
 from nucliadb_ingest.orm.exceptions import DeadletteredError
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE, Resource
-from nucliadb_ingest.orm.shard import Shard
+from nucliadb_ingest.orm.shard import Shard+
+from nucliadb_ingest.fields.file import FieldFile
+
 from nucliadb_ingest.orm.utils import get_node_klass
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
@@ -141,7 +143,30 @@ class Processor:
         # like rollback ol multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
-            await self.audit.report(message, audit_type)
+            audit_fields = []
+
+            # Collect for auditing all fields that have been added or modified
+            for fieldid, filefield in message.files.items():
+                audit_field = AuditField()
+                audit_field.action = AuditField.FieldAction.DELETED if audit_type is AuditRequest.AuditType.DELETED else AuditField.FieldAction.MODIFIED
+                audit_field.size = filefield.file.size
+                audit_field.filename = filefield.file.filename
+                audit_fields.append(audit_field)
+
+            # Collect for auditing all fields that have been deleted
+            for field in message.delete_fields:
+                if field.field_type is not FieldType.FILE:
+                    continue
+
+                filefield =
+                audit_field = AuditField()
+                audit_field.action = AuditField.FieldAction.DELETED
+                audit_field.size = filefield.file.size
+                audit_field.filename = filefield.file.filename
+                audit_fields.append(audit_field)
+
+
+            await self.audit.report(message, audit_type, audit_fields=audit_fields)
         elif self.audit is None:
             logger.warning("No audit defined")
         elif audit_type is None:

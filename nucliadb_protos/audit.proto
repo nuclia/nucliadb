@@ -4,6 +4,16 @@ import "google/protobuf/timestamp.proto";
 import "nucliadb_protos/nodereader.proto";
 import "nucliadb_protos/resources.proto";
 
+message AuditField {
+  enum FieldAction {
+    DELETED = 0;
+    MODIFIED = 1;
+  }
+  FieldAction action = 1;
+  int32 size = 2;
+  string filename = 3;
+}
+
 message AuditRequest {
   enum AuditType {
     VISITED = 0;
@@ -14,6 +24,7 @@ message AuditRequest {
     STOPPED = 5;
     SEARCH = 6;
     PROCESSED = 7;
+    KB_DELETED = 8;
   }
   AuditType type = 1;
   string kbid = 2;
@@ -30,4 +41,5 @@ message AuditRequest {
   string task = 11;
   int32 resources = 12;
   repeated resources.FieldID field_metadata = 13;
+  repeated AuditField storage_fields = 14;
 }
