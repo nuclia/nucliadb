@@ -135,7 +135,7 @@ pub struct Resource {
     pub texts: ::std::collections::HashMap<::prost::alloc::string::String, TextInformation>,
     // Key is RID/FIELDID
 
-    /// Document labels allways serialized full
+    /// Document labels always serialized full
     #[prost(string, repeated, tag="4")]
     pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// Tantivy doc

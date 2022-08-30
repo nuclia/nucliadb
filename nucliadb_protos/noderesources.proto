@@ -92,7 +92,7 @@ message Resource {
     map<string, TextInformation> texts = 3; // Tantivy doc filled by field allways full
     // Key is RID/FIELDID
 
-    repeated string labels = 4; // Document labels allways serialized full
+    repeated string labels = 4; // Document labels always serialized full
 
     enum ResourceStatus {
         PROCESSED = 0;

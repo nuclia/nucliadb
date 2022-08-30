@@ -380,7 +380,7 @@ class Resource(google.protobuf.message.Message):
     def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]:
         """Key is RID/FIELDID
 
-        Document labels allways serialized full
+        Document labels always serialized full
         """
         pass
     status: global___Resource.ResourceStatus.ValueType
