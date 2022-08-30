@@ -322,45 +322,6 @@ mod tests {
         assert!(true);
     }
 
-    #[test]
-    fn add_resource() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let resource = ResourceData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_resource(&mut txn, resource));
-        txn.commit().unwrap();
-        let txn = system.ro_txn();
-        assert!(system.get_resource_id(&txn, "Name").is_some());
-        assert!(system.get_resource_id(&txn, "Nonexistent").is_none());
-        assert!(system
-            .get_resource(&txn, system.get_resource_id(&txn, "Name").unwrap())
-            .is_some());
-        assert_eq!(
-            system
-                .get_resource(&txn, system.get_resource_id(&txn, "Name").unwrap())
-                .unwrap()
-                .name,
-            "Name"
-        );
-        txn.abort().unwrap();
-    }
-    #[test]
-    fn same_resource_same_id() {
-        let system = initialize_storage_system();
-        let mut txn = system.rw_txn();
-        let resource0 = ResourceData {
-            name: "Name".to_string(),
-        };
-        let resource1 = ResourceData {
-            name: "Name".to_string(),
-        };
-        assert!(system.add_resource(&mut txn, resource0));
-        assert!(!system.add_resource(&mut txn, resource1));
-        txn.commit().unwrap();
-    }
-
     const CHILD: &str = "child";
     const ABOUT: &str = "about";
 

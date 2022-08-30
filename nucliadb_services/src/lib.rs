@@ -19,8 +19,8 @@
 //
 pub mod fields;
 pub mod paragraphs;
-pub mod relations;
 pub mod vectors;
+pub mod relations;
 pub extern crate nucliadb_service_interface;
 
 use std::sync::{Arc, RwLock};
