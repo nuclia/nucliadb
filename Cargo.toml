@@ -9,4 +9,5 @@ members = [
   "nucliadb_vectors",
   "nucliadb_node/binding",
   "nucliadb_services",
+  "vectors_benchmark"
 ]
