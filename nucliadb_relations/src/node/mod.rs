@@ -18,134 +18,202 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use nucliadb_byte_rpr::*;
+use serde_json::Value;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ResourceData {
-    pub name: String,
-}
-impl ByteRpr for ResourceData {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut name_encoding = self.name.as_byte_rpr();
-        let len = name_encoding.len() as u64;
-        let mut len_encoding = len.as_byte_rpr();
-        let mut encoding = vec![];
-        encoding.append(&mut len_encoding);
-        encoding.append(&mut name_encoding);
-        encoding
+pub type NodeId = ID<String>;
+
+#[derive(Clone)]
+pub struct Node(Value);
+
+// Node ensures that the string serialization of the json representation will
+// maintain order.
+impl std::fmt::Display for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let normalized = format!("\"normalized\": \"{}\"", self.get_normalized());
+        let value = format!("\"value\": \"{}\"", self.get_value());
+        let ntype = format!("\"type\": \"{}\"", self.get_type());
+        let subtype = format!("\"subtype\": \"{}\"", self.get_subtype());
+        write!(f, "{{{},{},{},{} }}", normalized, value, ntype, subtype)
     }
-    fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let len_start = 0;
-        let len_end = len_start + u64::segment_len();
-        let len = u64::from_byte_rpr(&bytes[len_start..len_end]);
-        let name_start = len_end;
-        let name_end = name_start + (len as usize);
-        ResourceData {
-            name: String::from_byte_rpr(&bytes[name_start..name_end]),
+}
+impl From<&str> for Node {
+    fn from(raw: &str) -> Self {
+        Node(serde_json::from_str(raw).unwrap())
+    }
+}
+
+impl From<String> for Node {
+    fn from(raw: String) -> Self {
+        Node::from(raw.as_str())
+    }
+}
+
+impl std::ops::Deref for Node {
+    type Target = Value;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Node {
+    pub fn get_type(&self) -> &str {
+        self["type"].as_str().unwrap()
+    }
+    pub fn get_subtype(&self) -> &str {
+        self["subtype"].as_str().unwrap()
+    }
+    pub fn get_value(&self) -> &str {
+        self["value"].as_str().unwrap()
+    }
+    pub fn get_normalized(&self) -> &str {
+        self["normalized"].as_str().unwrap()
+    }
+}
+
+#[derive(Default)]
+pub struct NodeBuilder {
+    node_value: String,
+    node_type: String,
+    node_subtype: String,
+}
+impl NodeBuilder {
+    pub fn new() -> Self {
+        NodeBuilder::default()
+    }
+    pub fn with_type(mut self, v: String) -> Self {
+        self.node_type = v;
+        self
+    }
+    pub fn with_subtype(mut self, v: String) -> Self {
+        self.node_subtype = v;
+        self
+    }
+    pub fn with_value(mut self, v: String) -> Self {
+        self.node_value = v;
+        self
+    }
+    pub fn build(self) -> Node {
+        let json_obj = serde_json::json!({
+            "normalized": self.node_value.to_lowercase(),
+            "value": self.node_value,
+            "type": self.node_type,
+            "subtype": self.node_subtype,
+        });
+        Node(json_obj)
+    }
+}
+
+pub struct ID<T> {
+    pub raw: u128,
+    points_to: PhantomData<T>,
+}
+
+impl<T> std::fmt::Debug for ID<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ID({})", self.raw)
+    }
+}
+
+impl<T> std::fmt::Display for ID<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.raw)
+    }
+}
+
+impl<T> From<&str> for ID<T> {
+    fn from(raw: &str) -> Self {
+        ID {
+            raw: raw.parse::<u128>().unwrap(),
+            points_to: PhantomData,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct EntityData {
-    pub name: String,
+impl<T> Default for ID<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl<T> ID<T> {
+    pub fn new() -> ID<T> {
+        ID {
+            raw: 0,
+            points_to: PhantomData,
+        }
+    }
+    pub fn next(&mut self) -> ID<T> {
+        let crnt = *self;
+        self.raw += 1;
+        crnt
+    }
+}
+impl<T> Eq for ID<T> {}
+
+impl<T> Copy for ID<T> {}
+impl<T> Clone for ID<T> {
+    fn clone(&self) -> Self {
+        Self {
+            raw: self.raw,
+            points_to: self.points_to,
+        }
+    }
+}
+impl<T> PartialEq for ID<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw.eq(&other.raw)
+    }
+}
+impl<T> PartialOrd for ID<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.raw.partial_cmp(&other.raw)
+    }
+}
+impl<T> Ord for ID<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.raw.cmp(&other.raw)
+    }
+}
+impl<T> std::hash::Hash for ID<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.raw.hash(state)
+    }
 }
 
-impl ByteRpr for EntityData {
+impl<T> ByteRpr for ID<T> {
     fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut name_encoding = self.name.as_byte_rpr();
-        let len = name_encoding.len() as u64;
-        let mut len_encoding = len.as_byte_rpr();
-        let mut encoding = vec![];
-        encoding.append(&mut len_encoding);
-        encoding.append(&mut name_encoding);
-        encoding
+        self.raw.as_byte_rpr()
     }
+
     fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let len_start = 0;
-        let len_end = len_start + u64::segment_len();
-        let len = u64::from_byte_rpr(&bytes[len_start..len_end]);
-        let name_start = len_end;
-        let name_end = name_start + (len as usize);
-        EntityData {
-            name: String::from_byte_rpr(&bytes[name_start..name_end]),
+        let raw_start = 0;
+        let raw_end = raw_start + u128::segment_len();
+        ID {
+            raw: u128::from_byte_rpr(&bytes[raw_start..raw_end]),
+            points_to: PhantomData,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LabelData {
-    pub name: String,
-}
-impl ByteRpr for LabelData {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut name_encoding = self.name.as_byte_rpr();
-        let len = name_encoding.len() as u64;
-        let mut len_encoding = len.as_byte_rpr();
-        let mut encoding = vec![];
-        encoding.append(&mut len_encoding);
-        encoding.append(&mut name_encoding);
-        encoding
-    }
-    fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let len_start = 0;
-        let len_end = len_start + u64::segment_len();
-        let len = u64::from_byte_rpr(&bytes[len_start..len_end]);
-        let name_start = len_end;
-        let name_end = name_start + (len as usize);
-        LabelData {
-            name: String::from_byte_rpr(&bytes[name_start..name_end]),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ColabData {
-    pub name: String,
-}
-impl ByteRpr for ColabData {
-    fn as_byte_rpr(&self) -> Vec<u8> {
-        let mut name_encoding = self.name.as_byte_rpr();
-        let len = name_encoding.len() as u64;
-        let mut len_encoding = len.as_byte_rpr();
-        let mut encoding = vec![];
-        encoding.append(&mut len_encoding);
-        encoding.append(&mut name_encoding);
-        encoding
-    }
-    fn from_byte_rpr(bytes: &[u8]) -> Self {
-        let len_start = 0;
-        let len_end = len_start + u64::segment_len();
-        let len = u64::from_byte_rpr(&bytes[len_start..len_end]);
-        let name_start = len_end;
-        let name_end = name_start + (len as usize);
-        ColabData {
-            name: String::from_byte_rpr(&bytes[name_start..name_end]),
-        }
+impl<T> FixedByteLen for ID<T> {
+    fn segment_len() -> usize {
+        u128::segment_len()
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
+
     #[test]
-    fn node_serialization() {
-        let name = "Some generic name that goes everywhere".to_string();
-        let resource = ResourceData { name: name.clone() };
-        let entity = EntityData { name: name.clone() };
-        let label = LabelData { name: name.clone() };
-        let colaborator = ColabData { name };
-        assert_eq!(
-            resource,
-            ResourceData::from_byte_rpr(&resource.as_byte_rpr())
-        );
-        assert_eq!(
-            colaborator,
-            ColabData::from_byte_rpr(&colaborator.as_byte_rpr())
-        );
-        assert_eq!(entity, EntityData::from_byte_rpr(&entity.as_byte_rpr()));
-        assert_eq!(label, LabelData::from_byte_rpr(&label.as_byte_rpr()));
+    fn id_serialization_generation() {
+        let mut id_gen: ID<String> = ID::new();
+        let id_0 = id_gen.next();
+        let id_1 = id_gen.next();
+        assert_ne!(id_0, id_1);
+        assert_eq!(id_0, ID::from_byte_rpr(&id_0.as_byte_rpr()));
+        assert_eq!(id_1, ID::from_byte_rpr(&id_1.as_byte_rpr()));
     }
 }

@@ -50,6 +50,8 @@ impl Debug for FieldWriterService {
 }
 
 impl WService for FieldWriterService {}
+impl FieldServiceWriter for FieldWriterService {}
+impl FieldWriterOnly for FieldWriterService {}
 
 #[async_trait]
 impl ServiceChild for FieldWriterService {

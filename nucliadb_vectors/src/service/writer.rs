@@ -39,6 +39,8 @@ impl Debug for VectorWriterService {
     }
 }
 impl WService for VectorWriterService {}
+impl VectorServiceWriter for VectorWriterService {}
+impl VectorWriterOnly for VectorWriterService {}
 #[async_trait]
 impl ServiceChild for VectorWriterService {
     async fn stop(&self) -> InternalResult<()> {
