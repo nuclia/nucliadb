@@ -22,7 +22,11 @@ import uuid
 from datetime import datetime
 from os.path import dirname, getsize
 
+import nats
 import pytest
+from nats.aio.client import Client
+from nats.js import JetStreamContext
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.resources_pb2 import (
     TEXT,
     Classification,
@@ -31,6 +35,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
+    FieldID,
     FieldType,
     FileExtractedData,
     LargeComputedMetadataWrapper,
@@ -42,6 +47,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest import SERVICE_NAME
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_indexing, get_storage
 
@@ -191,3 +197,99 @@ async def test_ingest_error_message(
     assert lfm1 is not None
     assert fm1 is not None
     assert field_obj.value.body == message0.texts["wikipedia_ml"].body
+
+
+def make_test_message(
+    kbid: str, rid: str, filenames=[], message_type=BrokerMessage.AUTOCOMMIT
+):
+    message1: BrokerMessage = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        slug="slug1",
+        type=message_type,
+    )
+    for filename in filenames:
+        file_path = f"{dirname(__file__)}/assets/file.png"
+        cf1 = CloudFile(
+            uri="file.png",
+            source=CloudFile.Source.LOCAL,
+            bucket_name="/ingest/assets",
+            size=getsize(file_path),
+            content_type="image/png",
+            filename=f"{filename}.png",
+        )
+        message1.basic.icon = "text/plain"
+        message1.basic.title = "Title Resource"
+        message1.basic.summary = "Summary of document"
+        message1.basic.thumbnail = "doc"
+        message1.basic.layout = "default"
+        message1.basic.metadata.language = "es"
+        message1.basic.created.FromDatetime(datetime.now())
+        message1.basic.modified.FromDatetime(datetime.now())
+        message1.origin.source = Origin.Source.WEB
+        message1.files[filename].file.CopyFrom(cf1)
+
+    return message1
+
+
+async def get_audit_messages(sub):
+    msg = await sub.fetch(1)
+    auditreq = AuditRequest()
+    auditreq.ParseFromString(msg[0].data)
+    return auditreq
+
+
+@pytest.mark.asyncio
+async def test_ingest_audit_stream(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    knowledgebox,
+    stream_processor,
+    stream_audit: StreamAuditStorage,
+):
+    from nucliadb_utils.settings import audit_settings
+
+    # Prepare a test audit stream to receive our messages
+    partition = stream_audit.get_partition(knowledgebox)
+    client: Client = await nats.connect(stream_audit.nats_servers)
+    jetstream: JetStreamContext = client.jetstream()
+    if audit_settings.audit_jetstream_target is None:
+        assert False, "Missing jetstream target in audit settings"
+    subject = audit_settings.audit_jetstream_target.format(
+        partition=partition, type="*"
+    )
+    try:
+        await jetstream.delete_stream(name=audit_settings.audit_stream)
+    except nats.js.errors.NotFoundError:
+        pass
+    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+    psub = await jetstream.pull_subscribe(subject, "psub")
+
+    rid = str(uuid.uuid4())
+    message = make_test_message(knowledgebox, rid, ["file1"])
+
+    await stream_processor.process(message=message, seqid=1)
+
+    auditreq = await get_audit_messages(psub)
+    assert auditreq.kbid == knowledgebox
+    assert auditreq.rid == rid
+    assert auditreq.storage_fields[0].size == message.files["file1"].file.size
+    assert auditreq.storage_fields[0].action == AuditField.FieldAction.MODIFIED
+
+    message.files.clear()
+    fieldid = FieldID(field="file1", field_type=FieldType.FILE)
+    message.delete_fields.append(fieldid)
+
+    await stream_processor.process(message=message, seqid=2)
+
+    auditreq = await get_audit_messages(psub)
+    assert auditreq.kbid == knowledgebox
+    assert auditreq.rid == rid
+    assert auditreq.storage_fields[0].size == message.files["file1"].file.size
+    assert auditreq.storage_fields[0].action == AuditField.FieldAction.DELETED
+
+    await client.drain()
+    await client.close()

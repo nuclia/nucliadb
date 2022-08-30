@@ -52,6 +52,7 @@ from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_utils.audit.basic import BasicAuditStorage
+from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.redis import RedisPubsub
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.cache.utility import Cache
@@ -182,6 +183,14 @@ async def processor(redis_driver, gcs_storage, cache, audit):
 
 
 @pytest.fixture(scope="function")
+async def stream_processor(redis_driver, gcs_storage, cache, stream_audit):
+    proc = Processor(redis_driver, gcs_storage, stream_audit, cache, 1)
+    await proc.initialize()
+    yield proc
+    await proc.finalize()
+
+
+@pytest.fixture(scope="function")
 async def local_files():
     storage_settings.local_testing_files = f"{dirname(__file__)}"
 
@@ -274,14 +283,17 @@ async def txn(redis_driver):
 
 @pytest.fixture(scope="function")
 async def cache(redis):
+
     url = f"redis://{redis[0]}:{redis[1]}"
     pubsub = RedisPubsub(url)
+    set_utility(Utility.PUBSUB, pubsub)
     await pubsub.initialize()
     che = Cache(pubsub)
     await che.initialize()
     yield che
     await che.finalize()
     await pubsub.finalize()
+    set_utility(Utility.PUBSUB, None)
 
 
 @pytest.fixture(scope="function")
@@ -577,6 +589,21 @@ async def knowledgebox(redis_driver: RedisDriver):
 @pytest.fixture(scope="function")
 async def audit():
     return BasicAuditStorage()
+
+
+@pytest.fixture(scope="function")
+async def stream_audit(natsd: str):
+    from nucliadb_utils.settings import audit_settings
+
+    audit = StreamAuditStorage(
+        [natsd],
+        audit_settings.audit_jetstream_target,
+        audit_settings.audit_partitions,
+        audit_settings.audit_hash_seed,
+    )
+    await audit.initialize()
+    yield audit
+    await audit.finalize()
 
 
 @pytest.fixture(scope="function")

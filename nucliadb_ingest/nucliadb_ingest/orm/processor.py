@@ -20,7 +20,7 @@
 from enum import Enum
 from typing import AsyncIterator, Dict, List, Optional
 
-from nucliadb_protos.audit_pb2 import AuditRequest, AuditField
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -38,7 +38,7 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from sentry_sdk import capture_exception
 
 from nucliadb_ingest import SERVICE_NAME, logger
@@ -46,9 +46,7 @@ from nucliadb_ingest.maindb.driver import Driver, Transaction
 from nucliadb_ingest.orm.exceptions import DeadletteredError
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE, Resource
-from nucliadb_ingest.orm.shard import Shard+
-from nucliadb_ingest.fields.file import FieldFile
-
+from nucliadb_ingest.orm.shard import Shard
 from nucliadb_ingest.orm.utils import get_node_klass
 from nucliadb_ingest.sentry import SENTRY
 from nucliadb_ingest.settings import settings
@@ -143,30 +141,47 @@ class Processor:
         # like rollback ol multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
-            audit_fields = []
+            audit_storage_fields = []
 
-            # Collect for auditing all fields that have been added or modified
-            for fieldid, filefield in message.files.items():
+            # Collect all file fields that have been added or modified
+            for filefield in message.files.values():
                 audit_field = AuditField()
-                audit_field.action = AuditField.FieldAction.DELETED if audit_type is AuditRequest.AuditType.DELETED else AuditField.FieldAction.MODIFIED
+                audit_field.action = (
+                    AuditField.FieldAction.DELETED
+                    if audit_type is AuditRequest.AuditType.DELETED
+                    else AuditField.FieldAction.MODIFIED
+                )
                 audit_field.size = filefield.file.size
                 audit_field.filename = filefield.file.filename
-                audit_fields.append(audit_field)
+                audit_storage_fields.append(audit_field)
 
-            # Collect for auditing all fields that have been deleted
-            for field in message.delete_fields:
-                if field.field_type is not FieldType.FILE:
-                    continue
+            # Collect all file fields that have been deleted
+            if message.delete_fields:
+                txn = await self.driver.begin()
+                storage = await get_storage(service_name=SERVICE_NAME)
+                cache = await get_cache()
+                kb = KnowledgeBox(txn, storage, cache, message.kbid)
+                resource = Resource(txn, storage, kb, message.uuid)
 
-                filefield =
-                audit_field = AuditField()
-                audit_field.action = AuditField.FieldAction.DELETED
-                audit_field.size = filefield.file.size
-                audit_field.filename = filefield.file.filename
-                audit_fields.append(audit_field)
+                for fieldid in message.delete_fields:
+                    if fieldid.field_type is not FieldType.FILE:
+                        continue
 
+                    field = await resource.get_field(
+                        fieldid.field, FieldType.FILE, load=True
+                    )
+                    audit_field = AuditField()
+                    audit_field.action = AuditField.FieldAction.DELETED
+                    val = await field.get_value()
+                    audit_field.size = val.file.size
+                    audit_field.filename = val.file.filename
+                    audit_storage_fields.append(audit_field)
 
-            await self.audit.report(message, audit_type, audit_fields=audit_fields)
+                await txn.abort()
+
+            await self.audit.report(
+                message, audit_type, audit_storage_fields=audit_storage_fields
+            )
         elif self.audit is None:
             logger.warning("No audit defined")
         elif audit_type is None:
@@ -413,7 +428,7 @@ class Processor:
         if not (await KnowledgeBox.exist_kb(txn, uuid)):
             return None
 
-        storage = await get_storage(service_name=SERVICE_NAME)
+        storage = await get_storage()
         cache = await get_cache()
         kbobj = KnowledgeBox(txn, storage, cache, uuid)
         return kbobj
@@ -454,7 +469,6 @@ class Processor:
         config: Optional[KnowledgeBoxConfig],
         forceuuid: Optional[str] = None,
     ) -> str:
-        logger.info(f"Creating new kb: {slug} - {forceuuid}")
         txn = await self.driver.begin()
         try:
             uuid, failed = await KnowledgeBox.create(
@@ -467,7 +481,7 @@ class Processor:
             raise e
 
         if not failed:
-            storage = await get_storage(service_name=SERVICE_NAME)
+            storage = await get_storage()
             cache = await get_cache()
             kb = KnowledgeBox(txn, storage, cache, uuid)
             await kb.set_widgets(DEFAULT_WIDGET)
@@ -477,7 +491,6 @@ class Processor:
             raise Exception("Failed to create KB")
         else:
             await txn.commit(resource=False)
-        logger.info(f"Done")
         return uuid
 
     async def update_kb(
@@ -499,11 +512,9 @@ class Processor:
         await txn.abort()
 
     async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
-        logger.info(f"Deleting kb: {slug} - {kbid}")
         txn = await self.driver.begin()
         uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
         await txn.commit(resource=False)
-        logger.info("Done")
         return uuid
 
     async def notify(self, channel, payload: bytes):
