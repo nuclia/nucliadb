@@ -17,6 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::collections::HashMap;
+
 use nucliadb_protos::order_by::OrderType;
 use nucliadb_protos::{
     FacetResult, FacetResults, OrderBy, ParagraphResult, ParagraphSearchResponse,
@@ -32,7 +34,7 @@ use crate::reader::ParagraphReaderService;
 pub struct SearchResponse<'a> {
     pub text_service: &'a ParagraphReaderService,
     pub query: &'a str,
-    pub facets_count: FacetCounts,
+    pub facets_count: Option<FacetCounts>,
     pub facets: Vec<String>,
     pub top_docs: Vec<(f32, DocAddress)>,
     pub order_by: Option<OrderBy>,
@@ -121,25 +123,29 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = response.facets;
-        let facets_count = response.facets_count;
-        let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
-            facets_count
-                .top_k(facet, 50)
-                .into_iter()
-                .map(|(facet, count)| FacetResult {
-                    tag: facet.to_string(),
-                    total: count as i32,
-                })
-                .collect()
+        let facets = match response.facets_count {
+            None => HashMap::default(),
+            Some(facets_count) => {
+                let facets = response.facets;
+                let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
+                    facets_count
+                        .top_k(facet, 50)
+                        .into_iter()
+                        .map(|(facet, count)| FacetResult {
+                            tag: facet.to_string(),
+                            total: count as i32,
+                        })
+                        .collect()
+                };
+                facets
+                    .into_iter()
+                    .map(|facet| (&facets_count, facet))
+                    .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
+                    .filter(|(r, _)| !r.is_empty())
+                    .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+                    .collect()
+            }
         };
-        let facets = facets
-            .into_iter()
-            .map(|facet| (&facets_count, facet))
-            .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
-            .filter(|(r, _)| !r.is_empty())
-            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-            .collect();
         ParagraphSearchResponse {
             results,
             facets,

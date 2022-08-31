@@ -83,9 +83,11 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
 
         let result = index.search(&(total_to_get, request), &lock)?;
-        let documents = result[offset..]
-            .to_vec()
+        let documents = result
             .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx >= offset)
+            .map(|(_, v)| v)
             .map(|(id, distance)| DocumentScored {
                 doc_id: Some(DocumentVectorIdentifier { id }),
                 score: distance,

@@ -73,22 +73,17 @@ impl ReaderChild for VectorReaderService {
             request.tags.clone(),
             total_to_get,
         );
-        let documents = raw_result[offset..]
-            .to_vec()
+        let documents = raw_result
             .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx >= offset)
+            .map(|(_, v)| v)
             .map(|(id, distance)| DocumentScored {
                 doc_id: Some(DocumentVectorIdentifier { id }),
                 score: distance,
             })
             .collect::<Vec<_>>();
 
-        // let mut documents = Vec::with_capacity(request.result_per_page as usize);
-        // for (id, distance) in raw_result[offset..].into_iter() {
-        //     documents.push(DocumentScored {
-        //         doc_id: Some(DocumentVectorIdentifier { id }),
-        //         score: distance,
-        //     });
-        // }
         Ok(VectorSearchResponse {
             documents,
             page_number: request.page_number,

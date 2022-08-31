@@ -37,6 +37,7 @@ use tracing::*;
 use super::schema::ParagraphSchema;
 use crate::search_query;
 use crate::search_response::SearchResponse;
+
 pub struct ParagraphReaderService {
     index: Index,
     pub schema: ParagraphSchema,
@@ -87,7 +88,6 @@ impl ReaderChild for ParagraphReaderService {
                     .collect()
             })
             .unwrap_or_default();
-
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
         let (top_docs, facets_count) = {
             let queries = create_query(&parser, &text, request, &self.schema, 1);
@@ -257,7 +257,7 @@ impl ParagraphReaderService {
         offset: usize,
         facets: &[String],
         multic_flag: bool,
-    ) -> (Vec<(f32, DocAddress)>, FacetCounts) {
+    ) -> (Vec<(f32, DocAddress)>, Option<FacetCounts>) {
         let query = BooleanQuery::new(query);
         let searcher = self.reader.searcher();
         let facet_collector = facets.iter().fold(
@@ -267,25 +267,29 @@ impl ParagraphReaderService {
                 collector
             },
         );
-        if multic_flag {
+        if !multic_flag {
+            let facet_counts = searcher.search(&query, &facet_collector).unwrap();
+            (vec![], Some(facet_counts))
+        } else if facets.is_empty() {
+            let extra_result = results + 1;
+            let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
+            let top_docs = searcher.search(&query, &topdocs).unwrap();
+            (top_docs, None)
+        } else {
             let extra_result = results + 1;
             let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
             let mut multicollector = MultiCollector::new();
             let facet_handler = multicollector.add_collector(facet_collector);
             let topdocs_handler = multicollector.add_collector(topdocs);
-            // let count_handler = multicollector.add_collector(Count);
 
             debug!("{:?}", query);
 
             let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
             let facets_count = facet_handler.extract(&mut multi_fruit);
             let top_docs = topdocs_handler.extract(&mut multi_fruit);
-            // let count_docs = count_handler.extract(&mut multi_fruit);
+
             debug!("{:?}", top_docs);
-            (top_docs, facets_count)
-        } else {
-            let facet_counts = searcher.search(&query, &facet_collector).unwrap();
-            (vec![], facet_counts)
+            (top_docs, Some(facets_count))
         }
     }
     fn keys(&self) -> Vec<String> {

@@ -464,11 +464,9 @@ impl FieldReaderService {
                     .and_offset(offset)
                     .order_by_u64_field(order_field);
                 let topdocs_handler = multicollector.add_collector(topdocs_collector);
-                // let count_handler = multicollector.add_collector(Count);
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                // let count_docs = count_handler.extract(&mut multi_fruit);
                 self.convert_int_order(
                     SearchResponse {
                         facets_count,
@@ -487,11 +485,9 @@ impl FieldReaderService {
                 let facet_handler = multicollector.add_collector(facet_collector);
                 let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(offset);
                 let topdocs_handler = multicollector.add_collector(topdocs_collector);
-                // let count_handler = multicollector.add_collector(Count);
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                // let count_docs = count_handler.extract(&mut multi_fruit);
                 self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
