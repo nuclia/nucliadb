@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from sys import audit
 from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
 from uuid import uuid4
 
@@ -158,7 +157,7 @@ class KnowledgeBox:
 
         audit_util = get_audit()
         if audit_util is not None:
-            audit_util.delete_kb(kbid)
+            await audit_util.delete_kb(kbid)
         return kbid
 
     @classmethod

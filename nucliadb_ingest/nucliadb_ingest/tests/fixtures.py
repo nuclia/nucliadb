@@ -598,7 +598,7 @@ async def stream_audit(natsd: str):
 
     audit = StreamAuditStorage(
         [natsd],
-        audit_settings.audit_jetstream_target, # type: ignore
+        audit_settings.audit_jetstream_target,  # type: ignore
         audit_settings.audit_partitions,
         audit_settings.audit_hash_seed,
     )
