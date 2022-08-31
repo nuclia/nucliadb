@@ -268,14 +268,19 @@ impl ParagraphReaderService {
             },
         );
         if multic_flag {
-            let topdocs = TopDocs::with_limit(results).and_offset(offset);
+            let extra_result = results + 1;
+            let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
             let mut multicollector = MultiCollector::new();
             let facet_handler = multicollector.add_collector(facet_collector);
             let topdocs_handler = multicollector.add_collector(topdocs);
+            // let count_handler = multicollector.add_collector(Count);
+
             debug!("{:?}", query);
+
             let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
             let facets_count = facet_handler.extract(&mut multi_fruit);
             let top_docs = topdocs_handler.extract(&mut multi_fruit);
+            // let count_docs = count_handler.extract(&mut multi_fruit);
             debug!("{:?}", top_docs);
             (top_docs, facets_count)
         } else {

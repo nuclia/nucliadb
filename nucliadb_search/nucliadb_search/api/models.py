@@ -113,6 +113,9 @@ class Paragraphs(BaseModel):
     results: List[Paragraph] = []
     facets: Optional[FacetsResult] = None
     query: Optional[str] = None
+    total: int = 0
+    page_number: int = 0
+    page_size: int = 20
 
 
 class ResourceResult(BaseModel):
@@ -128,6 +131,9 @@ class Resources(BaseModel):
     results: List[ResourceResult]
     facets: Optional[FacetsResult] = None
     query: Optional[str] = None
+    total: int = 0
+    page_number: int = 0
+    page_size: int = 20
 
 
 class Relation(BaseModel):

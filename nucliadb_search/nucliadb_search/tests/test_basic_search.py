@@ -58,6 +58,24 @@ async def test_search_sc_2104(
 
 
 @pytest.mark.asyncio
+async def test_multiple_search_resource_all(
+    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+) -> None:
+    kbid = multiple_search_resource
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=0&page_size=20",
+        )
+        assert len(resp.json()["paragraphs"]["results"]) == 20
+
+        import pdb
+
+        pdb.set_trace()
+        pass
+
+
+@pytest.mark.asyncio
 async def test_search_resource_all(
     search_api: Callable[..., AsyncClient], test_search_resource: str
 ) -> None:

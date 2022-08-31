@@ -68,7 +68,9 @@ async def merge_documents_results(
     query = None
     raw_resource_list: List[ResourceResult] = []
     facets: Dict[str, Any] = {}
+    total = 0
     for document_response in documents:
+        total += document_response.total
         if query is None:
             query = document_response.query
         if document_response.facets:
@@ -104,19 +106,18 @@ async def merge_documents_results(
 
     raw_resource_list.sort(key=lambda x: x.score)
 
-    init = count * page
-    last = init + count
-    if last > len(raw_resource_list):
-        last = len(raw_resource_list)
-
-    resource_list = raw_resource_list[init:last]
-    # Filter the resources that are matching the length
-
-    for resource in resource_list:
+    for resource in raw_resource_list:
         if resource.rid not in resources:
             resources.append(resource.rid)
 
-    return Resources(facets=facets, results=resource_list, query=query)
+    return Resources(
+        facets=facets,
+        results=raw_resource_list,
+        query=query,
+        total=total,
+        page_number=page,
+        page_size=count,
+    )
 
 
 async def merge_suggest_paragraph_results(
@@ -176,11 +177,11 @@ async def merge_vectors_results(
                 continue
             if math.isnan(document.score):
                 continue
-            count = document.doc_id.id.count("/")
-            if count == 4:
+            id_count = document.doc_id.id.count("/")
+            if id_count == 4:
                 rid, field_type, field, index, position = document.doc_id.id.split("/")
                 subfield = None
-            elif count == 5:
+            elif id_count == 5:
                 (
                     rid,
                     field_type,
@@ -232,7 +233,9 @@ async def merge_paragraph_results(
     raw_paragraph_list: List[Paragraph] = []
     facets: Dict[str, Any] = {}
     query = None
+    total = 0
     for paragraph_response in paragraphs:
+        total += paragraph_response.total
         if query is None:
             query = paragraph_response.query
         if paragraph_response.facets:
@@ -261,18 +264,17 @@ async def merge_paragraph_results(
 
     raw_paragraph_list.sort(key=lambda x: x.score)
 
-    init = count * page
-    last = init + count
-    if last > len(raw_paragraph_list):
-        last = len(raw_paragraph_list)
-
-    paragraph_list = raw_paragraph_list[init:last]
-    # Filter the resources that are matching the length
-
-    for paragraph in paragraph_list:
+    for paragraph in raw_paragraph_list:
         if paragraph.rid not in resources:
             resources.append(paragraph.rid)
-    return Paragraphs(results=paragraph_list, facets=facets, query=query)
+    return Paragraphs(
+        results=raw_paragraph_list,
+        facets=facets,
+        query=query,
+        total=total,
+        page_number=page,
+        page_size=count,
+    )
 
 
 async def merge_results(

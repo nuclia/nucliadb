@@ -279,6 +279,7 @@ class DocumentSearchResponse(google.protobuf.message.Message):
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DocumentResult]: ...
@@ -289,6 +290,9 @@ class DocumentSearchResponse(google.protobuf.message.Message):
     query: typing.Text
     """The text that lead to this results"""
 
+    next_page: builtins.bool
+    """Is there a next page"""
+
     def __init__(self,
         *,
         total: builtins.int = ...,
@@ -297,8 +301,9 @@ class DocumentSearchResponse(google.protobuf.message.Message):
         page_number: builtins.int = ...,
         result_per_page: builtins.int = ...,
         query: typing.Text = ...,
+        next_page: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["facets",b"facets","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["facets",b"facets","next_page",b"next_page","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
 global___DocumentSearchResponse = DocumentSearchResponse
 
 class ParagraphResult(google.protobuf.message.Message):
@@ -356,6 +361,7 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphResult]:
@@ -374,6 +380,9 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
     query: typing.Text
     """The text that lead to this results"""
 
+    next_page: builtins.bool
+    """Is there a next page"""
+
     def __init__(self,
         *,
         total: builtins.int = ...,
@@ -382,8 +391,9 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
         page_number: builtins.int = ...,
         result_per_page: builtins.int = ...,
         query: typing.Text = ...,
+        next_page: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["facets",b"facets","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["facets",b"facets","next_page",b"next_page","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
 global___ParagraphSearchResponse = ParagraphSearchResponse
 
 class VectorSearchRequest(google.protobuf.message.Message):
@@ -391,6 +401,8 @@ class VectorSearchRequest(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
     TAGS_FIELD_NUMBER: builtins.int
+    PAGE_NUMBER_FIELD_NUMBER: builtins.int
+    RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     id: typing.Text
     """Shard ID"""
@@ -403,15 +415,23 @@ class VectorSearchRequest(google.protobuf.message.Message):
     def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]:
         """tags to filter"""
         pass
+    page_number: builtins.int
+    """What page is the answer."""
+
+    result_per_page: builtins.int
+    """How many results are in this page."""
+
     reload: builtins.bool
     def __init__(self,
         *,
         id: typing.Text = ...,
         vector: typing.Optional[typing.Iterable[builtins.float]] = ...,
         tags: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        page_number: builtins.int = ...,
+        result_per_page: builtins.int = ...,
         reload: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id",b"id","reload",b"reload","tags",b"tags","vector",b"vector"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id",b"id","page_number",b"page_number","reload",b"reload","result_per_page",b"result_per_page","tags",b"tags","vector",b"vector"]) -> None: ...
 global___VectorSearchRequest = VectorSearchRequest
 
 class DocumentVectorIdentifier(google.protobuf.message.Message):
@@ -444,15 +464,25 @@ global___DocumentScored = DocumentScored
 class VectorSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     DOCUMENTS_FIELD_NUMBER: builtins.int
+    PAGE_NUMBER_FIELD_NUMBER: builtins.int
+    RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     @property
     def documents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DocumentScored]:
         """List of docs closer to the asked one."""
         pass
+    page_number: builtins.int
+    """What page is the answer."""
+
+    result_per_page: builtins.int
+    """How many results are in this page."""
+
     def __init__(self,
         *,
         documents: typing.Optional[typing.Iterable[global___DocumentScored]] = ...,
+        page_number: builtins.int = ...,
+        result_per_page: builtins.int = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["documents",b"documents"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["documents",b"documents","page_number",b"page_number","result_per_page",b"result_per_page"]) -> None: ...
 global___VectorSearchResponse = VectorSearchResponse
 
 class RelationSearchRequest(google.protobuf.message.Message):

@@ -42,13 +42,20 @@ pub struct SearchResponse<'a> {
 
 impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchResponse) -> Self {
-        let total = response.top_docs.len();
+        let mut total = response.top_docs.len();
+        let next_page: bool;
+        if total > response.results_per_page as usize {
+            next_page = true;
+            total = response.results_per_page as usize;
+        } else {
+            next_page = false;
+        }
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
         let searcher = response.text_service.reader.searcher();
 
         let default_split = Value::Str("".to_string());
         info!("Result search: {:?}", response.top_docs.len());
-        for (score, doc_address) in response.top_docs {
+        for (score, doc_address) in response.top_docs.into_iter().take(total) {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
@@ -140,6 +147,7 @@ impl<'a> From<SearchResponse<'a>> for ParagraphSearchResponse {
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
+            next_page,
         }
     }
 }

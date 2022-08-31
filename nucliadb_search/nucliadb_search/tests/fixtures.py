@@ -156,8 +156,23 @@ async def test_search_resource(
     return await inject_message(processor, knowledgebox, message1)
 
 
-async def inject_message(processor, knowledgebox, message):
-    await processor.process(message=message, seqid=1)
+@pytest.fixture(scope="function")
+async def multiple_search_resource(
+    indexing_utility_registered,
+    processor,
+    knowledgebox,
+):
+    """
+    Create a resource that has every possible bit of information
+    """
+    for count in range(100):
+        message1 = broker_resource(knowledgebox)
+        await inject_message(processor, knowledgebox, message1, count)
+    return knowledgebox
+
+
+async def inject_message(processor, knowledgebox, message, count: int = 0):
+    await processor.process(message=message, seqid=count)
 
     # Make sure is indexed
     driver = await get_driver()
@@ -174,8 +189,8 @@ async def inject_message(processor, knowledgebox, message):
         for replica in shard.shard.replicas:
             node_obj = NODES.get(replica.node)
             if node_obj is not None:
-                count: Shard = await node_obj.reader.GetShard(replica.shard)
-                if count.resources > 0:
+                count_shard: Shard = await node_obj.reader.GetShard(replica.shard)
+                if count_shard.resources >= count:
                     checks[replica.shard.id] = True
                 print(count)
 

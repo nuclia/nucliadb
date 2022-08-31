@@ -724,7 +724,7 @@ def broker_resource(knowledgebox):
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
-        slug="slug1",
+        slug=f"{rid}slug1",
         type=BrokerMessage.AUTOCOMMIT,
     )
 
