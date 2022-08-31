@@ -1,18 +1,35 @@
+// Copyright (C) 2021 Bosutech XXI S.L.
+//
+// nucliadb is offered under the AGPL v3.0 and as commercial software.
+// For commercial licensing, contact us at info@nuclia.com.
+//
+// AGPL:
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as
+// published by the Free Software Foundation, either version 3 of the
+// License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
+
 use std::io::Read;
 
-/*
-    VectorIter expects for the vectors to be encoded in the
-    following format:
-        - vector dimension: u32 in raw little endian
-        - the elements in sequence: f32 in raw little endian.
-*/
+// VectorIter expects for the vectors to be encoded in the
+// following format:
+// - vector dimension: u32 in raw little endian
+// - the elements in sequence: f32 in raw little endian.
 pub struct VectorIter<Contents> {
     reader: Contents,
 }
 
 impl<Contents> VectorIter<Contents>
-where
-    Contents: Read,
+where Contents: Read
 {
     pub fn new(reader: Contents) -> VectorIter<Contents> {
         VectorIter { reader }
@@ -20,8 +37,7 @@ where
 }
 
 impl<Contents> Iterator for VectorIter<Contents>
-where
-    Contents: Read,
+where Contents: Read
 {
     type Item = Vec<f32>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -45,8 +61,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::io::{Read, Write};
+
+    use super::*;
 
     const DIM: u32 = 5;
     const V1: [f32; DIM as usize] = [0.0, 1.1, 2.2, 3.3, 4.4];
