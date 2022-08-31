@@ -6,6 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rand = "0.8.4"
 tempfile = "3"
+thiserror = "1.0.31"
 clap = { version = "3.1.18", features = ["derive"] }
 nucliadb_vectors2 = {path= "../nucliadb_vectors2"}
+
+[[bin]]
+name = "vectors_benchmark"
+path = "src/vectors_benchmark.rs"
