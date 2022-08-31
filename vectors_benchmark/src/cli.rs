@@ -42,7 +42,7 @@ pub type BenchR<O> = Result<O, BenchErr>;
 #[clap(author, version, about, long_about = None)]
 pub struct Args {
     /// Path to the .fvectors file that will populate the index
-    #[clap(short, long)]
+    #[clap(short, long,  default_value_t = String::from("./vectors.fvecs"))]
     vectors: String,
     /// Path where the output should be located
     #[clap(short, long, default_value_t = String::from("./"))]
@@ -58,6 +58,11 @@ pub struct Args {
     batch_size: usize,
 }
 
+impl Default for Args {
+    fn default() -> Self {
+        Args::new()
+    }
+}
 impl Args {
     pub fn new() -> Args {
         Args::parse()

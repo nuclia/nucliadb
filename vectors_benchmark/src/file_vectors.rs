@@ -24,19 +24,19 @@ use std::io::Read;
 // following format:
 // - vector dimension: u32 in raw little endian
 // - the elements in sequence: f32 in raw little endian.
-pub struct VectorIter<Contents> {
+pub struct FileVectors<Contents> {
     reader: Contents,
 }
 
-impl<Contents> VectorIter<Contents>
+impl<Contents> FileVectors<Contents>
 where Contents: Read
 {
-    pub fn new(reader: Contents) -> VectorIter<Contents> {
-        VectorIter { reader }
+    pub fn new(reader: Contents) -> FileVectors<Contents> {
+        FileVectors { reader }
     }
 }
 
-impl<Contents> Iterator for VectorIter<Contents>
+impl<Contents> Iterator for FileVectors<Contents>
 where Contents: Read
 {
     type Item = Vec<f32>;
@@ -102,7 +102,7 @@ mod test {
             buf.write_all(&i.to_le_bytes()).unwrap();
         }
         let vec_reader = VecReader { idx: 0, buf: &buf };
-        let mut iter = VectorIter::new(vec_reader);
+        let mut iter = FileVectors::new(vec_reader);
         let v1 = iter.next();
         assert_eq!(v1.as_ref().map(|v| v.as_slice()), Some(V1.as_slice()));
         let v2 = iter.next();

@@ -19,21 +19,26 @@
 //
 pub mod cli;
 pub mod engines;
+pub mod file_vectors;
 pub mod plot_writer;
-pub mod query_iter;
+pub mod random_vectors;
 pub mod reader;
-pub mod vector_iter;
+pub mod stats;
 pub mod writer;
 
 pub mod cli_interface {
     pub use super::cli::Args;
+    pub use super::file_vectors::*;
     pub use super::plot_writer::*;
-    pub use super::query_iter::*;
-    pub use super::vector_iter::*;
+    pub use super::random_vectors::*;
     pub use super::{engines, reader, writer};
 }
 
 pub trait VectorEngine {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>);
     fn search(&self, no_results: usize, query: &[f32]);
+}
+
+pub trait Logger {
+    fn report(&mut self) -> cli::BenchR<()>;
 }

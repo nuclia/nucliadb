@@ -20,28 +20,26 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
-use super::plot_writer::PlotWriter;
-use super::query_iter::QueryIter;
-use super::VectorEngine;
+use super::{Logger, VectorEngine};
 
-pub fn read_benchmark<Eng>(
+pub fn read_benchmark<Eng, QIter, Plot>(
     stop_point: Arc<AtomicBool>,
     no_results: usize,
     engine: Eng,
-    mut plotw: PlotWriter,
-    queries: QueryIter,
+    mut plotw: Plot,
+    queries: QIter,
 ) where
     Eng: VectorEngine,
+    QIter: Iterator<Item = Vec<f32>>,
+    Plot: Logger,
 {
-    let mut iter = queries.enumerate();
+    let mut iter = queries;
     while !stop_point.load(Ordering::SeqCst) {
-        let (x, query) = iter.next().unwrap();
-        let now = SystemTime::now();
+        let query = iter.next().unwrap();
         engine.search(no_results, &query);
-        let tick = now.elapsed().unwrap().as_millis();
-        plotw.add(x, tick).unwrap();
+        plotw.report().unwrap();
         std::thread::sleep(Duration::from_millis(100));
     }
 }

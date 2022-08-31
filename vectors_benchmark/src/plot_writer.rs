@@ -21,16 +21,32 @@
 use std::fs::File;
 use std::io;
 use std::io::Write;
+use std::time::SystemTime;
 
 pub struct PlotWriter {
+    start: SystemTime,
+    idx: usize,
     file: File,
 }
 
 impl PlotWriter {
     pub fn new(file: File) -> PlotWriter {
-        PlotWriter { file }
+        PlotWriter {
+            start: SystemTime::now(),
+            idx: 0,
+            file,
+        }
     }
-    pub fn add(&mut self, x: usize, y: u128) -> io::Result<()> {
+    pub fn add(&mut self) -> io::Result<()> {
+        let x = self.idx;
+        let y = self.start.elapsed().unwrap().as_millis();
+        self.idx += 1;
         writeln!(self.file, "{x} {y}")
+    }
+}
+
+impl super::Logger for PlotWriter {
+    fn report(&mut self) -> crate::cli::BenchR<()> {
+        Ok(self.add()?)
     }
 }

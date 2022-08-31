@@ -18,21 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::io::Read;
-use std::time::SystemTime;
+use super::{Logger, VectorEngine};
 
-use super::plot_writer::PlotWriter;
-use super::vector_iter::VectorIter;
-use super::VectorEngine;
-
-pub fn write_benchmark<Eng, Cnt>(
+pub fn write_benchmark<Eng, QIter, Plot>(
     batch_size: usize,
     mut engine: Eng,
-    mut plotw: PlotWriter,
-    vectors: VectorIter<Cnt>,
+    mut plotw: Plot,
+    vectors: QIter,
 ) where
     Eng: VectorEngine,
-    Cnt: Read,
+    QIter: Iterator<Item = Vec<f32>>,
+    Plot: Logger,
 {
     let mut kbatch = vec![];
     let mut vbatch = vec![];
@@ -42,10 +38,8 @@ pub fn write_benchmark<Eng, Cnt>(
         kbatch.push(format!("{batch_id}/{x}"));
         vbatch.push(vector);
         if vbatch.len() == batch_size {
-            let now = SystemTime::now();
             engine.add_batch(batch_id, kbatch, vbatch);
-            let tick = now.elapsed().unwrap().as_millis();
-            plotw.add(x, tick).unwrap();
+            plotw.report().unwrap();
             batch_num += 1;
             batch_id = format!("Batch{batch_num}");
             kbatch = vec![];

@@ -18,13 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub struct QueryIter(usize);
-impl QueryIter {
-    pub fn new(dim: usize) -> QueryIter {
-        QueryIter(dim)
+pub struct RandomVectors(usize);
+impl RandomVectors {
+    pub fn new(dim: usize) -> RandomVectors {
+        RandomVectors(dim)
     }
 }
-impl Iterator for QueryIter {
+impl Iterator for RandomVectors {
     type Item = Vec<f32>;
     fn next(&mut self) -> Option<Self::Item> {
         let new = (0..self.0)
