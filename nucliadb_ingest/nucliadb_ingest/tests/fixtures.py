@@ -269,6 +269,7 @@ async def redis_driver(redis):
     driver = RedisDriver(url=url)
     await driver.initialize()
     await driver.redis.flushall()
+    print(f"Redis driver ready at {url}")
     yield driver
     await driver.finalize()
     settings.driver_redis_url = None
@@ -597,7 +598,7 @@ async def stream_audit(natsd: str):
 
     audit = StreamAuditStorage(
         [natsd],
-        audit_settings.audit_jetstream_target,
+        audit_settings.audit_jetstream_target, # type: ignore
         audit_settings.audit_partitions,
         audit_settings.audit_hash_seed,
     )

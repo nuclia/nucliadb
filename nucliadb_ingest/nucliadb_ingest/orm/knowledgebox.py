@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from sys import audit
 from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
 from uuid import uuid4
 
@@ -62,7 +63,7 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_audit, get_storage
 
 KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
@@ -154,6 +155,10 @@ class KnowledgeBox:
         when = datetime.now().isoformat()
         await subtxn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
         await subtxn.commit(resource=False)
+
+        audit_util = get_audit()
+        if audit_util is not None:
+            audit_util.delete_kb(kbid)
         return kbid
 
     @classmethod
@@ -515,7 +520,7 @@ class KnowledgeBox:
 
     async def add_resource(
         self, uuid: str, slug: str, basic: Optional[Basic] = None
-    ) -> Optional[Resource]:
+    ) -> Resource:
         if basic is None:
             basic = Basic()
         if slug == "":

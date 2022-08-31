@@ -47,3 +47,6 @@ class BasicAuditStorage(AuditStorage):
         resources: int,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
+
+    async def delete_kb(self, kbid):
+        logger.debug(f"KB DELETED {kbid}")

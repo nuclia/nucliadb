@@ -22,27 +22,35 @@ class AuditField(google.protobuf.message.Message):
         V: typing_extensions.TypeAlias = ValueType
     class _FieldActionEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[AuditField._FieldAction.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        DELETED: AuditField._FieldAction.ValueType  # 0
+        ADDED: AuditField._FieldAction.ValueType  # 0
         MODIFIED: AuditField._FieldAction.ValueType  # 1
+        DELETED: AuditField._FieldAction.ValueType  # 2
     class FieldAction(_FieldAction, metaclass=_FieldActionEnumTypeWrapper):
         pass
 
-    DELETED: AuditField.FieldAction.ValueType  # 0
+    ADDED: AuditField.FieldAction.ValueType  # 0
     MODIFIED: AuditField.FieldAction.ValueType  # 1
+    DELETED: AuditField.FieldAction.ValueType  # 2
 
     ACTION_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int
+    SIZE_DELTA_FIELD_NUMBER: builtins.int
+    FIELDID_FIELD_NUMBER: builtins.int
     FILENAME_FIELD_NUMBER: builtins.int
     action: global___AuditField.FieldAction.ValueType
     size: builtins.int
+    size_delta: builtins.int
+    fieldid: typing.Text
     filename: typing.Text
     def __init__(self,
         *,
         action: global___AuditField.FieldAction.ValueType = ...,
         size: builtins.int = ...,
+        size_delta: builtins.int = ...,
+        fieldid: typing.Text = ...,
         filename: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action",b"action","filename",b"filename","size",b"size"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["action",b"action","fieldid",b"fieldid","filename",b"filename","size",b"size","size_delta",b"size_delta"]) -> None: ...
 global___AuditField = AuditField
 
 class AuditRequest(google.protobuf.message.Message):

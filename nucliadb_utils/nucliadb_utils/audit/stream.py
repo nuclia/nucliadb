@@ -154,6 +154,15 @@ class StreamAuditStorage(AuditStorage):
 
         await self.send(auditrequest)
 
+    async def delete_kb(self, kbid):
+        # Search is a base64 encoded search
+        auditrequest = AuditRequest()
+        auditrequest.kbid = kbid
+        auditrequest.type = AuditRequest.KB_DELETED
+        auditrequest.time.FromDatetime(datetime.now())
+
+        await self.send(auditrequest)
+
     async def search(
         self,
         kbid: str,

@@ -6,12 +6,15 @@ import "nucliadb_protos/resources.proto";
 
 message AuditField {
   enum FieldAction {
-    DELETED = 0;
+    ADDED = 0;
     MODIFIED = 1;
+    DELETED = 2;
   }
   FieldAction action = 1;
   int32 size = 2;
-  string filename = 3;
+  int32 size_delta = 3;
+  string fieldid = 4;
+  string filename = 5;
 }
 
 message AuditRequest {

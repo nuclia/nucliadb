@@ -270,26 +270,30 @@ async def test_ingest_audit_stream(
 
     rid = str(uuid.uuid4())
     message = make_test_message(knowledgebox, rid, ["file1"])
+    # We use the same file multiple times, so the size will be the same
+    test_file_size = message.files["file1"].file.size
 
     await stream_processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
     assert auditreq.kbid == knowledgebox
     assert auditreq.rid == rid
-    assert auditreq.storage_fields[0].size == message.files["file1"].file.size
+    assert auditreq.type == AuditRequest.AuditType.NEW
     assert auditreq.storage_fields[0].action == AuditField.FieldAction.MODIFIED
+    assert auditreq.storage_fields[0].size == test_file_size
 
     message.files.clear()
     fieldid = FieldID(field="file1", field_type=FieldType.FILE)
     message.delete_fields.append(fieldid)
 
     await stream_processor.process(message=message, seqid=2)
-
     auditreq = await get_audit_messages(psub)
+
     assert auditreq.kbid == knowledgebox
     assert auditreq.rid == rid
-    assert auditreq.storage_fields[0].size == message.files["file1"].file.size
+    assert auditreq.type == AuditRequest.AuditType.MODIFIED
     assert auditreq.storage_fields[0].action == AuditField.FieldAction.DELETED
+    assert auditreq.storage_fields[0].size == test_file_size
 
     await client.drain()
     await client.close()

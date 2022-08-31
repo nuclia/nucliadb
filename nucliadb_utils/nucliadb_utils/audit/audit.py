@@ -49,3 +49,6 @@ class AuditStorage:
         resources: int,
     ):
         raise NotImplementedError
+
+    async def delete_kb(self, kbid):
+        raise NotImplementedError
