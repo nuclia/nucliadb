@@ -37,6 +37,11 @@ async def test_tikv_driver(tikvd):
     await driver_basic(driver)
 
 
+@pytest.mark.asyncio
+async def test_local_driver(local_driver):
+    await driver_basic(local_driver)
+
+
 async def driver_basic(driver):
     await driver.initialize()
 

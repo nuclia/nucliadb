@@ -24,6 +24,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from os.path import dirname, getsize
+from shutil import rmtree
+from tempfile import mkdtemp
 from typing import List
 
 import aioredis
@@ -40,6 +42,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from nucliadb_ingest.chitchat import start_chitchat
 from nucliadb_ingest.consumer.service import ConsumerService
 from nucliadb_ingest.maindb.driver import Driver
+from nucliadb_ingest.maindb.local import LocalDriver
 from nucliadb_ingest.maindb.redis import RedisDriver
 from nucliadb_ingest.maindb.tikv import TiKVDriver
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
@@ -253,6 +256,16 @@ async def grpc_servicer(redis, transaction_utility, gcs_storage, fake_node):
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
     clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def local_driver():
+    path = mkdtemp()
+    driver: Driver = LocalDriver(url=path)
+    await driver.initialize()
+    yield driver
+    await driver.finalize()
+    rmtree(path)
 
 
 @pytest.fixture(scope="function")
@@ -1021,6 +1034,7 @@ async def create_resource(storage, driver, cache, knowledgebox):
 
     convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
     await convfield.set_extracted_text(make_extracted_text(convfield.id, body="MyText"))
+
     # 2.6 KEYWORDSET FIELD
 
     k2 = rpb.FieldKeywordset(
