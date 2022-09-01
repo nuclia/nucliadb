@@ -280,6 +280,7 @@ class DocumentSearchResponse(google.protobuf.message.Message):
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
     NEXT_PAGE_FIELD_NUMBER: builtins.int
+    BM25_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DocumentResult]: ...
@@ -293,6 +294,7 @@ class DocumentSearchResponse(google.protobuf.message.Message):
     next_page: builtins.bool
     """Is there a next page"""
 
+    bm25: builtins.bool
     def __init__(self,
         *,
         total: builtins.int = ...,
@@ -302,8 +304,9 @@ class DocumentSearchResponse(google.protobuf.message.Message):
         result_per_page: builtins.int = ...,
         query: typing.Text = ...,
         next_page: builtins.bool = ...,
+        bm25: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["facets",b"facets","next_page",b"next_page","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["bm25",b"bm25","facets",b"facets","next_page",b"next_page","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
 global___DocumentSearchResponse = DocumentSearchResponse
 
 class ParagraphResult(google.protobuf.message.Message):
@@ -316,26 +319,29 @@ class ParagraphResult(google.protobuf.message.Message):
     PARAGRAPH_FIELD_NUMBER: builtins.int
     SPLIT_FIELD_NUMBER: builtins.int
     INDEX_FIELD_NUMBER: builtins.int
+    SCORE_BM25_FIELD_NUMBER: builtins.int
     uuid: typing.Text
-    score: builtins.float
+    score: builtins.int
     field: typing.Text
     start: builtins.int
     end: builtins.int
     paragraph: typing.Text
     split: typing.Text
     index: builtins.int
+    score_bm25: builtins.float
     def __init__(self,
         *,
         uuid: typing.Text = ...,
-        score: builtins.float = ...,
+        score: builtins.int = ...,
         field: typing.Text = ...,
         start: builtins.int = ...,
         end: builtins.int = ...,
         paragraph: typing.Text = ...,
         split: typing.Text = ...,
         index: builtins.int = ...,
+        score_bm25: builtins.float = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","paragraph",b"paragraph","score",b"score","split",b"split","start",b"start","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","paragraph",b"paragraph","score",b"score","score_bm25",b"score_bm25","split",b"split","start",b"start","uuid",b"uuid"]) -> None: ...
 global___ParagraphResult = ParagraphResult
 
 class ParagraphSearchResponse(google.protobuf.message.Message):
@@ -362,6 +368,7 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
     NEXT_PAGE_FIELD_NUMBER: builtins.int
+    BM25_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphResult]:
@@ -383,6 +390,7 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
     next_page: builtins.bool
     """Is there a next page"""
 
+    bm25: builtins.bool
     def __init__(self,
         *,
         total: builtins.int = ...,
@@ -392,8 +400,9 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
         result_per_page: builtins.int = ...,
         query: typing.Text = ...,
         next_page: builtins.bool = ...,
+        bm25: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["facets",b"facets","next_page",b"next_page","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["bm25",b"bm25","facets",b"facets","next_page",b"next_page","page_number",b"page_number","query",b"query","result_per_page",b"result_per_page","results",b"results","total",b"total"]) -> None: ...
 global___ParagraphSearchResponse = ParagraphSearchResponse
 
 class VectorSearchRequest(google.protobuf.message.Message):

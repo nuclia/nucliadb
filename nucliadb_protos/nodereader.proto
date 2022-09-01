@@ -107,18 +107,20 @@ message DocumentSearchResponse {
 
     // Is there a next page
     bool next_page = 7;
+    bool bm25 = 8;
 }
 
 
 message ParagraphResult {
     string uuid = 1;
-    float score = 2;
+    uint64 score = 2;
     string field = 3;
     uint64 start = 4;
     uint64 end = 5;
     string paragraph = 6;
     string split = 7;
     uint64 index = 8;
+    float score_bm25 = 9;
 }
 
 message ParagraphSearchResponse {
@@ -142,6 +144,7 @@ message ParagraphSearchResponse {
 
     // Is there a next page
     bool next_page = 7;
+    bool bm25 = 8;
 }
 
 message VectorSearchRequest {

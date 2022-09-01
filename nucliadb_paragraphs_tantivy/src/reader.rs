@@ -22,21 +22,19 @@ use std::fmt::Debug;
 
 use async_std::fs;
 use async_trait::async_trait;
-use nucliadb_protos::{ParagraphSearchRequest, ParagraphSearchResponse, ResourceId};
+use nucliadb_protos::{OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId};
 use nucliadb_service_interface::prelude::*;
-use tantivy::collector::{
-    Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
-};
+use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{
-    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy,
-};
+use tantivy::{Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::search_query;
-use crate::search_response::SearchResponse;
+use crate::search_response::SearchBm25Response;
+use crate::search_response::SearchFacetsResponse;
+use crate::search_response::SearchIntResponse;
 
 pub struct ParagraphReaderService {
     index: Index,
@@ -70,6 +68,7 @@ impl ServiceChild for ParagraphReaderService {
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
     type Response = ParagraphSearchResponse;
+
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         use search_query::create_query;
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
@@ -77,6 +76,7 @@ impl ReaderChild for ParagraphReaderService {
         let offset = results * request.page_number as usize;
         let text = &request.body;
         let multi_flag = results > 0 && !text.is_empty();
+        let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
             .as_ref()
@@ -89,26 +89,32 @@ impl ReaderChild for ParagraphReaderService {
             })
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (top_docs, facets_count) = {
-            let queries = create_query(&parser, &text, request, &self.schema, 1);
-            let dist_1 = self.do_search(queries, results, offset, &facets, multi_flag);
-            if multi_flag && dist_1.0.is_empty() {
-                let queries = create_query(&parser, &text, request, &self.schema, 2);
-                self.do_search(queries, results, offset, &facets, multi_flag)
-            } else {
-                dist_1
-            }
-        };
-        Ok(ParagraphSearchResponse::from(SearchResponse {
-            facets_count,
-            facets,
-            top_docs,
-            text_service: self,
-            query: &text,
-            order_by: request.order.clone(),
-            page_number: request.page_number,
-            results_per_page: results as i32,
-        }))
+        let queries = create_query(&parser, &text, request, &self.schema, 1);
+        let dist_1 = self.do_search(
+            request,
+            queries,
+            results,
+            offset,
+            &facets,
+            multi_flag,
+            order_field,
+            &text,
+        );
+        if multi_flag && (dist_1.results.is_empty()) {
+            let queries = create_query(&parser, &text, request, &self.schema, 2);
+            Ok(self.do_search(
+                request,
+                queries,
+                results,
+                offset,
+                &facets,
+                multi_flag,
+                order_field,
+                &text,
+            ))
+        } else {
+            Ok(dist_1)
+        }
     }
     fn reload(&self) {
         self.reader.reload().unwrap();
@@ -252,12 +258,15 @@ impl ParagraphReaderService {
     }
     fn do_search(
         &self,
+        request: &ParagraphSearchRequest,
         query: Vec<(Occur, Box<dyn Query>)>,
         results: usize,
         offset: usize,
         facets: &[String],
         multic_flag: bool,
-    ) -> (Vec<(f32, DocAddress)>, Option<FacetCounts>) {
+        order_field: Option<Field>,
+        text: &str,
+    ) -> ParagraphSearchResponse {
         let query = BooleanQuery::new(query);
         let searcher = self.reader.searcher();
         let facet_collector = facets.iter().fold(
@@ -268,30 +277,92 @@ impl ParagraphReaderService {
             },
         );
         if !multic_flag {
-            let facet_counts = searcher.search(&query, &facet_collector).unwrap();
-            (vec![], Some(facet_counts))
+            // No query search, just facets
+            let facets_count = searcher.search(&query, &facet_collector).unwrap();
+            ParagraphSearchResponse::from(SearchFacetsResponse {
+                text_service: self,
+                facets_count: Some(facets_count),
+                facets: facets.to_vec(),
+            })
         } else if facets.is_empty() {
+            // Only query no facets
             let extra_result = results + 1;
-            let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
-            let top_docs = searcher.search(&query, &topdocs).unwrap();
-            (top_docs, None)
+            match order_field {
+                Some(order_field) => {
+                    let topdocs = TopDocs::with_limit(extra_result)
+                        .and_offset(offset)
+                        .order_by_u64_field(order_field);
+                    let top_docs = searcher.search(&query, &topdocs).unwrap();
+                    ParagraphSearchResponse::from(SearchIntResponse {
+                        facets_count: None,
+                        facets: facets.to_vec(),
+                        top_docs,
+                        text_service: self,
+                        query: text,
+                        page_number: request.page_number,
+                        results_per_page: results as i32,
+                    })
+                }
+                None => {
+                    let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
+                    let top_docs = searcher.search(&query, &topdocs).unwrap();
+                    ParagraphSearchResponse::from(SearchBm25Response {
+                        facets_count: None,
+                        facets: facets.to_vec(),
+                        top_docs,
+                        text_service: self,
+                        query: text,
+                        page_number: request.page_number,
+                        results_per_page: results as i32,
+                    })
+                }
+            }
         } else {
             let extra_result = results + 1;
-            let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
-            let mut multicollector = MultiCollector::new();
-            let facet_handler = multicollector.add_collector(facet_collector);
-            let topdocs_handler = multicollector.add_collector(topdocs);
 
-            debug!("{:?}", query);
-
-            let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-            let facets_count = facet_handler.extract(&mut multi_fruit);
-            let top_docs = topdocs_handler.extract(&mut multi_fruit);
-
-            debug!("{:?}", top_docs);
-            (top_docs, Some(facets_count))
+            match order_field {
+                Some(order_field) => {
+                    let topdocs = TopDocs::with_limit(extra_result)
+                        .and_offset(offset)
+                        .order_by_u64_field(order_field);
+                    let mut multicollector = MultiCollector::new();
+                    let facet_handler = multicollector.add_collector(facet_collector);
+                    let topdocs_handler = multicollector.add_collector(topdocs);
+                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
+                    let facets_count = facet_handler.extract(&mut multi_fruit);
+                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
+                    ParagraphSearchResponse::from(SearchIntResponse {
+                        facets_count: Some(facets_count),
+                        facets: facets.to_vec(),
+                        top_docs,
+                        text_service: self,
+                        query: text,
+                        page_number: request.page_number,
+                        results_per_page: results as i32,
+                    })
+                }
+                None => {
+                    let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
+                    let mut multicollector = MultiCollector::new();
+                    let facet_handler = multicollector.add_collector(facet_collector);
+                    let topdocs_handler = multicollector.add_collector(topdocs);
+                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
+                    let facets_count = facet_handler.extract(&mut multi_fruit);
+                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
+                    ParagraphSearchResponse::from(SearchBm25Response {
+                        facets_count: Some(facets_count),
+                        facets: facets.to_vec(),
+                        top_docs,
+                        text_service: self,
+                        query: text,
+                        page_number: request.page_number,
+                        results_per_page: results as i32,
+                    })
+                }
+            }
         }
     }
+
     fn keys(&self) -> Vec<String> {
         let searcher = self.reader.searcher();
         searcher
@@ -314,6 +385,20 @@ impl ParagraphReaderService {
         Facet::from_text(maybe_facet)
             .map_err(|_| error!("Invalid facet: {maybe_facet}"))
             .is_ok()
+    }
+
+    fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
+        match order {
+            Some(order) => match order.field.as_str() {
+                "created" => Some(self.schema.created),
+                "modified" => Some(self.schema.modified),
+                _ => {
+                    error!("Order by {} is not currently supported.", order.field);
+                    None
+                }
+            },
+            None => None,
+        }
     }
 }
 

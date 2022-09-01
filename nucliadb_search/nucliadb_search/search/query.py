@@ -52,6 +52,23 @@ async def global_query_to_pb(
 
     request = SearchRequest()
     request.reload = reload
+
+    # We need to ask for all and cut later
+    request.page_number = 0
+    request.result_per_page = page_number * page_size + page_size
+
+    if range_creation_start is not None:
+        request.timestamps.from_created.FromDatetime(range_creation_start)
+
+    if range_creation_end is not None:
+        request.timestamps.to_created.FromDatetime(range_creation_end)
+
+    if range_modification_start is not None:
+        request.timestamps.from_modified.FromDatetime(range_modification_start)
+
+    if range_modification_end is not None:
+        request.timestamps.to_modified.FromDatetime(range_modification_end)
+
     if SearchOptions.DOCUMENT in features or SearchOptions.PARAGRAPH in features:
         request.body = query
         request.filter.tags.extend(filters)
@@ -59,8 +76,6 @@ async def global_query_to_pb(
         if sort:
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
-        request.page_number = page_number
-        request.result_per_page = page_size
         request.fields.extend(fields)
 
     request.document = SearchOptions.DOCUMENT in features

@@ -310,6 +310,7 @@ impl FieldReaderService {
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
             next_page,
+            bm25: false,
         }
     }
 
@@ -388,6 +389,7 @@ impl FieldReaderService {
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
             next_page,
+            bm25: true,
         }
     }
 
@@ -430,7 +432,13 @@ impl FieldReaderService {
         let facets = request
             .faceted
             .as_ref()
-            .map(|v| v.tags.clone())
+            .map(|v| {
+                v.tags
+                    .iter()
+                    .filter(|s| FieldReaderService::is_valid_facet(*s))
+                    .cloned()
+                    .collect()
+            })
             .unwrap_or_default();
         let mut facet_collector = FacetCollector::for_field(self.schema.facets);
         for facet in &facets {
@@ -520,6 +528,11 @@ impl FieldReaderService {
                     .to_string()
             })
             .collect()
+    }
+    fn is_valid_facet(maybe_facet: &str) -> bool {
+        Facet::from_text(maybe_facet)
+            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
+            .is_ok()
     }
 }
 

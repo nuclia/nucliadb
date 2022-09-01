@@ -71,13 +71,8 @@ class Sort(int, Enum):
     ASC = 1
 
 
-class FacetItem(BaseModel):
-    tag: str
-    total: int
-
-
 class Facet(BaseModel):
-    facetresults: List[FacetItem]
+    facetresults: Dict[str, int]
 
 
 FacetsResult = Dict[str, Any]
