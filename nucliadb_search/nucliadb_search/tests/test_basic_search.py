@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from typing import Callable
 
 import pytest
@@ -68,11 +69,30 @@ async def test_multiple_search_resource_all(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=0&page_size=20",
         )
         assert len(resp.json()["paragraphs"]["results"]) == 20
+        assert resp.json()["paragraphs"]["next_page"]
+        assert resp.json()["fulltext"]["next_page"]
 
-        import pdb
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=4&page_size=20",
+        )
+        for _ in range(10):
+            if (
+                len(resp.json()["paragraphs"]["results"]) < 20
+                or len(resp.json()["fulltext"]["results"]) < 20
+            ):
+                await asyncio.sleep(1)
+                resp = await client.get(
+                    f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=4&page_size=20",
+                )
+            else:
+                break
+        assert len(resp.json()["paragraphs"]["results"]) == 20
+        assert resp.json()["paragraphs"]["total"] == 20
+        assert len(resp.json()["fulltext"]["results"]) == 20
+        assert resp.json()["fulltext"]["total"] == 20
 
-        pdb.set_trace()
-        pass
+        assert resp.json()["paragraphs"]["next_page"] is False
+        assert resp.json()["fulltext"]["next_page"] is False
 
 
 @pytest.mark.asyncio
@@ -83,7 +103,7 @@ async def test_search_resource_all(
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true",
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
         )
         assert resp.status_code == 200
         assert resp.json()["fulltext"]["query"] == "own text"
@@ -99,7 +119,7 @@ async def test_search_resource_all(
             == "My <mark>own</mark> <mark>text</mark> Ramon. This is great to be here. "
         )
         assert len(resp.json()["resources"]) == 1
-        assert len(resp.json()["sentences"]) == 2
+        assert len(resp.json()["sentences"]["results"]) == 1
 
     async with search_api(roles=[NucliaDBRoles.READER], root=True) as client:
         resp = await client.get(
@@ -155,6 +175,7 @@ async def test_search_resource_all(
                 vrequest = VectorSearchRequest()
                 vrequest.id = shard.id
                 vrequest.vector.extend(Q)
+                vrequest.result_per_page = 20
                 vrequest.reload = True
 
                 paragraphs = await node_obj.reader.ParagraphSearch(prequest)  # type: ignore

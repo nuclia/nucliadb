@@ -36,6 +36,14 @@ from nucliadb_search import API_PREFIX
 from nucliadb_utils.utilities import clear_global_cache
 
 
+def free_port() -> int:
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("", 0))
+    return sock.getsockname()[1]
+
+
 @pytest.fixture(scope="function")
 def test_settings_search(gcs, redis, node):  # type: ignore
     from nucliadb_ingest.settings import settings as ingest_settings
@@ -50,7 +58,7 @@ def test_settings_search(gcs, redis, node):  # type: ignore
 
     storage_settings.gcs_endpoint_url = gcs
     storage_settings.file_backend = "gcs"
-    storage_settings.gcs_bucket = "test"
+    storage_settings.gcs_bucket = "test_{kbid}"
 
     extended_storage_settings.gcs_indexing_bucket = "indexing"
     extended_storage_settings.gcs_deadletter_bucket = "deadletter"
@@ -65,8 +73,10 @@ def test_settings_search(gcs, redis, node):  # type: ignore
     ingest_settings.pull_time = 0
     ingest_settings.driver = "redis"
     ingest_settings.driver_redis_url = url
+    ingest_settings.nuclia_partitions = 1
 
     nuclia_settings.dummy_processing = True
+    ingest_settings.grpc_port = free_port()
 
     nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
 
@@ -101,7 +111,7 @@ async def search_api(
     # Make sure is clean
     await asyncio.sleep(1)
     while len(NODES) < 2:
-        print("awaiting cluster nodes - fixtures.py:113")
+        print("awaiting cluster nodes - search fixtures.py")
         await asyncio.sleep(4)
 
     def make_client_fixture(
@@ -167,17 +177,19 @@ async def multiple_search_resource(
     """
     for count in range(100):
         message1 = broker_resource(knowledgebox)
-        await inject_message(processor, knowledgebox, message1, count)
+        await inject_message(processor, knowledgebox, message1, count + 1)
     return knowledgebox
 
 
-async def inject_message(processor, knowledgebox, message, count: int = 0):
+async def inject_message(processor, knowledgebox, message, count: int = 1):
     await processor.process(message=message, seqid=count)
 
     # Make sure is indexed
     driver = await get_driver()
     txn = await driver.begin()
     shard = await Node.actual_shard(txn, knowledgebox)
+    if shard is None:
+        raise Exception("Could not find shard")
     await txn.abort()
 
     checks: Dict[str, bool] = {}
@@ -189,7 +201,7 @@ async def inject_message(processor, knowledgebox, message, count: int = 0):
         for replica in shard.shard.replicas:
             node_obj = NODES.get(replica.node)
             if node_obj is not None:
-                count_shard: Shard = await node_obj.reader.GetShard(replica.shard)
+                count_shard: Shard = await node_obj.reader.GetShard(replica.shard)  # type: ignore
                 if count_shard.resources >= count:
                     checks[replica.shard.id] = True
                 print(count)

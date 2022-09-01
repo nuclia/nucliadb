@@ -90,6 +90,8 @@ class Sentence(BaseModel):
 class Sentences(BaseModel):
     results: List[Sentence] = []
     facets: FacetsResult
+    page_number: int = 0
+    page_size: int = 20
 
 
 class Paragraph(BaseModel):
@@ -111,6 +113,7 @@ class Paragraphs(BaseModel):
     total: int = 0
     page_number: int = 0
     page_size: int = 20
+    next_page: bool = False
 
 
 class ResourceResult(BaseModel):
@@ -118,7 +121,7 @@ class ResourceResult(BaseModel):
     rid: str
     field_type: str
     field: str
-    text: str
+    text: Optional[str]
     positions: POSITIONS = {}
 
 
@@ -129,6 +132,7 @@ class Resources(BaseModel):
     total: int = 0
     page_number: int = 0
     page_size: int = 20
+    next_page: bool = False
 
 
 class Relation(BaseModel):

@@ -36,46 +36,13 @@ from nucliadb_utils.utilities import clear_global_cache
 
 
 @pytest.fixture(scope="function")
-def test_settings_one(gcs, redis, node):  # type: ignore
-    from nucliadb_ingest.settings import settings as ingest_settings
-    from nucliadb_utils.cache.settings import settings as cache_settings
-    from nucliadb_utils.settings import (
-        nucliadb_settings,
-        running_settings,
-        storage_settings,
-    )
-    from nucliadb_utils.storages.settings import settings as extended_storage_settings
-
-    storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
-    storage_settings.gcs_bucket = "test_{kbid}"
-
-    url = f"redis://{redis[0]}:{redis[1]}"
-    cache_settings.cache_pubsub_driver = "redis"
-    cache_settings.cache_pubsub_channel = "pubsub-nuclia"
-    cache_settings.cache_pubsub_redis_url = url
-
-    running_settings.debug = False
-
-    ingest_settings.pull_time = 0
-    ingest_settings.driver = "redis"
-    ingest_settings.driver_redis_url = url
-    ingest_settings.chitchat_binding_host = "0.0.0.0"
-    ingest_settings.chitchat_binding_port = 31337
-    ingest_settings.chitchat_enabled = True
-
-    nucliadb_settings.nucliadb_ingest = f"localhost:{ingest_settings.grpc_port}"
-
-    # ingest_settings.chitchat_peers_addr = [
-    #    f'{node["writer1"]["host"]}:{node["writer1"]["chitchat"]}',
-    #    f'{node["writer2"]["host"]}:{node["writer2"]["chitchat"]}',
-    # ]
-
-    extended_storage_settings.local_testing_files = f"{dirname(__file__)}"
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_api(redis, transaction_utility, test_settings_one: None, event_loop):  # type: ignore
+async def nucliadb_api(
+    redis,
+    transaction_utility,
+    indexing_utility_registered,
+    test_settings_search: None,
+    event_loop,
+):  # type: ignore
     from nucliadb_ingest.orm import NODES
     from nucliadb_one.app import application
 
@@ -92,7 +59,9 @@ async def nucliadb_api(redis, transaction_utility, test_settings_one: None, even
 
     await application.router.startup()
 
+    await asyncio.sleep(1)
     while len(NODES) < 2:
+        print("awaiting cluster nodes - one fixtures.py")
         await asyncio.sleep(4)
 
     def make_client_fixture(

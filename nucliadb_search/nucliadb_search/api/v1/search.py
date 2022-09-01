@@ -73,7 +73,7 @@ async def search_knowledgebox(
     sort: SortOption = SortOption.CREATED,
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
-    max_score: float = Query(default=0.73),
+    max_score: float = Query(default=0.70),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
@@ -90,6 +90,7 @@ async def search_knowledgebox(
     debug: bool = Query(default=False),
     highlight: bool = Query(default=False),
     split: bool = Query(default=False),
+    text_resource: bool = Query(default=False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -201,6 +202,7 @@ async def search_knowledgebox(
         max_score=max_score,
         highlight=highlight,
         split=split,
+        text_resource=text_resource,
     )
     await abort_transaction()
 
