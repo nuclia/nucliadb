@@ -445,11 +445,6 @@ async def test_ingest_audit_stream_mixed(
     assert audit_by_fieldid["text1"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["conv1"].action == AuditField.FieldAction.DELETED
 
-    import asyncio
-
-    for i in range(20):
-        await asyncio.sleep(1)
-
     #
     # Test 2: delete resource
     #
@@ -464,14 +459,13 @@ async def test_ingest_audit_stream_mixed(
     }
 
     assert set(audit_actions_by_fieldid.keys()) == {
-        "conv1",
         "text1",
-        "file_1",
         "datetime1",
         "layout1",
         "link1",
         "keywordset1",
         "file1",
+        "file_1",
     }
     assert set(audit_actions_by_fieldid.values()) == {AuditField.FieldAction.DELETED}
 
