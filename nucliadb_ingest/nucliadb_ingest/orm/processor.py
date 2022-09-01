@@ -383,7 +383,6 @@ class Processor:
             if seqid == -1:
                 raise handled_exception
             else:
-                raise handled_exception
                 raise DeadletteredError() from handled_exception
 
         return TxnResult.RESOURCE_CREATED if created else TxnResult.RESOURCE_MODIFIED
