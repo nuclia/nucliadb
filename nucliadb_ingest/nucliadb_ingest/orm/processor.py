@@ -154,6 +154,9 @@ class Processor:
         # sizes that disappear from storage
 
         for field_type, field_id in resource_keys:
+            if field_type is FieldType.GENERIC:
+                continue
+
             if not (
                 field_id in message.files
                 or message.type is BrokerMessage.MessageType.DELETE
@@ -177,7 +180,7 @@ class Processor:
         field_keys = await resource.get_fields_ids()
 
         for field_id, field_type in self.iterate_auditable_fields(field_keys, message):
-            field = await resource.get_field(field_id, FieldType.FILE, load=True)
+            field = await resource.get_field(field_id, field_type, load=True)
             val = await field.get_value()
 
             auditfield = AuditField()
@@ -217,20 +220,18 @@ class Processor:
             # If we are fully deleting a resource we won't iterate the delete_fields (if any)
             # Make no sense as we already collected all resource fields as deleted
             for fieldid in message.delete_fields:
-                if fieldid.field_type is not FieldType.FILE:
-                    continue
-
                 field = await resource.get_field(
                     fieldid.field, FieldType.FILE, load=True
                 )
                 audit_field = AuditField()
                 audit_field.action = AuditField.FieldAction.DELETED
-                val = await field.get_value()
-                audit_field.size = 0
-                audit_field.size_delta = -val.file.size
                 audit_field.field_id = fieldid.field
-                audit_field.field_type = FieldType.FILE
-                audit_field.filename = val.file.filename
+                audit_field.field_type = fieldid.field_type
+                if fieldid.field_type is FieldType.FILE:
+                    val = await field.get_value()
+                    audit_field.size = 0
+                    audit_field.size_delta = -val.file.size
+                    audit_field.filename = val.file.filename
                 audit_storage_fields.append(audit_field)
 
         await txn.abort()

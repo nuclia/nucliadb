@@ -47,6 +47,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest import SERVICE_NAME
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_ingest.orm.resource import Resource
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import Utility, get_indexing, get_storage, set_utility
@@ -199,16 +200,8 @@ async def test_ingest_error_message(
     assert field_obj.value.body == message0.texts["wikipedia_ml"].body
 
 
-def make_test_message(
-    kbid: str, rid: str, filenames=[], message_type=BrokerMessage.AUTOCOMMIT
-):
-    message1: BrokerMessage = BrokerMessage(
-        kbid=kbid,
-        uuid=rid,
-        slug="slug1",
-        type=message_type,
-    )
-    for (fileid, filename) in filenames:
+def add_filefields(message, items=[]):
+    for (fieldid, filename) in items:
         file_path = f"{dirname(__file__)}/assets/{filename}"
         cf1 = CloudFile(
             uri=filename,
@@ -218,18 +211,34 @@ def make_test_message(
             content_type="application/octet-stream",
             filename=filename,
         )
-        message1.basic.icon = "text/plain"
-        message1.basic.title = "Title Resource"
-        message1.basic.summary = "Summary of document"
-        message1.basic.thumbnail = "doc"
-        message1.basic.layout = "default"
-        message1.basic.metadata.language = "es"
-        message1.basic.created.FromDatetime(datetime.now())
-        message1.basic.modified.FromDatetime(datetime.now())
-        message1.origin.source = Origin.Source.WEB
-        message1.files[fileid].file.CopyFrom(cf1)
+        message.files[fieldid].file.CopyFrom(cf1)
 
-    return message1
+
+def add_textfields(message, items=[]):
+    for fieldid in items:
+        message.texts[fieldid].body = "some random text"
+
+
+def make_message(
+    kbid: str, rid: str, slug: str = "resource", message_type=BrokerMessage.AUTOCOMMIT
+):
+    message: BrokerMessage = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        slug=slug,
+        type=message_type,
+    )
+    message.basic.icon = "text/plain"
+    message.basic.title = "Title Resource"
+    message.basic.summary = "Summary of document"
+    message.basic.thumbnail = "doc"
+    message.basic.layout = "default"
+    message.basic.metadata.language = "es"
+    message.basic.created.FromDatetime(datetime.now())
+    message.basic.modified.FromDatetime(datetime.now())
+    message.origin.source = Origin.Source.WEB
+
+    return message
 
 
 async def get_audit_messages(sub):
@@ -279,9 +288,9 @@ async def test_ingest_audit_stream_files_only(
     #
     # Test 1: add a resource with some files
     #
-    message = make_test_message(
-        knowledgebox,
-        rid,
+    message = make_message(knowledgebox, rid)
+    add_filefields(
+        message,
         [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
     )
     await stream_processor.process(message=message, seqid=1)
@@ -324,9 +333,8 @@ async def test_ingest_audit_stream_files_only(
     # Test 3: modify a file while adding and deleting other files
     #
 
-    message = make_test_message(
-        knowledgebox, rid, [("file_2", "file.png"), ("file_4", "text.pb")]
-    )
+    message = make_message(knowledgebox, rid)
+    add_filefields(message, [("file_2", "file.png"), ("file_4", "text.pb")])
     fieldid = FieldID(field="file_3", field_type=FieldType.FILE)
     message.delete_fields.append(fieldid)
 
@@ -352,8 +360,8 @@ async def test_ingest_audit_stream_files_only(
     # Test 4: delete resource
     #
 
-    message = make_test_message(
-        knowledgebox, rid, [], message_type=BrokerMessage.MessageType.DELETE
+    message = make_message(
+        knowledgebox, rid, message_type=BrokerMessage.MessageType.DELETE
     )
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
@@ -377,6 +385,95 @@ async def test_ingest_audit_stream_files_only(
     auditreq = await get_audit_messages(psub)
     assert auditreq.kbid == knowledgebox
     assert auditreq.type == AuditRequest.AuditType.KB_DELETED
+
+    await txn.abort()
+
+    await client.drain()
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_ingest_audit_stream_mixed(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    stream_processor,
+    stream_audit: StreamAuditStorage,
+    redis_driver,
+    test_resource: Resource,
+):
+    from nucliadb_utils.settings import audit_settings
+
+    kbid = test_resource.kb.kbid
+    rid = test_resource.uuid
+    # Prepare a test audit stream to receive our messages
+    partition = stream_audit.get_partition(kbid)
+    client: Client = await nats.connect(stream_audit.nats_servers)
+    jetstream: JetStreamContext = client.jetstream()
+    if audit_settings.audit_jetstream_target is None:
+        assert False, "Missing jetstream target in audit settings"
+    subject = audit_settings.audit_jetstream_target.format(
+        partition=partition, type="*"
+    )
+    try:
+        await jetstream.delete_stream(name=audit_settings.audit_stream)
+    except nats.js.errors.NotFoundError:
+        pass
+    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+    psub = await jetstream.pull_subscribe(subject, "psub")
+
+    #
+    # Test 1: starting with a complete resource, do one of heac add, mod, del field
+    #
+    message = make_message(kbid, rid)
+    add_filefields(message, [("file_1", "file.png")])
+    add_textfields(message, ["text1"])
+    fieldid = FieldID(field="conv1", field_type=FieldType.CONVERSATION)
+    message.delete_fields.append(fieldid)
+    await stream_processor.process(message=message, seqid=1)
+
+    auditreq = await get_audit_messages(psub)
+    assert auditreq.kbid == kbid
+    assert auditreq.rid == rid
+    assert auditreq.type == AuditRequest.AuditType.MODIFIED
+
+    assert len(auditreq.fields_audit) == 3
+    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
+    assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.ADDED
+    assert audit_by_fieldid["text1"].action == AuditField.FieldAction.MODIFIED
+    assert audit_by_fieldid["conv1"].action == AuditField.FieldAction.DELETED
+
+    import asyncio
+
+    for i in range(20):
+        await asyncio.sleep(1)
+
+    #
+    # Test 2: delete resource
+    #
+
+    message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
+    await stream_processor.process(message=message, seqid=2)
+    auditreq = await get_audit_messages(psub)
+
+    # We know what should be in the resource and all must me delete actions
+    audit_actions_by_fieldid = {
+        audit.field_id: audit.action for audit in auditreq.fields_audit
+    }
+
+    assert set(audit_actions_by_fieldid.keys()) == {
+        "conv1",
+        "text1",
+        "file_1",
+        "datetime1",
+        "layout1",
+        "link1",
+        "keywordset1",
+        "file1",
+    }
+    assert set(audit_actions_by_fieldid.values()) == {AuditField.FieldAction.DELETED}
 
     await txn.abort()
 
