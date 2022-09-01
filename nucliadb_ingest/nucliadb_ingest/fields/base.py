@@ -126,7 +126,10 @@ class Field:
             kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
         )
         # Make sure we explicitly delete the field and any nested key
+        keys_to_delete = []
         async for key in self.resource.txn.keys(field_base_key):
+            keys_to_delete.append(key)
+        for key in keys_to_delete:
             await self.resource.txn.delete(key)
         await self.delete_extracted_text()
         await self.delete_vectors()
