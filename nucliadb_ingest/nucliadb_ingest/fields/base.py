@@ -122,11 +122,12 @@ class Field:
         self.resource.modified = True
 
     async def delete(self):
-        await self.resource.txn.delete(
-            KB_RESOURCE_FIELD.format(
-                kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
-            )
+        field_base_key = KB_RESOURCE_FIELD.format(
+            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
         )
+        # Make sure we explicitly delete the field and any nested key
+        async for key in self.resource.txn.keys(field_base_key):
+            await self.resource.txn.delete(key)
         await self.delete_extracted_text()
         await self.delete_vectors()
         await self.delete_metadata()
