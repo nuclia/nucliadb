@@ -13,8 +13,9 @@ message AuditField {
   FieldAction action = 1;
   int32 size = 2;
   int32 size_delta = 3;
-  string fieldid = 4;
-  string filename = 5;
+  string field_id = 4;
+  resources.FieldType field_type = 5;
+  string filename = 6;
 }
 
 message AuditRequest {
@@ -44,5 +45,6 @@ message AuditRequest {
   string task = 11;
   int32 resources = 12;
   repeated resources.FieldID field_metadata = 13;
-  repeated AuditField storage_fields = 14;
+  repeated AuditField fields_audit = 14;
+
 }

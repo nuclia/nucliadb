@@ -104,25 +104,56 @@ class Processor:
             await self.cache.finalize()
 
     @staticmethod
-    def iterate_audit_file_fields(resource_keys, message):
+    def iterate_auditable_fields(resource_keys, message):
         """
         Generator that emits the combined list of field ids from both
         the existing resource and message that needs to be considered
-        in the audit of file field storage
+        in the audit of fields.
         """
         yielded = set()
-        for field_id in message.files.keys():
 
-            yield field_id
-            yielded.add(field_id)
+        # Include all fields present in the message we are processing
+        for field_id in message.files.keys():
+            key = (field_id, FieldType.FILE)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.conversations.keys():
+            key = (field_id, FieldType.CONVERSATION)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.layouts.keys():
+            key = (field_id, FieldType.LAYOUT)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.texts.keys():
+            key = (field_id, FieldType.TEXT)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.keywordsets.keys():
+            key = (field_id, FieldType.KEYWORDSET)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.datetimes.keys():
+            key = (field_id, FieldType.DATETIME)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.links.keys():
+            key = (field_id, FieldType.LINK)
+            yield key
+            yielded.add(key)
+
+        # Include fields of the current resource
+        # We'll Ignore fields that are not in current message with the exception of DELETE resource
+        # message, then we want them all, because among other things we need to report all the individual
+        # sizes that disappear from storage
 
         for field_type, field_id in resource_keys:
-            # We only care of file fields
-            if field_type is not FieldType.FILE:
-                continue
-
-            # Ignore fields that are not in current message with the exception of DELETE resource
-            # message, then we want them all
             if not (
                 field_id in message.files
                 or message.type is BrokerMessage.MessageType.DELETE
@@ -130,13 +161,13 @@ class Processor:
                 continue
 
             # Avoid duplicates
-            if field_id in yielded:
+            if (field_type, field_id) in yielded:
                 continue
 
-            yield field_id
+            yield (field_id, field_type)
 
-    async def collect_storage_audit_fields(self, message: BrokerMessage):
-        audit_storage_fields = []
+    async def collect_audit_fields(self, message: BrokerMessage) -> List[AuditField]:
+        audit_storage_fields: List[AuditField] = []
         txn = await self.driver.begin()
 
         storage = await get_storage(service_name=SERVICE_NAME)
@@ -144,35 +175,40 @@ class Processor:
         kb = KnowledgeBox(txn, storage, cache, message.kbid)
         resource = Resource(txn, storage, kb, message.uuid)
         field_keys = await resource.get_fields_ids()
-        for field_id in self.iterate_audit_file_fields(field_keys, message):
+
+        for field_id, field_type in self.iterate_auditable_fields(field_keys, message):
             field = await resource.get_field(field_id, FieldType.FILE, load=True)
             val = await field.get_value()
 
+            auditfield = AuditField()
+            auditfield.field_type = field_type
+            auditfield.field_id = field_id
+            if field_type is FieldType.FILE:
+                auditfield.filename = message.files[field_id].file.filename
             if val is None:
                 # The field did not exist previously, so we are adding it now
-                size = size_delta = message.files[field_id].file.size
-                file_action = AuditField.FieldAction.ADDED
+                auditfield.action = AuditField.FieldAction.ADDED
+                if field_type is FieldType.FILE:
+                    auditfield.size = auditfield.size_delta = message.files[
+                        field_id
+                    ].file.size
             elif message.type is BrokerMessage.MessageType.DELETE:
                 # The file did exist, and we are deleting the field as a side effect of deleting the resource
-                size = 0
-                size_delta = -val.file.size
-                file_action = AuditField.FieldAction.DELETED
+                auditfield.action = AuditField.FieldAction.DELETED
+                if field_type is FieldType.FILE:
+                    auditfield.size = 0
+                    auditfield.size_delta = -val.file.size
             else:
-                # The field did exist, so we are overwriting it with a modified file
-                # When modified
-                size = message.files[field_id].file.size
-                size_delta = val.file.size - message.files[field_id].file.size
-                file_action = AuditField.FieldAction.MODIFIED
+                # The field did exist, so we are overwriting it, with a modified file
+                # in case of a file
+                auditfield.action = AuditField.FieldAction.MODIFIED
+                if field_type is FieldType.FILE:
+                    auditfield.size = message.files[field_id].file.size
+                    auditfield.size_delta = (
+                        val.file.size - message.files[field_id].file.size
+                    )
 
-            audit_storage_fields.append(
-                AuditField(
-                    action=file_action,
-                    size=size,
-                    size_delta=size_delta,
-                    fieldid=field_id,
-                    filename=message.files[field_id].file.filename,
-                )
-            )
+            audit_storage_fields.append(auditfield)
 
         if (
             message.delete_fields
@@ -192,7 +228,8 @@ class Processor:
                 val = await field.get_value()
                 audit_field.size = 0
                 audit_field.size_delta = -val.file.size
-                audit_field.fieldid = fieldid.field
+                audit_field.field_id = fieldid.field
+                audit_field.field_type = FieldType.FILE
                 audit_field.filename = val.file.filename
                 audit_storage_fields.append(audit_field)
 
@@ -219,19 +256,19 @@ class Processor:
                 return False
 
         audit_type: Optional[int] = None
-        audit_storage_fields = None
+        audit_fields = None
         if message.type == BrokerMessage.MessageType.DELETE:
-            audit_storage_fields = await self.collect_storage_audit_fields(message)
+            audit_fields = await self.collect_audit_fields(message)
             await self.delete_resource(message, seqid, partition)
             audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
-            audit_storage_fields = await self.collect_storage_audit_fields(message)
+            audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.autocommit(message, seqid, partition)
             audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
-            audit_storage_fields = await self.collect_storage_audit_fields(message)
+            audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.commit(message, seqid, partition)
             audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
@@ -241,9 +278,7 @@ class Processor:
         # like rollback ol multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
-            await self.audit.report(
-                message, audit_type, audit_storage_fields=audit_storage_fields
-            )
+            await self.audit.report(message, audit_type, audit_fields=audit_fields)
         elif self.audit is None:
             logger.warning("No audit defined")
         elif audit_type is None:

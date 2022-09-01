@@ -26,7 +26,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 class AuditStorage:
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_storage_fields: Optional[List[AuditField]] = None):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
 
         raise NotImplementedError
 

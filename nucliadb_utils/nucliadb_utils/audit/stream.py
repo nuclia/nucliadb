@@ -124,7 +124,7 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_storage_fields: Optional[List[AuditField]] = None):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
         auditrequest.kbid = message.kbid
@@ -137,8 +137,8 @@ class StreamAuditStorage(AuditStorage):
         for field in message.field_metadata:
             auditrequest.field_metadata.append(field.field)
 
-        if audit_storage_fields:
-            auditrequest.storage_fields.extend(audit_storage_fields)
+        if audit_fields:
+            auditrequest.fields_audit.extend(audit_fields)
 
         await self.send(auditrequest)
 

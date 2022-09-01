@@ -35,22 +35,25 @@ class AuditField(google.protobuf.message.Message):
     ACTION_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int
     SIZE_DELTA_FIELD_NUMBER: builtins.int
-    FIELDID_FIELD_NUMBER: builtins.int
+    FIELD_ID_FIELD_NUMBER: builtins.int
+    FIELD_TYPE_FIELD_NUMBER: builtins.int
     FILENAME_FIELD_NUMBER: builtins.int
     action: global___AuditField.FieldAction.ValueType
     size: builtins.int
     size_delta: builtins.int
-    fieldid: typing.Text
+    field_id: typing.Text
+    field_type: nucliadb_protos.resources_pb2.FieldType.ValueType
     filename: typing.Text
     def __init__(self,
         *,
         action: global___AuditField.FieldAction.ValueType = ...,
         size: builtins.int = ...,
         size_delta: builtins.int = ...,
-        fieldid: typing.Text = ...,
+        field_id: typing.Text = ...,
+        field_type: nucliadb_protos.resources_pb2.FieldType.ValueType = ...,
         filename: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action",b"action","fieldid",b"fieldid","filename",b"filename","size",b"size","size_delta",b"size_delta"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["action",b"action","field_id",b"field_id","field_type",b"field_type","filename",b"filename","size",b"size","size_delta",b"size_delta"]) -> None: ...
 global___AuditField = AuditField
 
 class AuditRequest(google.protobuf.message.Message):
@@ -94,7 +97,7 @@ class AuditRequest(google.protobuf.message.Message):
     TASK_FIELD_NUMBER: builtins.int
     RESOURCES_FIELD_NUMBER: builtins.int
     FIELD_METADATA_FIELD_NUMBER: builtins.int
-    STORAGE_FIELDS_FIELD_NUMBER: builtins.int
+    FIELDS_AUDIT_FIELD_NUMBER: builtins.int
     type: global___AuditRequest.AuditType.ValueType
     kbid: typing.Text
     userid: typing.Text
@@ -112,7 +115,7 @@ class AuditRequest(google.protobuf.message.Message):
     @property
     def field_metadata(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.FieldID]: ...
     @property
-    def storage_fields(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AuditField]: ...
+    def fields_audit(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AuditField]: ...
     def __init__(self,
         *,
         type: global___AuditRequest.AuditType.ValueType = ...,
@@ -127,8 +130,8 @@ class AuditRequest(google.protobuf.message.Message):
         task: typing.Text = ...,
         resources: builtins.int = ...,
         field_metadata: typing.Optional[typing.Iterable[nucliadb_protos.resources_pb2.FieldID]] = ...,
-        storage_fields: typing.Optional[typing.Iterable[global___AuditField]] = ...,
+        fields_audit: typing.Optional[typing.Iterable[global___AuditField]] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["search",b"search","time",b"time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field_metadata",b"field_metadata","fields",b"fields","kbid",b"kbid","origin",b"origin","resources",b"resources","rid",b"rid","search",b"search","storage_fields",b"storage_fields","task",b"task","time",b"time","timeit",b"timeit","type",b"type","userid",b"userid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field_metadata",b"field_metadata","fields",b"fields","fields_audit",b"fields_audit","kbid",b"kbid","origin",b"origin","resources",b"resources","rid",b"rid","search",b"search","task",b"task","time",b"time","timeit",b"timeit","type",b"type","userid",b"userid"]) -> None: ...
 global___AuditRequest = AuditRequest

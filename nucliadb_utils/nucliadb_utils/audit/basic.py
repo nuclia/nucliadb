@@ -31,7 +31,7 @@ class BasicAuditStorage(AuditStorage):
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_storage_fields: Optional[List[AuditField]] = None):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
         logger.debug(f"AUDIT {audit_type} {self.message_to_str(message)}")
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):

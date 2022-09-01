@@ -240,7 +240,7 @@ async def get_audit_messages(sub):
 
 
 @pytest.mark.asyncio
-async def test_ingest_audit_stream(
+async def test_ingest_audit_stream_files_only(
     local_files,
     gcs_storage: Storage,
     txn,
@@ -291,7 +291,7 @@ async def test_ingest_audit_stream(
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
 
-    audit_by_fieldid = {audit.fieldid: audit for audit in auditreq.storage_fields}
+    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.ADDED
     assert audit_by_fieldid["file_1"].size == test_png_size
     assert audit_by_fieldid["file_1"].size_delta == test_png_size
@@ -316,9 +316,9 @@ async def test_ingest_audit_stream(
     assert auditreq.kbid == knowledgebox
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
-    assert auditreq.storage_fields[0].action == AuditField.FieldAction.DELETED
-    assert auditreq.storage_fields[0].size == 0
-    assert auditreq.storage_fields[0].size_delta == -test_png_size
+    assert auditreq.fields_audit[0].action == AuditField.FieldAction.DELETED
+    assert auditreq.fields_audit[0].size == 0
+    assert auditreq.fields_audit[0].size_delta == -test_png_size
 
     #
     # Test 3: modify a file while adding and deleting other files
@@ -337,7 +337,7 @@ async def test_ingest_audit_stream(
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
-    audit_by_fieldid = {audit.fieldid: audit for audit in auditreq.storage_fields}
+    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.MODIFIED
     assert audit_by_fieldid["file_2"].size == test_png_size
     assert audit_by_fieldid["file_2"].size_delta == test_text_size - test_png_size
@@ -358,7 +358,7 @@ async def test_ingest_audit_stream(
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
-    audit_by_fieldid = {audit.fieldid: audit for audit in auditreq.storage_fields}
+    audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.DELETED
     assert audit_by_fieldid["file_2"].size == 0
     assert audit_by_fieldid["file_2"].size_delta == -test_png_size
