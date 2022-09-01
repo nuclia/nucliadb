@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 
 use async_std::fs;
@@ -282,25 +283,7 @@ impl FieldReaderService {
             }
         }
 
-        let facets = response.facets;
-        let facets_count = response.facets_count;
-        let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
-            facets_count
-                .top_k(facet, 50)
-                .into_iter()
-                .map(|(facet, count)| FacetResult {
-                    tag: facet.to_string(),
-                    total: count as i32,
-                })
-                .collect()
-        };
-        let facets = facets
-            .into_iter()
-            .map(|facet| (&facets_count, facet))
-            .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
-            .filter(|(r, _)| !r.is_empty())
-            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-            .collect();
+        let facets = self.create_facets(response.facets, response.facets_count);
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
@@ -360,26 +343,8 @@ impl FieldReaderService {
                 Err(e) => error!("Error retrieving document from index: {}", e),
             }
         }
-        let facets = response.facets;
-        let facets_count = response.facets_count;
-        let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
-            facets_count
-                .top_k(facet, 50)
-                .into_iter()
-                .map(|(facet, count)| FacetResult {
-                    tag: facet.to_string(),
-                    total: count as i32,
-                })
-                .collect()
-        };
-        let facets = facets
-            .into_iter()
-            .map(|facet| (&facets_count, facet))
-            .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
-            .filter(|(r, _)| !r.is_empty())
-            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-            .collect();
 
+        let facets = self.create_facets(response.facets, response.facets_count);
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
@@ -391,6 +356,31 @@ impl FieldReaderService {
             next_page,
             bm25: true,
         }
+    }
+
+    fn facet_count(&self, facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
+        facets_count
+            .top_k(facet, 50)
+            .into_iter()
+            .map(|(facet, count)| FacetResult {
+                tag: facet.to_string(),
+                total: count as i32,
+            })
+            .collect()
+    }
+
+    fn create_facets(
+        &self,
+        facets: Vec<String>,
+        facets_count: FacetCounts,
+    ) -> HashMap<String, FacetResults> {
+        facets
+            .into_iter()
+            .map(|facet| (&facets_count, facet))
+            .map(|(facets_count, facet)| (self.facet_count(&facet, facets_count), facet))
+            .filter(|(r, _)| !r.is_empty())
+            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+            .collect()
     }
 
     fn adapt_text(parser: &QueryParser, text: &str) -> String {
