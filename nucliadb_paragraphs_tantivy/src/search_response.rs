@@ -28,6 +28,26 @@ use tracing::*;
 
 use crate::reader::ParagraphReaderService;
 
+fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
+    facets_count
+        .top_k(facet, 50)
+        .into_iter()
+        .map(|(facet, count)| FacetResult {
+            tag: facet.to_string(),
+            total: count as i32,
+        })
+        .collect()
+}
+fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<String, FacetResults> {
+    facets
+        .into_iter()
+        .map(|facet| (&facets_count, facet))
+        .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
+        .filter(|(r, _)| !r.is_empty())
+        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+        .collect()
+}
+
 pub struct SearchBm25Response<'a> {
     pub text_service: &'a ParagraphReaderService,
     pub query: &'a str,
@@ -56,29 +76,10 @@ pub struct SearchFacetsResponse<'a> {
 
 impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchFacetsResponse) -> Self {
-        let facets = match response.facets_count {
-            None => HashMap::default(),
-            Some(facets_count) => {
-                let facets = response.facets;
-                let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
-                    facets_count
-                        .top_k(facet, 50)
-                        .into_iter()
-                        .map(|(facet, count)| FacetResult {
-                            tag: facet.to_string(),
-                            total: count as i32,
-                        })
-                        .collect()
-                };
-                facets
-                    .into_iter()
-                    .map(|facet| (&facets_count, facet))
-                    .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
-                    .filter(|(r, _)| !r.is_empty())
-                    .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-                    .collect()
-            }
-        };
+        let facets = response
+            .facets_count
+            .map(|count| produce_facets(response.facets, count))
+            .unwrap_or_default();
         let results: Vec<ParagraphResult> = Vec::with_capacity(0);
         ParagraphSearchResponse {
             results,
@@ -165,29 +166,10 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = match response.facets_count {
-            None => HashMap::default(),
-            Some(facets_count) => {
-                let facets = response.facets;
-                let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
-                    facets_count
-                        .top_k(facet, 50)
-                        .into_iter()
-                        .map(|(facet, count)| FacetResult {
-                            tag: facet.to_string(),
-                            total: count as i32,
-                        })
-                        .collect()
-                };
-                facets
-                    .into_iter()
-                    .map(|facet| (&facets_count, facet))
-                    .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
-                    .filter(|(r, _)| !r.is_empty())
-                    .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-                    .collect()
-            }
-        };
+        let facets = response
+            .facets_count
+            .map(|count| produce_facets(response.facets, count))
+            .unwrap_or_default();
         ParagraphSearchResponse {
             results,
             facets,
@@ -197,7 +179,6 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             query: response.query.to_string(),
             next_page,
             bm25: false,
-            ..Default::default()
         }
     }
 }
@@ -278,29 +259,10 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             }
         }
 
-        let facets = match response.facets_count {
-            None => HashMap::default(),
-            Some(facets_count) => {
-                let facets = response.facets;
-                let do_count = |facet: &str, facets_count: &FacetCounts| -> Vec<FacetResult> {
-                    facets_count
-                        .top_k(facet, 50)
-                        .into_iter()
-                        .map(|(facet, count)| FacetResult {
-                            tag: facet.to_string(),
-                            total: count as i32,
-                        })
-                        .collect()
-                };
-                facets
-                    .into_iter()
-                    .map(|facet| (&facets_count, facet))
-                    .map(|(facets_count, facet)| (do_count(&facet, facets_count), facet))
-                    .filter(|(r, _)| !r.is_empty())
-                    .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-                    .collect()
-            }
-        };
+        let facets = response
+            .facets_count
+            .map(|count| produce_facets(response.facets, count))
+            .unwrap_or_default();
         ParagraphSearchResponse {
             results,
             facets,
@@ -310,7 +272,6 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             query: response.query.to_string(),
             next_page,
             bm25: true,
-            ..Default::default()
         }
     }
 }

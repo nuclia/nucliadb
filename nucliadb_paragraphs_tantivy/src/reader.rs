@@ -32,9 +32,7 @@ use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::search_query;
-use crate::search_response::SearchBm25Response;
-use crate::search_response::SearchFacetsResponse;
-use crate::search_response::SearchIntResponse;
+use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 pub struct ParagraphReaderService {
     index: Index,
@@ -75,7 +73,7 @@ impl ReaderChild for ParagraphReaderService {
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
         let text = &request.body;
-        let multi_flag = results > 0 && !text.is_empty();
+        let multic_flag = results > 0 && !text.is_empty();
         let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
@@ -90,28 +88,19 @@ impl ReaderChild for ParagraphReaderService {
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
         let queries = create_query(&parser, &text, request, &self.schema, 1);
-        let dist_1 = self.do_search(
+        let searcher = Searcher {
             request,
-            queries,
             results,
             offset,
-            &facets,
-            multi_flag,
+            facets: &facets,
+            multic_flag,
             order_field,
-            &text,
-        );
-        if multi_flag && (dist_1.results.is_empty()) {
+            text: &text,
+        };
+        let dist_1 = searcher.do_search(queries, self);
+        if multic_flag && (dist_1.results.is_empty()) {
             let queries = create_query(&parser, &text, request, &self.schema, 2);
-            Ok(self.do_search(
-                request,
-                queries,
-                results,
-                offset,
-                &facets,
-                multi_flag,
-                order_field,
-                &text,
-            ))
+            Ok(searcher.do_search(queries, self))
         } else {
             Ok(dist_1)
         }
@@ -256,112 +245,6 @@ impl ParagraphReaderService {
                 }),
         }
     }
-    fn do_search(
-        &self,
-        request: &ParagraphSearchRequest,
-        query: Vec<(Occur, Box<dyn Query>)>,
-        results: usize,
-        offset: usize,
-        facets: &[String],
-        multic_flag: bool,
-        order_field: Option<Field>,
-        text: &str,
-    ) -> ParagraphSearchResponse {
-        let query = BooleanQuery::new(query);
-        let searcher = self.reader.searcher();
-        let facet_collector = facets.iter().fold(
-            FacetCollector::for_field(self.schema.facets),
-            |mut collector, facet| {
-                collector.add_facet(Facet::from(facet));
-                collector
-            },
-        );
-        if !multic_flag {
-            // No query search, just facets
-            let facets_count = searcher.search(&query, &facet_collector).unwrap();
-            ParagraphSearchResponse::from(SearchFacetsResponse {
-                text_service: self,
-                facets_count: Some(facets_count),
-                facets: facets.to_vec(),
-            })
-        } else if facets.is_empty() {
-            // Only query no facets
-            let extra_result = results + 1;
-            match order_field {
-                Some(order_field) => {
-                    let topdocs = TopDocs::with_limit(extra_result)
-                        .and_offset(offset)
-                        .order_by_u64_field(order_field);
-                    let top_docs = searcher.search(&query, &topdocs).unwrap();
-                    ParagraphSearchResponse::from(SearchIntResponse {
-                        facets_count: None,
-                        facets: facets.to_vec(),
-                        top_docs,
-                        text_service: self,
-                        query: text,
-                        page_number: request.page_number,
-                        results_per_page: results as i32,
-                    })
-                }
-                None => {
-                    let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
-                    let top_docs = searcher.search(&query, &topdocs).unwrap();
-                    ParagraphSearchResponse::from(SearchBm25Response {
-                        facets_count: None,
-                        facets: facets.to_vec(),
-                        top_docs,
-                        text_service: self,
-                        query: text,
-                        page_number: request.page_number,
-                        results_per_page: results as i32,
-                    })
-                }
-            }
-        } else {
-            let extra_result = results + 1;
-
-            match order_field {
-                Some(order_field) => {
-                    let topdocs = TopDocs::with_limit(extra_result)
-                        .and_offset(offset)
-                        .order_by_u64_field(order_field);
-                    let mut multicollector = MultiCollector::new();
-                    let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(topdocs);
-                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                    let facets_count = facet_handler.extract(&mut multi_fruit);
-                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                    ParagraphSearchResponse::from(SearchIntResponse {
-                        facets_count: Some(facets_count),
-                        facets: facets.to_vec(),
-                        top_docs,
-                        text_service: self,
-                        query: text,
-                        page_number: request.page_number,
-                        results_per_page: results as i32,
-                    })
-                }
-                None => {
-                    let topdocs = TopDocs::with_limit(extra_result).and_offset(offset);
-                    let mut multicollector = MultiCollector::new();
-                    let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(topdocs);
-                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
-                    let facets_count = facet_handler.extract(&mut multi_fruit);
-                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                    ParagraphSearchResponse::from(SearchBm25Response {
-                        facets_count: Some(facets_count),
-                        facets: facets.to_vec(),
-                        top_docs,
-                        text_service: self,
-                        query: text,
-                        page_number: request.page_number,
-                        results_per_page: results as i32,
-                    })
-                }
-            }
-        }
-    }
 
     fn keys(&self) -> Vec<String> {
         let searcher = self.reader.searcher();
@@ -398,6 +281,118 @@ impl ParagraphReaderService {
                 }
             },
             None => None,
+        }
+    }
+}
+
+struct Searcher<'a> {
+    request: &'a ParagraphSearchRequest,
+    results: usize,
+    offset: usize,
+    facets: &'a [String],
+    multic_flag: bool,
+    order_field: Option<Field>,
+    text: &'a str,
+}
+impl<'a> Searcher<'a> {
+    fn do_search(
+        &self,
+        query: Vec<(Occur, Box<dyn Query>)>,
+        service: &ParagraphReaderService,
+    ) -> ParagraphSearchResponse {
+        let query = BooleanQuery::new(query);
+        let searcher = service.reader.searcher();
+        let facet_collector = self.facets.iter().fold(
+            FacetCollector::for_field(service.schema.facets),
+            |mut collector, facet| {
+                collector.add_facet(Facet::from(facet));
+                collector
+            },
+        );
+        if !self.multic_flag {
+            // No query search, just facets
+            let facets_count = searcher.search(&query, &facet_collector).unwrap();
+            ParagraphSearchResponse::from(SearchFacetsResponse {
+                text_service: service,
+                facets_count: Some(facets_count),
+                facets: self.facets.to_vec(),
+            })
+        } else if self.facets.is_empty() {
+            // Only query no facets
+            let extra_result = self.results + 1;
+            match self.order_field {
+                Some(order_field) => {
+                    let topdocs = TopDocs::with_limit(extra_result)
+                        .and_offset(self.offset)
+                        .order_by_u64_field(order_field);
+                    let top_docs = searcher.search(&query, &topdocs).unwrap();
+                    ParagraphSearchResponse::from(SearchIntResponse {
+                        facets_count: None,
+                        facets: self.facets.to_vec(),
+                        top_docs,
+                        text_service: service,
+                        query: self.text,
+                        page_number: self.request.page_number,
+                        results_per_page: self.results as i32,
+                    })
+                }
+                None => {
+                    let topdocs = TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let top_docs = searcher.search(&query, &topdocs).unwrap();
+                    ParagraphSearchResponse::from(SearchBm25Response {
+                        facets_count: None,
+                        facets: self.facets.to_vec(),
+                        top_docs,
+                        text_service: service,
+                        query: self.text,
+                        page_number: self.request.page_number,
+                        results_per_page: self.results as i32,
+                    })
+                }
+            }
+        } else {
+            let extra_result = self.results + 1;
+
+            match self.order_field {
+                Some(order_field) => {
+                    let topdocs = TopDocs::with_limit(extra_result)
+                        .and_offset(self.offset)
+                        .order_by_u64_field(order_field);
+                    let mut multicollector = MultiCollector::new();
+                    let facet_handler = multicollector.add_collector(facet_collector);
+                    let topdocs_handler = multicollector.add_collector(topdocs);
+                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
+                    let facets_count = facet_handler.extract(&mut multi_fruit);
+                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
+                    ParagraphSearchResponse::from(SearchIntResponse {
+                        facets_count: Some(facets_count),
+                        facets: self.facets.to_vec(),
+                        top_docs,
+                        text_service: service,
+                        query: self.text,
+                        page_number: self.request.page_number,
+                        results_per_page: self.results as i32,
+                    })
+                }
+                None => {
+                    let topdocs = TopDocs::with_limit(extra_result).and_offset(self.offset);
+                    let mut multicollector = MultiCollector::new();
+                    let facet_handler = multicollector.add_collector(facet_collector);
+                    let topdocs_handler = multicollector.add_collector(topdocs);
+                    let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
+                    let facets_count = facet_handler.extract(&mut multi_fruit);
+                    let top_docs = topdocs_handler.extract(&mut multi_fruit);
+                    ParagraphSearchResponse::from(SearchBm25Response {
+                        facets_count: Some(facets_count),
+                        facets: self.facets.to_vec(),
+                        top_docs,
+                        text_service: service,
+                        query: self.text,
+                        page_number: self.request.page_number,
+                        results_per_page: self.results as i32,
+                    })
+                }
+            }
         }
     }
 }
