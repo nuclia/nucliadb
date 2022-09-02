@@ -112,8 +112,6 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
-                    let terms = response.termc.get_terms(doc_address.doc_id);
-                    println!("{terms:?}");
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
@@ -152,7 +150,12 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
-
+                    let mut terms: Vec<_> = response
+                        .termc
+                        .get_terms(doc_address.doc_id)
+                        .into_iter()
+                        .collect();
+                    terms.sort();
                     let result = ParagraphResult {
                         uuid,
                         score,
@@ -162,6 +165,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         paragraph,
                         split,
                         index,
+                        matches: terms,
                         ..Default::default()
                     };
 
@@ -207,8 +211,6 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
-                    let terms = response.termc.get_terms(doc_address.doc_id);
-                    println!("{terms:?}");
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
@@ -247,7 +249,12 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
-
+                    let mut terms: Vec<_> = response
+                        .termc
+                        .get_terms(doc_address.doc_id)
+                        .into_iter()
+                        .collect();
+                    terms.sort();
                     let result = ParagraphResult {
                         uuid,
                         score_bm25: score,
@@ -257,6 +264,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         paragraph,
                         split,
                         index,
+                        matches: terms,
                         ..Default::default()
                     };
 

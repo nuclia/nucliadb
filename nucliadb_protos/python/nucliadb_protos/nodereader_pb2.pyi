@@ -320,6 +320,7 @@ class ParagraphResult(google.protobuf.message.Message):
     SPLIT_FIELD_NUMBER: builtins.int
     INDEX_FIELD_NUMBER: builtins.int
     SCORE_BM25_FIELD_NUMBER: builtins.int
+    MATCHES_FIELD_NUMBER: builtins.int
     uuid: typing.Text
     score: builtins.int
     field: typing.Text
@@ -329,6 +330,8 @@ class ParagraphResult(google.protobuf.message.Message):
     split: typing.Text
     index: builtins.int
     score_bm25: builtins.float
+    @property
+    def matches(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     def __init__(self,
         *,
         uuid: typing.Text = ...,
@@ -340,8 +343,9 @@ class ParagraphResult(google.protobuf.message.Message):
         split: typing.Text = ...,
         index: builtins.int = ...,
         score_bm25: builtins.float = ...,
+        matches: typing.Optional[typing.Iterable[typing.Text]] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","paragraph",b"paragraph","score",b"score","score_bm25",b"score_bm25","split",b"split","start",b"start","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","matches",b"matches","paragraph",b"paragraph","score",b"score","score_bm25",b"score_bm25","split",b"split","start",b"start","uuid",b"uuid"]) -> None: ...
 global___ParagraphResult = ParagraphResult
 
 class ParagraphSearchResponse(google.protobuf.message.Message):

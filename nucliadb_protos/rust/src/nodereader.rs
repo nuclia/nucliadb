@@ -149,6 +149,8 @@ pub struct ParagraphResult {
     pub index: u64,
     #[prost(float, tag="9")]
     pub score_bm25: f32,
+    #[prost(string, repeated, tag="10")]
+    pub matches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
