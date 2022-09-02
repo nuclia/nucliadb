@@ -1,0 +1,23 @@
+[package]
+name = "vectors_benchmark"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.4"
+tempfile = "3"
+thiserror = "1.0.31"
+serde_json = "1.0.82"
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "3.1.18", features = ["derive"] }
+nucliadb_vectors2 = {path= "../nucliadb_vectors2"}
+
+[[bin]]
+name = "vectors_benchmark"
+path = "src/binaries/vectors_benchmark.rs"
+
+[[bin]]
+name = "1m_stats"
+path = "src/binaries/1m_stats.rs"
