@@ -116,8 +116,6 @@ async def driver_basic(driver):
         current_internal_kbs_keys.add(key)
     await txn.abort()
 
-    assert current_internal_kbs_keys == {
-        "/internal/kbs/kb1/shards/shard1"
-    }
+    assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
 
     await driver.finalize()
