@@ -42,7 +42,6 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
 }
 
 pub struct VectorReaderService {
-    no_results: usize,
     index: RwLock<Index>,
 }
 impl Debug for VectorReaderService {
@@ -71,21 +70,34 @@ impl ReaderChild for VectorReaderService {
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         debug!(
             "{} {} {}",
-            self.no_results,
+            request.result_per_page,
             request.tags.len(),
             request.vector.len()
         );
         let index = self.index.read().unwrap();
         let lock = index.get_slock()?;
-        let result = index.search(&(self.no_results, request), &lock)?;
+
+        let offset = request.result_per_page * request.page_number;
+        let total_to_get = offset + request.result_per_page;
+        let offset = offset as usize;
+        let total_to_get = total_to_get as usize;
+
+        let result = index.search(&(total_to_get, request), &lock)?;
         let documents = result
             .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx >= offset)
+            .map(|(_, v)| v)
             .map(|(id, distance)| DocumentScored {
                 doc_id: Some(DocumentVectorIdentifier { id }),
                 score: distance,
             })
             .collect::<Vec<_>>();
-        Ok(VectorSearchResponse { documents })
+        Ok(VectorSearchResponse {
+            documents,
+            page_number: request.page_number,
+            result_per_page: request.result_per_page,
+        })
     }
     fn stored_ids(&self) -> Vec<String> {
         let index = self.index.read().unwrap();
@@ -110,7 +122,6 @@ impl VectorReaderService {
             Err(Box::new("Shard already created".to_string()))
         } else {
             Ok(VectorReaderService {
-                no_results: config.no_results.unwrap(),
                 index: RwLock::new(Index::reader(path)?),
             })
         }
@@ -121,7 +132,6 @@ impl VectorReaderService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(VectorReaderService {
-                no_results: config.no_results.unwrap(),
                 index: RwLock::new(Index::reader(path)?),
             })
         }
@@ -192,9 +202,11 @@ mod tests {
             id: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
             reload: false,
         };
         let result = reader.search(&request).unwrap();
-        assert_eq!(result.documents.len(), reader.no_results);
+        assert_eq!(result.documents.len(), 3);
     }
 }

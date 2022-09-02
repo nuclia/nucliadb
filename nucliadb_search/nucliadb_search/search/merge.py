@@ -20,9 +20,11 @@
 import math
 from typing import Any, Dict, List
 
-from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import (
+    DocumentResult,
+    DocumentScored,
     DocumentSearchResponse,
+    ParagraphResult,
     ParagraphSearchResponse,
     SearchResponse,
     SuggestResponse,
@@ -63,60 +65,83 @@ async def merge_documents_results(
     kbid: str,
     highlight_split: bool = False,
     split: bool = False,
+    text_resource: bool = False,
 ) -> Resources:
 
-    query = None
-    raw_resource_list: List[ResourceResult] = []
+    raw_resource_list: List[DocumentResult] = []
     facets: Dict[str, Any] = {}
+    query = None
+    total = 0
+    next_page = False
     for document_response in documents:
         if query is None:
             query = document_response.query
         if document_response.facets:
             for key, value in document_response.facets.items():
-                facets[key] = MessageToDict(value)
+                for facetresult in value.facetresults:
+                    facets.setdefault(key, {}).setdefault(facetresult.tag, 0)
+                    facets[key][facetresult.tag] += facetresult.total
 
+        if document_response.next_page:
+            next_page = True
         for result in document_response.results:
-            # /f/file
-            text, positions = await get_text_resource(
-                result,
-                kbid,
-                document_response.query,
-                highlight_split=highlight_split,
-                split=split,
-            )
-            labels = await get_labels_resource(result, kbid)
-            _, field_type, field = result.field.split("/")
-            if result.score == 0:
-                score = result.score_bm25
-            else:
-                score = result.score
-            raw_resource_list.append(
-                ResourceResult(
-                    score=score,
-                    rid=result.uuid,
-                    field=field,
-                    field_type=field_type,
-                    text=text,
-                    positions=positions,
-                    labels=labels,
-                )
-            )
+            raw_resource_list.append(result)
 
     raw_resource_list.sort(key=lambda x: x.score)
 
-    init = count * page
-    last = init + count
-    if last > len(raw_resource_list):
-        last = len(raw_resource_list)
+    skip = page * count
+    end = skip + count
+    length = len(raw_resource_list)
 
-    resource_list = raw_resource_list[init:last]
-    # Filter the resources that are matching the length
+    if length > end:
+        next_page = True
 
-    for resource in resource_list:
-        if resource.rid not in resources:
-            resources.append(resource.rid)
+    result_resource_list: List[ResourceResult] = []
+    for result in raw_resource_list[min(skip, length) : min(end, length)]:
 
-    return Resources(facets=facets, results=resource_list, query=query)
+        # /f/file
+        if text_resource:
+            text, positions = await get_text_resource(
+                result,
+                kbid,
+                query,
+                highlight_split=highlight_split,
+                split=split,
+            )
+        else:
+            text = None
+            positions = {}
+        labels = await get_labels_resource(result, kbid)
+        _, field_type, field = result.field.split("/")
+        if result.score == 0:
+            score = result.score_bm25
+        else:
+            score = result.score
+        result_resource_list.append(
+            ResourceResult(
+                score=score,
+                rid=result.uuid,
+                field=field,
+                field_type=field_type,
+                text=text,
+                positions=positions,
+                labels=labels,
+            )
+        )
+        if result.uuid not in resources:
+            resources.append(result.uuid)
+
+    total = len(result_resource_list)
+
+    return Resources(
+        facets=facets,
+        results=result_resource_list,
+        query=query,
+        total=total,
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+    )
 
 
 async def merge_suggest_paragraph_results(
@@ -165,10 +190,10 @@ async def merge_vectors_results(
     kbid: str,
     count: int,
     page: int,
-    max_score: float = 0.85,
+    max_score: float = 0.70,
 ):
-    results: List[Sentence] = []
     facets: Dict[str, Any] = {}
+    raw_vectors_list: List[DocumentScored] = []
 
     for vector in vectors:
         for document in vector.documents:
@@ -176,47 +201,56 @@ async def merge_vectors_results(
                 continue
             if math.isnan(document.score):
                 continue
-            count = document.doc_id.id.count("/")
-            if count == 4:
-                rid, field_type, field, index, position = document.doc_id.id.split("/")
-                subfield = None
-            elif count == 5:
-                (
-                    rid,
-                    field_type,
-                    field,
-                    subfield,
-                    index,
-                    position,
-                ) = document.doc_id.id.split("/")
-            start, end = position.split("-")
-            start_int = int(start)
-            end_int = int(end)
-            index_int = int(index)
-            text = await get_text_sentence(
-                rid, field_type, field, kbid, index_int, start_int, end_int, subfield
-            )
-            labels = await get_labels_sentence(
-                rid, field_type, field, kbid, index_int, start_int, end_int, subfield
-            )
-            results.append(
-                Sentence(
-                    score=document.score,
-                    rid=rid,
-                    field_type=field_type,
-                    field=field,
-                    text=text,
-                    labels=labels,
-                )
-            )
+            raw_vectors_list.append(document)
 
-    results.sort(key=lambda x: x.score)
+    raw_vectors_list.sort(key=lambda x: x.score)
 
-    for paragraph in results:
-        if paragraph.rid not in resources:
-            resources.append(paragraph.rid)
+    skip = page * count
+    end_element = skip + count
+    length = len(raw_vectors_list)
 
-    return Sentences(results=results, facets=facets)
+    result_sentence_list: List[Sentence] = []
+    for result in raw_vectors_list[min(skip, length) : min(end_element, length)]:
+
+        id_count = result.doc_id.id.count("/")
+        if id_count == 4:
+            rid, field_type, field, index, position = result.doc_id.id.split("/")
+            subfield = None
+        elif id_count == 5:
+            (
+                rid,
+                field_type,
+                field,
+                subfield,
+                index,
+                position,
+            ) = result.doc_id.id.split("/")
+        start, end = position.split("-")
+        start_int = int(start)
+        end_int = int(end)
+        index_int = int(index)
+        text = await get_text_sentence(
+            rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+        )
+        labels = await get_labels_sentence(
+            rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+        )
+        result_sentence_list.append(
+            Sentence(
+                score=result.score,
+                rid=rid,
+                field_type=field_type,
+                field=field,
+                text=text,
+                labels=labels,
+            )
+        )
+        if rid not in resources:
+            resources.append(rid)
+
+    return Sentences(
+        results=result_sentence_list, facets=facets, page_number=page, page_size=count
+    )
 
 
 async def merge_paragraph_results(
@@ -229,50 +263,73 @@ async def merge_paragraph_results(
     split: bool,
 ):
 
-    raw_paragraph_list: List[Paragraph] = []
+    raw_paragraph_list: List[ParagraphResult] = []
     facets: Dict[str, Any] = {}
     query = None
+    next_page = False
     for paragraph_response in paragraphs:
         if query is None:
             query = paragraph_response.query
+
         if paragraph_response.facets:
             for key, value in paragraph_response.facets.items():
-                facets[key] = MessageToDict(value)
+                for facetresult in value.facetresults:
+                    facets.setdefault(key, {}).setdefault(facetresult.tag, 0)
+                    facets[key][facetresult.tag] += facetresult.total
+        if paragraph_response.next_page:
+            next_page = True
         for result in paragraph_response.results:
-            _, field_type, field = result.field.split("/")
-            text, positions = await get_text_paragraph(
-                result, kbid, paragraph_response.query, highlight_split, split
-            )
-            labels = await get_labels_paragraph(result, kbid)
-            seconds_positions = await get_seconds_paragraph(result, kbid)
-            new_paragraph = Paragraph(
-                score=result.score,
-                rid=result.uuid,
-                field_type=field_type,
-                field=field,
-                text=text,
-                positions=positions,
-                labels=labels,
-            )
-            if seconds_positions is not None:
-                new_paragraph.start_seconds = seconds_positions[0]
-                new_paragraph.end_seconds = seconds_positions[1]
-            raw_paragraph_list.append(new_paragraph)
+            raw_paragraph_list.append(result)
 
     raw_paragraph_list.sort(key=lambda x: x.score)
 
-    init = count * page
-    last = init + count
-    if last > len(raw_paragraph_list):
-        last = len(raw_paragraph_list)
+    skip = page * count
+    end = skip + count
+    length = len(raw_paragraph_list)
 
-    paragraph_list = raw_paragraph_list[init:last]
-    # Filter the resources that are matching the length
+    if length > end:
+        next_page = True
 
-    for paragraph in paragraph_list:
-        if paragraph.rid not in resources:
-            resources.append(paragraph.rid)
-    return Paragraphs(results=paragraph_list, facets=facets, query=query)
+    result_paragraph_list: List[Paragraph] = []
+    for result in raw_paragraph_list[min(skip, length) : min(end, length)]:
+        _, field_type, field = result.field.split("/")
+        text, positions = await get_text_paragraph(
+            result, kbid, paragraph_response.query, highlight_split, split
+        )
+        labels = await get_labels_paragraph(result, kbid)
+        seconds_positions = await get_seconds_paragraph(result, kbid)
+        if result.score == 0:
+            score = result.score_bm25
+        else:
+            score = result.score
+
+        new_paragraph = Paragraph(
+            score=score,
+            rid=result.uuid,
+            field_type=field_type,
+            field=field,
+            text=text,
+            positions=positions,
+            labels=labels,
+        )
+        if seconds_positions is not None:
+            new_paragraph.start_seconds = seconds_positions[0]
+            new_paragraph.end_seconds = seconds_positions[1]
+        result_paragraph_list.append(new_paragraph)
+        if new_paragraph.rid not in resources:
+            resources.append(new_paragraph.rid)
+
+    total = len(result_paragraph_list)
+
+    return Paragraphs(
+        results=result_paragraph_list,
+        facets=facets,
+        query=query,
+        total=total,
+        page_number=page,
+        page_size=count,
+        next_page=next_page,
+    )
 
 
 async def merge_results(
@@ -286,6 +343,7 @@ async def merge_results(
     max_score: float = 0.85,
     highlight: bool = False,
     split: bool = False,
+    text_resource: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
@@ -302,7 +360,7 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, highlight, split
+        documents, resources, count, page, kbid, highlight, split, text_resource
     )
 
     api_results.paragraphs = await merge_paragraph_results(

@@ -242,7 +242,14 @@ impl FieldReaderService {
         searcher: &Searcher,
     ) -> DocumentSearchResponse {
         info!("Document query at {}:{}", line!(), file!());
-        let total = response.top_docs.len();
+        let mut total = response.top_docs.len();
+        let next_page: bool;
+        if total > response.results_per_page as usize {
+            next_page = true;
+            total = response.results_per_page as usize;
+        } else {
+            next_page = false;
+        }
         let mut results = Vec::with_capacity(total);
         info!("Document query at {}:{}", line!(), file!());
         for (score, doc_address) in response.top_docs {
@@ -276,25 +283,7 @@ impl FieldReaderService {
             }
         }
 
-        let facets = response.facets;
-        let facets_count = response.facets_count;
-        let do_count = |facets_count: &FacetCounts| -> Vec<FacetResult> {
-            facets_count
-                .top_k("/t", 50)
-                .into_iter()
-                .map(|(facet, count)| FacetResult {
-                    tag: facet.to_string(),
-                    total: count as i32,
-                })
-                .collect()
-        };
-        let facets = facets
-            .into_iter()
-            .map(|facet| (&facets_count, facet))
-            .map(|(facets_count, facet)| (do_count(facets_count), facet))
-            .filter(|(r, _)| !r.is_empty())
-            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-            .collect();
+        let facets = self.create_facets(response.facets, response.facets_count);
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
@@ -303,6 +292,8 @@ impl FieldReaderService {
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
+            next_page,
+            bm25: false,
         }
     }
 
@@ -312,10 +303,17 @@ impl FieldReaderService {
         searcher: &Searcher,
     ) -> DocumentSearchResponse {
         info!("Document query at {}:{}", line!(), file!());
-        let total = response.top_docs.len();
+        let mut total = response.top_docs.len();
+        let next_page: bool;
+        if total > response.results_per_page as usize {
+            next_page = true;
+            total = response.results_per_page as usize;
+        } else {
+            next_page = false;
+        }
         let mut results = Vec::with_capacity(total);
         info!("Document query at {}:{}", line!(), file!());
-        for (score, doc_address) in response.top_docs {
+        for (score, doc_address) in response.top_docs.into_iter().take(total) {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     info!("Document query at {}:{}", line!(), file!());
@@ -346,30 +344,7 @@ impl FieldReaderService {
             }
         }
 
-        let mut facets = HashMap::new();
-        info!("Document query at {}:{}", line!(), file!());
-
-        for facet in response.facets {
-            info!("Document query at {}:{}", line!(), file!());
-            let count: Vec<_> = response
-                .facets_count
-                .top_k("/t", 50)
-                .iter()
-                .map(|(facet, count)| FacetResult {
-                    tag: facet.to_string(),
-                    total: *count as i32,
-                })
-                .collect();
-
-            facets.insert(
-                facet,
-                FacetResults {
-                    facetresults: count,
-                },
-            );
-            info!("Document query at {}:{}", line!(), file!());
-        }
-
+        let facets = self.create_facets(response.facets, response.facets_count);
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
@@ -378,7 +353,34 @@ impl FieldReaderService {
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
+            next_page,
+            bm25: true,
         }
+    }
+
+    fn facet_count(&self, facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
+        facets_count
+            .top_k(facet, 50)
+            .into_iter()
+            .map(|(facet, count)| FacetResult {
+                tag: facet.to_string(),
+                total: count as i32,
+            })
+            .collect()
+    }
+
+    fn create_facets(
+        &self,
+        facets: Vec<String>,
+        facets_count: FacetCounts,
+    ) -> HashMap<String, FacetResults> {
+        facets
+            .into_iter()
+            .map(|facet| (&facets_count, facet))
+            .map(|(facets_count, facet)| (self.facet_count(&facet, facets_count), facet))
+            .filter(|(r, _)| !r.is_empty())
+            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+            .collect()
     }
 
     fn adapt_text(parser: &QueryParser, text: &str) -> String {
@@ -411,13 +413,22 @@ impl FieldReaderService {
         } else {
             Box::new(AllQuery) as Box<dyn Query>
         };
+
+        // Offset to search from
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
+        let extra_result = results + 1;
         let order_field = self.get_order_field(&request.order);
         let facets = request
             .faceted
             .as_ref()
-            .map(|v| v.tags.clone())
+            .map(|v| {
+                v.tags
+                    .iter()
+                    .filter(|s| FieldReaderService::is_valid_facet(*s))
+                    .cloned()
+                    .collect()
+            })
             .unwrap_or_default();
         let mut facet_collector = FacetCollector::for_field(self.schema.facets);
         for facet in &facets {
@@ -428,23 +439,28 @@ impl FieldReaderService {
         }
         let searcher = self.reader.searcher();
         match order_field {
-            _ if !multic_flag => self.convert_bm25_order(
-                SearchResponse {
-                    facets,
-                    query: &text,
-                    top_docs: vec![],
-                    facets_count: searcher.search(&query, &facet_collector).unwrap(),
-                    order_by: request.order.clone(),
-                    page_number: request.page_number,
-                    results_per_page: results as i32,
-                },
-                &searcher,
-            ),
+            _ if !multic_flag => {
+                // Just a facet search
+                let facets_count = searcher.search(&query, &facet_collector).unwrap();
+                self.convert_bm25_order(
+                    SearchResponse {
+                        facets,
+                        query: &text,
+                        top_docs: vec![],
+                        facets_count,
+                        order_by: request.order.clone(),
+                        page_number: request.page_number,
+                        results_per_page: results as i32,
+                    },
+                    &searcher,
+                )
+            }
             Some(order_field) => {
                 let mut multicollector = MultiCollector::new();
                 let facet_handler = multicollector.add_collector(facet_collector);
-                let topdocs = TopDocs::with_limit(results).and_offset(offset);
-                let topdocs_collector = topdocs.order_by_u64_field(order_field);
+                let topdocs_collector = TopDocs::with_limit(extra_result)
+                    .and_offset(offset)
+                    .order_by_u64_field(order_field);
                 let topdocs_handler = multicollector.add_collector(topdocs_collector);
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
@@ -465,8 +481,8 @@ impl FieldReaderService {
             None => {
                 let mut multicollector = MultiCollector::new();
                 let facet_handler = multicollector.add_collector(facet_collector);
-                let topdocs = TopDocs::with_limit(results).and_offset(offset);
-                let topdocs_handler = multicollector.add_collector(topdocs);
+                let topdocs_collector = TopDocs::with_limit(extra_result).and_offset(offset);
+                let topdocs_handler = multicollector.add_collector(topdocs_collector);
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
@@ -502,6 +518,11 @@ impl FieldReaderService {
                     .to_string()
             })
             .collect()
+    }
+    fn is_valid_facet(maybe_facet: &str) -> bool {
+        Facet::from_text(maybe_facet)
+            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
+            .is_ok()
     }
 }
 
@@ -595,7 +616,7 @@ mod tests {
         };
 
         let faceted = Faceted {
-            tags: vec!["".to_string(), "/l".to_string(), "/t".to_string()],
+            tags: vec!["/".to_string(), "/l".to_string(), "/t".to_string()],
         };
 
         let now = SystemTime::now()

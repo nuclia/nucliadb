@@ -123,13 +123,18 @@ pub struct DocumentSearchResponse {
     /// The text that lead to this results
     #[prost(string, tag="6")]
     pub query: ::prost::alloc::string::String,
+    /// Is there a next page
+    #[prost(bool, tag="7")]
+    pub next_page: bool,
+    #[prost(bool, tag="8")]
+    pub bm25: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphResult {
     #[prost(string, tag="1")]
     pub uuid: ::prost::alloc::string::String,
-    #[prost(float, tag="2")]
-    pub score: f32,
+    #[prost(uint64, tag="2")]
+    pub score: u64,
     #[prost(string, tag="3")]
     pub field: ::prost::alloc::string::String,
     #[prost(uint64, tag="4")]
@@ -142,6 +147,8 @@ pub struct ParagraphResult {
     pub split: ::prost::alloc::string::String,
     #[prost(uint64, tag="8")]
     pub index: u64,
+    #[prost(float, tag="9")]
+    pub score_bm25: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
@@ -162,6 +169,11 @@ pub struct ParagraphSearchResponse {
     /// The text that lead to this results
     #[prost(string, tag="6")]
     pub query: ::prost::alloc::string::String,
+    /// Is there a next page
+    #[prost(bool, tag="7")]
+    pub next_page: bool,
+    #[prost(bool, tag="8")]
+    pub bm25: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSearchRequest {
@@ -174,6 +186,12 @@ pub struct VectorSearchRequest {
     /// tags to filter
     #[prost(string, repeated, tag="3")]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// What page is the answer.
+    #[prost(int32, tag="4")]
+    pub page_number: i32,
+    /// How many results are in this page.
+    #[prost(int32, tag="5")]
+    pub result_per_page: i32,
     #[prost(bool, tag="13")]
     pub reload: bool,
 }
@@ -194,6 +212,12 @@ pub struct VectorSearchResponse {
     /// List of docs closer to the asked one.
     #[prost(message, repeated, tag="1")]
     pub documents: ::prost::alloc::vec::Vec<DocumentScored>,
+    /// What page is the answer.
+    #[prost(int32, tag="4")]
+    pub page_number: i32,
+    /// How many results are in this page.
+    #[prost(int32, tag="5")]
+    pub result_per_page: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchRequest {
@@ -291,7 +315,7 @@ pub mod node_reader_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -304,7 +328,6 @@ pub mod node_reader_client {
         ) -> NodeReaderClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
-            T::ResponseBody: Default,
             T: tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
                 Response = http::Response<
@@ -355,9 +378,9 @@ pub mod node_reader_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        > {
+                tonic::Response<super::super::noderesources::ShardList>,
+                tonic::Status,
+            > {
             self.inner
                 .ready()
                 .await
@@ -561,9 +584,9 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        >;
+                tonic::Response<super::super::noderesources::ShardList>,
+                tonic::Status,
+            >;
         async fn document_search(
             &self,
             request: tonic::Request<super::DocumentSearchRequest>,
