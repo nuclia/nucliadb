@@ -17,16 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Dict, List, Optional, Union
+import asyncio
+from asyncio import Event
+from functools import partial
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import nats
 from nats.aio.client import Client
+from nats.aio.msg import Msg
+from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
+
+
+class WaitFor:
+    uuid: str
+    seq: Optional[int] = None
+
+    def __init__(self, uuid: str, seq: Optional[int] = None):
+        self.uuid = uuid
+        self.seq = seq
 
 
 class LocalTransactionUtility:
@@ -59,11 +73,13 @@ class TransactionUtility:
         nats_target: str,
         nats_creds: Optional[str] = None,
         nats_index_target: Optional[str] = None,
+        nats_notify_subject: Optional[str] = None,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
         self.nats_target = nats_target
         self.nats_index_target = nats_index_target
+        self.nats_notify_subject = nats_notify_subject
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -77,6 +93,31 @@ class TransactionUtility:
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
+
+    async def wait_for_commited(
+        self, kbid: str, waiting_for: WaitFor
+    ) -> Tuple[Optional[Subscription], Optional[Event]]:
+        if self.nats_notify_subject is None:
+            logger.warn("Not waiting because there is not subject to wait")
+            return None, None
+
+        if self.nc is None:
+            logger.warn("No Nats configured")
+            return None, None
+
+        async def received(waiting_for: WaitFor, event: Event, msg: Msg):
+            pb = Notification()
+            pb.ParseFromString(msg.data)
+            if pb.uuid == waiting_for.uuid:
+                if waiting_for.seq is None or pb.seqid == waiting_for.seq:
+                    event.set()
+
+        waiting_event = Event()
+        partial_received = partial(received, waiting_for, waiting_event)
+        sid = await self.nc.subscribe(
+            self.nats_notify_subject.format(kbid=kbid), cb=partial_received
+        )
+        return sid, waiting_event
 
     async def initialize(self, service_name: Optional[str] = None):
 
@@ -96,6 +137,7 @@ class TransactionUtility:
 
         jetstream = self.nc.jetstream()
         tracer_provider = get_telemetry(service_name)
+
         if tracer_provider is not None and jetstream is not None:
             logger.info("Configuring transaction queue with telemetry")
             self.js = JetStreamContextTelemetry(
@@ -110,13 +152,32 @@ class TransactionUtility:
             await self.nc.close()
             self.nc = None
 
-    async def commit(self, writer: BrokerMessage, partition: int) -> int:
+    async def commit(
+        self, writer: BrokerMessage, partition: int, wait: bool = False
+    ) -> int:
         if self.js is None:
             raise AttributeError()
+
+        waiting_event: Optional[Event] = None
+        sid: Optional[Subscription] = None
+
+        waiting_for = WaitFor(uuid=writer.uuid)
+        if wait:
+            sid, waiting_event = await self.wait_for_commited(writer.kbid, waiting_for)
 
         res = await self.js.publish(
             self.nats_target.format(partition=partition), writer.SerializeToString()
         )
+
+        waiting_for.seq = res.seq
+
+        if wait and waiting_event is not None and sid is not None:
+            try:
+                await asyncio.wait_for(waiting_event.wait(), timeout=120.0)
+            except asyncio.TimeoutError:
+                logger.warn("Took too much to commit")
+            await sid.unsubscribe()
+
         logger.info(
             f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"
         )

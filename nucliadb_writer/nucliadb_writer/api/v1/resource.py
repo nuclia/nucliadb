@@ -66,8 +66,10 @@ from nucliadb_writer.utilities import get_processing
 
 if TYPE_CHECKING:
     SKIP_STORE_DEFAULT = False
+    SYNC_CALL = False
 else:
     SKIP_STORE_DEFAULT = Header(False)
+    SYNC_CALL = Header(False)
 
 
 @api.post(
@@ -84,6 +86,7 @@ async def create_resource(
     item: CreateResourcePayload,
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction()
     processing = get_processing()
@@ -136,7 +139,7 @@ async def create_resource(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    await transaction.commit(writer, partition)
+    await transaction.commit(writer, partition, x_synchronous)
 
     return ResourceCreated(seqid=seqid, uuid=uuid)
 

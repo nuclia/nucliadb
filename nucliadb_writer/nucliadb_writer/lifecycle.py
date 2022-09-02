@@ -72,6 +72,7 @@ async def initialize():
             nats_creds=transaction_settings.transaction_jetstream_auth,
             nats_servers=transaction_settings.transaction_jetstream_servers,
             nats_target=transaction_settings.transaction_jetstream_target,
+            nats_notify_subject=transaction_settings.transaction_notification,
         )
         await transaction_utility.initialize(SERVICE_NAME)
     set_utility(Utility.TRANSACTION, transaction_utility)
