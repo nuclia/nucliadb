@@ -26,6 +26,7 @@ use tantivy::schema::Value;
 use tantivy::DocAddress;
 use tracing::*;
 
+use crate::fuzzy_query::TermCollector;
 use crate::reader::ParagraphReaderService;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
@@ -56,6 +57,7 @@ pub struct SearchBm25Response<'a> {
     pub top_docs: Vec<(f32, DocAddress)>,
     pub page_number: i32,
     pub results_per_page: i32,
+    pub termc: TermCollector,
 }
 
 pub struct SearchIntResponse<'a> {
@@ -66,6 +68,7 @@ pub struct SearchIntResponse<'a> {
     pub top_docs: Vec<(u64, DocAddress)>,
     pub page_number: i32,
     pub results_per_page: i32,
+    pub termc: TermCollector,
 }
 
 pub struct SearchFacetsResponse<'a> {
@@ -109,6 +112,8 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
+                    let terms = response.termc.get_terms(doc_address.doc_id);
+                    println!("{terms:?}");
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
@@ -202,6 +207,8 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
+                    let terms = response.termc.get_terms(doc_address.doc_id);
+                    println!("{terms:?}");
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
