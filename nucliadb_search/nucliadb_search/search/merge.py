@@ -206,11 +206,11 @@ async def merge_vectors_results(
     raw_vectors_list.sort(key=lambda x: x.score)
 
     skip = page * count
-    end = skip + count
+    end_element = skip + count
     length = len(raw_vectors_list)
 
     result_sentence_list: List[Sentence] = []
-    for result in raw_vectors_list[min(skip, length) : min(end, length)]:
+    for result in raw_vectors_list[min(skip, length) : min(end_element, length)]:
 
         id_count = result.doc_id.id.count("/")
         if id_count == 4:

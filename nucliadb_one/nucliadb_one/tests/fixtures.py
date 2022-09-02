@@ -20,7 +20,6 @@
 import asyncio
 import uuid
 from enum import Enum
-from os.path import dirname
 from typing import List
 
 import aioredis
