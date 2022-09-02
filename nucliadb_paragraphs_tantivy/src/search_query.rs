@@ -23,26 +23,37 @@ use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;
 
+use crate::fuzzy_query::{FuzzyTermQuery, TermCollector};
 use crate::schema::ParagraphSchema;
 
 type QueryP = (Occur, Box<dyn Query>);
-type NewFuzz = fn(Term, u8, bool) -> FuzzyTermQuery;
+type NewFuzz = fn(Term, u8, bool, TermCollector) -> FuzzyTermQuery;
 
-fn term_query_to_fuzzy(query: Box<dyn Query>, distance: u8, with: NewFuzz) -> Box<dyn Query> {
+fn term_query_to_fuzzy(
+    query: Box<dyn Query>,
+    distance: u8,
+    termc: TermCollector,
+    with: NewFuzz,
+) -> Box<dyn Query> {
     let term_query: &TermQuery = query.downcast_ref().unwrap();
     let term = term_query.term().clone();
-    Box::new(with(term, distance, true))
+    Box::new(with(term, distance, true, termc))
 }
 
-fn queryp_map(queries: Vec<QueryP>, distance: u8, as_prefix: usize) -> Vec<QueryP> {
+fn queryp_map(
+    queries: Vec<QueryP>,
+    distance: u8,
+    as_prefix: usize,
+    termc: TermCollector,
+) -> Vec<QueryP> {
     queries
         .into_iter()
         .enumerate()
         .map(|(id, (_, query))| {
             let query = if query.is::<TermQuery>() && id == as_prefix {
-                term_query_to_fuzzy(query, distance, FuzzyTermQuery::new_prefix)
+                term_query_to_fuzzy(query, distance, termc.clone(), FuzzyTermQuery::new_prefix)
             } else if query.is::<TermQuery>() {
-                term_query_to_fuzzy(query, distance, FuzzyTermQuery::new)
+                term_query_to_fuzzy(query, distance, termc.clone(), FuzzyTermQuery::new)
             } else {
                 query
             };
@@ -71,7 +82,7 @@ fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usi
         })
 }
 
-fn flat_and_adapt(query: Box<dyn Query>, distance: u8) -> Vec<QueryP> {
+fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: TermCollector) -> Vec<QueryP> {
     let (queries, as_prefix) = if query.is::<BooleanQuery>() {
         let query: Box<BooleanQuery> = query.downcast().unwrap();
         let (as_prefix, queries) = flat_bool_query(*query, (usize::MAX, vec![]));
@@ -85,15 +96,20 @@ fn flat_and_adapt(query: Box<dyn Query>, distance: u8) -> Vec<QueryP> {
         let as_prefix = 1;
         (queries, as_prefix)
     };
-    queryp_map(queries, distance, as_prefix)
+    queryp_map(queries, distance, as_prefix, termc)
 }
 
-fn parse_query(parser: &QueryParser, text: &str, distance: u8) -> Vec<QueryP> {
+fn parse_query(
+    parser: &QueryParser,
+    text: &str,
+    distance: u8,
+    termc: TermCollector,
+) -> Vec<QueryP> {
     if text.is_empty() {
         vec![(Occur::Should, Box::new(AllQuery) as Box<dyn Query>)]
     } else {
         let query = parser.parse_query(text).unwrap();
-        flat_and_adapt(query, distance)
+        flat_and_adapt(query, distance, termc)
     }
 }
 
@@ -103,7 +119,7 @@ pub fn create_query(
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
-) -> Vec<QueryP> {
+) -> (TermCollector, Vec<QueryP>) {
     let (quotes, reg) =
         text.split(' ')
             .into_iter()
@@ -116,7 +132,8 @@ pub fn create_query(
                 }
                 (quotes, reg)
             });
-    let mut queries = parse_query(parser, &reg, distance);
+    let termc = TermCollector::new();
+    let mut queries = parse_query(parser, &reg, distance, termc.clone());
 
     for quote in quotes {
         let query = parser.parse_query(quote).unwrap();
@@ -149,7 +166,7 @@ pub fn create_query(
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
-    queries
+    (termc, queries)
 }
 
 #[cfg(test)]
@@ -175,7 +192,7 @@ mod tests {
         let boolean0: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries0));
         let boolean1: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries1));
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
-        let adapted = flat_and_adapt(Box::new(nested), 2);
+        let adapted = flat_and_adapt(Box::new(nested), 2, TermCollector::new());
         assert_eq!(adapted.len(), 24);
         assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must));
         assert!(adapted

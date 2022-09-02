@@ -89,16 +89,21 @@ impl ReaderChild for ParagraphReaderService {
             .unwrap_or_default();
 
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (top_docs, facets_count) = {
-            let queries = create_query(&parser, &text, request, &self.schema, 1);
+        let (termc, top_docs, facets_count) = {
+            let (termc, queries) = create_query(&parser, &text, request, &self.schema, 1);
             let dist_1 = self.do_search(queries, results, offset, &facets, multi_flag);
             if multi_flag && dist_1.0.is_empty() {
-                let queries = create_query(&parser, &text, request, &self.schema, 2);
-                self.do_search(queries, results, offset, &facets, multi_flag)
+                let (termc, queries) = create_query(&parser, &text, request, &self.schema, 2);
+                let dist_2 = self.do_search(queries, results, offset, &facets, multi_flag);
+                (termc, dist_2.0, dist_2.1)
             } else {
-                dist_1
+                (termc, dist_1.0, dist_1.1)
             }
         };
+        for (_, doc) in &top_docs {
+            let terms = termc.get_terms(doc.doc_id);
+            println!("{terms:?}")
+        }
         Ok(ParagraphSearchResponse::from(SearchResponse {
             facets_count,
             facets,
