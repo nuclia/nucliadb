@@ -155,9 +155,7 @@ class RedisTransaction(Transaction):
         _count = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
 
         async with self.redis.client() as conn:
-            async for key in conn.scan_iter(
-                match=match.encode() + b"*", count=_count
-            ):
+            async for key in conn.scan_iter(match=match.encode() + b"*", count=_count):
                 str_key = key.decode()
                 if str_key in self.deleted_keys:
                     continue
@@ -204,7 +202,5 @@ class RedisDriver(Driver):
         if self.redis is None:
             raise AttributeError()
         async with self.redis.client() as conn:
-            async for key in conn.scan_iter(
-                match=match.encode() + b"*", count=count
-            ):
+            async for key in conn.scan_iter(match=match.encode() + b"*", count=count):
                 yield key.decode()
