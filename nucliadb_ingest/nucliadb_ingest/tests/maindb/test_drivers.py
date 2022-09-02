@@ -97,7 +97,7 @@ async def driver_basic(driver):
     await txn.set("/internal/kbs", b"I am the father")
     await txn.commit(resource=False)
 
-    # It works both without trailing slash ...
+    # It works without trailing slash ...
     txn = await driver.begin()
     current_internal_kbs_keys = set()
     async for key in txn.keys("/internal/kbs"):
