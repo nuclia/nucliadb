@@ -59,7 +59,12 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
-from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility, get_utility
+from nucliadb_utils.utilities import (
+    Utility,
+    clear_global_cache,
+    get_utility,
+    set_utility,
+)
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -298,6 +303,7 @@ async def cache(redis):
     await che.finalize()
     await pubsub.finalize()
     set_utility(Utility.PUBSUB, None)
+
 
 @pytest.fixture(scope="function")
 async def chitchat():
