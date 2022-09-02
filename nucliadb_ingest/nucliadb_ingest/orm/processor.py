@@ -589,7 +589,7 @@ class Processor:
             raise e
 
         if not failed:
-            storage = await get_storage()
+            storage = await get_storage(service_name=SERVICE_NAME)
             cache = await get_cache()
             kb = KnowledgeBox(txn, storage, cache, uuid)
             await kb.set_widgets(DEFAULT_WIDGET)

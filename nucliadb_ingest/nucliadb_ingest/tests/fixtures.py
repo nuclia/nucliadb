@@ -59,7 +59,7 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
-from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility
+from nucliadb_utils.utilities import Utility, clear_global_cache, set_utility, get_utility
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -285,17 +285,19 @@ async def txn(redis_driver):
 @pytest.fixture(scope="function")
 async def cache(redis):
 
-    url = f"redis://{redis[0]}:{redis[1]}"
-    pubsub = RedisPubsub(url)
-    set_utility(Utility.PUBSUB, pubsub)
-    await pubsub.initialize()
+    pubsub = get_utility(Utility.PUBSUB)
+    if pubsub is None:
+        url = f"redis://{redis[0]}:{redis[1]}"
+        pubsub = RedisPubsub(url)
+        await pubsub.initialize()
+        set_utility(Utility.PUBSUB, pubsub)
+
     che = Cache(pubsub)
     await che.initialize()
     yield che
     await che.finalize()
     await pubsub.finalize()
     set_utility(Utility.PUBSUB, None)
-
 
 @pytest.fixture(scope="function")
 async def chitchat():
