@@ -176,6 +176,8 @@ pub struct ParagraphSearchResponse {
     pub next_page: bool,
     #[prost(bool, tag="8")]
     pub bm25: bool,
+    #[prost(string, repeated, tag="9")]
+    pub ematches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSearchRequest {

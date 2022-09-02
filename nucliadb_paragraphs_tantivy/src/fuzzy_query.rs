@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io;
 use std::ops::Range;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use levenshtein_automata::{Distance, LevenshteinAutomatonBuilder, DFA};
 use once_cell::sync::Lazy;
@@ -13,34 +13,11 @@ use tantivy::{DocId, DocSet, Score, Searcher, SegmentReader, TantivyError};
 use tantivy_common::BitSet;
 use tantivy_fst::Automaton;
 
-#[derive(Debug, Clone)]
-pub struct TermCollector {
-    terms: Arc<RwLock<HashMap<DocId, HashSet<String>>>>,
-}
-impl Default for TermCollector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl TermCollector {
-    pub fn new() -> TermCollector {
-        TermCollector {
-            terms: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-    pub fn log(&self, doc: DocId, term: String) {
-        let mut writer = self.terms.write().unwrap();
-        writer.entry(doc).or_insert_with(HashSet::new).insert(term);
-    }
-    pub fn get_terms(&self, doc: DocId) -> HashSet<String> {
-        let mut writer = self.terms.write().unwrap();
-        std::mem::take(writer.entry(doc).or_insert_with(HashSet::new))
-    }
-}
+use crate::search_query::SharedTermC;
 
 /// A weight struct for Fuzzy Term and Regex Queries
 pub struct AutomatonWeight<A> {
-    terms: TermCollector,
+    terms: SharedTermC,
     field: Field,
     automaton: Arc<A>,
 }
@@ -54,7 +31,7 @@ where
     pub fn new<IntoArcA: Into<Arc<A>>>(
         field: Field,
         automaton: IntoArcA,
-        terms: TermCollector,
+        terms: SharedTermC,
     ) -> AutomatonWeight<A> {
         AutomatonWeight {
             field,
@@ -83,9 +60,10 @@ where
         let mut doc_bitset = BitSet::with_max_value(max_doc);
         let inverted_index = reader.inverted_index(self.field)?;
         let term_dict = inverted_index.terms();
+        let mut termc = self.terms.get_termc();
         let mut term_stream = self.automaton_stream(term_dict)?;
         while term_stream.advance() {
-            let term_key = String::from_utf8(term_stream.key().to_vec()).unwrap();
+            let term_key = term_stream.term_ord();
             let term_info = term_stream.value();
             let mut block_segment_postings = inverted_index
                 .read_block_postings_from_terminfo(term_info, IndexRecordOption::Basic)?;
@@ -95,12 +73,13 @@ where
                     break;
                 }
                 for &doc in docs {
-                    self.terms.log(doc, term_key.clone());
+                    termc.log_fterm(doc, (inverted_index.clone(), term_key));
                     doc_bitset.insert(doc);
                 }
                 block_segment_postings.advance();
             }
         }
+        self.terms.set_termc(termc);
         let doc_bitset = BitSetDocSet::from(doc_bitset);
         let const_scorer = ConstScorer::new(doc_bitset, boost);
         Ok(Box::new(const_scorer))
@@ -159,9 +138,9 @@ static LEV_BUILDER: Lazy<HashMap<(u8, bool), LevenshteinAutomatonBuilder>> = Laz
     lev_builder_cache
 });
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FuzzyTermQuery {
-    termc: TermCollector,
+    termc: SharedTermC,
     /// What term are we searching
     term: Term,
     /// How many changes are we going to allow
@@ -172,13 +151,18 @@ pub struct FuzzyTermQuery {
     prefix: bool,
 }
 
+impl std::fmt::Debug for FuzzyTermQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Fuzzy")
+    }
+}
 impl FuzzyTermQuery {
     /// Creates a new Fuzzy Query
     pub fn new(
         term: Term,
         distance: u8,
         transposition_cost_one: bool,
-        termc: TermCollector,
+        termc: SharedTermC,
     ) -> FuzzyTermQuery {
         FuzzyTermQuery {
             term,
@@ -194,7 +178,7 @@ impl FuzzyTermQuery {
         term: Term,
         distance: u8,
         transposition_cost_one: bool,
-        termc: TermCollector,
+        termc: SharedTermC,
     ) -> FuzzyTermQuery {
         FuzzyTermQuery {
             term,

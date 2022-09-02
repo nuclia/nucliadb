@@ -17,22 +17,75 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
+
 use nucliadb_protos::ParagraphSearchRequest;
 use nucliadb_service_interface::prelude::*;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
-use tantivy::Term;
+use tantivy::{DocId, InvertedIndexReader, Term};
 
-use crate::fuzzy_query::{FuzzyTermQuery, TermCollector};
+use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
 
 type QueryP = (Occur, Box<dyn Query>);
-type NewFuzz = fn(Term, u8, bool, TermCollector) -> FuzzyTermQuery;
+type NewFuzz = fn(Term, u8, bool, SharedTermC) -> FuzzyTermQuery;
+
+#[derive(Clone)]
+pub struct TermCollector {
+    pub eterms: HashSet<String>,
+    pub fterms: HashMap<DocId, Vec<(Arc<InvertedIndexReader>, u64)>>,
+}
+impl Default for TermCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl TermCollector {
+    pub fn new() -> TermCollector {
+        TermCollector {
+            fterms: HashMap::new(),
+            eterms: HashSet::new(),
+        }
+    }
+    pub fn log_eterm(&mut self, term: String) {
+        self.eterms.insert(term);
+    }
+    pub fn log_fterm(&mut self, doc: DocId, data: (Arc<InvertedIndexReader>, u64)) {
+        self.fterms.entry(doc).or_insert_with(Vec::new).push(data);
+    }
+    pub fn get_fterms(&self, doc: DocId) -> Vec<String> {
+        let mut terms = Vec::new();
+        for (index, term) in self.fterms[&doc].iter().cloned() {
+            let term_dict = index.terms();
+            let mut term_s = vec![];
+            if term_dict.ord_to_term(term, &mut term_s).unwrap() {
+                terms.push(String::from_utf8(term_s).unwrap());
+            }
+        }
+        terms
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct SharedTermC(Arc<Mutex<TermCollector>>);
+impl SharedTermC {
+    pub fn new() -> SharedTermC {
+        SharedTermC::default()
+    }
+    pub fn get_termc(&self) -> TermCollector {
+        std::mem::take(&mut self.0.lock().unwrap())
+    }
+    pub fn set_termc(&self, termc: TermCollector) {
+        *self.0.lock().unwrap() = termc;
+    }
+}
 
 fn term_query_to_fuzzy(
     query: Box<dyn Query>,
     distance: u8,
-    termc: TermCollector,
+    termc: SharedTermC,
     with: NewFuzz,
 ) -> Box<dyn Query> {
     let term_query: &TermQuery = query.downcast_ref().unwrap();
@@ -44,7 +97,7 @@ fn queryp_map(
     queries: Vec<QueryP>,
     distance: u8,
     as_prefix: usize,
-    termc: TermCollector,
+    termc: SharedTermC,
 ) -> Vec<QueryP> {
     queries
         .into_iter()
@@ -54,6 +107,20 @@ fn queryp_map(
                 term_query_to_fuzzy(query, distance, termc.clone(), FuzzyTermQuery::new_prefix)
             } else if query.is::<TermQuery>() {
                 term_query_to_fuzzy(query, distance, termc.clone(), FuzzyTermQuery::new)
+            } else if query.is::<PhraseQuery>() {
+                let phrase: &PhraseQuery = query.downcast_ref().unwrap();
+                let mut total = vec![];
+                for term in phrase.phrase_terms() {
+                    total.append(&mut term.value_bytes().to_vec());
+                    total.append(&mut b" ".to_vec());
+                }
+                if let Ok(mut eterm) = String::from_utf8(total) {
+                    eterm.pop();
+                    let mut terms = termc.get_termc();
+                    terms.log_eterm(eterm);
+                    termc.set_termc(terms);
+                }
+                query
             } else {
                 query
             };
@@ -82,7 +149,7 @@ fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usi
         })
 }
 
-fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: TermCollector) -> Vec<QueryP> {
+fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
     let (queries, as_prefix) = if query.is::<BooleanQuery>() {
         let query: Box<BooleanQuery> = query.downcast().unwrap();
         let (as_prefix, queries) = flat_bool_query(*query, (usize::MAX, vec![]));
@@ -99,12 +166,7 @@ fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: TermCollector) -> 
     queryp_map(queries, distance, as_prefix, termc)
 }
 
-fn parse_query(
-    parser: &QueryParser,
-    text: &str,
-    distance: u8,
-    termc: TermCollector,
-) -> Vec<QueryP> {
+fn parse_query(parser: &QueryParser, text: &str, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
     if text.is_empty() {
         vec![(Occur::Should, Box::new(AllQuery) as Box<dyn Query>)]
     } else {
@@ -119,7 +181,7 @@ pub fn create_query(
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
-) -> (TermCollector, Vec<QueryP>) {
+) -> (SharedTermC, Vec<QueryP>) {
     let (quotes, reg) =
         text.split(' ')
             .into_iter()
@@ -132,7 +194,7 @@ pub fn create_query(
                 }
                 (quotes, reg)
             });
-    let termc = TermCollector::new();
+    let termc = SharedTermC::new();
     let mut queries = parse_query(parser, &reg, distance, termc.clone());
 
     for quote in quotes {
@@ -192,7 +254,7 @@ mod tests {
         let boolean0: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries0));
         let boolean1: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries1));
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
-        let adapted = flat_and_adapt(Box::new(nested), 2, TermCollector::new());
+        let adapted = flat_and_adapt(Box::new(nested), 2, SharedTermC::new());
         assert_eq!(adapted.len(), 24);
         assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must));
         assert!(adapted

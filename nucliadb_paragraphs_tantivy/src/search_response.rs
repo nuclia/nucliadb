@@ -26,8 +26,8 @@ use tantivy::schema::Value;
 use tantivy::DocAddress;
 use tracing::*;
 
-use crate::fuzzy_query::TermCollector;
 use crate::reader::ParagraphReaderService;
+use crate::search_query::TermCollector;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -106,7 +106,6 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
 
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
         let searcher = response.text_service.reader.searcher();
-
         let default_split = Value::Str("".to_string());
         for (score, doc_address) in response.top_docs.into_iter().take(total) {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
@@ -152,7 +151,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response
                         .termc
-                        .get_terms(doc_address.doc_id)
+                        .get_fterms(doc_address.doc_id)
                         .into_iter()
                         .collect();
                     terms.sort();
@@ -188,6 +187,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             query: response.query.to_string(),
             next_page,
             bm25: false,
+            ematches: response.termc.eterms.into_iter().collect(),
         }
     }
 }
@@ -251,7 +251,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response
                         .termc
-                        .get_terms(doc_address.doc_id)
+                        .get_fterms(doc_address.doc_id)
                         .into_iter()
                         .collect();
                     terms.sort();
@@ -287,6 +287,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             query: response.query.to_string(),
             next_page,
             bm25: true,
+            ematches: response.termc.eterms.into_iter().collect(),
         }
     }
 }
