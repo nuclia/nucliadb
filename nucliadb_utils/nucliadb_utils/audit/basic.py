@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_protos.audit_pb2 import AuditRequest
+from typing import List, Optional
+
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -29,7 +31,7 @@ class BasicAuditStorage(AuditStorage):
     def message_to_str(self, message: BrokerMessage) -> str:
         return f"{message.type}+{message.multiid}+{message.audit.user}+{message.kbid}+{message.uuid}+{message.audit.when.ToJsonString()}+{message.audit.origin}+{message.audit.source}"  # noqa
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
         logger.debug(f"AUDIT {audit_type} {self.message_to_str(message)}")
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
@@ -45,3 +47,6 @@ class BasicAuditStorage(AuditStorage):
         resources: int,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
+
+    async def delete_kb(self, kbid):
+        logger.debug(f"KB DELETED {kbid}")

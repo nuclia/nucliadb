@@ -18,9 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import AsyncIterator, Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional, Tuple
 
-from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -38,7 +38,7 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from sentry_sdk import capture_exception
 
 from nucliadb_ingest import SERVICE_NAME, logger
@@ -103,6 +103,140 @@ class Processor:
         if self.cache is not None:
             await self.cache.finalize()
 
+    @staticmethod
+    def iterate_auditable_fields(resource_keys, message):
+        """
+        Generator that emits the combined list of field ids from both
+        the existing resource and message that needs to be considered
+        in the audit of fields.
+        """
+        yielded = set()
+
+        # Include all fields present in the message we are processing
+        for field_id in message.files.keys():
+            key = (field_id, FieldType.FILE)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.conversations.keys():
+            key = (field_id, FieldType.CONVERSATION)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.layouts.keys():
+            key = (field_id, FieldType.LAYOUT)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.texts.keys():
+            key = (field_id, FieldType.TEXT)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.keywordsets.keys():
+            key = (field_id, FieldType.KEYWORDSET)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.datetimes.keys():
+            key = (field_id, FieldType.DATETIME)
+            yield key
+            yielded.add(key)
+
+        for field_id in message.links.keys():
+            key = (field_id, FieldType.LINK)
+            yield key
+            yielded.add(key)
+
+        # Include fields of the current resource
+        # We'll Ignore fields that are not in current message with the exception of DELETE resource
+        # message, then we want them all, because among other things we need to report all the individual
+        # sizes that disappear from storage
+
+        for field_type, field_id in resource_keys:
+            if field_type is FieldType.GENERIC:
+                continue
+
+            if not (
+                field_id in message.files
+                or message.type is BrokerMessage.MessageType.DELETE
+            ):
+                continue
+
+            # Avoid duplicates
+            if (field_type, field_id) in yielded:
+                continue
+
+            yield (field_id, field_type)
+
+    async def collect_audit_fields(self, message: BrokerMessage) -> List[AuditField]:
+        audit_storage_fields: List[AuditField] = []
+        txn = await self.driver.begin()
+
+        storage = await get_storage(service_name=SERVICE_NAME)
+        cache = await get_cache()
+        kb = KnowledgeBox(txn, storage, cache, message.kbid)
+        resource = Resource(txn, storage, kb, message.uuid)
+        field_keys = await resource.get_fields_ids()
+
+        for field_id, field_type in self.iterate_auditable_fields(field_keys, message):
+            field = await resource.get_field(field_id, field_type, load=True)
+            val = await field.get_value()
+
+            auditfield = AuditField()
+            auditfield.field_type = field_type
+            auditfield.field_id = field_id
+            if field_type is FieldType.FILE:
+                auditfield.filename = message.files[field_id].file.filename
+            if val is None:
+                # The field did not exist previously, so we are adding it now
+                auditfield.action = AuditField.FieldAction.ADDED
+                if field_type is FieldType.FILE:
+                    auditfield.size = auditfield.size_delta = message.files[
+                        field_id
+                    ].file.size
+            elif message.type is BrokerMessage.MessageType.DELETE:
+                # The file did exist, and we are deleting the field as a side effect of deleting the resource
+                auditfield.action = AuditField.FieldAction.DELETED
+                if field_type is FieldType.FILE:
+                    auditfield.size = 0
+                    auditfield.size_delta = -val.file.size
+            else:
+                # The field did exist, so we are overwriting it, with a modified file
+                # in case of a file
+                auditfield.action = AuditField.FieldAction.MODIFIED
+                if field_type is FieldType.FILE:
+                    auditfield.size = message.files[field_id].file.size
+                    auditfield.size_delta = (
+                        val.file.size - message.files[field_id].file.size
+                    )
+
+            audit_storage_fields.append(auditfield)
+
+        if (
+            message.delete_fields
+            and message.type is not BrokerMessage.MessageType.DELETE
+        ):
+            # If we are fully deleting a resource we won't iterate the delete_fields (if any)
+            # Make no sense as we already collected all resource fields as deleted
+            for fieldid in message.delete_fields:
+                field = await resource.get_field(
+                    fieldid.field, FieldType.FILE, load=True
+                )
+                audit_field = AuditField()
+                audit_field.action = AuditField.FieldAction.DELETED
+                audit_field.field_id = fieldid.field
+                audit_field.field_type = fieldid.field_type
+                if fieldid.field_type is FieldType.FILE:
+                    val = await field.get_value()
+                    audit_field.size = 0
+                    audit_field.size_delta = -val.file.size
+                    audit_field.filename = val.file.filename
+                audit_storage_fields.append(audit_field)
+
+        await txn.abort()
+        return audit_storage_fields
+
     async def process(
         self,
         message: BrokerMessage,
@@ -123,15 +257,19 @@ class Processor:
                 return False
 
         audit_type: Optional[int] = None
+        audit_fields = None
         if message.type == BrokerMessage.MessageType.DELETE:
+            audit_fields = await self.collect_audit_fields(message)
             await self.delete_resource(message, seqid, partition)
             audit_type = AuditRequest.AuditType.DELETED
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
+            audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.autocommit(message, seqid, partition)
             audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
+            audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.commit(message, seqid, partition)
             audit_type = AUDIT_TYPES.get(txn_result)
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
@@ -141,7 +279,7 @@ class Processor:
         # like rollback ol multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
-            await self.audit.report(message, audit_type)
+            await self.audit.report(message, audit_type, audit_fields=audit_fields)
         elif self.audit is None:
             logger.warning("No audit defined")
         elif audit_type is None:
@@ -206,13 +344,19 @@ class Processor:
         handled_exception = None
         origin_txn = seqid
 
-        created = resource is None
+        created = False
 
         try:
             for message in messages:
                 if resource is not None:
                     assert resource.uuid == message.uuid
-                resource = await self.apply_resource(message, kb, resource)
+                result = await self.apply_resource(message, kb, resource)
+
+                if result is None:
+                    continue
+
+                resource, _created = result
+                created = created or _created
 
             if resource:
                 await resource.compute_global_text()
@@ -314,7 +458,8 @@ class Processor:
         message: BrokerMessage,
         kb: KnowledgeBox,
         resource: Optional[Resource] = None,
-    ):
+    ) -> Optional[Tuple[Resource, bool]]:
+        created = False
         if resource is None:
             # Make sure we load the resource in case it already exusts on db
             if message.uuid is None and message.slug:
@@ -326,6 +471,7 @@ class Processor:
         if resource is None and message.source is message.MessageSource.WRITER:
             # It's a new resource
             resource = await kb.add_resource(uuid, message.slug, message.basic)
+            created = True
         elif resource is not None:
             # It's an update of an existing resource, can come either from writer or
             # from processing
@@ -345,7 +491,9 @@ class Processor:
         if resource:
             await resource.apply_fields(message)
             await resource.apply_extracted(message)
-        return resource
+            return (resource, created)
+
+        return None
 
     async def notify_commit(
         self, partition: str, seqid: int, multi: str, kbid: str, uuid: str
@@ -388,7 +536,7 @@ class Processor:
         if not (await KnowledgeBox.exist_kb(txn, uuid)):
             return None
 
-        storage = await get_storage(service_name=SERVICE_NAME)
+        storage = await get_storage()
         cache = await get_cache()
         kbobj = KnowledgeBox(txn, storage, cache, uuid)
         return kbobj
@@ -429,7 +577,6 @@ class Processor:
         config: Optional[KnowledgeBoxConfig],
         forceuuid: Optional[str] = None,
     ) -> str:
-        logger.info(f"Creating new kb: {slug} - {forceuuid}")
         txn = await self.driver.begin()
         try:
             uuid, failed = await KnowledgeBox.create(
@@ -452,7 +599,6 @@ class Processor:
             raise Exception("Failed to create KB")
         else:
             await txn.commit(resource=False)
-        logger.info(f"Done")
         return uuid
 
     async def update_kb(
@@ -474,11 +620,9 @@ class Processor:
         await txn.abort()
 
     async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
-        logger.info(f"Deleting kb: {slug} - {kbid}")
         txn = await self.driver.begin()
         uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
         await txn.commit(resource=False)
-        logger.info("Done")
         return uuid
 
     async def notify(self, channel, payload: bytes):

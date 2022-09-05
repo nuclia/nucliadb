@@ -23,7 +23,7 @@ from typing import List, Optional
 
 import mmh3  # type: ignore
 import nats
-from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -98,6 +98,7 @@ class StreamAuditStorage(AuditStorage):
             self.nc = None
 
     async def run(self):
+
         while True:
             audit = await self.queue.get()
             try:
@@ -123,7 +124,7 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
         auditrequest.kbid = message.kbid
@@ -136,6 +137,9 @@ class StreamAuditStorage(AuditStorage):
         for field in message.field_metadata:
             auditrequest.field_metadata.append(field.field)
 
+        if audit_fields:
+            auditrequest.fields_audit.extend(audit_fields)
+
         await self.send(auditrequest)
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
@@ -146,6 +150,15 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.rid = uuid
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.VISITED
+        auditrequest.time.FromDatetime(datetime.now())
+
+        await self.send(auditrequest)
+
+    async def delete_kb(self, kbid):
+        # Search is a base64 encoded search
+        auditrequest = AuditRequest()
+        auditrequest.kbid = kbid
+        auditrequest.type = AuditRequest.KB_DELETED
         auditrequest.time.FromDatetime(datetime.now())
 
         await self.send(auditrequest)

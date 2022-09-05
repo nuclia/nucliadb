@@ -58,16 +58,64 @@ async def driver_basic(driver):
     result = await txn.batch_get(
         ["/kbs/kb1/r/uuid1/text", "/internal/kbs/kb1/shards/shard1"]
     )
+    await txn.abort()
 
-    await txn.commit(resource=False)
-
+    current_internal_kbs_keys = set()
     async for key in driver.keys("/internal/kbs"):
-        assert key in ["/internal/kbs/kb1/title", "/internal/kbs/kb1/shards/shard1"]
+        current_internal_kbs_keys.add(key)
+    assert current_internal_kbs_keys == {
+        "/internal/kbs/kb1/title",
+        "/internal/kbs/kb1/shards/shard1",
+    }
 
+    # Test delete one key
     txn = await driver.begin()
     result = await txn.delete("/internal/kbs/kb1/title")
+    await txn.commit(resource=False)
+
+    current_internal_kbs_keys = set()
+    async for key in driver.keys("/internal/kbs"):
+        current_internal_kbs_keys.add(key)
+
+    assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
+
+    # Test nested keys are NOT deleted when deleting the parent one
+
+    txn = await driver.begin()
+    result = await txn.delete("/internal/kbs")
+    await txn.commit(resource=False)
+
+    current_internal_kbs_keys = set()
+    async for key in driver.keys("/internal/kbs"):
+        current_internal_kbs_keys.add(key)
+
+    assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
+
+    # Test that all nested keys where a parent path exist as a key, are all returned by scan keys
+
+    txn = await driver.begin()
+    await txn.set("/internal/kbs", b"I am the father")
+    await txn.commit(resource=False)
+
+    # It works without trailing slash ...
+    txn = await driver.begin()
+    current_internal_kbs_keys = set()
     async for key in txn.keys("/internal/kbs"):
-        assert key in ["/internal/kbs/kb1/title", "/internal/kbs/kb1/shards/shard1"]
+        current_internal_kbs_keys.add(key)
     await txn.abort()
+
+    assert current_internal_kbs_keys == {
+        "/internal/kbs/kb1/shards/shard1",
+        "/internal/kbs",
+    }
+
+    # but with it it does not return the father
+    txn = await driver.begin()
+    current_internal_kbs_keys = set()
+    async for key in txn.keys("/internal/kbs/"):
+        current_internal_kbs_keys.add(key)
+    await txn.abort()
+
+    assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
 
     await driver.finalize()

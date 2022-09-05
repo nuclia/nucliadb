@@ -130,7 +130,7 @@ class GCSStorageField(StorageField):
                 )
             else:
                 data = await resp.json()
-                assert data["name"] == destination_uri
+                assert data["resource"]["name"] == destination_uri
 
     async def iter_data(self, headers=None):
 
@@ -318,7 +318,9 @@ class GCSStorageField(StorageField):
         if self.field.old_uri not in ("", None):
             # Already has a file
             try:
-                await self.storage.delete_upload(self.field.uri, self.field.bucket_name)
+                await self.storage.delete_upload(
+                    self.field.old_uri, self.field.bucket_name
+                )
             except GoogleCloudException as e:
                 logger.warning(
                     f"Could not delete existing google cloud file "
