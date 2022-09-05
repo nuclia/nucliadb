@@ -18,13 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb_protos.audit_pb2 import AuditRequest
+from typing import List, Optional
+
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 class AuditStorage:
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
 
         raise NotImplementedError
 
@@ -46,4 +48,7 @@ class AuditStorage:
         timeit: float,
         resources: int,
     ):
+        raise NotImplementedError
+
+    async def delete_kb(self, kbid):
         raise NotImplementedError

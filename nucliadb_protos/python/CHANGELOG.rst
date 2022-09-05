@@ -1,10 +1,16 @@
 CHANGELOG
 =========
 
-0.0.28 (unreleased)
+0.0.29 (unreleased)
 -------------------
 
 - Nothing changed yet.
+
+
+0.0.28 (2022-09-05)
+-------------------
+
+- Extend audit to provide insight of how many fields have changed and it's file fields storage movements
 
 
 0.0.27 (2022-08-03)
