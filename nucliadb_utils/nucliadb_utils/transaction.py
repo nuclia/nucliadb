@@ -44,7 +44,9 @@ class WaitFor:
 
 
 class LocalTransactionUtility:
-    async def commit(self, writer: BrokerMessage, partition: int) -> int:
+    async def commit(
+        self, writer: BrokerMessage, partition: int, wait: bool = False
+    ) -> int:
         from nucliadb_utils.utilities import get_ingest
 
         ingest = get_ingest()
