@@ -32,6 +32,7 @@ use crate::schema::ParagraphSchema;
 type QueryP = (Occur, Box<dyn Query>);
 type NewFuzz = fn(Term, u8, bool, SharedTermC) -> FuzzyTermQuery;
 
+// Used to identify the terms matched by tantivy
 #[derive(Clone)]
 pub struct TermCollector {
     pub eterms: HashSet<String>,
