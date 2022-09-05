@@ -19,6 +19,8 @@
 #
 from datetime import datetime
 from typing import Callable
+from nucliadb_protos.writer_pb2 import ResourceFieldId
+from nucliadb_utils.utilities import get_ingest
 
 import pytest
 from asynctest.mock import CoroutineMock  # type: ignore
@@ -126,6 +128,90 @@ async def test_resource_crud(writer_api, knowledgebox_writer):
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
         )
         assert resp.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_resource_crud_sync(writer_api, knowledgebox_writer):
+    knowledgebox_id = knowledgebox_writer
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        # Test create resource
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "slug": "resource1",
+                "title": "My resource",
+                "summary": "Some summary",
+                "icon": "image/png",
+                "layout": "layout",
+                "metadata": {
+                    "language": "en",
+                    "metadata": {"key1": "value1", "key2": "value2"},
+                },
+                "fieldmetadata": [
+                    {
+                        "paragraphs": [
+                            {
+                                "key": "paragraph1",
+                                "classifications": [
+                                    {"labelset": "ls1", "label": "label1"}
+                                ],
+                            }
+                        ],
+                        "token": [{"token": "token1", "klass": "klass1"}],
+                        "field": {"field": "text1", "field_type": "text"},
+                    }
+                ],
+                "usermetadata": {
+                    "classifications": [{"labelset": "ls1", "label": "label1"}],
+                    "relations": [
+                        {
+                            "relation": "CHILD",
+                            "properties": {
+                                "prop1": "value",
+                            },
+                            "resource": "resource_uuid",
+                        }
+                    ],
+                },
+                "origin": {
+                    "source_id": "source_id",
+                    "url": "http://some_source",
+                    "created": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "modified": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "metadata": {"key1": "value1", "key2": "value2"},
+                    "tags": ["tag1", "tag2"],
+                    "colaborators": ["col1", "col2"],
+                    "filename": "file.pdf",
+                    "related": ["related1"],
+                },
+                "texts": {"text1": TEST_TEXT_PAYLOAD},
+                "links": {"link1": TEST_LINK_PAYLOAD},
+                "files": {"file1": TEST_FILE_PAYLOAD},
+                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
+                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+                "keywordsets": {"keywordset1": TEST_KEYWORDSETS_PAYLOAD},
+                "datetimes": {"datetime1": TEST_DATETIMES_PAYLOAD},
+            },
+        )
+
+        import pdb
+
+        pdb.set_trace()
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "uuid" in data
+        assert "seqid" in data
+        assert "took" in data
+        rid = data["uuid"]
+
+        ingest = get_ingest()
+        pbrequest = ResourceFieldId()
+        pbrequest.kbid = knowledgebox_id
+        pbrequest.rid = rid
+
+        res = await ingest.ResourceFieldExists(pbrequest)
+        assert res.found
 
 
 @pytest.mark.asyncio

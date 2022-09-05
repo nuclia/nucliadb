@@ -88,6 +88,7 @@ class RedisPubsub(PubSubDriver):
         await self.pubsub.unsubscribe(key)
 
     async def subscribe(self, handler: Callable, key: str, group: str = None):
+
         if group is not None:
             raise GroupNotSupported()
         if self.driver is None or self.pubsub is None:
@@ -95,10 +96,8 @@ class RedisPubsub(PubSubDriver):
 
         subscription = {key: handler}
         await self.pubsub.subscribe(**subscription)
-
         if self.task is None:
             self.task = asyncio.create_task(self.pubsub.run())
 
     def parse(self, data: Dict[str, str]):
-        payload = orjson.loads(data["data"])
-        return payload
+        return data["data"]

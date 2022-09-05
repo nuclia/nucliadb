@@ -32,6 +32,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils import logger
+from nucliadb_utils.cache.pubsub import PubSubDriver
 
 
 class WaitFor:
@@ -75,13 +76,18 @@ class TransactionUtility:
         nats_target: str,
         nats_creds: Optional[str] = None,
         nats_index_target: Optional[str] = None,
-        nats_notify_subject: Optional[str] = None,
+        notify_subject: Optional[str] = None,
     ):
         self.nats_creds = nats_creds
         self.nats_servers = nats_servers
         self.nats_target = nats_target
         self.nats_index_target = nats_index_target
-        self.nats_notify_subject = nats_notify_subject
+        self.notify_subject = notify_subject
+        self.pubsub: Optional[PubSubDriver] = None
+        if self.notify_subject is not None:
+            from nucliadb_utils.utilities import Utility, get_utility
+
+            self.pubsub = get_utility(Utility.PUBSUB)
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -96,30 +102,37 @@ class TransactionUtility:
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
 
+    async def stop_waiting(self, kbid: str):
+        if self.pubsub is None:
+            logger.warn("No PubSub configured")
+            return None, None
+        await self.pubsub.unsubscribe(key=self.notify_subject.format(kbid=kbid))
+
     async def wait_for_commited(
         self, kbid: str, waiting_for: WaitFor
     ) -> Tuple[Optional[Subscription], Optional[Event]]:
-        if self.nats_notify_subject is None:
+        if self.notify_subject is None:
             logger.warn("Not waiting because there is not subject to wait")
             return None, None
 
-        if self.nc is None:
-            logger.warn("No Nats configured")
+        if self.pubsub is None:
+            logger.warn("No PubSub configured")
             return None, None
 
-        async def received(waiting_for: WaitFor, event: Event, msg: Msg):
+        def received(waiting_for: WaitFor, event: Event, raw_data: bytes):
+            data = self.pubsub.parse(raw_data)
             pb = Notification()
-            pb.ParseFromString(msg.data)
+            pb.ParseFromString(data)
             if pb.uuid == waiting_for.uuid:
                 if waiting_for.seq is None or pb.seqid == waiting_for.seq:
                     event.set()
 
         waiting_event = Event()
         partial_received = partial(received, waiting_for, waiting_event)
-        sid = await self.nc.subscribe(
-            self.nats_notify_subject.format(kbid=kbid), cb=partial_received
+        await self.pubsub.subscribe(
+            handler=partial_received, key=self.notify_subject.format(kbid=kbid)
         )
-        return sid, waiting_event
+        return waiting_event
 
     async def initialize(self, service_name: Optional[str] = None):
 
@@ -161,11 +174,10 @@ class TransactionUtility:
             raise AttributeError()
 
         waiting_event: Optional[Event] = None
-        sid: Optional[Subscription] = None
 
         waiting_for = WaitFor(uuid=writer.uuid)
         if wait:
-            sid, waiting_event = await self.wait_for_commited(writer.kbid, waiting_for)
+            waiting_event = await self.wait_for_commited(writer.kbid, waiting_for)
 
         res = await self.js.publish(
             self.nats_target.format(partition=partition), writer.SerializeToString()
@@ -173,12 +185,12 @@ class TransactionUtility:
 
         waiting_for.seq = res.seq
 
-        if wait and waiting_event is not None and sid is not None:
+        if wait and waiting_event is not None:
             try:
-                await asyncio.wait_for(waiting_event.wait(), timeout=120.0)
+                await asyncio.wait_for(waiting_event.wait(), timeout=30.0)
             except asyncio.TimeoutError:
-                logger.warn("Took too much to commit")
-            await sid.unsubscribe()
+                logger.warning("Took too much to commit")
+            await self.stop_waiting(writer.kbid)
 
         logger.info(
             f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"
