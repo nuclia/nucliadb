@@ -21,7 +21,6 @@ import asyncio
 from typing import Callable, Dict, Optional
 
 import aioredis
-import orjson
 import prometheus_client  # type: ignore
 from aioredis.client import PubSub
 

@@ -20,12 +20,10 @@
 import asyncio
 from asyncio import Event
 from functools import partial
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 import nats
 from nats.aio.client import Client
-from nats.aio.msg import Msg
-from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
 
@@ -105,21 +103,28 @@ class TransactionUtility:
     async def stop_waiting(self, kbid: str):
         if self.pubsub is None:
             logger.warn("No PubSub configured")
-            return None, None
-        await self.pubsub.unsubscribe(key=self.notify_subject.format(kbid=kbid))
+            return
+        if self.notify_subject is None:
+            logger.warn("No subject defined")
+            return
+        await self.pubsub.unsubscribe(
+            channel_name=self.notify_subject.format(kbid=kbid)
+        )
 
     async def wait_for_commited(
         self, kbid: str, waiting_for: WaitFor
-    ) -> Tuple[Optional[Subscription], Optional[Event]]:
+    ) -> Optional[Event]:
         if self.notify_subject is None:
             logger.warn("Not waiting because there is not subject to wait")
-            return None, None
+            return None
 
         if self.pubsub is None:
             logger.warn("No PubSub configured")
-            return None, None
+            return None
 
         def received(waiting_for: WaitFor, event: Event, raw_data: bytes):
+            if self.pubsub is None:
+                return None
             data = self.pubsub.parse(raw_data)
             pb = Notification()
             pb.ParseFromString(data)

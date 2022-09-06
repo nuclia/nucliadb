@@ -250,7 +250,7 @@ class Storage:
         cf.filename = filename
         cf.content_type = content_type
         cf.size = len(payload)
-        cf.source = self.source
+        cf.source = self.source  # type: ignore
 
         if md5 is None:
             md5hash = hashlib.md5(payload).digest()

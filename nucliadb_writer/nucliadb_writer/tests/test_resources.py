@@ -19,17 +19,17 @@
 #
 from datetime import datetime
 from typing import Callable
-from nucliadb_protos.writer_pb2 import ResourceFieldId
-from nucliadb_utils.utilities import get_ingest
 
 import pytest
 from asynctest.mock import CoroutineMock  # type: ignore
 from httpx import AsyncClient
+from nucliadb_protos.writer_pb2 import ResourceFieldId
 
 import nucliadb_models
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_ingest.processing import PushPayload
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils.utilities import get_ingest
 from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb_writer.tests.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
