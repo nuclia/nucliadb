@@ -234,6 +234,7 @@ message SuggestResponse {
     repeated ParagraphResult results = 2;
     // The text that lead to this results
     string query = 3;
+    repeated string ematches = 4;
 
 }
 

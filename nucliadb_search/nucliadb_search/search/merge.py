@@ -52,7 +52,6 @@ from nucliadb_search.search.fetch import (
     get_resource_cache,
     get_seconds_paragraph,
     get_text_paragraph,
-    get_text_resource,
     get_text_sentence,
 )
 
@@ -63,9 +62,6 @@ async def merge_documents_results(
     count: int,
     page: int,
     kbid: str,
-    highlight_split: bool = False,
-    split: bool = False,
-    text_resource: bool = False,
 ) -> Resources:
 
     raw_resource_list: List[DocumentResult] = []
@@ -100,17 +96,7 @@ async def merge_documents_results(
     for result in raw_resource_list[min(skip, length) : min(end, length)]:
 
         # /f/file
-        if text_resource:
-            text, positions = await get_text_resource(
-                result,
-                kbid,
-                query,
-                highlight_split=highlight_split,
-                split=split,
-            )
-        else:
-            text = None
-            positions = {}
+
         labels = await get_labels_resource(result, kbid)
         _, field_type, field = result.field.split("/")
         if result.score == 0:
@@ -123,8 +109,6 @@ async def merge_documents_results(
                 rid=result.uuid,
                 field=field,
                 field_type=field_type,
-                text=text,
-                positions=positions,
                 labels=labels,
             )
         )
@@ -147,41 +131,44 @@ async def merge_documents_results(
 async def merge_suggest_paragraph_results(
     suggest_responses: List[SuggestResponse],
     kbid: str,
-    highlight_split: bool,
-    split: bool,
+    highlight: bool,
 ):
 
-    raw_paragraph_list: List[Paragraph] = []
+    raw_paragraph_list: List[ParagraphResult] = []
     query = None
+    ematches = None
     for suggest_response in suggest_responses:
         if query is None:
             query = suggest_response.query
+        if ematches is None:
+            ematches = suggest_response.ematches
         for result in suggest_response.results:
-            _, field_type, field = result.field.split("/")
-            text, positions = await get_text_paragraph(
-                result,
-                kbid,
-                suggest_response.query,
-                highlight_split=highlight_split,
-                split=split,
-            )
-            labels = await get_labels_paragraph(result, kbid)
-            seconds_positions = await get_seconds_paragraph(result, kbid)
-            new_paragraph = Paragraph(
-                score=result.score,
-                rid=result.uuid,
-                field_type=field_type,
-                field=field,
-                text=text,
-                positions=positions,
-                labels=labels,
-            )
-            if seconds_positions is not None:
-                new_paragraph.start_seconds = seconds_positions[0]
-                new_paragraph.end_seconds = seconds_positions[1]
-            raw_paragraph_list.append(new_paragraph)
+            raw_paragraph_list.append(result)
 
-    return Paragraphs(results=raw_paragraph_list, query=query)
+    raw_paragraph_list.sort(key=lambda x: x.score)
+
+    result_paragraph_list: List[Paragraph] = []
+    for result in raw_paragraph_list[:10]:
+        _, field_type, field = result.field.split("/")
+        text = await get_text_paragraph(
+            result, kbid, highlight=highlight, ematches=ematches
+        )
+        labels = await get_labels_paragraph(result, kbid)
+        seconds_positions = await get_seconds_paragraph(result, kbid)
+        new_paragraph = Paragraph(
+            score=result.score,
+            rid=result.uuid,
+            field_type=field_type,
+            field=field,
+            text=text,
+            labels=labels,
+        )
+        if seconds_positions is not None:
+            new_paragraph.start_seconds = seconds_positions[0]
+            new_paragraph.end_seconds = seconds_positions[1]
+        result_paragraph_list.append(new_paragraph)
+
+    return Paragraphs(results=result_paragraph_list, query=query)
 
 
 async def merge_vectors_results(
@@ -259,15 +246,17 @@ async def merge_paragraph_results(
     kbid: str,
     count: int,
     page: int,
-    highlight_split: bool,
-    split: bool,
+    highlight: bool,
 ):
 
     raw_paragraph_list: List[ParagraphResult] = []
     facets: Dict[str, Any] = {}
     query = None
     next_page = False
+    ematches: List[str] = None
     for paragraph_response in paragraphs:
+        if ematches is None:
+            ematches = paragraph_response.ematches
         if query is None:
             query = paragraph_response.query
 
@@ -293,9 +282,7 @@ async def merge_paragraph_results(
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[min(skip, length) : min(end, length)]:
         _, field_type, field = result.field.split("/")
-        text, positions = await get_text_paragraph(
-            result, kbid, paragraph_response.query, highlight_split, split
-        )
+        text = await get_text_paragraph(result, kbid, highlight, ematches)
         labels = await get_labels_paragraph(result, kbid)
         seconds_positions = await get_seconds_paragraph(result, kbid)
         if result.score == 0:
@@ -309,7 +296,6 @@ async def merge_paragraph_results(
             field_type=field_type,
             field=field,
             text=text,
-            positions=positions,
             labels=labels,
         )
         if seconds_positions is not None:
@@ -342,8 +328,6 @@ async def merge_results(
     extracted: List[ExtractedDataTypeName],
     max_score: float = 0.85,
     highlight: bool = False,
-    split: bool = False,
-    text_resource: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
@@ -360,11 +344,11 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, highlight, split, text_resource
+        documents, resources, count, page, kbid
     )
 
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight_split=highlight, split=split
+        paragraphs, resources, kbid, count, page, highlight=highlight
     )
 
     api_results.sentences = await merge_vectors_results(
@@ -406,13 +390,12 @@ async def merge_suggest_results(
     kbid: str,
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
-    highlight_split: bool = False,
-    split: bool = False,
+    highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
 
     api_results = KnowledgeboxSuggestResults()
 
     api_results.paragraphs = await merge_suggest_paragraph_results(
-        results, kbid, highlight_split=highlight_split, split=split
+        results, kbid, highlight=highlight
     )
     return api_results

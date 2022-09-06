@@ -602,19 +602,23 @@ class SuggestResponse(google.protobuf.message.Message):
     TOTAL_FIELD_NUMBER: builtins.int
     RESULTS_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
+    EMATCHES_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphResult]: ...
     query: typing.Text
     """The text that lead to this results"""
 
+    @property
+    def ematches(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     def __init__(self,
         *,
         total: builtins.int = ...,
         results: typing.Optional[typing.Iterable[global___ParagraphResult]] = ...,
         query: typing.Text = ...,
+        ematches: typing.Optional[typing.Iterable[typing.Text]] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["query",b"query","results",b"results","total",b"total"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ematches",b"ematches","query",b"query","results",b"results","total",b"total"]) -> None: ...
 global___SuggestResponse = SuggestResponse
 
 class SearchResponse(google.protobuf.message.Message):

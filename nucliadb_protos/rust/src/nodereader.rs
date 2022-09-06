@@ -281,6 +281,8 @@ pub struct SuggestResponse {
     /// The text that lead to this results
     #[prost(string, tag="3")]
     pub query: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="4")]
+    pub ematches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {
@@ -319,7 +321,7 @@ pub mod node_reader_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -332,7 +334,6 @@ pub mod node_reader_client {
         ) -> NodeReaderClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
-            T::ResponseBody: Default,
             T: tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
                 Response = http::Response<
@@ -383,9 +384,9 @@ pub mod node_reader_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        > {
+                tonic::Response<super::super::noderesources::ShardList>,
+                tonic::Status,
+            > {
             self.inner
                 .ready()
                 .await
@@ -589,9 +590,9 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        >;
+                tonic::Response<super::super::noderesources::ShardList>,
+                tonic::Status,
+            >;
         async fn document_search(
             &self,
             request: tonic::Request<super::DocumentSearchRequest>,

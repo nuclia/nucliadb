@@ -85,7 +85,6 @@ async def suggest_knowledgebox(
     x_forwarded_for: str = Header(""),
     debug: bool = Query(False),
     highlight: bool = Query(False),
-    split: bool = Query(False),
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
@@ -169,8 +168,7 @@ async def suggest_knowledgebox(
         kbid=kbid,
         show=show,
         field_type_filter=field_type_filter,
-        highlight_split=highlight,
-        split=split,
+        highlight=highlight,
     )
     await abort_transaction()
 
