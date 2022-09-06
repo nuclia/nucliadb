@@ -180,5 +180,4 @@ class NatsPubsub(PubSubDriver):
             raise ErrConnectionClosed("Could not publish")
 
     def parse(self, data: Msg):
-        payload = orjson.loads(data.data)
-        return payload
+        return data.data
