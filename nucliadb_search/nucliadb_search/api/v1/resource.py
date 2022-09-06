@@ -179,7 +179,6 @@ async def search(
         field_type_filter=field_type_filter,
         extracted=extracted,
         highlight_split=highlight,
-        split=split,
     )
     await abort_transaction()
 

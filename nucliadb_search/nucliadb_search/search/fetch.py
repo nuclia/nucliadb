@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import re
+import string
 from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
@@ -37,13 +38,14 @@ from nucliadb_models.serialize import (
     serialize,
 )
 from nucliadb_search import SERVICE_NAME, logger
-from nucliadb_search.api.models import EXTRACTED_POSITIONS, POSITIONS
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
+
+PRE_WORD = string.punctuation + " "
 
 
 def get_resource_cache(clear: bool = False) -> Dict[str, ResourceORM]:
@@ -199,56 +201,18 @@ async def get_labels_sentence(
     return labels
 
 
-async def get_text_resource(
-    result: DocumentResult,
-    kbid: str,
-    query: Optional[str] = None,
-    highlight_split: bool = False,
-    split: bool = False,
-) -> EXTRACTED_POSITIONS:
-
-    if query is None:
-        return "", {}
-
-    if split is False:
-        return "", {}
-
-    orm_resource = await get_resource_from_cache(kbid, result.uuid)
-
-    if orm_resource is None:
-        logger.error(f"{result.uuid} does not exist on DB")
-        return "", {}
-
-    _, field_type, field = result.field.split("/")
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.warn(
-            f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
-        )
-        return "", {}
-
-    splitted_text, positions = split_text(
-        extracted_text.text, query, highlight=highlight_split
-    )
-
-    return splitted_text, positions
-
-
 async def get_text_paragraph(
     result: ParagraphResult,
     kbid: str,
-    query: Optional[str] = None,
-    highlight_split: bool = False,
-    split: bool = False,
-) -> EXTRACTED_POSITIONS:
+    highlight: bool = False,
+    ematches: Optional[List[str]] = None,
+) -> str:
 
     orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
-        return "", {}
+        return ""
 
     _, field_type, field = result.field.split("/")
     field_type_int = KB_REVERSE[field_type]
@@ -258,106 +222,73 @@ async def get_text_paragraph(
         logger.warn(
             f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
         )
-        return "", {}
+        return ""
 
-    positions: Dict[str, List[Tuple[int, int]]] = {}
     if result.split not in (None, ""):
         text = extracted_text.split_text[result.split]
         splitted_text = text[result.start : result.end]
     else:
         splitted_text = extracted_text.text[result.start : result.end]
 
-    if query and split:
-        splitted_text, positions = highlight(
-            splitted_text, query, highlight=highlight_split
+    if highlight:
+        splitted_text = highlight_paragraph(
+            splitted_text, words=result.matches, ematches=ematches  # type: ignore
         )
 
-    return splitted_text, positions
+    return splitted_text
 
 
-def split_text(text: str, query: str, highlight: bool = False, margin: int = 20):
-    quoted: List[str] = re.findall('"([^"]*)"', query)
+def highlight_paragraph(
+    text: str, words: List[str] = [], ematches: Optional[List[str]] = None
+) -> str:
     text_lower = text.lower()
-    cleaned = query
-    positions: POSITIONS = {}
-    for quote in quoted:
-        cleaned = cleaned.replace(f'"{quote}"', "")
-        found = [x.span() for x in re.finditer(quote.lower(), text_lower)]
-        if len(found):
-            positions.setdefault(quote, []).extend(found)
 
-    query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
-    for word in query_words:
-        if len(word) > 2:
-            found = [x.span() for x in re.finditer(word.lower(), text_lower)]
-            if len(found):
-                positions.setdefault(word, []).extend(found)
+    marks = [0] * (len(text) + 1)
+    if ematches is not None:
+        for quote in ematches:
+            for match in re.finditer(quote.lower(), text_lower):
+                start, end = match.span()
+                marks[start] = 1
+                marks[end] = 2
+
+    for word in words:
+        for match in re.finditer(word.lower(), text_lower):
+            start, end = match.span()
+            if marks[start] == 0 and marks[end] == 0:
+                marks[start] = 1
+                marks[end] = 2
 
     new_text = ""
-    ordered = [x for xs in positions.values() for x in xs]
-    ordered.sort()
-    last = 0
-    for order in ordered:
-        if order[0] < last:
-            continue
-        if order[0] - margin > last and last > 0:
-            new_text += text[last : last + margin]
-            new_text += "…"
-            last += margin
+    actual = 0
 
-        if last > order[0] - margin:
-            new_text += text[last : order[0]]
+    length = len(text_lower)
+
+    for index, pos in enumerate(marks):
+        if index >= length:
+            char_pos = ""
         else:
-            new_text += " …"
-            new_text += text[order[0] - margin : order[0]]
-
-        if highlight:
+            begining = True
+            if index > 0 and text[index - 1] not in PRE_WORD:
+                begining = False
+            char_pos = text[index]
+        if pos == 1 and actual == 0 and begining:
             new_text += "<mark>"
-        new_text += text[order[0] : order[1]]
-        if highlight:
+            new_text += char_pos
+            actual = 1
+        elif pos == 2 and actual == 1:
             new_text += "</mark>"
-        last = order[1]
-    if len(new_text) > 0:
-        new_text += text[last : min(len(text), last + margin)]
-        new_text += "…"
+            new_text += char_pos
+            actual = 0
+        elif pos == 1 and actual > 0:
+            new_text += char_pos
+            actual += 1
+        elif pos == 2 and actual > 1:
+            new_text += char_pos
+            actual -= 1
+        else:
+            new_text += char_pos
 
-    return new_text, positions
-
-
-def highlight(text: str, query: str, highlight: bool = False):
-    quoted: List[str] = re.findall('"([^"]*)"', query)
-    text_lower = text.lower()
-    cleaned = query
-    positions: POSITIONS = {}
-    for quote in quoted:
-        cleaned = cleaned.replace(f'"{quote}"', "")
-        found = [x.span() for x in re.finditer(quote.lower(), text_lower)]
-        if len(found):
-            positions.setdefault(quote, []).extend(found)
-
-    query_words = "".join([x for x in cleaned if x.isalnum() or x.isspace()]).split()
-    for word in query_words:
-        if len(word) > 2:
-            found = [x.span() for x in re.finditer(word.lower(), text_lower)]
-            if len(found):
-                positions.setdefault(word, []).extend(found)
-
-    if highlight:
-        new_text = ""
-        ordered = [x for xs in positions.values() for x in xs]
-        ordered.sort()
-        last = 0
-        for order in ordered:
-            if order[0] < last:
-                continue
-            new_text += text[last : order[0]]
-            new_text += "<mark>"
-            new_text += text[order[0] : order[1]]
-            new_text += "</mark>"
-            last = order[1]
-        new_text += text[last:]
-        return new_text, positions
-    return text, positions
+    return new_text
 
 
 async def get_labels_resource(result: DocumentResult, kbid: str) -> List[str]:

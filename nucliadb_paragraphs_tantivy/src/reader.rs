@@ -32,6 +32,7 @@ use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::search_query;
+use crate::search_query::SharedTermC;
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
 pub struct ParagraphReaderService {
@@ -87,7 +88,7 @@ impl ReaderChild for ParagraphReaderService {
             })
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let queries = create_query(&parser, &text, request, &self.schema, 1);
+        let (termc, queries) = create_query(&parser, &text, request, &self.schema, 1);
         let searcher = Searcher {
             request,
             results,
@@ -97,10 +98,10 @@ impl ReaderChild for ParagraphReaderService {
             order_field,
             text: &text,
         };
-        let dist_1 = searcher.do_search(queries, self);
+        let dist_1 = searcher.do_search(termc, queries, self);
         if multic_flag && (dist_1.results.is_empty()) {
-            let queries = create_query(&parser, &text, request, &self.schema, 2);
-            Ok(searcher.do_search(queries, self))
+            let (termc, queries) = create_query(&parser, &text, request, &self.schema, 2);
+            Ok(searcher.do_search(termc, queries, self))
         } else {
             Ok(dist_1)
         }
@@ -297,6 +298,7 @@ struct Searcher<'a> {
 impl<'a> Searcher<'a> {
     fn do_search(
         &self,
+        termc: SharedTermC,
         query: Vec<(Occur, Box<dyn Query>)>,
         service: &ParagraphReaderService,
     ) -> ParagraphSearchResponse {
@@ -330,6 +332,7 @@ impl<'a> Searcher<'a> {
                         facets_count: None,
                         facets: self.facets.to_vec(),
                         top_docs,
+                        termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
                         page_number: self.request.page_number,
@@ -343,6 +346,7 @@ impl<'a> Searcher<'a> {
                         facets_count: None,
                         facets: self.facets.to_vec(),
                         top_docs,
+                        termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
                         page_number: self.request.page_number,
@@ -368,6 +372,7 @@ impl<'a> Searcher<'a> {
                         facets_count: Some(facets_count),
                         facets: self.facets.to_vec(),
                         top_docs,
+                        termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
                         page_number: self.request.page_number,
@@ -386,6 +391,7 @@ impl<'a> Searcher<'a> {
                         facets_count: Some(facets_count),
                         facets: self.facets.to_vec(),
                         top_docs,
+                        termc: termc.get_termc(),
                         text_service: service,
                         query: self.text,
                         page_number: self.request.page_number,

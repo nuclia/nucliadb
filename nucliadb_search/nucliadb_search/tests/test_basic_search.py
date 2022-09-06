@@ -59,6 +59,23 @@ async def test_search_sc_2104(
 
 
 @pytest.mark.asyncio
+async def test_multiple_fuzzy_search_resource_all(
+    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+) -> None:
+    kbid = multiple_search_resource
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&page_number=0&page_size=20',
+        )
+        assert len(resp.json()["paragraphs"]["results"]) == 20
+        assert (
+            resp.json()["paragraphs"]["results"][0]["text"]
+            == "My <mark>own</mark> <mark>text</mark> Ramon. <mark>This is great</mark> to be here. "
+        )
+
+
+@pytest.mark.asyncio
 async def test_multiple_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -67,14 +84,14 @@ async def test_multiple_search_resource_all(
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         await asyncio.sleep(1)
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=0&page_size=20",
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=20",
         )
         assert len(resp.json()["paragraphs"]["results"]) == 20
         assert resp.json()["paragraphs"]["next_page"]
         assert resp.json()["fulltext"]["next_page"]
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=4&page_size=20",
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
         )
         for _ in range(10):
             if (
@@ -83,7 +100,7 @@ async def test_multiple_search_resource_all(
             ):
                 await asyncio.sleep(1)
                 resp = await client.get(
-                    f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=4&page_size=20",
+                    f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",
                 )
             else:
                 break
@@ -110,10 +127,6 @@ async def test_search_resource_all(
         assert resp.status_code == 200
         assert resp.json()["fulltext"]["query"] == "own text"
         assert resp.json()["paragraphs"]["query"] == "own text"
-        assert (
-            resp.json()["fulltext"]["results"][0]["text"]
-            == "My <mark>own</mark> <mark>text</mark> Ramon. This is grea…"
-        )
         assert resp.json()["paragraphs"]["results"][0]["start_seconds"] == [0]
         assert resp.json()["paragraphs"]["results"][0]["end_seconds"] == [10]
         assert (

@@ -27,6 +27,7 @@ use tantivy::DocAddress;
 use tracing::*;
 
 use crate::reader::ParagraphReaderService;
+use crate::search_query::TermCollector;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -56,6 +57,7 @@ pub struct SearchBm25Response<'a> {
     pub top_docs: Vec<(f32, DocAddress)>,
     pub page_number: i32,
     pub results_per_page: i32,
+    pub termc: TermCollector,
 }
 
 pub struct SearchIntResponse<'a> {
@@ -66,6 +68,7 @@ pub struct SearchIntResponse<'a> {
     pub top_docs: Vec<(u64, DocAddress)>,
     pub page_number: i32,
     pub results_per_page: i32,
+    pub termc: TermCollector,
 }
 
 pub struct SearchFacetsResponse<'a> {
@@ -103,7 +106,6 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
 
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
         let searcher = response.text_service.reader.searcher();
-
         let default_split = Value::Str("".to_string());
         for (score, doc_address) in response.top_docs.into_iter().take(total) {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
@@ -147,7 +149,12 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
-
+                    let mut terms: Vec<_> = response
+                        .termc
+                        .get_fterms(doc_address.doc_id)
+                        .into_iter()
+                        .collect();
+                    terms.sort();
                     let result = ParagraphResult {
                         uuid,
                         score,
@@ -157,6 +164,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         paragraph,
                         split,
                         index,
+                        matches: terms,
                         ..Default::default()
                     };
 
@@ -179,6 +187,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
             query: response.query.to_string(),
             next_page,
             bm25: false,
+            ematches: response.termc.eterms.into_iter().collect(),
         }
     }
 }
@@ -240,7 +249,12 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .to_string();
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
-
+                    let mut terms: Vec<_> = response
+                        .termc
+                        .get_fterms(doc_address.doc_id)
+                        .into_iter()
+                        .collect();
+                    terms.sort();
                     let result = ParagraphResult {
                         uuid,
                         score_bm25: score,
@@ -250,6 +264,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         paragraph,
                         split,
                         index,
+                        matches: terms,
                         ..Default::default()
                     };
 
@@ -272,6 +287,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
             query: response.query.to_string(),
             next_page,
             bm25: true,
+            ematches: response.termc.eterms.into_iter().collect(),
         }
     }
 }
