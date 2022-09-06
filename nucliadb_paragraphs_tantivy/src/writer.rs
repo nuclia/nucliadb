@@ -74,14 +74,7 @@ impl ServiceChild for ParagraphWriterService {
 
 impl WriterChild for ParagraphWriterService {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        let resource_id = resource.resource.as_ref().unwrap();
         let mut modified = false;
-
-        if !resource_id.uuid.is_empty() {
-            let uuid_term = Term::from_field_text(self.schema.uuid, &resource_id.uuid);
-            self.writer.write().unwrap().delete_term(uuid_term);
-            modified = true;
-        }
 
         if resource.status != ResourceStatus::Delete as i32 {
             let _ = self.index_paragraph(resource);
@@ -218,6 +211,7 @@ impl ParagraphWriterService {
         for (field, text_info) in &resource.texts {
             for (paragraph_id, p) in inspect_paragraph(field) {
                 paragraph_counter += 1;
+                let paragraph_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
                 let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
@@ -250,6 +244,7 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
                 debug!("Paragraph added");
+                self.writer.write().unwrap().delete_term(paragraph_term);
                 self.writer.write().unwrap().add_document(doc).unwrap();
                 if paragraph_counter % 500 == 0 {
                     debug!("Commited");
