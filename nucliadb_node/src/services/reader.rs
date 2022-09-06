@@ -246,7 +246,7 @@ impl ShardReaderService {
             query: rparagraph.query,
             total: rparagraph.total,
             results: rparagraph.results,
-            ematches: rparagraph.ematches
+            ematches: rparagraph.ematches,
         })
     }
 
