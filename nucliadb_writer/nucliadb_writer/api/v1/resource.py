@@ -146,7 +146,7 @@ async def create_resource(
     await transaction.commit(writer, partition, x_synchronous)
 
     if x_synchronous:
-        return ResourceCreated(seqid=seqid, uuid=uuid, took=time() - t0)
+        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
     else:
         return ResourceCreated(seqid=seqid, uuid=uuid)
 

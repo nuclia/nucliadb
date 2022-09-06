@@ -195,14 +195,11 @@ async def test_resource_crud_sync(writer_api, knowledgebox_writer):
             },
         )
 
-        import pdb
-
-        pdb.set_trace()
         assert resp.status_code == 201
         data = resp.json()
         assert "uuid" in data
         assert "seqid" in data
-        assert "took" in data
+        assert "elapsed" in data
         rid = data["uuid"]
 
         ingest = get_ingest()
