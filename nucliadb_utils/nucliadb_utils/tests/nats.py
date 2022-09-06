@@ -203,7 +203,7 @@ def start_gnatsd(gnatsd: Gnatsd):
 @pytest.fixture(scope="session")
 def natsd_server():
     if not os.path.isfile("nats-server"):
-        version = "v2.7.2"
+        version = "v2.8.4"
         arch = platform.machine()
         if arch == "x86_64":
             arch = "amd64"
