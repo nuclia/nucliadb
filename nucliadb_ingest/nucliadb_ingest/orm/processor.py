@@ -460,7 +460,7 @@ class Processor:
     ) -> Optional[Tuple[Resource, bool]]:
         created = False
         if resource is None:
-            # Make sure we load the resource in case it already exusts on db
+            # Make sure we load the resource in case it already exists on db
             if message.uuid is None and message.slug:
                 uuid = await kb.get_resource_uuid_by_slug(message.slug)
             else:
