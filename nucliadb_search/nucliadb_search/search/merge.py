@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import math
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -151,7 +151,7 @@ async def merge_suggest_paragraph_results(
     for result in raw_paragraph_list[:10]:
         _, field_type, field = result.field.split("/")
         text = await get_text_paragraph(
-            result, kbid, highlight=highlight, ematches=ematches
+            result, kbid, highlight=highlight, ematches=ematches  # type: ignore
         )
         labels = await get_labels_paragraph(result, kbid)
         seconds_positions = await get_seconds_paragraph(result, kbid)
@@ -253,10 +253,10 @@ async def merge_paragraph_results(
     facets: Dict[str, Any] = {}
     query = None
     next_page = False
-    ematches: List[str] = None
+    ematches: Optional[List[str]] = None
     for paragraph_response in paragraphs:
         if ematches is None:
-            ematches = paragraph_response.ematches
+            ematches = paragraph_response.ematches  # type: ignore
         if query is None:
             query = paragraph_response.query
 
@@ -370,7 +370,6 @@ async def merge_paragraphs_results(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     highlight_split: bool,
-    split: bool,
 ) -> ResourceSearchResults:
     paragraphs = []
     for result in results:
@@ -380,7 +379,7 @@ async def merge_paragraphs_results(
 
     resources: List[str] = list()
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight_split, split
+        paragraphs, resources, kbid, count, page, highlight=highlight_split
     )
     return api_results
 

@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import re
-from contextvars import ContextVar
 import string
+from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
@@ -205,14 +205,14 @@ async def get_text_paragraph(
     result: ParagraphResult,
     kbid: str,
     highlight: bool = False,
-    ematches: List[str] = [],
+    ematches: Optional[List[str]] = None,
 ) -> str:
 
     orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:
         logger.error(f"{result.uuid} does not exist on DB")
-        return "", {}
+        return ""
 
     _, field_type, field = result.field.split("/")
     field_type_int = KB_REVERSE[field_type]
@@ -222,7 +222,7 @@ async def get_text_paragraph(
         logger.warn(
             f"{result.uuid} {field} {field_type_int} extracted_text does not exist on DB"
         )
-        return "", {}
+        return ""
 
     if result.split not in (None, ""):
         text = extracted_text.split_text[result.split]
@@ -232,23 +232,24 @@ async def get_text_paragraph(
 
     if highlight:
         splitted_text = highlight_paragraph(
-            splitted_text, words=result.matches, ematches=ematches
+            splitted_text, words=result.matches, ematches=ematches  # type: ignore
         )
 
     return splitted_text
 
 
 def highlight_paragraph(
-    text: str, words: List[str] = [], ematches: List[str] = []
+    text: str, words: List[str] = [], ematches: Optional[List[str]] = None
 ) -> str:
     text_lower = text.lower()
 
     marks = [0] * (len(text) + 1)
-    for quote in ematches:
-        for match in re.finditer(quote.lower(), text_lower):
-            start, end = match.span()
-            marks[start] = 1
-            marks[end] = 2
+    if ematches is not None:
+        for quote in ematches:
+            for match in re.finditer(quote.lower(), text_lower):
+                start, end = match.span()
+                marks[start] = 1
+                marks[end] = 2
 
     for word in words:
         for match in re.finditer(word.lower(), text_lower):
