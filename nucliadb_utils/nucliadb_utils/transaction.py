@@ -107,9 +107,7 @@ class TransactionUtility:
         if self.notify_subject is None:
             logger.warn("No subject defined")
             return
-        await self.pubsub.unsubscribe(
-            channel_name=self.notify_subject.format(kbid=kbid)
-        )
+        await self.pubsub.unsubscribe(key=self.notify_subject.format(kbid=kbid))
 
     async def wait_for_commited(
         self, kbid: str, waiting_for: WaitFor

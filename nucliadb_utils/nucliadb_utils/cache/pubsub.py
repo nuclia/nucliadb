@@ -33,7 +33,7 @@ class PubSubDriver:
     async def publish(self, channel_name: str, data: bytes):
         raise NotImplementedError()
 
-    async def unsubscribe(self, channel_name: str):
+    async def unsubscribe(self, key: str):
         raise NotImplementedError()
 
     async def subscribe(self, handler: Callable, key: str, group: str = None):
