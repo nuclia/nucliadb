@@ -82,6 +82,7 @@ class UpdateResourcePayload(BaseModel):
 
 class ResourceCreated(BaseModel):
     uuid: str
+    elapsed: Optional[float] = None
     seqid: Optional[int] = None
 
 

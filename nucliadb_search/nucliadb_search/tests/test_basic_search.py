@@ -65,6 +65,7 @@ async def test_multiple_search_resource_all(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        await asyncio.sleep(1)
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&page_number=0&page_size=20",
         )
@@ -102,6 +103,7 @@ async def test_search_resource_all(
     kbid = test_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        await asyncio.sleep(1)
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&split=true&highlight=true&text_resource=true",
         )

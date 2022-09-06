@@ -133,7 +133,8 @@ class Cache:
     def invalidate(self, data: Dict[str, Any]):
         if self.pubsub is None:
             raise AttributeError("Pubsub not configured")
-        payload = self.pubsub.parse(data)
+        raw_payload = self.pubsub.parse(data)
+        payload = orjson.loads(raw_payload)
         if "origin" in payload and payload["origin"] == self.ident:
             # Skip my messages
             return

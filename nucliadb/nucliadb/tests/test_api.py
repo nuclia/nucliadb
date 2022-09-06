@@ -56,6 +56,7 @@ async def test_creation(
             "texts": {"text1": {"body": "My text"}},
         },
     )
+
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 

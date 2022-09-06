@@ -204,7 +204,6 @@ async def inject_message(processor, knowledgebox, message, count: int = 1):
                 count_shard: Shard = await node_obj.reader.GetShard(replica.shard)  # type: ignore
                 if count_shard.resources >= count:
                     checks[replica.shard.id] = True
-                print(count)
 
         if all(checks.values()):
             break

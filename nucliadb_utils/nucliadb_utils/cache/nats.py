@@ -25,7 +25,6 @@ from typing import Dict, List, Optional
 
 import nats
 import nats.errors
-import orjson
 from nats.aio.client import Client
 from nats.aio.errors import ErrConnectionClosed, ErrNoServers, ErrTimeout
 from nats.aio.msg import Msg
@@ -180,5 +179,4 @@ class NatsPubsub(PubSubDriver):
             raise ErrConnectionClosed("Could not publish")
 
     def parse(self, data: Msg):
-        payload = orjson.loads(data.data)
-        return payload
+        return data.data

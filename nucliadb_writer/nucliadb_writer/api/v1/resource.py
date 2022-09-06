@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from time import time
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -66,8 +67,10 @@ from nucliadb_writer.utilities import get_processing
 
 if TYPE_CHECKING:
     SKIP_STORE_DEFAULT = False
+    SYNC_CALL = False
 else:
     SKIP_STORE_DEFAULT = Header(False)
+    SYNC_CALL = Header(False)
 
 
 @api.post(
@@ -75,6 +78,7 @@ else:
     status_code=201,
     name="Create Resource",
     response_model=ResourceCreated,
+    response_model_exclude_unset=True,
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
@@ -84,6 +88,7 @@ async def create_resource(
     item: CreateResourcePayload,
     kbid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction()
     processing = get_processing()
@@ -136,9 +141,14 @@ async def create_resource(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    await transaction.commit(writer, partition)
+    if x_synchronous:
+        t0 = time()
+    await transaction.commit(writer, partition, x_synchronous)
 
-    return ResourceCreated(seqid=seqid, uuid=uuid)
+    if x_synchronous:
+        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
+    else:
+        return ResourceCreated(seqid=seqid, uuid=uuid)
 
 
 @api.patch(
