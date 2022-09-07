@@ -186,18 +186,22 @@ class KnowledgeBoxCount(BaseModel):
 
 class DocumentServiceEnum(str, Enum):
     DOCUMENT_V0 = "DOCUMENT_V0"
+    DOCUMENT_V1 = "DOCUMENT_V1"
 
 
 class ParagraphServiceEnum(str, Enum):
     PARAGRAPH_V0 = "PARAGRAPH_V0"
+    PARAGRAPH_V1 = "PARAGRAPH_V1"
 
 
 class VectorServiceEnum(str, Enum):
     VECTOR_V0 = "VECTOR_V0"
+    VECTOR_V1 = "VECTOR_V1"
 
 
 class RelationServiceEnum(str, Enum):
     RELATION_V0 = "RELATION_V0"
+    RELATION_V1 = "RELATION_V1"
 
 
 class ShardCreated(BaseModel):
