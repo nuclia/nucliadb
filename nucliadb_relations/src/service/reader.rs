@@ -78,7 +78,7 @@ impl ReaderChild for RelationsReaderService {
         let mut query = QueryConstructor::default()
             .depth(request.depth as u32)
             .prefixed(request.prefix.clone())
-            .always_jump(HashSet::from([rtype_parsing(RelationType::Sym, "")]))
+            .always_jump(HashSet::from([rtype_parsing(RelationType::Synonym, "")]))
             .build()
             .unwrap();
         request

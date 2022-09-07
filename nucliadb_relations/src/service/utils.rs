@@ -10,7 +10,7 @@ pub fn rtype_parsing(rtype: RelationType, additional: &str) -> EdgeType {
         RelationType::About => EdgeType::from("About"),
         RelationType::Child => EdgeType::from("Child"),
         RelationType::Colab => EdgeType::from("Colab"),
-        RelationType::Sym => EdgeType::from("Sym"),
+        RelationType::Synonym => EdgeType::from("Synonym"),
         RelationType::Other => EdgeType::from(additional),
     }
 }
@@ -21,7 +21,7 @@ pub fn string_to_rtype(rtype: &str) -> (RelationType, String) {
         "About" => (RelationType::About, String::new()),
         "Child" => (RelationType::Child, String::new()),
         "Colab" => (RelationType::Colab, String::new()),
-        "Sym" => (RelationType::Sym, String::new()),
+        "Synonym" => (RelationType::Synonym, String::new()),
         v => (RelationType::Other, v.to_string()),
     }
 }

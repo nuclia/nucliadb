@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bnucliadb_protos/utils.proto\x12\x05utils\"\xe9\x01\n\x08Relation\x12.\n\x08relation\x18\x05 \x01(\x0e\x32\x1c.utils.Relation.RelationType\x12#\n\x06source\x18\x06 \x01(\x0b\x32\x13.utils.RelationNode\x12\x1f\n\x02to\x18\x07 \x01(\x0b\x32\x13.utils.RelationNode\x12\x16\n\x0erelation_label\x18\x08 \x01(\t\"O\n\x0cRelationType\x12\t\n\x05\x43HILD\x10\x00\x12\t\n\x05\x41\x42OUT\x10\x01\x12\n\n\x06\x45NTITY\x10\x02\x12\t\n\x05\x43OLAB\x10\x03\x12\x07\n\x03SYM\x10\x04\x12\t\n\x05OTHER\x10\x05\"\x96\x01\n\x0cRelationNode\x12\r\n\x05value\x18\x04 \x01(\t\x12+\n\x05ntype\x18\x05 \x01(\x0e\x32\x1c.utils.RelationNode.NodeType\x12\x0f\n\x07subtype\x18\x06 \x01(\t\"9\n\x08NodeType\x12\n\n\x06\x45NTITY\x10\x00\x12\t\n\x05LABEL\x10\x01\x12\x0c\n\x08RESOURCE\x10\x02\x12\x08\n\x04USER\x10\x03\"\xa0\x01\n\rExtractedText\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x37\n\nsplit_text\x18\x02 \x03(\x0b\x32#.utils.ExtractedText.SplitTextEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x30\n\x0eSplitTextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"d\n\x06Vector\x12\r\n\x05start\x18\x01 \x01(\x05\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x05\x12\x17\n\x0fstart_paragraph\x18\x03 \x01(\x05\x12\x15\n\rend_paragraph\x18\x04 \x01(\x05\x12\x0e\n\x06vector\x18\x05 \x03(\x02\")\n\x07Vectors\x12\x1e\n\x07vectors\x18\x01 \x03(\x0b\x32\r.utils.Vector\"\xca\x01\n\x0cVectorObject\x12\x1f\n\x07vectors\x18\x01 \x01(\x0b\x32\x0e.utils.Vectors\x12<\n\rsplit_vectors\x18\x02 \x03(\x0b\x32%.utils.VectorObject.SplitVectorsEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x43\n\x11SplitVectorsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.utils.Vectors:\x02\x38\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bnucliadb_protos/utils.proto\x12\x05utils\"\xed\x01\n\x08Relation\x12.\n\x08relation\x18\x05 \x01(\x0e\x32\x1c.utils.Relation.RelationType\x12#\n\x06source\x18\x06 \x01(\x0b\x32\x13.utils.RelationNode\x12\x1f\n\x02to\x18\x07 \x01(\x0b\x32\x13.utils.RelationNode\x12\x16\n\x0erelation_label\x18\x08 \x01(\t\"S\n\x0cRelationType\x12\t\n\x05\x43HILD\x10\x00\x12\t\n\x05\x41\x42OUT\x10\x01\x12\n\n\x06\x45NTITY\x10\x02\x12\t\n\x05\x43OLAB\x10\x03\x12\x0b\n\x07SYNONYM\x10\x04\x12\t\n\x05OTHER\x10\x05\"\x96\x01\n\x0cRelationNode\x12\r\n\x05value\x18\x04 \x01(\t\x12+\n\x05ntype\x18\x05 \x01(\x0e\x32\x1c.utils.RelationNode.NodeType\x12\x0f\n\x07subtype\x18\x06 \x01(\t\"9\n\x08NodeType\x12\n\n\x06\x45NTITY\x10\x00\x12\t\n\x05LABEL\x10\x01\x12\x0c\n\x08RESOURCE\x10\x02\x12\x08\n\x04USER\x10\x03\"\xa0\x01\n\rExtractedText\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x37\n\nsplit_text\x18\x02 \x03(\x0b\x32#.utils.ExtractedText.SplitTextEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x30\n\x0eSplitTextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"d\n\x06Vector\x12\r\n\x05start\x18\x01 \x01(\x05\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x05\x12\x17\n\x0fstart_paragraph\x18\x03 \x01(\x05\x12\x15\n\rend_paragraph\x18\x04 \x01(\x05\x12\x0e\n\x06vector\x18\x05 \x03(\x02\")\n\x07Vectors\x12\x1e\n\x07vectors\x18\x01 \x03(\x0b\x32\r.utils.Vector\"\xca\x01\n\x0cVectorObject\x12\x1f\n\x07vectors\x18\x01 \x01(\x0b\x32\x0e.utils.Vectors\x12<\n\rsplit_vectors\x18\x02 \x03(\x0b\x32%.utils.VectorObject.SplitVectorsEntry\x12\x16\n\x0e\x64\x65leted_splits\x18\x03 \x03(\t\x1a\x43\n\x11SplitVectorsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.utils.Vectors:\x02\x38\x01\x62\x06proto3')
 
 
 
@@ -94,23 +94,23 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _VECTOROBJECT_SPLITVECTORSENTRY._options = None
   _VECTOROBJECT_SPLITVECTORSENTRY._serialized_options = b'8\001'
   _RELATION._serialized_start=39
-  _RELATION._serialized_end=272
+  _RELATION._serialized_end=276
   _RELATION_RELATIONTYPE._serialized_start=193
-  _RELATION_RELATIONTYPE._serialized_end=272
-  _RELATIONNODE._serialized_start=275
-  _RELATIONNODE._serialized_end=425
-  _RELATIONNODE_NODETYPE._serialized_start=368
-  _RELATIONNODE_NODETYPE._serialized_end=425
-  _EXTRACTEDTEXT._serialized_start=428
-  _EXTRACTEDTEXT._serialized_end=588
-  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_start=540
-  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_end=588
-  _VECTOR._serialized_start=590
-  _VECTOR._serialized_end=690
-  _VECTORS._serialized_start=692
-  _VECTORS._serialized_end=733
-  _VECTOROBJECT._serialized_start=736
-  _VECTOROBJECT._serialized_end=938
-  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_start=871
-  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_end=938
+  _RELATION_RELATIONTYPE._serialized_end=276
+  _RELATIONNODE._serialized_start=279
+  _RELATIONNODE._serialized_end=429
+  _RELATIONNODE_NODETYPE._serialized_start=372
+  _RELATIONNODE_NODETYPE._serialized_end=429
+  _EXTRACTEDTEXT._serialized_start=432
+  _EXTRACTEDTEXT._serialized_end=592
+  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_start=544
+  _EXTRACTEDTEXT_SPLITTEXTENTRY._serialized_end=592
+  _VECTOR._serialized_start=594
+  _VECTOR._serialized_end=694
+  _VECTORS._serialized_start=696
+  _VECTORS._serialized_end=737
+  _VECTOROBJECT._serialized_start=740
+  _VECTOROBJECT._serialized_end=942
+  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_start=875
+  _VECTOROBJECT_SPLITVECTORSENTRY._serialized_end=942
 # @@protoc_insertion_point(module_scope)

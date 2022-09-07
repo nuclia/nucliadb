@@ -30,7 +30,7 @@ pub mod relation {
         /// related with user (GENERATED)
         Colab = 3,
         /// Synonym relation
-        Sym = 4,
+        Synonym = 4,
         /// related with something
         Other = 5,
     }

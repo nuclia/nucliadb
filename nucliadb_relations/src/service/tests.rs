@@ -149,7 +149,7 @@ fn entities(mut edges: Vec<Relation>) -> Vec<Relation> {
 
 fn similatity_edges(mut edges: Vec<Relation>) -> Vec<Relation> {
     let r0 = Relation {
-        relation: RelationType::Sym as i32,
+        relation: RelationType::Synonym as i32,
         source: Some(E0.clone()),
         to: Some(E1.clone()),
         relation_label: "".to_string(),

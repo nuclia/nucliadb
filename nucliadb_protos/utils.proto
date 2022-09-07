@@ -10,7 +10,7 @@ message Relation {
         ABOUT = 1;  // related with label (GENERATED)
         ENTITY = 2;  // related with an entity (GENERATED)
         COLAB = 3;  // related with user (GENERATED)
-        SYM = 4;  // Synonym relation
+        SYNONYM = 4;  // Synonym relation
         OTHER = 5;  // related with something
     }
     // relation is the type of the label.

@@ -34,7 +34,7 @@ class Relation(google.protobuf.message.Message):
         COLAB: Relation._RelationType.ValueType  # 3
         """related with user (GENERATED)"""
 
-        SYM: Relation._RelationType.ValueType  # 4
+        SYNONYM: Relation._RelationType.ValueType  # 4
         """Synonym relation"""
 
         OTHER: Relation._RelationType.ValueType  # 5
@@ -55,7 +55,7 @@ class Relation(google.protobuf.message.Message):
     COLAB: Relation.RelationType.ValueType  # 3
     """related with user (GENERATED)"""
 
-    SYM: Relation.RelationType.ValueType  # 4
+    SYNONYM: Relation.RelationType.ValueType  # 4
     """Synonym relation"""
 
     OTHER: Relation.RelationType.ValueType  # 5
