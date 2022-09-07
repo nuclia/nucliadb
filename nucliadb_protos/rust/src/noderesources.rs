@@ -43,21 +43,25 @@ pub mod shard_created {
     #[repr(i32)]
     pub enum DocumentService {
         DocumentV0 = 0,
+        DocumentV1 = 1,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum ParagraphService {
         ParagraphV0 = 0,
+        ParagraphV1 = 1,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum VectorService {
         VectorV0 = 0,
+        VectorV1 = 1,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum RelationService {
         RelationV0 = 0,
+        RelationV1 = 1,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

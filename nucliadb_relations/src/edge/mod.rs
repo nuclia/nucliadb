@@ -37,7 +37,7 @@ fn apply_decoding(encoded: &str) -> (Option<NodeId>, Option<EdgeType>, Option<No
         .strip_suffix(']')
         .unwrap();
     let parts: Vec<&str> = raw.split('/').collect();
-    let from = parts.get(0).copied().map(NodeId::from);
+    let from = parts.first().copied().map(NodeId::from);
     let edge = parts.get(1).copied().map(EdgeType::from);
     let to = parts.get(2).copied().map(NodeId::from);
     (from, edge, to)

@@ -19,6 +19,9 @@
 use std::path::Path;
 
 use futures::try_join;
+use nucliadb_protos::shard_created::{
+    DocumentService, ParagraphService, RelationService, VectorService,
+};
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_services::*;
 use tracing::*;
@@ -35,13 +38,41 @@ pub struct ShardWriterService {
     paragraph_writer_service: paragraphs::WParagraphs,
     vector_writer_service: vectors::WVectors,
     relation_writer_service: relations::WRelations,
-    pub document_service_version: i32,
-    pub paragraph_service_version: i32,
-    pub vector_service_version: i32,
-    pub relation_service_version: i32,
+    document_service_version: i32,
+    paragraph_service_version: i32,
+    vector_service_version: i32,
+    relation_service_version: i32,
 }
 
 impl ShardWriterService {
+    pub fn document_version(&self) -> DocumentService {
+        match self.document_service_version {
+            0 => DocumentService::DocumentV0,
+            1 => DocumentService::DocumentV1,
+            i => panic!("Unknown document version {i}"),
+        }
+    }
+    pub fn paragraph_version(&self) -> ParagraphService {
+        match self.paragraph_service_version {
+            0 => ParagraphService::ParagraphV0,
+            1 => ParagraphService::ParagraphV1,
+            i => panic!("Unknown paragraph version {i}"),
+        }
+    }
+    pub fn vector_version(&self) -> VectorService {
+        match self.vector_service_version {
+            0 => VectorService::VectorV0,
+            1 => VectorService::VectorV1,
+            i => panic!("Unknown vector version {i}"),
+        }
+    }
+    pub fn relation_version(&self) -> RelationService {
+        match self.relation_service_version {
+            0 => RelationService::RelationV0,
+            1 => RelationService::RelationV1,
+            i => panic!("Unknown relation version {i}"),
+        }
+    }
     /// Start the service
     pub async fn start(id: &str) -> InternalResult<ShardWriterService> {
         let shard_path = Configuration::shards_path_id(id);
