@@ -111,8 +111,7 @@ class Driver(str, Enum):
     LOCAL = "LOCAL"
 
 
-class Settings(pydantic.BaseModel):
-
+class Settings(pydantic.BaseSettings):
     driver: Driver = pydantic.Field(Driver.LOCAL, description="Main DB Path string")
     maindb: str = pydantic.Field(description="Main DB Path string")
     blob: str = pydantic.Field(description="Blob Path string")
@@ -130,13 +129,16 @@ class Settings(pydantic.BaseModel):
 
 
 def run():
+    if os.environ.get("NUCLIADB_ENV"):
+        nucliadb_args = Settings()
+    else:
 
-    parser = pydantic_argparse.ArgumentParser(
-        model=Settings,
-        prog="NucliaDB",
-        description="NucliaDB Starting script",
-    )
-    nucliadb_args = parser.parse_typed_args()
+        parser = pydantic_argparse.ArgumentParser(
+            model=Settings,
+            prog="NucliaDB",
+            description="NucliaDB Starting script",
+        )
+        nucliadb_args = parser.parse_typed_args()
 
     config_nucliadb(nucliadb_args)
     run_nucliadb(nucliadb_args)
@@ -257,12 +259,16 @@ def purge():
     )
     from nucliadb_writer.settings import settings as writer_settings
 
-    parser = pydantic_argparse.ArgumentParser(
-        model=Settings,
-        prog="NucliaDB",
-        description="NucliaDB Starting script",
-    )
-    nucliadb_args = parser.parse_typed_args()
+    if os.environ.get("NUCLIADB_ENV"):
+        nucliadb_args = Settings()
+    else:
+
+        parser = pydantic_argparse.ArgumentParser(
+            model=Settings,
+            prog="NucliaDB",
+            description="NucliaDB Starting script",
+        )
+        nucliadb_args = parser.parse_typed_args()
 
     ingest_settings.driver = "local"
     ingest_settings.driver_local_url = nucliadb_args.maindb

@@ -332,7 +332,6 @@ impl NodeWriter {
 
 #[pymodule]
 fn nucliadb_node_binding(_py: Python, m: &PyModule) -> PyResult<()> {
-    pyo3_log::init();
     let log_levels = Configuration::log_level();
 
     let mut layers = Vec::new();

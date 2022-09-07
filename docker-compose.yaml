@@ -6,11 +6,24 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - DATA_PATH=/data
+      - NUCLIADB_ENV=True
+      - DRIVER=LOCAL
+      - MAINDB=/data/maindb
+      - BLOB=/data/blobs
+      - NODE=/data/node
+      - HTTP=8080
+      - GRPC=8060
+      - TRAIN=8040
+      - LOG=ERROR
+      - ZONE=europe-1
       - RUST_BACKTRACE=1
       - RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG
     ports:
       - "8080:8080"
-      - "10004:10000"
+      - "8060:8060"
+      - "8040:8040"
     volumes:
       - nucliadb-data:/data
+
+volumes:
+  nucliadb-data: {}

@@ -86,6 +86,8 @@ async def test_multiple_search_resource_all(
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=20",
         )
+        if resp.status_code != 200:
+            print(resp.content)
         assert resp.status_code == 200
         assert len(resp.json()["paragraphs"]["results"]) == 20
         assert resp.json()["paragraphs"]["next_page"]
