@@ -20,7 +20,13 @@
 import uuid
 
 import pytest
-from nucliadb_protos.resources_pb2 import Classification
+from nucliadb_protos.resources_pb2 import (
+    Classification,
+    FieldComputedMetadataWrapper,
+    FieldID,
+    FieldText,
+    FieldType,
+)
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -139,3 +145,84 @@ async def test_ingest_colab_relation_extraction(
         assert pb.relations[i].relation == Relation.RelationType.COLAB
         assert pb.relations[i].source.value == rid
         assert pb.relations[i].to.value == colaborator
+
+
+@pytest.mark.asyncio
+async def test_ingest_field_metadata_relation_extraction(
+    fake_node, local_files, gcs_storage, knowledgebox, processor, test_resource
+):
+    rid = str(uuid.uuid4())
+    bm = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug="slug-1",
+        type=BrokerMessage.AUTOCOMMIT,
+        texts={
+            "title": FieldText(
+                body="Title with metadata",
+                format=FieldText.Format.PLAIN,
+            )
+        },
+    )
+
+    fcmw = FieldComputedMetadataWrapper(
+        field=FieldID(
+            field_type=FieldType.TEXT,
+            field="title",
+        )
+    )
+    fcmw.metadata.metadata.ner.update(
+        {
+            "value-1": "subtype-1",
+            "value-2": "subtype-1",
+        }
+    )
+
+    fcmw.metadata.metadata.classifications.extend(
+        [
+            Classification(labelset="ls1", label="label1"),
+        ]
+    )
+
+    bm.field_metadata.append(fcmw)
+
+    await processor.process(message=bm, seqid=1)
+
+    index = get_indexing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    # Resource is indexed in two shard replicas
+    pb = await storage.get_indexing(index._calls[0][1])
+    pb2 = await storage.get_indexing(index._calls[1][1])
+
+    assert index._calls[0][1] != index._calls[1][1]
+    assert pb == pb2
+
+    generated_relations = [
+        # From ner metadata
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
+            to=RelationNode(
+                value="value-1", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
+            to=RelationNode(
+                value="value-2", ntype=RelationNode.NodeType.ENTITY, subtype="subtype-1"
+            ),
+        ),
+        # From classification metadata
+        Relation(
+            relation=Relation.RelationType.ABOUT,
+            source=RelationNode(value=rid, ntype=RelationNode.NodeType.RESOURCE),
+            to=RelationNode(
+                value="ls1/label1",
+                ntype=RelationNode.NodeType.LABEL,
+            ),
+        ),
+    ]
+    for generated_relation in generated_relations:
+        assert generated_relation in pb.relations
