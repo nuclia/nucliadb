@@ -1,0 +1,141 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+import uuid
+
+import pytest
+from nucliadb_protos.resources_pb2 import Classification
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
+
+from nucliadb_ingest import SERVICE_NAME
+from nucliadb_utils.utilities import get_indexing, get_storage
+
+
+@pytest.mark.asyncio
+async def test_ingest_relations_indexing(
+    fake_node, local_files, gcs_storage, knowledgebox, processor
+):
+    rid = str(uuid.uuid4())
+    bm = BrokerMessage(
+        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+    )
+
+    e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
+    e1 = RelationNode(
+        value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official"
+    )
+    e2 = RelationNode(
+        value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda"
+    )
+    r0 = Relation(
+        relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R0"
+    )
+    r1 = Relation(
+        relation=Relation.RelationType.ENTITY, source=e0, to=e2, relation_label="R1"
+    )
+    r2 = Relation(
+        relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R2"
+    )
+
+    bm.relations.extend([r0, r1, r2])
+
+    await processor.process(message=bm, seqid=1)
+
+    index = get_indexing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    # Resource is indexed in two shard replicas
+    pb = await storage.get_indexing(index._calls[0][1])
+    pb2 = await storage.get_indexing(index._calls[1][1])
+
+    assert index._calls[0][1] != index._calls[1][1]
+    assert pb == pb2
+
+    assert len(pb.relations) == 3
+    assert pb.relations[0] == r0
+    assert pb.relations[1] == r1
+    assert pb.relations[2] == r2
+
+
+@pytest.mark.asyncio
+async def test_ingest_label_relation_extraction(
+    fake_node, local_files, gcs_storage, knowledgebox, processor, test_resource
+):
+    rid = str(uuid.uuid4())
+    bm = BrokerMessage(
+        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+    )
+
+    labels = [
+        ("labelset-1", "label-1"),
+        ("labelset-1", "label-2"),
+        ("labelset-2", "label-1"),
+        ("labelset-2", "label-3"),
+    ]
+    bm.basic.usermetadata.classifications.extend(
+        [Classification(labelset=labelset, label=label) for labelset, label in labels]
+    )
+
+    await processor.process(message=bm, seqid=1)
+
+    index = get_indexing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    # Resource is indexed in two shard replicas
+    pb = await storage.get_indexing(index._calls[0][1])
+    pb2 = await storage.get_indexing(index._calls[1][1])
+
+    assert index._calls[0][1] != index._calls[1][1]
+    assert pb == pb2
+
+    for i, (labelset, label) in enumerate(labels):
+        assert pb.relations[i].relation == Relation.RelationType.ABOUT
+        assert pb.relations[i].source.value == rid
+        assert pb.relations[i].to.value == f"{labelset}/{label}"
+
+
+@pytest.mark.asyncio
+async def test_ingest_colab_relation_extraction(
+    fake_node, local_files, gcs_storage, knowledgebox, processor, test_resource
+):
+    rid = str(uuid.uuid4())
+    bm = BrokerMessage(
+        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+    )
+
+    colaborators = ["Alice", "Bob", "Trudy"]
+    bm.origin.colaborators.extend(colaborators)
+
+    await processor.process(message=bm, seqid=1)
+
+    index = get_indexing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    # Resource is indexed in two shard replicas
+    pb = await storage.get_indexing(index._calls[0][1])
+    pb2 = await storage.get_indexing(index._calls[1][1])
+
+    assert index._calls[0][1] != index._calls[1][1]
+    assert pb == pb2
+
+    for i, colaborator in enumerate(colaborators):
+        assert pb.relations[i].relation == Relation.RelationType.COLAB
+        assert pb.relations[i].source.value == rid
+        assert pb.relations[i].to.value == colaborator

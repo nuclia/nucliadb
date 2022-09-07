@@ -42,7 +42,7 @@ from nucliadb_protos.resources_pb2 import (
     Origin,
     Paragraph,
 )
-from nucliadb_protos.utils_pb2 import Relation, RelationNode, Vector
+from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_ingest import SERVICE_NAME
@@ -473,49 +473,3 @@ async def test_ingest_audit_stream_mixed(
 
     await client.drain()
     await client.close()
-
-
-@pytest.mark.asyncio
-async def test_ingest_relations_indexing(
-    fake_node, local_files, gcs_storage, knowledgebox, processor
-):
-    rid = str(uuid.uuid4())
-    bm = BrokerMessage(
-        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
-    )
-
-    e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
-    e1 = RelationNode(
-        value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official"
-    )
-    e2 = RelationNode(
-        value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda"
-    )
-    r0 = Relation(
-        relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R0"
-    )
-    r1 = Relation(
-        relation=Relation.RelationType.ENTITY, source=e0, to=e2, relation_label="R1"
-    )
-    r2 = Relation(
-        relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R2"
-    )
-
-    bm.relations.extend([r0, r1, r2])
-
-    await processor.process(message=bm, seqid=1)
-
-    index = get_indexing()
-    storage = await get_storage(service_name=SERVICE_NAME)
-
-    # Resource is indexed in two shard replicas
-    pb = await storage.get_indexing(index._calls[0][1])
-    pb2 = await storage.get_indexing(index._calls[1][1])
-
-    assert index._calls[0][1] != index._calls[1][1]
-    assert pb == pb2
-
-    assert len(pb.relations) == 3
-    assert pb.relations[0] == r0
-    assert pb.relations[1] == r1
-    assert pb.relations[2] == r2
