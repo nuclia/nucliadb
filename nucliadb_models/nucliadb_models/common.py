@@ -93,6 +93,7 @@ class CloudLink(BaseModel):
     size: Optional[int]
     content_type: Optional[str]
     filename: Optional[str]
+    md5: Optional[str]
 
     @staticmethod
     def format_reader_download_uri(uri: str) -> str:

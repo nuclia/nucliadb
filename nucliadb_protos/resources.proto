@@ -242,6 +242,7 @@ message FieldText {
     }
     string body = 1;
     Format format = 2;
+    string md5 = 3;
 }
 
 message Block {

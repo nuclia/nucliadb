@@ -120,6 +120,7 @@ class LocalStorageField(StorageField):
             field: CloudFile = CloudFile(
                 filename=cf.filename,
                 size=cf.size,
+                md5=cf.md5,
                 content_type=cf.content_type,
                 bucket_name=self.bucket,
                 source=CloudFile.LOCAL,
@@ -131,6 +132,7 @@ class LocalStorageField(StorageField):
             field = CloudFile(
                 filename=cf.filename,
                 size=cf.size,
+                md5=cf.md5,
                 content_type=cf.content_type,
                 bucket_name=self.bucket,
                 source=CloudFile.LOCAL,

@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import hashlib
+
 from nucliadb_protos.resources_pb2 import FieldText
 
 from nucliadb_ingest.fields.base import Field
@@ -29,6 +31,8 @@ class Text(Field):
     type: str = "t"
 
     async def set_value(self, payload: FieldText):
+        if payload.md5 == "":
+            payload.md5 = hashlib.md5(payload.body.encode()).hexdigest()
         await self.db_set_value(payload)
 
     async def get_value(self) -> FieldText:
