@@ -20,8 +20,9 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
-// use crate::services::vector::config::Distance;
-// use crate::services::vector::config::VectorServiceConfiguration;
+use nucliadb_protos::shard_created::{
+    DocumentService, ParagraphService, RelationService, VectorService,
+};
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
     ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
@@ -32,7 +33,6 @@ use nucliadb_services::*;
 use tokio::{task, try_join};
 use tracing::*;
 
-// use super::vector::service::VectorService;
 use crate::config::Configuration;
 use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
@@ -48,13 +48,41 @@ pub struct ShardReaderService {
     paragraph_reader_service: paragraphs::RParagraphs,
     vector_reader_service: vectors::RVectors,
     relation_reader_service: relations::RRelations,
-    pub document_service_version: i32,
-    pub paragraph_service_version: i32,
-    pub vector_service_version: i32,
-    pub relation_service_version: i32,
+    document_service_version: i32,
+    paragraph_service_version: i32,
+    vector_service_version: i32,
+    relation_service_version: i32,
 }
 
 impl ShardReaderService {
+    pub fn document_version(&self) -> DocumentService {
+        match self.document_service_version {
+            0 => DocumentService::DocumentV0,
+            1 => DocumentService::DocumentV1,
+            i => panic!("Unknown document version {i}"),
+        }
+    }
+    pub fn paragraph_version(&self) -> ParagraphService {
+        match self.paragraph_service_version {
+            0 => ParagraphService::ParagraphV0,
+            1 => ParagraphService::ParagraphV1,
+            i => panic!("Unknown paragraph version {i}"),
+        }
+    }
+    pub fn vector_version(&self) -> VectorService {
+        match self.vector_service_version {
+            0 => VectorService::VectorV0,
+            1 => VectorService::VectorV1,
+            i => panic!("Unknown vector version {i}"),
+        }
+    }
+    pub fn relation_version(&self) -> RelationService {
+        match self.relation_service_version {
+            0 => RelationService::RelationV0,
+            1 => RelationService::RelationV1,
+            i => panic!("Unknown relation version {i}"),
+        }
+    }
     pub async fn get_info(&self) -> StatsData {
         self.reload_policy(true).await;
         let field_reader_service = self.field_reader_service.clone();

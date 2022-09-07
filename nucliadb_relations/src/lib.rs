@@ -20,9 +20,9 @@
 
 mod edge;
 mod node;
-pub mod search_engine;
+mod search_engine;
 pub mod service;
-pub mod storage_system;
+mod storage_system;
 
 mod graph {
     pub use crate::edge::*;

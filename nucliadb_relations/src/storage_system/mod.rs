@@ -40,7 +40,7 @@ mod env_config {
     pub const ENV: &str = "ENV_lmdb";
     pub const STAMP: &str = "stamp.nuclia";
     pub const MAP_SIZE: usize = 1048576 * 100000;
-    pub const MAX_DBS: u32 = 3000;
+    pub const MAX_DBS: u32 = 5;
 }
 
 mod state_fields {
@@ -51,9 +51,6 @@ pub struct RoToken<'a>(RoTxn<'a>);
 impl<'a> RoToken<'a> {
     pub fn commit(self) -> Result<(), heed::Error> {
         self.0.commit()
-    }
-    pub fn abort(self) -> Result<(), heed::Error> {
-        self.0.abort()
     }
 }
 impl<'a> std::ops::Deref for RoToken<'a> {
@@ -73,9 +70,6 @@ pub struct RwToken<'a>(RwTxn<'a, 'a>);
 impl<'a> RwToken<'a> {
     pub fn commit(self) -> Result<(), heed::Error> {
         self.0.commit()
-    }
-    pub fn abort(self) -> Result<(), heed::Error> {
-        self.0.abort()
     }
 }
 impl<'a> std::ops::Deref for RwToken<'a> {
@@ -357,7 +351,6 @@ mod tests {
                 .unwrap(),
             "Name"
         );
-        txn.abort().unwrap();
     }
     #[test]
     fn same_resource_same_id() {
@@ -393,7 +386,6 @@ mod tests {
                 .get_node(&txn, system.get_id(&txn, "Name1").unwrap())
                 .unwrap()
         );
-        txn.abort().unwrap();
     }
     #[test]
     fn graph_querying() {
@@ -479,7 +471,6 @@ mod tests {
             let matches: HashSet<_> = system.match_edges(&txn, PartialEdge::wildcard()).collect();
             assert_eq!(all_edges, matches);
         }
-        txn.abort().unwrap();
     }
     #[test]
     fn query_delete() {

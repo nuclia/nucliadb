@@ -116,6 +116,7 @@ impl PartialEdge {
     fn new(from: Option<NodeId>, qtype: Option<EdgeType>, to: Option<NodeId>) -> PartialEdge {
         PartialEdge { from, qtype, to }
     }
+    #[allow(unused)]
     pub fn with_type(from: NodeId, qtype: EdgeType, to: Option<NodeId>) -> PartialEdge {
         PartialEdge::new(Some(from), Some(qtype), to)
     }
