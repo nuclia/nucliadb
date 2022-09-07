@@ -203,6 +203,7 @@ class GCSStorageField(StorageField):
                 size=cf.size,
                 content_type=cf.content_type,
                 bucket_name=self.bucket,
+                md5=cf.md5,
                 source=CloudFile.GCS,
                 old_uri=self.field.uri,
                 old_bucket=self.field.bucket_name,
@@ -212,6 +213,7 @@ class GCSStorageField(StorageField):
             field = CloudFile(
                 filename=cf.filename,
                 size=cf.size,
+                md5=cf.md5,
                 content_type=cf.content_type,
                 bucket_name=self.bucket,
                 source=CloudFile.GCS,

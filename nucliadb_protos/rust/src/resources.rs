@@ -370,6 +370,8 @@ pub struct FieldText {
     pub body: ::prost::alloc::string::String,
     #[prost(enumeration="field_text::Format", tag="2")]
     pub format: i32,
+    #[prost(string, tag="3")]
+    pub md5: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `FieldText`.
 pub mod field_text {

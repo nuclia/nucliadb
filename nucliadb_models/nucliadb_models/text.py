@@ -50,6 +50,7 @@ class TextFormat(Enum):  # type: ignore
 class FieldText(BaseModel):
     body: Optional[str]
     format: Optional[TextFormat]
+    md5: Optional[str]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldText) -> _T:

@@ -83,6 +83,20 @@ async def test_resource_download_field_file(
 
         open(filename, "rb").read() == resp.content
 
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/resource/{rid}?show=values",
+        )
+        assert resp.status_code == 200
+
+        assert (
+            resp.json()["data"]["texts"]["text1"]["value"]["md5"]
+            == "74a3187271f1d526b1f6271bfb7df52e"
+        )
+        assert (
+            resp.json()["data"]["files"]["file1"]["value"]["file"]["md5"]
+            == "01cca3f53edb934a445a3112c6caa652"
+        )
+
 
 @pytest.mark.asyncio
 async def test_resource_download_field_layout(

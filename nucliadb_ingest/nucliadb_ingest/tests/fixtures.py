@@ -682,6 +682,7 @@ TEST_CLOUDFILE = rpb.CloudFile(
     size=getsize(f"{dirname(__file__)}/orm/assets/text.pb"),
     content_type="application/octet-stream",
     filename="text.pb",
+    md5="01cca3f53edb934a445a3112c6caa652",
 )
 
 

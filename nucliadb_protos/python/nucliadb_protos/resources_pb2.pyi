@@ -881,14 +881,17 @@ class FieldText(google.protobuf.message.Message):
 
     BODY_FIELD_NUMBER: builtins.int
     FORMAT_FIELD_NUMBER: builtins.int
+    MD5_FIELD_NUMBER: builtins.int
     body: typing.Text
     format: global___FieldText.Format.ValueType
+    md5: typing.Text
     def __init__(self,
         *,
         body: typing.Text = ...,
         format: global___FieldText.Format.ValueType = ...,
+        md5: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","format",b"format"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","format",b"format","md5",b"md5"]) -> None: ...
 global___FieldText = FieldText
 
 class Block(google.protobuf.message.Message):
