@@ -75,6 +75,7 @@ COPY nucliadb_reader/requirements.txt /usr/src/app/requirements-reader.txt
 COPY nucliadb_one/requirements.txt /usr/src/app/requirements-one.txt
 COPY nucliadb_train/requirements.txt /usr/src/app/requirements-train.txt
 COPY nucliadb_telemetry/requirements.txt /usr/src/app/requirements-telemetry.txt
+COPY nucliadb/requirements.txt /usr/src/app/requirements.txt
 
 RUN set -eux; \
     pip install --no-cache-dir \
@@ -90,7 +91,8 @@ RUN set -eux; \
     -r /usr/src/app/requirements-reader.txt \
     -r /usr/src/app/requirements-search.txt \
     -r /usr/src/app/requirements-one.txt \
-    -r /usr/src/app/requirements-train.txt
+    -r /usr/src/app/requirements-train.txt \
+    -r /usr/src/app/requirements.txt
 
 # Copy source code
 COPY nucliadb_utils /usr/src/app/nucliadb_utils

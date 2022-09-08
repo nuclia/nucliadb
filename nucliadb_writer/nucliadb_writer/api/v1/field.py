@@ -51,9 +51,11 @@ from nucliadb_writer.utilities import get_processing
 if TYPE_CHECKING:
     SKIP_STORE_DEFAULT = False
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, FieldType.V]
+    SYNC_CALL = False
 else:
     SKIP_STORE_DEFAULT = Header(False)
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, int]
+    SYNC_CALL = Header(False)
 
 
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
@@ -430,6 +432,7 @@ async def delete_resource_field(
     kbid: str,
     field_type: models.FieldTypeName,
     field_id: str,
+    x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction()
     partitioning = get_partitioning()
@@ -442,11 +445,12 @@ async def delete_resource_field(
 
     pb_field_id = FieldID()
     pb_field_id.field_type = FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP[field_type]
+    pb_field_id.field = field_id
 
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
     # Create processing message
-    await transaction.commit(writer, partition)
+    await transaction.commit(writer, partition, x_synchronous)
 
     return Response(status_code=204)
