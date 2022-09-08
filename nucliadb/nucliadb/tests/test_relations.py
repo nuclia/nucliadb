@@ -17,20 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
-
-from httpx import AsyncClient
-
 import pytest
-
-from nucliadb_protos.noderesources_pb2 import Resource
-from nucliadb_protos.noderesources_pb2 import ResourceID
-from nucliadb_protos.utils_pb2 import Relation
-from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_protos.nodereader_pb2 import RelationSearchRequest
-from nucliadb_protos.nodereader_pb2 import RelationFilter
-from nucliadb_protos.writer_pb2_grpc import WriterStub
+from httpx import AsyncClient
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
@@ -47,7 +38,6 @@ async def test_relations(
       for the resource
     - Validate the relations have been saved and are searchable
     """
-
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
@@ -59,11 +49,21 @@ async def test_relations(
     rid = resp.json()["uuid"]
 
     e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
-    e1 = RelationNode(value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official")
-    e2 = RelationNode(value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda")
-    r0 = Relation(relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R0")
-    r1 = Relation(relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R1")
-    r2 = Relation(relation=Relation.RelationType.CHILD, source=e2, to=e0, relation_label="R2")
+    e1 = RelationNode(
+        value="E1", ntype=RelationNode.NodeType.ENTITY, subtype="Official"
+    )
+    e2 = RelationNode(
+        value="E2", ntype=RelationNode.NodeType.ENTITY, subtype="Propaganda"
+    )
+    r0 = Relation(
+        relation=Relation.RelationType.CHILD, source=e0, to=e1, relation_label="R0"
+    )
+    r1 = Relation(
+        relation=Relation.RelationType.CHILD, source=e1, to=e2, relation_label="R1"
+    )
+    r2 = Relation(
+        relation=Relation.RelationType.CHILD, source=e2, to=e0, relation_label="R2"
+    )
 
     bm = BrokerMessage()
     bm.uuid = rid
@@ -73,7 +73,7 @@ async def test_relations(
     async def iterate(value: BrokerMessage):
         yield value
 
-    await nucliadb_grpc.ProcessMessage(iterate(bm))
+    nucliadb_grpc.ProcessMessage(iterate(bm))
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=relations"
@@ -81,3 +81,68 @@ async def test_relations(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["relations"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_relations_extracted(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    """
+    Test description:
+    -
+    """
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My resource",
+            "slug": "myresource",
+            "summary": "Some summary",
+            "origin": {
+                "colaborators": ["Anne", "John"],
+            },
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "labelset-1", "label": "label-1"},
+                    {"labelset": "labelset-2", "label": "label-2"},
+                ],
+                "relations": [
+                    {
+                        "relation": "CHILD",
+                        "resource": "document",
+                    },
+                    {
+                        "relation": "ABOUT",
+                        "label": "label",
+                    },
+                    {
+                        "relation": "ENTITY",
+                        "entity": {
+                            "entity": "entity-1",
+                            "entity_type": "entity-type-1",
+                        },
+                    },
+                    {
+                        "relation": "COLAB",
+                        "user": "user",
+                    },
+                    {
+                        "relation": "OTHER",
+                        "other": "other",
+                    },
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=relations"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["relations"]
