@@ -82,7 +82,7 @@ async def test_ingest_relations_indexing(
 
 @pytest.mark.asyncio
 async def test_ingest_label_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor, test_resource
+    fake_node, local_files, gcs_storage, knowledgebox, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -119,7 +119,7 @@ async def test_ingest_label_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_colab_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor, test_resource
+    fake_node, local_files, gcs_storage, knowledgebox, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -149,7 +149,7 @@ async def test_ingest_colab_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_field_metadata_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor, test_resource
+    fake_node, local_files, gcs_storage, knowledgebox, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
@@ -226,3 +226,76 @@ async def test_ingest_field_metadata_relation_extraction(
     ]
     for generated_relation in generated_relations:
         assert generated_relation in pb.relations
+
+
+@pytest.mark.asyncio
+async def test_ingest_field_relations_relation_extraction(
+    fake_node, local_files, gcs_storage, knowledgebox, processor
+):
+    rid = str(uuid.uuid4())
+    bm = BrokerMessage(
+        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+    )
+
+    relationnode = RelationNode(
+        value=rid, ntype=RelationNode.NodeType.RESOURCE, subtype="subtype-1"
+    )
+    test_relations = [
+        Relation(
+            relation=Relation.RelationType.CHILD,
+            source=relationnode,
+            to=RelationNode(
+                value="document",
+                ntype=RelationNode.NodeType.RESOURCE,
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.ABOUT,
+            source=relationnode,
+            to=RelationNode(
+                value="label",
+                ntype=RelationNode.NodeType.LABEL,
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=relationnode,
+            to=RelationNode(
+                value="entity",
+                ntype=RelationNode.NodeType.ENTITY,
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.COLAB,
+            source=relationnode,
+            to=RelationNode(
+                value="user",
+                ntype=RelationNode.NodeType.USER,
+            ),
+        ),
+        Relation(
+            relation=Relation.RelationType.OTHER,
+            source=relationnode,
+            to=RelationNode(
+                value="other",
+                ntype=RelationNode.NodeType.RESOURCE,
+            ),
+        ),
+    ]
+    bm.relations.extend(test_relations)
+
+    await processor.process(message=bm, seqid=1)
+
+    index = get_indexing()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    # Resource is indexed in two shard replicas
+    pb = await storage.get_indexing(index._calls[0][1])
+    pb2 = await storage.get_indexing(index._calls[1][1])
+
+    assert index._calls[0][1] != index._calls[1][1]
+    assert pb == pb2
+
+    assert len(pb.relations) == len(test_relations)
+    for relation in test_relations:
+        assert relation in pb.relations
