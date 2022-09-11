@@ -31,6 +31,12 @@ from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.processing import PushPayload, Source
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.writer import (
+    CreateResourcePayload,
+    ResourceCreated,
+    ResourceUpdated,
+    UpdateResourcePayload,
+)
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -42,12 +48,6 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 from nucliadb_writer import SERVICE_NAME
-from nucliadb_writer.api.models import (
-    CreateResourcePayload,
-    ResourceCreated,
-    ResourceUpdated,
-    UpdateResourcePayload,
-)
 from nucliadb_writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -166,6 +166,7 @@ async def modify_resource(
     kbid: str,
     rid: str,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction()
     processing = get_processing()
@@ -208,7 +209,7 @@ async def modify_resource(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    await transaction.commit(writer, partition)
+    await transaction.commit(writer, partition, x_synchronous)
 
     return ResourceUpdated(seqid=seqid)
 
