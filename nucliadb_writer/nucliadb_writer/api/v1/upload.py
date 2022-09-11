@@ -43,6 +43,7 @@ from starlette.requests import Request as StarletteRequest
 from nucliadb_ingest.orm.utils import set_title
 from nucliadb_ingest.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -54,7 +55,6 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 from nucliadb_writer import SERVICE_NAME, logger
-from nucliadb_writer.api.models import CreateResourcePayload
 from nucliadb_writer.exceptions import (
     ConflictError,
     IngestNotAvailable,

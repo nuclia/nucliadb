@@ -142,7 +142,8 @@ class ResourceSearchResults(BaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
     relations: Optional[Relations] = None
-    shards: Optional[List[Tuple[str, str, str]]]
+    nodes: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
 
 
 class KnowledgeboxSearchResults(BaseModel):
@@ -151,7 +152,8 @@ class KnowledgeboxSearchResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     fulltext: Optional[Resources] = None
     relations: Optional[Relations] = None
-    shards: Optional[List[Tuple[str, str, str]]]
+    nodes: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
 
 
 class KnowledgeboxSuggestResults(BaseModel):

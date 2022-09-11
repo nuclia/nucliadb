@@ -25,7 +25,6 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-from nucliadb_models import SlugString
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.datetime import FieldDatetime
@@ -43,6 +42,7 @@ from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Metadata, Origin, Relation, UserMetadata
 from nucliadb_models.text import FieldText
+from nucliadb_models.utils import SlugString
 from nucliadb_protos import resources_pb2
 
 

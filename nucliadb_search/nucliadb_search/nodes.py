@@ -53,7 +53,9 @@ class NodesManager:
         shards = await self.get_shards_by_kbid_inner(kbid)
         return [x for x in shards.shards]
 
-    def choose_node(self, shard: ShardObject) -> Tuple[Node, Optional[str], str]:
+    def choose_node(
+        self, shard: ShardObject, shards: List[str] = []
+    ) -> Tuple[Node, Optional[str], str]:
         if NODE_CLUSTER.local_node:
             return (
                 NODE_CLUSTER.get_local_node(),
@@ -69,7 +71,11 @@ class NodesManager:
             if node_id in NODES:
                 node_obj = NODES[node_id]
                 shard_id = shard.replicas[node].shard.id
-                break
+                if len(shards) > 0 and shard_id not in shards:
+                    node_obj = None
+                    shard_id = None
+                else:
+                    break
 
         if node_obj is None or node_id is None:
             raise KeyError("Could not find a node to query")
