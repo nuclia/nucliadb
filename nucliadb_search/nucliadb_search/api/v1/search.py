@@ -87,13 +87,15 @@ async def search_knowledgebox(
         ]
     ),
     reload: bool = Query(default=True),
-    debug: bool = Query(default=False),
+    debug: bool = Query(False),
+    shards: bool = Query(False),
     highlight: bool = Query(default=False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
+    shard: List[str] = Query([]),
     x_ndb_client: SearchClientType = Header(SearchClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -139,9 +141,10 @@ async def search_knowledgebox(
     incomplete_results = False
     ops = []
     queried_shards = []
-    for shard in shard_groups:
+    queried_nodes = []
+    for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard_obj, shard)
         except KeyError:
             incomplete_results = True
         else:
@@ -149,7 +152,8 @@ async def search_knowledgebox(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(query_shard(node, shard_id, pb_query))
-                queried_shards.append((node.label, shard_id, node_id))
+                queried_nodes.append((node.label, shard_id, node_id))
+                queried_shards.append(shard_id)
 
     if not ops:
         await abort_transaction()
@@ -214,5 +218,7 @@ async def search_knowledgebox(
             len(search_results.resources),
         )
     if debug:
+        search_results.nodes = queried_nodes
+    if shards:
         search_results.shards = queried_shards
     return search_results

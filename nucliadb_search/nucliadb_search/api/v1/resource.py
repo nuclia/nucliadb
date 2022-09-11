@@ -89,6 +89,8 @@ async def search(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     x_ndb_client: SearchClientType = Header(SearchClientType.API),
     debug: bool = Query(False),
+    shards: bool = Query(False),
+    shard: List[str] = [],
 ) -> ResourceSearchResults:
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
@@ -121,10 +123,11 @@ async def search(
 
     incomplete_results = False
     ops = []
+    queried_nodes = []
     queried_shards = []
-    for shard in shard_groups:
+    for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard_obj, shard)
         except KeyError:
             incomplete_results = True
         else:
@@ -132,7 +135,8 @@ async def search(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(query_paragraph_shard(node, shard_id, pb_query))
-                queried_shards.append((node.label, shard_id, node_id))
+                queried_nodes.append((node.label, shard_id, node_id))
+                queried_shards.append(shard_id)
 
     if not ops:
         await abort_transaction()
@@ -185,5 +189,7 @@ async def search(
     get_counter()[f"{kbid}_-_search_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
     if debug:
+        search_results.nodes = queried_nodes
+    if shards:
         search_results.shards = queried_shards
     return search_results
