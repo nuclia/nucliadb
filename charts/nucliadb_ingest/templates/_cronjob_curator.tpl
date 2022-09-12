@@ -1,6 +1,6 @@
 {{ define "curator.cronjob" }}
 kind: CronJob
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 metadata:
   name: "{{ .cronname }}"
   labels:
