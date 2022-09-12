@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
@@ -25,7 +26,9 @@ from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import Resource
+from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 
 if TYPE_CHECKING:
     SortValue = OrderBy.OrderType.V
@@ -228,3 +231,33 @@ class KnowledgeboxShards(BaseModel):
     kbid: str
     actual: int
     shards: List[ShardObject]
+
+
+class SearchRequest(BaseModel):
+    query: str
+    fields: List[str] = []
+    filters: List[str] = []
+    faceted: List[str] = []
+    sort: SortOption = SortOption.CREATED
+    page_number: int = 0
+    page_size: int = 20
+    max_score: float = 0.70
+    range_creation_start: Optional[datetime] = None
+    range_creation_end: Optional[datetime] = None
+    range_modification_start: Optional[datetime] = None
+    range_modification_end: Optional[datetime] = None
+    features: List[SearchOptions] = [
+        SearchOptions.PARAGRAPH,
+        SearchOptions.DOCUMENT,
+        SearchOptions.VECTOR,
+        SearchOptions.RELATIONS,
+    ]
+    reload: bool = True
+    debug: bool = False
+    shards: bool = False
+    highlight: bool = False
+    show: List[ResourceProperties] = [ResourceProperties.BASIC]
+    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
+    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
+    shard: List[str] = []
+    vector: Optional[List[float]] = None

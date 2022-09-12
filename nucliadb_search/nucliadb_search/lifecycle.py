@@ -64,7 +64,7 @@ async def initialize() -> None:
 
     existing_chitchat_utility = get_utility(Utility.CHITCHAT)
     if existing_chitchat_utility is None:
-        start_chitchat()
+        start_chitchat(SERVICE_NAME)
     else:
         logger.info(
             "Not registering search chitchat as already exist a chitchat utility"

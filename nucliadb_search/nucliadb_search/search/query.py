@@ -46,6 +46,7 @@ async def global_query_to_pb(
     fields: List[str] = [],
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
+    vector: Optional[List[float]] = None,
 ) -> SearchRequest:
 
     predict = get_predict()
@@ -81,8 +82,10 @@ async def global_query_to_pb(
     request.document = SearchOptions.DOCUMENT in features
     request.paragraph = SearchOptions.PARAGRAPH in features
 
-    if SearchOptions.VECTOR in features:
+    if SearchOptions.VECTOR in features and vector is None:
         request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
+    elif SearchOptions.VECTOR in features and vector is not None:
+        request.vector.extend(vector)
 
     if SearchOptions.RELATIONS in features:
         pass

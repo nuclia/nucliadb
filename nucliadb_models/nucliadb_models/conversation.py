@@ -109,7 +109,7 @@ class FieldConversation(BaseModel):
 
 class InputMessageContent(BaseModel):
     text: str
-    format: MessageFormat
+    format: MessageFormat = MessageFormat.PLAIN
     attachments: List[FileB64] = []
 
 

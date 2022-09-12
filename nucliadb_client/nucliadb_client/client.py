@@ -13,6 +13,7 @@ from nucliadb_client.knowledgebox import KnowledgeBox
 
 API_PREFIX = "api"
 KBS_PREFIX = "/kbs"
+KB_PREFIX = "/kb"
 
 
 class NucliaDBClient:
@@ -41,6 +42,13 @@ class NucliaDBClient:
             KnowledgeBox(kbid=kb.uuid, client=self, slug=kb.slug)
             result.append(KnowledgeBox)
         return result
+
+    def get_kb(self, *, slug: str) -> Optional[KnowledgeBox]:
+        response = self.http_reader_v1.get(f"{KB_PREFIX}/s/{slug}")
+        if response.status_code == 404:
+            return None
+        response_obj = KnowledgeBoxObj.parse_raw(response.content)
+        return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 
     def create_kb(
         self,

@@ -26,10 +26,10 @@ from nucliadb_ingest.orm.node import DefinedNodesNucliaDBSearch
 from nucliadb_search.settings import settings
 
 
-def start_chitchat():
+def start_chitchat(service_name: str):
     if settings.nodes_load_ingest:
         # used for testing proposes get nodes from a real ingest
         load_nodes = DefinedNodesNucliaDBSearch()
         asyncio.create_task(load_nodes.start(), name="NODES_LOAD")
     else:
-        start_chitchat_ingest()
+        start_chitchat_ingest(service_name)

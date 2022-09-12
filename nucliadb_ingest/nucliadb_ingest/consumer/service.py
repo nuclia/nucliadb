@@ -114,7 +114,7 @@ class ConsumerService:
 
     async def run(self, service_name: Optional[str] = None):
         logger.info(
-            f"Pulling from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
+            f"Ingest txn from zone '{self.zone}' & partitions: {','.join(self.partitions)}"
         )
 
         for partition in self.partitions:
