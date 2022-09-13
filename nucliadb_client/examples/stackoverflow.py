@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import xml.sax
-import sys
+from time import time
 from bs4 import BeautifulSoup
 from nucliadb_models.conversation import (
     InputConversationField,
@@ -150,7 +150,14 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                     icf.messages.append(imq)
                     icf.messages.append(ima)
                     payload.conversations["stack"] = icf
+
+                    # Create the resource with the row value
+                    t0 = time()
                     resource = kb.create_resource(payload)
+                    print(f"Creation {time() - t0}")
+
+                    # Upload search information
+                    # Vector of question
                     vector = Vector(
                         start=0,
                         end=len(uploading_post.body),
@@ -166,6 +173,22 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                         split=question_id,
                     )
 
+                    # Vector of title
+                    title_vector = model.encode([uploading_post.title])
+                    vector = Vector(
+                        start=0,
+                        end=len(uploading_post.title),
+                        start_paragraph=0,
+                        end_paragraph=len(post.body),
+                    )
+                    vector.vector.extend(title_vector[0])
+                    resource.add_vectors(
+                        "title",
+                        FieldType.GENERIC,
+                        [vector],
+                    )
+
+                    # Vector of answer
                     vector = Vector(
                         start=0,
                         end=len(post.body),
@@ -178,7 +201,10 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                         "stack",
                         FieldType.CONVERSATION,
                         [vector],
+                        split=post_id,
                     )
+
+                    # Text
                     resource.add_text(
                         "stack",
                         FieldType.CONVERSATION,
@@ -188,7 +214,10 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                     resource.add_text(
                         "stack", FieldType.CONVERSATION, post.body, split=post_id
                     )
+
+                    t0 = time()
                     resource.commit()
+                    print(f"process {time() - t0}")
 
                     del QUESTIONS[question_id]
                     del ANSWERS[post_id]
