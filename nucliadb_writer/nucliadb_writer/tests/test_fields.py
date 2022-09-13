@@ -320,3 +320,46 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1"
         )
         assert resp.status_code == 204
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("text/text1", TEST_TEXT_PAYLOAD),
+        ("link/link1", TEST_LINK_PAYLOAD),
+        ("keywordset/kws1", TEST_KEYWORDSETS_PAYLOAD),
+        ("datetime/date1", TEST_DATETIMES_PAYLOAD),
+        ("conversation/conv1", TEST_CONVERSATION_PAYLOAD),
+        ("conversation/conv1/messages", TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD),
+        ("layout/layout1", TEST_LAYOUT_PAYLOAD),
+        ("layout/layout1/blocks", TEST_LAYOUT_APPEND_BLOCKS_PAYLOAD),
+        ("file/file1", TEST_FILE_PAYLOAD),
+    ],
+)
+async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
+    knowledgebox_id = knowledgebox_writer
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        HEADERS = {"X-SYNCHRONOUS": "True"}
+        # Create a resource
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers=HEADERS,
+            json={
+                "slug": "resource1",
+                "title": "My resource",
+                "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
+                "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        rid = data["uuid"]
+
+        resource_path = f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}"
+        resp = await client.put(
+            f"{resource_path}/{endpoint}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json=payload,
+        )
+        assert resp.status_code in (201, 200)

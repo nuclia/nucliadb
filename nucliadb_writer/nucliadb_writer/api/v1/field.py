@@ -272,7 +272,6 @@ async def add_resource_field_conversation(
     field_payload: models.InputConversationField,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_conversation_field(
         field_id, field_payload, writer, toprocess, kbid, rid
