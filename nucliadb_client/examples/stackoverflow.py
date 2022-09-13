@@ -239,6 +239,8 @@ if __name__ == "__main__":
     if kb is None:
         kb = client.create_kb(slug="stackoverflow", title="StackOverflow Example")
 
+    print(f"0 {datetime.now()}")
+
     parser = xml.sax.make_parser()
     parser.setContentHandler(StreamHandler())
     # if you can provide a file-like object it's as simple as
