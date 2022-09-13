@@ -143,7 +143,7 @@ async def create_resource(
     writer.source = BrokerMessage.MessageSource.WRITER
     if x_synchronous:
         t0 = time()
-    await transaction.commit(writer, partition, x_synchronous)
+    await transaction.commit(writer, partition, wait=x_synchronous)
 
     if x_synchronous:
         return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
@@ -209,7 +209,7 @@ async def modify_resource(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    await transaction.commit(writer, partition, x_synchronous)
+    await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=seqid)
 
@@ -273,7 +273,12 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource(request: Request, kbid: str, rid: str):
+async def delete_resource(
+    request: Request,
+    kbid: str,
+    rid: str,
+    x_synchronous: bool = SYNC_CALL,
+):
 
     set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
 
@@ -290,7 +295,7 @@ async def delete_resource(request: Request, kbid: str, rid: str):
     parse_audit(writer.audit, request)
 
     # Create processing message
-    await transaction.commit(writer, partition)
+    await transaction.commit(writer, partition, wait=x_synchronous)
 
     return Response(status_code=204)
 

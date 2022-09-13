@@ -26,6 +26,7 @@ target
 .eggs
 .egg-info
 *.so
+venv/
 
 # Coverage
 .coverage
