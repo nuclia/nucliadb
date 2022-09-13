@@ -210,6 +210,24 @@ async def test_resource_crud_sync(writer_api, knowledgebox_writer):
         res = await ingest.ResourceFieldExists(pbrequest)
         assert res.found
 
+        # Test update resource
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={},
+        )
+        assert resp.status_code == 200
+
+        # Test delete resource
+        resp = await client.delete(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
+            headers={"X-SYNCHRONOUS": "True"},
+        )
+        assert resp.status_code == 204
+
+        res = await ingest.ResourceFieldExists(pbrequest)
+        assert not res.found
+
 
 @pytest.mark.asyncio
 async def test_reprocess_resource(
