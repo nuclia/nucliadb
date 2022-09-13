@@ -184,19 +184,20 @@ async def search(
     # We need to query all nodes
     pb_query = await global_query_to_pb(
         kbid,
-        item.features,
-        item.query,
-        item.filters,
-        item.faceted,
-        item.sort.value,
-        item.page_number,
-        item.page_size,
-        item.range_creation_start,
-        item.range_creation_end,
-        item.range_modification_start,
-        item.range_modification_end,
-        item.fields,
-        item.reload,
+        features=item.features,
+        query=item.query,
+        filters=item.filters,
+        faceted=item.faceted,
+        sort=item.sort.value,
+        page_number=item.page_number,
+        page_size=item.page_size,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
+        fields=item.fields,
+        reload=item.reload,
+        vector=item.vector,
     )
 
     incomplete_results = False
