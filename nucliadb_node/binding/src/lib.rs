@@ -29,7 +29,8 @@ use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
     op_status, DocumentSearchRequest, OpStatus, ParagraphSearchRequest, RelationSearchRequest,
-    Resource, ResourceId, SearchRequest, Shard as ShardPB, ShardId, VectorSearchRequest,
+    Resource, ResourceId, SearchRequest, Shard as ShardPB, ShardId, SuggestRequest,
+    VectorSearchRequest,
 };
 use prost::Message;
 use pyo3::exceptions;
@@ -56,6 +57,7 @@ impl NodeReader {
             reader: Arc::new(RwLock::new(RustReaderService::new())),
         }
     }
+
     pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
@@ -75,6 +77,7 @@ impl NodeReader {
             }
         })
     }
+
     pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
@@ -83,6 +86,7 @@ impl NodeReader {
             Ok(shards.encode_to_vec())
         })
     }
+
     pub fn search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
@@ -99,6 +103,24 @@ impl NodeReader {
             }
         })
     }
+
+    pub fn suggest<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let reader = self.reader.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            let mut lock = reader.write().await;
+            let suggest_request = SuggestRequest::decode(&mut Cursor::new(request)).unwrap();
+            let shard_id = ShardId {
+                id: suggest_request.shard.clone(),
+            };
+            let response = lock.suggest(&shard_id, suggest_request).await;
+            match response {
+                Some(Ok(response)) => Ok(response.encode_to_vec()),
+                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+            }
+        })
+    }
+
     pub fn vector_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
@@ -115,6 +137,7 @@ impl NodeReader {
             }
         })
     }
+
     pub fn document_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
@@ -132,6 +155,7 @@ impl NodeReader {
             }
         })
     }
+
     pub fn paragraph_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
@@ -149,6 +173,7 @@ impl NodeReader {
             }
         })
     }
+
     pub fn relation_search<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
         let _ = RelationSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         todo!()

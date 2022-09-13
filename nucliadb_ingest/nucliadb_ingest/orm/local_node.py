@@ -22,7 +22,12 @@ from __future__ import annotations
 from typing import Optional
 from uuid import uuid4
 
-from nucliadb_protos.nodereader_pb2 import SearchRequest, SearchResponse
+from nucliadb_protos.nodereader_pb2 import (
+    SearchRequest,
+    SearchResponse,
+    SuggestRequest,
+    SuggestResponse,
+)
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import ShardCreated, ShardId, ShardIds
@@ -64,6 +69,17 @@ class LocalReaderWrapper:
         shard = NodeResourcesShard()
         shard.ParseFromString(pb_bytes)
         return shard
+
+    async def Suggest(self, request: SuggestRequest) -> SuggestResponse:
+        print("Request:")
+        print(request)
+        result = await self.reader.suggest(request.SerializeToString())
+        pb_bytes = bytes(result)
+        pb = SuggestResponse()
+        pb.ParseFromString(pb_bytes)
+        print("Response:")
+        print(pb)
+        return pb
 
 
 class LocalNode(AbstractNode):
