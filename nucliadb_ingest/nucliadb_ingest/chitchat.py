@@ -34,10 +34,10 @@ if SENTRY:
     from sentry_sdk import capture_exception
 
 
-def start_chitchat() -> Optional[ChitchatNucliaDB]:
+def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
 
     if settings.chitchat_enabled is False:
-        logger.info("Chitchat not enabled")
+        logger.info(f"Chitchat not enabled - {service_name}")
         return None
 
     chitchat = ChitchatNucliaDB(

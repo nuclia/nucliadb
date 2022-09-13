@@ -149,7 +149,7 @@ impl NodeReader for NodeReaderGRPCDriver {
                 Ok(tonic::Response::new(response))
             }
             Some(Err(e)) => {
-                info!("Document search ended incorrectly");
+                info!("Document search ended incorrectly {:?}", e.to_string());
                 Err(tonic::Status::internal(e.to_string()))
             }
             None => {
@@ -210,7 +210,7 @@ impl NodeReader for NodeReaderGRPCDriver {
                 Ok(tonic::Response::new(response))
             }
             Some(Err(e)) => {
-                info!("Document search ended incorrectly");
+                info!("Document search ended incorrectly {:?}", e.to_string());
                 Err(tonic::Status::internal(e.to_string()))
             }
             None => {

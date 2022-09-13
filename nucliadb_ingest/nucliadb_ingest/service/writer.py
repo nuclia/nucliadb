@@ -169,10 +169,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def ProcessMessage(  # type: ignore
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
-        async for message in request_stream:
-            await self.proc.process(message, -1, 0, transaction_check=False)
         response = OpStatusWriter()
-        response.status = OpStatusWriter.Status.OK
+        async for message in request_stream:
+            try:
+                await self.proc.process(message, -1, 0, transaction_check=False)
+            except Exception:
+                logger.exception("Error processing", stack_info=True)
+                response.status = OpStatusWriter.Status.ERROR
+                break
+            response.status = OpStatusWriter.Status.OK
+
         return response
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore

@@ -6,7 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - NUCLIADB_ENV=True
       - DRIVER=LOCAL
       - MAINDB=/data/maindb
       - BLOB=/data/blobs

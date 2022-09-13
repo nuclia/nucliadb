@@ -30,11 +30,11 @@ from nucliadb_ingest.processing import PushPayload
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import PushConversation
 from nucliadb_models.resource import FIELD_TYPES_MAP
+from nucliadb_models.writer import CreateResourcePayload, UpdateResourcePayload
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
 from nucliadb_writer import SERVICE_NAME
-from nucliadb_writer.api.models import CreateResourcePayload, UpdateResourcePayload
 from nucliadb_writer.layouts import serialize_blocks
 from nucliadb_writer.utilities import get_processing
 

@@ -38,6 +38,7 @@ from nucliadb_search.api.models import (
     KnowledgeboxSearchResults,
     SearchClientType,
     SearchOptions,
+    SearchRequest,
     SortOption,
 )
 from nucliadb_search.api.v1.router import KB_PREFIX, api
@@ -87,28 +88,90 @@ async def search_knowledgebox(
         ]
     ),
     reload: bool = Query(default=True),
-    debug: bool = Query(default=False),
+    debug: bool = Query(False),
+    shards: bool = Query(False),
     highlight: bool = Query(default=False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
+    shard: List[str] = Query([]),
+    x_ndb_client: SearchClientType = Header(SearchClientType.API),
+    x_nucliadb_user: str = Header(""),
+    x_forwarded_for: str = Header(""),
+) -> KnowledgeboxSearchResults:
+    item = SearchRequest(
+        query=query,
+        fields=fields,
+        filters=filters,
+        faceted=faceted,
+        sort=sort,
+        page_number=page_number,
+        page_size=page_size,
+        max_score=max_score,
+        range_creation_end=range_creation_end,
+        range_creation_start=range_creation_start,
+        range_modification_end=range_modification_end,
+        range_modification_start=range_modification_start,
+        features=features,
+        reload=reload,
+        debug=debug,
+        shards=shards,
+        highlight=highlight,
+        show=show,
+        field_type_filter=field_type_filter,
+        extracted=extracted,
+        shard=shard,
+    )
+    return await search(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    )
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/search",
+    status_code=200,
+    description="Search on a knowledge box",
+    response_model=KnowledgeboxSearchResults,
+    response_model_exclude_unset=True,
+    tags=["Search"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def search_post_knowledgebox(
+    request: Request,
+    response: Response,
+    kbid: str,
+    item: SearchRequest,
     x_ndb_client: SearchClientType = Header(SearchClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
     # We need the nodes/shards that are connected to the KB
+    return await search(
+        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    )
+
+
+async def search(
+    response: Response,
+    kbid: str,
+    item: SearchRequest,
+    x_ndb_client: SearchClientType,
+    x_nucliadb_user: str,
+    x_forwarded_for: str,
+):
     nodemanager = get_nodes()
     audit = get_audit()
     timeit = time()
 
-    if query == "":
+    if item.query == "":
         # If query is not defined we force to not return results
-        page_size = 1
-        page_number = 0
-        if SearchOptions.VECTOR in features:
-            features.remove(SearchOptions.VECTOR)
+        item.page_size = 1
+        item.page_number = 0
+        if SearchOptions.VECTOR in item.features:
+            item.features.remove(SearchOptions.VECTOR)
 
     try:
         shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
@@ -121,27 +184,29 @@ async def search_knowledgebox(
     # We need to query all nodes
     pb_query = await global_query_to_pb(
         kbid,
-        features,
-        query,
-        filters,
-        faceted,
-        sort.value,
-        page_number,
-        page_size,
-        range_creation_start,
-        range_creation_end,
-        range_modification_start,
-        range_modification_end,
-        fields,
-        reload,
+        features=item.features,
+        query=item.query,
+        filters=item.filters,
+        faceted=item.faceted,
+        sort=item.sort.value,
+        page_number=item.page_number,
+        page_size=item.page_size,
+        range_creation_start=item.range_creation_start,
+        range_creation_end=item.range_creation_end,
+        range_modification_start=item.range_modification_start,
+        range_modification_end=item.range_modification_end,
+        fields=item.fields,
+        reload=item.reload,
+        vector=item.vector,
     )
 
     incomplete_results = False
     ops = []
     queried_shards = []
-    for shard in shard_groups:
+    queried_nodes = []
+    for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard_obj, item.shard)
         except KeyError:
             incomplete_results = True
         else:
@@ -149,7 +214,8 @@ async def search_knowledgebox(
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
                 ops.append(query_shard(node, shard_id, pb_query))
-                queried_shards.append((node.label, shard_id, node_id))
+                queried_nodes.append((node.label, shard_id, node_id))
+                queried_shards.append(shard_id)
 
     if not ops:
         await abort_transaction()
@@ -191,14 +257,14 @@ async def search_knowledgebox(
     # We need to merge
     search_results = await merge_results(
         results,
-        count=page_size,
-        page=page_number,
+        count=item.page_size,
+        page=item.page_number,
         kbid=kbid,
-        show=show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
-        max_score=max_score,
-        highlight=highlight,
+        show=item.show,
+        field_type_filter=item.field_type_filter,
+        extracted=item.extracted,
+        max_score=item.max_score,
+        highlight=item.highlight,
     )
     await abort_transaction()
 
@@ -213,6 +279,8 @@ async def search_knowledgebox(
             timeit - time(),
             len(search_results.resources),
         )
-    if debug:
+    if item.debug:
+        search_results.nodes = queried_nodes
+    if item.shards:
         search_results.shards = queried_shards
     return search_results

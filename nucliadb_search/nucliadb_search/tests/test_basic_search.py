@@ -82,16 +82,32 @@ async def test_multiple_search_resource_all(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=20",
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40&shards=true",
         )
         if resp.status_code != 200:
             print(resp.content)
+
         assert resp.status_code == 200
-        assert len(resp.json()["paragraphs"]["results"]) == 20
+        assert len(resp.json()["paragraphs"]["results"]) == 40
         assert resp.json()["paragraphs"]["next_page"]
         assert resp.json()["fulltext"]["next_page"]
+
+        shards = resp.json()["shards"]
+        pos_30 = resp.json()["paragraphs"]["results"][30]
+        pos_35 = resp.json()["paragraphs"]["results"][35]
+
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shard={shards[0]}&shards=true",  # noqa
+        )
+        if resp.status_code != 200:
+            print(resp.content)
+
+        assert resp.status_code == 200
+        assert resp.json()["shards"][0] == shards[0]
+        assert resp.json()["paragraphs"]["results"][0]["rid"] == pos_30["rid"]
+        assert resp.json()["paragraphs"]["results"][5]["rid"] == pos_35["rid"]
 
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=4&page_size=20",

@@ -43,9 +43,10 @@ class LocalTransaction(Transaction):
     visited_keys: Dict[str, bytes]
     deleted_keys: List[str]
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, driver: Driver):
         self.url = url
         self.open = True
+        self.driver = driver
         self.modified_keys = {}
         self.visited_keys = {}
         self.deleted_keys = []
@@ -217,7 +218,7 @@ class LocalDriver(Driver):
     async def begin(self) -> LocalTransaction:
         if self.url is None:
             raise AttributeError("Invalid url")
-        return LocalTransaction(self.url)
+        return LocalTransaction(self.url, self)
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True

@@ -16,20 +16,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from __future__ import annotations
 
-import asyncio
-
-from nucliadb_ingest.chitchat import start_chitchat as start_chitchat_ingest
-from nucliadb_ingest.orm.node import DefinedNodesNucliaDBSearch
-from nucliadb_search.settings import settings
+from nucliadb_client.client import NucliaDBClient
 
 
-def start_chitchat(service_name: str):
-    if settings.nodes_load_ingest:
-        # used for testing proposes get nodes from a real ingest
-        load_nodes = DefinedNodesNucliaDBSearch()
-        asyncio.create_task(load_nodes.start(), name="NODES_LOAD")
-    else:
-        start_chitchat_ingest(service_name)
+def test_knowledgebox_creation(nucliadb_client: NucliaDBClient):
+    kb = nucliadb_client.create_kb(
+        title="My KB", description="Its a new KB", slug="mykb"
+    )
+    info = kb.get()
+    info.slug == "mykb"
+    info.config.title == "My KB"
+    info.config.description == "Its a new KB"
+
+    assert kb.delete()
+    info = kb.get()

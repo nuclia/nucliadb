@@ -1,0 +1,4 @@
+nucliadb_protos
+httpx
+grpcio-health-checking
+grpcio

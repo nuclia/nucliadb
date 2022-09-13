@@ -66,7 +66,7 @@ impl Configuration {
     }
 
     pub fn shards_path_id(id: &str) -> String {
-        return format!("{}/{}", Configuration::shards_path(), id);
+        format!("{}/{}", Configuration::shards_path(), id)
     }
 
     /// Reader GRPC service port

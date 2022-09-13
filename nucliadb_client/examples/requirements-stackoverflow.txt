@@ -1,0 +1,3 @@
+sentence_transformers
+bs4
+python-dateutil

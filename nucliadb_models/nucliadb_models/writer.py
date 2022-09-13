@@ -21,28 +21,41 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-import nucliadb_models as models
-from nucliadb_ingest.processing import PushProcessingOptions
+from nucliadb_models.conversation import InputConversationField
+from nucliadb_models.datetime import FieldDatetime
+from nucliadb_models.file import FileField
+from nucliadb_models.keywordset import FieldKeywordset
+from nucliadb_models.layout import InputLayoutField
+from nucliadb_models.link import LinkField
+from nucliadb_models.metadata import (
+    InputMetadata,
+    Origin,
+    UserFieldMetadata,
+    UserMetadata,
+)
+from nucliadb_models.processing import PushProcessingOptions
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import SlugString
 
 
 class CreateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
-    slug: Optional[models.SlugString] = None
+    slug: Optional[SlugString] = None
     icon: Optional[str] = None
     layout: Optional[str] = None
-    metadata: Optional[models.InputMetadata] = None
-    usermetadata: Optional[models.UserMetadata] = None
-    fieldmetadata: Optional[List[models.UserFieldMetadata]] = None
-    origin: Optional[models.Origin] = None
+    metadata: Optional[InputMetadata] = None
+    usermetadata: Optional[UserMetadata] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    origin: Optional[Origin] = None
 
-    files: Dict[str, models.FileField] = {}
-    links: Dict[str, models.LinkField] = {}
-    texts: Dict[str, models.TextField] = {}
-    layouts: Dict[str, models.InputLayoutField] = {}
-    conversations: Dict[str, models.InputConversationField] = {}
-    keywordsets: Dict[str, models.FieldKeywordset] = {}
-    datetimes: Dict[str, models.FieldDatetime] = {}
+    files: Dict[str, FileField] = {}
+    links: Dict[str, LinkField] = {}
+    texts: Dict[str, TextField] = {}
+    layouts: Dict[str, InputLayoutField] = {}
+    conversations: Dict[str, InputConversationField] = {}
+    keywordsets: Dict[str, FieldKeywordset] = {}
+    datetimes: Dict[str, FieldDatetime] = {}
 
     # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -62,19 +75,19 @@ class CreateResourcePayload(BaseModel):
 class UpdateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
-    slug: Optional[models.SlugString] = None
+    slug: Optional[SlugString] = None
     icon: Optional[str] = None
     layout: Optional[str] = None
-    usermetadata: Optional[models.UserMetadata] = None
-    fieldmetadata: Optional[List[models.UserFieldMetadata]] = None
+    usermetadata: Optional[UserMetadata] = None
+    fieldmetadata: Optional[List[UserFieldMetadata]] = None
 
-    files: Dict[str, models.FileField] = {}
-    links: Dict[str, models.LinkField] = {}
-    texts: Dict[str, models.TextField] = {}
-    layouts: Dict[str, models.InputLayoutField] = {}
-    conversations: Dict[str, models.InputConversationField] = {}
-    keywordsets: Dict[str, models.FieldKeywordset] = {}
-    datetimes: Dict[str, models.FieldDatetime] = {}
+    files: Dict[str, FileField] = {}
+    links: Dict[str, LinkField] = {}
+    texts: Dict[str, TextField] = {}
+    layouts: Dict[str, InputLayoutField] = {}
+    conversations: Dict[str, InputConversationField] = {}
+    keywordsets: Dict[str, FieldKeywordset] = {}
+    datetimes: Dict[str, FieldDatetime] = {}
 
     # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()

@@ -53,7 +53,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     ingest = get_ingest()
     response = KnowledgeBoxList()
     async for kb_id in ingest.ListKnowledgeBox(KnowledgeBoxPrefix(prefix=prefix)):  # type: ignore
-        if kb_id.slug != "":
+        if kb_id.slug == "":
             slug = None
         else:
             slug = kb_id.slug
@@ -73,6 +73,30 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     ingest = get_ingest()
     kbobj: KnowledgeBox = await ingest.GetKnowledgeBox(KnowledgeBoxID(uuid=kbid))  # type: ignore
+    if kbobj.status == KnowledgeBoxResponseStatus.OK:
+        return KnowledgeBoxObj(
+            uuid=kbobj.uuid,
+            slug=kbobj.slug,
+            config=MessageToDict(kbobj.config, preserving_proto_field_name=True),
+        )
+    elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    else:
+        raise HTTPException(status_code=500, detail="Uknonwn GRPC response")
+
+
+@api.get(
+    f"/{KB_PREFIX}/s/{{slug}}",
+    status_code=200,
+    name="Get Knowledge Box by SLUG",
+    response_model=KnowledgeBoxObj,
+    tags=["Knowledge Boxes"],
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
+@version(1)
+async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
+    ingest = get_ingest()
+    kbobj: KnowledgeBox = await ingest.GetKnowledgeBox(KnowledgeBoxID(slug=slug))  # type: ignore
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObj(
             uuid=kbobj.uuid,

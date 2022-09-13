@@ -39,6 +39,8 @@ class AbstractShard:
 
 
 class AbstractNode:
+    label: str
+
     @classmethod
     def create_shard_klass(cls, shard_id: str, pbshard: PBShard) -> AbstractShard:
         pass

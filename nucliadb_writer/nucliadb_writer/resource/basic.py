@@ -39,7 +39,7 @@ from nucliadb_ingest.processing import PushPayload
 from nucliadb_models import RelationType
 from nucliadb_models.resource import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.text import PushTextFormat, Text
-from nucliadb_writer.api.models import (
+from nucliadb_models.writer import (
     ComminResourcePayload,
     CreateResourcePayload,
     UpdateResourcePayload,

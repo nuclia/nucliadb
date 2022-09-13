@@ -18,9 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-import re
-
-import pydantic
 
 from .common import *  # noqa
 from .conversation import *  # noqa
@@ -31,10 +28,8 @@ from .keywordset import *  # noqa
 from .layout import *  # noqa
 from .link import *  # noqa
 from .metadata import *  # noqa
+from .processing import *  # noqa
 from .text import *  # noqa
+from .writer import *  # noqa
 
 logger = logging.getLogger("nucliadb_models")
-
-
-class SlugString(pydantic.ConstrainedStr):
-    regex = re.compile(r"[a-z0-9_-]+")

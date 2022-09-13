@@ -16,20 +16,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from __future__ import annotations
 
-import asyncio
+from typing import Optional
 
-from nucliadb_ingest.chitchat import start_chitchat as start_chitchat_ingest
-from nucliadb_ingest.orm.node import DefinedNodesNucliaDBSearch
-from nucliadb_search.settings import settings
+from pydantic import BaseModel
 
 
-def start_chitchat(service_name: str):
-    if settings.nodes_load_ingest:
-        # used for testing proposes get nodes from a real ingest
-        load_nodes = DefinedNodesNucliaDBSearch()
-        asyncio.create_task(load_nodes.start(), name="NODES_LOAD")
-    else:
-        start_chitchat_ingest(service_name)
+class PushProcessingOptions(BaseModel):
+    # Enable ML processing
+    ml_text: Optional[bool] = True
