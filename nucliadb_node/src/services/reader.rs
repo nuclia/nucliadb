@@ -253,9 +253,11 @@ impl ShardReaderService {
     #[tracing::instrument(name = "ShardReaderService::search", skip(self, search_request))]
     pub async fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload).await;
-        let skip_vectors = search_request.body.is_empty() || search_request.result_per_page == 0;
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
+        let skip_vectors = search_request.body.is_empty()
+            || search_request.result_per_page.eq(&0)
+            || search_request.vector.is_empty();
 
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
