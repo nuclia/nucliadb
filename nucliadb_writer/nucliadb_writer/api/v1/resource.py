@@ -279,7 +279,6 @@ async def delete_resource(
     rid: str,
     x_synchronous: bool = SYNC_CALL,
 ):
-
     set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
 
     transaction = get_transaction()
