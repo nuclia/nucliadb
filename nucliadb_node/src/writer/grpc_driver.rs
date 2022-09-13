@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use async_std::sync::{Arc, RwLock};
+use async_std::sync::RwLock;
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
     op_status, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
@@ -31,10 +31,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
-pub struct NodeWriterGRPCDriver(Arc<RwLock<NodeWriterService>>);
+pub struct NodeWriterGRPCDriver(RwLock<NodeWriterService>);
 impl From<NodeWriterService> for NodeWriterGRPCDriver {
     fn from(node: NodeWriterService) -> NodeWriterGRPCDriver {
-        NodeWriterGRPCDriver(Arc::new(RwLock::new(node)))
+        NodeWriterGRPCDriver(RwLock::new(node))
     }
 }
 

@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use async_std::sync::{Arc, RwLock};
+use async_std::sync::RwLock;
 use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, EmptyQuery, IdCollection,
@@ -33,10 +33,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
 
-pub struct NodeReaderGRPCDriver(Arc<RwLock<NodeReaderService>>);
+pub struct NodeReaderGRPCDriver(RwLock<NodeReaderService>);
 impl From<NodeReaderService> for NodeReaderGRPCDriver {
     fn from(node: NodeReaderService) -> NodeReaderGRPCDriver {
-        NodeReaderGRPCDriver(Arc::new(RwLock::new(node)))
+        NodeReaderGRPCDriver(RwLock::new(node))
     }
 }
 
