@@ -4,7 +4,7 @@ CHANGELOG
 1.0.9 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Parametrize upload token expiration
 
 
 1.0.8 (2022-07-20)
