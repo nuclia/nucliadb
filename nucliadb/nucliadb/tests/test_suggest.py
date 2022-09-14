@@ -226,6 +226,33 @@ async def test_suggest_related_entities(
     body = resp.json()
     assert not body["entities"]["entities"]
 
+    # Test correct query tokenization
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=bar")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona"}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Bar")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona"}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BAR")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona"}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BÄR")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona"}
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BàR")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona"}
+
     # Test multiple word suggest and ordering
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
