@@ -32,8 +32,8 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search.api.models import (
-    ResourceSearchResults,
     NucliaDBClientType,
+    ResourceSearchResults,
     SearchOptions,
     SortOption,
 )
