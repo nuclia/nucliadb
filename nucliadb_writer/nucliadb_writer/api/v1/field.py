@@ -101,7 +101,7 @@ async def finish_field_put(
     writer: BrokerMessage,
     toprocess: PushPayload,
     partition: int,
-    x_synchronous: bool,
+    wait_on_commit: bool,
 ) -> int:
     # Create processing message
     transaction = get_transaction()
@@ -110,7 +110,7 @@ async def finish_field_put(
     seqid = await processing.send_to_process(toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    await transaction.commit(writer, partition, wait=x_synchronous)
+    await transaction.commit(writer, partition, wait=wait_on_commit)
 
     return seqid
 

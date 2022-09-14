@@ -411,3 +411,47 @@ async def test_knowledgebox_file_upload_field_headers(
         key=writer.files[field].file.uri,
     )
     assert len(data.read()) == 30472
+
+
+@pytest.mark.asyncio
+async def test_knowledgebox_file_upload_field_sync(
+    writer_api, knowledgebox_writer, resource
+):
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+
+        filename = base64.b64encode(b"image.jpg").decode()
+        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+            resp = await client.post(
+                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
+                data=f.read(),
+                headers={
+                    "X-FILENAME": filename,
+                    "X-LANGUAGE": "ca",
+                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
+                    "content-type": "image/jpg",
+                    "X-SYNCHRONOUS": "True",
+                },
+            )
+            assert resp.status_code == 201
+
+    processing = get_processing()
+    transaction = get_transaction()
+
+    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    msgs = await sub.fetch(2)
+    writer = BrokerMessage()
+    writer.ParseFromString(msgs[1].data)
+    await msgs[1].ack()
+
+    payload = processing.calls[1]
+
+    assert payload["kbid"] == knowledgebox_writer
+    path = resp.headers["ndb-field"]
+    field = path.split("/")[-1]
+
+    storage = await get_storage()
+    data = await storage.downloadbytes(
+        bucket=writer.files[field].file.bucket_name,
+        key=writer.files[field].file.uri,
+    )
+    assert len(data.read()) == 30472
