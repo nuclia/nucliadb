@@ -34,7 +34,7 @@ RUN set -eux; \
     wget "https://github.com/tikv/client-py/archive/refs/tags/${CLIENT_VERSION}.tar.gz"; \
     tar -xzf 0.0.3.tar.gz; \
     cd client-py-${CLIENT_VERSION}; \
-    maturin build; \
+    maturin build --release; \
     cp target/wheels/tikv_client-${CLIENT_VERSION}-*.whl /
 
 
@@ -44,7 +44,7 @@ WORKDIR /nucliadb
 
 RUN set -eux; \
     cd nucliadb_node/binding; \
-    maturin build
+    maturin build --release
 
 RUN cp /nucliadb/target/wheels/nucliadb_node*.whl /
 
