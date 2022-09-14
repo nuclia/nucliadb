@@ -23,8 +23,7 @@ CHANGELOG
 1.1.5 (unreleased)
 ------------------
 
-- Nothing changed yet.
-
+- Minimize sleep time
 
 1.1.4 (2022-07-22)
 ------------------
