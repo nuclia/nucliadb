@@ -64,7 +64,7 @@ async def clean_telemetry(service_name: str):
         tracer_provider = GLOBAL_PROVIDER[service_name]
         await tracer_provider.force_flush()
         # Without this sleep, force_flush fails on exporting pending spans
-        await asyncio.sleep(1)
+        await asyncio.sleep(0)
         tracer_provider.shutdown()
         del GLOBAL_PROVIDER[service_name]
 
