@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
+use futures::future::try_join_all;
 use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
@@ -40,6 +41,8 @@ use crate::telemetry::run_with_telemetry;
 
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;
+const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
+
 #[derive(Debug)]
 pub struct ShardReaderService {
     pub id: String,
@@ -298,23 +301,60 @@ impl ShardReaderService {
         }
     }
 
+    /// Return a list of queries to suggest from the original
+    /// query. The query with more words will come first. `max_group`
+    /// defines the limit of words a query can have.
+    fn split_suggest_query(query: String, max_group: usize) -> Vec<String> {
+        let words = query.split(' ');
+        let mut i = 0;
+        let mut prefixes = vec![];
+        let mut prefix = String::new();
+
+        for word in words.rev() {
+            if prefix.is_empty() {
+                prefix = word.to_string();
+            } else {
+                prefix = format!("{word} {prefix}");
+            }
+            prefixes.push(prefix.clone());
+
+            i += 1;
+            if i == max_group {
+                break;
+            }
+        }
+
+        prefixes.into_iter().rev().collect()
+    }
+
     pub async fn suggest(&self, search_request: SuggestRequest) -> InternalResult<SuggestResponse> {
         // Search for entities related to the query.
 
-        let relations_request = RelationSearchRequest {
-            id: String::default(),
-            prefix: search_request.body.clone(),
-            type_filters: vec![RelationFilter {
-                ntype: relation_node::NodeType::Entity as i32,
-                subtype: "".to_string(),
-            }],
-            depth: 10,
-            ..Default::default()
-        };
-        println!("Relation search request: {:#?}", relations_request);
-        let relations_reader_service = self.relation_reader_service.clone();
-        let relations_task =
-            task::spawn_blocking(move || relations_reader_service.search(&relations_request));
+        let prefixes =
+            Self::split_suggest_query(search_request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
+
+        let relations_requests = prefixes
+            .into_iter()
+            .map(|prefix| RelationSearchRequest {
+                id: String::default(),
+                prefix: prefix,
+                type_filters: vec![RelationFilter {
+                    ntype: relation_node::NodeType::Entity as i32,
+                    subtype: "".to_string(),
+                }],
+                depth: 10,
+                ..Default::default()
+            })
+            .collect::<Vec<RelationSearchRequest>>();
+
+        println!("Relation search request: {:#?}", relations_requests);
+        let mut relations_tasks = vec![];
+        for relations_request in relations_requests {
+            let relations_reader_service = self.relation_reader_service.clone();
+            relations_tasks.push(task::spawn_blocking(move || {
+                relations_reader_service.search(&relations_request)
+            }))
+        }
         info!("{}:{}", line!(), file!());
 
         let paragraph_request = ParagraphSearchRequest {
@@ -336,17 +376,23 @@ impl ShardReaderService {
             task::spawn_blocking(move || paragraph_reader_service.search(&paragraph_request));
         info!("{}:{}", line!(), file!());
 
-        let (rrelations, rparagraph) = try_join!(relations_task, paragraph_task).unwrap();
-        info!("{}:{}", line!(), file!());
+        let (rparagraph, rrelations) =
+            try_join!(paragraph_task, try_join_all(relations_tasks)).unwrap();
 
-        let rrelations = rrelations.unwrap();
         let rparagraph = rparagraph.unwrap();
 
         println!("Relations result: {:#?}", rrelations);
         let entities = rrelations
-            .neighbours
-            .iter()
-            .map(|relation_node| relation_node.value.clone())
+            .into_iter()
+            .map(|relation| {
+                relation
+                    .unwrap()
+                    .neighbours
+                    .iter()
+                    .map(|relation_node| relation_node.value.clone())
+                    .collect::<Vec<String>>()
+            })
+            .flatten()
             .collect::<Vec<String>>();
         println!("Entities: {:#?}", entities);
 
@@ -537,5 +583,24 @@ impl ShardReaderService {
                 .await
                 .unwrap()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_suggest_split() {
+        let query = "Some search with multiple words".to_string();
+
+        assert_eq!(
+            ShardReaderService::split_suggest_query(query.clone(), 3),
+            vec!["with multiple words", "multiple words", "words"]
+        );
+        assert_eq!(
+            ShardReaderService::split_suggest_query(query.clone(), 2),
+            vec!["multiple words", "words"]
+        );
     }
 }

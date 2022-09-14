@@ -225,3 +225,10 @@ async def test_suggest_related_entities(
     assert resp.status_code == 200
     body = resp.json()
     assert not body["entities"]["entities"]
+
+    # Test multiple word suggest and ordering
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]
