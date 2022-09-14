@@ -25,6 +25,7 @@ from typing import Dict, List, Optional
 import xml.sax
 from time import time
 from bs4 import BeautifulSoup
+from nucliadb_client.resource import Resource
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
@@ -52,12 +53,15 @@ ANSWERS: Dict[str, str] = {}
 client: Optional[NucliaDBClient] = None
 kb: Optional[KnowledgeBox] = None
 
+PAYLOADS = []
+BROKER_MESSAGES = []
+
 
 @dataclass
 class Post:
+    id: str
     title: Optional[str] = None
     body: Optional[str] = None
-    vectors: Optional[List[float]] = None
     creation: Optional[datetime] = None
     answer: Optional[Post] = None
     tags: Optional[List[str]] = None
@@ -70,6 +74,109 @@ class StreamHandler(xml.sax.handler.ContentHandler):
     lastName = None
     count = 0
 
+    def upload_post(self, question: Post, answer: Post) -> Resource:
+
+        payload = CreateResourcePayload()
+        payload.title = question.title
+        payload.origin = Origin()
+        payload.origin.tags = question.tags
+        payload.icon = "text/conversation"
+        payload.metadata = InputMetadata()
+        payload.metadata.language = "en"
+        payload.slug = question.id
+
+        self.count += 1
+        if self.count % 50 == 0:
+            print(f"{self.count} {datetime.now()}")
+        if self.count == 500_000:
+            print("DONE")
+            exit(0)
+
+        imq = InputMessage(
+            timestamp=question.creation,
+            who=question.who,
+            ident=question.id,
+            content=InputMessageContent(text=question.body),
+        )
+
+        ima = InputMessage(
+            timestamp=answer.creation,
+            who=answer.who,
+            ident=answer.id,
+            content=InputMessageContent(text=answer.body),
+        )
+
+        icf = InputConversationField()
+        icf.messages.append(imq)
+        icf.messages.append(ima)
+        payload.conversations["stack"] = icf
+
+        # Create the resource with the row value
+        resource = kb.create_resource(payload)
+
+        return resource
+
+    def compute_vectors(self, resource: Resource, question: Post, answer: Post):
+        # Upload search information
+        # Vectors
+        embeddings = model.encode([question.title, question.body, answer.body])
+
+        # Title vector
+        vector = Vector(
+            start=0,
+            end=len(question.title),
+            start_paragraph=0,
+            end_paragraph=len(question.title),
+        )
+        vector.vector.extend(embeddings[0])
+        resource.add_vectors(
+            "title",
+            FieldType.GENERIC,
+            [vector],
+        )
+
+        # Question vector
+        vector = Vector(
+            start=0,
+            end=len(question.body),
+            start_paragraph=0,
+            end_paragraph=len(question.body),
+        )
+        vector.vector.extend(embeddings[1])
+
+        resource.add_vectors(
+            "stack",
+            FieldType.CONVERSATION,
+            [vector],
+            split=question.id,
+        )
+
+        # Vector of answer
+        vector = Vector(
+            start=0,
+            end=len(answer.body),
+            start_paragraph=0,
+            end_paragraph=len(answer.body),
+        )
+        vector.vector.extend(embeddings[2])
+
+        resource.add_vectors(
+            "stack",
+            FieldType.CONVERSATION,
+            [vector],
+            split=answer.id,
+        )
+
+    def compute_text(self, resource: Resource, question: Post, answer: Post):
+        # Text
+        resource.add_text(
+            "stack",
+            FieldType.CONVERSATION,
+            question.body,
+            split=question.id,
+        )
+        resource.add_text("stack", FieldType.CONVERSATION, answer.body, split=answer.id)
+
     def startElement(self, name, attrs):
         self.lastName = name
         if name == "posts":
@@ -80,9 +187,9 @@ class StreamHandler(xml.sax.handler.ContentHandler):
     def endElement(self, name):
         if name == "row":
 
-            post = Post()
-            post.title = self.lastEntry.get("Title")
             post_id = self.lastEntry.get("Id")
+            post = Post(id=post_id)
+            post.title = self.lastEntry.get("Title")
             body = self.lastEntry.get("Body")
             answer = self.lastEntry.get("AcceptedAnswerId")
             ANSWERS[answer] = post_id
@@ -90,7 +197,6 @@ class StreamHandler(xml.sax.handler.ContentHandler):
             post.who = self.lastEntry.get("OwnerUserId")
             tree = BeautifulSoup(body, features="html.parser")
             good_html = tree.get_text().replace("\n", " \n ")
-
             post.body = good_html
 
             tags = self.lastEntry.get("Tags")
@@ -102,10 +208,6 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                 ).split(",")
                 post.tags = tags
 
-            # Sentences are encoded by calling model.encode()
-            embeddings = model.encode([good_html])
-            post.vectors = embeddings[0]
-
             type_post = self.lastEntry.get("PostTypeId")
             if type_post == "1":
                 QUESTIONS[post_id] = post
@@ -114,110 +216,15 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                 if post_id in ANSWERS:
                     # We found an answer
                     question_id = ANSWERS[post_id]
-                    uploading_post = QUESTIONS[question_id]
-
-                    payload = CreateResourcePayload()
-                    payload.title = uploading_post.title
-                    payload.origin = Origin()
-                    payload.origin.tags = uploading_post.tags
-                    payload.icon = "text/conversation"
-                    payload.metadata = InputMetadata()
-                    payload.metadata.language = "en"
-                    payload.slug = post_id
-
-                    self.count += 1
-                    if self.count % 50 == 0:
-                        print(f"{self.count} {datetime.now()}")
-                    if self.count == 500_000:
-                        print("DONE")
-                        exit(0)
-
-                    imq = InputMessage(
-                        timestamp=uploading_post.creation,
-                        who=uploading_post.who,
-                        ident=question_id,
-                        content=InputMessageContent(text=uploading_post.body),
+                    question_post = QUESTIONS[question_id]
+                    resource = self.upload_post(question=question_post, answer=post)
+                    self.compute_vectors(
+                        resource=resource, question=question_post, answer=post
                     )
-
-                    ima = InputMessage(
-                        timestamp=post.creation,
-                        who=post.who,
-                        ident=post_id,
-                        content=InputMessageContent(text=post.body),
+                    self.compute_text(
+                        resource=resource, question=question_post, answer=post
                     )
-
-                    icf = InputConversationField()
-                    icf.messages.append(imq)
-                    icf.messages.append(ima)
-                    payload.conversations["stack"] = icf
-
-                    # Create the resource with the row value
-                    t0 = time()
-                    resource = kb.create_resource(payload)
-                    print(f"Creation {time() - t0}")
-
-                    # Upload search information
-                    # Vector of question
-                    vector = Vector(
-                        start=0,
-                        end=len(uploading_post.body),
-                        start_paragraph=0,
-                        end_paragraph=len(uploading_post.body),
-                    )
-                    vector.vector.extend(uploading_post.vectors)
-
-                    resource.add_vectors(
-                        "stack",
-                        FieldType.CONVERSATION,
-                        [vector],
-                        split=question_id,
-                    )
-
-                    # Vector of title
-                    title_vector = model.encode([uploading_post.title])
-                    vector = Vector(
-                        start=0,
-                        end=len(uploading_post.title),
-                        start_paragraph=0,
-                        end_paragraph=len(post.body),
-                    )
-                    vector.vector.extend(title_vector[0])
-                    resource.add_vectors(
-                        "title",
-                        FieldType.GENERIC,
-                        [vector],
-                    )
-
-                    # Vector of answer
-                    vector = Vector(
-                        start=0,
-                        end=len(post.body),
-                        start_paragraph=0,
-                        end_paragraph=len(post.body),
-                    )
-                    vector.vector.extend(post.vectors)
-
-                    resource.add_vectors(
-                        "stack",
-                        FieldType.CONVERSATION,
-                        [vector],
-                        split=post_id,
-                    )
-
-                    # Text
-                    resource.add_text(
-                        "stack",
-                        FieldType.CONVERSATION,
-                        uploading_post.body,
-                        split=question_id,
-                    )
-                    resource.add_text(
-                        "stack", FieldType.CONVERSATION, post.body, split=post_id
-                    )
-
-                    t0 = time()
                     resource.commit()
-                    print(f"process {time() - t0}")
 
                     del QUESTIONS[question_id]
                     del ANSWERS[post_id]
