@@ -63,6 +63,7 @@ class StorageSettings(BaseSettings):
     s3_bucket: Optional[str] = None
 
     local_files: Optional[str] = None
+    upload_token_expiration: Optional[int] = 3
 
 
 storage_settings = StorageSettings()
