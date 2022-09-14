@@ -20,7 +20,7 @@
 CHANGELOG
 =========
 
-1.1.5 (unreleased)
+1.1.5 (2022-09-14)
 ------------------
 
 - Minimize sleep time
