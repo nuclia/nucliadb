@@ -37,6 +37,9 @@ async def test_tikv_driver(tikvd):
     await driver_basic(driver)
 
 
+@pytest.mark.skip(
+    reason="Local driver doesn't implement saving info in intermediate nodes"
+)
 @pytest.mark.asyncio
 async def test_local_driver(local_driver):
     await driver_basic(local_driver)
