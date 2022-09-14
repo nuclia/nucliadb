@@ -24,7 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_search.api.models import SearchClientType
+from nucliadb_search.api.models import NucliaDBClientType
 from nucliadb_search.api.v1.router import KB_PREFIX
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 
@@ -137,7 +137,7 @@ async def test_kb_accounting(
     # web searches
     async with search_api(
         roles=[NucliaDBRoles.READER],
-        extra_headers={"x-ndb-client": SearchClientType.WEB},
+        extra_headers={"x-ndb-client": NucliaDBClientType.WEB},
     ) as client:
         for i in range(2):
             resp = await client.get(
@@ -148,7 +148,7 @@ async def test_kb_accounting(
     # widget searches
     async with search_api(
         roles=[NucliaDBRoles.READER],
-        extra_headers={"x-ndb-client": SearchClientType.WIDGET},
+        extra_headers={"x-ndb-client": NucliaDBClientType.WIDGET},
     ) as client:
         for i in range(3):
             resp = await client.get(
@@ -163,6 +163,6 @@ async def test_kb_accounting(
         assert resp.status_code == 200
 
         data = resp.json()
-        assert data[f"{kbid}_-_search_client_{SearchClientType.API.value}"] == 1
-        assert data[f"{kbid}_-_search_client_{SearchClientType.WEB.value}"] == 2
-        assert data[f"{kbid}_-_search_client_{SearchClientType.WIDGET.value}"] == 3
+        assert data[f"{kbid}_-_search_client_{NucliaDBClientType.API.value}"] == 1
+        assert data[f"{kbid}_-_search_client_{NucliaDBClientType.WEB.value}"] == 2
+        assert data[f"{kbid}_-_search_client_{NucliaDBClientType.WIDGET.value}"] == 3

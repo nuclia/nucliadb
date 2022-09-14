@@ -32,8 +32,8 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search.api.models import (
+    NucliaDBClientType,
     ResourceSearchResults,
-    SearchClientType,
     SearchOptions,
     SortOption,
 )
@@ -87,7 +87,7 @@ async def search(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    x_ndb_client: SearchClientType = Header(SearchClientType.API),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = Query(False),
     shards: bool = Query(False),
     shard: List[str] = [],
