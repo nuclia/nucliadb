@@ -36,7 +36,7 @@ from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search import logger
 from nucliadb_search.api.models import (
     KnowledgeboxSearchResults,
-    SearchClientType,
+    NucliaDBClientType,
     SearchOptions,
     SearchRequest,
     SortOption,
@@ -97,7 +97,7 @@ async def search_knowledgebox(
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     shard: List[str] = Query([]),
-    x_ndb_client: SearchClientType = Header(SearchClientType.API),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
@@ -144,7 +144,7 @@ async def search_post_knowledgebox(
     response: Response,
     kbid: str,
     item: SearchRequest,
-    x_ndb_client: SearchClientType = Header(SearchClientType.API),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
@@ -158,7 +158,7 @@ async def search(
     response: Response,
     kbid: str,
     item: SearchRequest,
-    x_ndb_client: SearchClientType,
+    x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ):

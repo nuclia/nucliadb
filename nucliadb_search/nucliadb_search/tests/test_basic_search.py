@@ -33,7 +33,7 @@ from nucliadb_ingest.orm import NODES
 from nucliadb_ingest.tests.vectors import Q
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_search.api.models import SearchClientType
+from nucliadb_search.api.models import NucliaDBClientType
 from nucliadb_search.api.v1.router import KB_PREFIX
 from nucliadb_utils.keys import KB_SHARDS
 
@@ -163,7 +163,7 @@ async def test_search_resource_all(
         # as the search didn't use a specific client, it will be accounted as API
         assert (
             resp.json()[
-                f"{test_search_resource}_-_search_client_{SearchClientType.API.value}"
+                f"{test_search_resource}_-_search_client_{NucliaDBClientType.API.value}"
             ]
             == 1
         )

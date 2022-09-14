@@ -35,7 +35,7 @@ from nucliadb_models.serialize import ResourceProperties
 from nucliadb_search import logger
 from nucliadb_search.api.models import (
     KnowledgeboxSuggestResults,
-    SearchClientType,
+    NucliaDBClientType,
     SuggestOptions,
 )
 from nucliadb_search.api.v1.router import KB_PREFIX, api
@@ -80,7 +80,7 @@ async def suggest_knowledgebox(
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
-    x_ndb_client: SearchClientType = Header(SearchClientType.API),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
     debug: bool = Query(False),

@@ -57,12 +57,13 @@ class SuggestOptions(str, Enum):
     INTENT = "intent"
 
 
-class SearchClientType(str, Enum):
+class NucliaDBClientType(str, Enum):
     API = "api"
     WIDGET = "widget"
     WEB = "web"
     DASHBOARD = "dashboard"
     DESKTOP = "desktop"
+    CHROME_EXTENSION = "chrome_extension"
 
 
 class Sort(int, Enum):
