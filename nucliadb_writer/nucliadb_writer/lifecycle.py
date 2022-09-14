@@ -55,6 +55,7 @@ async def initialize():
         driver=storage_settings.file_backend,
         dummy=nuclia_settings.dummy_processing,
         disable_send_to_process=nuclia_settings.disable_send_to_process,
+        days_to_keep=storage_settings.upload_token_expiration,
     )
     await processing_engine.initialize()
     set_utility(Utility.PROCESSING, processing_engine)
