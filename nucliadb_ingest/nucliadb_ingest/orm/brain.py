@@ -231,6 +231,9 @@ class ResourceBrain:
                 )
             )
 
+        # relations
+        self.brain.relations.extend(basic.usermetadata.relations)
+
         self.compute_tags()
 
     def process_meta(

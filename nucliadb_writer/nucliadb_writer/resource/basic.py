@@ -101,6 +101,7 @@ def parse_basic_modify(
             ]
 
             bm.basic.fieldmetadata.append(userfieldmetadata)
+
     if item.usermetadata is not None:
         # protobuferrs repeated fields don't support assignment
         # will allways be a clean basic

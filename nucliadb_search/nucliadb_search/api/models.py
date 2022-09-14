@@ -142,6 +142,11 @@ class Relations(BaseModel):
     results: List[Relation] = []
 
 
+class RelatedEntities(BaseModel):
+    total: int = 0
+    entities: List[str] = []
+
+
 class ResourceSearchResults(BaseModel):
     sentences: Optional[Sentences] = None
     paragraphs: Optional[Paragraphs] = None
@@ -162,6 +167,7 @@ class KnowledgeboxSearchResults(BaseModel):
 
 class KnowledgeboxSuggestResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
+    entities: Optional[RelatedEntities] = None
     shards: Optional[List[Tuple[str, str, str]]]
 
 

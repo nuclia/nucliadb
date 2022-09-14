@@ -218,57 +218,68 @@ impl ShardWriterService {
 
     #[tracing::instrument(name = "ShardWriterService::set_resource", skip(self, resource))]
     pub async fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
+        info!("Writer set_resource: {:#?}", resource);
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
-        info!("Field service starts");
         let span = tracing::Span::current();
         let text_task = tokio::task::spawn_blocking(move || {
-            run_with_telemetry(
+            info!("Field service starts set_resource");
+            let result = run_with_telemetry(
                 info_span!(parent: &span, "field writer set resource"),
                 || {
                     let mut writer = field_writer_service.write().unwrap();
                     writer.set_resource(&field_resource)
                 },
-            )
+            );
+            info!("Field service ends set_resource");
+            result
         });
-        info!("Field service ends");
+
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer_service.clone();
-        info!("Paragraph service starts");
         let span = tracing::Span::current();
         let paragraph_task = tokio::task::spawn_blocking(move || {
-            run_with_telemetry(
+            info!("Paragraph service starts set_resource");
+            let result = run_with_telemetry(
                 info_span!(parent: &span, "paragraph writer set resource"),
                 || {
                     let mut writer = paragraph_writer_service.write().unwrap();
                     writer.set_resource(&paragraph_resource)
                 },
-            )
+            );
+            info!("Paragraph service ends set_resource");
+            result
         });
-        info!("Paragraph service ends");
+
         let vector_writer_service = self.vector_writer_service.clone();
         let vector_resource = resource.clone();
-        info!("Vector service starts");
         let span = tracing::Span::current();
         let vector_task = tokio::task::spawn_blocking(move || {
-            run_with_telemetry(
+            info!("Vector service starts set_resource");
+            let result = run_with_telemetry(
                 info_span!(parent: &span, "vector writer set resource"),
                 || {
                     let mut writer = vector_writer_service.write().unwrap();
                     writer.set_resource(&vector_resource)
                 },
-            )
+            );
+            info!("Vector service ends set_resource");
+            result
         });
-        info!("Vector service ends");
 
         let relation_writer_service = self.relation_writer_service.clone();
         let relation_resource = resource.clone();
         let relation_task = tokio::task::spawn_blocking(move || {
+            info!("Relation service starts set_resource");
             let mut writer = relation_writer_service.write().unwrap();
-            writer.set_resource(&relation_resource)
+            let result = writer.set_resource(&relation_resource);
+            info!("Relation service ends set_resource");
+            result
         });
+
         let (text_result, paragraph_result, vector_result, relation_result) =
             try_join!(text_task, paragraph_task, vector_task, relation_task).unwrap();
+
         text_result?;
         paragraph_result?;
         vector_result?;

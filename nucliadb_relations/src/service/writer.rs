@@ -68,7 +68,6 @@ impl WriterChild for RelationsWriterService {
         }
     }
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        info!("Set resource in relations starts");
         let mut txn = self.index.rw_txn();
         if resource.status != ResourceStatus::Delete as i32 {
             for relation in &resource.relations {
@@ -95,7 +94,6 @@ impl WriterChild for RelationsWriterService {
             }
         }
         txn.commit().unwrap();
-        info!("Set resource in relations ends");
         Ok(())
     }
     fn garbage_collection(&mut self) {}

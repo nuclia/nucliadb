@@ -24,9 +24,9 @@ use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_protos::{
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
-    SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    relation_node, DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
+    ParagraphSearchResponse, RelatedEntities, RelationSearchRequest, RelationSearchResponse,
+    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
     VectorSearchResponse,
 };
 use nucliadb_services::*;
@@ -299,6 +299,24 @@ impl ShardReaderService {
     }
 
     pub async fn suggest(&self, search_request: SuggestRequest) -> InternalResult<SuggestResponse> {
+        // Search for entities related to the query.
+
+        let relations_request = RelationSearchRequest {
+            id: String::default(),
+            prefix: search_request.body.clone(),
+            type_filters: vec![RelationFilter {
+                ntype: relation_node::NodeType::Entity as i32,
+                subtype: "".to_string(),
+            }],
+            depth: 10,
+            ..Default::default()
+        };
+        println!("Relation search request: {:#?}", relations_request);
+        let relations_reader_service = self.relation_reader_service.clone();
+        let relations_task =
+            task::spawn_blocking(move || relations_reader_service.search(&relations_request));
+        info!("{}:{}", line!(), file!());
+
         let paragraph_request = ParagraphSearchRequest {
             body: search_request.body.clone(),
             filter: search_request.filter.clone(),
@@ -318,13 +336,29 @@ impl ShardReaderService {
             task::spawn_blocking(move || paragraph_reader_service.search(&paragraph_request));
         info!("{}:{}", line!(), file!());
 
-        let rparagraph = paragraph_task.await.unwrap()?;
+        let (rrelations, rparagraph) = try_join!(relations_task, paragraph_task).unwrap();
         info!("{}:{}", line!(), file!());
+
+        let rrelations = rrelations.unwrap();
+        let rparagraph = rparagraph.unwrap();
+
+        println!("Relations result: {:#?}", rrelations);
+        let entities = rrelations
+            .neighbours
+            .iter()
+            .map(|relation_node| relation_node.value.clone())
+            .collect::<Vec<String>>();
+        println!("Entities: {:#?}", entities);
+
         Ok(SuggestResponse {
             query: rparagraph.query,
             total: rparagraph.total,
             results: rparagraph.results,
             ematches: rparagraph.ematches,
+            entities: Some(RelatedEntities {
+                total: entities.len() as u32,
+                entities: entities,
+            }),
         })
     }
 

@@ -186,11 +186,11 @@ message VectorSearchResponse {
 // search may  be faster.
 message RelationFilter {
     // Will filter the search to nodes of type ntype.
-    utils.RelationNode.NodeType ntype=1;
+    utils.RelationNode.NodeType ntype = 1;
     // Additionally the search can be even more specific by 
     // providing a subtype. The empty string is a wilcard that 
     // indicates to not filter by subtype. 
-    string subtype=2;
+    string subtype = 2;
 }
 
 // A request for the relation index.
@@ -252,15 +252,21 @@ message SuggestRequest {
 }
 
 
+message RelatedEntities {
+    repeated string entities = 1;
+    uint32 total = 2;
+}
 
 message SuggestResponse {
-
     int32 total = 1;
     repeated ParagraphResult results = 2;
+
     // The text that lead to this results
     string query = 3;
     repeated string ematches = 4;
 
+    // Entities related with the query
+    RelatedEntities entities = 5;
 }
 
 message SearchResponse {

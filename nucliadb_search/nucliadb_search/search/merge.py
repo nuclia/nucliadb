@@ -38,6 +38,7 @@ from nucliadb_search.api.models import (
     KnowledgeboxSuggestResults,
     Paragraph,
     Paragraphs,
+    RelatedEntities,
     ResourceResult,
     Resources,
     ResourceSearchResults,
@@ -388,6 +389,18 @@ async def merge_paragraphs_results(
     return api_results
 
 
+async def merge_suggest_entities_results(
+    suggest_responses: List[SuggestResponse],
+) -> RelatedEntities:
+    merge = RelatedEntities(entities=[], total=0)
+
+    for response in suggest_responses:
+        merge.entities.extend(response.entities.entities)
+        merge.total += response.entities.total
+
+    return merge
+
+
 async def merge_suggest_results(
     results: List[SuggestResponse],
     kbid: str,
@@ -401,4 +414,5 @@ async def merge_suggest_results(
     api_results.paragraphs = await merge_suggest_paragraph_results(
         results, kbid, highlight=highlight
     )
+    api_results.entities = await merge_suggest_entities_results(results)
     return api_results

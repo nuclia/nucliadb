@@ -310,6 +310,13 @@ pub struct SuggestRequest {
     pub timestamps: ::core::option::Option<Timestamps>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelatedEntities {
+    #[prost(string, repeated, tag="1")]
+    pub entities: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(uint32, tag="2")]
+    pub total: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestResponse {
     #[prost(int32, tag="1")]
     pub total: i32,
@@ -320,6 +327,9 @@ pub struct SuggestResponse {
     pub query: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="4")]
     pub ematches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// Entities related with the query
+    #[prost(message, optional, tag="5")]
+    pub entities: ::core::option::Option<RelatedEntities>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchResponse {
