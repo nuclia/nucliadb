@@ -92,7 +92,9 @@ async def test_relations_extracted(
 ):
     """
     Test description:
-    -
+
+    Create a resource with fields from which relations can be
+    extracted and test it.
     """
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
@@ -141,5 +143,4 @@ async def test_relations_extracted(
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
-
     assert len(resp.json()["usermetadata"]["relations"]) == 5

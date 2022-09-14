@@ -173,7 +173,7 @@ async def test_suggest_related_entities(
                         "entity": {
                             "entity": "Israel",
                             "entity_type": "country",
-                        }
+                        },
                     },
                     {
                         "relation": "ENTITY",
@@ -187,7 +187,7 @@ async def test_suggest_related_entities(
                         "entity": {
                             "entity": "Solomon Islands",
                             "entity_type": "country",
-                        }
+                        },
                     },
                 ],
             },
