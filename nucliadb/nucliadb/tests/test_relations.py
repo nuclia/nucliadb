@@ -73,7 +73,7 @@ async def test_relations(
     async def iterate(value: BrokerMessage):
         yield value
 
-    nucliadb_grpc.ProcessMessage(iterate(bm))
+    await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}?show=relations"
