@@ -214,6 +214,10 @@ impl ShardWriterService {
         if let Err(e) = self.vector_writer_service.write().unwrap().stop().await {
             error!("Error stopping the Vector service: {}", e);
         }
+
+        if let Err(e) = self.relation_writer_service.write().unwrap().stop().await {
+            error!("Error stopping the Relations service: {}", e);
+        }
     }
 
     #[tracing::instrument(name = "ShardWriterService::set_resource", skip(self, resource))]

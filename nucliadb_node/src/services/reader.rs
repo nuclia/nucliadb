@@ -337,7 +337,7 @@ impl ShardReaderService {
             .into_iter()
             .map(|prefix| RelationSearchRequest {
                 id: String::default(),
-                prefix: prefix,
+                prefix,
                 type_filters: vec![RelationFilter {
                     ntype: relation_node::NodeType::Entity as i32,
                     subtype: "".to_string(),
@@ -382,7 +382,7 @@ impl ShardReaderService {
 
         let entities = rrelations
             .into_iter()
-            .map(|relation| {
+            .flat_map(|relation| {
                 relation
                     .unwrap()
                     .neighbours
@@ -390,7 +390,6 @@ impl ShardReaderService {
                     .map(|relation_node| relation_node.value.clone())
                     .collect::<Vec<String>>()
             })
-            .flatten()
             .collect::<Vec<String>>();
 
         Ok(SuggestResponse {
@@ -400,7 +399,7 @@ impl ShardReaderService {
             ematches: rparagraph.ematches,
             entities: Some(RelatedEntities {
                 total: entities.len() as u32,
-                entities: entities,
+                entities,
             }),
         })
     }
