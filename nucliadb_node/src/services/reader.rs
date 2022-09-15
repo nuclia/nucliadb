@@ -347,7 +347,6 @@ impl ShardReaderService {
             })
             .collect::<Vec<RelationSearchRequest>>();
 
-        println!("Relation search request: {:#?}", relations_requests);
         let mut relations_tasks = vec![];
         for relations_request in relations_requests {
             let relations_reader_service = self.relation_reader_service.clone();
@@ -381,7 +380,6 @@ impl ShardReaderService {
 
         let rparagraph = rparagraph.unwrap();
 
-        println!("Relations result: {:#?}", rrelations);
         let entities = rrelations
             .into_iter()
             .map(|relation| {
@@ -394,7 +392,6 @@ impl ShardReaderService {
             })
             .flatten()
             .collect::<Vec<String>>();
-        println!("Entities: {:#?}", entities);
 
         Ok(SuggestResponse {
             query: rparagraph.query,

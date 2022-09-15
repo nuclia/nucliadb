@@ -71,14 +71,10 @@ class LocalReaderWrapper:
         return shard
 
     async def Suggest(self, request: SuggestRequest) -> SuggestResponse:
-        print("Request:")
-        print(request)
         result = await self.reader.suggest(request.SerializeToString())
         pb_bytes = bytes(result)
         pb = SuggestResponse()
         pb.ParseFromString(pb_bytes)
-        print("Response:")
-        print(pb)
         return pb
 
 

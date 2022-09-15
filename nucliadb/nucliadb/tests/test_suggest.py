@@ -194,15 +194,6 @@ async def test_suggest_related_entities(
         },
     )
     assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=relations"
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    print("Resource relations:")
-    print(body)
 
     # Test simple suggestions
 

@@ -218,7 +218,6 @@ impl ShardWriterService {
 
     #[tracing::instrument(name = "ShardWriterService::set_resource", skip(self, resource))]
     pub async fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        info!("Writer set_resource: {:#?}", resource);
         let field_writer_service = self.field_writer_service.clone();
         let field_resource = resource.clone();
         let span = tracing::Span::current();
