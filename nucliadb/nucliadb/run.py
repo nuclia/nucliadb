@@ -1,8 +1,4 @@
-from nucliadb import config_nucliadb
-from nucliadb import run_nucliadb
-from nucliadb import Settings
-from line_profiler import LineProfiler
-
+from nucliadb import Settings, config_nucliadb, run_nucliadb
 
 if __name__ == "__main__":
     nucliadb_args = Settings()

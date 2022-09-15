@@ -1,5 +1,4 @@
-from nucliadb import config_nucliadb
-from nucliadb import Settings
+from nucliadb import Settings, config_nucliadb
 
 nucliadb_args = Settings()
 config_nucliadb(nucliadb_args)
