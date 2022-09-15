@@ -181,12 +181,37 @@ message VectorSearchResponse {
     int32 result_per_page = 5;
 }
 
+// Relation filters are used to make the 
+// search domain smaller. By providing filters the 
+// search may  be faster.
+message RelationFilter {
+    // Will filter the search to nodes of type ntype.
+    utils.RelationNode.NodeType ntype = 1;
+    // Additionally the search can be even more specific by 
+    // providing a subtype. The empty string is a wilcard that 
+    // indicates to not filter by subtype. 
+    string subtype = 2;
+}
+
+// A request for the relation index.
 message RelationSearchRequest {
-    
+    string id = 1; //Shard ID
+    // A search will start from each of the entry points.
+    // Zero entry points are provided will trigger an iteration
+    // through all of the nodes.
+    repeated utils.RelationNode entry_points = 2;
+    // If needed, the search can be guided through 
+    repeated RelationFilter type_filters = 3;
+    // The user can impose a limit in the number of jumps
+    // the seach may perfom.
+    int32 depth = 4;
+    // Nodes can be filtered by prefix.
+    string prefix = 5;
+    bool reload = 13;
 }
 
 message RelationSearchResponse {
-    
+    repeated utils.RelationNode neighbours = 1;
 }
 
 message SearchRequest {
@@ -227,15 +252,21 @@ message SuggestRequest {
 }
 
 
+message RelatedEntities {
+    repeated string entities = 1;
+    uint32 total = 2;
+}
 
 message SuggestResponse {
-
     int32 total = 1;
     repeated ParagraphResult results = 2;
+
     // The text that lead to this results
     string query = 3;
     repeated string ematches = 4;
 
+    // Entities related with the query
+    RelatedEntities entities = 5;
 }
 
 message SearchResponse {
@@ -247,6 +278,25 @@ message SearchResponse {
 message IdCollection {
     repeated string ids = 1;
 }
+
+message RelationEdge {
+    utils.Relation.RelationType edge_type = 1;
+    string property = 2;   
+}
+
+message EdgeList {
+    repeated RelationEdge list = 1;
+}
+
+message RelationTypeListMember {
+    utils.RelationNode.NodeType with_type = 1;
+    string with_subtype = 2;
+}
+
+message TypeList {
+    repeated RelationTypeListMember list = 1;
+}
+
 
 // Implemented at nucliadb_object_storage
 
@@ -262,6 +312,10 @@ service NodeReader {
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
+    rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
+
+    rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
+    rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
 
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}

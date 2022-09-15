@@ -110,10 +110,10 @@ impl NodeWriterService {
         let new_shard = self.get_shard(&ShardId { id: new_id }).await.unwrap();
         ShardCreated {
             id: new_shard.id.clone(),
-            document_service: new_shard.document_service_version,
-            paragraph_service: new_shard.paragraph_service_version,
-            vector_service: new_shard.vector_service_version,
-            relation_service: new_shard.relation_service_version,
+            document_service: new_shard.document_version() as i32,
+            paragraph_service: new_shard.paragraph_version() as i32,
+            vector_service: new_shard.vector_version() as i32,
+            relation_service: new_shard.relation_version() as i32,
         }
     }
 

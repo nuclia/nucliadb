@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import TokenSplit as PBTokenSplit
 from nucliadb_protos.resources_pb2 import UserFieldMetadata as PBUserFieldMetadata
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 
@@ -56,9 +57,9 @@ async def test_create_resource_orm_with_basic(
 
     r1 = PBRelation(
         relation=PBRelation.CHILD,
-        resource="000001",
+        source=RelationNode(value="000000", ntype=RelationNode.NodeType.RESOURCE),
+        to=RelationNode(value="000001", ntype=RelationNode.NodeType.RESOURCE),
     )
-    r1.properties["prop1"] = "prop2"
 
     basic.usermetadata.relations.append(r1)
 

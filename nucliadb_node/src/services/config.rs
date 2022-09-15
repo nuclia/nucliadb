@@ -20,30 +20,138 @@ use std::path;
 use nucliadb_services::*;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+
+#[derive(Serialize, Deserialize, Default)]
+struct StoredConfig {
+    #[serde(default)]
+    pub version_paragraphs: Option<u32>,
+    #[serde(default)]
+    pub version_vectors: Option<u32>,
+    #[serde(default)]
+    pub version_fields: Option<u32>,
+    #[serde(default)]
+    pub version_relations: Option<u32>,
+}
+impl StoredConfig {
+    fn fill_gaps(&mut self) -> bool {
+        let mut modifed = false;
+        if self.version_paragraphs.is_none() {
+            self.version_paragraphs = Some(paragraphs::MAX_VERSION);
+            modifed = true;
+        }
+        if self.version_vectors.is_none() {
+            self.version_vectors = Some(vectors::MAX_VERSION);
+            modifed = true;
+        }
+        if self.version_fields.is_none() {
+            self.version_fields = Some(fields::MAX_VERSION);
+            modifed = true;
+        }
+        if self.version_relations.is_none() {
+            self.version_relations = Some(fields::MAX_VERSION);
+            modifed = true;
+        }
+        modifed
+    }
+}
+
+enum ConfigState {
+    UpToDate(ShardConfig),
+    Modified(ShardConfig),
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ShardConfig {
     pub version_paragraphs: u32,
     pub version_vectors: u32,
     pub version_fields: u32,
+    pub version_relations: u32,
 }
 
+impl Default for ShardConfig {
+    fn default() -> Self {
+        ShardConfig {
+            version_paragraphs: paragraphs::MAX_VERSION,
+            version_fields: fields::MAX_VERSION,
+            version_vectors: vectors::MAX_VERSION,
+            version_relations: relations::MAX_VERSION,
+        }
+    }
+}
+
+impl From<StoredConfig> for ShardConfig {
+    fn from(raw: StoredConfig) -> Self {
+        ShardConfig {
+            version_paragraphs: raw.version_paragraphs.unwrap(),
+            version_fields: raw.version_fields.unwrap(),
+            version_vectors: raw.version_vectors.unwrap(),
+            version_relations: raw.version_relations.unwrap(),
+        }
+    }
+}
 impl ShardConfig {
     pub async fn new(path: &str) -> ShardConfig {
         fs::create_dir_all(path).await.unwrap();
         let json_file = path::Path::new(path).join("config.json");
         if !json_file.exists() {
-            let config = ShardConfig {
-                version_paragraphs: paragraphs::MAX_VERSION,
-                version_fields: fields::MAX_VERSION,
-                version_vectors: vectors::MAX_VERSION,
-            };
+            let config = ShardConfig::default();
             let serialized = serde_json::to_string(&config).unwrap();
             fs::File::create(&json_file).await.unwrap();
             fs::write(&json_file, &serialized).await.unwrap();
-            config
-        } else {
-            let content = fs::read_to_string(&json_file).await.unwrap();
-            serde_json::from_str(&content).unwrap()
         }
+        match ShardConfig::read_config(&json_file).await {
+            ConfigState::UpToDate(config) => config,
+            ConfigState::Modified(config) => {
+                let serialized = serde_json::to_string(&config).unwrap();
+                fs::File::create(&json_file).await.unwrap();
+                fs::write(&json_file, &serialized).await.unwrap();
+                config
+            }
+        }
+    }
+    pub async fn open(path: &str) -> Option<ShardConfig> {
+        let json_file = path::Path::new(path).join("config.json");
+        if json_file.exists() {
+            match ShardConfig::read_config(&json_file).await {
+                ConfigState::UpToDate(config) => Some(config),
+                ConfigState::Modified(_) => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    async fn read_config(json_file: &path::Path) -> ConfigState {
+        let content = fs::read_to_string(&json_file).await.unwrap();
+        let mut raw: StoredConfig = serde_json::from_str(&content).unwrap();
+        if raw.fill_gaps() {
+            ConfigState::Modified(ShardConfig::from(raw))
+        } else {
+            ConfigState::UpToDate(ShardConfig::from(raw))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn open_and_new() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = ShardConfig::open(dir.path().to_str().unwrap()).await;
+        assert!(config.is_none());
+        let config = ShardConfig::new(dir.path().to_str().unwrap()).await;
+        assert_eq!(config.version_relations, relations::MAX_VERSION);
+        assert_eq!(config.version_fields, fields::MAX_VERSION);
+        assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);
+        assert_eq!(config.version_vectors, vectors::MAX_VERSION);
+        let config = ShardConfig::open(dir.path().to_str().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(config.version_relations, relations::MAX_VERSION);
+        assert_eq!(config.version_fields, fields::MAX_VERSION);
+        assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);
+        assert_eq!(config.version_vectors, vectors::MAX_VERSION);
     }
 }

@@ -2,35 +2,42 @@ syntax = "proto3";
 
 package utils;
 
-message EntityRelation {
-    string entity = 1;
-    string entity_type = 2;
-}
-
+// Relations are connexions between nodes in the relation index. 
+// They are tuplets (Source, Relation Type, Relation Label, To).
 message Relation {
     enum RelationType {
         CHILD = 0;  // Child resource
-        ABOUT = 2;  // related with label (GENERATED)
-        ENTITY = 3;  // related with an entity (GENERATED)
-        COLAB = 4;  // related with user (GENERATED)
+        ABOUT = 1;  // related with label (GENERATED)
+        ENTITY = 2;  // related with an entity (GENERATED)
+        COLAB = 3;  // related with user (GENERATED)
+        SYNONYM = 4;  // Synonym relation
         OTHER = 5;  // related with something
     }
+    // relation is the type of the label.
+    RelationType relation = 5;
+    // The source of the edge.
+    RelationNode source = 6;
+    // The destination of the edge.
+    RelationNode to = 7;
+    // Apart of having types, edges may be valued like
+    // in the case of 'OTHER' edges. 
+    string relation_label = 8;
+}
 
-    RelationType relation = 1;
-
-    // Relations can be with a resource, label, user or entity
-    oneof target {
-        string resource = 2;
-        string label = 3;
-        string user = 4;
-        EntityRelation entity = 5;
-        string other = 6;
+// Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index.
+message RelationNode {
+    enum NodeType {
+        ENTITY=0;
+        LABEL=1;
+        RESOURCE=2;
+        USER=3;
     }
-
-    map<string, string> properties = 7;
-    oneof source {
-        EntityRelation from_entity = 8;
-    }
+    // Value of the node.
+    string value = 4;
+    // The type of the node.
+    NodeType ntype = 5;
+    // A node may have a subtype (the string should be empty in case it does not).
+    string subtype = 6;
 }
 
 message ExtractedText {

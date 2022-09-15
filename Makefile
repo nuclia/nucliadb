@@ -150,7 +150,7 @@ build-nucliadb:
 	docker buildx build --platform linux/amd64,linux/arm64 -t nuclia/nucliadb:latest --push -f Dockerfile .
 
 debug-test-nucliadb:
-	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/nucliadb -k test_counters -s
+	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/nucliadb -sxv
 
 debug-run-nucliadb:
 	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_vectors2=DEBUG nucliadb --maindb=data/maindb --blob=data/blob --node=data/node --zone=europe-1 --log=DEBUG
@@ -161,4 +161,8 @@ debug-run-nucliadb-redis:
 
 build-node-binding:
 	maturin build -m nucliadb_node/binding/Cargo.toml --release
-	pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-macosx_11_0_arm64.whl --force
+	pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-*.whl --force
+
+build-node-binding-debug:
+	maturin build -m nucliadb_node/binding/Cargo.toml
+	pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-*.whl --force

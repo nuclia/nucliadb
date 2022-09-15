@@ -8,6 +8,7 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
+import nucliadb_protos.utils_pb2
 import typing
 import typing_extensions
 from nucliadb_protos.noderesources_pb2 import (
@@ -28,9 +29,9 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 
 from nucliadb_protos.utils_pb2 import (
-    EntityRelation as EntityRelation,
     ExtractedText as ExtractedText,
     Relation as Relation,
+    RelationNode as RelationNode,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -502,16 +503,85 @@ class VectorSearchResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["documents",b"documents","page_number",b"page_number","result_per_page",b"result_per_page"]) -> None: ...
 global___VectorSearchResponse = VectorSearchResponse
 
-class RelationSearchRequest(google.protobuf.message.Message):
+class RelationFilter(google.protobuf.message.Message):
+    """Relation filters are used to make the 
+    search domain smaller. By providing filters the 
+    search may  be faster.
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NTYPE_FIELD_NUMBER: builtins.int
+    SUBTYPE_FIELD_NUMBER: builtins.int
+    ntype: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
+    """Will filter the search to nodes of type ntype."""
+
+    subtype: typing.Text
+    """Additionally the search can be even more specific by 
+    providing a subtype. The empty string is a wilcard that 
+    indicates to not filter by subtype.
+    """
+
     def __init__(self,
+        *,
+        ntype: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType = ...,
+        subtype: typing.Text = ...,
         ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ntype",b"ntype","subtype",b"subtype"]) -> None: ...
+global___RelationFilter = RelationFilter
+
+class RelationSearchRequest(google.protobuf.message.Message):
+    """A request for the relation index."""
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    ID_FIELD_NUMBER: builtins.int
+    ENTRY_POINTS_FIELD_NUMBER: builtins.int
+    TYPE_FILTERS_FIELD_NUMBER: builtins.int
+    DEPTH_FIELD_NUMBER: builtins.int
+    PREFIX_FIELD_NUMBER: builtins.int
+    RELOAD_FIELD_NUMBER: builtins.int
+    id: typing.Text
+    """Shard ID"""
+
+    @property
+    def entry_points(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]:
+        """A search will start from each of the entry points.
+        Zero entry points are provided will trigger an iteration
+        through all of the nodes.
+        """
+        pass
+    @property
+    def type_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationFilter]:
+        """If needed, the search can be guided through"""
+        pass
+    depth: builtins.int
+    """The user can impose a limit in the number of jumps
+    the seach may perfom.
+    """
+
+    prefix: typing.Text
+    """Nodes can be filtered by prefix."""
+
+    reload: builtins.bool
+    def __init__(self,
+        *,
+        id: typing.Text = ...,
+        entry_points: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.RelationNode]] = ...,
+        type_filters: typing.Optional[typing.Iterable[global___RelationFilter]] = ...,
+        depth: builtins.int = ...,
+        prefix: typing.Text = ...,
+        reload: builtins.bool = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["depth",b"depth","entry_points",b"entry_points","id",b"id","prefix",b"prefix","reload",b"reload","type_filters",b"type_filters"]) -> None: ...
 global___RelationSearchRequest = RelationSearchRequest
 
 class RelationSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NEIGHBOURS_FIELD_NUMBER: builtins.int
+    @property
+    def neighbours(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
     def __init__(self,
+        *,
+        neighbours: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.RelationNode]] = ...,
         ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours"]) -> None: ...
 global___RelationSearchResponse = RelationSearchResponse
 
 class SearchRequest(google.protobuf.message.Message):
@@ -597,12 +667,28 @@ class SuggestRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["body",b"body","filter",b"filter","shard",b"shard","timestamps",b"timestamps"]) -> None: ...
 global___SuggestRequest = SuggestRequest
 
+class RelatedEntities(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    ENTITIES_FIELD_NUMBER: builtins.int
+    TOTAL_FIELD_NUMBER: builtins.int
+    @property
+    def entities(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    total: builtins.int
+    def __init__(self,
+        *,
+        entities: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        total: builtins.int = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entities",b"entities","total",b"total"]) -> None: ...
+global___RelatedEntities = RelatedEntities
+
 class SuggestResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     TOTAL_FIELD_NUMBER: builtins.int
     RESULTS_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
     EMATCHES_FIELD_NUMBER: builtins.int
+    ENTITIES_FIELD_NUMBER: builtins.int
     total: builtins.int
     @property
     def results(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphResult]: ...
@@ -611,14 +697,20 @@ class SuggestResponse(google.protobuf.message.Message):
 
     @property
     def ematches(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    @property
+    def entities(self) -> global___RelatedEntities:
+        """Entities related with the query"""
+        pass
     def __init__(self,
         *,
         total: builtins.int = ...,
         results: typing.Optional[typing.Iterable[global___ParagraphResult]] = ...,
         query: typing.Text = ...,
         ematches: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        entities: typing.Optional[global___RelatedEntities] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ematches",b"ematches","query",b"query","results",b"results","total",b"total"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["entities",b"entities"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ematches",b"ematches","entities",b"entities","query",b"query","results",b"results","total",b"total"]) -> None: ...
 global___SuggestResponse = SuggestResponse
 
 class SearchResponse(google.protobuf.message.Message):
@@ -653,3 +745,55 @@ class IdCollection(google.protobuf.message.Message):
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["ids",b"ids"]) -> None: ...
 global___IdCollection = IdCollection
+
+class RelationEdge(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    EDGE_TYPE_FIELD_NUMBER: builtins.int
+    PROPERTY_FIELD_NUMBER: builtins.int
+    edge_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
+    property: typing.Text
+    def __init__(self,
+        *,
+        edge_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
+        property: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["edge_type",b"edge_type","property",b"property"]) -> None: ...
+global___RelationEdge = RelationEdge
+
+class EdgeList(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    LIST_FIELD_NUMBER: builtins.int
+    @property
+    def list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationEdge]: ...
+    def __init__(self,
+        *,
+        list: typing.Optional[typing.Iterable[global___RelationEdge]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["list",b"list"]) -> None: ...
+global___EdgeList = EdgeList
+
+class RelationTypeListMember(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    WITH_TYPE_FIELD_NUMBER: builtins.int
+    WITH_SUBTYPE_FIELD_NUMBER: builtins.int
+    with_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
+    with_subtype: typing.Text
+    def __init__(self,
+        *,
+        with_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType = ...,
+        with_subtype: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["with_subtype",b"with_subtype","with_type",b"with_type"]) -> None: ...
+global___RelationTypeListMember = RelationTypeListMember
+
+class TypeList(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    LIST_FIELD_NUMBER: builtins.int
+    @property
+    def list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationTypeListMember]: ...
+    def __init__(self,
+        *,
+        list: typing.Optional[typing.Iterable[global___RelationTypeListMember]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["list",b"list"]) -> None: ...
+global___TypeList = TypeList

@@ -12,9 +12,9 @@ import nucliadb_protos.utils_pb2
 import typing
 import typing_extensions
 from nucliadb_protos.utils_pb2 import (
-    EntityRelation as EntityRelation,
     ExtractedText as ExtractedText,
     Relation as Relation,
+    RelationNode as RelationNode,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -90,10 +90,12 @@ class ShardCreated(google.protobuf.message.Message):
     class _DocumentServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._DocumentService.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         DOCUMENT_V0: ShardCreated._DocumentService.ValueType  # 0
+        DOCUMENT_V1: ShardCreated._DocumentService.ValueType  # 1
     class DocumentService(_DocumentService, metaclass=_DocumentServiceEnumTypeWrapper):
         pass
 
     DOCUMENT_V0: ShardCreated.DocumentService.ValueType  # 0
+    DOCUMENT_V1: ShardCreated.DocumentService.ValueType  # 1
 
     class _ParagraphService:
         ValueType = typing.NewType('ValueType', builtins.int)
@@ -101,10 +103,12 @@ class ShardCreated(google.protobuf.message.Message):
     class _ParagraphServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._ParagraphService.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PARAGRAPH_V0: ShardCreated._ParagraphService.ValueType  # 0
+        PARAGRAPH_V1: ShardCreated._ParagraphService.ValueType  # 1
     class ParagraphService(_ParagraphService, metaclass=_ParagraphServiceEnumTypeWrapper):
         pass
 
     PARAGRAPH_V0: ShardCreated.ParagraphService.ValueType  # 0
+    PARAGRAPH_V1: ShardCreated.ParagraphService.ValueType  # 1
 
     class _VectorService:
         ValueType = typing.NewType('ValueType', builtins.int)
@@ -112,10 +116,12 @@ class ShardCreated(google.protobuf.message.Message):
     class _VectorServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._VectorService.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         VECTOR_V0: ShardCreated._VectorService.ValueType  # 0
+        VECTOR_V1: ShardCreated._VectorService.ValueType  # 1
     class VectorService(_VectorService, metaclass=_VectorServiceEnumTypeWrapper):
         pass
 
     VECTOR_V0: ShardCreated.VectorService.ValueType  # 0
+    VECTOR_V1: ShardCreated.VectorService.ValueType  # 1
 
     class _RelationService:
         ValueType = typing.NewType('ValueType', builtins.int)
@@ -123,10 +129,12 @@ class ShardCreated(google.protobuf.message.Message):
     class _RelationServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCreated._RelationService.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         RELATION_V0: ShardCreated._RelationService.ValueType  # 0
+        RELATION_V1: ShardCreated._RelationService.ValueType  # 1
     class RelationService(_RelationService, metaclass=_RelationServiceEnumTypeWrapper):
         pass
 
     RELATION_V0: ShardCreated.RelationService.ValueType  # 0
+    RELATION_V1: ShardCreated.RelationService.ValueType  # 1
 
     ID_FIELD_NUMBER: builtins.int
     DOCUMENT_SERVICE_FIELD_NUMBER: builtins.int
@@ -380,7 +388,7 @@ class Resource(google.protobuf.message.Message):
     def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]:
         """Key is RID/FIELDID
 
-        Document labels allways serialized full
+        Document labels always serialized full
         """
         pass
     status: global___Resource.ResourceStatus.ValueType
