@@ -595,7 +595,7 @@ mod tests {
             vec!["with multiple words", "multiple words", "words"]
         );
         assert_eq!(
-            ShardReaderService::split_suggest_query(query.clone(), 2),
+            ShardReaderService::split_suggest_query(query, 2),
             vec!["multiple words", "words"]
         );
     }
