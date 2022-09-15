@@ -23,10 +23,10 @@ import os
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.utilities import get_storage, get_transaction
+from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction
 from nucliadb_writer.api.v1.router import KB_PREFIX
 from nucliadb_writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb_writer.utilities import get_processing
@@ -434,7 +434,10 @@ async def test_knowledgebox_file_upload_field_sync(
             )
             assert resp.status_code == 201
 
-            resp = await client.get(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1",
-            )
-            assert resp.status_code == 200
+        ingest = get_ingest()
+        pbrequest = ResourceFieldId()
+        pbrequest.kbid = knowledgebox_writer
+        pbrequest.rid = resource
+
+        res = await ingest.ResourceFieldExists(pbrequest)
+        assert res.found
