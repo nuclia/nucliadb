@@ -59,9 +59,6 @@ class Relation(BaseModel):
     def check_relation_is_valid(cls, values):
         if values["relation"] == RelationType.CHILD.value:
             if "resource" not in values:
-                import pdb
-
-                pdb.set_trace()
                 raise ValueError(
                     "Missing 'resource' field containg the uuid of a resource"
                 )
