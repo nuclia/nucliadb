@@ -192,7 +192,7 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     """
 
     amount = 10
-    for i in range(1, 10 + 1):
+    for i in range(1, amount + 1):
         message = broker_simple_resource(knowledgebox, i)
         await processor.process(message=message, seqid=-1, transaction_check=False)
 
