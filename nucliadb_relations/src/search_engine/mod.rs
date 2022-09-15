@@ -20,6 +20,7 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 
 use crate::graph::*;
+use crate::string_normalization::normalize;
 
 #[derive(Default, derive_builder::Builder, Debug)]
 #[builder(name = "QueryConstructor", pattern = "owned")]
@@ -39,7 +40,7 @@ pub struct Query {
 }
 impl QueryConstructor {
     pub fn prefixed(mut self, prefix: String) -> Self {
-        self.prefixed = Some(prefix.to_lowercase());
+        self.prefixed = Some(normalize(&prefix));
         self
     }
 }

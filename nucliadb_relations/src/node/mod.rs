@@ -23,6 +23,7 @@ use std::marker::PhantomData;
 use nucliadb_byte_rpr::*;
 use serde_json::Value;
 
+use crate::string_normalization::normalize;
 pub type NodeId = ID<String>;
 
 #[derive(Clone)]
@@ -97,7 +98,7 @@ impl NodeBuilder {
     }
     pub fn build(self) -> Node {
         let json_obj = serde_json::json!({
-            "normalized": self.node_value.to_lowercase(),
+            "normalized": normalize(&self.node_value),
             "value": self.node_value,
             "type": self.node_type,
             "subtype": self.node_subtype,

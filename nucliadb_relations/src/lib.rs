@@ -23,6 +23,7 @@ mod node;
 mod search_engine;
 pub mod service;
 mod storage_system;
+mod string_normalization;
 
 mod graph {
     pub use crate::edge::*;
