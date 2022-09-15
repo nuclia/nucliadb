@@ -417,7 +417,7 @@ async def patch(
     status_code=201,
     tags=["Resource fields"],
     name="Upload binary file",
-    description="Upload a file as a field on an existing resource, if the field exist will return a conflict (419)",
+    description="Upload a file as a field on an existing resource, if the field exists will return a conflict (419)",
 )
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{UPLOAD}",
@@ -437,6 +437,7 @@ async def upload(
     x_password: Optional[List[str]] = Header(None),  # type: ignore
     x_language: Optional[List[str]] = Header(None),  # type: ignore
     x_md5: Optional[List[str]] = Header(None),  # type: ignore
+    x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
 
     logger.info(request.headers)
@@ -529,6 +530,7 @@ async def upload(
             path=path,
             request=request,
             bucket=await storage_manager.storage.get_bucket_name(kbid),
+            wait_on_commit=x_synchronous,
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
@@ -605,6 +607,7 @@ async def store_file_on_nuclia_db(
     language: Optional[str] = None,
     md5: Optional[str] = None,
     item: Optional[CreateResourcePayload] = None,
+    wait_on_commit: bool = False,
 ) -> int:
     # File is on NucliaDB Storage at path
 
@@ -686,6 +689,6 @@ async def store_file_on_nuclia_db(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    await transaction.commit(writer, partition)
+    await transaction.commit(writer, partition, wait=wait_on_commit)
 
     return seqid

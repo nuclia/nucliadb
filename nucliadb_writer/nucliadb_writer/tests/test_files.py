@@ -23,10 +23,11 @@ import os
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.utilities import get_storage, get_transaction
+from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction
 from nucliadb_writer.api.v1.router import KB_PREFIX
 from nucliadb_writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb_writer.utilities import get_processing
@@ -411,3 +412,35 @@ async def test_knowledgebox_file_upload_field_headers(
         key=writer.files[field].file.uri,
     )
     assert len(data.read()) == 30472
+
+
+@pytest.mark.asyncio
+async def test_knowledgebox_file_upload_field_sync(
+    writer_api, knowledgebox_writer, resource
+):
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+
+        filename = base64.b64encode(b"image.jpg").decode()
+        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+            resp = await client.post(
+                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
+                data=f.read(),
+                headers={
+                    "X-FILENAME": filename,
+                    "X-LANGUAGE": "ca",
+                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
+                    "content-type": "image/jpg",
+                    "X-SYNCHRONOUS": "True",
+                },
+            )
+            assert resp.status_code == 201
+
+        ingest = get_ingest()
+        pbrequest = ResourceFieldId()
+        pbrequest.kbid = knowledgebox_writer
+        pbrequest.rid = resource
+        pbrequest.field_type = FieldType.FILE
+        pbrequest.field = "field1"
+
+        res = await ingest.ResourceFieldExists(pbrequest)
+        assert res.found
