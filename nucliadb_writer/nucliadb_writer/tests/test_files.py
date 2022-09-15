@@ -23,6 +23,7 @@ import os
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
 from nucliadb_models.resource import NucliaDBRoles
@@ -438,6 +439,8 @@ async def test_knowledgebox_file_upload_field_sync(
         pbrequest = ResourceFieldId()
         pbrequest.kbid = knowledgebox_writer
         pbrequest.rid = resource
+        pbrequest.field_type = FieldType.FILE
+        pbrequest.field = "field1"
 
         res = await ingest.ResourceFieldExists(pbrequest)
         assert res.found
