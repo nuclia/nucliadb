@@ -434,24 +434,7 @@ async def test_knowledgebox_file_upload_field_sync(
             )
             assert resp.status_code == 201
 
-    processing = get_processing()
-    transaction = get_transaction()
-
-    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
-    msgs = await sub.fetch(2)
-    writer = BrokerMessage()
-    writer.ParseFromString(msgs[1].data)
-    await msgs[1].ack()
-
-    payload = processing.calls[1]
-
-    assert payload["kbid"] == knowledgebox_writer
-    path = resp.headers["ndb-field"]
-    field = path.split("/")[-1]
-
-    storage = await get_storage()
-    data = await storage.downloadbytes(
-        bucket=writer.files[field].file.bucket_name,
-        key=writer.files[field].file.uri,
-    )
-    assert len(data.read()) == 30472
+            resp = await client.get(
+                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1",
+            )
+            assert resp.status_code == 200
