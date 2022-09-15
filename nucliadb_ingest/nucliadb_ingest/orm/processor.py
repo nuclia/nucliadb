@@ -683,10 +683,8 @@ class Processor:
     ) -> AsyncIterator[TrainResource]:
         txn = await self.driver.begin()
         kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
-        async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid),
-        ):
-
+        base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
+        async for key in txn.keys(match=base, count=-1):
             # Fetch and Add wanted item
             rid = await txn.get(key)
             if rid is not None:
