@@ -20,7 +20,7 @@
 import asyncio
 import uuid
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 import aioredis
 import pytest
@@ -64,8 +64,12 @@ async def nucliadb_api(
         await asyncio.sleep(4)
 
     def make_client_fixture(
-        roles: List[Enum] = [], user: str = "", version: str = "1", root: bool = False
+        roles: Optional[List[Enum]] = None,
+        user: str = "",
+        version: str = "1",
+        root: bool = False,
     ) -> AsyncClient:
+        roles = roles or []
         client_base_url = "http://test"
 
         if root is False:

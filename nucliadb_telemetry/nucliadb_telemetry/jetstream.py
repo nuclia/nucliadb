@@ -215,7 +215,7 @@ class NatsClientTelemetry:
         payload: bytes = b"",
         timeout: float = 0.5,
         old_style: bool = False,
-        headers: Dict[str, Any] = None,
+        headers: Optional[Dict[str, Any]] = None,
     ) -> Msg:
         headers = {} if headers is None else headers
         inject(headers)

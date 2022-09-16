@@ -26,7 +26,7 @@ from datetime import datetime
 from os.path import dirname, getsize
 from shutil import rmtree
 from tempfile import mkdtemp
-from typing import List
+from typing import List, Optional
 
 import aioredis
 import docker  # type: ignore
@@ -1011,7 +1011,9 @@ async def create_resource(storage, driver, cache, knowledgebox):
 
     # 2.5 CONVERSATION FIELD
 
-    def make_message(text: str, files: List[rpb.CloudFile] = []) -> rpb.Message:
+    def make_message(
+        text: str, files: Optional[List[rpb.CloudFile]] = None
+    ) -> rpb.Message:
         msg = rpb.Message(
             who="myself",
         )

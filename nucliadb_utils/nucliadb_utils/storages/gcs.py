@@ -410,7 +410,7 @@ class GCSStorage(Storage):
         executor: Optional[ThreadPoolExecutor] = None,
         deadletter_bucket: Optional[str] = None,
         indexing_bucket: Optional[str] = None,
-        labels: Dict[str, str] = {},
+        labels: Optional[Dict[str, str]] = None,
         url: str = "https://www.googleapis.com",
         scopes: List[str] = None,
     ):
@@ -427,7 +427,7 @@ class GCSStorage(Storage):
         self._location = location
         self._project = project
         # https://cloud.google.com/storage/docs/bucket-locations
-        self._bucket_labels = labels
+        self._bucket_labels = labels or {}
         self._executor = executor
         self._creation_access_token = datetime.now()
         self._upload_url = (

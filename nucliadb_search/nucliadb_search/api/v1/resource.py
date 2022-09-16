@@ -64,9 +64,9 @@ async def search(
     kbid: str,
     rid: str,
     query: str,
-    fields: List[str] = [],
-    filters: List[str] = [],
-    faceted: List[str] = [],
+    fields: Optional[List[str]] = None,
+    filters: Optional[List[str]] = None,
+    faceted: Optional[List[str]] = None,
     sort: SortOption = SortOption.CREATED,
     page_number: int = 0,
     page_size: int = 20,
@@ -89,8 +89,11 @@ async def search(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = Query(False),
-    shards: List[str] = [],
+    shards: Optional[List[str]] = None,
 ) -> ResourceSearchResults:
+    filters = filters or []
+    faceted = faceted or []
+
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
 
@@ -116,7 +119,7 @@ async def search(
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        fields,
+        fields=fields,
         reload=reload,
     )
 

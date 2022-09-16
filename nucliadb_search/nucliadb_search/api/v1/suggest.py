@@ -64,9 +64,9 @@ async def suggest_knowledgebox(
     response: Response,
     kbid: str,
     query: str,
-    fields: List[str] = [],
-    filters: List[str] = [],
-    faceted: List[str] = [],
+    fields: Optional[List[str]] = None,
+    filters: Optional[List[str]] = None,
+    faceted: Optional[List[str]] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
@@ -86,6 +86,9 @@ async def suggest_knowledgebox(
     debug: bool = Query(False),
     highlight: bool = Query(False),
 ) -> KnowledgeboxSuggestResults:
+    filters = filters or []
+    faceted = faceted or []
+
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
 
@@ -107,7 +110,7 @@ async def suggest_knowledgebox(
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        fields,
+        fields=fields,
     )
 
     incomplete_results = False

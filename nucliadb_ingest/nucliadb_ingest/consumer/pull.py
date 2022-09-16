@@ -66,7 +66,7 @@ class PullWorker:
         cache: Optional[Cache] = None,
         service_name: Optional[str] = None,
         nats_creds: Optional[str] = None,
-        nats_servers: Optional[List[str]] = [],
+        nats_servers: Optional[List[str]] = None,
         creds: Optional[str] = None,
         local_subscriber: bool = False,
     ):
@@ -83,7 +83,7 @@ class PullWorker:
         self.creds = creds
         self.cache = cache
         self.nats_creds = nats_creds
-        self.nats_servers = nats_servers
+        self.nats_servers = nats_servers or []
         self.target = target
         self.group = group
         self.stream = stream

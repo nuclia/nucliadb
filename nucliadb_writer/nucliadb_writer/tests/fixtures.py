@@ -19,7 +19,7 @@
 #
 import asyncio
 from enum import Enum
-from typing import AsyncIterator, Callable, List
+from typing import AsyncIterator, Callable, List, Optional
 
 import aioredis
 import pytest
@@ -49,10 +49,11 @@ async def writer_api(
     from nucliadb_writer.app import application
 
     def make_client_fixture(
-        roles: List[Enum] = [],
+        roles: Optional[List[Enum]] = None,
         user: str = "",
         version: str = "1",
     ) -> AsyncClient:
+        roles = roles or []
         client_base_url = "http://test"
         client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 
