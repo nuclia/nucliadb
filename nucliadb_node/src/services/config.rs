@@ -109,18 +109,6 @@ impl ShardConfig {
             }
         }
     }
-    pub async fn open(path: &str) -> Option<ShardConfig> {
-        let json_file = path::Path::new(path).join("config.json");
-        if json_file.exists() {
-            match ShardConfig::read_config(&json_file).await {
-                ConfigState::UpToDate(config) => Some(config),
-                ConfigState::Modified(_) => None,
-            }
-        } else {
-            None
-        }
-    }
-
     async fn read_config(json_file: &path::Path) -> ConfigState {
         let content = fs::read_to_string(&json_file).await.unwrap();
         let mut raw: StoredConfig = serde_json::from_str(&content).unwrap();
@@ -138,17 +126,7 @@ mod tests {
     #[tokio::test]
     async fn open_and_new() {
         let dir = tempfile::tempdir().unwrap();
-
-        let config = ShardConfig::open(dir.path().to_str().unwrap()).await;
-        assert!(config.is_none());
         let config = ShardConfig::new(dir.path().to_str().unwrap()).await;
-        assert_eq!(config.version_relations, relations::MAX_VERSION);
-        assert_eq!(config.version_fields, fields::MAX_VERSION);
-        assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);
-        assert_eq!(config.version_vectors, vectors::MAX_VERSION);
-        let config = ShardConfig::open(dir.path().to_str().unwrap())
-            .await
-            .unwrap();
         assert_eq!(config.version_relations, relations::MAX_VERSION);
         assert_eq!(config.version_fields, fields::MAX_VERSION);
         assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);
