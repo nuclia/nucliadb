@@ -26,9 +26,20 @@ use nucliadb_protos::shard_created::{
 };
 use nucliadb_protos::{
     // relation_node,
-    DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelatedEntities, RelationSearchRequest, RelationSearchResponse,
-    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    DocumentSearchRequest,
+    DocumentSearchResponse,
+    EdgeList,
+    ParagraphSearchRequest,
+    ParagraphSearchResponse,
+    RelatedEntities,
+    RelationSearchRequest,
+    RelationSearchResponse,
+    SearchRequest,
+    SearchResponse,
+    SuggestRequest,
+    SuggestResponse,
+    TypeList,
+    VectorSearchRequest,
     VectorSearchResponse,
 };
 use nucliadb_services::*;
