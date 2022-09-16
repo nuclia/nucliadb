@@ -186,7 +186,7 @@ mod tests {
 
     fn generate_graph() -> StorageSystem {
         let dir = tempfile::tempdir().unwrap();
-        let system = StorageSystem::create(dir.path());
+        let system = StorageSystem::new(dir.path());
         let mut txn = system.rw_txn();
         {
             system.add_node(&mut txn, NA.to_string());

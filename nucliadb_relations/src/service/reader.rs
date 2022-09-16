@@ -125,7 +125,7 @@ impl RelationsReaderService {
             tokio::fs::create_dir_all(path).await.unwrap();
 
             Ok(RelationsReaderService {
-                index: StorageSystem::create(path),
+                index: StorageSystem::new(path),
             })
         }
     }
@@ -136,7 +136,7 @@ impl RelationsReaderService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(RelationsReaderService {
-                index: StorageSystem::open(path),
+                index: StorageSystem::new(path),
             })
         }
     }

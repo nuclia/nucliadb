@@ -105,7 +105,7 @@ impl RelationsWriterService {
     pub async fn start(config: &RelationServiceConfiguration) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         Ok(RelationsWriterService {
-            index: StorageSystem::start(path),
+            index: StorageSystem::new(path),
         })
     }
     pub async fn new(config: &RelationServiceConfiguration) -> InternalResult<Self> {
@@ -116,7 +116,7 @@ impl RelationsWriterService {
             tokio::fs::create_dir_all(path).await.unwrap();
 
             Ok(RelationsWriterService {
-                index: StorageSystem::create(path),
+                index: StorageSystem::new(path),
             })
         }
     }
@@ -127,7 +127,7 @@ impl RelationsWriterService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(RelationsWriterService {
-                index: StorageSystem::open(path),
+                index: StorageSystem::new(path),
             })
         }
     }

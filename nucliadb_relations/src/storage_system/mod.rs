@@ -38,7 +38,6 @@ mod db_name {
 
 mod env_config {
     pub const ENV: &str = "ENV_lmdb";
-    pub const STAMP: &str = "stamp.nuclia";
     pub const MAP_SIZE: usize = 1048576 * 100000;
     pub const MAX_DBS: u32 = 5;
 }
@@ -128,66 +127,21 @@ pub struct StorageSystem {
 }
 
 impl StorageSystem {
-    pub fn start(path: &Path) -> StorageSystem {
-        if !path.join(env_config::STAMP).exists() {
-            StorageSystem::create(path)
-        } else {
-            StorageSystem::open(path)
-        }
-    }
-    pub fn create(path: &Path) -> StorageSystem {
-        if !path.join(env_config::STAMP).exists() {
-            let env_path = path.join(env_config::ENV);
-            std::fs::create_dir_all(&env_path).unwrap();
-            let mut env_builder = EnvOpenOptions::new();
-            env_builder.max_dbs(env_config::MAX_DBS);
-            env_builder.map_size(env_config::MAP_SIZE);
-            unsafe {
-                env_builder.flag(Flags::MdbNoLock);
-            }
-            let env = env_builder.open(&env_path).unwrap();
-            let keys = env.create_database(Some(db_name::KEYS)).unwrap();
-            let inv_keys = env.create_database(Some(db_name::INVERSE_KEYS)).unwrap();
-            let edges = env.create_database(Some(db_name::EDGES)).unwrap();
-            let in_edges = env.create_database(Some(db_name::INVERSE_EDGES)).unwrap();
-            let state = env.create_database(Some(db_name::STATE)).unwrap();
-            std::fs::File::create(path.join(env_config::STAMP)).unwrap();
-            StorageSystem {
-                env,
-                keys,
-                inv_keys,
-                edges,
-                in_edges,
-                state,
-            }
-        } else {
-            StorageSystem::open(path)
-        }
-    }
-
-    pub fn open(path: &Path) -> StorageSystem {
+    pub fn new(path: &Path) -> StorageSystem {
         let env_path = path.join(env_config::ENV);
-        if !path.join(env_config::STAMP).exists() {
-            panic!("{:?} is not a valid index", path);
-        }
+        std::fs::create_dir_all(&env_path).unwrap();
         let mut env_builder = EnvOpenOptions::new();
+        env_builder.max_dbs(env_config::MAX_DBS);
+        env_builder.map_size(env_config::MAP_SIZE);
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
         }
-        env_builder.max_dbs(env_config::MAX_DBS);
-        env_builder.map_size(env_config::MAP_SIZE);
         let env = env_builder.open(&env_path).unwrap();
-        let keys = env.open_database(Some(db_name::KEYS)).unwrap().unwrap();
-        let inv_keys = env
-            .open_database(Some(db_name::INVERSE_KEYS))
-            .unwrap()
-            .unwrap();
-        let edges = env.open_database(Some(db_name::EDGES)).unwrap().unwrap();
-        let in_edges = env
-            .open_database(Some(db_name::INVERSE_EDGES))
-            .unwrap()
-            .unwrap();
-        let state = env.open_database(Some(db_name::STATE)).unwrap().unwrap();
+        let keys = env.create_database(Some(db_name::KEYS)).unwrap();
+        let inv_keys = env.create_database(Some(db_name::INVERSE_KEYS)).unwrap();
+        let edges = env.create_database(Some(db_name::EDGES)).unwrap();
+        let in_edges = env.create_database(Some(db_name::INVERSE_EDGES)).unwrap();
+        let state = env.create_database(Some(db_name::STATE)).unwrap();
         StorageSystem {
             env,
             keys,
@@ -197,7 +151,6 @@ impl StorageSystem {
             state,
         }
     }
-
     pub fn rw_txn(&self) -> RwToken<'_> {
         RwToken(self.env.write_txn().unwrap())
     }
@@ -305,14 +258,14 @@ mod tests {
     use super::*;
     fn initialize_storage_system() -> StorageSystem {
         let dir = tempfile::tempdir().unwrap();
-        StorageSystem::create(dir.path())
+        StorageSystem::new(dir.path())
     }
 
     #[test]
     fn open_and_create() {
         let dir = tempfile::tempdir().unwrap();
-        StorageSystem::create(dir.path());
-        StorageSystem::open(dir.path());
+        StorageSystem::new(dir.path());
+        StorageSystem::new(dir.path());
         assert!(true);
     }
 
