@@ -89,7 +89,6 @@ async def search_knowledgebox(
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
-    shards: bool = Query(False),
     highlight: bool = Query(default=False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
@@ -117,7 +116,6 @@ async def search_knowledgebox(
         features=features,
         reload=reload,
         debug=debug,
-        shards=shards,
         highlight=highlight,
         show=show,
         field_type_filter=field_type_filter,
@@ -281,6 +279,6 @@ async def search(
         )
     if item.debug:
         search_results.nodes = queried_nodes
-    if item.shards:
-        search_results.shards = queried_shards
+
+    search_results.shards = queried_shards
     return search_results

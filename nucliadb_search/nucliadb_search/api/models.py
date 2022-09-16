@@ -265,7 +265,6 @@ class SearchRequest(BaseModel):
     ]
     reload: bool = True
     debug: bool = False
-    shards: bool = False
     highlight: bool = False
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)

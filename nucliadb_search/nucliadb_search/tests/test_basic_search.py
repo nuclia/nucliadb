@@ -84,7 +84,7 @@ async def test_multiple_search_resource_all(
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         await asyncio.sleep(5)
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40&shards=true",
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=0&page_size=40",
         )
         if resp.status_code != 200:
             print(resp.content)
@@ -99,7 +99,7 @@ async def test_multiple_search_resource_all(
         pos_35 = resp.json()["paragraphs"]["results"][35]
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shard={shards[0]}&shards=true",  # noqa
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shard={shards[0]}",  # noqa
         )
         if resp.status_code != 200:
             print(resp.content)
