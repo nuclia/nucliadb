@@ -173,12 +173,7 @@ impl ShardReaderService {
         let rsc = RelationServiceConfiguration {
             path: format!("{}/relations", shard_path),
         };
-        let config = loop {
-            match ShardConfig::open(&shard_path).await {
-                None => task::yield_now().await,
-                Some(config) => break config,
-            }
-        };
+        let config = ShardConfig::new(&shard_path).await;
         let field_reader_service = fields::create_reader(&fsc, config.version_fields).await?;
         let paragraph_reader_service =
             paragraphs::create_reader(&psc, config.version_paragraphs).await?;
