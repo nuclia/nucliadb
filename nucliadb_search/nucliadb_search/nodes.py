@@ -54,8 +54,10 @@ class NodesManager:
         return [x for x in shards.shards]
 
     def choose_node(
-        self, shard: ShardObject, shards: List[str] = []
+        self, shard: ShardObject, shards: Optional[List[str]] = None
     ) -> Tuple[Node, Optional[str], str]:
+        shards = shards or []
+
         if NODE_CLUSTER.local_node:
             return (
                 NODE_CLUSTER.get_local_node(),

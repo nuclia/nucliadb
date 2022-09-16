@@ -19,7 +19,7 @@
 import asyncio
 from enum import Enum
 from os.path import dirname
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import aioredis
 import pytest
@@ -115,12 +115,13 @@ async def search_api(
         await asyncio.sleep(4)
 
     def make_client_fixture(
-        roles: List[Enum] = [],
+        roles: Optional[List[Enum]] = None,
         user: str = "",
         version: str = "1",
         root: bool = False,
-        extra_headers: Dict[str, str] = {},
+        extra_headers: Optional[Dict[str, str]] = None,
     ) -> AsyncClient:
+        roles = roles or []
         client_base_url = "http://test"
 
         if root is False:
@@ -130,6 +131,7 @@ async def search_api(
         client.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
         client.headers["X-NUCLIADB-USER"] = user
 
+        extra_headers = extra_headers or {}
         if len(extra_headers) == 0:
             return client
 

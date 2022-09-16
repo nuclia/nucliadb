@@ -239,7 +239,7 @@ async def get_text_paragraph(
 
 
 def highlight_paragraph(
-    text: str, words: List[str] = [], ematches: Optional[List[str]] = None
+    text: str, words: List[str], ematches: Optional[List[str]] = None
 ) -> str:
     text_lower = text.lower()
 
