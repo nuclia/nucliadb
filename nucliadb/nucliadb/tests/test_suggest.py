@@ -98,155 +98,155 @@ async def test_suggest_fuzzy_search(
     assert len(body["paragraphs"]["results"]) == 6
 
 
-@pytest.mark.asyncio
-async def test_suggest_related_entities(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
-):
-    """
-    Test description:
+# @pytest.mark.asyncio
+# async def test_suggest_related_entities(
+#     nucliadb_grpc: WriterStub,
+#     nucliadb_reader: AsyncClient,
+#     nucliadb_writer: AsyncClient,
+#     knowledgebox,
+# ):
+#     """
+#     Test description:
 
-    Create a new resoure with some entities and relations and use
-    /suggest endpoint to make autocomplete suggestions.
-    """
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        json={
-            "title": "My resource",
-            "slug": "myresource",
-            "summary": "Some summary",
-            "origin": {
-                "colaborators": ["Irene", "Anastasia"],
-            },
-            "usermetadata": {
-                "classifications": [
-                    {"labelset": "labelset-1", "label": "label-1"},
-                    {"labelset": "labelset-2", "label": "label-2"},
-                ],
-                "relations": [
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Anna",
-                            "entity_type": "person",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Annika",
-                            "entity_type": "person",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Anthony",
-                            "entity_type": "person",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "John",
-                            "entity_type": "person",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Barcelona",
-                            "entity_type": "city",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "New York",
-                            "entity_type": "city",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Israel",
-                            "entity_type": "country",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Netherlands",
-                            "entity_type": "country",
-                        },
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Solomon Islands",
-                            "entity_type": "country",
-                        },
-                    },
-                ],
-            },
-        },
-    )
-    assert resp.status_code == 201
+#     Create a new resoure with some entities and relations and use
+#     /suggest endpoint to make autocomplete suggestions.
+#     """
+#     resp = await nucliadb_writer.post(
+#         f"/kb/{knowledgebox}/resources",
+#         json={
+#             "title": "My resource",
+#             "slug": "myresource",
+#             "summary": "Some summary",
+#             "origin": {
+#                 "colaborators": ["Irene", "Anastasia"],
+#             },
+#             "usermetadata": {
+#                 "classifications": [
+#                     {"labelset": "labelset-1", "label": "label-1"},
+#                     {"labelset": "labelset-2", "label": "label-2"},
+#                 ],
+#                 "relations": [
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Anna",
+#                             "entity_type": "person",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Annika",
+#                             "entity_type": "person",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Anthony",
+#                             "entity_type": "person",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "John",
+#                             "entity_type": "person",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Barcelona",
+#                             "entity_type": "city",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "New York",
+#                             "entity_type": "city",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Israel",
+#                             "entity_type": "country",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Netherlands",
+#                             "entity_type": "country",
+#                         },
+#                     },
+#                     {
+#                         "relation": "ENTITY",
+#                         "entity": {
+#                             "entity": "Solomon Islands",
+#                             "entity_type": "country",
+#                         },
+#                     },
+#                 ],
+#             },
+#         },
+#     )
+#     assert resp.status_code == 201
 
-    # Test simple suggestions
+#     # Test simple suggestions
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Anna", "Annika", "Anthony"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Anna", "Annika", "Anthony"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=ann")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Anna", "Annika"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=ann")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Anna", "Annika"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=jo")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"John"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=jo")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"John"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=any")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert not body["entities"]["entities"]
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=any")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert not body["entities"]["entities"]
 
-    # Test correct query tokenization
+#     # Test correct query tokenization
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=bar")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=bar")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Barcelona"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Bar")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Bar")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Barcelona"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BAR")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BAR")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Barcelona"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BÄR")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BÄR")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Barcelona"}
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BàR")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert set(body["entities"]["entities"]) == {"Barcelona"}
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BàR")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert set(body["entities"]["entities"]) == {"Barcelona"}
 
-    # Test multiple word suggest and ordering
+#     # Test multiple word suggest and ordering
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]
+#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
+#     assert resp.status_code == 200
+#     body = resp.json()
+#     assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]
