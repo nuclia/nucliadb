@@ -89,8 +89,7 @@ async def search(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = Query(False),
-    shards: bool = Query(False),
-    shard: List[str] = [],
+    shards: List[str] = [],
 ) -> ResourceSearchResults:
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
@@ -127,7 +126,7 @@ async def search(
     queried_shards = []
     for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_obj, shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard_obj, shards)
         except KeyError:
             incomplete_results = True
         else:
@@ -190,6 +189,6 @@ async def search(
     response.status_code = 206 if incomplete_results else 200
     if debug:
         search_results.nodes = queried_nodes
-    if shards:
-        search_results.shards = queried_shards
+
+    search_results.shards = queried_shards
     return search_results

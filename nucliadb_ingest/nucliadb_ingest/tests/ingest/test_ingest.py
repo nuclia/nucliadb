@@ -200,7 +200,8 @@ async def test_ingest_error_message(
     assert field_obj.value.body == message0.texts["wikipedia_ml"].body
 
 
-def add_filefields(message, items=[]):
+def add_filefields(message, items=None):
+    items = items or []
     for (fieldid, filename) in items:
         file_path = f"{dirname(__file__)}/assets/{filename}"
         cf1 = CloudFile(
@@ -214,7 +215,8 @@ def add_filefields(message, items=[]):
         message.files[fieldid].file.CopyFrom(cf1)
 
 
-def add_textfields(message, items=[]):
+def add_textfields(message, items=None):
+    items = items or []
     for fieldid in items:
         message.texts[fieldid].body = "some random text"
 

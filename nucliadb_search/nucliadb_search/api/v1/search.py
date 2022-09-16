@@ -89,14 +89,13 @@ async def search_knowledgebox(
     ),
     reload: bool = Query(default=True),
     debug: bool = Query(False),
-    shards: bool = Query(False),
     highlight: bool = Query(default=False),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shard: List[str] = Query([]),
+    shards: List[str] = Query([]),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -117,12 +116,11 @@ async def search_knowledgebox(
         features=features,
         reload=reload,
         debug=debug,
-        shards=shards,
         highlight=highlight,
         show=show,
         field_type_filter=field_type_filter,
         extracted=extracted,
-        shard=shard,
+        shards=shards,
     )
     return await search(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -206,7 +204,7 @@ async def search(
     queried_nodes = []
     for shard_obj in shard_groups:
         try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_obj, item.shard)
+            node, shard_id, node_id = nodemanager.choose_node(shard_obj, item.shards)
         except KeyError:
             incomplete_results = True
         else:
@@ -281,6 +279,6 @@ async def search(
         )
     if item.debug:
         search_results.nodes = queried_nodes
-    if item.shards:
-        search_results.shards = queried_shards
+
+    search_results.shards = queried_shards
     return search_results

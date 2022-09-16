@@ -46,7 +46,7 @@ class Gnatsd(object):
         debug=False,
         tls=False,
         cluster_listen=None,
-        routes=[],
+        routes=None,
         config_file=None,
     ):
         self.port = port
@@ -59,7 +59,7 @@ class Gnatsd(object):
         self.tls = tls
         self.token = token
         self.cluster_listen = cluster_listen
-        self.routes = routes
+        self.routes = routes or []
         self.bin_name = "gnatsd"
         self.config_file = config_file
         self.folder = None
