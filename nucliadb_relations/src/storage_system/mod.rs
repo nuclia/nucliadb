@@ -20,13 +20,12 @@
 
 use std::path::Path;
 
+use crate::edge::*;
+use crate::node::*;
 use heed::flags::Flags;
 use heed::types::{ByteSlice, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions, RoIter, RoPrefix, RoTxn, RwTxn};
 use nucliadb_byte_rpr::*;
-
-use crate::edge::*;
-use crate::node::*;
 
 mod db_name {
     pub const KEYS: &str = "KEYS_LMDB";
@@ -205,13 +204,17 @@ impl StorageSystem {
         RoToken(self.env.read_txn().unwrap())
     }
     pub fn add_node(&self, txn: &mut RwTxn, value: String) -> bool {
+        println!("Adding node: {value}");
         let mut had_effect = false;
         if self.keys.get(txn, &value).unwrap().is_none() {
             let node_id = self.get_fresh_node_id(txn);
+            println!("Adding to keys");
             self.keys.put(txn, &value, &node_id.as_byte_rpr()).unwrap();
+            println!("Adding inv keys");
             self.inv_keys
                 .put(txn, &node_id.as_byte_rpr(), &value)
                 .unwrap();
+            println!("End");
             had_effect = true;
         }
         had_effect
