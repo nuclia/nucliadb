@@ -32,7 +32,7 @@ pub async fn open_reader(
     version: u32,
 ) -> InternalResult<RRelations> {
     match version {
-        0 => nucliadb_relations::service::RelationsReaderService::start(config)
+        0 => nucliadb_relations::service::RelationsReaderService::open(config)
             .await
             .map(|v| Arc::new(v) as RRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
@@ -44,7 +44,7 @@ pub async fn open_writer(
     version: u32,
 ) -> InternalResult<WRelations> {
     match version {
-        0 => nucliadb_relations::service::RelationsWriterService::start(config)
+        0 => nucliadb_relations::service::RelationsWriterService::open(config)
             .await
             .map(|v| Arc::new(RwLock::new(v)) as WRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
