@@ -85,12 +85,14 @@ impl WriterChild for RelationsWriterService {
                     .with_subtype(to.subtype.clone())
                     .build()
                     .to_string();
-                self.index.add_node(&mut txn, source.clone());
-                self.index.add_node(&mut txn, to.clone());
-                let source = self.index.get_id(&txn, &source).unwrap();
-                let to = self.index.get_id(&txn, &to).unwrap();
-                let etype = rtype_parsing(relation.relation(), &relation.relation_label);
-                self.index.add_edge(&mut txn, Edge::new(source, etype, to));
+                if !source.is_empty() && !to.is_empty() {
+                    self.index.add_node(&mut txn, source.clone());
+                    self.index.add_node(&mut txn, to.clone());
+                    let source = self.index.get_id(&txn, &source).unwrap();
+                    let to = self.index.get_id(&txn, &to).unwrap();
+                    let etype = rtype_parsing(relation.relation(), &relation.relation_label);
+                    self.index.add_edge(&mut txn, Edge::new(source, etype, to));
+                }
             }
         }
         txn.commit().unwrap();
