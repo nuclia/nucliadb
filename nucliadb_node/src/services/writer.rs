@@ -270,23 +270,22 @@ impl ShardWriterService {
             result
         });
 
-        let relation_writer_service = self.relation_writer_service.clone();
-        let relation_resource = resource.clone();
-        let relation_task = tokio::task::spawn_blocking(move || {
-            info!("Relation service starts set_resource");
-            let mut writer = relation_writer_service.write().unwrap();
-            let result = writer.set_resource(&relation_resource);
-            info!("Relation service ends set_resource");
-            result
-        });
+        // let relation_writer_service = self.relation_writer_service.clone();
+        // let relation_resource = resource.clone();
+        // let relation_task = tokio::task::spawn_blocking(move || {
+        //     info!("Relation service starts set_resource");
+        //     let mut writer = relation_writer_service.write().unwrap();
+        //     let result = writer.set_resource(&relation_resource);
+        //     info!("Relation service ends set_resource");
+        //     result
+        // });
 
-        let (text_result, paragraph_result, vector_result, relation_result) =
-            try_join!(text_task, paragraph_task, vector_task, relation_task).unwrap();
+        let (text_result, paragraph_result, vector_result) =
+            try_join!(text_task, paragraph_task, vector_task).unwrap();
 
         text_result?;
         paragraph_result?;
         vector_result?;
-        relation_result?;
         Ok(())
     }
 
