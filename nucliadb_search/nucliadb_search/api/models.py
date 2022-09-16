@@ -269,5 +269,5 @@ class SearchRequest(BaseModel):
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
-    shard: List[str] = []
+    shards: List[str] = []
     vector: Optional[List[float]] = None
