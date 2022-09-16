@@ -343,6 +343,8 @@ async def merge_results(
         documents.append(result.document)
         vectors.append(result.vector)
 
+    print_before_merge(paragraphs)
+
     api_results = KnowledgeboxSearchResults()
 
     get_resource_cache(clear=True)
@@ -363,7 +365,22 @@ async def merge_results(
     api_results.resources = await fetch_resources(
         resources, kbid, show, field_type_filter, extracted
     )
+    print_after_merge(api_results)
     return api_results
+
+
+def print_before_merge(paragraphs):
+    print("BEFORE MERGE!")
+    rids = sorted([r.uuid for p in paragraphs for r in p.results])
+    for r in rids:
+        print(r)
+
+
+def print_after_merge(results):
+    print("AFTER MERGE:")
+    rs = sorted([p.rid for p in results.paragraphs.results])
+    for r in rs:
+        print(r)
 
 
 async def merge_paragraphs_results(
