@@ -146,9 +146,6 @@ build-local-sidecar:
 	docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
 
 
-build-nucliadb:
-	docker buildx build --platform linux/amd64,linux/arm64 -t nuclia/nucliadb:latest --push -f Dockerfile .
-
 debug-test-nucliadb:
 	RUST_BACKTRACE=1 RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG pytest nucliadb/nucliadb -sxv
 
