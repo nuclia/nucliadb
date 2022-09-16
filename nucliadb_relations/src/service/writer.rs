@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use async_trait::async_trait;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
@@ -31,19 +30,15 @@ pub struct RelationsWriterService {
     index: StorageSystem,
 }
 
-impl WService for RelationsWriterService {}
-impl RelationWriterOnly for RelationsWriterService {}
-impl RelationServiceWriter for RelationsWriterService {}
-
+impl RelationWriter for RelationsWriterService {}
 impl std::fmt::Debug for RelationsWriterService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RelationWriterService").finish()
     }
 }
 
-#[async_trait]
-impl ServiceChild for RelationsWriterService {
-    async fn stop(&self) -> InternalResult<()> {
+impl WriterChild for RelationsWriterService {
+    fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping relation writer Service");
         Ok(())
     }
@@ -53,9 +48,6 @@ impl ServiceChild for RelationsWriterService {
         txn.commit().unwrap();
         count as usize
     }
-}
-
-impl WriterChild for RelationsWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let mut txn = self.index.rw_txn();
         if let Some(id) = self.index.get_id(&txn, &resource_id.uuid) {
@@ -100,18 +92,18 @@ impl WriterChild for RelationsWriterService {
 }
 
 impl RelationsWriterService {
-    pub async fn start(config: &RelationServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         Ok(RelationsWriterService {
             index: StorageSystem::start(path),
         })
     }
-    pub async fn new(config: &RelationServiceConfiguration) -> InternalResult<Self> {
+    pub fn new(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
-            tokio::fs::create_dir_all(path).await.unwrap();
+            std::fs::create_dir_all(path).unwrap();
 
             Ok(RelationsWriterService {
                 index: StorageSystem::create(path),
@@ -119,7 +111,7 @@ impl RelationsWriterService {
         }
     }
 
-    pub async fn open(config: &RelationServiceConfiguration) -> InternalResult<Self> {
+    pub fn open(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
             Err(Box::new("Shard does not exist".to_string()))

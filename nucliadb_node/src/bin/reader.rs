@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     std::fs::create_dir_all(Configuration::shards_path())?;
     if !Configuration::lazy_loading() {
-        node_reader_service.load_shards().await?;
+        node_reader_service.load_shards()?;
     }
 
     let node_reader_service = NodeReaderGRPCDriver::from(node_reader_service);

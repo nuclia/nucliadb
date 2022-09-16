@@ -22,53 +22,35 @@ use nucliadb_service_interface::relations_interface::*;
 use crate::*;
 pub const MAX_VERSION: u32 = 0;
 
-type RServiceT = dyn RelationServiceReader;
-type WServiceT = dyn RelationServiceWriter;
-pub type RRelations = Arc<RServiceT>;
-pub type WRelations = Arc<RwLock<WServiceT>>;
+pub type RRelations = Arc<dyn RelationReader>;
+pub type WRelations = Arc<RwLock<dyn RelationWriter>>;
 
-pub async fn open_reader(
-    config: &RelationServiceConfiguration,
-    version: u32,
-) -> InternalResult<RRelations> {
+pub fn open_reader(config: &RelationConfig, version: u32) -> InternalResult<RRelations> {
     match version {
         0 => nucliadb_relations::service::RelationsReaderService::start(config)
-            .await
             .map(|v| Arc::new(v) as RRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
-pub async fn open_writer(
-    config: &RelationServiceConfiguration,
-    version: u32,
-) -> InternalResult<WRelations> {
+pub fn open_writer(config: &RelationConfig, version: u32) -> InternalResult<WRelations> {
     match version {
         0 => nucliadb_relations::service::RelationsWriterService::start(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
-pub async fn create_reader(
-    config: &RelationServiceConfiguration,
-    version: u32,
-) -> InternalResult<RRelations> {
+pub fn create_reader(config: &RelationConfig, version: u32) -> InternalResult<RRelations> {
     match version {
         0 => nucliadb_relations::service::RelationsReaderService::new(config)
-            .await
             .map(|v| Arc::new(v) as RRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
-pub async fn create_writer(
-    config: &RelationServiceConfiguration,
-    version: u32,
-) -> InternalResult<WRelations> {
+pub fn create_writer(config: &RelationConfig, version: u32) -> InternalResult<WRelations> {
     match version {
         0 => nucliadb_relations::service::RelationsWriterService::new(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WRelations),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }

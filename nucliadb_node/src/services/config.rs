@@ -15,11 +15,10 @@
 // GNU Affero General Public License for more details.
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-use std::path;
+use std::{fs, path};
 
 use nucliadb_services::*;
 use serde::{Deserialize, Serialize};
-use tokio::fs;
 
 #[derive(Serialize, Deserialize, Default)]
 struct StoredConfig {
@@ -90,28 +89,27 @@ impl From<StoredConfig> for ShardConfig {
     }
 }
 impl ShardConfig {
-    pub async fn new(path: &str) -> ShardConfig {
-        fs::create_dir_all(path).await.unwrap();
+    pub fn new(path: &str) -> ShardConfig {
+        fs::create_dir_all(path).unwrap();
         let json_file = path::Path::new(path).join("config.json");
         if !json_file.exists() {
             let config = ShardConfig::default();
             let serialized = serde_json::to_string(&config).unwrap();
-            fs::File::create(&json_file).await.unwrap();
-            fs::write(&json_file, &serialized).await.unwrap();
+            fs::File::create(&json_file).unwrap();
+            fs::write(&json_file, &serialized).unwrap();
         }
-        match ShardConfig::read_config(&json_file).await {
+        match ShardConfig::read_config(&json_file) {
             ConfigState::UpToDate(config) => config,
             ConfigState::Modified(config) => {
                 let serialized = serde_json::to_string(&config).unwrap();
-                fs::File::create(&json_file).await.unwrap();
-                fs::write(&json_file, &serialized).await.unwrap();
+                fs::File::create(&json_file).unwrap();
+                fs::write(&json_file, &serialized).unwrap();
                 config
             }
         }
     }
-
-    async fn read_config(json_file: &path::Path) -> ConfigState {
-        let content = fs::read_to_string(&json_file).await.unwrap();
+    fn read_config(json_file: &path::Path) -> ConfigState {
+        let content = fs::read_to_string(&json_file).unwrap();
         let mut raw: StoredConfig = serde_json::from_str(&content).unwrap();
         if raw.fill_gaps() {
             ConfigState::Modified(ShardConfig::from(raw))
@@ -127,8 +125,7 @@ mod tests {
     #[tokio::test]
     async fn open_and_new() {
         let dir = tempfile::tempdir().unwrap();
-
-        let config = ShardConfig::new(dir.path().to_str().unwrap()).await;
+        let config = ShardConfig::new(dir.path().to_str().unwrap());
         assert_eq!(config.version_relations, relations::MAX_VERSION);
         assert_eq!(config.version_fields, fields::MAX_VERSION);
         assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);

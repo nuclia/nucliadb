@@ -17,14 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_node::config::Configuration;
 use std::io::Cursor;
 use std::sync::Arc;
-use tracing_subscriber::filter::Targets;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
+use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
@@ -37,6 +33,10 @@ use pyo3::exceptions;
 use pyo3::prelude::*;
 use tokio::sync::RwLock;
 use tracing::*;
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 type RawProtos = Vec<u8>;
 
 #[pyclass]
@@ -63,8 +63,8 @@ impl NodeReader {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
             let mut lock = reader.write().await;
-            if let Some(shard) = lock.get_shard(&shard_id).await {
-                let stats = shard.get_info().await;
+            if let Some(shard) = lock.get_shard(&shard_id) {
+                let stats = shard.get_info();
                 let shard_pb = ShardPB {
                     shard_id: String::from(&shard.id),
                     resources: stats.resources as u64,
@@ -82,7 +82,7 @@ impl NodeReader {
         let reader = self.reader.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let lock = reader.write().await;
-            let shards = lock.get_shards().await;
+            let shards = lock.get_shards();
             Ok(shards.encode_to_vec())
         })
     }
@@ -95,7 +95,7 @@ impl NodeReader {
             let shard_id = ShardId {
                 id: search_request.shard.clone(),
             };
-            let response = lock.search(&shard_id, search_request).await;
+            let response = lock.search(&shard_id, search_request);
             match response {
                 Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -112,7 +112,7 @@ impl NodeReader {
             let shard_id = ShardId {
                 id: suggest_request.shard.clone(),
             };
-            let response = lock.suggest(&shard_id, suggest_request).await;
+            let response = lock.suggest(&shard_id, suggest_request);
             match response {
                 Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -129,7 +129,7 @@ impl NodeReader {
             let shard_id = ShardId {
                 id: vector_request.id.clone(),
             };
-            let response = lock.vector_search(&shard_id, vector_request).await;
+            let response = lock.vector_search(&shard_id, vector_request);
             match response {
                 Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -147,7 +147,7 @@ impl NodeReader {
             let shard_id = ShardId {
                 id: document_request.id.clone(),
             };
-            let response = lock.document_search(&shard_id, document_request).await;
+            let response = lock.document_search(&shard_id, document_request);
             match response {
                 Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -165,7 +165,7 @@ impl NodeReader {
             let shard_id = ShardId {
                 id: paragraph_request.id.clone(),
             };
-            let response = lock.paragraph_search(&shard_id, paragraph_request).await;
+            let response = lock.paragraph_search(&shard_id, paragraph_request);
             match response {
                 Some(Ok(response)) => Ok(response.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -205,7 +205,7 @@ impl NodeWriter {
             let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
 
             let mut lock = writer.write().await;
-            match lock.get_shard(&shard_id).await {
+            match lock.get_shard(&shard_id) {
                 Some(_) => Ok(shard_id.encode_to_vec()),
                 None => Err(exceptions::PyTypeError::new_err("Not found")),
             }
@@ -216,7 +216,7 @@ impl NodeWriter {
         let writer = self.writer.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut w = writer.write().await;
-            let shard = w.new_shard().await;
+            let shard = w.new_shard();
             Ok(shard.encode_to_vec())
         })
     }
@@ -227,7 +227,7 @@ impl NodeWriter {
             let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
 
             let mut w = writer.write().await;
-            match w.delete_shard(&shard_id).await {
+            match w.delete_shard(&shard_id) {
                 Some(Ok(_)) => Ok(shard_id.encode_to_vec()),
                 Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
                 None => Err(exceptions::PyTypeError::new_err("Shard not found")),
@@ -253,7 +253,7 @@ impl NodeWriter {
             let shard_id = ShardId {
                 id: resource.shard_id.clone(),
             };
-            match lock.set_resource(&shard_id, &resource).await {
+            match lock.set_resource(&shard_id, &resource) {
                 Some(Ok(count)) => {
                     let status = OpStatus {
                         status: 0,
@@ -291,7 +291,7 @@ impl NodeWriter {
             let shard_id = ShardId {
                 id: resource.shard_id.clone(),
             };
-            match lock.remove_resource(&shard_id, &resource).await {
+            match lock.remove_resource(&shard_id, &resource) {
                 Some(Ok(count)) => {
                     let status = OpStatus {
                         status: 0,
@@ -325,7 +325,7 @@ impl NodeWriter {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let mut lock = writer.write().await;
             let request = ShardId::decode(&mut Cursor::new(request)).unwrap();
-            match lock.gc(&request).await {
+            match lock.gc(&request) {
                 Some(Ok(_)) => {
                     let status = OpStatus {
                         status: 0,

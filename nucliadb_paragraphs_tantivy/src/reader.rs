@@ -19,9 +19,8 @@
 //
 
 use std::fmt::Debug;
+use std::fs;
 
-use async_std::fs;
-use async_trait::async_trait;
 use nucliadb_protos::{OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId};
 use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
@@ -50,13 +49,12 @@ impl Debug for ParagraphReaderService {
     }
 }
 
-impl RService for ParagraphReaderService {}
-impl ParagraphServiceReader for ParagraphReaderService {}
-impl ParagraphReaderOnly for ParagraphReaderService {}
+impl ParagraphReader for ParagraphReaderService {}
 
-#[async_trait]
-impl ServiceChild for ParagraphReaderService {
-    async fn stop(&self) -> InternalResult<()> {
+impl ReaderChild for ParagraphReaderService {
+    type Request = ParagraphSearchRequest;
+    type Response = ParagraphSearchResponse;
+    fn stop(&self) -> InternalResult<()> {
         info!("Stopping Paragraph Reader Service");
         Ok(())
     }
@@ -64,12 +62,6 @@ impl ServiceChild for ParagraphReaderService {
         let searcher = self.reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap()
     }
-}
-
-impl ReaderChild for ParagraphReaderService {
-    type Request = ParagraphSearchRequest;
-    type Response = ParagraphSearchResponse;
-
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         use search_query::create_query;
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
@@ -150,13 +142,13 @@ impl ParagraphReaderService {
         Ok(docs)
     }
 
-    pub async fn start(config: &ParagraphServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
         info!("Starting Paragraph Service");
-        match ParagraphReaderService::open(config).await {
+        match ParagraphReaderService::open(config) {
             Ok(service) => Ok(service),
             Err(_e) => {
                 warn!("Paragraph Service does not exists. Creating a new one.");
-                match ParagraphReaderService::new(config).await {
+                match ParagraphReaderService::new(config) {
                     Ok(service) => Ok(service),
                     Err(e) => {
                         error!("Error starting Paragraph service: {}", e);
@@ -166,29 +158,23 @@ impl ParagraphReaderService {
             }
         }
     }
-    pub async fn new(
-        config: &ParagraphServiceConfiguration,
-    ) -> InternalResult<ParagraphReaderService> {
-        match ParagraphReaderService::new_inner(config).await {
+    pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
+        match ParagraphReaderService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
-    pub async fn open(
-        config: &ParagraphServiceConfiguration,
-    ) -> InternalResult<ParagraphReaderService> {
-        match ParagraphReaderService::open_inner(config).await {
+    pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
+        match ParagraphReaderService::open_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
 
-    pub async fn new_inner(
-        config: &ParagraphServiceConfiguration,
-    ) -> tantivy::Result<ParagraphReaderService> {
+    pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
 
-        fs::create_dir_all(&config.path).await?;
+        fs::create_dir_all(&config.path)?;
 
         debug!("Creating index builder {}:{}", line!(), file!());
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
@@ -218,9 +204,7 @@ impl ParagraphReaderService {
         })
     }
 
-    pub async fn open_inner(
-        config: &ParagraphServiceConfiguration,
-    ) -> tantivy::Result<ParagraphReaderService> {
+    pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
         let index = Index::open_in_dir(&config.path)?;
 
@@ -553,17 +537,17 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_new_paragraph() -> anyhow::Result<()> {
+    #[test]
+    fn test_new_paragraph() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
-        let psc = ParagraphServiceConfiguration {
+        let psc = ParagraphConfig {
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
         };
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).await.unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
         let _ = paragraph_writer_service.set_resource(&resource1);
 
-        let paragraph_reader_service = ParagraphReaderService::start(&psc).await.unwrap();
+        let paragraph_reader_service = ParagraphReaderService::start(&psc).unwrap();
 
         let reader = paragraph_writer_service.index.reader()?;
         let searcher = reader.searcher();

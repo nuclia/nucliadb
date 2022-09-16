@@ -34,19 +34,13 @@ impl std::fmt::Display for FieldError {
 
 impl InternalError for FieldError {}
 
-pub struct FieldServiceConfiguration {
+pub struct FieldConfig {
     pub path: String,
 }
 
-pub trait FieldReaderOnly {}
-pub trait FieldWriterOnly {}
-
-pub trait FieldServiceReader:
-    ServiceChild
-    + RService
-    + ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
-    + FieldReaderOnly
+pub trait FieldReader:
+    ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
 {
 }
 
-pub trait FieldServiceWriter: WService + ServiceChild + WriterChild + FieldWriterOnly {}
+pub trait FieldWriter: WriterChild {}

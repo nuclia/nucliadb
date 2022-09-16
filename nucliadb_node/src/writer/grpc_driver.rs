@@ -51,7 +51,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
-        let exists = writer.get_shard(&shard_id).await.is_some();
+        let exists = writer.get_shard(&shard_id).is_some();
         std::mem::drop(writer);
         match exists {
             true => {
@@ -75,7 +75,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("Creating new shard");
         let mut writer = self.0.write().await;
-        let response = writer.new_shard().await;
+        let response = writer.new_shard();
 
         Ok(tonic::Response::new(response))
     }
@@ -93,7 +93,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
-        match writer.delete_shard(&shard_id).await {
+        match writer.delete_shard(&shard_id) {
             Some(Ok(_)) => Ok(tonic::Response::new(shard_id)),
             Some(Err(e)) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
@@ -137,7 +137,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             id: resource.shard_id.clone(),
         };
         let mut writer = self.0.write().await;
-        match writer.set_resource(&shard_id, &resource).await {
+        match writer.set_resource(&shard_id, &resource) {
             Some(Ok(count)) => {
                 info!("Set resource ends correctly");
                 let status = OpStatus {
@@ -179,7 +179,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             id: resource.shard_id.clone(),
         };
         let mut writer = self.0.write().await;
-        match writer.remove_resource(&shard_id, &resource).await {
+        match writer.remove_resource(&shard_id, &resource) {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -219,7 +219,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
-        match writer.gc(&shard_id).await {
+        match writer.gc(&shard_id) {
             Some(Ok(_)) => {
                 let resp = EmptyResponse {};
                 Ok(tonic::Response::new(resp))

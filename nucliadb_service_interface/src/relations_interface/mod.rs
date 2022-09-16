@@ -22,7 +22,7 @@ use nucliadb_protos::*;
 use crate::service_interface::*;
 
 #[derive(Clone)]
-pub struct RelationServiceConfiguration {
+pub struct RelationConfig {
     pub path: String,
 }
 
@@ -31,25 +31,14 @@ pub struct RelationError {
     pub msg: String,
 }
 
-pub trait RelationReaderOnly {
+pub trait RelationReader:
+    ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse>
+{
     fn get_edges(&self) -> EdgeList;
     fn get_node_types(&self) -> TypeList;
 }
 
-pub trait RelationWriterOnly {}
-
-pub trait RelationServiceReader:
-    ServiceChild
-    + RService
-    + ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse>
-    + RelationReaderOnly
-{
-}
-
-pub trait RelationServiceWriter:
-    WService + ServiceChild + WriterChild + RelationWriterOnly
-{
-}
+pub trait RelationWriter: WriterChild {}
 
 impl std::fmt::Display for RelationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
