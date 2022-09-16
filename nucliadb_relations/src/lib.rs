@@ -18,11 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#[allow(unused)]
 mod edge;
+#[allow(unused)]
 mod node;
+#[allow(unused)]
 mod search_engine;
+#[allow(unused)]
 pub mod service;
+#[allow(unused)]
 mod storage_system;
+#[allow(unused)]
 mod string_normalization;
 
 mod graph {

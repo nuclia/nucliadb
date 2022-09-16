@@ -57,53 +57,57 @@ impl ServiceChild for RelationsReaderService {
 impl ReaderChild for RelationsReaderService {
     type Request = RelationSearchRequest;
     type Response = RelationSearchResponse;
-    fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        use std::collections::HashSet;
-        let txn = self.index.ro_txn();
-        let entry_points: Vec<_> = request
-            .entry_points
-            .iter()
-            .map(|node| {
-                NodeBuilder::new()
-                    .with_value(node.value.clone())
-                    .with_type(node_type_parsing(node.ntype()))
-                    .with_subtype(node.subtype.clone())
-                    .build()
-                    .to_string()
-            })
-            .map(|node| self.index.get_id(&txn, &node))
-            .filter(|n| n.is_some())
-            .flatten()
-            .collect();
-        let mut query = QueryConstructor::default()
-            .depth(request.depth as u32)
-            .prefixed(request.prefix.clone())
-            .always_jump(HashSet::from([rtype_parsing(RelationType::Synonym, "")]))
-            .build()
-            .unwrap();
-        request
-            .type_filters
-            .iter()
-            .cloned()
-            .for_each(|tf| query.add_types(node_type_parsing(tf.ntype()), tf.subtype));
+    fn search(&self, _request: &Self::Request) -> InternalResult<Self::Response> {
+        //use std::collections::HashSet;
+        // let txn = self.index.ro_txn();
+        // let entry_points: Vec<_> = request
+        //     .entry_points
+        //     .iter()
+        //     .map(|node| {
+        //         NodeBuilder::new()
+        //             .with_value(node.value.clone())
+        //             .with_type(node_type_parsing(node.ntype()))
+        //             .with_subtype(node.subtype.clone())
+        //             .build()
+        //             .to_string()
+        //     })
+        //     .map(|node| self.index.get_id(&txn, &node))
+        //     .filter(|n| n.is_some())
+        //     .flatten()
+        //     .collect();
+        // let mut query = QueryConstructor::default()
+        //     .depth(request.depth as u32)
+        //     .prefixed(request.prefix.clone())
+        //     .always_jump(HashSet::from([rtype_parsing(RelationType::Synonym, "")]))
+        //     .build()
+        //     .unwrap();
+        // request
+        //     .type_filters
+        //     .iter()
+        //     .cloned()
+        //     .for_each(|tf| query.add_types(node_type_parsing(tf.ntype()), tf.subtype));
+        // Ok(RelationSearchResponse {
+        //     neighbours: process_query(&entry_points, &self.index, query)
+        //         .matches
+        //         .into_iter()
+        //         .map(|id| Node::from(self.index.get_node(&txn, id).unwrap()))
+        //         .map(|node| RelationNode {
+        //             value: node.get_value().to_string(),
+        //             ntype: string_to_node_type(node.get_type()) as i32,
+        //             subtype: node.get_subtype().to_string(),
+        //         })
+        //         .collect(),
+        // })
         Ok(RelationSearchResponse {
-            neighbours: process_query(&entry_points, &self.index, query)
-                .matches
-                .into_iter()
-                .map(|id| Node::from(self.index.get_node(&txn, id).unwrap()))
-                .map(|node| RelationNode {
-                    value: node.get_value().to_string(),
-                    ntype: string_to_node_type(node.get_type()) as i32,
-                    subtype: node.get_subtype().to_string(),
-                })
-                .collect(),
+            neighbours: vec![]
         })
     }
     fn stored_ids(&self) -> Vec<String> {
-        let txn = self.index.ro_txn();
-        let keys: Vec<_> = self.index.get_keys(&txn).collect();
-        txn.commit().unwrap();
-        keys
+        // let txn = self.index.ro_txn();
+        // let keys: Vec<_> = self.index.get_keys(&txn).collect();
+        // txn.commit().unwrap();
+        // keys
+        vec![]
     }
     fn reload(&self) {}
 }
@@ -144,24 +148,26 @@ impl RelationsReaderService {
 
 impl RelationReaderOnly for RelationsReaderService {
     fn get_edges(&self) -> EdgeList {
-        let list: Vec<_> = get_edge_types(&self.index)
-            .into_iter()
-            .map(|rtype| string_to_rtype(&rtype))
-            .map(|(etype, property)| RelationEdge {
-                property,
-                edge_type: etype as i32,
-            })
-            .collect();
-        EdgeList { list }
+        // let list: Vec<_> = get_edge_types(&self.index)
+        //     .into_iter()
+        //     .map(|rtype| string_to_rtype(&rtype))
+        //     .map(|(etype, property)| RelationEdge {
+        //         property,
+        //         edge_type: etype as i32,
+        //     })
+        //     .collect();
+        // EdgeList { list }
+        EdgeList { list: vec![] }
     }
     fn get_node_types(&self) -> TypeList {
-        let list: Vec<_> = get_node_types(&self.index)
-            .into_iter()
-            .map(|(node_type, subtype)| RelationTypeListMember {
-                with_type: string_to_node_type(&node_type) as i32,
-                with_subtype: subtype,
-            })
-            .collect();
-        TypeList { list }
+        // let list: Vec<_> = get_node_types(&self.index)
+        //     .into_iter()
+        //     .map(|(node_type, subtype)| RelationTypeListMember {
+        //         with_type: string_to_node_type(&node_type) as i32,
+        //         with_subtype: subtype,
+        //     })
+        //     .collect();
+        // TypeList { list }
+        TypeList { list: vec![] }
     }
 }

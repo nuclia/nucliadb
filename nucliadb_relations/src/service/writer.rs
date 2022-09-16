@@ -56,46 +56,47 @@ impl ServiceChild for RelationsWriterService {
 }
 
 impl WriterChild for RelationsWriterService {
-    fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
-        let mut txn = self.index.rw_txn();
-        if let Some(id) = self.index.get_id(&txn, &resource_id.uuid) {
-            self.index.delete_node(&mut txn, id);
-            txn.commit().unwrap();
-            Ok(())
-        } else {
-            txn.commit().unwrap();
-            Err(Box::new(format!("Invalid resource {}", resource_id.uuid)))
-        }
+    fn delete_resource(&mut self, _resource_id: &ResourceId) -> InternalResult<()> {
+        // let mut txn = self.index.rw_txn();
+        // if let Some(id) = self.index.get_id(&txn, &resource_id.uuid) {
+        //     self.index.delete_node(&mut txn, id);
+        //     txn.commit().unwrap();
+        //     Ok(())
+        // } else {
+        //     txn.commit().unwrap();
+        //     Err(Box::new(format!("Invalid resource {}", resource_id.uuid)))
+        // }
+        Ok(())
     }
-    fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        let mut txn = self.index.rw_txn();
-        if resource.status != ResourceStatus::Delete as i32 {
-            for relation in &resource.relations {
-                let source = relation.source.as_ref().unwrap();
-                let to = relation.to.as_ref().unwrap();
-                let source = NodeBuilder::new()
-                    .with_value(source.value.clone())
-                    .with_type(node_type_parsing(source.ntype()))
-                    .with_subtype(source.subtype.clone())
-                    .build()
-                    .to_string();
-                let to = NodeBuilder::new()
-                    .with_value(to.value.clone())
-                    .with_type(node_type_parsing(to.ntype()))
-                    .with_subtype(to.subtype.clone())
-                    .build()
-                    .to_string();
-                if !source.is_empty() && !to.is_empty() {
-                    self.index.add_node(&mut txn, source.clone());
-                    self.index.add_node(&mut txn, to.clone());
-                    let source = self.index.get_id(&txn, &source).unwrap();
-                    let to = self.index.get_id(&txn, &to).unwrap();
-                    let etype = rtype_parsing(relation.relation(), &relation.relation_label);
-                    self.index.add_edge(&mut txn, Edge::new(source, etype, to));
-                }
-            }
-        }
-        txn.commit().unwrap();
+    fn set_resource(&mut self, _resource: &Resource) -> InternalResult<()> {
+        // let mut txn = self.index.rw_txn();
+        // if resource.status != ResourceStatus::Delete as i32 {
+        //     for relation in &resource.relations {
+        //         let source = relation.source.as_ref().unwrap();
+        //         let to = relation.to.as_ref().unwrap();
+        //         let source = NodeBuilder::new()
+        //             .with_value(source.value.clone())
+        //             .with_type(node_type_parsing(source.ntype()))
+        //             .with_subtype(source.subtype.clone())
+        //             .build()
+        //             .to_string();
+        //         let to = NodeBuilder::new()
+        //             .with_value(to.value.clone())
+        //             .with_type(node_type_parsing(to.ntype()))
+        //             .with_subtype(to.subtype.clone())
+        //             .build()
+        //             .to_string();
+        //         if !source.is_empty() && !to.is_empty() {
+        //             self.index.add_node(&mut txn, source.clone());
+        //             self.index.add_node(&mut txn, to.clone());
+        //             let source = self.index.get_id(&txn, &source).unwrap();
+        //             let to = self.index.get_id(&txn, &to).unwrap();
+        //             let etype = rtype_parsing(relation.relation(), &relation.relation_label);
+        //             self.index.add_edge(&mut txn, Edge::new(source, etype, to));
+        //         }
+        //     }
+        // }
+        // txn.commit().unwrap();
         Ok(())
     }
     fn garbage_collection(&mut self) {}
