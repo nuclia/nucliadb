@@ -99,7 +99,7 @@ async def test_multiple_search_resource_all(
         pos_35 = resp.json()["paragraphs"]["results"][35]
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shard={shards[0]}",  # noqa
+            f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number=3&page_size=10&shards={shards[0]}",  # noqa
         )
         if resp.status_code != 200:
             print(resp.content)
