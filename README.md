@@ -50,7 +50,7 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 - Distributed search
 - Cloud-native: Kubernetes only
 
-### Upcomming Features
+## Upcomming Features
 
 - Blob support with Azure Blob storage
 - Index relations on index storage
@@ -72,11 +72,8 @@ Only needed if you want to use _Nuclia Understanding API™_ and _Nuclia Learnin
 First we need object storage and blob storage
 
 ```
-docker run redis
-docker run minio
+docker run -e LOG=INFO -it nuclia/nucliadb:latest
 ```
-
-TODO
 
 ### Create a Knowledge box container
 
@@ -119,17 +116,17 @@ curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
 
 # 🙋 FAQ
 
-### How is NucliaDB different from traditional search engines like Elasticsearch or Solr?
+## How is NucliaDB different from traditional search engines like Elasticsearch or Solr?
 
 The core difference and advantage of NucliaDB is its architecture built from the ground up for cloud and unstructured data. Its vector index plus standard keyword and fuzzy search provide an API to use all extracted and learned information from Nuclia, understanding API and provide super NLP powers to any application with low code and peace of mind.
 
-### What license does NucliaDB use?
+## What license does NucliaDB use?
 
 NucliaDB is open-source under the GNU Affero General Public License Version 3 - AGPLv3. Fundamentally, this means that you are free to use Quickwit for your project, as long as you don't modify NucliaDB. If you do, you have to make the modifications public.
 
-### What is Nuclia's business model?
+## What is Nuclia's business model?
 
-Our business model relies on our Nuclia Learning API and Nuclia Understanding API. We also offer NucliaDB as a service at our multi-cloud provider infrastructure: [https://nuclia.cloud](https://nuclia.cloud).
+Our business model relies on our normalization API, this one is based on `Nuclia Learning API` and `Nuclia Understanding API`. This two APIs offers transformation of unstrcutured data to NucliaDB compatible data with AI. We also offer NucliaDB as a service at our multi-cloud provider infrastructure: [https://nuclia.cloud](https://nuclia.cloud).
 
 # 🤝 Contribute and spread the word
 

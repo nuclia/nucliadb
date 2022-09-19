@@ -4,7 +4,7 @@ There are many ways to contribute to nucliadb.
 Code contribution are welcome of course, but also
 bug reports, feature request, and evangelizing are as valuable.
 
-# Submitting a PR
+## Submitting a PR
 
 Check if your issue is already listed [github](https://github.com/nuclia/nucliadb/issues).
 If it is not, create your own issue.
@@ -17,7 +17,7 @@ keep it open, just write `See #<Issue Number>`.
 Feel free to send your contribution in an unfinished state to get early feedback.
 In that case, simply mark the PR with the tag [WIP] (standing for work in progress).
 
-# Signing the CLA
+## Signing the CLA
 
 nucliadb is an opensource project licensed a AGPLv3.
 It is also distributed under a commercial license by Bosutech XXI.
@@ -26,21 +26,19 @@ Contributors are required to sign a Contributor License Agreement.
 The process is simple and fast. Upon your first pull request, you will be prompted to
 [sign our CLA by visiting this link](https://cla-assistant.io/nuclia/nucliadb).
 
-# Development
+## Development
 
-## Setup & run tests
+### Setup & run tests NucliaDB
 
-1. Install Docker (https://docs.docker.com/engine/install/) and Docker Compose (https://docs.docker.com/compose/install/)
-2. Start the external services with `make docker-compose-up`
-3. Run `nucliadb_ENV=LOCAL cargo test --all-features`
+1. Install Python > 3.9 with a virtualenv with your prefered tool (pyenv, conda, pipenv,...)
+2. Install NucliaDB Rust code `pip install maturin; maturin build -m nucliadb_node/binding/Cargo.toml --release; pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-*.whl --force`
+3. Install NucliaDB Python code `pip install -r nucliadb/requirements-sources.txt -r nucliadb/requirements-test.txt -r nucliadb/requirements.txt -e nucliadb`
+4. Run `pytest nucliadb`
 
-## Running services such as PostgreSQL locally.
+### Run with Redis
 
-1. Ensure Docker and Docker Compose are correctly installed on your machine (see above)
-2. Run `make docker-compose-up` to launch all the services or `make docker-compose-up DOCKER_SERVICES=postgres` to launch a subset of services.
+TODO
 
-## Tracing with Jaeger
+### Run with Jaegger
 
-1. Ensure Docker and Docker Compose are correctly installed on your machine (see above)
-2. Start the Jaeger services (UI, collector, agent, ...) running the command `make docker-compose-up DOCKER_SERVICES=jaeger`
-3. Open your browser and visit [localhost:16686](http://localhost:16686/)
+TODO
