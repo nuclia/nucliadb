@@ -128,7 +128,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                     break Some((n, self.cosine_similarity(n, y)));
                 }
                 Some(Cnx(down, _)) => {
-                    println!("Address: {down:?}");
                     for (n, _) in layer.get_out_edges(down) {
                         if !visited.contains(&n) {
                             candidates.push(Cnx(n, self.cosine_similarity(n, y)));
