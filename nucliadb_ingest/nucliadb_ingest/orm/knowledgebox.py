@@ -46,7 +46,6 @@ from nucliadb_ingest.maindb.driver import Driver, Transaction
 from nucliadb_ingest.orm.exceptions import (
     KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
-    NodeError,
     ShardNotFound,
 )
 from nucliadb_ingest.orm.local_node import LocalNode
@@ -407,8 +406,8 @@ class KnowledgeBox:
                     replica.node
                 )
                 if node is None:
-                    await txn.abort()
-                    raise NodeError(f"No node {replica.node} available")
+                    logger.info(f"No node {replica.node} found lets continue")
+                    continue
 
                 try:
                     await node.delete_shard(replica.shard.id)
