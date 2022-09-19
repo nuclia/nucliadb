@@ -22,16 +22,9 @@ use std::io::Cursor;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::*;
-<<<<<<< Updated upstream:nucliadb_node/src/bin/payload_test.rs
-=======
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::vectos_interface::VectorServiceConfiguration;
-use nucliadb_vectors::service::{VectorWriterService, VectorReaderService};
->>>>>>> Stashed changes:nucliadb_vectors/src/sic/analysis.rs
 use prost::Message;
-#[tokio::main]
-<<<<<<< Updated upstream:nucliadb_node/src/bin/payload_test.rs
-async fn main() -> anyhow::Result<()> {
+
+fn main() -> anyhow::Result<()> {
     let mut writer = NodeWriterService::new();
     let mut reader = NodeReaderService::new();
 
@@ -40,19 +33,6 @@ async fn main() -> anyhow::Result<()> {
     let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
     for file_path in std::fs::read_dir(&resources_dir).unwrap() {
-=======
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = TempDir::new("payload_dir").unwrap();
-    let vsc = VectorServiceConfiguration {
-        no_results: Some(10),
-        path: dir.path().to_str().unwrap().to_string(),
-    };
-    let mut writer = VectorWriterService::start(&vsc).await.unwrap();
-    let reader = VectorReaderService::start(&vsc).await.unwrap();
-    let payload_dir = std::path::Path::new("/Users/hermegarcia/RustWorkspace/data");
-    assert!(payload_dir.exists());
-    for file_path in std::fs::read_dir(&payload_dir).unwrap() {
->>>>>>> Stashed changes:nucliadb_vectors/src/sic/analysis.rs
         let file_path = file_path.unwrap().path();
         println!("processing {file_path:?}");
         let content = std::fs::read(&file_path).unwrap();
@@ -66,7 +46,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Paragraphs {}", info.paragraphs);
         println!("resources {}", info.resources);
     }
-    reader.reload();
-    println!("No vectors: {}", reader.count());
     Ok(())
 }
