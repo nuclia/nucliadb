@@ -119,27 +119,21 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         x: Address,
         y: Address,
     ) -> Option<(Address, f32)> {
-        if !self.tracker.is_deleted(x) {
-            return Some((x, self.cosine_similarity(x, y)));
-        }
-        let mut candidates = layer
-            .get_out_edges(x)
-            .map(|(n, d)| Cnx(n, d.dist))
-            .collect::<BinaryHeap<_>>();
-        let mut visited = HashSet::new();
+        let mut candidates = BinaryHeap::from([Cnx(x, self.cosine_similarity(x, y))]);
+        let mut visited = HashSet::from([x]);
         loop {
-            match candidates.peek().cloned() {
+            match candidates.pop() {
                 None => break None,
                 Some(Cnx(n, _)) if !self.tracker.is_deleted(n) => {
                     break Some((n, self.cosine_similarity(n, y)));
                 }
                 Some(Cnx(down, _)) => {
-                    visited.insert(down);
-                    candidates.pop();
-                    layer
-                        .get_out_edges(down)
-                        .filter(|(a, _)| !visited.contains(a))
-                        .for_each(|(n, _)| candidates.push(Cnx(n, self.cosine_similarity(n, y))));
+                    for (n, _) in layer.get_out_edges(down) {
+                        if !visited.contains(&n) {
+                            candidates.push(Cnx(n, self.cosine_similarity(n, y)));
+                            visited.insert(n);
+                        }
+                    }
                 }
             }
         }
