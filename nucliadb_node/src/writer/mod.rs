@@ -29,6 +29,7 @@ use uuid::Uuid;
 
 use crate::config::Configuration;
 use crate::services::writer::ShardWriterService;
+use crate::utils::POOL;
 
 type ShardWriterDB = HashMap<String, ShardWriterService>;
 
@@ -101,7 +102,7 @@ impl NodeWriterService {
 
     pub fn new_shard(&mut self) -> ShardCreated {
         let new_id = Uuid::new_v4().to_string();
-        let new_shard = ShardWriterService::new(&new_id).unwrap();
+        let new_shard = POOL.install(|| ShardWriterService::new(&new_id)).unwrap();
         let prev = self.shards.insert(new_id.clone(), new_shard);
         debug_assert!(prev.is_none());
         let new_shard = self.get_shard(&ShardId { id: new_id }).unwrap();
@@ -118,7 +119,7 @@ impl NodeWriterService {
         self.load_shard(shard_id);
         self.shards
             .remove(&shard_id.id)
-            .map(|shard| shard.delete().map_err(|e| e.into()))
+            .map(|shard| POOL.install(|| shard.delete()).map_err(|e| e.into()))
     }
 
     pub fn set_resource(
@@ -128,8 +129,8 @@ impl NodeWriterService {
     ) -> Option<ServiceResult<usize>> {
         self.load_shard(shard_id);
         if let Some(shard) = self.get_mut_shard(shard_id) {
-            let res = shard
-                .set_resource(resource)
+            let res = POOL
+                .install(|| shard.set_resource(resource))
                 .map(|_| shard.count())
                 .map_err(|e| e.into());
             Some(res)
@@ -145,8 +146,8 @@ impl NodeWriterService {
     ) -> Option<ServiceResult<usize>> {
         self.load_shard(shard_id);
         if let Some(shard) = self.get_mut_shard(shard_id) {
-            let res = shard
-                .remove_resource(resource)
+            let res = POOL
+                .install(|| shard.remove_resource(resource))
                 .map(|_| shard.count())
                 .map_err(|e| e.into());
             Some(res)
@@ -168,6 +169,6 @@ impl NodeWriterService {
     pub fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
         self.load_shard(shard_id);
         self.get_mut_shard(shard_id)
-            .map(|shard| shard.gc().map_err(|e| e.into()))
+            .map(|shard| POOL.install(|| shard.gc()).map_err(|e| e.into()))
     }
 }

@@ -79,7 +79,6 @@ impl WriterChild for ParagraphWriterService {
             self.writer.delete_term(uuid_term);
             modified = true;
         }
-
         match self.writer.commit() {
             _ if !modified => Ok(()),
             Ok(opstamp) => {
