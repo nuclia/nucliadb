@@ -153,6 +153,13 @@ impl Index {
         txn.abort().unwrap();
     }
     pub fn commit(&mut self) {
+        {
+            self.layers_out
+                .iter()
+                .zip(self.layers_in.iter())
+                .map(|(out, xin)| (out.capacity(), xin.capacity()))
+                .for_each(|(sout, sin)| println!("(out: {}, in: {})", sout, sin))
+        }
         for i in 0..self.layers_len {
             let mut rw_txn = self.lmdb_driver.rw_txn();
             self.lmdb_driver
