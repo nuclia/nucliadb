@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import annotations
+import asyncio
 
 from typing import Optional
 from uuid import uuid4
+from nucliadb_ingest.settings import settings
 
 from nucliadb_protos.nodereader_pb2 import (
     SearchRequest,
@@ -41,6 +43,7 @@ from nucliadb_ingest.orm import NODE_CLUSTER
 from nucliadb_ingest.orm.abc import AbstractNode
 from nucliadb_ingest.orm.local_shard import LocalShard
 from nucliadb_utils.keys import KB_SHARDS
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     from nucliadb_node_binding import NodeReader  # type: ignore
@@ -55,23 +58,33 @@ class LocalReaderWrapper:
 
     def __init__(self):
         self.reader = NodeReader.new()
+        self.executor = ThreadPoolExecutor(settings.local_reader_threads)
 
     async def Search(self, request: SearchRequest) -> SearchResponse:
-        result = await self.reader.search(request.SerializeToString())
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.search, request.SerializeToString()
+        )
         pb_bytes = bytes(result)
         pb = SearchResponse()
         pb.ParseFromString(pb_bytes)
         return pb
 
     async def GetShard(self, request: ShardId) -> NodeResourcesShard:
-        result = await self.reader.get_shard(request.SerializeToString())
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.get_shard, request.SerializeToString()
+        )
         pb_bytes = bytes(result)
         shard = NodeResourcesShard()
         shard.ParseFromString(pb_bytes)
         return shard
 
     async def Suggest(self, request: SuggestRequest) -> SuggestResponse:
-        result = await self.reader.suggest(request.SerializeToString())
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.suggest, request.SerializeToString()
+        )
         pb_bytes = bytes(result)
         pb = SuggestResponse()
         pb.ParseFromString(pb_bytes)
@@ -87,6 +100,7 @@ class LocalNode(AbstractNode):
         self.writer = NodeWriter.new()
         self.reader = LocalReaderWrapper()
         self.address = "local"
+        self.executor = ThreadPoolExecutor(settings.local_writer_threads)
 
     @classmethod
     async def get(cls, _) -> LocalNode:
@@ -136,7 +150,10 @@ class LocalNode(AbstractNode):
 
     async def get_shard(self, id: str) -> ShardId:
         req = ShardId(id=id)
-        resp = await self.writer.get_shard(req)  # type: ignore
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.get_shard, req.SerializeToString()
+        )
         pb_bytes = bytes(resp)
         shard_id = ShardId()
         shard_id.ParseFromString(pb_bytes)
@@ -148,7 +165,8 @@ class LocalNode(AbstractNode):
         return await self.reader.GetShard(req)  # type: ignore
 
     async def new_shard(self) -> ShardCreated:
-        resp = await self.writer.new_shard()  # type: ignore
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(self.executor, self.writer.new_shard)
         pb_bytes = bytes(resp)
         shard_created = ShardCreated()
         shard_created.ParseFromString(pb_bytes)
@@ -156,7 +174,10 @@ class LocalNode(AbstractNode):
 
     async def delete_shard(self, id: str) -> str:
         req = ShardId(id=id)
-        resp = await self.writer.delete_shard(req)  # type: ignore
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.delete_shard, req.SerializeToString()
+        )
         pb_bytes = bytes(resp)
         shard_id = ShardId()
         shard_id.ParseFromString(pb_bytes)
@@ -164,22 +185,28 @@ class LocalNode(AbstractNode):
         return shard_id.id
 
     async def list_shards(self) -> ShardIds:
-        resp = await self.writer.list_shards()  # type: ignore
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(self.executor, self.writer.list_shards)
         pb_bytes = bytes(resp)
         shards_ids = ShardIds()
         shards_ids.ParseFromString(pb_bytes)
         return shards_ids
 
     async def add_resource(self, req: Resource) -> OpStatus:
-
-        resp = await self.writer.set_resource(req.SerializeToString())
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.set_resource, req.SerializeToString()
+        )
         pb_bytes = bytes(resp)
         op_status = OpStatus()
         op_status.ParseFromString(pb_bytes)
         return op_status
 
     async def delete_resource(self, req: ResourceID) -> OpStatus:
-        resp = await self.writer.remove_resource(req)
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.remove_resource, req.SerializeToString()
+        )
         pb_bytes = bytes(resp)
         op_status = OpStatus()
         op_status.ParseFromString(pb_bytes)

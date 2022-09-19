@@ -68,5 +68,8 @@ class Settings(BaseSettings):
     sidecar_port_map: Dict[int, int] = {}
     max_node_fields: int = 200000
 
+    local_reader_threads = 5
+    local_writer_threads = 5
+
 
 settings = Settings()
