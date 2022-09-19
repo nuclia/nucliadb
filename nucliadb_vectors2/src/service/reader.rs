@@ -78,6 +78,7 @@ impl ReaderChild for VectorReaderService {
         );
         let index = self.index.read().unwrap();
         let lock = index.get_slock()?;
+        info!("Index Open");
 
         let offset = request.result_per_page * request.page_number;
         let total_to_get = offset + request.result_per_page;
@@ -85,6 +86,7 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
 
         let result = index.search(&(total_to_get, request), &lock)?;
+        info!("Search done");
         let documents = result
             .into_iter()
             .enumerate()
@@ -95,6 +97,7 @@ impl ReaderChild for VectorReaderService {
                 score: distance,
             })
             .collect::<Vec<_>>();
+        info!("Result created");
         Ok(VectorSearchResponse {
             documents,
             page_number: request.page_number,
