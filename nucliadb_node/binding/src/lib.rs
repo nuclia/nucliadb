@@ -18,8 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::io::Cursor;
-use std::sync::{Arc, RwLock};
-
 use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
@@ -41,7 +39,7 @@ type RawProtos = Vec<u8>;
 
 #[pyclass]
 pub struct NodeReader {
-    reader: Arc<RwLock<RustReaderService>>,
+    reader: RustReaderService,
 }
 impl Default for NodeReader {
     fn default() -> NodeReader {
@@ -54,15 +52,13 @@ impl NodeReader {
     #[staticmethod]
     pub fn new() -> NodeReader {
         NodeReader {
-            reader: Arc::new(RwLock::new(RustReaderService::new())),
+            reader: RustReaderService::new(),
         }
     }
 
-    pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
+    pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-        let mut lock = reader.write().unwrap();
-        if let Some(shard) = lock.get_shard(&shard_id) {
+        if let Some(shard) = self.reader.get_shard(&shard_id) {
             let stats = shard.get_info();
             let shard_pb = ShardPB {
                 shard_id: String::from(&shard.id),
@@ -77,20 +73,16 @@ impl NodeReader {
     }
 
     pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let lock = reader.write().unwrap();
-        let shards = lock.get_shards();
+        let shards = self.reader.get_shards();
         Ok(PyList::new(py, shards.encode_to_vec()))
     }
 
-    pub fn search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let mut lock = reader.write().unwrap();
+    pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let search_request = SearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
             id: search_request.shard.clone(),
         };
-        let response = lock.search(&shard_id, search_request);
+        let response = self.reader.search(&shard_id, search_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -98,14 +90,12 @@ impl NodeReader {
         }
     }
 
-    pub fn suggest<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let mut lock = reader.write().unwrap();
+    pub fn suggest<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let suggest_request = SuggestRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
             id: suggest_request.shard.clone(),
         };
-        let response = lock.suggest(&shard_id, suggest_request);
+        let response = self.reader.suggest(&shard_id, suggest_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -113,14 +103,12 @@ impl NodeReader {
         }
     }
 
-    pub fn vector_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let mut lock = reader.write().unwrap();
+    pub fn vector_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let vector_request = VectorSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
             id: vector_request.id.clone(),
         };
-        let response = lock.vector_search(&shard_id, vector_request);
+        let response = self.reader.vector_search(&shard_id, vector_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -128,14 +116,16 @@ impl NodeReader {
         }
     }
 
-    pub fn document_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let mut lock = reader.write().unwrap();
+    pub fn document_search<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
         let document_request = DocumentSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
             id: document_request.id.clone(),
         };
-        let response = lock.document_search(&shard_id, document_request);
+        let response = self.reader.document_search(&shard_id, document_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -143,14 +133,16 @@ impl NodeReader {
         }
     }
 
-    pub fn paragraph_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let mut lock = reader.write().unwrap();
+    pub fn paragraph_search<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
         let paragraph_request = ParagraphSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
         };
-        let response = lock.paragraph_search(&shard_id, paragraph_request);
+        let response = self.reader.paragraph_search(&shard_id, paragraph_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -158,14 +150,16 @@ impl NodeReader {
         }
     }
 
-    pub fn relation_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        let mut lock = reader.write().unwrap();
+    pub fn relation_search<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
         let paragraph_request = RelationSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
         };
-        let response = lock.relation_search(&shard_id, paragraph_request);
+        let response = self.reader.relation_search(&shard_id, paragraph_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -176,7 +170,7 @@ impl NodeReader {
 
 #[pyclass]
 pub struct NodeWriter {
-    writer: Arc<RwLock<RustWriterService>>,
+    writer: RustWriterService,
 }
 
 impl Default for NodeWriter {
@@ -189,54 +183,43 @@ impl NodeWriter {
     #[staticmethod]
     pub fn new() -> NodeWriter {
         NodeWriter {
-            writer: Arc::new(RwLock::new(RustWriterService::new())),
+            writer: RustWriterService::new(),
         }
     }
 
-    pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
+    pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-
-        let mut lock = writer.write().unwrap();
-        match lock.get_shard(&shard_id) {
+        match self.writer.get_shard(&shard_id) {
             Some(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
             None => Err(exceptions::PyTypeError::new_err("Not found")),
         }
     }
 
-    pub fn new_shard<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        let mut w = writer.write().unwrap();
-        let shard = w.new_shard();
+    pub fn new_shard<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard = self.writer.new_shard();
         Ok(PyList::new(py, shard.encode_to_vec()))
     }
 
-    pub fn delete_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
+    pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-        let mut w = writer.write().unwrap();
-        match w.delete_shard(&shard_id) {
+        match self.writer.delete_shard(&shard_id) {
             Some(Ok(_)) => Ok(PyList::new(py, shard_id.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Shard not found")),
         }
     }
 
-    pub fn list_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        let w = writer.read().unwrap();
-        let shard_ids = w.get_shard_ids();
+    pub fn list_shards<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_ids = self.writer.get_shard_ids();
         Ok(PyList::new(py, shard_ids.encode_to_vec()))
     }
 
-    pub fn set_resource<'p>(&self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        let mut lock = writer.write().unwrap();
+    pub fn set_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let resource = Resource::decode(&mut Cursor::new(resource)).unwrap();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
-        match lock.set_resource(&shard_id, &resource) {
+        match self.writer.set_resource(&shard_id, &resource) {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -264,14 +247,12 @@ impl NodeWriter {
         }
     }
 
-    pub fn remove_resource<'p>(&self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        let mut lock = writer.write().unwrap();
+    pub fn remove_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let resource = ResourceId::decode(&mut Cursor::new(resource)).unwrap();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
-        match lock.remove_resource(&shard_id, &resource) {
+        match self.writer.remove_resource(&shard_id, &resource) {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -299,11 +280,9 @@ impl NodeWriter {
         }
     }
 
-    pub fn gc<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        let mut lock = writer.write().unwrap();
+    pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let request = ShardId::decode(&mut Cursor::new(request)).unwrap();
-        match lock.gc(&request) {
+        match self.writer.gc(&request) {
             Some(Ok(_)) => {
                 let status = OpStatus {
                     status: 0,
