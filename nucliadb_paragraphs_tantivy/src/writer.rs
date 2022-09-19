@@ -19,10 +19,8 @@
 //
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::RwLock;
+use std::fs;
 
-use async_std::fs;
-use async_trait::async_trait;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
@@ -43,7 +41,7 @@ lazy_static::lazy_static! {
 pub struct ParagraphWriterService {
     pub index: Index,
     pub schema: ParagraphSchema,
-    writer: RwLock<IndexWriter>,
+    writer: IndexWriter,
 }
 
 impl Debug for ParagraphWriterService {
@@ -55,15 +53,11 @@ impl Debug for ParagraphWriterService {
     }
 }
 
-impl WService for ParagraphWriterService {}
-impl ParagraphServiceWriter for ParagraphWriterService {}
-impl ParagraphWriterOnly for ParagraphWriterService {}
+impl ParagraphWriter for ParagraphWriterService {}
 
-#[async_trait]
-impl ServiceChild for ParagraphWriterService {
-    async fn stop(&self) -> InternalResult<()> {
+impl WriterChild for ParagraphWriterService {
+    fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Paragraph Service");
-        self.writer.write().unwrap().commit().unwrap();
         Ok(())
     }
 
@@ -72,9 +66,6 @@ impl ServiceChild for ParagraphWriterService {
         let searcher = reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap_or(0)
     }
-}
-
-impl WriterChild for ParagraphWriterService {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let mut modified = false;
 
@@ -85,11 +76,11 @@ impl WriterChild for ParagraphWriterService {
 
         for paragraph_id in &resource.paragraphs_to_delete {
             let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
-            self.writer.write().unwrap().delete_term(uuid_term);
+            self.writer.delete_term(uuid_term);
             modified = true;
         }
 
-        match self.writer.write().unwrap().commit() {
+        match self.writer.commit() {
             _ if !modified => Ok(()),
             Ok(opstamp) => {
                 debug!("Commit {}!", opstamp);
@@ -104,8 +95,8 @@ impl WriterChild for ParagraphWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        self.writer.write().unwrap().delete_term(uuid_term);
-        match self.writer.write().unwrap().commit() {
+        self.writer.delete_term(uuid_term);
+        match self.writer.commit() {
             Ok(opstamp) => {
                 debug!("Commit {}!", opstamp);
                 Ok(())
@@ -121,16 +112,16 @@ impl WriterChild for ParagraphWriterService {
 }
 
 impl ParagraphWriterService {
-    pub async fn start(config: &ParagraphServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
         info!("Starting Paragraph Service");
-        match ParagraphWriterService::open(config).await {
+        match ParagraphWriterService::open(config) {
             Ok(service) => Ok(service),
             Err(e) => {
                 warn!("Paragraph Service Open failed {}. Creating a new one.", e);
-                match ParagraphWriterService::new(config).await {
+                match ParagraphWriterService::new(config) {
                     Ok(service) => Ok(service),
                     Err(e) => {
-                        error!("Error starting Paragraph service: {}", e);
+                        error!("ParagraphConfigice: {}", e);
                         Err(Box::new(ParagraphError { msg: e.to_string() }))
                     }
                 }
@@ -138,28 +129,22 @@ impl ParagraphWriterService {
         }
     }
 
-    pub async fn new(
-        config: &ParagraphServiceConfiguration,
-    ) -> InternalResult<ParagraphWriterService> {
-        match ParagraphWriterService::new_inner(config).await {
+    pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
+        match ParagraphWriterService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
-    pub async fn open(
-        config: &ParagraphServiceConfiguration,
-    ) -> InternalResult<ParagraphWriterService> {
-        match ParagraphWriterService::open_inner(config).await {
+    pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
+        match ParagraphWriterService::open_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
-    pub async fn new_inner(
-        config: &ParagraphServiceConfiguration,
-    ) -> tantivy::Result<ParagraphWriterService> {
+    pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::new();
 
-        fs::create_dir_all(&config.path).await?;
+        fs::create_dir_all(&config.path)?;
 
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
         let settings = IndexSettings {
@@ -173,7 +158,7 @@ impl ParagraphWriterService {
         index_builder = index_builder.settings(settings);
         let index = index_builder.create_in_dir(&config.path).unwrap();
 
-        let writer = RwLock::new(index.writer_with_num_threads(1, 6_000_000).unwrap());
+        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(ParagraphWriterService {
             index,
@@ -182,14 +167,12 @@ impl ParagraphWriterService {
         })
     }
 
-    pub async fn open_inner(
-        config: &ParagraphServiceConfiguration,
-    ) -> tantivy::Result<ParagraphWriterService> {
+    pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::new();
 
         let index = Index::open_in_dir(&config.path)?;
 
-        let writer = RwLock::new(index.writer_with_num_threads(1, 6_000_000).unwrap());
+        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(ParagraphWriterService {
             index,
@@ -246,17 +229,17 @@ impl ParagraphWriterService {
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
                 debug!("Paragraph added");
-                self.writer.write().unwrap().delete_term(paragraph_term);
-                self.writer.write().unwrap().add_document(doc).unwrap();
+                self.writer.delete_term(paragraph_term);
+                self.writer.add_document(doc).unwrap();
                 if paragraph_counter % 500 == 0 {
                     debug!("Commited");
-                    self.writer.write().unwrap().commit().unwrap();
+                    self.writer.commit().unwrap();
                 }
             }
         }
         if paragraph_counter > 0 {
             debug!("Commited End");
-            self.writer.write().unwrap().commit().unwrap();
+            self.writer.commit().unwrap();
         }
 
         Ok(())
@@ -407,14 +390,14 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_new_writer() -> anyhow::Result<()> {
+    #[test]
+    fn test_new_writer() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
-        let psc = ParagraphServiceConfiguration {
+        let psc = ParagraphConfig {
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
         };
 
-        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).await.unwrap();
+        let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
         let _ = paragraph_writer_service.set_resource(&resource1);
         let _ = paragraph_writer_service.set_resource(&resource1);

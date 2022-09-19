@@ -21,53 +21,35 @@ use crate::*;
 
 pub const MAX_VERSION: u32 = 0;
 
-type RServiceT = dyn FieldServiceReader;
-type WServiceT = dyn FieldServiceWriter;
-pub type RFields = Arc<RServiceT>;
-pub type WFields = Arc<RwLock<WServiceT>>;
+pub type RFields = Arc<dyn FieldReader>;
+pub type WFields = Arc<RwLock<dyn FieldWriter>>;
 
-pub async fn open_reader(
-    config: &FieldServiceConfiguration,
-    version: u32,
-) -> InternalResult<RFields> {
+pub fn open_reader(config: &FieldConfig, version: u32) -> InternalResult<RFields> {
     match version {
         0 => nucliadb_fields_tantivy::reader::FieldReaderService::open(config)
-            .await
             .map(|v| Arc::new(v) as RFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
-pub async fn open_writer(
-    config: &FieldServiceConfiguration,
-    version: u32,
-) -> InternalResult<WFields> {
+pub fn open_writer(config: &FieldConfig, version: u32) -> InternalResult<WFields> {
     match version {
         0 => nucliadb_fields_tantivy::writer::FieldWriterService::open(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
-pub async fn create_reader(
-    config: &FieldServiceConfiguration,
-    version: u32,
-) -> InternalResult<RFields> {
+pub fn create_reader(config: &FieldConfig, version: u32) -> InternalResult<RFields> {
     match version {
         0 => nucliadb_fields_tantivy::reader::FieldReaderService::new(config)
-            .await
             .map(|v| Arc::new(v) as RFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
-pub async fn create_writer(
-    config: &FieldServiceConfiguration,
-    version: u32,
-) -> InternalResult<WFields> {
+pub fn create_writer(config: &FieldConfig, version: u32) -> InternalResult<WFields> {
     match version {
         0 => nucliadb_fields_tantivy::writer::FieldWriterService::new(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WFields),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }

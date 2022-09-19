@@ -20,7 +20,6 @@
 use std::fmt::Debug;
 use std::sync::RwLock;
 
-use async_trait::async_trait;
 use nucliadb_protos::{
     DocumentScored, DocumentVectorIdentifier, VectorSearchRequest, VectorSearchResponse,
 };
@@ -40,23 +39,18 @@ impl Debug for VectorReaderService {
     }
 }
 
-impl RService for VectorReaderService {}
-impl VectorServiceReader for VectorReaderService {}
-impl VectorReaderOnly for VectorReaderService {}
-#[async_trait]
-impl ServiceChild for VectorReaderService {
-    async fn stop(&self) -> InternalResult<()> {
+impl VectorReader for VectorReaderService {}
+impl ReaderChild for VectorReaderService {
+    type Request = VectorSearchRequest;
+    type Response = VectorSearchResponse;
+
+    fn stop(&self) -> InternalResult<()> {
         info!("Stopping vector reader Service");
         Ok(())
     }
     fn count(&self) -> usize {
         self.index.read().unwrap().no_vectors()
     }
-}
-
-impl ReaderChild for VectorReaderService {
-    type Request = VectorSearchRequest;
-    type Response = VectorSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         debug!(
             "{} {} {}",
@@ -102,28 +96,27 @@ impl ReaderChild for VectorReaderService {
 }
 
 impl VectorReaderService {
-    pub async fn start(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            Ok(VectorReaderService::new(config).await.unwrap())
+            Ok(VectorReaderService::new(config).unwrap())
         } else {
-            Ok(VectorReaderService::open(config).await.unwrap())
+            Ok(VectorReaderService::open(config).unwrap())
         }
     }
-    pub async fn new(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+    pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
-            tokio::fs::create_dir_all(&path).await.unwrap();
-
+            std::fs::create_dir_all(&path).unwrap();
             Ok(VectorReaderService {
                 index: RwLock::new(Reader::new(&config.path)),
             })
         }
     }
 
-    pub async fn open(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+    pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
             Err(Box::new("Shard does not exist".to_string()))
@@ -145,10 +138,10 @@ mod tests {
     use super::*;
     use crate::service::writer::VectorWriterService;
 
-    #[tokio::test]
-    async fn test_new_vector_reader() {
+    #[test]
+    fn test_new_vector_reader() {
         let dir = TempDir::new("payload_dir").unwrap();
-        let vsc = VectorServiceConfiguration {
+        let vsc = VectorConfig {
             no_results: Some(3),
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
         };
@@ -186,11 +179,11 @@ mod tests {
             shard_id: "DOC".to_string(),
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::start(&vsc).await.unwrap();
+        let mut writer = VectorWriterService::start(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        writer.stop().await.unwrap();
-        let reader = VectorReaderService::start(&vsc).await.unwrap();
+        writer.stop().unwrap();
+        let reader = VectorReaderService::start(&vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],

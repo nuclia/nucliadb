@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use nucliadb_services::{ServiceError, ServiceResult};
 use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
@@ -28,7 +29,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
 use crate::config::Configuration;
-use crate::result::{ServiceError, ServiceResult};
 
 const TRACE_ID: &str = "trace-id";
 

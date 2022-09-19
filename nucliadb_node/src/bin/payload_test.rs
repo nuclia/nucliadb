@@ -29,10 +29,8 @@ async fn main() -> anyhow::Result<()> {
     let mut reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");
-    let new_shard = writer.new_shard().await;
-    let shard_id = ShardId {
-        id: new_shard.id.clone(),
-    };
+    let new_shard = writer.new_shard();
+    let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
     for file_path in std::fs::read_dir(&resources_dir).unwrap() {
         let file_path = file_path.unwrap().path();
@@ -40,10 +38,10 @@ async fn main() -> anyhow::Result<()> {
         let content = std::fs::read(&file_path).unwrap();
         let resource = Resource::decode(&mut Cursor::new(content)).unwrap();
         println!("Adding resource {}", file_path.display());
-        let res = writer.set_resource(&shard_id, &resource).await.unwrap();
+        let res = writer.set_resource(&shard_id, &resource).unwrap();
         assert!(res.is_ok());
         println!("Resource added: {}", res.unwrap());
-        let info = reader.get_shard(&shard_id).await.unwrap().get_info().await;
+        let info = reader.get_shard(&shard_id).unwrap().get_info();
         println!("Sentences {}", info.sentences);
         println!("Paragraphs {}", info.paragraphs);
         println!("resources {}", info.resources);

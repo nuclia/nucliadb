@@ -51,20 +51,20 @@ impl NodeWriterService {
         }
     }
     /// Stop all shards on memory
-    pub async fn shutdown(&mut self) {
+    pub fn shutdown(&mut self) {
         for (shard_id, shard) in self.shards.iter_mut() {
             info!("Stopping shard {}", shard_id);
-            ShardWriterService::stop(shard).await;
+            ShardWriterService::stop(shard);
         }
     }
 
-    pub async fn load_shards(&mut self) -> ServiceResult<()> {
+    pub fn load_shards(&mut self) -> ServiceResult<()> {
         info!("Recovering shards from {}...", Configuration::shards_path());
         for entry in std::fs::read_dir(Configuration::shards_path())? {
             let entry = entry?;
             let shard_id = String::from(entry.file_name().to_str().unwrap());
 
-            let shard: ShardWriterService = ShardWriterService::open(&shard_id.to_string()).await?;
+            let shard: ShardWriterService = ShardWriterService::open(&shard_id.to_string())?;
             self.shards.insert(shard_id.clone(), shard);
             info!("Shard loaded: {:?}", shard_id);
         }
@@ -72,7 +72,7 @@ impl NodeWriterService {
     }
 
     #[instrument(name = "NodeWriterService::load_shard", skip(self))]
-    async fn load_shard(&mut self, shard_id: &ShardId) {
+    fn load_shard(&mut self, shard_id: &ShardId) {
         info!("{}: Loading shard", shard_id.id);
         let in_memory = self.shards.contains_key(&shard_id.id);
         if !in_memory {
@@ -80,10 +80,7 @@ impl NodeWriterService {
             let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id.id);
-                let shard = ShardWriterService::open(&shard_id.id)
-                    .instrument(trace_span!("ShardWriterService::open"))
-                    .await
-                    .unwrap();
+                let shard = ShardWriterService::open(&shard_id.id).unwrap();
                 info!("{}: Loaded shard", shard_id.id);
                 self.shards.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
@@ -93,21 +90,21 @@ impl NodeWriterService {
         }
     }
 
-    pub async fn get_shard(&mut self, shard_id: &ShardId) -> Option<&ShardWriterService> {
-        self.load_shard(shard_id).await;
+    pub fn get_shard(&mut self, shard_id: &ShardId) -> Option<&ShardWriterService> {
+        self.load_shard(shard_id);
         self.shards.get(&shard_id.id)
     }
-    pub async fn get_mut_shard(&mut self, shard_id: &ShardId) -> Option<&mut ShardWriterService> {
-        self.load_shard(shard_id).await;
+    pub fn get_mut_shard(&mut self, shard_id: &ShardId) -> Option<&mut ShardWriterService> {
+        self.load_shard(shard_id);
         self.shards.get_mut(&shard_id.id)
     }
 
-    pub async fn new_shard(&mut self) -> ShardCreated {
+    pub fn new_shard(&mut self) -> ShardCreated {
         let new_id = Uuid::new_v4().to_string();
-        let new_shard = ShardWriterService::new(&new_id).await.unwrap();
+        let new_shard = ShardWriterService::new(&new_id).unwrap();
         let prev = self.shards.insert(new_id.clone(), new_shard);
         debug_assert!(prev.is_none());
-        let new_shard = self.get_shard(&ShardId { id: new_id }).await.unwrap();
+        let new_shard = self.get_shard(&ShardId { id: new_id }).unwrap();
         ShardCreated {
             id: new_shard.id.clone(),
             document_service: new_shard.document_version() as i32,
@@ -117,25 +114,22 @@ impl NodeWriterService {
         }
     }
 
-    pub async fn delete_shard(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
-        self.load_shard(shard_id).await;
-        if let Some(shard) = self.shards.remove(&shard_id.id) {
-            Some(shard.delete().await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+    pub fn delete_shard(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
+        self.load_shard(shard_id);
+        self.shards
+            .remove(&shard_id.id)
+            .map(|shard| shard.delete().map_err(|e| e.into()))
     }
 
-    pub async fn set_resource(
+    pub fn set_resource(
         &mut self,
         shard_id: &ShardId,
         resource: &Resource,
     ) -> Option<ServiceResult<usize>> {
-        self.load_shard(shard_id).await;
-        if let Some(shard) = self.get_mut_shard(shard_id).await {
+        self.load_shard(shard_id);
+        if let Some(shard) = self.get_mut_shard(shard_id) {
             let res = shard
                 .set_resource(resource)
-                .await
                 .map(|_| shard.count())
                 .map_err(|e| e.into());
             Some(res)
@@ -144,16 +138,15 @@ impl NodeWriterService {
         }
     }
 
-    pub async fn remove_resource(
+    pub fn remove_resource(
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
     ) -> Option<ServiceResult<usize>> {
-        self.load_shard(shard_id).await;
-        if let Some(shard) = self.get_mut_shard(shard_id).await {
+        self.load_shard(shard_id);
+        if let Some(shard) = self.get_mut_shard(shard_id) {
             let res = shard
                 .remove_resource(resource)
-                .await
                 .map(|_| shard.count())
                 .map_err(|e| e.into());
             Some(res)
@@ -172,11 +165,9 @@ impl NodeWriterService {
         ShardIds { ids }
     }
 
-    pub async fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
-        self.load_shard(shard_id).await;
-        match self.get_mut_shard(shard_id).await {
-            Some(shard) => Some(shard.gc().await.map_err(|e| e.into())),
-            None => None,
-        }
+    pub fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
+        self.load_shard(shard_id);
+        self.get_mut_shard(shard_id)
+            .map(|shard| shard.gc().map_err(|e| e.into()))
     }
 }
