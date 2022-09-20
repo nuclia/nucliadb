@@ -236,11 +236,6 @@ impl ParagraphWriterService {
                 }
             }
         }
-        if paragraph_counter > 0 {
-            debug!("Commited End");
-            self.writer.commit().unwrap();
-        }
-
         Ok(())
     }
 }
