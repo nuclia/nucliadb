@@ -170,7 +170,7 @@ class Resource:
             if payload.HasField("usermetadata"):
                 self.basic.usermetadata.CopyFrom(payload.usermetadata)
 
-            if payload.HasField("fieldmetadata"):
+            if len(payload.fieldmetadata):
                 # TODO
                 # Provide a way for the front-end to patch all the metadata of a given field.
 

@@ -34,7 +34,54 @@ from nucliadb_search.api.v1.router import KB_PREFIX
 async def test_patch_fieldmetadata(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-    # Create a resource with a couple of text fields
+    """Test description:
+
+    - Create a resource with a couple of text fields and some initial
+      fieldmetadata
+
+    - Validate fieldmetadata is properly set and returned
+
+    - Add more metadata using a PATCH request
+
+    - Validate all fieldmetadata is merged and returned
+
+    """
+
+    fieldmetadata_0 = {
+        "field": {"field": "textfield1", "field_type": "text"},
+        "paragraphs": [
+            {
+                "key": "paragraph0",
+                "classifications": [
+                    {"labelset": "My Labels", "label": "Label 0"},
+                ],
+            },
+        ],
+    }
+    fieldmetadata_1 = {
+        "field": {"field": "textfield1", "field_type": "text"},
+        "paragraphs": [
+            {
+                "key": "paragraph1",
+                "classifications": [
+                    {"labelset": "My Labels", "label": "Label 1"}
+                ],
+            }
+        ],
+    }
+    fieldmetadata_2 = {
+        "field": {"field": "textfield2", "field_type": "text"},
+        "paragraphs": [
+            {
+                "key": "paragraph2",
+                "classifications": [
+                    {"labelset": "My Labels", "label": "Label 2"}
+                ],
+            }
+        ],
+    }
+
+    # Create a resource with a couple of text fields and some fieldmetadata
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_one}/resources",
@@ -43,111 +90,40 @@ async def test_patch_fieldmetadata(
                 "texts": {
                     "textfield1": {"body": "Some text", "format": "PLAIN"},
                     "textfield2": {"body": "Some other text", "format": "PLAIN"},
-                }
+                },
+                "fieldmetadata": [fieldmetadata_0],
             },
         )
         assert resp.status_code == 201
-        resp = resp.json()
-        uuid = resp["uuid"]
+        rid = resp.json()["uuid"]
 
-    # Add metadata for the first field
+    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
+        fieldmetadata = resp.json()["fieldmetadata"]
+        assert len(fieldmetadata) == 1
+        assert fieldmetadata[0]["field"] == fieldmetadata_0["field"]
+        assert fieldmetadata[0]["paragraphs"] == fieldmetadata_0["paragraphs"]
+
+    # Add more metadata on resource modification
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}",
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
             headers={"X-SYNCHRONOUS": "True"},
-            json={
-                "fieldmetadata": [
-                    {
-                        "field": {"field": "textfield1", "field_type": "text"},
-                        "paragraphs": [
-                            {
-                                "key": "paragraph1",
-                                "classifications": [
-                                    {"labelset": "My Labels", "label": "Label 1"}
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            },
+            json={"fieldmetadata": [fieldmetadata_1, fieldmetadata_2]},
         )
         assert resp.status_code == 200
 
-    # Check that fieldmetadata was correctly saved
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=basic",
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
         )
         assert resp.status_code == 200
-        data = resp.json()
+        fieldmetadata = resp.json()["fieldmetadata"]
 
-        assert data["fieldmetadata"] == [
-            {
-                "field": {"field": "textfield1", "field_type": "text"},
-                "paragraphs": [
-                    {
-                        "key": "paragraph1",
-                        "classification": [
-                            {"labelset": "My Labels", "label": "Label 1"}
-                        ],
-                    }
-                ],
-            }
-        ]
-
-    # Add metadata for second field
-    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-        resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}",
-            headers={"X-SYNCHRONOUS": "True"},
-            json={
-                "fieldmetadata": [
-                    {
-                        "field": {"field": "textfield2", "field_type": "text"},
-                        "paragraphs": [
-                            {
-                                "key": "paragraph2",
-                                "classifications": [
-                                    {"labelset": "My Labels", "label": "Label 2"}
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            },
-        )
-        assert resp.status_code == 200
-
-    # Check that fieldmedatada on second field was saved and also preserved on first field
-    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=basic",
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-
-        # Check that fieldmetadata is correct
-        assert data["fieldmetadata"] == [
-            {
-                "field": {"field": "textfield1", "field_type": "text"},
-                "paragraphs": [
-                    {
-                        "key": "paragraph1",
-                        "classification": [
-                            {"labelset": "My Labels", "label": "Label 1"}
-                        ],
-                    }
-                ],
-            },
-            {
-                "field": {"field": "textfield2", "field_type": "text"},
-                "paragraphs": [
-                    {
-                        "key": "paragraph2",
-                        "classification": [
-                            {"labelset": "My Labels", "label": "Label 2"}
-                        ],
-                    }
-                ],
-            },
-        ]
+        assert len(fieldmetadata) == 3
+        assert fieldmetadata[0]["field"] == fieldmetadata_0["field"]
+        assert fieldmetadata[0]["paragraphs"] == fieldmetadata_0["paragraphs"]
+        assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
+        assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
+        assert fieldmetadata[2]["field"] == fieldmetadata_2["field"]
+        assert fieldmetadata[2]["paragraphs"] == fieldmetadata_2["paragraphs"]
