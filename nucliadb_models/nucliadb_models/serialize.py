@@ -183,7 +183,8 @@ async def serialize(
                 orm_resource.basic.usermetadata
             )
             resource.fieldmetadata = [
-                models.UserFieldMetadata.from_message(fm) for fm in orm_resource.basic.fieldmetadata
+                models.UserFieldMetadata.from_message(fm)
+                for fm in orm_resource.basic.fieldmetadata
             ]
 
     if ResourceProperties.RELATIONS in show:

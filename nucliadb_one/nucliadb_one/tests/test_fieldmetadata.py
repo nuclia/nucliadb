@@ -34,24 +34,31 @@ from nucliadb_search.api.v1.router import KB_PREFIX
 async def test_patch_fieldmetadata(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
+    # Create a resource with a couple of text fields
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_one}/resources",
             headers={"X-SYNCHRONOUS": "True"},
-            json={"texts": {"text1": {"body": "test1", "format": "PLAIN"}}},
+            json={
+                "texts": {
+                    "textfield1": {"body": "Some text", "format": "PLAIN"},
+                    "textfield2": {"body": "Some other text", "format": "PLAIN"},
+                }
+            },
         )
         assert resp.status_code == 201
         resp = resp.json()
         uuid = resp["uuid"]
 
+    # Add metadata for the first field
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.patch(
             f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}",
             headers={"X-SYNCHRONOUS": "True"},
             json={
                 "fieldmetadata": [
                     {
-                        "field": {"field": "text1", "field_type": "text"},
+                        "field": {"field": "textfield1", "field_type": "text"},
                         "paragraphs": [
                             {
                                 "key": "paragraph1",
@@ -66,13 +73,37 @@ async def test_patch_fieldmetadata(
         )
         assert resp.status_code == 200
 
+    # Check that fieldmetadata was correctly saved
+    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=basic",
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+
+        assert data["fieldmetadata"] == [
+            {
+                "field": {"field": "textfield1", "field_type": "text"},
+                "paragraphs": [
+                    {
+                        "key": "paragraph1",
+                        "classification": [
+                            {"labelset": "My Labels", "label": "Label 1"}
+                        ],
+                    }
+                ],
+            }
+        ]
+
+    # Add metadata for second field
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.patch(
             f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}",
             headers={"X-SYNCHRONOUS": "True"},
             json={
                 "fieldmetadata": [
                     {
-                        "field": {"field": "text1", "field_type": "text"},
+                        "field": {"field": "textfield2", "field_type": "text"},
                         "paragraphs": [
                             {
                                 "key": "paragraph2",
@@ -87,14 +118,36 @@ async def test_patch_fieldmetadata(
         )
         assert resp.status_code == 200
 
+    # Check that fieldmedatada on second field was saved and also preserved on first field
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp1 = await client.get(
+        resp = await client.get(
             f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=basic",
         )
-        assert resp1.status_code == 200
-    data = resp1.json()
+        assert resp.status_code == 200
+        data = resp.json()
 
-    assert (
-        data["fieldmetadata"][0]["paragraphs"][0]["classifications"][0]["label"]
-        == "Label 1"
-    )
+        # Check that fieldmetadata is correct
+        assert data["fieldmetadata"] == [
+            {
+                "field": {"field": "textfield1", "field_type": "text"},
+                "paragraphs": [
+                    {
+                        "key": "paragraph1",
+                        "classification": [
+                            {"labelset": "My Labels", "label": "Label 1"}
+                        ],
+                    }
+                ],
+            },
+            {
+                "field": {"field": "textfield2", "field_type": "text"},
+                "paragraphs": [
+                    {
+                        "key": "paragraph2",
+                        "classification": [
+                            {"labelset": "My Labels", "label": "Label 2"}
+                        ],
+                    }
+                ],
+            },
+        ]

@@ -169,10 +169,13 @@ class Resource:
             # We force the usermetadata classification to be the one defined
             if payload.HasField("usermetadata"):
                 self.basic.usermetadata.CopyFrom(payload.usermetadata)
+
             if payload.HasField("fieldmetadata"):
                 # TODO
                 # Provide a way for the front-end to patch all the metadata of a given field.
+
                 # We need to take care of merging with metadata of other fields that may already exists.
+
                 # Warning: for deletion, we need to remove existing values from the orm.
                 pass
         else:

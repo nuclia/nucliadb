@@ -82,7 +82,12 @@ def parse_basic_modify(
             userfieldmetadata = UserFieldMetadata()
             for token in fieldmetadata.token:
                 userfieldmetadata.token.append(
-                    TokenSplit(token=token.token, klass=token.klass, start=token.start, end=token.end)
+                    TokenSplit(
+                        token=token.token,
+                        klass=token.klass,
+                        start=token.start,
+                        end=token.end,
+                    )
                 )
             for paragraph in fieldmetadata.paragraphs:
                 paragraphpb = ParagraphAnnotation(key=paragraph.key)

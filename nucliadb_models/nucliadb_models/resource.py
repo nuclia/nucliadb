@@ -212,9 +212,9 @@ class Resource(BaseModel):
     thumbnail: Optional[str]
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
+    fieldmetadata: Optional[List[UserFieldMetadata]]
     created: Optional[datetime]
     modified: Optional[datetime]
-    fieldmetadata: Optional[List[UserFieldMetadata]]
 
     origin: Optional[Origin]
     relations: Optional[List[Relation]]
