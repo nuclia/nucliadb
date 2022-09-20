@@ -65,7 +65,7 @@ impl NodeWriterService {
             let entry = entry?;
             let shard_id = String::from(entry.file_name().to_str().unwrap());
 
-            let shard: ShardWriterService = ShardWriterService::open(&shard_id.to_string())?;
+            let shard = POOL.install(|| ShardWriterService::open(&shard_id.to_string()))?;
             self.shards.insert(shard_id.clone(), shard);
             info!("Shard loaded: {:?}", shard_id);
         }
@@ -81,7 +81,9 @@ impl NodeWriterService {
             let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id.id);
-                let shard = ShardWriterService::open(&shard_id.id).unwrap();
+                let shard = POOL
+                    .install(|| ShardWriterService::open(&shard_id.id))
+                    .unwrap();
                 info!("{}: Loaded shard", shard_id.id);
                 self.shards.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
