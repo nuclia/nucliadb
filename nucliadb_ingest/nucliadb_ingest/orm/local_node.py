@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import annotations
-import asyncio
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from uuid import uuid4
-from nucliadb_ingest.settings import settings
 
 from nucliadb_protos.nodereader_pb2 import (
     SearchRequest,
@@ -42,8 +42,8 @@ from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm import NODE_CLUSTER
 from nucliadb_ingest.orm.abc import AbstractNode
 from nucliadb_ingest.orm.local_shard import LocalShard
+from nucliadb_ingest.settings import settings
 from nucliadb_utils.keys import KB_SHARDS
-from concurrent.futures import ThreadPoolExecutor
 
 try:
     from nucliadb_node_binding import NodeReader  # type: ignore
