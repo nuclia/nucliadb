@@ -291,6 +291,8 @@ message UserMetadata {
 message TokenSplit {
     string token = 1;
     string klass = 2;
+    uint32 start = 3;
+    uint32 end = 4;
 }
 
 

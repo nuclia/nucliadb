@@ -25,6 +25,7 @@ from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 from pydantic.class_validators import root_validator
 
+from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
 
 from .common import Classification, FieldID
@@ -201,6 +202,8 @@ class UserMetadata(BaseModel):
 class TokenSplit(BaseModel):
     token: str
     klass: str
+    start: int
+    end: int
 
 
 class ParagraphAnnotation(BaseModel):
@@ -212,6 +215,17 @@ class UserFieldMetadata(BaseModel):
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
     field: FieldID
+
+    @classmethod
+    def from_message(cls: Type[_T], message: resources_pb2.UserFieldMetadata) -> _T:
+        value = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+            use_integers_for_enums=True,
+        )
+        value["field"]["field_type"] = FIELD_TYPES_MAP[value["field"]["field_type"]]
+        return cls(**value)
 
 
 class Basic(BaseModel):

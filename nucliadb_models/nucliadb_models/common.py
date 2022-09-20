@@ -19,9 +19,11 @@
 #
 import re
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
+
+from nucliadb_protos import resources_pb2
 
 FIELD_TYPE_CHAR_MAP = {
     "c": "conversation",
@@ -161,3 +163,19 @@ class Paragraph(BaseModel):
 
 class Shards(BaseModel):
     shards: Optional[List[str]]
+
+
+FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
+    resources_pb2.FieldType.FILE: FieldTypeName.FILE,
+    resources_pb2.FieldType.LINK: FieldTypeName.LINK,
+    resources_pb2.FieldType.DATETIME: FieldTypeName.DATETIME,
+    resources_pb2.FieldType.KEYWORDSET: FieldTypeName.KEYWORDSET,
+    resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
+    resources_pb2.FieldType.LAYOUT: FieldTypeName.LAYOUT,
+    resources_pb2.FieldType.GENERIC: FieldTypeName.GENERIC,
+    resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
+}
+
+FIELD_TYPES_MAP_REVERSE: Dict[str, int] = {
+    y.value: x for x, y in FIELD_TYPES_MAP.items()  # type: ignore
+}

@@ -27,9 +27,8 @@ import nucliadb_models as models
 from nucliadb_ingest.fields.conversation import Conversation
 from nucliadb_ingest.orm.resource import Resource as ORMResource
 from nucliadb_ingest.processing import PushPayload
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.conversation import PushConversation
-from nucliadb_models.resource import FIELD_TYPES_MAP
 from nucliadb_models.writer import CreateResourcePayload, UpdateResourcePayload
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import StorageField

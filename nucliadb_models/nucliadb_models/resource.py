@@ -25,7 +25,6 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation
 from nucliadb_models.datetime import FieldDatetime
 from nucliadb_models.extracted import (
@@ -40,10 +39,15 @@ from nucliadb_models.file import FieldFile
 from nucliadb_models.keywordset import FieldKeywordset
 from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
-from nucliadb_models.metadata import Metadata, Origin, Relation, UserMetadata
+from nucliadb_models.metadata import (
+    Metadata,
+    Origin,
+    Relation,
+    UserFieldMetadata,
+    UserMetadata,
+)
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_protos import resources_pb2
 
 
 class NucliaDBRoles(str, Enum):
@@ -210,6 +214,7 @@ class Resource(BaseModel):
     usermetadata: Optional[UserMetadata]
     created: Optional[datetime]
     modified: Optional[datetime]
+    fieldmetadata: Optional[List[UserFieldMetadata]]
 
     origin: Optional[Origin]
     relations: Optional[List[Relation]]
@@ -226,19 +231,3 @@ class ResourcePagination(BaseModel):
 class ResourceList(BaseModel):
     resources: List[Resource]
     pagination: ResourcePagination
-
-
-FIELD_TYPES_MAP: Dict[int, FieldTypeName] = {
-    resources_pb2.FieldType.FILE: FieldTypeName.FILE,
-    resources_pb2.FieldType.LINK: FieldTypeName.LINK,
-    resources_pb2.FieldType.DATETIME: FieldTypeName.DATETIME,
-    resources_pb2.FieldType.KEYWORDSET: FieldTypeName.KEYWORDSET,
-    resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
-    resources_pb2.FieldType.LAYOUT: FieldTypeName.LAYOUT,
-    resources_pb2.FieldType.GENERIC: FieldTypeName.GENERIC,
-    resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
-}
-
-FIELD_TYPES_MAP_REVERSE: Dict[str, int] = {
-    y.value: x for x, y in FIELD_TYPES_MAP.items()  # type: ignore
-}
