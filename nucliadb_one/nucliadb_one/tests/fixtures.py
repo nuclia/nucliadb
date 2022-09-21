@@ -32,6 +32,15 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_search import API_PREFIX
 from nucliadb_search.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb_utils.utilities import clear_global_cache
+from nucliadb_writer.settings import settings as writer_settings
+
+
+@pytest.fixture(scope="function")
+def extra_settings(redis):
+    writer_settings.dm_enabled = True
+    writer_settings.dm_redis_host = redis[0]
+    writer_settings.dm_redis_port = redis[1]
+    yield
 
 
 @pytest.fixture(scope="function")

@@ -145,7 +145,6 @@ async def post(
     """
     An empty POST request is used to create a new upload resource. The Upload-Length header indicates the size of the entire upload in bytes.
     """
-
     dm = get_dm()
     storage_manager = get_storage_manager()
 
@@ -314,6 +313,7 @@ async def patch(
     upload_id: str,
     rid: Optional[str] = None,
     field: Optional[str] = None,
+    x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specifyied offset
@@ -363,8 +363,9 @@ async def patch(
         ),
     }
 
-    if dm.get("size") is not None and dm.offset >= dm.get("size"):
+    upload_finished = dm.get("size") is not None and dm.offset >= dm.get("size")
 
+    if upload_finished:
         rid = dm.get("rid", rid)
         if rid is None:
             raise AttributeError()
@@ -401,6 +402,7 @@ async def patch(
                 request=request,
                 bucket=await storage_manager.storage.get_bucket_name(kbid),
                 item=creation_payload,
+                wait_on_commit=x_synchronous,
             )
         except LimitsExceededError as exc:
             raise HTTPException(status_code=402, detail=str(exc))
