@@ -37,14 +37,21 @@ from nucliadb_client.resource import Resource
 
 def get_docs(n, n_dim, kb):
     with open("cache-vectors.nucliadb", "w+") as pblist:
+        pending = []
         for i in range(n):
             if i % 50 == 0:
                 print(f"{i}")
+                for r in pending:
+                    pblist.write(
+                        base64.b64encode(r.serialize(processor=False)).decode() + "\n"
+                    )
+                pending = []
+
             r = Resource(rid=str(i), kb=kb)
             vector = Vector()
             vector.vector.extend(np.random.rand(n_dim))
             r.add_vectors("vectors", FieldType.TEXT, [vector])
-            pblist.write(base64.b64encode(r.serialize(processor=False)).decode() + "/n")
+            pending.append(r)
 
 
 def timer(func):
@@ -62,7 +69,7 @@ D = 128
 
 
 async def upload(kb: KnowledgeBox):
-    await kb.init_async_grpc()
+    kb.init_async_grpc()
     pending = []
     i = 0
     async with aiofiles.open("cache-vectors.nucliadb", "r") as pblist:
@@ -73,7 +80,7 @@ async def upload(kb: KnowledgeBox):
             pending.append(resource.commit(processor=False))
             if len(pending) % 100 == 0:
                 await asyncio.gather(*pending)
-                print("{i}")
+                print(f"{i}")
                 pending = []
 
         if len(pending):
@@ -82,8 +89,8 @@ async def upload(kb: KnowledgeBox):
 
 
 @timer
-def create(docs):
-    asyncio.run(upload(docs))
+def create(kb):
+    asyncio.run(upload(kb))
 
 
 if __name__ == "__main__":
@@ -91,10 +98,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Ingest stackoverflow")
 
-    parser.add_argument(
-        "--compute",
-        dest="compute",
-    )
+    parser.add_argument("--compute", dest="compute", action="store_true")
 
     parser.add_argument(
         "--host",
@@ -127,7 +131,7 @@ if __name__ == "__main__":
     if args.compute:
         get_docs(1_000_000, D, kb)
     print(f"indexing 1000000 docs ...")
-    create_time, _ = create()
+    create_time, _ = create(kb)
     print(f"time {create_time}")
 
     # print(f'reading 1000000 docs ...')

@@ -498,12 +498,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def Export(self, request: ExportRequest, context=None):
+        try:
+            txn = await self.proc.driver.begin()
+            storage = await get_storage(service_name=SERVICE_NAME)
+            cache = await get_cache()
 
-        txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-
-        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
-        async for resource in kbobj.iterate_resources():
-            yield await resource.generate_broker_message()
-        await txn.abort()
+            kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+            async for resource in kbobj.iterate_resources():
+                yield await resource.generate_broker_message(cf=False)
+            await txn.abort()
+        except Exception:
+            logger.exception("Export", stack_info=True)
+            raise

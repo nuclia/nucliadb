@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 from typing import TYPE_CHECKING, AsyncIterator, List, Optional
 
 from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
 from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from nucliadb_client.client import NucliaDBClient
 
 import httpx
-from grpc import aio  # type: ignore
 
 from nucliadb_client.resource import Resource
 
@@ -66,7 +65,7 @@ class KnowledgeBox:
         return KnowledgeBoxObj.parse_raw(response)
 
     def list_elements(self, page: int = 0, size: int = 20) -> List[Resource]:
-        response = self.http_manager_v1.get(f"resources?page={page}&size={size}")
+        response = self.http_reader_v1.get(f"resources?page={page}&size={size}")
         response_obj = ResourceList.parse_raw(response.content)
         result = []
         for resource in response_obj.resources:
@@ -91,15 +90,12 @@ class KnowledgeBox:
         res._bm = pb
         return res
 
-    async def export(self) -> AsyncIterator[BrokerMessage]:
+    async def export(self) -> AsyncIterator[str]:
         assert self.client.writer_stub_async
         req = ExportRequest()
         req.kbid = self.kbid
         async for bm in self.client.writer_stub_async.Export(req):  # type: ignore
-            yield bm
+            yield base64.b64encode(bm.SerializeToString()).decode()
 
     def init_async_grpc(self):
-        async_channel = aio.insecure_channel(
-            f"{self.client.grpc_host}:{self.client.grpc_port}"
-        )
-        self.client.writer_stub_async = WriterStub(async_channel)
+        self.client.init_async_grpc()

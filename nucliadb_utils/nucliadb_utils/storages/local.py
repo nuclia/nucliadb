@@ -40,9 +40,11 @@ class LocalStorageField(StorageField):
     def metadata_key(self, uri: Optional[str] = None):
         if uri is None and self.field is not None:
             return f"{self.field.uri}.metadata"
+        elif uri is None and self.key is not None:
+            return f"{self.key}.metadata"
         elif uri is not None:
             return f"{uri}.metadata"
-        raise AttributeError("No URI and no Field")
+        raise AttributeError("No URI and no Field Utils")
 
     async def move(
         self,
