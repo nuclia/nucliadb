@@ -177,9 +177,10 @@ class Resource:
                 fields = []
                 positions = {}
                 for i, fieldmetadata in enumerate(self.basic.fieldmetadata):
-                    if fieldmetadata.field.field not in fields:
-                        fields.append(fieldmetadata.field.field)
-                    positions[fieldmetadata.field.field] = i
+                    field_id = self.generate_field_id(fieldmetadata.field)
+                    if field_id not in fields:
+                        fields.append(field_id)
+                    positions[field_id] = i
 
                 updated = [
                     self.basic.fieldmetadata[positions[field]] for field in fields
