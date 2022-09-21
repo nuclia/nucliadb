@@ -180,14 +180,15 @@ class Resource:
     def cleanup(self):
         self._bm = None
 
-    async def commit(self):
+    async def commit(self, processor: bool = True):
         if self.bm is None:
             raise AttributeError("No Broker Message")
 
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
         self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
-        self.bm.source = BrokerMessage.MessageSource.PROCESSOR
+        if processor:
+            self.bm.source = BrokerMessage.MessageSource.PROCESSOR
         self.bm.basic.metadata.useful = True
         self.bm.basic.metadata.status = Metadata.Status.PROCESSED
 

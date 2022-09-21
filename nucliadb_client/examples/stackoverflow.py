@@ -255,7 +255,6 @@ async def upload(args, kb):
     print(f"{datetime.now()} lets upload")
     kb.init_async_grpc()
     async with aiofiles.open(args.cache, "r") as cache_file:
-        print("Found one in indexing!")
         TASKS = []
 
         for line in await cache_file.readlines():
@@ -265,11 +264,12 @@ async def upload(args, kb):
             TASKS.append(res.commit())
             if len(TASKS) > 10:
                 await asyncio.gather(*TASKS)
-                print(f"{datetime.now()} upload")
+                print(f"{datetime.now()} upload {len(TASKS)}")
                 TASKS = []
 
         if len(TASKS):
             await asyncio.gather(*TASKS)
+            print(f"{datetime.now()} upload {len(TASKS)}")
 
 
 if __name__ == "__main__":
@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--compute", dest="compute", action="store_true")
 
-    parser.add_argument("--num", dest="num", type=int, default=20)
+    parser.add_argument("--num", dest="num", type=int, default=100000)
 
     args = parser.parse_args()
     client = NucliaDBClient(

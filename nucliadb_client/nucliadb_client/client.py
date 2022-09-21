@@ -36,7 +36,7 @@ KB_PREFIX = "/kb"
 
 
 class NucliaDBClient:
-    writer_stub_async: Optional[WriterStub]
+    writer_stub_async: Optional[WriterStub] = None
 
     def __init__(
         self, host: str, grpc: int, http: int, train: int, schema: str = "http"
