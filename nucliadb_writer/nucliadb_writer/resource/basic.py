@@ -73,6 +73,8 @@ def parse_basic_modify(
         toprocess.genericfield["summary"] = Text(
             body=item.summary, format=PushTextFormat.PLAIN
         )
+    if item.thumbnail:
+        bm.basic.thumbnail = item.thumbnail
     if item.layout:
         bm.basic.layout = item.layout
     if item.icon:
