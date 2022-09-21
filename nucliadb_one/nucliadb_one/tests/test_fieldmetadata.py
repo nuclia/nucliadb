@@ -127,3 +127,59 @@ async def test_patch_fieldmetadata(
         assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
         assert fieldmetadata[2]["field"] == fieldmetadata_2["field"]
         assert fieldmetadata[2]["paragraphs"] == fieldmetadata_2["paragraphs"]
+
+
+@pytest.mark.asyncio
+async def test_delete_fieldmetadata(
+    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+) -> None:
+
+    fieldmetadata_0 = {
+        "field": {"field": "textfield1", "field_type": "text"},
+        "paragraphs": [
+            {
+                "key": "paragraph2",
+                "classifications": [
+                    {"labelset": "My Labels", "label": "Label 2"}
+                ],
+            }
+        ],
+    }
+
+    fieldmetadata_delete = {
+        "field": {"field": "textfield1", "field_type": "text"},
+        "paragraphs": []
+    }
+
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "texts": {
+                    "textfield1": {"body": "Some text", "format": "PLAIN"},
+                    "textfield2": {"body": "Some other text", "format": "PLAIN"},
+                },
+                "fieldmetadata": [fieldmetadata_0],
+            },
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={"fieldmetadata": [fieldmetadata_delete]},
+        )
+        assert resp.status_code == 200
+
+    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+        )
+        assert resp.status_code == 200
+        fieldmetadata = resp.json()["fieldmetadata"]
+
+        assert len(fieldmetadata) == 1
+        assert fieldmetadata[0]["field"]["field"] == "textfield1"
+        assert len(fieldmetadata[0]["paragraphs"]) == 0
