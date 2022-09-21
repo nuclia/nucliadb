@@ -242,7 +242,7 @@ async def test_search_pagination(
     kbid = multiple_search_resource
 
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
 
         n_results_expected = 100
         page_size = 20
@@ -276,5 +276,6 @@ async def test_search_pagination(
                 # Pagination ended! No more results
                 assert request_n == expected_requests - 1
 
+        # Check that we iterated over all matching resources
         unique_results = set(results)
         assert len(unique_results) == n_results_expected

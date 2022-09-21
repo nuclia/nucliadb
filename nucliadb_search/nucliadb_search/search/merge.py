@@ -275,7 +275,7 @@ async def merge_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(raw_paragraph_list) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score)
+        raw_paragraph_list.sort(key=lambda x: x.score, reverse=True)
 
     skip = page * count
     end = skip + count
