@@ -85,7 +85,7 @@ async def merge_documents_results(
             raw_resource_list.append(result)
 
     if len(documents) > 1:
-        raw_resource_list.sort(key=lambda x: x.score)
+        raw_resource_list.sort(key=lambda x: x.score, reverse=True)
 
     skip = page * count
     end = skip + count
@@ -148,7 +148,7 @@ async def merge_suggest_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(suggest_responses) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score)
+        raw_paragraph_list.sort(key=lambda x: x.score, reverse=True)
 
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[:10]:
@@ -194,7 +194,7 @@ async def merge_vectors_results(
             raw_vectors_list.append(document)
 
     if len(vectors) > 1:
-        raw_vectors_list.sort(key=lambda x: x.score)
+        raw_vectors_list.sort(key=lambda x: x.score, reverse=True)
 
     skip = page * count
     end_element = skip + count
