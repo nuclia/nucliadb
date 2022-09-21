@@ -166,18 +166,27 @@ class Resource:
         await self.get_basic()
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
+
             # We force the usermetadata classification to be the one defined
             if payload.HasField("usermetadata"):
                 self.basic.usermetadata.CopyFrom(payload.usermetadata)
 
             if len(payload.fieldmetadata):
-                # TODO
-                # Provide a way for the front-end to patch all the metadata of a given field.
+                # keep only the last fieldmetadata item for each field. API
+                # users are responsible to manage fieldmetadata properly
+                fields = []
+                positions = {}
+                for i, fieldmetadata in enumerate(self.basic.fieldmetadata):
+                    if fieldmetadata.field.field not in fields:
+                        fields.append(fieldmetadata.field.field)
+                    positions[fieldmetadata.field.field] = i
 
-                # We need to take care of merging with metadata of other fields that may already exists.
+                updated = [
+                    self.basic.fieldmetadata[positions[field]] for field in fields
+                ]
 
-                # Warning: for deletion, we need to remove existing values from the orm.
-                pass
+                del self.basic.fieldmetadata[:]
+                self.basic.fieldmetadata.extend(updated)
         else:
             self.basic = payload
         if slug is not None and slug != "":
