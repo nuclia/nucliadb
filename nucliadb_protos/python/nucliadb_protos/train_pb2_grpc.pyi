@@ -91,6 +91,7 @@ from nucliadb_protos.writer_pb2 import (
     DelLabelsRequest as DelLabelsRequest,
     DetWidgetsRequest as DetWidgetsRequest,
     Error as Error,
+    ExportRequest as ExportRequest,
     GetEntitiesGroupRequest as GetEntitiesGroupRequest,
     GetEntitiesGroupResponse as GetEntitiesGroupResponse,
     GetEntitiesRequest as GetEntitiesRequest,

@@ -39,21 +39,35 @@ class NucliaDBClient:
     writer_stub_async: Optional[WriterStub] = None
 
     def __init__(
-        self, host: str, grpc: int, http: int, train: int, schema: str = "http"
+        self,
+        host: str,
+        grpc: int,
+        http: int,
+        train: int,
+        schema: str = "http",
+        writer_host: Optional[str] = None,
+        reader_host: Optional[str] = None,
+        grpc_host: Optional[str] = None,
     ):
+        if reader_host is None:
+            reader_host = host
+        if writer_host is None:
+            writer_host = host
         self.http_reader_v1 = httpx.Client(
-            base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
+            base_url=f"{schema}://{reader_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "READER"},
         )
         self.http_writer_v1 = httpx.Client(
-            base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
+            base_url=f"{schema}://{writer_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
         )
         self.http_manager_v1 = httpx.Client(
             base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "MANAGER"},
         )
-        self.grpc_host = host
+        if grpc_host is None:
+            grpc_host = host
+        self.grpc_host = grpc_host
         self.grpc_port = grpc
         channel = insecure_channel(f"{host}:{grpc}")
         self.writer_stub = WriterStub(channel)

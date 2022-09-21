@@ -78,3 +78,5 @@ tmp/nucliadb
 .projectile
 .dir-locals.el
 nucliadb_client/examples/cache.nucliadb
+nucliadb_client/examples/cache-vectors.nucliadb
+nucliadb_client/examples/fran.export

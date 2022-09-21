@@ -19,36 +19,32 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-from nucliadb_client.resource import Resource
-import numpy as np
-import random
 import argparse
-import functools
 import asyncio
+import base64
+import functools
 from time import perf_counter
-from nucliadb_client.client import NucliaDBClient
+
+import aiofiles
+import numpy as np
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.resources_pb2 import (
-    ExtractedTextWrapper,
-    ExtractedVectorsWrapper,
-    FieldComputedMetadataWrapper,
-    FieldType,
-    Metadata,
-    Paragraph,
-)
+
+from nucliadb_client.client import NucliaDBClient
+from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_client.resource import Resource
 
 
-def get_docs(n, n_dim, n_query, kb):
-    result = []
-    for i in range(n):
-        if i % 50:
-            print(f"{i}")
-        r = Resource(rid=str(i), kb=kb)
-        vector = Vector()
-        vector.vector.extend(np.random.rand(n_dim))
-        r.add_vectors("vectors", FieldType.TEXT, [vector])
-        result.append(r)
-    return result
+def get_docs(n, n_dim, kb):
+    with open("cache-vectors.nucliadb", "w+") as pblist:
+        for i in range(n):
+            if i % 50 == 0:
+                print(f"{i}")
+            r = Resource(rid=str(i), kb=kb)
+            vector = Vector()
+            vector.vector.extend(np.random.rand(n_dim))
+            r.add_vectors("vectors", FieldType.TEXT, [vector])
+            pblist.write(base64.b64encode(r.serialize(processor=False)).decode() + "/n")
 
 
 def timer(func):
@@ -65,11 +61,24 @@ n_query = 1
 D = 128
 
 
-async def upload(resources):
-    if resources[0].kb.client.writer_stub_async is None:
-        resources[0].kb.init_async_grpc()
-    for i in range(0, len(resources), 10):
-        await asyncio.gather(*[resource.commit(processor=False) for resource in resources[i: i+10]])
+async def upload(kb: KnowledgeBox):
+    await kb.init_async_grpc()
+    pending = []
+    i = 0
+    async with aiofiles.open("cache-vectors.nucliadb", "r") as pblist:
+        for pbline in await pblist.readlines():
+            i += 1
+            resource = Resource(rid=None, kb=kb)
+            resource.parse(base64.b64decode(pbline.strip()))
+            pending.append(resource.commit(processor=False))
+            if len(pending) % 100 == 0:
+                await asyncio.gather(*pending)
+                print("{i}")
+                pending = []
+
+        if len(pending):
+            await asyncio.gather(*pending)
+            print("{i}")
 
 
 @timer
@@ -83,8 +92,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest stackoverflow")
 
     parser.add_argument(
-        "--dump",
-        dest="dump",
+        "--compute",
+        dest="compute",
     )
 
     parser.add_argument(
@@ -115,10 +124,11 @@ if __name__ == "__main__":
     if kb is None:
         kb = client.create_kb(slug="vectors_single", title="Vectors test")
 
-    docs = get_docs(1_000_000, D, n_query, kb)
-    print(f'indexing 1000000 docs ...')
-    create_time, _ = create(docs)
-    print(f'time {create_time}')
+    if args.compute:
+        get_docs(1_000_000, D, kb)
+    print(f"indexing 1000000 docs ...")
+    create_time, _ = create()
+    print(f"time {create_time}")
 
     # print(f'reading 1000000 docs ...')
     # read_time, _ = read(
