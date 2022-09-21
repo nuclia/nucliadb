@@ -1043,14 +1043,20 @@ class TokenSplit(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     TOKEN_FIELD_NUMBER: builtins.int
     KLASS_FIELD_NUMBER: builtins.int
+    START_FIELD_NUMBER: builtins.int
+    END_FIELD_NUMBER: builtins.int
     token: typing.Text
     klass: typing.Text
+    start: builtins.int
+    end: builtins.int
     def __init__(self,
         *,
         token: typing.Text = ...,
         klass: typing.Text = ...,
+        start: builtins.int = ...,
+        end: builtins.int = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["klass",b"klass","token",b"token"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","klass",b"klass","start",b"start","token",b"token"]) -> None: ...
 global___TokenSplit = TokenSplit
 
 class ParagraphAnnotation(google.protobuf.message.Message):

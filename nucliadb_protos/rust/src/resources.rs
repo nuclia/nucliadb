@@ -459,6 +459,10 @@ pub struct TokenSplit {
     pub token: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub klass: ::prost::alloc::string::String,
+    #[prost(uint32, tag="3")]
+    pub start: u32,
+    #[prost(uint32, tag="4")]
+    pub end: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphAnnotation {
