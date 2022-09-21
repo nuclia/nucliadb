@@ -25,10 +25,6 @@ from httpx import AsyncClient
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_search.api.v1.router import KB_PREFIX
 
-# TODO
-# - Patch one field. Make sure other fields are intact.
-# - Delete metadata of one field.
-
 
 @pytest.mark.asyncio
 async def test_fieldmetadata_crud(
