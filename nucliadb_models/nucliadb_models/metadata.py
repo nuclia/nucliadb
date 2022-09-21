@@ -205,6 +205,12 @@ class TokenSplit(BaseModel):
     start: int
     end: int
 
+    @root_validator(pre=True)
+    def check_start_greater_than_end(cls, values):
+        if values["start"] >= values["end"]:
+            raise ValueError("'start' must be greater than 'end'")
+        return values
+
 
 class ParagraphAnnotation(BaseModel):
     classifications: List[Classification] = []
