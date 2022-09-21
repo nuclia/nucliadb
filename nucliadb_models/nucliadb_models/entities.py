@@ -34,6 +34,9 @@ class EntitiesGroup(BaseModel):
     title: Optional[str] = None
     color: Optional[str] = None
 
+    # custom = true if they have been created by the user.
+    custom: bool = False
+
 
 class KnowledgeBoxEntities(BaseModel):
     uuid: str

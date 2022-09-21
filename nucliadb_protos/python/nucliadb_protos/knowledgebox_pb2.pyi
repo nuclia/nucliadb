@@ -341,17 +341,20 @@ class EntitiesGroup(google.protobuf.message.Message):
     ENTITIES_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     COLOR_FIELD_NUMBER: builtins.int
+    CUSTOM_FIELD_NUMBER: builtins.int
     @property
     def entities(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___Entity]: ...
     title: typing.Text
     color: typing.Text
+    custom: builtins.bool
     def __init__(self,
         *,
         entities: typing.Optional[typing.Mapping[typing.Text, global___Entity]] = ...,
         title: typing.Text = ...,
         color: typing.Text = ...,
+        custom: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","entities",b"entities","title",b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","custom",b"custom","entities",b"entities","title",b"title"]) -> None: ...
 global___EntitiesGroup = EntitiesGroup
 
 class Widget(google.protobuf.message.Message):
