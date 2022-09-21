@@ -28,11 +28,12 @@ use nucliadb_protos::{
     SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_services::*;
+use rayon::prelude::*;
 use tracing::*;
 
 use crate::config::Configuration;
 use crate::services::reader::ShardReaderService;
-
+use crate::utils::POOL;
 type ShardReaderDB = HashMap<String, ShardReaderService>;
 
 #[derive(Debug)]
@@ -54,21 +55,20 @@ impl NodeReaderService {
     }
 
     /// Stop all shards on memory
-    pub async fn shutdown(&mut self) {
+    pub fn shutdown(&mut self) {
         for (shard_id, shard) in &mut self.shards {
             info!("Stopping shard {}", shard_id);
-            ShardReaderService::stop(shard).await;
+            ShardReaderService::stop(shard);
         }
     }
 
     /// Load all shards on the shards memory structure
-    pub async fn load_shards(&mut self) -> ServiceResult<()> {
+    pub fn load_shards(&mut self) -> ServiceResult<()> {
         info!("Recovering shards from {}...", Configuration::shards_path());
         for entry in std::fs::read_dir(Configuration::shards_path())? {
             let entry = entry?;
             let shard_id = String::from(entry.file_name().to_str().unwrap());
-
-            let shard: ShardReaderService = ShardReaderService::open(&shard_id.to_string()).await?;
+            let shard = POOL.install(|| ShardReaderService::open(&shard_id.to_string()))?;
             self.shards.insert(shard_id.clone(), shard);
             info!("Shard loaded: {:?}", shard_id);
         }
@@ -76,7 +76,7 @@ impl NodeReaderService {
     }
 
     #[instrument(name = "NodeReaderService::load_shard", skip(self))]
-    pub async fn load_shard(&mut self, shard_id: &ShardId) {
+    pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_id = &shard_id.id;
         info!("{}: Loading shard", shard_id);
         let in_memory = self.shards.contains_key(shard_id);
@@ -85,7 +85,7 @@ impl NodeReaderService {
             let in_disk = Path::new(&Configuration::shards_path_id(shard_id)).exists();
             if in_disk {
                 info!("{}: Shard was in disk", shard_id);
-                let shard = ShardReaderService::open(shard_id).await.unwrap();
+                let shard = POOL.install(|| ShardReaderService::open(shard_id)).unwrap();
                 info!("{}: Loaded shard", shard_id);
                 self.shards.insert(shard_id.to_string(), shard);
                 info!("{}: Inserted on memory", shard_id);
@@ -94,143 +94,128 @@ impl NodeReaderService {
             info!("{}: Shard was in memory", shard_id);
         }
     }
-    pub async fn get_shard(&mut self, shard_id: &ShardId) -> Option<&ShardReaderService> {
-        self.load_shard(shard_id).await;
+    pub fn get_shard(&mut self, shard_id: &ShardId) -> Option<&ShardReaderService> {
+        self.load_shard(shard_id);
         self.shards.get(&shard_id.id)
     }
-    pub async fn get_mut_shard(&mut self, shard_id: &ShardId) -> Option<&mut ShardReaderService> {
-        self.load_shard(shard_id).await;
+    pub fn get_mut_shard(&mut self, shard_id: &ShardId) -> Option<&mut ShardReaderService> {
+        self.load_shard(shard_id);
         self.shards.get_mut(&shard_id.id)
     }
-    pub async fn get_shards(&self) -> ShardList {
-        let mut shards = Vec::with_capacity(self.shards.len());
-        for (shard_id, shard) in &self.shards {
-            let resources = shard.get_resources();
-            let elem = ShardPB {
-                shard_id: shard_id.to_string(),
-                resources: resources as u64,
-                paragraphs: 0_u64,
-                sentences: 0_u64,
-            };
-            shards.push(elem);
+    pub fn get_shards(&self) -> ShardList {
+        let shards = self.shards.par_iter().map(|(shard_id, shard)| ShardPB {
+            shard_id: shard_id.to_string(),
+            resources: shard.get_resources() as u64,
+            paragraphs: 0_u64,
+            sentences: 0_u64,
+        });
+        ShardList {
+            shards: POOL.install(|| shards.collect()),
         }
-        ShardList { shards }
     }
-    pub async fn suggest(
+    pub fn suggest(
         &mut self,
         shard_id: &ShardId,
         request: SuggestRequest,
     ) -> Option<ServiceResult<SuggestResponse>> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            Some(shard.suggest(request).await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.suggest(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
-    pub async fn search(
+    pub fn search(
         &mut self,
         shard_id: &ShardId,
         request: SearchRequest,
     ) -> Option<ServiceResult<SearchResponse>> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            Some(shard.search(request).await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.search(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
 
-    pub async fn relation_search(
+    pub fn relation_search(
         &mut self,
         shard_id: &ShardId,
         request: RelationSearchRequest,
     ) -> Option<ServiceResult<RelationSearchResponse>> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            Some(shard.relation_search(request).await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.relation_search(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
 
-    pub async fn vector_search(
+    pub fn vector_search(
         &mut self,
         shard_id: &ShardId,
         request: VectorSearchRequest,
     ) -> Option<ServiceResult<VectorSearchResponse>> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            Some(shard.vector_search(request).await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.vector_search(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
 
-    pub async fn paragraph_search(
+    pub fn paragraph_search(
         &mut self,
         shard_id: &ShardId,
         request: ParagraphSearchRequest,
     ) -> Option<ServiceResult<ParagraphSearchResponse>> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            Some(shard.paragraph_search(request).await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.paragraph_search(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
 
-    pub async fn document_search(
+    pub fn document_search(
         &mut self,
         shard_id: &ShardId,
         request: DocumentSearchRequest,
     ) -> Option<ServiceResult<DocumentSearchResponse>> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            Some(shard.document_search(request).await.map_err(|e| e.into()))
-        } else {
-            None
-        }
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.document_search(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
-    pub async fn document_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            let ids = shard.get_field_keys().await;
+    pub fn document_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id) {
+            let ids = POOL.install(|| shard.get_field_keys());
             Some(IdCollection { ids })
         } else {
             None
         }
     }
-    pub async fn paragraph_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            let ids = shard.get_paragraphs_keys().await;
+    pub fn paragraph_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id) {
+            let ids = POOL.install(|| shard.get_paragraphs_keys());
             Some(IdCollection { ids })
         } else {
             None
         }
     }
-    pub async fn vector_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            let ids = shard.get_vectors_keys().await;
+    pub fn vector_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id) {
+            let ids = POOL.install(|| shard.get_vectors_keys());
             Some(IdCollection { ids })
         } else {
             None
         }
     }
-    pub async fn relation_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            let ids = shard.get_relations_keys().await;
+    pub fn relation_ids(&mut self, shard_id: &ShardId) -> Option<IdCollection> {
+        if let Some(shard) = self.get_shard(shard_id) {
+            let ids = POOL.install(|| shard.get_relations_keys());
             Some(IdCollection { ids })
         } else {
             None
         }
     }
 
-    pub async fn relation_edges(&mut self, shard_id: &ShardId) -> Option<EdgeList> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            let edges = shard.get_relations_edges().await;
+    pub fn relation_edges(&mut self, shard_id: &ShardId) -> Option<EdgeList> {
+        if let Some(shard) = self.get_shard(shard_id) {
+            let edges = POOL.install(|| shard.get_relations_edges());
             Some(edges)
         } else {
             None
         }
     }
 
-    pub async fn relation_types(&mut self, shard_id: &ShardId) -> Option<TypeList> {
-        if let Some(shard) = self.get_shard(shard_id).await {
-            let types = shard.get_relations_types().await;
+    pub fn relation_types(&mut self, shard_id: &ShardId) -> Option<TypeList> {
+        if let Some(shard) = self.get_shard(shard_id) {
+            let types = POOL.install(|| shard.get_relations_types());
             Some(types)
         } else {
             None

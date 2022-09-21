@@ -17,6 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
+from uuid import uuid4
+
+from nucliadb_client.knowledgebox import KnowledgeBox
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
@@ -26,9 +30,6 @@ from nucliadb_models.conversation import (
 from nucliadb_models.datetime import FieldDatetime
 from nucliadb_models.text import TextField
 from nucliadb_models.writer import CreateResourcePayload
-from nucliadb_client.knowledgebox import KnowledgeBox
-from datetime import datetime
-from uuid import uuid4
 
 
 def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):
@@ -36,7 +37,7 @@ def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):
     payload.icon = "plain/text"
     payload.title = "My Resource"
     payload.summary = "My long summary of the resource"
-    payload.slug = "myresource"
+    payload.slug = "myresource"  # type: ignore
 
     payload.conversations["conv1"] = InputConversationField(
         message=[

@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use async_trait::async_trait;
 use nucliadb_protos::{Resource, ResourceId};
 
 pub trait InternalError: std::fmt::Display + std::fmt::Debug + Send {}
@@ -72,28 +71,20 @@ impl InternalError for String {}
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
-pub trait WService: std::fmt::Debug + ServiceChild + WriterChild + Send + Sync {}
-pub trait RService: std::fmt::Debug + ServiceChild + ReaderChild + Send + Sync {}
-
-/// Start and stop
-#[async_trait]
-pub trait ServiceChild {
-    /// To Stop the service
-    async fn stop(&self) -> InternalResult<()>;
-    /// Number of resources
-    fn count(&self) -> usize;
-}
-
-pub trait WriterChild {
+pub trait WriterChild: std::fmt::Debug + Send + Sync {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()>;
     fn garbage_collection(&mut self);
+    fn stop(&mut self) -> InternalResult<()>;
+    fn count(&self) -> usize;
 }
 
-pub trait ReaderChild {
+pub trait ReaderChild: std::fmt::Debug + Send + Sync {
     type Request;
     type Response;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response>;
     fn reload(&self);
     fn stored_ids(&self) -> Vec<String>;
+    fn stop(&self) -> InternalResult<()>;
+    fn count(&self) -> usize;
 }

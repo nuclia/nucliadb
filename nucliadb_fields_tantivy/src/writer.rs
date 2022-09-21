@@ -19,10 +19,8 @@
 //
 
 use std::fmt::Debug;
-use std::sync::RwLock;
+use std::fs;
 
-use async_std::fs;
-use async_trait::async_trait;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
@@ -37,7 +35,7 @@ use super::schema::{timestamp_to_datetime_utc, FieldSchema};
 pub struct FieldWriterService {
     index: Index,
     pub schema: FieldSchema,
-    writer: RwLock<IndexWriter>,
+    writer: IndexWriter,
 }
 
 impl Debug for FieldWriterService {
@@ -49,15 +47,11 @@ impl Debug for FieldWriterService {
     }
 }
 
-impl WService for FieldWriterService {}
-impl FieldServiceWriter for FieldWriterService {}
-impl FieldWriterOnly for FieldWriterService {}
+impl FieldWriter for FieldWriterService {}
 
-#[async_trait]
-impl ServiceChild for FieldWriterService {
-    async fn stop(&self) -> InternalResult<()> {
+impl WriterChild for FieldWriterService {
+    fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Text Service");
-        self.writer.write().unwrap().commit().unwrap();
         Ok(())
     }
 
@@ -66,20 +60,17 @@ impl ServiceChild for FieldWriterService {
         let searcher = reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap_or(0)
     }
-}
-
-impl WriterChild for FieldWriterService {
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let resource_id = resource.resource.as_ref().unwrap();
 
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        self.writer.write().unwrap().delete_term(uuid_term);
+        self.writer.delete_term(uuid_term);
 
         if resource.status != ResourceStatus::Delete as i32 {
             self.index_document(resource);
         }
-        match self.writer.write().unwrap().commit() {
+        match self.writer.commit() {
             Ok(opstamp) => trace!("Commit {}!", opstamp),
             Err(e) => error!("Error doing commit: {}", e),
         }
@@ -88,8 +79,8 @@ impl WriterChild for FieldWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        self.writer.write().unwrap().delete_term(uuid_term);
-        match self.writer.write().unwrap().commit() {
+        self.writer.delete_term(uuid_term);
+        match self.writer.commit() {
             Ok(opstamp) => {
                 trace!("Commit {}!", opstamp);
                 Ok(())
@@ -104,16 +95,16 @@ impl WriterChild for FieldWriterService {
 }
 
 impl FieldWriterService {
-    pub async fn start(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &FieldConfig) -> InternalResult<Self> {
         info!("Starting Text Service");
-        match FieldWriterService::open(config).await {
+        match FieldWriterService::open(config) {
             Ok(service) => Ok(service),
             Err(e) => {
                 warn!("Field Service Open failed {}. Creating a new one.", e);
-                match FieldWriterService::new(config).await {
+                match FieldWriterService::new(config) {
                     Ok(service) => Ok(service),
                     Err(e) => {
-                        error!("Error starting Text service: {}", e);
+                        error!("FieldConfigce: {}", e);
                         Err(Box::new(FieldError { msg: e.to_string() }))
                     }
                 }
@@ -121,23 +112,21 @@ impl FieldWriterService {
         }
     }
 
-    pub async fn new(config: &FieldServiceConfiguration) -> InternalResult<Self> {
-        match FieldWriterService::new_inner(config).await {
+    pub fn new(config: &FieldConfig) -> InternalResult<Self> {
+        match FieldWriterService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
         }
     }
-    pub async fn open(config: &FieldServiceConfiguration) -> InternalResult<Self> {
-        match FieldWriterService::open_inner(config).await {
+    pub fn open(config: &FieldConfig) -> InternalResult<Self> {
+        match FieldWriterService::open_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
         }
     }
-    pub async fn new_inner(
-        config: &FieldServiceConfiguration,
-    ) -> tantivy::Result<FieldWriterService> {
+    pub fn new_inner(config: &FieldConfig) -> tantivy::Result<FieldWriterService> {
         let field_schema = FieldSchema::new();
-        fs::create_dir_all(&config.path).await?;
+        fs::create_dir_all(&config.path)?;
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
@@ -150,7 +139,7 @@ impl FieldWriterService {
         index_builder = index_builder.settings(settings);
         let index = index_builder.create_in_dir(&config.path).unwrap();
 
-        let writer = RwLock::new(index.writer_with_num_threads(1, 6_000_000).unwrap());
+        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(FieldWriterService {
             index,
@@ -159,14 +148,12 @@ impl FieldWriterService {
         })
     }
 
-    pub async fn open_inner(
-        config: &FieldServiceConfiguration,
-    ) -> tantivy::Result<FieldWriterService> {
+    pub fn open_inner(config: &FieldConfig) -> tantivy::Result<FieldWriterService> {
         let field_schema = FieldSchema::new();
 
         let index = Index::open_in_dir(&config.path)?;
 
-        let writer = RwLock::new(index.writer_with_num_threads(1, 6_000_000).unwrap());
+        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
         Ok(FieldWriterService {
             index,
@@ -209,11 +196,7 @@ impl FieldWriterService {
                 let facet = Facet::from(label.as_str());
                 subdoc.add_facet(self.schema.facets, facet);
             }
-            self.writer
-                .write()
-                .unwrap()
-                .add_document(subdoc.clone())
-                .unwrap();
+            self.writer.add_document(subdoc.clone()).unwrap();
         }
     }
 }
@@ -283,14 +266,14 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_new_writer() -> anyhow::Result<()> {
+    #[test]
+    fn test_new_writer() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
-        let fsc = FieldServiceConfiguration {
+        let fsc = FieldConfig {
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
         };
 
-        let mut field_writer_service = FieldWriterService::start(&fsc).await.unwrap();
+        let mut field_writer_service = FieldWriterService::start(&fsc).unwrap();
         let resource1 = create_resource("shard1".to_string());
         let _ = field_writer_service.set_resource(&resource1);
         let _ = field_writer_service.set_resource(&resource1);

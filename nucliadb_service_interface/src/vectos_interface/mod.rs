@@ -21,23 +21,17 @@ use nucliadb_protos::*;
 
 use crate::service_interface::*;
 #[derive(Clone)]
-pub struct VectorServiceConfiguration {
+pub struct VectorConfig {
     pub no_results: Option<usize>,
     pub path: String,
 }
 
-pub trait VectorReaderOnly {}
-pub trait VectorWriterOnly {}
-
-pub trait VectorServiceReader:
-    ServiceChild
-    + RService
-    + ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse>
-    + VectorReaderOnly
+pub trait VectorReader:
+    ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse>
 {
 }
 
-pub trait VectorServiceWriter: WService + ServiceChild + WriterChild + VectorWriterOnly {}
+pub trait VectorWriter: WriterChild {}
 
 #[derive(Debug)]
 pub struct VectorError {

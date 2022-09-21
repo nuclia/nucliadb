@@ -20,11 +20,25 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+import argparse
+import asyncio
+import base64
+import re
 import xml.sax
+from dataclasses import dataclass
+from datetime import datetime
 from time import time
-from bs4 import BeautifulSoup
+from typing import Dict, List, Optional
+
+import aiofiles
+from bs4 import BeautifulSoup  # type: ignore
+from dateutil.parser import parse
+from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.utils_pb2 import Vector
+from sentence_transformers import SentenceTransformer  # type: ignore
+
+from nucliadb_client.client import NucliaDBClient
+from nucliadb_client.knowledgebox import KnowledgeBox
 from nucliadb_client.resource import Resource
 from nucliadb_models.conversation import (
     InputConversationField,
@@ -33,17 +47,6 @@ from nucliadb_models.conversation import (
 )
 from nucliadb_models.metadata import InputMetadata, Origin
 from nucliadb_models.writer import CreateResourcePayload
-from nucliadb_protos.resources_pb2 import FieldType
-from nucliadb_protos.utils_pb2 import Vector
-from sentence_transformers import SentenceTransformer
-from dateutil.parser import parse
-from datetime import datetime
-import re
-import argparse
-
-from nucliadb_client.client import NucliaDBClient
-from nucliadb_client.knowledgebox import KnowledgeBox
-
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -52,9 +55,6 @@ QUESTIONS: Dict[str, Post] = {}
 ANSWERS: Dict[str, str] = {}
 client: Optional[NucliaDBClient] = None
 kb: Optional[KnowledgeBox] = None
-
-PAYLOADS = []
-BROKER_MESSAGES = []
 
 
 @dataclass
@@ -74,23 +74,25 @@ class StreamHandler(xml.sax.handler.ContentHandler):
     lastName = None
     count = 0
 
+    def __init__(self, file_obj, num: int = 10000):
+        self.num = num
+        self.file_obj = file_obj
+        super(StreamHandler, self).__init__()
+
     def upload_post(self, question: Post, answer: Post) -> Resource:
 
         payload = CreateResourcePayload()
         payload.title = question.title
         payload.origin = Origin()
-        payload.origin.tags = question.tags
+        if question.tags is None:
+            tags = []
+        else:
+            tags = question.tags
+        payload.origin.tags = tags
         payload.icon = "text/conversation"
         payload.metadata = InputMetadata()
         payload.metadata.language = "en"
-        payload.slug = question.id
-
-        self.count += 1
-        if self.count % 50 == 0:
-            print(f"{self.count} {datetime.now()}")
-        if self.count == 500_000:
-            print("DONE")
-            exit(0)
+        payload.slug = question.id  # type: ignore
 
         imq = InputMessage(
             timestamp=question.creation,
@@ -112,6 +114,8 @@ class StreamHandler(xml.sax.handler.ContentHandler):
         payload.conversations["stack"] = icf
 
         # Create the resource with the row value
+        if kb is None:
+            raise Exception("No KB defined")
         resource = kb.create_resource(payload)
 
         return resource
@@ -124,29 +128,29 @@ class StreamHandler(xml.sax.handler.ContentHandler):
         # Title vector
         vector = Vector(
             start=0,
-            end=len(question.title),
+            end=len(question.title) if question.title else 0,
             start_paragraph=0,
-            end_paragraph=len(question.title),
+            end_paragraph=len(question.title) if question.title else 0,
         )
         vector.vector.extend(embeddings[0])
         resource.add_vectors(
             "title",
-            FieldType.GENERIC,
+            FieldType.GENERIC,  # type: ignore
             [vector],
         )
 
         # Question vector
         vector = Vector(
             start=0,
-            end=len(question.body),
+            end=len(question.body) if question.body else 0,
             start_paragraph=0,
-            end_paragraph=len(question.body),
+            end_paragraph=len(question.body) if question.body else 0,
         )
         vector.vector.extend(embeddings[1])
 
         resource.add_vectors(
             "stack",
-            FieldType.CONVERSATION,
+            FieldType.CONVERSATION,  # type: ignore
             [vector],
             split=question.id,
         )
@@ -154,15 +158,15 @@ class StreamHandler(xml.sax.handler.ContentHandler):
         # Vector of answer
         vector = Vector(
             start=0,
-            end=len(answer.body),
+            end=len(answer.body) if answer.body else 0,
             start_paragraph=0,
-            end_paragraph=len(answer.body),
+            end_paragraph=len(answer.body) if answer.body else 0,
         )
         vector.vector.extend(embeddings[2])
 
         resource.add_vectors(
             "stack",
-            FieldType.CONVERSATION,
+            FieldType.CONVERSATION,  # type: ignore
             [vector],
             split=answer.id,
         )
@@ -171,11 +175,11 @@ class StreamHandler(xml.sax.handler.ContentHandler):
         # Text
         resource.add_text(
             "stack",
-            FieldType.CONVERSATION,
-            question.body,
+            FieldType.CONVERSATION,  # type: ignore
+            question.body if question.body else "",
             split=question.id,
         )
-        resource.add_text("stack", FieldType.CONVERSATION, answer.body, split=answer.id)
+        resource.add_text("stack", FieldType.CONVERSATION, answer.body, split=answer.id)  # type: ignore
 
     def startElement(self, name, attrs):
         self.lastName = name
@@ -224,8 +228,18 @@ class StreamHandler(xml.sax.handler.ContentHandler):
                     self.compute_text(
                         resource=resource, question=question_post, answer=post
                     )
-                    resource.commit()
 
+                    print("Found one on compute!")
+                    self.file_obj.write(
+                        base64.b64encode(resource.serialize()).decode() + "\n"
+                    )
+                    resource.cleanup()
+                    self.count += 1
+                    if self.count % 50 == 0:
+                        print(f"{self.count} {datetime.now()}")
+
+                    if self.count > self.num and self.num != -1:
+                        raise StopIteration
                     del QUESTIONS[question_id]
                     del ANSWERS[post_id]
 
@@ -235,6 +249,27 @@ class StreamHandler(xml.sax.handler.ContentHandler):
 
     def characters(self, content):
         pass
+
+
+async def upload(args, kb):
+    print(f"{datetime.now()} lets upload")
+    kb.init_async_grpc()
+    async with aiofiles.open(args.cache, "r") as cache_file:
+        print("Found one in indexing!")
+        TASKS = []
+
+        for line in await cache_file.readlines():
+            if len(line.strip()) == 0:
+                continue
+            res = kb.parse_bm(base64.b64decode(line.strip()))
+            TASKS.append(res.commit())
+            if len(TASKS) > 10:
+                await asyncio.gather(*TASKS)
+                print(f"{datetime.now()} upload")
+                TASKS = []
+
+        if len(TASKS):
+            await asyncio.gather(*TASKS)
 
 
 if __name__ == "__main__":
@@ -267,6 +302,12 @@ if __name__ == "__main__":
         dest="train",
     )
 
+    parser.add_argument("--cache", dest="cache", default="cache.nucliadb")
+
+    parser.add_argument("--compute", dest="compute", action="store_true")
+
+    parser.add_argument("--num", dest="num", type=int, default=20)
+
     args = parser.parse_args()
     client = NucliaDBClient(
         host=args.host, grpc=args.grpc, http=args.http, train=args.train
@@ -277,8 +318,17 @@ if __name__ == "__main__":
 
     print(f"0 {datetime.now()}")
 
-    parser = xml.sax.make_parser()
-    parser.setContentHandler(StreamHandler())
-    # if you can provide a file-like object it's as simple as
-    with open(args.dump) as f:
-        parser.parse(f)
+    if args.compute:
+        xml_parser = xml.sax.make_parser()
+        with open(args.cache, "w+") as cache_file:
+            handler = StreamHandler(cache_file, args.num)
+            xml_parser.setContentHandler(handler)
+            # if you can provide a file-like object it's as simple as
+            with open(args.dump) as f:
+                try:
+                    xml_parser.parse(f)
+                except StopIteration:
+                    pass
+        print(f"Compute done with {handler.count}")
+
+    asyncio.run(upload(args, kb))

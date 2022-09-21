@@ -69,6 +69,7 @@ python-code-lint:
 	isort --profile black nucliadb_telemetry
 	isort --profile black nucliadb_train
 	isort --profile black nucliadb_dataset
+	isort --profile black nucliadb_client
 	isort --profile black nucliadb
 
 	flake8  --config nucliadb_reader/setup.cfg nucliadb_reader/nucliadb_reader
@@ -82,6 +83,7 @@ python-code-lint:
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 	flake8  --config nucliadb_train/setup.cfg nucliadb_train/nucliadb_train
 	flake8  --config nucliadb_train/setup.cfg nucliadb_dataset/nucliadb_dataset
+	flake8  --config nucliadb_train/setup.cfg nucliadb_client/nucliadb_client
 	flake8  --config nucliadb_train/setup.cfg nucliadb/nucliadb
 
 	black nucliadb_reader
@@ -95,6 +97,7 @@ python-code-lint:
 	black nucliadb_telemetry
 	black nucliadb_train
 	black nucliadb_dataset
+	black nucliadb_client
 	black nucliadb
 
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
@@ -108,6 +111,7 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_node
 	MYPYPATH=./mypy_stubs mypy nucliadb_train
 	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
+	MYPYPATH=./mypy_stubs mypy nucliadb_client
 	MYPYPATH=./mypy_stubs mypy nucliadb
 
 venv:  ## Initializes an environment

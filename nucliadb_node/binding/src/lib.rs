@@ -17,14 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_node::config::Configuration;
 use std::io::Cursor;
-use std::sync::Arc;
-use tracing_subscriber::filter::Targets;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
-
+use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
@@ -35,13 +29,17 @@ use nucliadb_protos::{
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
-use tokio::sync::RwLock;
+use pyo3::types::PyList;
 use tracing::*;
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 type RawProtos = Vec<u8>;
 
 #[pyclass]
 pub struct NodeReader {
-    reader: Arc<RwLock<RustReaderService>>,
+    reader: RustReaderService,
 }
 impl Default for NodeReader {
     fn default() -> NodeReader {
@@ -54,135 +52,125 @@ impl NodeReader {
     #[staticmethod]
     pub fn new() -> NodeReader {
         NodeReader {
-            reader: Arc::new(RwLock::new(RustReaderService::new())),
+            reader: RustReaderService::new(),
         }
     }
 
-    pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-            let mut lock = reader.write().await;
-            if let Some(shard) = lock.get_shard(&shard_id).await {
-                let stats = shard.get_info().await;
-                let shard_pb = ShardPB {
-                    shard_id: String::from(&shard.id),
-                    resources: stats.resources as u64,
-                    paragraphs: stats.paragraphs as u64,
-                    sentences: stats.sentences as u64,
-                };
-                Ok(shard_pb.encode_to_vec())
-            } else {
-                Err(exceptions::PyTypeError::new_err("Not found"))
-            }
-        })
+    pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        if let Some(shard) = self.reader.get_shard(&shard_id) {
+            let stats = shard.get_info();
+            let shard_pb = ShardPB {
+                shard_id: String::from(&shard.id),
+                resources: stats.resources as u64,
+                paragraphs: stats.paragraphs as u64,
+                sentences: stats.sentences as u64,
+            };
+            Ok(PyList::new(py, shard_pb.encode_to_vec()))
+        } else {
+            Err(exceptions::PyTypeError::new_err("Not found"))
+        }
     }
 
     pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let lock = reader.write().await;
-            let shards = lock.get_shards().await;
-            Ok(shards.encode_to_vec())
-        })
+        let shards = self.reader.get_shards();
+        Ok(PyList::new(py, shards.encode_to_vec()))
     }
 
-    pub fn search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = reader.write().await;
-            let search_request = SearchRequest::decode(&mut Cursor::new(request)).unwrap();
-            let shard_id = ShardId {
-                id: search_request.shard.clone(),
-            };
-            let response = lock.search(&shard_id, search_request).await;
-            match response {
-                Some(Ok(response)) => Ok(response.encode_to_vec()),
-                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
-            }
-        })
+    pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let search_request = SearchRequest::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = ShardId {
+            id: search_request.shard.clone(),
+        };
+        let response = self.reader.search(&shard_id, search_request);
+        match response {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
     }
 
-    pub fn suggest<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = reader.write().await;
-            let suggest_request = SuggestRequest::decode(&mut Cursor::new(request)).unwrap();
-            let shard_id = ShardId {
-                id: suggest_request.shard.clone(),
-            };
-            let response = lock.suggest(&shard_id, suggest_request).await;
-            match response {
-                Some(Ok(response)) => Ok(response.encode_to_vec()),
-                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
-            }
-        })
+    pub fn suggest<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let suggest_request = SuggestRequest::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = ShardId {
+            id: suggest_request.shard.clone(),
+        };
+        let response = self.reader.suggest(&shard_id, suggest_request);
+        match response {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
     }
 
-    pub fn vector_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = reader.write().await;
-            let vector_request = VectorSearchRequest::decode(&mut Cursor::new(request)).unwrap();
-            let shard_id = ShardId {
-                id: vector_request.id.clone(),
-            };
-            let response = lock.vector_search(&shard_id, vector_request).await;
-            match response {
-                Some(Ok(response)) => Ok(response.encode_to_vec()),
-                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
-            }
-        })
+    pub fn vector_search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let vector_request = VectorSearchRequest::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = ShardId {
+            id: vector_request.id.clone(),
+        };
+        let response = self.reader.vector_search(&shard_id, vector_request);
+        match response {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
     }
 
-    pub fn document_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = reader.write().await;
-            let document_request =
-                DocumentSearchRequest::decode(&mut Cursor::new(request)).unwrap();
-            let shard_id = ShardId {
-                id: document_request.id.clone(),
-            };
-            let response = lock.document_search(&shard_id, document_request).await;
-            match response {
-                Some(Ok(response)) => Ok(response.encode_to_vec()),
-                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
-            }
-        })
+    pub fn document_search<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let document_request = DocumentSearchRequest::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = ShardId {
+            id: document_request.id.clone(),
+        };
+        let response = self.reader.document_search(&shard_id, document_request);
+        match response {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
     }
 
-    pub fn paragraph_search<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let reader = self.reader.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = reader.write().await;
-            let paragraph_request =
-                ParagraphSearchRequest::decode(&mut Cursor::new(request)).unwrap();
-            let shard_id = ShardId {
-                id: paragraph_request.id.clone(),
-            };
-            let response = lock.paragraph_search(&shard_id, paragraph_request).await;
-            match response {
-                Some(Ok(response)) => Ok(response.encode_to_vec()),
-                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-                None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
-            }
-        })
+    pub fn paragraph_search<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let paragraph_request = ParagraphSearchRequest::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = ShardId {
+            id: paragraph_request.id.clone(),
+        };
+        let response = self.reader.paragraph_search(&shard_id, paragraph_request);
+        match response {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
     }
 
-    pub fn relation_search<'p>(&self, request: RawProtos, _py: Python<'p>) -> PyResult<&'p PyAny> {
-        let _ = RelationSearchRequest::decode(&mut Cursor::new(request)).unwrap();
-        todo!()
+    pub fn relation_search<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let paragraph_request = RelationSearchRequest::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = ShardId {
+            id: paragraph_request.id.clone(),
+        };
+        let response = self.reader.relation_search(&shard_id, paragraph_request);
+        match response {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
     }
 }
 
 #[pyclass]
 pub struct NodeWriter {
-    writer: Arc<RwLock<RustWriterService>>,
+    writer: RustWriterService,
 }
 
 impl Default for NodeWriter {
@@ -195,163 +183,131 @@ impl NodeWriter {
     #[staticmethod]
     pub fn new() -> NodeWriter {
         NodeWriter {
-            writer: Arc::new(RwLock::new(RustWriterService::new())),
+            writer: RustWriterService::new(),
         }
     }
 
-    pub fn get_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+    pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        match self.writer.get_shard(&shard_id) {
+            Some(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
+            None => Err(exceptions::PyTypeError::new_err("Not found")),
+        }
+    }
 
-            let mut lock = writer.write().await;
-            match lock.get_shard(&shard_id).await {
-                Some(_) => Ok(shard_id.encode_to_vec()),
-                None => Err(exceptions::PyTypeError::new_err("Not found")),
+    pub fn new_shard<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard = self.writer.new_shard();
+        Ok(PyList::new(py, shard.encode_to_vec()))
+    }
+
+    pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        match self.writer.delete_shard(&shard_id) {
+            Some(Ok(_)) => Ok(PyList::new(py, shard_id.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Shard not found")),
+        }
+    }
+
+    pub fn list_shards<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_ids = self.writer.get_shard_ids();
+        Ok(PyList::new(py, shard_ids.encode_to_vec()))
+    }
+
+    pub fn set_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let resource = Resource::decode(&mut Cursor::new(resource)).unwrap();
+        let shard_id = ShardId {
+            id: resource.shard_id.clone(),
+        };
+        match self.writer.set_resource(&shard_id, &resource) {
+            Some(Ok(count)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
             }
-        })
-    }
-
-    pub fn new_shard<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut w = writer.write().await;
-            let shard = w.new_shard().await;
-            Ok(shard.encode_to_vec())
-        })
-    }
-
-    pub fn delete_shard<'p>(&self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-
-            let mut w = writer.write().await;
-            match w.delete_shard(&shard_id).await {
-                Some(Ok(_)) => Ok(shard_id.encode_to_vec()),
-                Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-                None => Err(exceptions::PyTypeError::new_err("Shard not found")),
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
             }
-        })
-    }
-
-    pub fn list_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let w = writer.read().await;
-            let shard_ids = w.get_shard_ids();
-            Ok(shard_ids.encode_to_vec())
-        })
-    }
-
-    pub fn set_resource<'p>(&self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = writer.write().await;
-            let resource = Resource::decode(&mut Cursor::new(resource)).unwrap();
-
-            let shard_id = ShardId {
-                id: resource.shard_id.clone(),
-            };
-            match lock.set_resource(&shard_id, &resource).await {
-                Some(Ok(count)) => {
-                    let status = OpStatus {
-                        status: 0,
-                        detail: "Success!".to_string(),
-                        count: count as u64,
-                        shard_id: shard_id.id.clone(),
-                    };
-                    Ok(status.encode_to_vec())
-                }
-                Some(Err(e)) => {
-                    let status = op_status::Status::Error as i32;
-                    let detail = format!("Error: {}", e);
-                    let op_status = OpStatus {
-                        status,
-                        detail,
-                        count: 0_u64,
-                        shard_id: shard_id.id.clone(),
-                    };
-                    Ok(op_status.encode_to_vec())
-                }
-                None => {
-                    let message = format!("Error loading shard {:?}", shard_id);
-                    Err(exceptions::PyTypeError::new_err(message))
-                }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(exceptions::PyTypeError::new_err(message))
             }
-        })
+        }
     }
 
-    pub fn remove_resource<'p>(&self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = writer.write().await;
-            let resource = ResourceId::decode(&mut Cursor::new(resource)).unwrap();
-
-            let shard_id = ShardId {
-                id: resource.shard_id.clone(),
-            };
-            match lock.remove_resource(&shard_id, &resource).await {
-                Some(Ok(count)) => {
-                    let status = OpStatus {
-                        status: 0,
-                        detail: "Success!".to_string(),
-                        count: count as u64,
-                        shard_id: shard_id.id.clone(),
-                    };
-                    Ok(status.encode_to_vec())
-                }
-                Some(Err(e)) => {
-                    let status = op_status::Status::Error as i32;
-                    let detail = format!("Error: {}", e);
-                    let op_status = OpStatus {
-                        status,
-                        detail,
-                        count: 0_u64,
-                        shard_id: shard_id.id.clone(),
-                    };
-                    Ok(op_status.encode_to_vec())
-                }
-                None => {
-                    let message = format!("Error loading shard {:?}", shard_id);
-                    Err(exceptions::PyTypeError::new_err(message))
-                }
+    pub fn remove_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let resource = ResourceId::decode(&mut Cursor::new(resource)).unwrap();
+        let shard_id = ShardId {
+            id: resource.shard_id.clone(),
+        };
+        match self.writer.remove_resource(&shard_id, &resource) {
+            Some(Ok(count)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
             }
-        })
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(exceptions::PyTypeError::new_err(message))
+            }
+        }
     }
 
-    pub fn gc<'p>(&self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let writer = self.writer.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
-            let mut lock = writer.write().await;
-            let request = ShardId::decode(&mut Cursor::new(request)).unwrap();
-            match lock.gc(&request).await {
-                Some(Ok(_)) => {
-                    let status = OpStatus {
-                        status: 0,
-                        detail: "Success!".to_string(),
-                        count: 0,
-                        shard_id: request.id.clone(),
-                    };
-                    Ok(status.encode_to_vec())
-                }
-                Some(Err(e)) => {
-                    let status = op_status::Status::Error as i32;
-                    let detail = format!("Error: {}", e);
-                    let op_status = OpStatus {
-                        status,
-                        detail,
-                        count: 0_u64,
-                        shard_id: request.id.clone(),
-                    };
-                    Ok(op_status.encode_to_vec())
-                }
-                None => {
-                    let message = format!("Error loading shard {:?}", request);
-                    Err(exceptions::PyTypeError::new_err(message))
-                }
+    pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let request = ShardId::decode(&mut Cursor::new(request)).unwrap();
+        match self.writer.gc(&request) {
+            Some(Ok(_)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: 0,
+                    shard_id: request.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
             }
-        })
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: request.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", request);
+                Err(exceptions::PyTypeError::new_err(message))
+            }
+        }
     }
 }
 

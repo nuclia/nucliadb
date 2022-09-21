@@ -127,14 +127,12 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 Some(Cnx(n, _)) if !self.tracker.is_deleted(n) => {
                     break Some((n, self.cosine_similarity(n, y)));
                 }
-                Some(Cnx(down, _)) => {
-                    for (n, _) in layer.get_out_edges(down) {
-                        if !visited.contains(&n) {
-                            candidates.push(Cnx(n, self.cosine_similarity(n, y)));
-                            visited.insert(n);
-                        }
+                Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, _)| {
+                    if !visited.contains(&n) {
+                        candidates.push(Cnx(n, self.cosine_similarity(n, y)));
+                        visited.insert(n);
                     }
-                }
+                }),
             }
         }
     }

@@ -19,9 +19,8 @@
 //
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
+use std::fs;
 
-use async_std::fs;
-use async_trait::async_trait;
 use nucliadb_protos::{
     DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults,
     OrderBy, ResourceId,
@@ -74,13 +73,13 @@ impl Debug for FieldReaderService {
     }
 }
 
-impl RService for FieldReaderService {}
-impl FieldServiceReader for FieldReaderService {}
-impl FieldReaderOnly for FieldReaderService {}
+impl FieldReader for FieldReaderService {}
 
-#[async_trait]
-impl ServiceChild for FieldReaderService {
-    async fn stop(&self) -> InternalResult<()> {
+impl ReaderChild for FieldReaderService {
+    type Request = DocumentSearchRequest;
+    type Response = DocumentSearchResponse;
+
+    fn stop(&self) -> InternalResult<()> {
         info!("Stopping Reader Text Service");
         Ok(())
     }
@@ -89,11 +88,6 @@ impl ServiceChild for FieldReaderService {
         let searcher = self.reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap()
     }
-}
-
-impl ReaderChild for FieldReaderService {
-    type Request = DocumentSearchRequest;
-    type Response = DocumentSearchResponse;
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         info!("Document search at {}:{}", line!(), file!());
         let body = &request.body;
@@ -146,13 +140,13 @@ impl FieldReaderService {
         Ok(docs)
     }
 
-    pub async fn start(config: &FieldServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &FieldConfig) -> InternalResult<Self> {
         info!("Starting Text Service");
-        match FieldReaderService::open(config).await {
+        match FieldReaderService::open(config) {
             Ok(service) => Ok(service),
             Err(_e) => {
                 warn!("Text Service does not exists. Creating a new one.");
-                match FieldReaderService::new(config).await {
+                match FieldReaderService::new(config) {
                     Ok(service) => Ok(service),
                     Err(e) => {
                         error!("Error starting Text service: {}", e);
@@ -162,24 +156,22 @@ impl FieldReaderService {
             }
         }
     }
-    pub async fn new(config: &FieldServiceConfiguration) -> InternalResult<Self> {
-        match FieldReaderService::new_inner(config).await {
+    pub fn new(config: &FieldConfig) -> InternalResult<Self> {
+        match FieldReaderService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
         }
     }
-    pub async fn open(config: &FieldServiceConfiguration) -> InternalResult<Self> {
-        match FieldReaderService::open_inner(config).await {
+    pub fn open(config: &FieldConfig) -> InternalResult<Self> {
+        match FieldReaderService::open_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
         }
     }
-    pub async fn new_inner(
-        config: &FieldServiceConfiguration,
-    ) -> tantivy::Result<FieldReaderService> {
+    pub fn new_inner(config: &FieldConfig) -> tantivy::Result<FieldReaderService> {
         let field_schema = FieldSchema::new();
 
-        fs::create_dir_all(&config.path).await?;
+        fs::create_dir_all(&config.path)?;
 
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         let settings = IndexSettings {
@@ -206,9 +198,7 @@ impl FieldReaderService {
         })
     }
 
-    pub async fn open_inner(
-        config: &FieldServiceConfiguration,
-    ) -> tantivy::Result<FieldReaderService> {
+    pub fn open_inner(config: &FieldConfig) -> tantivy::Result<FieldReaderService> {
         let field_schema = FieldSchema::new();
         let index = Index::open_in_dir(&config.path)?;
 
@@ -593,18 +583,18 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_new_reader() -> anyhow::Result<()> {
+    #[test]
+    fn test_new_reader() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
-        let fsc = FieldServiceConfiguration {
+        let fsc = FieldConfig {
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
         };
 
-        let mut field_writer_service = FieldWriterService::start(&fsc).await.unwrap();
+        let mut field_writer_service = FieldWriterService::start(&fsc).unwrap();
         let resource1 = create_resource("shard1".to_string());
         let _ = field_writer_service.set_resource(&resource1);
 
-        let field_reader_service = FieldReaderService::start(&fsc).await.unwrap();
+        let field_reader_service = FieldReaderService::start(&fsc).unwrap();
 
         let rid = ResourceId {
             shard_id: "shard1".to_string(),

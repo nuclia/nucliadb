@@ -21,7 +21,7 @@ use nucliadb_protos::*;
 
 use crate::service_interface::*;
 
-pub struct ParagraphServiceConfiguration {
+pub struct ParagraphConfig {
     pub path: String,
 }
 #[derive(Debug)]
@@ -37,18 +37,9 @@ impl std::fmt::Display for ParagraphError {
 
 impl InternalError for ParagraphError {}
 
-pub trait ParagraphReaderOnly {}
-pub trait ParagraphWriterOnly {}
-
-pub trait ParagraphServiceReader:
-    ServiceChild
-    + RService
-    + ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
-    + ParagraphReaderOnly
+pub trait ParagraphReader:
+    ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
 {
 }
 
-pub trait ParagraphServiceWriter:
-    WService + ServiceChild + WriterChild + ParagraphWriterOnly
-{
-}
+pub trait ParagraphWriter: WriterChild {}
