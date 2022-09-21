@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, AsyncIterator, List, Optional
 
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
@@ -90,6 +90,13 @@ class KnowledgeBox:
         res = Resource(rid=pb.uuid, kb=self)
         res._bm = pb
         return res
+
+    async def export(self) -> AsyncIterator[BrokerMessage]:
+        assert self.client.writer_stub_async
+        req = ExportRequest()
+        req.kbid = self.kbid
+        async for bm in self.client.writer_stub_async.Export(req):  # type: ignore
+            yield bm
 
     def init_async_grpc(self):
         async_channel = aio.insecure_channel(

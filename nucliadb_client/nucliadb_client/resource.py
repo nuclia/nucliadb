@@ -47,7 +47,9 @@ class Resource:
     http_writer_v1: httpx.Client
     http_manager_v1: httpx.Client
 
-    def __init__(self, rid: str, kb: "KnowledgeBox", slug: Optional[str] = None):
+    def __init__(
+        self, rid: Optional[str], kb: "KnowledgeBox", slug: Optional[str] = None
+    ):
         self.rid = rid
         self.kb = kb
         self.http_reader_v1 = httpx.Client(
@@ -150,6 +152,9 @@ class Resource:
         if self.bm is None:
             raise AttributeError("No Broker Message")
 
+        if self.rid is None:
+            raise AttributeError("Not initialized")
+
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
         self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
@@ -164,14 +169,24 @@ class Resource:
 
         self._bm = None
 
-    def serialize(self) -> bytes:
+    def parse(self, payload: bytes):
+        self._bm = BrokerMessage()
+        self._bm.ParseFromString(payload)
+        self.rid = self.bm.uuid
+        self.slug = self.bm.slug
+
+    def serialize(self, processor: bool = True) -> bytes:
         if self.bm is None:
             raise AttributeError("No Broker Message")
+
+        if self.rid is None:
+            raise AttributeError("Not initialized")
 
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
         self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
-        self.bm.source = BrokerMessage.MessageSource.PROCESSOR
+        if processor:
+            self.bm.source = BrokerMessage.MessageSource.PROCESSOR
         self.bm.basic.metadata.useful = True
         self.bm.basic.metadata.status = Metadata.Status.PROCESSED
 
@@ -184,6 +199,12 @@ class Resource:
         if self.bm is None:
             raise AttributeError("No Broker Message")
 
+        if self.kb.client.writer_stub_async is None:
+            raise AttributeError("Writer Stub Async not initialized")
+
+        if self.rid is None:
+            raise AttributeError("Not initialized")
+
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
         self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
@@ -195,7 +216,7 @@ class Resource:
         def iterator():
             yield self.bm
 
-        await self.kb.client.writer_stub_async.ProcessMessage(iterator())
+        await self.kb.client.writer_stub_async.ProcessMessage(iterator())  # type: ignore
         logger.info(f"Commited {self.bm.uuid}")
 
         self._bm = None

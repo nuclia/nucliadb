@@ -1180,3 +1180,14 @@ class ResourceFieldExistsResponse(google.protobuf.message.Message):
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["found",b"found"]) -> None: ...
 global___ResourceFieldExistsResponse = ResourceFieldExistsResponse
+
+class ExportRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KBID_FIELD_NUMBER: builtins.int
+    kbid: typing.Text
+    def __init__(self,
+        *,
+        kbid: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid"]) -> None: ...
+global___ExportRequest = ExportRequest
