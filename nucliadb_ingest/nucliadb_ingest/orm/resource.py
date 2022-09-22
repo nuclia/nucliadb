@@ -244,7 +244,9 @@ class Resource:
                     brain.apply_field_vectors(field_key, vo, [], {})
         return brain
 
-    async def generate_broker_message(self, full: bool = True) -> BrokerMessage:
+    async def generate_broker_message(
+        self, full: bool = True, vectors: bool = True
+    ) -> BrokerMessage:
         # full means downloading all the pointers
         # minuts the ones to external files that are not PB
         # Go for all fields and recreate brain
@@ -319,7 +321,7 @@ class Resource:
             evw = ExtractedVectorsWrapper()
             evw.field.field = field_id
             evw.field.field_type = type_id  # type: ignore
-            if full:
+            if full and vectors:
                 field_vectors = await field.get_vectors()
                 if field_vectors is not None:
                     evw.vectors.CopyFrom(field_vectors)
