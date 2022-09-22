@@ -36,13 +36,18 @@ async def start_grpc(service_name: Optional[str] = None):
     aio.init_grpc_aio()
 
     tracer_provider = get_telemetry(service_name)
-
     if tracer_provider is not None:
         await init_telemetry(tracer_provider)
         otgrpc = OpenTelemetryGRPC(f"{service_name}_grpc", tracer_provider)
         server = otgrpc.init_server()
     else:
-        server = aio.server()
+        options = [
+            (
+                "grpc.max_receive_message_length",
+                settings.max_receive_message_length * 1024 * 1024,
+            ),
+        ]
+        server = aio.server(options=options)
 
     servicer = WriterServicer()
     await servicer.initialize()

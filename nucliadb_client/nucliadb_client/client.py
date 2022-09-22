@@ -144,5 +144,10 @@ class NucliaDBClient:
     def init_async_grpc(self):
         if self.writer_stub_async is not None:
             logger.warn("Exists already a writer, replacing on the new loop")
-        async_channel = aio.insecure_channel(f"{self.grpc_host}:{self.grpc_port}")
+        options = [
+            ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+        ]
+        async_channel = aio.insecure_channel(
+            f"{self.grpc_host}:{self.grpc_port}", options
+        )
         self.writer_stub_async = WriterStub(async_channel)

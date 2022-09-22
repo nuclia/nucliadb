@@ -23,6 +23,7 @@ import argparse
 import asyncio
 import base64
 import functools
+from datetime import datetime
 from time import perf_counter
 
 import aiofiles
@@ -38,20 +39,18 @@ from nucliadb_client.resource import Resource
 def get_docs(n, n_dim, kb):
     with open("cache-vectors.nucliadb", "w+") as pblist:
         pending = []
+        r = Resource(rid=str(0), kb=kb)
         for i in range(n):
-            if i % 50 == 0:
+            if i % 100_000 == 0:
                 print(f"{i}")
-                for r in pending:
-                    pblist.write(
-                        base64.b64encode(r.serialize(processor=False)).decode() + "\n"
-                    )
-                pending = []
+                pblist.write(
+                    base64.b64encode(r.serialize(processor=False)).decode() + "\n"
+                )
+                r = Resource(rid=str(i), kb=kb)
 
-            r = Resource(rid=str(i), kb=kb)
             vector = Vector()
             vector.vector.extend(np.random.rand(n_dim))
-            r.add_vectors("vectors", FieldType.TEXT, [vector])
-            pending.append(r)
+            r.add_vectors(f"vectors{i}", FieldType.TEXT, [vector])
 
 
 def timer(func):
@@ -70,22 +69,12 @@ D = 128
 
 async def upload(kb: KnowledgeBox):
     kb.init_async_grpc()
-    pending = []
-    i = 0
     async with aiofiles.open("cache-vectors.nucliadb", "r") as pblist:
         for pbline in await pblist.readlines():
-            i += 1
             resource = Resource(rid=None, kb=kb)
             resource.parse(base64.b64decode(pbline.strip()))
-            pending.append(resource.commit(processor=False))
-            if len(pending) % 100 == 0:
-                await asyncio.gather(*pending)
-                print(f"{i}")
-                pending = []
-
-        if len(pending):
-            await asyncio.gather(*pending)
-            print("{i}")
+            await resource.commit(processor=False)
+            print(f"{datetime.now()}")
 
 
 @timer
