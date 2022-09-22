@@ -120,7 +120,7 @@ def set_info_on_span(
             Sequence[int],
             Sequence[float],
         ],
-    ] = {}
+    ]
 ):
     if telemetry_settings.jaeger_enabled:
         span = get_current_span()

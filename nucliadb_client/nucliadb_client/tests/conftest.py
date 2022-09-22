@@ -19,12 +19,13 @@
 
 from dataclasses import dataclass
 from typing import Optional
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
-from grpc import aio, insecure_channel  # type: ignore
+
+import pytest
+from grpc import insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
-import pytest
+from pytest_docker_fixtures import images  # type: ignore
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_client.client import NucliaDBClient
 

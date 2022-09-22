@@ -24,8 +24,6 @@
 
 pub mod services;
 
-pub mod result;
-
 /// Global configuration enviromental variables
 pub mod config;
 

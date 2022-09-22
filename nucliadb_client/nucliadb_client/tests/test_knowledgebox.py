@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from nucliadb_client.client import NucliaDBClient
+from nucliadb_models.resource import KnowledgeBoxConfig
 
 
 def test_knowledgebox_creation(nucliadb_client: NucliaDBClient):
@@ -26,6 +27,8 @@ def test_knowledgebox_creation(nucliadb_client: NucliaDBClient):
     )
     info = kb.get()
     info.slug == "mykb"
+    if info.config is None:
+        info.config = KnowledgeBoxConfig()
     info.config.title == "My KB"
     info.config.description == "Its a new KB"
 

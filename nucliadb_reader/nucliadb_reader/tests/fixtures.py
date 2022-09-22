@@ -20,7 +20,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 import pytest
 from httpx import AsyncClient
@@ -60,10 +60,11 @@ async def reader_api(test_settings_reader: None, local_files, event_loop):  # ty
             route.app.middleware_stack.handler = handler  # type: ignore
 
     def make_client_fixture(
-        roles: List[Enum] = [],
+        roles: Optional[List[Enum]] = None,
         user: str = "",
         version: str = "1",
     ) -> AsyncClient:
+        roles = roles or []
         client_base_url = "http://test"
         client_base_url = f"{client_base_url}/{API_PREFIX}/v{version}"
 

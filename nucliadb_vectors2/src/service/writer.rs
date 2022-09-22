@@ -17,9 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::fmt::Debug;
-use std::sync::RwLock;
 
-use async_trait::async_trait;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
@@ -29,7 +27,7 @@ use crate::data_point;
 use crate::data_point_provider::*;
 
 pub struct VectorWriterService {
-    index: RwLock<Index>,
+    index: Index,
 }
 
 impl Debug for VectorWriterService {
@@ -37,29 +35,22 @@ impl Debug for VectorWriterService {
         f.debug_struct("VectorWriterService").finish()
     }
 }
-impl WService for VectorWriterService {}
-impl VectorServiceWriter for VectorWriterService {}
-impl VectorWriterOnly for VectorWriterService {}
-#[async_trait]
-impl ServiceChild for VectorWriterService {
-    async fn stop(&self) -> InternalResult<()> {
+
+impl VectorWriter for VectorWriterService {}
+impl WriterChild for VectorWriterService {
+    fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping vector writer Service");
         Ok(())
     }
     fn count(&self) -> usize {
-        let index = self.index.read().unwrap();
-        let lock = index.get_slock().unwrap();
-        index.no_nodes(&lock)
+        let lock = self.index.get_slock().unwrap();
+        self.index.no_nodes(&lock)
     }
-}
-
-impl WriterChild for VectorWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         info!("Delete resource in vector starts");
-        let mut index = self.index.write().unwrap();
-        let lock = index.get_elock()?;
-        index.delete(&resource_id.uuid, &lock);
-        index.commit(lock)?;
+        let lock = self.index.get_elock()?;
+        self.index.delete(&resource_id.uuid, &lock);
+        self.index.commit(lock)?;
         info!("Delete resource in vector ends");
         Ok(())
     }
@@ -68,7 +59,6 @@ impl WriterChild for VectorWriterService {
         info!("Set resource in vector starts");
         let resource_id = resource.resource.as_ref().unwrap().uuid.clone();
         let mut elems = vec![];
-        let mut provider = self.index.write().unwrap();
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
                 for index in paragraph.paragraphs.values() {
@@ -85,10 +75,10 @@ impl WriterChild for VectorWriterService {
             }
         }
         if !elems.is_empty() {
-            let new_dp = DataPoint::new(provider.get_location(), elems)?;
-            let lock = provider.get_elock()?;
-            provider.add(resource_id, new_dp, &lock);
-            provider.commit(lock)?;
+            let new_dp = DataPoint::new(self.index.get_location(), elems)?;
+            let lock = self.index.get_elock()?;
+            self.index.add(resource_id, new_dp, &lock);
+            self.index.commit(lock)?;
         }
         info!("Set resource in vector ends");
         Ok(())
@@ -97,32 +87,32 @@ impl WriterChild for VectorWriterService {
 }
 
 impl VectorWriterService {
-    pub async fn start(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+    pub fn start(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            VectorWriterService::new(config).await
+            VectorWriterService::new(config)
         } else {
-            VectorWriterService::open(config).await
+            VectorWriterService::open(config)
         }
     }
-    pub async fn new(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+    pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
-            tokio::fs::create_dir_all(&path).await.unwrap();
+            std::fs::create_dir_all(&path).unwrap();
             Ok(VectorWriterService {
-                index: RwLock::new(Index::writer(path)?),
+                index: Index::writer(path)?,
             })
         }
     }
-    pub async fn open(config: &VectorServiceConfiguration) -> InternalResult<Self> {
+    pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: RwLock::new(Index::writer(path)?),
+                index: Index::writer(path)?,
             })
         }
     }
@@ -137,10 +127,10 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_new_vector_writer() {
+    #[test]
+    fn test_new_vector_writer() {
         let dir = TempDir::new("payload_dir").unwrap();
-        let vsc = VectorServiceConfiguration {
+        let vsc = VectorConfig {
             no_results: None,
             path: dir.path().to_str().unwrap().to_string(),
         };
@@ -182,13 +172,13 @@ mod tests {
             shard_id: "DOC".to_string(),
         };
         // insert - delete - insert sequence
-        let mut writer = VectorWriterService::start(&vsc).await.unwrap();
+        let mut writer = VectorWriterService::start(&vsc).unwrap();
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
         let res = writer.delete_resource(&resource_id);
         assert!(res.is_ok());
         let res = writer.set_resource(&resource);
         assert!(res.is_ok());
-        writer.stop().await.unwrap();
+        writer.stop().unwrap();
     }
 }

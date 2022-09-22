@@ -18,17 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from typing import List, Optional
+
 import httpx
 from grpc import insecure_channel
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+
+from nucliadb_client.knowledgebox import KnowledgeBox
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxList,
     KnowledgeBoxObj,
 )
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-
-from nucliadb_client.knowledgebox import KnowledgeBox
-
 
 API_PREFIX = "api"
 KBS_PREFIX = "/kbs"
@@ -36,30 +36,50 @@ KB_PREFIX = "/kb"
 
 
 class NucliaDBClient:
+    writer_stub_async: Optional[WriterStub] = None
+
     def __init__(
-        self, host: str, grpc: int, http: int, train: int, schema: str = "http"
+        self,
+        host: str,
+        grpc: int,
+        http: int,
+        train: int,
+        schema: str = "http",
+        writer_host: Optional[str] = None,
+        reader_host: Optional[str] = None,
+        grpc_host: Optional[str] = None,
     ):
+        if reader_host is None:
+            reader_host = host
+        if writer_host is None:
+            writer_host = host
         self.http_reader_v1 = httpx.Client(
-            base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
+            base_url=f"{schema}://{reader_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "READER"},
         )
         self.http_writer_v1 = httpx.Client(
-            base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
+            base_url=f"{schema}://{writer_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
         )
         self.http_manager_v1 = httpx.Client(
             base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "MANAGER"},
         )
+        if grpc_host is None:
+            grpc_host = host
+        self.grpc_host = grpc_host
+        self.grpc_port = grpc
         channel = insecure_channel(f"{host}:{grpc}")
         self.writer_stub = WriterStub(channel)
 
     def list_kbs(self) -> List[KnowledgeBox]:
-        response = KnowledgeBoxList(self.http_manager_v1.get(KBS_PREFIX).json())
+        response = KnowledgeBoxList.parse_raw(
+            self.http_manager_v1.get(KBS_PREFIX).content
+        )
         result = []
         for kb in response.kbs:
-            KnowledgeBox(kbid=kb.uuid, client=self, slug=kb.slug)
-            result.append(KnowledgeBox)
+            new_kb = KnowledgeBox(kbid=kb.uuid, client=self, slug=kb.slug)
+            result.append(new_kb)
         return result
 
     def get_kb(self, *, slug: str) -> Optional[KnowledgeBox]:
@@ -77,7 +97,7 @@ class NucliaDBClient:
         description: Optional[str] = None,
     ) -> KnowledgeBox:
         payload = KnowledgeBoxConfig()
-        payload.slug = slug
+        payload.slug = slug  # type: ignore
         payload.title = title
         payload.description = description
 

@@ -164,20 +164,20 @@ fn similatity_edges(mut edges: Vec<Relation>) -> Vec<Relation> {
     edges
 }
 
-async fn simple_graph() -> (RelationsWriterService, RelationsReaderService) {
+fn simple_graph() -> (RelationsWriterService, RelationsReaderService) {
     let dir = tempfile::tempdir().unwrap();
-    let rsc = RelationServiceConfiguration {
+    let rsc = RelationConfig {
         path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
     };
     println!("Writer starts");
-    let writer = RelationsWriterService::start(&rsc).await.unwrap();
-    let reader = RelationsReaderService::open(&rsc).await.unwrap();
+    let writer = RelationsWriterService::start(&rsc).unwrap();
+    let reader = RelationsReaderService::open(&rsc).unwrap();
     (writer, reader)
 }
 
-#[tokio::test]
-async fn simple_request() -> anyhow::Result<()> {
-    let (mut writer, reader) = simple_graph().await;
+#[test]
+fn simple_request() -> anyhow::Result<()> {
+    let (mut writer, reader) = simple_graph();
     let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
     let graph = entities(empty_graph());
     resource.relations = graph;
@@ -192,9 +192,9 @@ async fn simple_request() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn simple_request_with_similarity() -> anyhow::Result<()> {
-    let (mut writer, reader) = simple_graph().await;
+#[test]
+fn simple_request_with_similarity() -> anyhow::Result<()> {
+    let (mut writer, reader) = simple_graph();
     let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
     let graph = similatity_edges(entities(empty_graph()));
     resource.relations = graph;
@@ -212,9 +212,9 @@ async fn simple_request_with_similarity() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn typed_request() -> anyhow::Result<()> {
-    let (mut writer, reader) = simple_graph().await;
+#[test]
+fn typed_request() -> anyhow::Result<()> {
+    let (mut writer, reader) = simple_graph();
     let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
     let graph = entities(empty_graph());
     resource.relations = graph;
@@ -229,9 +229,9 @@ async fn typed_request() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn just_prefix_querying() -> anyhow::Result<()> {
-    let (mut writer, reader) = simple_graph().await;
+#[test]
+fn just_prefix_querying() -> anyhow::Result<()> {
+    let (mut writer, reader) = simple_graph();
     let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
     let graph = entities(empty_graph());
     resource.relations = graph;
@@ -261,9 +261,9 @@ async fn just_prefix_querying() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn getting_node_types() -> anyhow::Result<()> {
-    let (mut writer, reader) = simple_graph().await;
+#[test]
+fn getting_node_types() -> anyhow::Result<()> {
+    let (mut writer, reader) = simple_graph();
     let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
     let graph = entities(empty_graph());
     resource.relations = graph;
@@ -285,9 +285,9 @@ async fn getting_node_types() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn getting_edges() -> anyhow::Result<()> {
-    let (mut writer, reader) = simple_graph().await;
+#[test]
+fn getting_edges() -> anyhow::Result<()> {
+    let (mut writer, reader) = simple_graph();
     let mut resource = create_empty_resource("f56c58ac-b4f9-4d61-a077-ffccaadd0001".to_string());
     let graph = entities(empty_graph());
     resource.relations = graph;

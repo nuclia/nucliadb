@@ -22,66 +22,43 @@ use crate::*;
 
 pub const MAX_VERSION: u32 = 1;
 
+pub type RVectors = Arc<dyn VectorReader>;
+pub type WVectors = Arc<RwLock<dyn VectorWriter>>;
 
-type RServiceT = dyn RService<Request = VectorSearchRequest, Response = VectorSearchResponse>;
-type WServiceT = dyn WService;
-pub type RVectors = Arc<RServiceT>;
-pub type WVectors = Arc<RwLock<WServiceT>>;
-
-pub async fn open_reader(
-    config: &VectorServiceConfiguration,
-    version: u32,
-) -> InternalResult<RVectors> {
+pub fn open_reader(config: &VectorConfig, version: u32) -> InternalResult<RVectors> {
     match version {
         0 => nucliadb_vectors::service::VectorReaderService::open(config)
-            .await
             .map(|v| Arc::new(v) as RVectors),
         1 => nucliadb_vectors2::service::VectorReaderService::open(config)
-            .await
             .map(|v| Arc::new(v) as RVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
-pub async fn open_writer(
-    config: &VectorServiceConfiguration,
-    version: u32,
-) -> InternalResult<WVectors> {
+pub fn open_writer(config: &VectorConfig, version: u32) -> InternalResult<WVectors> {
     match version {
         0 => nucliadb_vectors::service::VectorWriterService::open(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         1 => nucliadb_vectors2::service::VectorWriterService::open(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
-pub async fn create_reader(
-    config: &VectorServiceConfiguration,
-    version: u32,
-) -> InternalResult<RVectors> {
+pub fn create_reader(config: &VectorConfig, version: u32) -> InternalResult<RVectors> {
     match version {
         0 => nucliadb_vectors::service::VectorReaderService::new(config)
-            .await
             .map(|v| Arc::new(v) as RVectors),
         1 => nucliadb_vectors2::service::VectorReaderService::new(config)
-            .await
             .map(|v| Arc::new(v) as RVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 
-pub async fn create_writer(
-    config: &VectorServiceConfiguration,
-    version: u32,
-) -> InternalResult<WVectors> {
+pub fn create_writer(config: &VectorConfig, version: u32) -> InternalResult<WVectors> {
     match version {
         0 => nucliadb_vectors::service::VectorWriterService::new(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         1 => nucliadb_vectors2::service::VectorWriterService::new(config)
-            .await
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }

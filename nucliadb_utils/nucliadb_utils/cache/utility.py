@@ -146,8 +146,9 @@ class Cache:
                     del self._memory_cache[key]
 
     async def send_invalidation(
-        self, keys_to_invalidate: List[str] = [], purge: bool = False
+        self, keys_to_invalidate: Optional[List[str]] = None, purge: bool = False
     ):
+        keys_to_invalidate = keys_to_invalidate or []
         data = orjson.dumps(
             {"keys": keys_to_invalidate, "origin": self.ident, "purge": purge}
         )

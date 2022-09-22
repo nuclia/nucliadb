@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, TYPE_CHECKING
-import httpx
+import logging
+from typing import TYPE_CHECKING, List, Optional
 
-from nucliadb_models.resource import Resource as NucliaDBResource
+import httpx
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -32,16 +32,24 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_models.resource import Resource as NucliaDBResource
+
 if TYPE_CHECKING:
     from nucliadb_client.knowledgebox import KnowledgeBox
 
 RESOURCE_PREFIX = "resource"
+logger = logging.getLogger("nucliadb_client")
 
 
 class Resource:
     _bm: Optional[BrokerMessage] = None
+    http_reader_v1: httpx.Client
+    http_writer_v1: httpx.Client
+    http_manager_v1: httpx.Client
 
-    def __init__(self, rid: str, kb: "KnowledgeBox", slug: Optional[str] = None):
+    def __init__(
+        self, rid: Optional[str], kb: "KnowledgeBox", slug: Optional[str] = None
+    ):
         self.rid = rid
         self.kb = kb
         self.http_reader_v1 = httpx.Client(
@@ -49,12 +57,12 @@ class Resource:
             headers={"X-NUCLIADB-ROLES": "READER"},
             follow_redirects=True,
         )
-        self.http_writer_v1 = httpx.Client(
+        self.http_writer_v1: httpx.Client = httpx.Client(
             base_url=f"{kb.http_reader_v1.base_url}{RESOURCE_PREFIX}/{rid}",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
             follow_redirects=True,
         )
-        self.http_manager_v1 = httpx.Client(
+        self.http_manager_v1: httpx.Client = httpx.Client(
             base_url=f"{kb.http_reader_v1.base_url}{RESOURCE_PREFIX}/{rid}",
             headers={"X-NUCLIADB-ROLES": "MANAGER"},
             follow_redirects=True,
@@ -92,7 +100,7 @@ class Resource:
 
         evw = ExtractedVectorsWrapper()
         evw.field.field = field
-        evw.field.field_type = field_type
+        evw.field.field_type = field_type  # type: ignore
         for vector in vectors:
             if split is not None:
                 evw.vectors.split_vectors[split].vectors.append(vector)
@@ -111,7 +119,7 @@ class Resource:
 
         etw = ExtractedTextWrapper()
         etw.field.field = field
-        etw.field.field_type = field_type
+        etw.field.field_type = field_type  # type: ignore
         if split is not None:
             etw.body.split_text[split] = text
         else:
@@ -121,7 +129,7 @@ class Resource:
 
         fcmw = FieldComputedMetadataWrapper()
         fcmw.field.field = field
-        fcmw.field.field_type = field_type
+        fcmw.field.field_type = field_type  # type: ignore
         if split is not None:
             fcmw.metadata.split_metadata[split].paragraphs.append(
                 Paragraph(
@@ -140,9 +148,12 @@ class Resource:
             )
         self.bm.field_metadata.append(fcmw)
 
-    def commit(self):
+    def sync_commit(self):
         if self.bm is None:
             raise AttributeError("No Broker Message")
+
+        if self.rid is None:
+            raise AttributeError("Not initialized")
 
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
@@ -155,5 +166,57 @@ class Resource:
             yield self.bm
 
         self.kb.client.writer_stub.ProcessMessage(iterator())
+
+        self._bm = None
+
+    def parse(self, payload: bytes):
+        self._bm = BrokerMessage()
+        self._bm.ParseFromString(payload)
+        self.rid = self.bm.uuid
+        self.slug = self.bm.slug
+
+    def serialize(self, processor: bool = True) -> bytes:
+        if self.bm is None:
+            raise AttributeError("No Broker Message")
+
+        if self.rid is None:
+            raise AttributeError("Not initialized")
+
+        self.bm.uuid = self.rid
+        self.bm.kbid = self.kb.kbid
+        self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+        if processor:
+            self.bm.source = BrokerMessage.MessageSource.PROCESSOR
+        self.bm.basic.metadata.useful = True
+        self.bm.basic.metadata.status = Metadata.Status.PROCESSED
+
+        return self.bm.SerializeToString()
+
+    def cleanup(self):
+        self._bm = None
+
+    async def commit(self, processor: bool = True):
+        if self.bm is None:
+            raise AttributeError("No Broker Message")
+
+        if self.kb.client.writer_stub_async is None:
+            raise AttributeError("Writer Stub Async not initialized")
+
+        if self.rid is None:
+            raise AttributeError("Not initialized")
+
+        self.bm.uuid = self.rid
+        self.bm.kbid = self.kb.kbid
+        self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
+        if processor:
+            self.bm.source = BrokerMessage.MessageSource.PROCESSOR
+        self.bm.basic.metadata.useful = True
+        self.bm.basic.metadata.status = Metadata.Status.PROCESSED
+
+        def iterator():
+            yield self.bm
+
+        await self.kb.client.writer_stub_async.ProcessMessage(iterator())  # type: ignore
+        logger.info(f"Commited {self.bm.uuid}")
 
         self._bm = None

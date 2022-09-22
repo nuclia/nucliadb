@@ -39,6 +39,7 @@ from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
     DetWidgetsRequest,
+    ExportRequest,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -495,3 +496,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
         response = IndexStatus()
         return response
+
+    async def Export(self, request: ExportRequest, context=None):
+
+        txn = await self.proc.driver.begin()
+        storage = await get_storage(service_name=SERVICE_NAME)
+        cache = await get_cache()
+
+        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        async for resource in kbobj.iterate_resources():
+            yield await resource.generate_broker_message()
+        await txn.abort()

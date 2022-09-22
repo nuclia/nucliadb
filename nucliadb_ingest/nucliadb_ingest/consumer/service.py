@@ -44,7 +44,7 @@ class ConsumerService:
         creds: Optional[str] = None,
         nuclia_cluster_url: Optional[str] = None,
         nuclia_public_url: Optional[str] = None,
-        nats_servers: List[str] = [],
+        nats_servers: Optional[List[str]] = None,
         nats_auth: Optional[str] = None,
         nats_target: Optional[str] = None,
         nats_group: Optional[str] = None,
@@ -87,7 +87,7 @@ class ConsumerService:
         )
         self.nats_url = (
             nats_servers
-            if len(nats_servers) > 0
+            if nats_servers is not None and len(nats_servers) > 0
             else transaction_settings.transaction_jetstream_servers
         )
 

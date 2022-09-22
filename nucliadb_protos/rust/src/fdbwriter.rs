@@ -475,3 +475,8 @@ pub struct ResourceFieldExistsResponse {
     #[prost(bool, tag="1")]
     pub found: bool,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ExportRequest {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
+}

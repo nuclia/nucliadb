@@ -69,6 +69,10 @@ async def test_multiple_fuzzy_search_resource_all(
         resp = await client.get(
             f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&page_number=0&page_size=20',
         )
+        if resp.status_code != 200:
+            print(resp.content)
+
+        assert resp.status_code == 200
         assert len(resp.json()["paragraphs"]["results"]) == 20
         assert (
             resp.json()["paragraphs"]["results"][0]["text"]

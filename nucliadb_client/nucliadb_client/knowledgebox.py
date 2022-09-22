@@ -17,14 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator, List, Optional
+
+from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
 from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
 
 if TYPE_CHECKING:
     from nucliadb_client.client import NucliaDBClient
+
 import httpx
+from grpc import aio  # type: ignore
 
 from nucliadb_client.resource import Resource
 
@@ -32,6 +37,10 @@ KB_PREFIX = "kb"
 
 
 class KnowledgeBox:
+    http_reader_v1: httpx.Client
+    http_writer_v1: httpx.Client
+    http_manager_v1: httpx.Client
+
     def __init__(self, kbid: str, client: "NucliaDBClient", slug: Optional[str] = None):
         self.kbid = kbid
         self.client = client
@@ -65,10 +74,32 @@ class KnowledgeBox:
         return result
 
     def create_resource(self, payload: CreateResourcePayload) -> Resource:
-        response = self.http_writer_v1.post(f"resources", data=payload.json())
+        response = self.http_writer_v1.post(
+            f"resources", content=payload.json().encode()
+        )
         response_obj = ResourceCreated.parse_raw(response.content)
         return Resource(rid=response_obj.uuid, kb=self)
 
     def delete(self):
         resp = self.http_manager_v1.delete("")
         return resp.status_code == 200
+
+    def parse_bm(self, payload: bytes) -> Resource:
+        pb = BrokerMessage()
+        pb.ParseFromString(payload)
+        res = Resource(rid=pb.uuid, kb=self)
+        res._bm = pb
+        return res
+
+    async def export(self) -> AsyncIterator[BrokerMessage]:
+        assert self.client.writer_stub_async
+        req = ExportRequest()
+        req.kbid = self.kbid
+        async for bm in self.client.writer_stub_async.Export(req):  # type: ignore
+            yield bm
+
+    def init_async_grpc(self):
+        async_channel = aio.insecure_channel(
+            f"{self.client.grpc_host}:{self.client.grpc_port}"
+        )
+        self.client.writer_stub_async = WriterStub(async_channel)

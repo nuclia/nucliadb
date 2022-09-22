@@ -147,6 +147,17 @@ impl std::ops::Index<(Node, Node)> for GraphLayer {
 }
 
 impl GraphLayer {
+    #[allow(unused)]
+    pub fn capacity(&self) -> usize {
+        let size_of_node = std::mem::size_of::<Node>();
+        let size_of_edge = std::mem::size_of::<Edge>();
+        let size_of_connexions = |x: usize, t: &BTreeMap<Node, Edge>| -> usize {
+            x + (size_of_edge + size_of_node) * t.len()
+        };
+        self.cnx
+            .iter()
+            .fold(0, |p, (node, t)| size_of_connexions(p + size_of_node, t))
+    }
     pub fn new() -> GraphLayer {
         GraphLayer {
             cnx: HashMap::with_capacity(INITIAL_CAPACITY),

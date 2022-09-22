@@ -203,6 +203,10 @@ class WriterStub:
         nucliadb_protos.writer_pb2.IndexResource,
         nucliadb_protos.writer_pb2.IndexStatus]
 
+    Export: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.writer_pb2.ExportRequest,
+        nucliadb_protos.writer_pb2.BrokerMessage]
+
 
 class WriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -354,6 +358,12 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.IndexStatus: ...
+
+    @abc.abstractmethod
+    def Export(self,
+        request: nucliadb_protos.writer_pb2.ExportRequest,
+        context: grpc.ServicerContext,
+    ) -> typing.Iterator[nucliadb_protos.writer_pb2.BrokerMessage]: ...
 
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: grpc.Server) -> None: ...

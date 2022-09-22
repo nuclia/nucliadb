@@ -58,7 +58,7 @@ impl TermCollector {
     }
     pub fn get_fterms(&self, doc: DocId) -> Vec<String> {
         let mut terms = Vec::new();
-        for (index, term) in self.fterms[&doc].iter().cloned() {
+        for (index, term) in self.fterms.get(&doc).iter().flat_map(|v| v.iter()).cloned() {
             let term_dict = index.terms();
             let mut term_s = vec![];
             if term_dict.ord_to_term(term, &mut term_s).unwrap() {

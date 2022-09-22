@@ -43,11 +43,12 @@ async def global_query_to_pb(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    fields: List[str] = [],
+    fields: Optional[List[str]] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     vector: Optional[List[float]] = None,
 ) -> SearchRequest:
+    fields = fields or []
 
     predict = get_predict()
 
@@ -82,10 +83,11 @@ async def global_query_to_pb(
     request.document = SearchOptions.DOCUMENT in features
     request.paragraph = SearchOptions.PARAGRAPH in features
 
-    if SearchOptions.VECTOR in features and vector is None:
-        request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
-    elif SearchOptions.VECTOR in features and vector is not None:
-        request.vector.extend(vector)
+    if SearchOptions.VECTOR in features:
+        if vector is None:
+            request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
+        else:
+            request.vector.extend(vector)
 
     if SearchOptions.RELATIONS in features:
         pass
@@ -102,7 +104,7 @@ async def suggest_query_to_pb(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    fields: List[str] = [],
+    fields: Optional[List[str]] = None,
 ) -> SuggestRequest:
 
     request = SuggestRequest()
@@ -125,12 +127,11 @@ async def paragraph_query_to_pb(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    fields: List[str] = [],
+    fields: Optional[List[str]] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
 ) -> ParagraphSearchRequest:
-
-    # predict = get_predict()
+    fields = fields or []
 
     request = ParagraphSearchRequest()
     request.reload = reload
