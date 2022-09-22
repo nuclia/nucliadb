@@ -54,10 +54,10 @@ class NatsPubsub(PubSubDriver):
         thread: bool = False,
         name: Optional[str] = "natsutility",
         timeout: float = 2.0,
-        hosts: List[str] = [],
+        hosts: Optional[List[str]] = None,
         user_credentials_file: Optional[str] = None,
     ):
-        self._hosts = hosts
+        self._hosts = hosts or []
         self._timeout = timeout
         self._subscriptions = {}
         self._name = name
