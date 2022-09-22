@@ -93,7 +93,11 @@ async def test_entities_service(
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
 
-        entitygroup = {"title": "test group", "entities": {"abc": {"value": "ABC"}}}
+        entitygroup = {
+            "title": "test group",
+            "custom": True,
+            "entities": {"abc": {"value": "ABC"}},
+        }
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1", json=entitygroup
         )
@@ -101,10 +105,13 @@ async def test_entities_service(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
-        assert len(resp.json()["groups"]) == 1
+        groups = resp.json()["groups"]
+        assert len(groups) == 1
+        assert groups[0]["custom"] is True
 
         resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1")
         assert resp.status_code == 200
+        assert resp.json()["custom"] is True
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.delete(
