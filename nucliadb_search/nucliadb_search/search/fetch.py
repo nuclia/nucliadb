@@ -239,7 +239,7 @@ async def get_text_paragraph(
 
 
 def highlight_paragraph(
-    text: str, words: List[str], ematches: Optional[List[str]] = None
+    text: str, words: Optional[List[str]] = None, ematches: Optional[List[str]] = None
 ) -> str:
     text_lower = text.lower()
 
@@ -251,6 +251,7 @@ def highlight_paragraph(
                 marks[start] = 1
                 marks[end] = 2
 
+    words = words or []
     for word in words:
         for match in re.finditer(word.lower(), text_lower):
             start, end = match.span()
