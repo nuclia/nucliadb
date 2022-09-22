@@ -244,7 +244,9 @@ class Resource:
                     brain.apply_field_vectors(field_key, vo, [], {})
         return brain
 
-    async def generate_broker_message(self, cf: bool = True) -> BrokerMessage:
+    async def generate_broker_message(self, full: bool = True) -> BrokerMessage:
+        # full means downloading all the pointers
+        # minuts the ones to external files that are not PB
         # Go for all fields and recreate brain
         bm = BrokerMessage()
         bm.kbid = self.kb.kbid
@@ -290,15 +292,15 @@ class Resource:
             etw = ExtractedTextWrapper()
             etw.field.field = field_id
             etw.field.field_type = type_id  # type: ignore
-            if cf:
-                extracted_text_cf = await field.get_extracted_text_cf()
-                if extracted_text_cf is not None:
-                    etw.file.CopyFrom(extracted_text_cf)
-                    bm.extracted_text.append(etw)
-            else:
+            if full:
                 extracted_text = await field.get_extracted_text()
                 if extracted_text is not None:
                     etw.body.CopyFrom(extracted_text)
+                    bm.extracted_text.append(etw)
+            else:
+                extracted_text_cf = await field.get_extracted_text_cf()
+                if extracted_text_cf is not None:
+                    etw.file.CopyFrom(extracted_text_cf)
                     bm.extracted_text.append(etw)
 
             # Field Computed Metadata
@@ -317,15 +319,15 @@ class Resource:
             evw = ExtractedVectorsWrapper()
             evw.field.field = field_id
             evw.field.field_type = type_id  # type: ignore
-            if cf:
-                field_vectors_cf = await field.get_vectors_cf()
-                if field_vectors_cf is not None:
-                    evw.file.CopyFrom(field_vectors_cf)
-                    bm.field_vectors.append(evw)
-            else:
+            if full:
                 field_vectors = await field.get_vectors()
                 if field_vectors is not None:
                     evw.vectors.CopyFrom(field_vectors)
+                    bm.field_vectors.append(evw)
+            else:
+                field_vectors_cf = await field.get_vectors_cf()
+                if field_vectors_cf is not None:
+                    evw.file.CopyFrom(field_vectors_cf)
                     bm.field_vectors.append(evw)
 
             if type_id == FieldType.FILE and isinstance(field, File):

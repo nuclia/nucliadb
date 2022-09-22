@@ -354,6 +354,7 @@ class OpenTelemetryGRPC:
     ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_client")
         options = [
+            ("grpc.max_receive_message_length", max_send_message * 1024 * 1024),
             ("grpc.max_send_message_length", max_send_message * 1024 * 1024),
         ]
         if credentials is not None:
@@ -386,6 +387,7 @@ class OpenTelemetryGRPC:
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_server")
         interceptors = [OpenTelemetryServerInterceptor(tracer=tracer)]
         options = [
+            ("grpc.max_send_message_length", max_receive_message * 1024 * 1024),
             ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
         ]
         server = aio.server(

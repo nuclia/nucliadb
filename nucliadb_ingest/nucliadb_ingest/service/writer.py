@@ -505,7 +505,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
             async for resource in kbobj.iterate_resources():
-                yield await resource.generate_broker_message(cf=False)
+                yield await resource.generate_broker_message(full=True)
             await txn.abort()
         except Exception:
             logger.exception("Export", stack_info=True)
