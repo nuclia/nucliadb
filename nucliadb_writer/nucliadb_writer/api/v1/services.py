@@ -61,6 +61,9 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
         pbrequest.entities.title = item.title
     if item.color:
         pbrequest.entities.color = item.color
+
+    pbrequest.entities.custom = item.custom
+
     for key, entity in item.entities.items():
         entitypb = pbrequest.entities.entities[key]
         entitypb.value = entity.value

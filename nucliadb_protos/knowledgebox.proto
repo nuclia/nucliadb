@@ -124,6 +124,7 @@ message EntitiesGroup {
     map<string, Entity> entities = 1;
     string title = 2;
     string color = 3;
+    bool custom = 4;
 }
 
 

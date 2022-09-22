@@ -72,6 +72,49 @@ async def test_service_lifecycle_entities(writer_api):
 
 
 @pytest.mark.asyncio
+async def test_entities_custom_field(writer_api):
+    """
+    Test description:
+
+    - Create an entity group and check that the default value for the `custom`
+      field is False
+
+    - Create another entity group and set `custom` to True. Check that on a
+      subsequent get, the value is correct.
+    """
+    async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
+        resp = await client.post(
+            f"/{KBS_PREFIX}",
+            json={
+                "slug": "kbid1",
+                "title": "My Knowledge Box",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        kbid = data["uuid"]
+
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        eg = EntitiesGroup()
+        custom_eg = EntitiesGroup(custom=True)
+
+        resp = await client.post(f"/{KB_PREFIX}/{kbid}/entitiesgroup/0", json=eg.dict())
+        assert resp.status_code == 200
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/entitiesgroup/1", json=custom_eg.dict()
+        )
+        assert resp.status_code == 200
+
+        ingest = get_ingest()
+        result = await ingest.GetEntities(
+            writer_pb2.GetEntitiesRequest(kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kbid))
+        )
+        assert result.groups["0"].custom is False
+        assert result.groups["1"].custom is True
+
+
+@pytest.mark.asyncio
 async def test_service_lifecycle_labels(writer_api):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(

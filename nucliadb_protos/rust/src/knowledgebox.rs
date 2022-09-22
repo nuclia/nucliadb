@@ -150,6 +150,8 @@ pub struct EntitiesGroup {
     pub title: ::prost::alloc::string::String,
     #[prost(string, tag="3")]
     pub color: ::prost::alloc::string::String,
+    #[prost(bool, tag="4")]
+    pub custom: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Widget {

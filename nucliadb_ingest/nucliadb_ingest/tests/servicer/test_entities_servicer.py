@@ -42,6 +42,7 @@ async def test_create_entities_group(grpc_servicer: IngestFixture):
         entities=knowledgebox_pb2.EntitiesGroup(
             title="zero",
             color="#fff",
+            custom=True,
             entities={
                 "ent1": knowledgebox_pb2.Entity(value="1", merged=True, represents=[])
             },
