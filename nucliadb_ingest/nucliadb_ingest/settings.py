@@ -71,5 +71,7 @@ class Settings(BaseSettings):
     local_reader_threads = 5
     local_writer_threads = 5
 
+    max_receive_message_length: int = 4
+
 
 settings = Settings()

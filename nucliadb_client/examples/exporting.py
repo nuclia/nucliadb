@@ -33,9 +33,7 @@ async def exporting(kb: KnowledgeBox, dump: str):
     kb.init_async_grpc()
     async with aiofiles.open(dump, "w+") as dump_file:
         async for bm in kb.export():
-            await dump_file.write(
-                base64.b64encode(bm.SerializeToString()).decode() + "/n"
-            )
+            await dump_file.write(bm + "\n")
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Optional
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -40,7 +40,7 @@ class LocalFileStorageManager(FileStorageManager):
     def metadata_key(self, uri: Optional[str] = None):
         if uri is not None:
             return f"{uri}.metadata"
-        raise AttributeError("No URI and no Field")
+        raise AttributeError(f"No URI and no Field Writer")
 
     def get_file_path(self, bucket: str, key: str):
         return f"{self.storage.get_bucket_name(bucket)}/{key}"
@@ -128,12 +128,6 @@ class LocalFileStorageManager(FileStorageManager):
 
         await dm.finish()
         return path
-
-    async def exists(self) -> Optional[Dict[str, str]]:
-        if os.path.exists(self.metadata_key()):
-            async with aiofiles.open(self.metadata_key(), "r") as metadata:
-                return json.loads(await metadata.read())
-        return {}
 
 
 class LocalBlobStore(BlobStore):

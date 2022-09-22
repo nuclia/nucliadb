@@ -17,12 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional
+import base64
+from io import StringIO
+from typing import List, Optional, Union
 
+import aiofiles
 import httpx
+from grpc import aio  # type: ignore
 from grpc import insecure_channel
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb_client import logger
+from nucliadb_client.exceptions import ConflictError
 from nucliadb_client.knowledgebox import KnowledgeBox
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
@@ -102,5 +108,46 @@ class NucliaDBClient:
         payload.description = description
 
         response = self.http_manager_v1.post(KBS_PREFIX, json=payload.dict())
+        if response.status_code == 419:
+            raise ConflictError()
         response_obj = KnowledgeBoxObj.parse_raw(response.content)
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
+
+    async def import_kb(self, *, slug: str, location: Union[str, StringIO]):
+        kb = self.get_kb(slug=slug)
+        if kb is None:
+            kb = self.create_kb(slug=slug)
+
+        if isinstance(location, StringIO):
+            b64_pb = location.readline()
+            while b64_pb:
+                res = kb.parse_bm(base64.b64decode(b64_pb.strip()))
+                await res.commit(processor=False)
+                b64_pb = location.readline()
+
+        elif location.startswith("http"):
+            client = httpx.AsyncClient()
+            resp = await client.get(location)
+            async for line in resp.aiter_lines():
+                res = kb.parse_bm(base64.b64decode(line.strip()))
+                await res.commit()
+
+        else:
+            async with aiofiles.open(location, "r") as dump_file:
+
+                b64_pb = await dump_file.readline()
+                while b64_pb:
+                    res = kb.parse_bm(base64.b64decode(b64_pb.strip()))
+                    await res.commit(processor=False)
+                    b64_pb = await dump_file.readline()
+
+    def init_async_grpc(self):
+        if self.writer_stub_async is not None:
+            logger.warn("Exists already a writer, replacing on the new loop")
+        options = [
+            ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
+        ]
+        async_channel = aio.insecure_channel(
+            f"{self.grpc_host}:{self.grpc_port}", options
+        )
+        self.writer_stub_async = WriterStub(async_channel)
