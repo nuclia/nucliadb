@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import math
 from typing import Callable
 
 import pytest
@@ -236,3 +237,49 @@ async def test_search_resource_all(
                 assert results[2][0].endswith("20-45")
 
     await txn.abort()
+
+
+@pytest.mark.asyncio
+async def test_search_pagination(
+    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+) -> None:
+    kbid = multiple_search_resource
+
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        await asyncio.sleep(5)
+
+        n_results_expected = 100
+        page_size = 20
+        expected_requests = math.ceil(n_results_expected / page_size)
+
+        results = []
+        shards = None
+
+        for request_n in range(expected_requests):
+
+            url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number={request_n}&page_size={page_size}"  # noqa
+
+            if shards is not None and len(shards):
+                url += f"&shards={','.join(shards)}"
+
+            resp = await client.get(url)
+
+            if resp.status_code != 200:
+                print(resp.content)
+
+            assert resp.status_code == 200
+
+            response = resp.json()
+
+            for result in response["paragraphs"]["results"]:
+                results.append(result["rid"])
+
+            shards = response["shards"]
+
+            if not response["paragraphs"]["next_page"]:
+                # Pagination ended! No more results
+                assert request_n == expected_requests - 1
+
+        # Check that we iterated over all matching resources
+        unique_results = set(results)
+        assert len(unique_results) == n_results_expected

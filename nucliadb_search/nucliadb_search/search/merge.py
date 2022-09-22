@@ -58,19 +58,18 @@ from nucliadb_search.search.fetch import (
 
 
 async def merge_documents_results(
-    documents: List[DocumentSearchResponse],
+    document_responses: List[DocumentSearchResponse],
     resources: List[str],
     count: int,
     page: int,
     kbid: str,
 ) -> Resources:
-
     raw_resource_list: List[DocumentResult] = []
     facets: Dict[str, Any] = {}
     query = None
     total = 0
     next_page = False
-    for document_response in documents:
+    for document_response in document_responses:
         if query is None:
             query = document_response.query
         if document_response.facets:
@@ -84,8 +83,8 @@ async def merge_documents_results(
         for result in document_response.results:
             raw_resource_list.append(result)
 
-    if len(documents) > 1:
-        raw_resource_list.sort(key=lambda x: x.score)
+    if len(document_responses) > 1:
+        raw_resource_list.sort(key=lambda x: x.score, reverse=True)
 
     skip = page * count
     end = skip + count
@@ -148,7 +147,7 @@ async def merge_suggest_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(suggest_responses) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score)
+        raw_paragraph_list.sort(key=lambda x: x.score, reverse=True)
 
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[:10]:
@@ -175,7 +174,7 @@ async def merge_suggest_paragraph_results(
 
 
 async def merge_vectors_results(
-    vectors: List[VectorSearchResponse],
+    vector_responses: List[VectorSearchResponse],
     resources: List[str],
     kbid: str,
     count: int,
@@ -185,16 +184,16 @@ async def merge_vectors_results(
     facets: Dict[str, Any] = {}
     raw_vectors_list: List[DocumentScored] = []
 
-    for vector in vectors:
-        for document in vector.documents:
+    for vector_response in vector_responses:
+        for document in vector_response.documents:
             if document.score < max_score:
                 continue
             if math.isnan(document.score):
                 continue
             raw_vectors_list.append(document)
 
-    if len(vectors) > 1:
-        raw_vectors_list.sort(key=lambda x: x.score)
+    if len(vector_responses) > 1:
+        raw_vectors_list.sort(key=lambda x: x.score, reverse=True)
 
     skip = page * count
     end_element = skip + count
@@ -245,7 +244,7 @@ async def merge_vectors_results(
 
 
 async def merge_paragraph_results(
-    paragraphs: List[ParagraphSearchResponse],
+    paragraph_responses: List[ParagraphSearchResponse],
     resources: List[str],
     kbid: str,
     count: int,
@@ -258,7 +257,7 @@ async def merge_paragraph_results(
     query = None
     next_page = False
     ematches: Optional[List[str]] = None
-    for paragraph_response in paragraphs:
+    for paragraph_response in paragraph_responses:
         if ematches is None:
             ematches = paragraph_response.ematches  # type: ignore
         if query is None:
@@ -274,8 +273,8 @@ async def merge_paragraph_results(
         for result in paragraph_response.results:
             raw_paragraph_list.append(result)
 
-    if len(raw_paragraph_list) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score)
+    if len(paragraph_responses) > 1:
+        raw_paragraph_list.sort(key=lambda x: x.score, reverse=True)
 
     skip = page * count
     end = skip + count
@@ -324,7 +323,7 @@ async def merge_paragraph_results(
 
 
 async def merge_results(
-    results: List[SearchResponse],
+    search_responses: List[SearchResponse],
     count: int,
     page: int,
     kbid: str,
@@ -338,10 +337,10 @@ async def merge_results(
     documents = []
     vectors = []
 
-    for result in results:
-        paragraphs.append(result.paragraph)
-        documents.append(result.document)
-        vectors.append(result.vector)
+    for response in search_responses:
+        paragraphs.append(response.paragraph)
+        documents.append(response.document)
+        vectors.append(response.vector)
 
     api_results = KnowledgeboxSearchResults()
 
@@ -367,7 +366,7 @@ async def merge_results(
 
 
 async def merge_paragraphs_results(
-    results: List[ParagraphSearchResponse],
+    paragraph_responses: List[ParagraphSearchResponse],
     count: int,
     page: int,
     kbid: str,
@@ -377,7 +376,7 @@ async def merge_paragraphs_results(
     highlight_split: bool,
 ) -> ResourceSearchResults:
     paragraphs = []
-    for result in results:
+    for result in paragraph_responses:
         paragraphs.append(result)
 
     api_results = ResourceSearchResults()
@@ -402,7 +401,7 @@ async def merge_suggest_entities_results(
 
 
 async def merge_suggest_results(
-    results: List[SuggestResponse],
+    suggest_responses: List[SuggestResponse],
     kbid: str,
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
@@ -412,7 +411,7 @@ async def merge_suggest_results(
     api_results = KnowledgeboxSuggestResults()
 
     api_results.paragraphs = await merge_suggest_paragraph_results(
-        results, kbid, highlight=highlight
+        suggest_responses, kbid, highlight=highlight
     )
-    api_results.entities = await merge_suggest_entities_results(results)
+    api_results.entities = await merge_suggest_entities_results(suggest_responses)
     return api_results
