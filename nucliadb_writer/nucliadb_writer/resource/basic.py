@@ -37,7 +37,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_ingest.orm.utils import set_title
 from nucliadb_ingest.processing import PushPayload
 from nucliadb_models import RelationType
-from nucliadb_models.resource import FIELD_TYPES_MAP_REVERSE
+from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_models.writer import (
     ComminResourcePayload,
@@ -82,7 +82,12 @@ def parse_basic_modify(
             userfieldmetadata = UserFieldMetadata()
             for token in fieldmetadata.token:
                 userfieldmetadata.token.append(
-                    TokenSplit(token=token.token, klass=token.klass)
+                    TokenSplit(
+                        token=token.token,
+                        klass=token.klass,
+                        start=token.start,
+                        end=token.end,
+                    )
                 )
             for paragraph in fieldmetadata.paragraphs:
                 paragraphpb = ParagraphAnnotation(key=paragraph.key)

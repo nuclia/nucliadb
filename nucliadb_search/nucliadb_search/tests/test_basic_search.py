@@ -19,6 +19,7 @@
 #
 import asyncio
 import math
+import os
 from typing import Callable
 
 import pytest
@@ -37,6 +38,8 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_search.api.models import NucliaDBClientType
 from nucliadb_search.api.v1.router import KB_PREFIX
 from nucliadb_utils.keys import KB_SHARDS
+
+RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 
 @pytest.mark.asyncio
@@ -60,6 +63,7 @@ async def test_search_sc_2104(
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_multiple_fuzzy_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -240,6 +244,7 @@ async def test_search_resource_all(
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_search_pagination(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:

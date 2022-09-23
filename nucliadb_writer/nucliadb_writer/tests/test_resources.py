@@ -69,7 +69,9 @@ async def test_resource_crud(writer_api, knowledgebox_writer):
                                 ],
                             }
                         ],
-                        "token": [{"token": "token1", "klass": "klass1"}],
+                        "token": [
+                            {"token": "token1", "klass": "klass1", "start": 1, "end": 2}
+                        ],
                         "field": {"field": "text1", "field_type": "text"},
                     }
                 ],
@@ -158,7 +160,9 @@ async def test_resource_crud_sync(writer_api, knowledgebox_writer):
                                 ],
                             }
                         ],
-                        "token": [{"token": "token1", "klass": "klass1"}],
+                        "token": [
+                            {"token": "token1", "klass": "klass1", "start": 1, "end": 2}
+                        ],
                         "field": {"field": "text1", "field_type": "text"},
                     }
                 ],

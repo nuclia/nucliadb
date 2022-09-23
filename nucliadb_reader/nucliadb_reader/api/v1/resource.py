@@ -30,9 +30,9 @@ from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb_ingest.orm.resource import Resource as ORMResource
 from nucliadb_ingest.utils import get_driver
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
     Error,
-    FieldTypeName,
     NucliaDBRoles,
     Resource,
     ResourceList,

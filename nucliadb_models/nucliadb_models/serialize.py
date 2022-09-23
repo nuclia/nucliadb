@@ -28,9 +28,8 @@ from nucliadb_ingest.fields.file import File
 from nucliadb_ingest.fields.link import Link
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.utils import get_driver
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.resource import (
-    FIELD_TYPES_MAP,
     ConversationFieldData,
     ConversationFieldExtractedData,
     DatetimeFieldData,
@@ -183,6 +182,10 @@ async def serialize(
             resource.usermetadata = models.UserMetadata.from_message(
                 orm_resource.basic.usermetadata
             )
+            resource.fieldmetadata = [
+                models.UserFieldMetadata.from_message(fm)
+                for fm in orm_resource.basic.fieldmetadata
+            ]
 
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()

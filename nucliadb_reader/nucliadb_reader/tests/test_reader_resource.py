@@ -37,6 +37,7 @@ BASIC = (
     "usermetadata",
     "created",
     "modified",
+    "fieldmetadata",
 )
 RELATIONS = ("relations",)
 ORIGIN = ("origin",)
