@@ -24,7 +24,9 @@ jobs:
           python-version: 3.9
 
       - name: Install requirements
-        run: pip install -r nucliadb_models/requirements.txt
+        run: |
+          pip install -r nucliadb_models/requirements.txt
+          pip install wheel
 
       - name: Install nucliadb_client
         run: pip install -e ./nucliadb_models
