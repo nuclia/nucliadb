@@ -32,6 +32,8 @@ from nucliadb_writer.api.v1.router import KB_PREFIX
 from nucliadb_writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb_writer.utilities import get_processing
 
+ASSETS_PATH = os.path.dirname(__file__) + "/assets"
+
 
 @pytest.mark.asyncio
 async def test_knowledgebox_file_tus_options(writer_api, knowledgebox_writer):
@@ -88,7 +90,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
         url = resp.headers["location"]
 
         offset = 0
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             data = f.read(10000)
             while data != b"":
                 resp = await client.head(
@@ -166,7 +168,7 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
                 data=f.read(),
@@ -207,7 +209,7 @@ async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
                 data=f.read(),
@@ -225,7 +227,7 @@ async def test_knowledgebox_file_upload_root_headers(writer_api, knowledgebox_wr
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
         filename = base64.b64encode(b"image.jpg").decode()
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
                 data=f.read(),
@@ -303,7 +305,7 @@ async def test_knowledgebox_file_tus_upload_field(
         url = resp.headers["location"]
 
         offset = 0
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             data = f.read(10000)
             while data != b"":
                 resp = await client.head(
@@ -371,7 +373,7 @@ async def test_knowledgebox_file_upload_field_headers(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
         filename = base64.b64encode(b"image.jpg").decode()
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
                 data=f.read(),
@@ -421,7 +423,7 @@ async def test_knowledgebox_file_upload_field_sync(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
         filename = base64.b64encode(b"image.jpg").decode()
-        with open(os.path.dirname(__file__) + "/assets/image001.jpg", "rb") as f:
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
                 data=f.read(),

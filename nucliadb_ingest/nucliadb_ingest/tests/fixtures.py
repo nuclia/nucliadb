@@ -687,14 +687,14 @@ THUMBNAIL = rpb.CloudFile(
     filename="thumbnail.png",
 )
 
-
+TEST_CLOUDFILE_FILENAME = "text.pb"
 TEST_CLOUDFILE = rpb.CloudFile(
-    uri=f"text.pb",
+    uri=TEST_CLOUDFILE_FILENAME,
     source=rpb.CloudFile.Source.LOCAL,
     bucket_name="/orm/assets",
-    size=getsize(f"{dirname(__file__)}/orm/assets/text.pb"),
+    size=getsize(f"{dirname(__file__)}/orm/assets/{TEST_CLOUDFILE_FILENAME}"),
     content_type="application/octet-stream",
-    filename="text.pb",
+    filename=TEST_CLOUDFILE_FILENAME,
     md5="01cca3f53edb934a445a3112c6caa652",
 )
 

@@ -79,6 +79,8 @@ async def test_resource_download_field_file(
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/{field_id}/download/field",
         )
         assert resp.status_code == 200
+        assert resp.headers["Content-Disposition"]
+
         filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
 
         open(filename, "rb").read() == resp.content

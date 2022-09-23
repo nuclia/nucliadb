@@ -194,7 +194,8 @@ class GCloudFileStorageManager(FileStorageManager):
             filename = "file"
         else:
             filename = dm.filename
-        metadata = json.dumps({"NAME": filename})
+        metadata = json.dumps({"metadata": {"FILENAME": filename}})
+
         call_size = len(metadata)
         headers = await self.storage.get_access_headers()
 
