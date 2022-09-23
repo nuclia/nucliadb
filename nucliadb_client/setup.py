@@ -23,8 +23,9 @@ setup(
     long_description=(open("README.md").read() + "\n" + open("CHANGELOG.md").read()),
     classifiers=[
         "Development Status :: 4 - Beta",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.9",
         "Topic :: Software Development :: Libraries :: Python Modules",
+        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     ],
     url="https://nuclia.com",
     license="BSD",
