@@ -175,12 +175,21 @@ async def test_fieldmetadata_tokensplit_validations(
         resp = await client.patch(
             f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
             headers={"X-Synchronous": "true"},
-            json={"fieldmetadata": [{
-                "field": {"field": "textfield", "field_type": "text"},
-                "token": [
-                    {"token": "token0", "klass": "klassA", "start": 20, "end": 10}
+            json={
+                "fieldmetadata": [
+                    {
+                        "field": {"field": "textfield", "field_type": "text"},
+                        "token": [
+                            {
+                                "token": "token0",
+                                "klass": "klassA",
+                                "start": 20,
+                                "end": 10,
+                            }
+                        ],
+                    }
                 ]
-            }]},
+            },
         )
         assert resp.status_code == 422
 
@@ -188,11 +197,20 @@ async def test_fieldmetadata_tokensplit_validations(
         resp = await client.patch(
             f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
             headers={"X-Synchronous": "true"},
-            json={"fieldmetadata": [{
-                "field": {"field": "textfield", "field_type": "text"},
-                "token": [
-                    {"token": "token0", "klass": "klassA", "start": -1, "end": 10}
+            json={
+                "fieldmetadata": [
+                    {
+                        "field": {"field": "textfield", "field_type": "text"},
+                        "token": [
+                            {
+                                "token": "token0",
+                                "klass": "klassA",
+                                "start": -1,
+                                "end": 10,
+                            }
+                        ],
+                    }
                 ]
-            }]},
+            },
         )
         assert resp.status_code == 422
