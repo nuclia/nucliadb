@@ -115,7 +115,7 @@ jobs:
           profile: default
           override: true
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install the package
         run: |

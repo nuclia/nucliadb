@@ -82,9 +82,9 @@ python-code-lint:
 	flake8  --config nucliadb_one/setup.cfg nucliadb_node/nucliadb_node
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 	flake8  --config nucliadb_train/setup.cfg nucliadb_train/nucliadb_train
-	flake8  --config nucliadb_train/setup.cfg nucliadb_dataset/nucliadb_dataset
-	flake8  --config nucliadb_train/setup.cfg nucliadb_client/nucliadb_client
-	flake8  --config nucliadb_train/setup.cfg nucliadb/nucliadb
+	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
+	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
+	flake8  --config nucliadb/setup.cfg nucliadb/nucliadb
 
 	black nucliadb_reader
 	black nucliadb_writer
