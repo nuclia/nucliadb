@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+1.0.0a4
+-------
+
+- Pin GRPC for Mac ARM64
+
+
 1.0.0a3
 -------
 
