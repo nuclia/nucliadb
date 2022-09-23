@@ -1,7 +1,8 @@
 nucliadb_protos
 httpx
-grpcio-health-checking
-grpcio
+protobuf>=3.20.1
+types-protobuf>=3.19.20
+grpcio>=1.44.0
 aiofiles
 nucliadb-protos
 nucliadb-models
