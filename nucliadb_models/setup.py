@@ -10,7 +10,7 @@ def build_readme():
 
     readme += "\n"
 
-    with open("CHANGELOG") as f:
+    with open("CHANGELOG.md") as f:
         readme += f.read()
 
     return readme

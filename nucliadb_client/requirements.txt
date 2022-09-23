@@ -3,3 +3,5 @@ httpx
 grpcio-health-checking
 grpcio
 aiofiles
+nucliadb-protos
+nucliadb-models
