@@ -3,14 +3,23 @@ import base64
 import pytest
 
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
+from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb_writer.settings import settings as writer_settings
 from nucliadb_writer.tests.test_files import ASSETS_PATH as WRITER_ASSETS_PATH
 from nucliadb_writer.tus import TUSUPLOAD
 
 
+@pytest.fixture(scope="function")
+def configure_redis_dm(redis):
+    writer_settings.dm_enabled = True
+    writer_settings.dm_redis_host = redis[0]
+    writer_settings.dm_redis_port = redis[1]
+    yield
+
+
 @pytest.mark.asyncio
 async def test_file_tus_upload_and_download(
-    nucliadb_api, extra_settings, knowledgebox_one
+    nucliadb_api, configure_redis_dm, knowledgebox_one
 ):
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         language = base64.b64encode(b"ca").decode()
@@ -20,7 +29,7 @@ async def test_file_tus_upload_and_download(
 
         kb_path = f"/{KB_PREFIX}/{knowledgebox_one}"
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+            f"{kb_path}/{RESOURCES_PREFIX}",
             headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
@@ -74,7 +83,9 @@ async def test_file_tus_upload_and_download(
         assert resp.headers["Tus-Upload-Finished"] == "1"
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        download_url = f"/{KB_PREFIX}/{knowledgebox_one}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
+        download_url = (
+            f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1/download/field"
+        )
         resp = await client.get(download_url)
         assert resp.status_code == 200
         assert (
