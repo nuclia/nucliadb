@@ -32,4 +32,4 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "dp_metrics"
-path = "src/data_point/metrics.rs"
+path = "src/vectors/data_point/metrics.rs"

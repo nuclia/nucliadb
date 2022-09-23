@@ -23,8 +23,8 @@ pub mod writer;
 
 use nucliadb_service_interface::prelude::InternalError;
 
-use crate::data_point::DPError;
-use crate::data_point_provider::VectorErr;
+use crate::vectors::data_point::DPError;
+use crate::vectors::data_point_provider::VectorErr;
 
 impl InternalError for VectorErr {}
 impl From<VectorErr> for Box<dyn InternalError> {

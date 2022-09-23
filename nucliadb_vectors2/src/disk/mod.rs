@@ -21,6 +21,8 @@
 pub mod key_value;
 pub mod trie;
 pub mod vector;
+pub mod directory;
+use thiserror::Error;
 
 pub mod prelude {
     pub use key_value::Slot;
@@ -28,6 +30,16 @@ pub mod prelude {
 
     pub use super::{key_value, trie, usize_utils, vector};
 }
+
+#[derive(Debug, Error)]
+pub enum DiskErr {
+    #[error("Serialization error: {0}")]
+    SerErr(#[from] bincode::Error),
+    #[error("IO error: {0}")]
+    IoErr(#[from] std::io::Error),
+}
+
+pub type DiskR<O> = Result<O, DiskErr>;
 
 pub mod usize_utils {
     pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;

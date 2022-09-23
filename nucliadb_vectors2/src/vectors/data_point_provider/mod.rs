@@ -18,18 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod disk_handler;
-mod merger;
 mod state;
+mod merge_worker;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use std::{io, mem};
 
-use disk_handler::{ELock, Lock, SLock, Version};
+use crate::disk::directory::{ELock, Lock, SLock, Version};
+use crate::disk::{directory, DiskErr};
 use state::*;
 use thiserror::Error;
-
-use crate::data_point::{DPError, DataPoint};
+use crate::vectors::data_point::{DPError, DataPoint};
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -45,6 +44,8 @@ pub enum VectorErr {
     IoErr(#[from] io::Error),
     #[error("Error in data point: {0}")]
     Dp(#[from] DPError),
+    #[error("Error in disk: {0}")]
+    Disk(#[from] DiskErr),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;
@@ -55,12 +56,12 @@ pub struct Index {
     location: PathBuf,
 }
 impl Index {
-    fn update(&self, lock: &disk_handler::Lock) -> VectorR<()> {
-        let disk_v = disk_handler::crnt_version(lock)?;
+    fn update(&self, lock: &directory::Lock) -> VectorR<()> {
+        let disk_v = directory::crnt_version(lock)?;
         let date = self.date.read().unwrap();
         if disk_v > *date {
             mem::drop(date);
-            let new_state = disk_handler::load_state(lock)?;
+            let new_state = directory::load_state(lock)?;
             let mut state = self.state.write().unwrap();
             let mut date = self.date.write().unwrap();
             *state = new_state;
@@ -70,28 +71,30 @@ impl Index {
         }
         Ok(())
     }
-    pub fn reader(at: &Path) -> VectorR<Index> {
-        let lock = disk_handler::shared_lock(at)?;
-        let state = disk_handler::load_state(&lock)?;
-        let date = disk_handler::crnt_version(&lock)?;
-        mem::drop(lock);
-        Ok(Index {
+    fn new(at: &Path) -> VectorR<(Index, SLock)> {
+        directory::initialize_disk(at, || State::new(at.to_path_buf()))?;
+        let lock = directory::shared_lock(at)?;
+        let state = directory::load_state(&lock)?;
+        let date = directory::crnt_version(&lock)?;
+        let index = Index {
             state: RwLock::new(state),
             date: RwLock::new(date),
             location: at.to_path_buf(),
-        })
+        };
+        Ok((index, lock))
+    }
+    pub fn reader(at: &Path) -> VectorR<Index> {
+        let (index, lock) = Index::new(at)?;
+        std::mem::drop(lock);
+        Ok(index)
     }
     pub fn writer(at: &Path) -> VectorR<Index> {
-        let lock = disk_handler::shared_lock(at)?;
-        let state = disk_handler::load_state(&lock)?;
-        let date = disk_handler::crnt_version(&lock)?;
+        let (index, lock) = Index::new(at)?;
+        let state = index.state.read().unwrap();
         state.work_sanity_check();
-        mem::drop(lock);
-        Ok(Index {
-            state: RwLock::new(state),
-            date: RwLock::new(date),
-            location: at.to_path_buf(),
-        })
+        std::mem::drop(state);
+        std::mem::drop(lock);
+        Ok(index)
     }
     pub fn has_resource(&self, resource: impl AsRef<str>, _: &ELock) -> bool {
         let state = self.state.read().unwrap();
@@ -122,12 +125,12 @@ impl Index {
         state.get_no_nodes()
     }
     pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = disk_handler::exclusive_lock(&self.location)?;
+        let lock = directory::exclusive_lock(&self.location)?;
         self.update(&lock)?;
         Ok(lock)
     }
     pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = disk_handler::shared_lock(&self.location)?;
+        let lock = directory::shared_lock(&self.location)?;
         self.update(&lock)?;
         Ok(lock)
     }
@@ -137,8 +140,8 @@ impl Index {
     pub fn commit(&self, lock: ELock) -> VectorR<()> {
         let state = self.state.read().unwrap();
         let mut date = self.date.write().unwrap();
-        disk_handler::persist_state(&lock, &state)?;
-        *date = disk_handler::crnt_version(&lock)?;
+        directory::persist_state::<State>(&lock, &state)?;
+        *date = directory::crnt_version(&lock)?;
         Ok(())
     }
 }

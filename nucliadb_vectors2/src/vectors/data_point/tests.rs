@@ -19,8 +19,7 @@
 //
 
 use std::collections::HashSet;
-
-use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary};
+use crate::vectors::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary};
 
 fn create_query() -> Vec<f32> {
     vec![rand::random::<f32>; 178]

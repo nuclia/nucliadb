@@ -25,7 +25,7 @@ use nucliadb_protos::{
 use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
-use crate::data_point_provider::*;
+use crate::vectors::data_point_provider::*;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
     fn get_labels(&self) -> &[String] {
@@ -139,7 +139,7 @@ mod tests {
     use tempdir::TempDir;
 
     use super::*;
-    use crate::service::writer::VectorWriterService;
+    use crate::vectors::service::writer::VectorWriterService;
 
     #[test]
     fn test_new_vector_reader() {

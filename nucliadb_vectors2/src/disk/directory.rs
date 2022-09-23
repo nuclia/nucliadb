@@ -18,14 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use super::DiskR;
+use fs2::FileExt;
+use serde::{de::DeserializeOwned, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-
-use fs2::FileExt;
-
-use super::{State, VectorR};
 
 mod names {
     pub const LOCK: &str = "lk.lock";
@@ -35,7 +34,10 @@ mod names {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version(SystemTime);
 
-fn write_state(path: &Path, state: &State) -> VectorR<()> {
+fn write_state<S>(path: &Path, state: &S) -> DiskR<()>
+where
+    S: Serialize,
+{
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -45,37 +47,48 @@ fn write_state(path: &Path, state: &State) -> VectorR<()> {
     Ok(())
 }
 
-fn read_state(path: &Path) -> VectorR<State> {
+fn read_state<S>(path: &Path) -> DiskR<S>
+where
+    S: DeserializeOwned,
+{
     let mut file = OpenOptions::new()
         .read(true)
         .open(path.join(names::STATE))?;
     Ok(bincode::deserialize_from(&mut file)?)
 }
 
-fn initialize_disk(path: &Path) -> VectorR<()> {
+pub fn initialize_disk<S, F>(path: &Path, with: F) -> DiskR<()>
+where
+    F: Fn() -> S,
+    S: Serialize,
+{
     if !path.join(names::STATE).is_file() {
-        write_state(path, &State::new(path.to_path_buf()))?;
+        write_state(path, &with())?;
     }
     Ok(())
 }
 
-pub(super) fn exclusive_lock(path: &Path) -> VectorR<ELock> {
-    initialize_disk(path)?;
+pub fn exclusive_lock(path: &Path) -> DiskR<ELock> {
     Ok(ELock::new(path)?)
 }
-pub(super) fn shared_lock(path: &Path) -> VectorR<SLock> {
-    initialize_disk(path)?;
+pub fn shared_lock(path: &Path) -> DiskR<SLock> {
     Ok(SLock::new(path)?)
 }
 
-pub(super) fn persist_state(lock: &ELock, state: &State) -> VectorR<()> {
+pub fn persist_state<S>(lock: &ELock, state: &S) -> DiskR<()>
+where
+    S: Serialize,
+{
     write_state(lock.as_ref(), state)
 }
 
-pub(super) fn load_state(lock: &Lock) -> VectorR<State> {
+pub fn load_state<S>(lock: &Lock) -> DiskR<S>
+where
+    S: DeserializeOwned,
+{
     read_state(lock.as_ref())
 }
-pub(super) fn crnt_version(lock: &Lock) -> VectorR<Version> {
+pub fn crnt_version(lock: &Lock) -> DiskR<Version> {
     let meta = std::fs::metadata(lock.path.join(names::STATE))?;
     Ok(Version(meta.modified()?))
 }
@@ -151,12 +164,18 @@ impl AsRef<Path> for SLock {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use tempfile::TempDir;
 
-    use super::*;
+    #[derive(Serialize, serde::Deserialize, Default)]
+    struct State {
+        n: usize,
+    }
+
     #[test]
     fn test() {
         let dir = TempDir::new().unwrap();
+        initialize_disk(dir.path(), State::default).unwrap();
         let lock = exclusive_lock(dir.path()).unwrap();
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
@@ -166,7 +185,7 @@ mod tests {
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
         assert_eq!(v0, crnt_version(&lock).unwrap());
-        write_state(dir.path(), &State::new(dir.path().to_path_buf())).unwrap();
+        write_state(dir.path(), &State::default()).unwrap();
         let new_version = crnt_version(&lock).unwrap();
         assert!(v0 < new_version);
     }
