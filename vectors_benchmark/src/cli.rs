@@ -42,13 +42,13 @@ pub type BenchR<O> = Result<O, BenchErr>;
 #[clap(author, version, about, long_about = None)]
 pub struct Args {
     /// Path to the .fvectors file that will populate the index
-    #[clap(short, long,  default_value_t = String::from("./vectors.fvecs"))]
-    vectors: String,
+    #[clap(short, long, default_value_t = 100000)]
+    index: usize,
     /// Path where the output should be located
     #[clap(short, long, default_value_t = String::from("./"))]
     output: String,
     /// Dimension of the embeddings
-    #[clap(short, long)]
+    #[clap(short, long, default_value_t = 128)]
     embedding_dim: usize,
     /// Number of results per query
     #[clap(short, long, default_value_t = 10)]
@@ -67,10 +67,8 @@ impl Args {
     pub fn new() -> Args {
         Args::parse()
     }
-    pub fn vectors(&self) -> BenchR<File> {
-        let path = PathBuf::from(&self.vectors);
-        let file = OpenOptions::new().read(true).open(&path)?;
-        Ok(file)
+    pub fn index_len(&self) -> usize {
+        self.index
     }
     pub fn writer_plot(&self) -> BenchR<File> {
         let command = format!(

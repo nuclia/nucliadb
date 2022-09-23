@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use nucliadb_vectors2::data_point_provider::Index;
+use nucliadb_vectors2::vectors::data_point_provider::Index;
 use vectors_benchmark::cli_interface::*;
 fn main() {
     let args = Args::new();
@@ -31,7 +31,7 @@ fn main() {
     let writer = Index::writer(at.path()).unwrap();
     let batch_size = args.batch_size();
     let plotw = PlotWriter::new(args.writer_plot().unwrap());
-    let vector_it = FileVectors::new(args.vectors().unwrap());
+    let vector_it = RandomVectors::new(args.embedding_dim()).take(args.index_len());
     let writer_handler =
         thread::spawn(move || writer::write_benchmark(batch_size, writer, plotw, vector_it));
 

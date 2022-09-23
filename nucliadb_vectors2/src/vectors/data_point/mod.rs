@@ -35,6 +35,7 @@ use ops_hnsw::{DataRetriever, HnswOps};
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use crate::utils::DeleteLog;
 pub use uuid::Uuid as DpId;
 
 use crate::disk::prelude::*;
@@ -56,14 +57,7 @@ pub enum DPError {
 }
 type DPResult<T> = Result<T, DPError>;
 
-pub trait DeleteLog: std::marker::Sync {
-    fn is_deleted(&self, _: &str) -> bool;
-}
-impl<'a, D: DeleteLog> DeleteLog for &'a D {
-    fn is_deleted(&self, x: &str) -> bool {
-        D::is_deleted(self, x)
-    }
-}
+
 impl<Dl: DeleteLog> key_value::Slot for (Dl, Node) {
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
         self.1.get_key(x)

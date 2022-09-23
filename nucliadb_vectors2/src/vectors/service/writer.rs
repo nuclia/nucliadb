@@ -23,8 +23,8 @@ use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
-use crate::data_point;
-use crate::data_point_provider::*;
+use crate::vectors::data_point;
+use crate::vectors::data_point_provider::*;
 
 pub struct VectorWriterService {
     index: Index,

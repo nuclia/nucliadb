@@ -17,21 +17,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Mutex;
-use std::thread;
-
-use super::{disk_handler, VectorR};
-use crate::data_point::{DataPoint, DpId};
-
-pub type MergeTxn = Sender<PathBuf>;
-
-struct Updater {
-    rtxn: Receiver<PathBuf>,
+use super::{State, VectorR};
+use crate::disk::directory;
+use crate::utils::merger::{MergeQuery, MergeRequest};
+use crate::vectors::data_point::{DataPoint, DpId};
+use std::path::PathBuf;
+use tracing::*;
+pub struct Worker(PathBuf);
+impl MergeQuery for Worker {
+    fn do_work(&self) -> Result<(), String> {
+        self.work()
+            .map_err(|e| format!("Error in vectors worker {e}"))
+    }
 }
-
-impl Updater {
+impl Worker {
+    pub fn request(at: PathBuf) -> MergeRequest {
+        Box::new(Worker(at))
+    }
     fn merge_report(&self, old: &[DpId], new: DpId) -> String {
         use std::fmt::Write;
         let mut msg = String::new();
@@ -41,9 +43,10 @@ impl Updater {
         write!(msg, "==> {new}").unwrap();
         msg
     }
-    fn do_work(&self, subscriber: &Path) -> VectorR<()> {
-        let lock = disk_handler::shared_lock(subscriber)?;
-        let state = disk_handler::load_state(&lock)?;
+    fn work(&self) -> VectorR<()> {
+        let subscriber = self.0.as_path();
+        let lock = directory::shared_lock(subscriber)?;
+        let state: State = directory::load_state(&lock)?;
         std::mem::drop(lock);
         if let Some(work) = state.get_work() {
             let ids: Vec<_> = work.iter().map(|journal| journal.id()).collect();
@@ -51,12 +54,12 @@ impl Updater {
             std::mem::drop(state);
 
             let new_id = new_dp.meta().id();
-            let lock = disk_handler::exclusive_lock(subscriber)?;
-            let mut state = disk_handler::load_state(&lock)?;
+            let lock = directory::exclusive_lock(subscriber)?;
+            let mut state: State = directory::load_state(&lock)?;
             state.replace_work_unit(new_dp);
-            disk_handler::persist_state(&lock, &state)?;
+            directory::persist_state(&lock, &state)?;
             std::mem::drop(lock);
-            tracing::info!(
+            info!(
                 "Merge on {subscriber:?}:\n{}",
                 self.merge_report(&ids, new_id)
             );
@@ -67,31 +70,4 @@ impl Updater {
         }
         Ok(())
     }
-    pub fn new(rtxn: Receiver<PathBuf>) -> Updater {
-        Updater { rtxn }
-    }
-    pub fn run(self) {
-        loop {
-            match self.rtxn.recv() {
-                Err(err) => tracing::info!("channel error {}", err),
-                Ok(path) => match self.do_work(&path) {
-                    Ok(()) => (),
-                    Err(err) => tracing::info!("merging error {}", err),
-                },
-            }
-        }
-    }
-}
-
-lazy_static::lazy_static! {
-    static ref MERGER: Mutex<MergeTxn> = {
-        let (stxn, rtxn) = channel();
-        let updater = Updater::new(rtxn);
-        thread::spawn(move || updater.run());
-        Mutex::new(stxn)
-    };
-}
-
-pub fn get_notifier() -> MergeTxn {
-    MERGER.lock().unwrap().clone()
 }

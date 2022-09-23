@@ -18,34 +18,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod key_value;
-pub mod trie;
-pub mod vector;
-pub mod directory;
-use thiserror::Error;
+pub mod reader;
+pub mod writer;
 
-pub mod prelude {
-    pub use key_value::Slot;
-    pub use {bincode, serde};
+use nucliadb_service_interface::prelude::InternalError;
 
-    pub use super::{key_value, trie, usize_utils, vector};
-}
+use crate::vectors::data_point::DPError;
+use crate::vectors::data_point_provider::VectorErr;
 
-#[derive(Debug, Error)]
-pub enum DiskErr {
-    #[error("Serialization error: {0}")]
-    SerErr(#[from] bincode::Error),
-    #[error("IO error: {0}")]
-    IoErr(#[from] std::io::Error),
-}
-
-pub type DiskR<O> = Result<O, DiskErr>;
-
-pub mod usize_utils {
-    pub const USIZE_LEN: usize = (usize::BITS / 8) as usize;
-    pub fn usize_from_slice_le(v: &[u8]) -> usize {
-        let mut buff = [0; USIZE_LEN];
-        buff.copy_from_slice(v);
-        usize::from_le_bytes(buff)
+impl InternalError for VectorErr {}
+impl From<VectorErr> for Box<dyn InternalError> {
+    fn from(err: VectorErr) -> Self {
+        Box::new(err)
     }
 }
+impl InternalError for DPError {}
+impl From<DPError> for Box<dyn InternalError> {
+    fn from(err: DPError) -> Self {
+        Box::new(err)
+    }
+}
+
+pub use reader::*;
+pub use writer::*;

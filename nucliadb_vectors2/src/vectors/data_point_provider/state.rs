@@ -25,10 +25,12 @@ use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
+use super::merge_worker::Worker;
 use super::{SearchRequest, VectorR};
-use crate::data_point::{DataPoint, DeleteLog, DpId, Journal};
-use crate::data_point_provider::merger;
 use crate::utils::dtrie::DTrie;
+use crate::utils::merger;
+use crate::vectors::data_point::{DataPoint, DpId, Journal};
+use crate::utils::DeleteLog;
 const BUFFER_CAP: usize = 5;
 
 #[derive(Serialize, Deserialize)]
@@ -135,7 +137,7 @@ impl State {
     pub fn work_sanity_check(&self) {
         for _ in self.work_stack.iter() {
             let notifier = merger::get_notifier();
-            if let Err(e) = notifier.send(self.location.clone()) {
+            if let Err(e) = notifier.send(Worker::request(self.location.clone())) {
                 tracing::info!("Could not request merge: {}", e);
             }
         }
@@ -195,7 +197,7 @@ impl State {
             let prev = mem::replace(&mut self.current, WorkUnit::new());
             self.work_stack.push_front(prev);
             let notifier = merger::get_notifier();
-            if let Err(e) = notifier.send(self.location.clone()) {
+            if let Err(e) = notifier.send(Worker::request(self.location.clone())) {
                 tracing::info!("Could not request merge: {}", e);
             }
         }
@@ -228,7 +230,7 @@ mod test {
     use uuid::Uuid;
 
     use super::*;
-    use crate::data_point::{Elem, LabelDictionary};
+    use crate::vectors::data_point::{Elem, LabelDictionary};
     #[test]
     fn fssv_test() {
         const VALUES: &[(&str, f32)] = &[

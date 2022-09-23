@@ -20,3 +20,13 @@
 
 pub mod dtrie;
 pub mod trie;
+pub mod merger;
+
+pub trait DeleteLog: std::marker::Sync {
+    fn is_deleted(&self, _: &str) -> bool;
+}
+impl<'a, D: DeleteLog> DeleteLog for &'a D {
+    fn is_deleted(&self, x: &str) -> bool {
+        D::is_deleted(self, x)
+    }
+}

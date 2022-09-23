@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod data_point;
-pub mod data_point_provider;
+
+
 mod disk;
-pub mod service;
-mod utils;
+pub mod utils;
+pub mod vectors;

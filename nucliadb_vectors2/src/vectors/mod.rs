@@ -16,28 +16,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-//
-
-pub mod reader;
-pub mod writer;
-
-use nucliadb_service_interface::prelude::InternalError;
-
-use crate::data_point::DPError;
-use crate::data_point_provider::VectorErr;
-
-impl InternalError for VectorErr {}
-impl From<VectorErr> for Box<dyn InternalError> {
-    fn from(err: VectorErr) -> Self {
-        Box::new(err)
-    }
-}
-impl InternalError for DPError {}
-impl From<DPError> for Box<dyn InternalError> {
-    fn from(err: DPError) -> Self {
-        Box::new(err)
-    }
-}
-
-pub use reader::*;
-pub use writer::*;
+pub mod data_point;
+pub mod data_point_provider;
+pub mod service;

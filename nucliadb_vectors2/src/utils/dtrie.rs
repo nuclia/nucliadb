@@ -19,10 +19,8 @@
 //
 
 use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
-
-use crate::data_point::DeleteLog;
+use super::DeleteLog;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DTrie<Prop> {

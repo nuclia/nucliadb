@@ -44,6 +44,11 @@ pub fn write_benchmark<Eng, QIter, Plot>(
             batch_id = format!("Batch{batch_num}");
             kbatch = vec![];
             vbatch = vec![];
+            println!("Written {x}");
         }
+    }
+    if vbatch.len() > 0 {
+        engine.add_batch(batch_id, kbatch, vbatch);
+        plotw.report().unwrap();
     }
 }
