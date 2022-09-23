@@ -151,3 +151,48 @@ async def test_fieldmetadata_crud(
         assert fieldmetadata[1]["field"] == fieldmetadata_1["field"]
         assert fieldmetadata[1]["paragraphs"] == fieldmetadata_1["paragraphs"]
         assert fieldmetadata[1]["token"] == []
+
+
+@pytest.mark.asyncio
+async def test_fieldmetadata_tokensplit_validations(
+    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+) -> None:
+
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resources",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "texts": {
+                    "textfield": {"body": "Some text", "format": "PLAIN"},
+                },
+            },
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+
+        # Test: start greater than end
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            headers={"X-Synchronous": "true"},
+            json={"fieldmetadata": [{
+                "field": {"field": "textfield", "field_type": "text"},
+                "token": [
+                    {"token": "token0", "klass": "klassA", "start": 20, "end": 10}
+                ]
+            }]},
+        )
+        assert resp.status_code == 422
+
+        # Test: negative start
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            headers={"X-Synchronous": "true"},
+            json={"fieldmetadata": [{
+                "field": {"field": "textfield", "field_type": "text"},
+                "token": [
+                    {"token": "token0", "klass": "klassA", "start": -1, "end": 10}
+                ]
+            }]},
+        )
+        assert resp.status_code == 422

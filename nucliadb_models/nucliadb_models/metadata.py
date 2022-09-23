@@ -208,7 +208,10 @@ class TokenSplit(BaseModel):
     @root_validator(pre=True)
     def check_start_greater_than_end(cls, values):
         if values["start"] >= values["end"]:
-            raise ValueError("'start' must be greater than 'end'")
+            raise ValueError("'start' must be smaller than 'end'")
+        if values["start"] < 0:
+            raise ValueError("'start' must be a positive number")
+
         return values
 
 
