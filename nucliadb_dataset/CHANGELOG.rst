@@ -1,10 +1,10 @@
 CHANGELOG
 =========
 
-1.0.0a3 (unreleased)
---------------------
+1.0.0a3
+-------
 
-- Nothing changed yet.
+- Pin GRPC
 
 
 1.0.0a2 (2022-07-29)

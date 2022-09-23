@@ -1,10 +1,10 @@
 CHANGELOG
 =========
 
-0.0.29 (unreleased)
--------------------
+0.0.29
+------
 
-- Nothing changed yet.
+- Pin GRPC version
 
 
 0.0.28 (2022-09-05)

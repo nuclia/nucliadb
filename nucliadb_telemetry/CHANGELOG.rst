@@ -20,10 +20,10 @@
 CHANGELOG
 =========
 
-1.1.6 (unreleased)
-------------------
+1.1.6
+-----
 
-- Nothing changed yet.
+- Open GRPCIO ping
 
 
 1.1.5 (2022-09-14)

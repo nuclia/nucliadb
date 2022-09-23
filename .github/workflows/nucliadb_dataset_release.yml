@@ -1,12 +1,12 @@
-name: Release NucliaDB Telemetry
+name: Release NucliaDB Dataset
 
 on:
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_telemetry_release.yml"
-      - "nucliadb_telemetry/VERSION"
+      - ".github/workflows/nucliadb_dataset_release.yml"
+      - "nucliadb_dataset/VERSION"
 
 jobs:
   build_wheels:
@@ -25,14 +25,14 @@ jobs:
 
       - name: Install requirements
         run: |
-          pip install -r nucliadb_telemetry/requirements.txt
+          pip install -r nucliadb_dataset/requirements.txt
           pip install wheel
 
-      - name: Install nucliadb_telemetry
-        run: pip install -e ./nucliadb_telemetry
+      - name: Install nucliadb_dataset
+        run: pip install -e ./nucliadb_dataset
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist ./nucliadb_telemetry
+        run: pip wheel --no-deps -w dist ./nucliadb_dataset
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
