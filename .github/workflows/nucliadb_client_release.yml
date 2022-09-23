@@ -42,7 +42,7 @@ jobs:
         run: pip install -r nucliadb_client/requirements.txt
 
       - name: Install nucliadb_client
-        run: pip install nucliadb_client
+        run: pip install -e ./nucliadb_client
 
       - name: Build wheels
         run: pip wheel --no-deps -w dist nucliadb_client
