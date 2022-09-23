@@ -30,7 +30,7 @@ jobs:
         run: pip install -e ./nucliadb_client
 
       - name: Build wheels
-        run: pip wheel --no-deps -w dist nucliadb_client
+        run: pip wheel --no-deps -w dist ./nucliadb_client
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

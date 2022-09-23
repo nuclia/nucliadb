@@ -1,3 +1,6 @@
 pytest-docker-fixtures
 types-python-dateutil
 docker
+aiofiles
+types-aiofiles
+numpy
