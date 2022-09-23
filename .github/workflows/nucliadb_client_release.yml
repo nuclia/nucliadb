@@ -1,12 +1,6 @@
 name: Release NucliaDB Client
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "nucliadb_client/VERSION"
-
   push:
     branches:
       - main

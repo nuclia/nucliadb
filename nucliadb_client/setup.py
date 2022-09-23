@@ -20,7 +20,7 @@ requirements = load_reqs("requirements.txt")
 setup(
     name="nucliadb_client",
     version=open("VERSION").read().strip(),
-    long_description=(open("README.md").read() + "\n" + open("CHANGELOG").read()),
+    long_description=(open("README.md").read() + "\n" + open("CHANGELOG.md").read()),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3.7",
