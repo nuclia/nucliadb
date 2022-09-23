@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.0.0a2
+
+- Fix protobuf dependency
+
 ## 1.0.0a1
 
 - Import and export
