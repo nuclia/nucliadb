@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/nucliadb_client_release.yml"
       - "nucliadb_client/VERSION"
 
 jobs:
@@ -38,7 +39,7 @@ jobs:
           python-version: 3.9
 
       - name: Build wheels
-        run: pipx run cibuildwheel --output-dir dist nucliadb_client
+        run: pip wheel --no-deps -w dist nucliadb_client
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

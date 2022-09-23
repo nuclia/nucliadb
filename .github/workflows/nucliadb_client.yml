@@ -37,7 +37,7 @@ jobs:
           pip install -r code-requirements.txt
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_utils --config=nucliadb_client/setup.cfg
+          flake8 nucliadb_client --config=nucliadb_client/setup.cfg
           isort -c --profile black nucliadb_client/
           black --check --verbose nucliadb_client
 
