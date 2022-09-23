@@ -38,7 +38,6 @@ from nucliadb_client.resource import Resource
 
 def get_docs(n, n_dim, kb):
     with open("cache-vectors.nucliadb", "w+") as pblist:
-        pending = []
         r = Resource(rid=str(0), kb=kb)
         for i in range(n):
             if i % 100_000 == 0:
