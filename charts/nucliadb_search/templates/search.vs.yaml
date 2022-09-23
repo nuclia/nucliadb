@@ -11,7 +11,11 @@ spec:
   - name: nucliadb_search
     match:
     - uri:
-        regex: '^/api/v\d+/kb/[^/]+(/resource/[^/]+)?/search$'
+        regex: '^/api/v\d+/kb/[^/]+/search$'
+      method:
+        regex: 'GET|POST|OPTIONS'
+    - uri:
+        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+/search$'
       method:
         regex: 'GET|OPTIONS'
     - uri:
@@ -37,4 +41,5 @@ spec:
         - 'Authorization'
         allowMethods:
         - GET
+        - POST
         - OPTIONS
