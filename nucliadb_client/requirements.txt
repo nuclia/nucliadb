@@ -1,4 +1,3 @@
-nucliadb_protos
 httpx
 protobuf>=3.20.1
 types-protobuf>=3.19.20
