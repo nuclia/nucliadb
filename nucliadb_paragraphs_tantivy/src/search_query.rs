@@ -61,8 +61,11 @@ impl TermCollector {
         for (index, term) in self.fterms.get(&doc).iter().flat_map(|v| v.iter()).cloned() {
             let term_dict = index.terms();
             let mut term_s = vec![];
-            if term_dict.ord_to_term(term, &mut term_s).unwrap() {
-                terms.push(String::from_utf8(term_s).unwrap());
+            let found = term_dict.ord_to_term(term, &mut term_s).unwrap_or(false);
+            let elem = if found { term_s } else { vec![] };
+            match String::from_utf8(elem).ok() {
+                Some(v) if v.len() > 2 => terms.push(v),
+                _ => (),
             }
         }
         terms

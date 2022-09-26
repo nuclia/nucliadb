@@ -92,13 +92,7 @@ impl ReaderChild for ParagraphReaderService {
             order_field,
             text: &text,
         };
-        let dist_1 = searcher.do_search(termc, queries, self);
-        if multic_flag && (dist_1.results.is_empty()) {
-            let (termc, queries) = create_query(&parser, &text, request, &self.schema, 2);
-            Ok(searcher.do_search(termc, queries, self))
-        } else {
-            Ok(dist_1)
-        }
+        Ok(searcher.do_search(termc, queries, self))
     }
     fn reload(&self) {
         self.reader.reload().unwrap();

@@ -77,7 +77,7 @@ async def test_suggest_fuzzy_search(
     assert len(body["paragraphs"]["results"]) == 1
     assert body["paragraphs"]["results"][0]["rid"] == rid3
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=princess")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=princes")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 2
