@@ -187,6 +187,8 @@ async def serialize(
                 for fm in orm_resource.basic.fieldmetadata
             ]
 
+            resource.seqid = orm_resource.basic.seqid
+
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()
         if orm_resource.relations is not None:
