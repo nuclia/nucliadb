@@ -49,11 +49,15 @@ class File(Field):
             old_cf: Optional[CloudFile] = None
         else:
             old_cf = old_file.file
-        sf: StorageField = self.storage.file_field(
-            self.kbid, self.uuid, self.id, old_cf
-        )
-        cf: CloudFile = await self.storage.normalize_binary(payload.file, sf)
-        payload.file.CopyFrom(cf)
+
+        is_external_file = payload.file.source == CloudFile.Source.EXTERNAL
+        if not is_external_file:
+            sf: StorageField = self.storage.file_field(
+                self.kbid, self.uuid, self.id, old_cf
+            )
+            cf: CloudFile = await self.storage.normalize_binary(payload.file, sf)
+            payload.file.CopyFrom(cf)
+
         await self.db_set_value(payload)
 
     async def get_value(self) -> FieldFile:

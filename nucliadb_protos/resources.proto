@@ -15,6 +15,7 @@ message CloudFile {
         GCS = 1;
         S3 = 2;
         LOCAL = 3;
+        EXTERNAL = 4;
         EMPTY = 5;
     }
     Source source = 5;

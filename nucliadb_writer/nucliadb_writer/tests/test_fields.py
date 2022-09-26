@@ -21,7 +21,9 @@ import hashlib
 from base64 import b64encode
 from datetime import datetime
 from os.path import dirname
+from unittest.mock import patch
 
+import jwt
 import pytest
 
 from nucliadb_models.resource import NucliaDBRoles
@@ -89,12 +91,17 @@ TEST_LAYOUT_PAYLOAD = {
     },
     "format": "NUCLIAv1",
 }
+
 TEST_FILE_PAYLOAD = {
     "language": "en",
     "password": "xxxxxx",
     "file": load_file_as_FileB64_payload("/assets/image001.jpg", "image/jpg"),
 }
 
+TEST_EXTERNAL_FILE_PAYLOAD = {
+    "uri": "https://mysite.com/files/myfile.pdf",
+    "extra_headers": {"foo": "bar"},
+}
 
 TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
     {
@@ -211,6 +218,16 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
             json=TEST_FILE_PAYLOAD,
             headers={"x_skip_store": "1"},
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert "seqid" in data
+
+        # File field pointing to an externally hosted file
+        resp = await client.put(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
+            json=TEST_EXTERNAL_FILE_PAYLOAD,
+            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
         data = resp.json()
@@ -363,3 +380,40 @@ async def test_sync_ops(writer_api, knowledgebox_writer, endpoint, payload):
             json=payload,
         )
         assert resp.status_code in (201, 200)
+
+
+@pytest.fixture(scope="function")
+def jwt_encode_mock():
+    with patch.object(jwt, attribute="encode") as mock:
+        yield mock
+
+
+@pytest.mark.asyncio
+async def test_external_file_field_sends_correct_processing_payload(
+    writer_api, knowledgebox_writer, jwt_encode_mock
+):
+    knowledgebox_id = knowledgebox_writer
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            json={"slug": "resource1", "title": "My resource"},
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+
+        # File field pointing to an externally hosted file
+        resp = await client.put(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/externalfile",
+            json=TEST_EXTERNAL_FILE_PAYLOAD,
+            headers={"X-SYNCHRONOUS": "True"},
+        )
+        assert resp.status_code == 201
+
+        # Check that the payload sent to processing is correct
+        decoded_payload = jwt_encode_mock.call_args[0][0]
+        assert decoded_payload["uri"] == TEST_EXTERNAL_FILE_PAYLOAD["uri"]
+        assert decoded_payload["driver"] == 3
+        assert (
+            decoded_payload["extra_headers"]
+            == TEST_EXTERNAL_FILE_PAYLOAD["extra_headers"]
+        )

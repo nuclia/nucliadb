@@ -234,6 +234,21 @@ async def parse_file_field(
     toprocess.filefield[key] = await processing.convert_filefield_to_str(file_field)
 
 
+def parse_external_file_field(
+    key: str,
+    file_field: models.ExternalFileField,
+    writer: BrokerMessage,
+    toprocess: PushPayload,
+) -> None:
+    writer.files[key].added.FromDatetime(datetime.now())
+    writer.files[key].url = file_field.uri
+    writer.files[key].file.uri = file_field.uri
+    writer.files[key].file.source = resources_pb2.CloudFile.Source.EXTERNAL
+
+    processing = get_processing()
+    toprocess.filefield[key] = processing.convert_external_filefield_to_str(file_field)
+
+
 def parse_link_field(
     key: str,
     link_field: models.LinkField,

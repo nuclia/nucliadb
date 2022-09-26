@@ -21,7 +21,6 @@ import base64
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_writer.tus import UPLOAD
 

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 from fastapi import HTTPException, Response
 from fastapi.params import Header
@@ -40,6 +40,7 @@ from nucliadb_writer.resource.basic import set_last_seqid
 from nucliadb_writer.resource.field import (
     parse_conversation_field,
     parse_datetime_field,
+    parse_external_file_field,
     parse_file_field,
     parse_internal_file_field,
     parse_keywordset_field,
@@ -295,16 +296,34 @@ async def add_resource_field_conversation(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def add_resource_field_file(
+async def add_resource_field_internal_or_external_file(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: Union[models.FileField, models.ExternalFileField],
+    x_skip_store: bool = SKIP_STORE_DEFAULT,
+    x_synchronous: bool = SYNC_CALL,
+) -> ResourceFieldAdded:
+    if isinstance(field_payload, models.ExternalFileField):
+        return await add_resource_field_file_external(
+            request, kbid, rid, field_id, field_payload, x_synchronous
+        )
+    else:
+        return await add_resource_field_file_internal(
+            request, kbid, rid, field_id, field_payload, x_skip_store, x_synchronous
+        )
+
+
+async def add_resource_field_file_internal(
     request: Request,
     kbid: str,
     rid: str,
     field_id: str,
     field_payload: models.FileField,
-    x_skip_store: bool = SKIP_STORE_DEFAULT,
-    x_synchronous: bool = SYNC_CALL,
+    x_skip_store: bool,
+    x_synchronous: bool,
 ) -> ResourceFieldAdded:
-
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     if x_skip_store:
         await parse_file_field(field_id, field_payload, writer, toprocess)
@@ -315,6 +334,27 @@ async def add_resource_field_file(
 
     try:
         seqid = await finish_field_put(writer, toprocess, partition, x_synchronous)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
+
+    return ResourceFieldAdded(seqid=seqid)
+
+
+async def add_resource_field_file_external(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_payload: models.ExternalFileField,
+    wait_on_commit: bool,
+) -> ResourceFieldAdded:
+    writer, toprocess, partition = prepare_field_put(kbid, rid, request)
+    parse_external_file_field(field_id, field_payload, writer, toprocess)
+
+    try:
+        seqid = await finish_field_put(
+            writer, toprocess, partition, wait_on_commit=wait_on_commit
+        )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
