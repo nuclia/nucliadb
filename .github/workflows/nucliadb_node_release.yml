@@ -1,45 +1,75 @@
 name: Release NucliaDB Node
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "nucliadb_node/binding/VERSION"
-
   push:
     branches:
       - main
     paths:
+      - ".github/workflows/nucliadb_node_release.yml"
       - "nucliadb_node/binding/VERSION"
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: [test, lint]
     strategy:
-      fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-2016"]
-    env:
-      CIBW_ARCHS_LINUX: auto aarch64
-      CIBW_ARCHS_MACOS: x86_64 universal2 arm64
-      # Building for one python version is enough, since this is a
-      # ctypes-based 'universal binary wheel' (py3-none-*) not
-      # linked to a specific python version or implementation.
-      CIBW_BUILD: "cp39-*"
-
+        include:
+          - arch: x86_64-apple-darwin
+            os: macos-latest
+            file: nucliadb_node_binding-${{ github.ref_name }}.darwin-amd64
+          - arch: aarch64-apple-darwin
+            os: macos-latest
+            file: nucliadb_node_binding-${{ github.ref_name }}.darwin-arm64
+          - arch: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            file: nucliadb_node_binding-${{ github.ref_name }}.linux-amd64
+          - arch: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            file: nucliadb_node_binding-${{ github.ref_name }}.linux-arm64
+          - arch: x86_64-pc-windows-msvc
+            os: windows-latest
+            file: nucliadb_node_binding-${{ github.ref_name }}.windows-amd64
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.60.0
-          profile: default
-          override: true
+      - name: Checkout sources
+        uses: actions/checkout@v2
 
-      - uses: actions/checkout@v3
+      - name: Cache cargo assets
+        uses: actions/cache@v3
         with:
-          submodules: recursive
-          fetch-depth: 0
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Prepare environment
+        if: contains(matrix.arch, 'windows') && endsWith(matrix.arch, '-gnu')
+        run: echo "C:\msys64\usr\bin;$Env:Path" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+
+      - name: Install dependencies
+        if: contains(matrix.arch, 'windows') && endsWith(matrix.arch, '-msvc')
+        run: |
+          vcpkg integrate install
+          vcpkg install openssl:x64-windows-static
+      - name: Install dependencies
+        if: contains(matrix.arch, 'linux') && endsWith(matrix.arch, '-gnu')
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install musl-tools qemu-user libc6-dev-arm64-cross
+          sudo apt-get -y install g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: ${{ matrix.arch }}
+
+      - name: Output package versions
+        run: go version ; cargo version ; rustc --version ; cmake --version ; gcc --version ; g++ --version ; perl -v
 
       - name: Set up msbuild (Windows-only)
         uses: microsoft/setup-msbuild@v1.0.2
@@ -54,9 +84,60 @@ jobs:
       - name: Build wheels
         run: |
           pip install maturin
-          maturin build -m nucliadb_node/binding/Cargo.toml
+          BINDGEN_EXTRA_CLANG_ARGS_aarch64-unknown-linux-gnu="-I/usr/aarch64-linux-gnu/include/" maturin build -m nucliadb_node/binding/Cargo.toml  ${{ matrix.opts }} --release --locked --target ${{ matrix.arch }}
           mkdir -p dist/
           cp target/wheels/*.whl dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.file }}
+          path: |
+            target/${{ matrix.arch }}/relewheels/*.whl
+
+  package:
+    name: Upload Pypi
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download darwin amd64 binary
+        uses: actions/download-artifact@v3
+        with:
+          name: nucliadb_node_binding-${{ github.ref_name }}.darwin-amd64
+          path: darwin-amd64
+
+      - name: Download darwin arm64 binary
+        uses: actions/download-artifact@v3
+        with:
+          name: nucliadb_node_binding-${{ github.ref_name }}.darwin-arm64
+          path: darwin-arm64
+
+      - name: Download linux amd64 binary
+        uses: actions/download-artifact@v3
+        with:
+          name: nucliadb_node_binding-${{ github.ref_name }}.linux-amd64
+          path: linux-amd64
+
+      - name: Download linux arm64 binary
+        uses: actions/download-artifact@v3
+        with:
+          name: nucliadb_node_binding-${{ github.ref_name }}.linux-arm64
+          path: linux-arm64
+
+      - name: Download windows amd64 binary
+        uses: actions/download-artifact@v3
+        with:
+          name: nucliadb_node_binding-${{ github.ref_name }}.windows-amd64
+          path: windows-amd64
+
+      - name: Build wheels
+        run: |
+          mkdir -p dist/
+          cp windows-amd64/*.whl dist/
+          cp linux-arm64/*.whl dist/
+          cp linux-amd64/*.whl dist/
+          cp darwin-arm64/*.whl dist/
+          cp darwin-amd64/*.whl dist/
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
