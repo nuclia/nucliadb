@@ -170,3 +170,16 @@ build-node-binding-debug:
 
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest .
+
+build-nucliadb-rustbase_arm64:
+	docker build -t nuclia/nucliadb_rust_base:arm64 . -f Dockerfile.rust
+	docker push nuclia/nucliadb_rust_base:arm64
+
+build-nucliadb-rustbase_amd64:
+	docker build -t nuclia/nucliadb_rust_base:amd64 . -f Dockerfile.rust
+	docker push nuclia/nucliadb_rust_base:amd64
+
+link_docker_images:
+	docker manifest create nuclia/nucliadb_rust_base:latest --amend nuclia/nucliadb_rust_base:amd64 --amend nuclia/nucliadb_rust_base:arm64
+	docker manifest push nuclia/nucliadb_rust_base:latest
+

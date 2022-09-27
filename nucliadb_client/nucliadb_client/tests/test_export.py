@@ -57,7 +57,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     payload.texts["text1"] = TextField(body="My text")
     kb.create_resource(payload)
 
-    async for line in kb.export():
+    async for line in kb.generator():
         export.append(line)
 
     data = StringIO("\n".join(export))
@@ -74,5 +74,5 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     resources = kb.list_elements()
 
     bm = BrokerMessage()
-    bm.ParseFromString(base64.b64decode(export[0]))
+    bm.ParseFromString(base64.b64decode(export[0][4:]))
     assert bm.basic.title == resources[0].get().title

@@ -179,6 +179,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.ERROR
                 break
             response.status = OpStatusWriter.Status.OK
+            logger.info(f"Processed {message.uuid}")
 
         return response
 

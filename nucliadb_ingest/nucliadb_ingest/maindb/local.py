@@ -175,7 +175,7 @@ class LocalTransaction(Transaction):
         get_all_keys = count == -1
         total_count = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
         real_count = 0
-        path = self.compute_path(match)
+        path = self.compute_path(match) + "/"
         for str_key in glob.glob(path + "**", recursive=True):
             if str_key in self.deleted_keys:
                 continue

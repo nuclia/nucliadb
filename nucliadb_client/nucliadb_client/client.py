@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import base64
 from io import StringIO
 from typing import List, Optional, Union
 
@@ -49,16 +48,19 @@ class NucliaDBClient:
         host: str,
         grpc: int,
         http: int,
-        train: int,
+        train: Optional[int] = None,
         schema: str = "http",
         writer_host: Optional[str] = None,
         reader_host: Optional[str] = None,
         grpc_host: Optional[str] = None,
+        train_host: Optional[str] = None,
     ):
         if reader_host is None:
             reader_host = host
         if writer_host is None:
             writer_host = host
+        if train_host is None:
+            train_host = host
         self.http_reader_v1 = httpx.Client(
             base_url=f"{schema}://{reader_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "READER"},
@@ -75,6 +77,8 @@ class NucliaDBClient:
             grpc_host = host
         self.grpc_host = grpc_host
         self.grpc_port = grpc
+        self.train_port = train
+        self.train_host = train_host
         channel = insecure_channel(f"{host}:{grpc}")
         self.writer_stub = WriterStub(channel)
 
@@ -113,7 +117,7 @@ class NucliaDBClient:
         response_obj = KnowledgeBoxObj.parse_raw(response.content)
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 
-    async def import_kb(self, *, slug: str, location: Union[str, StringIO]):
+    async def import_kb(self, *, slug: str, location: Union[str, StringIO]) -> str:
         kb = self.get_kb(slug=slug)
         if kb is None:
             kb = self.create_kb(slug=slug)
@@ -121,25 +125,23 @@ class NucliaDBClient:
         if isinstance(location, StringIO):
             b64_pb = location.readline()
             while b64_pb:
-                res = kb.parse_bm(base64.b64decode(b64_pb.strip()))
-                await res.commit(processor=False)
+                await kb.import_export(b64_pb.strip())
                 b64_pb = location.readline()
 
         elif location.startswith("http"):
             client = httpx.AsyncClient()
             resp = await client.get(location)
             async for line in resp.aiter_lines():
-                res = kb.parse_bm(base64.b64decode(line.strip()))
-                await res.commit(processor=False)
+                await kb.import_export(line.strip())
 
         else:
             async with aiofiles.open(location, "r") as dump_file:
 
                 b64_pb = await dump_file.readline()
                 while b64_pb:
-                    res = kb.parse_bm(base64.b64decode(b64_pb.strip()))
-                    await res.commit(processor=False)
+                    await kb.import_export(b64_pb.strip())
                     b64_pb = await dump_file.readline()
+        return kb.kbid
 
     def init_async_grpc(self):
         if self.writer_stub_async is not None:

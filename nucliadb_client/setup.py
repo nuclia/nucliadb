@@ -33,4 +33,10 @@ setup(
     include_package_data=True,
     packages=find_packages(),
     install_requires=requirements,
+    entry_points={
+        "console_scripts": [
+            "nucliadb_export = nucliadb_client.export:run",
+            "nucliadb_import = nucliadb_client.import:run",
+        ]
+    },
 )

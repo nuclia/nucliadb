@@ -259,8 +259,7 @@ async def upload(args, kb):
         for line in await cache_file.readlines():
             if len(line.strip()) == 0:
                 continue
-            res = kb.parse_bm(base64.b64decode(line.strip()))
-            TASKS.append(res.commit())
+            TASKS.append(kb.import_export(line.strip()))
             if len(TASKS) > 10:
                 await asyncio.gather(*TASKS)
                 print(f"{datetime.now()} upload {len(TASKS)}")
