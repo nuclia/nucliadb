@@ -49,3 +49,23 @@ async def test_last_seqid_in_resource(
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
         assert seqid == resp.json()["last_seqid"]
+
+    # A resource update involving processing changes its seqid
+
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "texts": {
+                    "textfield2": {"body": "Another text", "format": "PLAIN"},
+                }
+            }
+        )
+        assert resp.status_code == 200
+        new_seqid = resp.json()["seqid"]
+        assert new_seqid > seqid
+
+    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
+        assert new_seqid == resp.json()["last_seqid"]

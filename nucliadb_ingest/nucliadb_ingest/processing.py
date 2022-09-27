@@ -286,7 +286,7 @@ class ProcessingEngine:
 
         if self.dummy:
             self.calls.append(item.dict())
-            return 1
+            return len(self.calls)
 
         headers = {"CONTENT-TYPE": "application/json"}
         if self.onprem is False:
