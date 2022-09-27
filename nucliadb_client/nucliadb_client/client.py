@@ -130,7 +130,7 @@ class NucliaDBClient:
             resp = await client.get(location)
             async for line in resp.aiter_lines():
                 res = kb.parse_bm(base64.b64decode(line.strip()))
-                await res.commit()
+                await res.commit(processor=False)
 
         else:
             async with aiofiles.open(location, "r") as dump_file:

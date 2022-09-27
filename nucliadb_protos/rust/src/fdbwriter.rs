@@ -480,5 +480,5 @@ pub struct ExportRequest {
     #[prost(string, tag="1")]
     pub kbid: ::prost::alloc::string::String,
     #[prost(bool, tag="2")]
-    pub vectors: bool,
+    pub values: bool,
 }

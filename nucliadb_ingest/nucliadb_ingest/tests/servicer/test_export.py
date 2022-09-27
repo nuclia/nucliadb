@@ -73,15 +73,25 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
     req = ExportRequest()
     req.kbid = result.uuid
-    req.vectors = True
+    req.values = False
     export: BrokerMessage
     found = False
     async for export in stub.Export(req):  # type: ignore
         assert found is False
         found = True
         assert export.basic.title == "My Title"
+        assert export.extracted_text[0].body.text == "My text"
+    assert found
+
+    req = ExportRequest()
+    req.kbid = result.uuid
+    req.values = True
+    found = False
+    async for export in stub.Export(req):  # type: ignore
+        assert found is False
+        found = True
+        assert export.basic.title == "My Title"
         assert export.texts["text1"].body == "My text1"
-        assert len(export.field_vectors[0].vectors.vectors.vectors[0].vector) == 2
         assert export.extracted_text[0].body.text == "My text"
     assert found
 

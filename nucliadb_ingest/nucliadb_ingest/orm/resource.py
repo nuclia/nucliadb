@@ -25,7 +25,6 @@ from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
-    ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
@@ -263,9 +262,60 @@ class Resource:
                     brain.apply_field_vectors(field_key, vo, [], {})
         return brain
 
-    async def generate_broker_message(
-        self, full: bool = True, vectors: bool = True
-    ) -> BrokerMessage:
+    async def generate_field_computed_metadata(
+        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+    ):
+        fcmw = FieldComputedMetadataWrapper()
+        fcmw.field.field = field_id
+        fcmw.field.field_type = type_id  # type: ignore
+
+        field_metadata = await field.get_field_metadata()
+        if field_metadata is not None:
+            fcmw.metadata.CopyFrom(field_metadata)
+            fcmw.field.field = field_id
+            fcmw.field.field_type = type_id  # type: ignore
+            bm.field_metadata.append(fcmw)
+            # Make sure cloud files are removed for exporting
+            fcmw.metadata.metadata.ClearField("thumbnail")
+
+    async def generate_extracted_text(
+        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+    ):
+        etw = ExtractedTextWrapper()
+        etw.field.field = field_id
+        etw.field.field_type = type_id  # type: ignore
+        extracted_text = await field.get_extracted_text()
+        if extracted_text is not None:
+            etw.body.CopyFrom(extracted_text)
+            bm.extracted_text.append(etw)
+
+    async def generate_field(
+        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+    ):
+        if type_id == FieldType.TEXT:
+            value = await field.get_value()
+            bm.texts[field_id].CopyFrom(value)
+        elif type_id == FieldType.LINK:
+            value = await field.get_value()
+            bm.links[field_id].CopyFrom(value)
+        # If its a file we do not want to extract
+        # elif type_id == FieldType.FILE:
+        #     value = await field.get_value()
+        #     bm.files[field_id].CopyFrom(value)
+        elif type_id == FieldType.CONVERSATION:
+            value = await field.get_value()
+            bm.conversations[field_id].CopyFrom(value)
+        elif type_id == FieldType.KEYWORDSET:
+            value = await field.get_value()
+            bm.keywordsets[field_id].CopyFrom(value)
+        elif type_id == FieldType.DATETIME:
+            value = await field.get_value()
+            bm.datetimes[field_id].CopyFrom(value)
+        elif type_id == FieldType.LAYOUT:
+            value = await field.get_value()
+            bm.layouts[field_id].CopyFrom(value)
+
+    async def generate_broker_message(self, values: bool = False) -> BrokerMessage:
         # full means downloading all the pointers
         # minuts the ones to external files that are not PB
         # Go for all fields and recreate brain
@@ -287,78 +337,30 @@ class Resource:
         fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             # Value
-            if type_id == FieldType.TEXT:
-                value = await field.get_value()
-                bm.texts[field_id].CopyFrom(value)
-            elif type_id == FieldType.LINK:
-                value = await field.get_value()
-                bm.links[field_id].CopyFrom(value)
-            elif type_id == FieldType.FILE:
-                value = await field.get_value()
-                bm.files[field_id].CopyFrom(value)
-            elif type_id == FieldType.CONVERSATION:
-                value = await field.get_value()
-                bm.conversations[field_id].CopyFrom(value)
-            elif type_id == FieldType.KEYWORDSET:
-                value = await field.get_value()
-                bm.keywordsets[field_id].CopyFrom(value)
-            elif type_id == FieldType.DATETIME:
-                value = await field.get_value()
-                bm.datetimes[field_id].CopyFrom(value)
-            elif type_id == FieldType.LAYOUT:
-                value = await field.get_value()
-                bm.layouts[field_id].CopyFrom(value)
+            if values:
+                await self.generate_field(bm, type_id, field_id, field)
 
             # Extracted text
-            etw = ExtractedTextWrapper()
-            etw.field.field = field_id
-            etw.field.field_type = type_id  # type: ignore
-            if full:
-                extracted_text = await field.get_extracted_text()
-                if extracted_text is not None:
-                    etw.body.CopyFrom(extracted_text)
-                    bm.extracted_text.append(etw)
-            else:
-                extracted_text_cf = await field.get_extracted_text_cf()
-                if extracted_text_cf is not None:
-                    etw.file.CopyFrom(extracted_text_cf)
-                    bm.extracted_text.append(etw)
+            await self.generate_extracted_text(bm, type_id, field_id, field)
 
             # Field Computed Metadata
-            fcmw = FieldComputedMetadataWrapper()
-            fcmw.field.field = field_id
-            fcmw.field.field_type = type_id  # type: ignore
-
-            field_metadata = await field.get_field_metadata()
-            if field_metadata is not None:
-                fcmw.metadata.CopyFrom(field_metadata)
-                fcmw.field.field = field_id
-                fcmw.field.field_type = type_id  # type: ignore
-                bm.field_metadata.append(fcmw)
-
-            # Vectors
-            evw = ExtractedVectorsWrapper()
-            evw.field.field = field_id
-            evw.field.field_type = type_id  # type: ignore
-            if full and vectors:
-                field_vectors = await field.get_vectors()
-                if field_vectors is not None:
-                    evw.vectors.CopyFrom(field_vectors)
-                    bm.field_vectors.append(evw)
-            else:
-                field_vectors_cf = await field.get_vectors_cf()
-                if field_vectors_cf is not None:
-                    evw.file.CopyFrom(field_vectors_cf)
-                    bm.field_vectors.append(evw)
+            await self.generate_field_computed_metadata(bm, type_id, field_id, field)
 
             if type_id == FieldType.FILE and isinstance(field, File):
                 field_extracted_data = await field.get_file_extracted_data()
                 if field_extracted_data is not None:
+                    field_extracted_data.ClearField("file_generated")
+                    field_extracted_data.ClearField("file_preview")
+                    field_extracted_data.ClearField("file_thumbnail")
+                    field_extracted_data.file_pages_previews.ClearField("pages")
                     bm.file_extracted_data.append(field_extracted_data)
 
             elif type_id == FieldType.LINK and isinstance(field, Link):
                 link_extracted_data = await field.get_link_extracted_data()
                 if link_extracted_data is not None:
+                    link_extracted_data.ClearField("link_thumbnail")
+                    link_extracted_data.ClearField("link_preview")
+                    link_extracted_data.ClearField("link_image")
                     bm.link_extracted_data.append(link_extracted_data)
         return bm
 

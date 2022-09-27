@@ -346,7 +346,7 @@ message ResourceFieldExistsResponse {
 
 message ExportRequest {
     string kbid = 1;
-    bool vectors = 2;
+    bool values = 2;
 }
 
 service Writer {
