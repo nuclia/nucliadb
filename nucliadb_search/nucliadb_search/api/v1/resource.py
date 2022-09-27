@@ -31,6 +31,7 @@ from sentry_sdk import capture_exception
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
+from nucliadb_search import logger
 from nucliadb_search.api.models import (
     NucliaDBClientType,
     ResourceSearchResults,
@@ -171,6 +172,7 @@ async def search(
         if isinstance(result, Exception):
             capture_exception(result)
             await abort_transaction()
+            logger.exception("Error while querying shard data", exc_info=True)
             raise HTTPException(
                 status_code=500, detail=f"Error while querying shard data"
             )

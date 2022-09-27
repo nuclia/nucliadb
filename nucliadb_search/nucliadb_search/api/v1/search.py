@@ -249,6 +249,7 @@ async def search(
         if isinstance(result, Exception):
             capture_exception(result)
             await abort_transaction()
+            logger.exception("Error while querying shard data", exc_info=True)
             raise HTTPException(
                 status_code=500, detail=f"Error while querying shard data"
             )
