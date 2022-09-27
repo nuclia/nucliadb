@@ -74,23 +74,21 @@ jobs:
         uses: microsoft/setup-msbuild@v1.0.2
         if: startsWith(matrix.os, 'windows')
 
-      - uses: actions/setup-python@v3
-        with:
-          python-version: 3.9
-
       - uses: Swatinem/rust-cache@v1
 
-      - name: Build wheels
-        run: |
-          pip install maturin
-          maturin build -m nucliadb_node/binding/Cargo.toml --release --target ${{ matrix.arch }}
+      - uses: messense/maturin-action@v1
+        with:
+          manylinux: auto
+          target: ${{ matrix.arch }}
+          command: build
+          args: --release -o dist -m nucliadb_node/binding/Cargo.toml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.file }}
           path: |
-            target/${{ matrix.arch }}/wheels/*.whl
+            dist/*.whl
 
   package:
     name: Upload Pypi
