@@ -83,16 +83,14 @@ jobs:
       - name: Build wheels
         run: |
           pip install maturin
-          BINDGEN_EXTRA_CLANG_ARGS_aarch64-unknown-linux-gnu="-I/usr/aarch64-linux-gnu/include/" maturin build -m nucliadb_node/binding/Cargo.toml  ${{ matrix.opts }} --release --locked --target ${{ matrix.arch }}
-          mkdir -p dist/
-          cp target/wheels/*.whl dist/
+          maturin build -m nucliadb_node/binding/Cargo.toml --release --cargo-extra-args="--locked  --target ${{ matrix.arch }}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.file }}
           path: |
-            target/${{ matrix.arch }}/relewheels/*.whl
+            target/${{ matrix.arch }}/wheels/*.whl
 
   package:
     name: Upload Pypi
