@@ -83,7 +83,7 @@ jobs:
       - name: Build wheels
         run: |
           pip install maturin
-          maturin build -m nucliadb_node/binding/Cargo.toml --release --cargo-extra-args="--locked  --target ${{ matrix.arch }}"
+          maturin build -m nucliadb_node/binding/Cargo.toml --release --target ${{ matrix.arch }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
