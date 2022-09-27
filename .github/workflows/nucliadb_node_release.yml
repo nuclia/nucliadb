@@ -74,9 +74,10 @@ jobs:
         uses: microsoft/setup-msbuild@v1.0.2
         if: startsWith(matrix.os, 'windows')
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: pypy3.9
+          architecture: x86
 
       - uses: Swatinem/rust-cache@v1
 
