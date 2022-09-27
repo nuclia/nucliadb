@@ -23,28 +23,28 @@ jobs:
           - os: windows
             ls: dir
             interpreter: 3.7 3.8 3.9 3.10
-          - os: windows
-            ls: dir
-            target: i686
-            python-architecture: x86
-            interpreter: 3.7 3.8 3.9 3.10
+          # - os: windows
+          #   ls: dir
+          #   target: i686
+          #   python-architecture: x86
+          #   interpreter: 3.7 3.8 3.9 3.10
           - os: macos
             target: aarch64
             interpreter: 3.7 3.8 3.9 3.10
-          - os: ubuntu
-            platform: linux
-            target: i686
+          # - os: ubuntu
+          #   platform: linux
+          #   target: i686
           # GCC 4.8.5 in manylinux2014 container doesn't support c11 atomic
           # we use manylinux_2_24 container for aarch64 and armv7 targets instead,
           - os: ubuntu
             platform: linux
             target: aarch64
             container: messense/manylinux_2_24-cross:aarch64
-          - os: ubuntu
-            platform: linux
-            target: armv7
-            container: messense/manylinux_2_24-cross:armv7
-            interpreter: 3.7 3.8 3.9 3.10
+          # - os: ubuntu
+          #   platform: linux
+          #   target: armv7
+          #   container: messense/manylinux_2_24-cross:armv7
+          #   interpreter: 3.7 3.8 3.9 3.10
           # musllinux
           - os: ubuntu
             platform: linux
