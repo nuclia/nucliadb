@@ -27,7 +27,7 @@ from nucliadb_search.api.v1.router import KB_PREFIX
 
 
 @pytest.mark.asyncio
-async def test_seqid_in_resource(
+async def test_last_seqid_in_resource(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
 
@@ -48,4 +48,4 @@ async def test_seqid_in_resource(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
-        assert seqid == resp.json()["seqid"]
+        assert seqid == resp.json()["last_seqid"]

@@ -187,7 +187,7 @@ async def serialize(
                 for fm in orm_resource.basic.fieldmetadata
             ]
 
-            resource.seqid = orm_resource.basic.seqid
+            resource.last_seqid = orm_resource.basic.last_seqid
 
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()

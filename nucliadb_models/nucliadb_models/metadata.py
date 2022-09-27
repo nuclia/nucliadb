@@ -240,7 +240,7 @@ class Basic(BaseModel):
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
     uuid: Optional[str]
-    seqid: Optional[int]
+    last_seqid: Optional[int]
 
 
 class InputOrigin(BaseModel):

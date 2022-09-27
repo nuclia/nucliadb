@@ -61,7 +61,7 @@ from nucliadb_writer.exceptions import (
     ResourceNotFound,
 )
 from nucliadb_writer.resource.audit import parse_audit
-from nucliadb_writer.resource.basic import parse_basic
+from nucliadb_writer.resource.basic import parse_basic, set_seqid
 from nucliadb_writer.resource.field import parse_fields
 from nucliadb_writer.resource.origin import parse_origin
 from nucliadb_writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
@@ -691,6 +691,7 @@ async def store_file_on_nuclia_db(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
+    set_seqid(writer, seqid)
     await transaction.commit(writer, partition, wait=wait_on_commit)
 
     return seqid
