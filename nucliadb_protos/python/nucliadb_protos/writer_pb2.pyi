@@ -1184,13 +1184,10 @@ global___ResourceFieldExistsResponse = ResourceFieldExistsResponse
 class ExportRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KBID_FIELD_NUMBER: builtins.int
-    VALUES_FIELD_NUMBER: builtins.int
     kbid: typing.Text
-    values: builtins.bool
     def __init__(self,
         *,
         kbid: typing.Text = ...,
-        values: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid","values",b"values"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid"]) -> None: ...
 global___ExportRequest = ExportRequest

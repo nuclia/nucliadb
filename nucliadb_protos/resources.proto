@@ -52,6 +52,9 @@ message Basic {
     string uuid = 12;
 
     repeated string labels = 13;
+
+    // last processing seqid of the resource
+    int64 last_seqid = 14;
 }
 
 
