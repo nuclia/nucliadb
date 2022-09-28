@@ -58,9 +58,9 @@ from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.basic import (
     parse_basic,
     parse_basic_modify,
+    set_seqid,
     set_status,
     set_status_modify,
-    set_seqid
 )
 from nucliadb_writer.resource.field import extract_fields, parse_fields
 from nucliadb_writer.resource.origin import parse_origin

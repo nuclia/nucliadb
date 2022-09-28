@@ -39,7 +39,7 @@ async def test_last_seqid_in_resource(
                 "texts": {
                     "textfield1": {"body": "Some text", "format": "PLAIN"},
                 }
-            }
+            },
         )
         assert resp.status_code == 201
         data = resp.json()
@@ -60,7 +60,7 @@ async def test_last_seqid_in_resource(
                 "texts": {
                     "textfield2": {"body": "Another text", "format": "PLAIN"},
                 }
-            }
+            },
         )
         assert resp.status_code == 200
         new_seqid = resp.json()["seqid"]
