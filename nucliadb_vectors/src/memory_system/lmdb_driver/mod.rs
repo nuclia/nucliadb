@@ -35,8 +35,11 @@ const DB_LAYERS_IN: &str = "LAYERS_IN_lmdb";
 const DB_LOG: &str = "LOG_lmdb";
 const DB_DELETED: &str = "DELETED_lmdb";
 const STAMP: &str = "stamp.nuclia";
-const MAP_SIZE: usize = 1048576 * 100000;
 const MAX_DBS: u32 = 3000;
+#[cfg(target_pointer_width = "64")]
+const MAP_SIZE: usize = 1048576 * 100000;
+#[cfg(target_pointer_width = "32")]
+const MAP_SIZE: usize = 1048576;
 
 pub struct LMBDStorage {
     env: Env,
