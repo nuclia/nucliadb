@@ -58,7 +58,7 @@ from nucliadb_writer.resource.audit import parse_audit
 from nucliadb_writer.resource.basic import (
     parse_basic,
     parse_basic_modify,
-    set_seqid,
+    set_last_seqid,
     set_status,
     set_status_modify,
 )
@@ -142,7 +142,7 @@ async def create_resource(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_seqid(writer, seqid)
+    set_last_seqid(writer, seqid)
     if x_synchronous:
         t0 = time()
     await transaction.commit(writer, partition, wait=x_synchronous)
@@ -211,7 +211,7 @@ async def modify_resource(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_seqid(writer, seqid)
+    set_last_seqid(writer, seqid)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=seqid)
