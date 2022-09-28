@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/nucliadb_node_release.yml"
-      - "nucliadb_node/binding/VERSION"
+      - "nucliadb_node/binding/Cargo.toml"
 
 jobs:
   build:

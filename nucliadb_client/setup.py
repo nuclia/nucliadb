@@ -36,7 +36,7 @@ setup(
     entry_points={
         "console_scripts": [
             "nucliadb_export = nucliadb_client.export:run",
-            "nucliadb_import = nucliadb_client.import:run",
+            "nucliadb_import = nucliadb_client.importing:run",
         ]
     },
 )

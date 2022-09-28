@@ -118,6 +118,7 @@ class NucliaDBClient:
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 
     async def import_kb(self, *, slug: str, location: Union[str, StringIO]) -> str:
+        self.init_async_grpc()
         kb = self.get_kb(slug=slug)
         if kb is None:
             kb = self.create_kb(slug=slug)

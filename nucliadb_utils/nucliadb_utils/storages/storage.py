@@ -194,6 +194,9 @@ class Storage:
             local_storage = get_local_storage()
             iterator = local_storage.download(file.bucket_name, file.uri)
             new_cf = await self.uploaditerator(iterator, destination, file)
+        elif file.source == CloudFile.EMPTY:
+            new_cf = CloudFile()
+            new_cf.CopyFrom(file)
         else:
             raise InvalidCloudFile()
         return new_cf

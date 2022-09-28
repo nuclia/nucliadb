@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -298,10 +299,10 @@ class Resource:
         elif type_id == FieldType.LINK:
             value = await field.get_value()
             bm.links[field_id].CopyFrom(value)
-        # If its a file we do not want to extract
-        # elif type_id == FieldType.FILE:
-        #     value = await field.get_value()
-        #     bm.files[field_id].CopyFrom(value)
+        elif type_id == FieldType.FILE:
+            value = await field.get_value()
+            bm.files[field_id].CopyFrom(value)
+            bm.files[field_id].file.source = CloudFile.Source.EMPTY
         elif type_id == FieldType.CONVERSATION:
             value = await field.get_value()
             bm.conversations[field_id].CopyFrom(value)
@@ -315,7 +316,7 @@ class Resource:
             value = await field.get_value()
             bm.layouts[field_id].CopyFrom(value)
 
-    async def generate_broker_message(self, values: bool = False) -> BrokerMessage:
+    async def generate_broker_message(self) -> BrokerMessage:
         # full means downloading all the pointers
         # minuts the ones to external files that are not PB
         # Go for all fields and recreate brain
@@ -337,8 +338,7 @@ class Resource:
         fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             # Value
-            if values:
-                await self.generate_field(bm, type_id, field_id, field)
+            await self.generate_field(bm, type_id, field_id, field)
 
             # Extracted text
             await self.generate_extracted_text(bm, type_id, field_id, field)

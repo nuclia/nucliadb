@@ -73,7 +73,6 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
     req = ExportRequest()
     req.kbid = result.uuid
-    req.values = False
     export: BrokerMessage
     found = False
     async for export in stub.Export(req):  # type: ignore
@@ -85,7 +84,6 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
     req = ExportRequest()
     req.kbid = result.uuid
-    req.values = True
     found = False
     async for export in stub.Export(req):  # type: ignore
         assert found is False

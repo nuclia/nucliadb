@@ -1,24 +1,9 @@
-FROM nuclia/nucliadb_rust_base:latest as python_rust
-
-COPY . /nucliadb
-
-WORKDIR /nucliadb
-
-RUN set -eux; \
-    cd nucliadb_node/binding; \
-    maturin build --release
-
-RUN cp /nucliadb/target/wheels/nucliadb_node*.whl /
-
-# ---------------------------------------------------
-
 FROM python:3.9
 
-COPY --from=python_rust /tikv_client*.whl /
-COPY --from=python_rust /nucliadb_node*.whl /
+COPY --from=nuclia/nucliadb_rust_base:latest /tikv_client*.whl /
 
 RUN pip install tikv_client-*.whl
-RUN pip install nucliadb_node*.whl
+RUN pip install nucliadb-node-binding
 
 RUN mkdir -p /usr/src/app
 
