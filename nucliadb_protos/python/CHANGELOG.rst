@@ -5,6 +5,7 @@ CHANGELOG
 ------
 
 - Export values optional
+- Add last_seqid to Basic
 
 0.0.29
 ------
