@@ -43,7 +43,7 @@ from starlette.requests import Request as StarletteRequest
 from nucliadb_ingest.orm.utils import set_title
 from nucliadb_ingest.processing import PushPayload, Source
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.writer import CreateResourcePayload
+from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -432,6 +432,7 @@ async def patch(
 @version(1)
 async def upload(
     request: StarletteRequest,
+    response: Response,
     kbid: str,
     path_rid: Optional[str] = None,
     field: Optional[str] = None,
@@ -440,7 +441,7 @@ async def upload(
     x_language: Optional[List[str]] = Header(None),  # type: ignore
     x_md5: Optional[List[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
-) -> Response:
+) -> ResourceFileUploaded:
 
     logger.info(request.headers)
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
@@ -537,13 +538,15 @@ async def upload(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
-    headers = {}
-    headers["NDB-Seq"] = f"{seqid}"
-    headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}"
-    headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}/field/{valid_field}"
+    response.headers["NDB-Seq"] = f"{seqid}"
+    response.headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}"
+    response.headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}/field/{valid_field}"
 
-    response = Response("", media_type="text/plain", status_code=201, headers=headers)
-    return response
+    return ResourceFileUploaded(
+        seqid=seqid,
+        rid=rid,
+        field_id=valid_field
+    )
 
 
 async def start_upload_field(
