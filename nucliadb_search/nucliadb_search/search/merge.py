@@ -84,7 +84,7 @@ async def merge_documents_results(
             raw_resource_list.append(result)
 
     if len(document_responses) > 1:
-        raw_resource_list.sort(key=lambda x: x.score, reverse=True)
+        raw_resource_list.sort(key=lambda x: x.score_bm25, reverse=True)
 
     skip = page * count
     end = skip + count
@@ -100,13 +100,10 @@ async def merge_documents_results(
 
         labels = await get_labels_resource(result, kbid)
         _, field_type, field = result.field.split("/")
-        if result.score == 0:
-            score = result.score_bm25
-        else:
-            score = result.score
+
         result_resource_list.append(
             ResourceResult(
-                score=score,
+                score=result.score_bm25,
                 rid=result.uuid,
                 field=field,
                 field_type=field_type,
@@ -147,7 +144,7 @@ async def merge_suggest_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(suggest_responses) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score, reverse=True)
+        raw_paragraph_list.sort(key=lambda x: x.score_bm25, reverse=True)
 
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[:10]:
@@ -158,7 +155,7 @@ async def merge_suggest_paragraph_results(
         labels = await get_labels_paragraph(result, kbid)
         seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
-            score=result.score,
+            score=result.score_bm25,
             rid=result.uuid,
             field_type=field_type,
             field=field,
@@ -274,7 +271,7 @@ async def merge_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(paragraph_responses) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score, reverse=True)
+        raw_paragraph_list.sort(key=lambda x: x.score_bm25, reverse=True)
 
     skip = page * count
     end = skip + count
@@ -289,13 +286,8 @@ async def merge_paragraph_results(
         text = await get_text_paragraph(result, kbid, highlight, ematches)
         labels = await get_labels_paragraph(result, kbid)
         seconds_positions = await get_seconds_paragraph(result, kbid)
-        if result.score == 0:
-            score = result.score_bm25
-        else:
-            score = result.score
-
         new_paragraph = Paragraph(
-            score=score,
+            score=result.score_bm25,
             rid=result.uuid,
             field_type=field_type,
             field=field,
