@@ -38,7 +38,14 @@ def free_port() -> int:
 
 
 @pytest.fixture(scope="function")
-async def nucliadb():
+async def dummy_processing():
+    from nucliadb_utils.settings import nuclia_settings
+
+    nuclia_settings.dummy_processing = True
+
+
+@pytest.fixture(scope="function")
+async def nucliadb(dummy_processing):
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = Settings(
             blob=f"{tmpdir}/blob",
