@@ -465,7 +465,6 @@ async def delete_resource_field(
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
-    # Create processing message
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return Response(status_code=204)

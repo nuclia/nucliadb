@@ -204,7 +204,6 @@ async def modify_resource(
     )
 
     set_status_modify(writer.basic, item)
-
     try:
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
@@ -227,6 +226,7 @@ async def modify_resource(
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def reprocess_resource(request: Request, kbid: str, rid: str):
+    transaction = get_transaction()
     processing = get_processing()
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
@@ -264,6 +264,13 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
         seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+
+    writer = BrokerMessage()
+    writer.kbid = kbid
+    writer.uuid = rid
+    writer.source = BrokerMessage.MessageSource.WRITER
+    set_last_seqid(writer, seqid)
+    await transaction.commit(writer, partition, wait=False)
 
     return ResourceUpdated(seqid=seqid)
 
