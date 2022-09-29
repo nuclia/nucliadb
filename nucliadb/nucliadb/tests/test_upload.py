@@ -49,10 +49,9 @@ async def test_upload(
     seqid = body["seqid"]
     rid = body["rid"]
     field_id = body["field_id"]
-
-    assert str(seqid) == resp.headers["NDB-Seq"]
-    assert rid == resp.headers["NDB-Resource"].split("/")[-1]
-    assert field_id == resp.headers["NDB-Field"].split("/")[-1]
+    assert seqid
+    assert rid
+    assert field_id
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{rid}/file/{field_id}"

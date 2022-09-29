@@ -432,7 +432,6 @@ async def patch(
 @version(1)
 async def upload(
     request: StarletteRequest,
-    response: Response,
     kbid: str,
     path_rid: Optional[str] = None,
     field: Optional[str] = None,
@@ -537,10 +536,6 @@ async def upload(
         )
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
-
-    response.headers["NDB-Seq"] = f"{seqid}"
-    response.headers["NDB-Resource"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}"
-    response.headers["NDB-Field"] = f"/{KB_PREFIX}/{kbid}/resources/{rid}/field/{valid_field}"
 
     return ResourceFileUploaded(
         seqid=seqid,
