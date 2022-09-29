@@ -191,9 +191,9 @@ async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
     payload = processing.calls[0]
 
     assert payload["kbid"] == knowledgebox_writer
-    path = resp.headers["ndb-field"]
-    field = path.split("/")[-1]
-    rid = path.split("/")[-3]
+    body = resp.json()
+    field = body["field_id"]
+    rid = body["uuid"]
     assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
@@ -252,9 +252,9 @@ async def test_knowledgebox_file_upload_root_headers(writer_api, knowledgebox_wr
     payload = processing.calls[0]
 
     assert payload["kbid"] == knowledgebox_writer
-    path = resp.headers["ndb-field"]
-    field = path.split("/")[-1]
-    rid = path.split("/")[-3]
+    body = resp.json()
+    field = body["field_id"]
+    rid = body["uuid"]
     assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
@@ -398,9 +398,9 @@ async def test_knowledgebox_file_upload_field_headers(
     payload = processing.calls[1]
 
     assert payload["kbid"] == knowledgebox_writer
-    path = resp.headers["ndb-field"]
-    field = path.split("/")[-1]
-    rid = path.split("/")[-3]
+    body = resp.json()
+    field = body["field_id"]
+    rid = body["uuid"]
     assert payload["filefield"][field] == "DUMMYJWT"
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"

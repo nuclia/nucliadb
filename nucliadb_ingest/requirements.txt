@@ -5,7 +5,7 @@ lru-dict==1.1.7
 backoff
 aiofiles==0.8.0
 types-aiofiles==0.8.3
-protobuf==3.20.1
+protobuf==3.20.2
 types-protobuf>=3.19.20
 grpcio>=1.44.0
 grpcio-health-checking>=1.44.0

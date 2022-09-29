@@ -114,3 +114,9 @@ class ResourceDeleted(BaseModel):
 
 
 ComminResourcePayload = Union[CreateResourcePayload, UpdateResourcePayload]
+
+
+class ResourceFileUploaded(BaseModel):
+    seqid: Optional[int] = None
+    uuid: Optional[str] = None
+    field_id: Optional[str] = None
