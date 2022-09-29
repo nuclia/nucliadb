@@ -19,6 +19,7 @@
 //
 
 use std::collections::HashSet;
+
 use crate::vectors::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary};
 
 fn create_query() -> Vec<f32> {

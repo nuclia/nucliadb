@@ -19,8 +19,8 @@
 //
 
 pub mod dtrie;
-pub mod trie;
 pub mod merger;
+pub mod trie;
 
 pub trait DeleteLog: std::marker::Sync {
     fn is_deleted(&self, _: &str) -> bool;

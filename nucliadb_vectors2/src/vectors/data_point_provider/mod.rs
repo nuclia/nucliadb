@@ -18,16 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod state;
 mod merge_worker;
+mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use std::{io, mem};
 
-use crate::disk::directory::{ELock, Lock, SLock, Version};
-use crate::disk::{directory, DiskErr};
 use state::*;
 use thiserror::Error;
+
+use crate::disk::directory::{ELock, Lock, SLock, Version};
+use crate::disk::{directory, DiskErr};
 use crate::vectors::data_point::{DPError, DataPoint};
 
 pub trait SearchRequest {
