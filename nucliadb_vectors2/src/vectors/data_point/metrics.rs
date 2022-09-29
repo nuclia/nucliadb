@@ -17,9 +17,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use nucliadb_vectors2::utils::DeleteLog;
 use nucliadb_vectors2::vectors::data_point::{DataPoint, Elem, LabelDictionary};
-use std::collections::HashSet;
 
 #[derive(Default)]
 pub struct Set(HashSet<String>);

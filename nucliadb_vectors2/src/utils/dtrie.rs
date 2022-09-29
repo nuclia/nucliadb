@@ -19,7 +19,9 @@
 //
 
 use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
+
 use super::DeleteLog;
 
 #[derive(Clone, Serialize, Deserialize)]

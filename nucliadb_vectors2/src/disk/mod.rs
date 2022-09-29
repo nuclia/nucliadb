@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+pub mod directory;
 pub mod key_value;
 pub mod trie;
 pub mod vector;
-pub mod directory;
 use thiserror::Error;
 
 pub mod prelude {

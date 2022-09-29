@@ -18,13 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use super::DiskR;
-use fs2::FileExt;
-use serde::{de::DeserializeOwned, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+
+use fs2::FileExt;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
+use super::DiskR;
 
 mod names {
     pub const LOCK: &str = "lk.lock";
@@ -35,9 +38,7 @@ mod names {
 pub struct Version(SystemTime);
 
 fn write_state<S>(path: &Path, state: &S) -> DiskR<()>
-where
-    S: Serialize,
-{
+where S: Serialize {
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -48,9 +49,7 @@ where
 }
 
 fn read_state<S>(path: &Path) -> DiskR<S>
-where
-    S: DeserializeOwned,
-{
+where S: DeserializeOwned {
     let mut file = OpenOptions::new()
         .read(true)
         .open(path.join(names::STATE))?;
@@ -76,16 +75,12 @@ pub fn shared_lock(path: &Path) -> DiskR<SLock> {
 }
 
 pub fn persist_state<S>(lock: &ELock, state: &S) -> DiskR<()>
-where
-    S: Serialize,
-{
+where S: Serialize {
     write_state(lock.as_ref(), state)
 }
 
 pub fn load_state<S>(lock: &Lock) -> DiskR<S>
-where
-    S: DeserializeOwned,
-{
+where S: DeserializeOwned {
     read_state(lock.as_ref())
 }
 pub fn crnt_version(lock: &Lock) -> DiskR<Version> {
@@ -164,8 +159,9 @@ impl AsRef<Path> for SLock {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[derive(Serialize, serde::Deserialize, Default)]
     struct State {

@@ -17,12 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::path::PathBuf;
+
+use tracing::*;
+
 use super::{State, VectorR};
 use crate::disk::directory;
 use crate::utils::merger::{MergeQuery, MergeRequest};
 use crate::vectors::data_point::{DataPoint, DpId};
-use std::path::PathBuf;
-use tracing::*;
 pub struct Worker(PathBuf);
 impl MergeQuery for Worker {
     fn do_work(&self) -> Result<(), String> {

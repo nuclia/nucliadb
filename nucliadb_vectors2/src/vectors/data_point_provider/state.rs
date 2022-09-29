@@ -28,9 +28,8 @@ use serde::{Deserialize, Serialize};
 use super::merge_worker::Worker;
 use super::{SearchRequest, VectorR};
 use crate::utils::dtrie::DTrie;
-use crate::utils::merger;
+use crate::utils::{merger, DeleteLog};
 use crate::vectors::data_point::{DataPoint, DpId, Journal};
-use crate::utils::DeleteLog;
 const BUFFER_CAP: usize = 5;
 
 #[derive(Serialize, Deserialize)]

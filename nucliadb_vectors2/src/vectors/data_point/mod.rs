@@ -35,10 +35,10 @@ use ops_hnsw::{DataRetriever, HnswOps};
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use crate::utils::DeleteLog;
 pub use uuid::Uuid as DpId;
 
 use crate::disk::prelude::*;
+use crate::utils::DeleteLog;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -56,7 +56,6 @@ pub enum DPError {
     SJ(#[from] serde_json::Error),
 }
 type DPResult<T> = Result<T, DPError>;
-
 
 impl<Dl: DeleteLog> key_value::Slot for (Dl, Node) {
     fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
