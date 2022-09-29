@@ -110,6 +110,7 @@ pub struct BrokerMessage {
     #[prost(message, optional, tag="29")]
     pub done_time: ::core::option::Option<::prost_types::Timestamp>,
     /// Not needed anymore
+    #[deprecated]
     #[prost(int64, tag="30")]
     pub txseqid: i64,
     #[prost(message, repeated, tag="31")]

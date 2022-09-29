@@ -106,7 +106,7 @@ message BrokerMessage {
     google.protobuf.Timestamp done_time = 29;
 
     // Not needed anymore
-    int64 txseqid = 30;
+    int64 txseqid = 30 [deprecated = true];
 
     repeated Error errors = 31;
     string processing_id = 32;

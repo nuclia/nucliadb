@@ -36,6 +36,7 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_partitioning, get_transaction
 from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb_writer.resource.audit import parse_audit
+from nucliadb_writer.resource.basic import set_last_seqid
 from nucliadb_writer.resource.field import (
     parse_conversation_field,
     parse_datetime_field,
@@ -110,6 +111,7 @@ async def finish_field_put(
     seqid = await processing.send_to_process(toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
+    set_last_seqid(writer, seqid)
     await transaction.commit(writer, partition, wait=wait_on_commit)
 
     return seqid
@@ -369,6 +371,7 @@ async def append_messages_to_conversation_field(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
+    set_last_seqid(writer, seqid)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceFieldAdded(seqid=seqid)
@@ -423,6 +426,7 @@ async def append_blocks_to_layout_field(
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
+    set_last_seqid(writer, seqid)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceFieldAdded(seqid=seqid)
@@ -461,7 +465,6 @@ async def delete_resource_field(
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)
 
-    # Create processing message
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return Response(status_code=204)

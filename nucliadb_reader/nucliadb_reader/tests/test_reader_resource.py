@@ -38,6 +38,7 @@ BASIC = (
     "created",
     "modified",
     "fieldmetadata",
+    "last_seqid",
 )
 RELATIONS = ("relations",)
 ORIGIN = ("origin",)

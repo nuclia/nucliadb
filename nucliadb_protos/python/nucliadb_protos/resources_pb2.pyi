@@ -138,6 +138,7 @@ class Basic(google.protobuf.message.Message):
     FIELDMETADATA_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
+    LAST_SEQID_FIELD_NUMBER: builtins.int
     slug: typing.Text
     icon: typing.Text
     title: typing.Text
@@ -163,6 +164,9 @@ class Basic(google.protobuf.message.Message):
 
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    last_seqid: builtins.int
+    """last processing seqid of the resource"""
+
     def __init__(self,
         *,
         slug: typing.Text = ...,
@@ -178,9 +182,10 @@ class Basic(google.protobuf.message.Message):
         fieldmetadata: typing.Optional[typing.Iterable[global___UserFieldMetadata]] = ...,
         uuid: typing.Text = ...,
         labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        last_seqid: builtins.int = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["created",b"created","metadata",b"metadata","modified",b"modified","usermetadata",b"usermetadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["created",b"created","fieldmetadata",b"fieldmetadata","icon",b"icon","labels",b"labels","layout",b"layout","metadata",b"metadata","modified",b"modified","slug",b"slug","summary",b"summary","thumbnail",b"thumbnail","title",b"title","usermetadata",b"usermetadata","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["created",b"created","fieldmetadata",b"fieldmetadata","icon",b"icon","labels",b"labels","last_seqid",b"last_seqid","layout",b"layout","metadata",b"metadata","modified",b"modified","slug",b"slug","summary",b"summary","thumbnail",b"thumbnail","title",b"title","usermetadata",b"usermetadata","uuid",b"uuid"]) -> None: ...
 global___Basic = Basic
 
 class Origin(google.protobuf.message.Message):

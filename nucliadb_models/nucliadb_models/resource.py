@@ -215,6 +215,7 @@ class Resource(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]]
     created: Optional[datetime]
     modified: Optional[datetime]
+    last_seqid: Optional[int]
 
     origin: Optional[Origin]
     relations: Optional[List[Relation]]

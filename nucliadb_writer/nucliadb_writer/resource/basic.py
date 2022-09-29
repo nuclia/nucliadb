@@ -215,3 +215,7 @@ def set_status(basic: Basic, item: CreateResourcePayload):
 
 def set_status_modify(basic: Basic, item: UpdateResourcePayload):
     basic.metadata.status = Metadata.Status.PENDING
+
+
+def set_last_seqid(bm: BrokerMessage, seqid: int):
+    bm.basic.last_seqid = seqid

@@ -71,6 +71,9 @@ pub struct Basic {
     pub uuid: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="13")]
     pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// last processing seqid of the resource
+    #[prost(int64, tag="14")]
+    pub last_seqid: i64,
 }
 // Block behaviors
 
