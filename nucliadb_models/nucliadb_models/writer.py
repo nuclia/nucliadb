@@ -118,5 +118,5 @@ ComminResourcePayload = Union[CreateResourcePayload, UpdateResourcePayload]
 
 class ResourceFileUploaded(BaseModel):
     seqid: Optional[int] = None
-    rid: Optional[str] = None
+    uuid: Optional[str] = None
     field_id: Optional[str] = None

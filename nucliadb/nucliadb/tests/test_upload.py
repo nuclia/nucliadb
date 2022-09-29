@@ -47,7 +47,7 @@ async def test_upload(
     body = resp.json()
 
     seqid = body["seqid"]
-    rid = body["rid"]
+    rid = body["uuid"]
     field_id = body["field_id"]
     assert seqid
     assert rid

@@ -539,7 +539,7 @@ async def upload(
 
     return ResourceFileUploaded(
         seqid=seqid,
-        rid=rid,
+        uuid=rid,
         field_id=valid_field
     )
 
