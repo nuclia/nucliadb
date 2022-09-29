@@ -537,11 +537,7 @@ async def upload(
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
-    return ResourceFileUploaded(
-        seqid=seqid,
-        uuid=rid,
-        field_id=valid_field
-    )
+    return ResourceFileUploaded(seqid=seqid, uuid=rid, field_id=valid_field)
 
 
 async def start_upload_field(

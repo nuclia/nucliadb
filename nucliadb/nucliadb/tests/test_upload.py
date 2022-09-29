@@ -21,9 +21,9 @@ import base64
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_writer.tus import UPLOAD
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
@@ -41,7 +41,7 @@ async def test_upload(
             "X-Synchronous": "true",
             "Content-Type": "text/plain",
         },
-        content=base64.b64encode(content)
+        content=base64.b64encode(content),
     )
     assert resp.status_code == 201
     body = resp.json()
