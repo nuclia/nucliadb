@@ -50,7 +50,7 @@ async def test_upload(
     seqid = body["seqid"]
     rid = body["uuid"]
     field_id = body["field_id"]
-    assert seqid
+    assert seqid is not None
     assert rid
     assert field_id
 
