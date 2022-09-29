@@ -28,7 +28,6 @@ from nucliadb_writer.tus import UPLOAD
 
 @pytest.mark.asyncio
 async def test_upload(
-    nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
@@ -43,6 +42,8 @@ async def test_upload(
         },
         content=base64.b64encode(content),
     )
+    if resp.status_code == 500:
+        print(resp.content)
     assert resp.status_code == 201
     body = resp.json()
 
