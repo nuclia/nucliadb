@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Literal, Union
+from typing import List, Literal, Union, Optional
 from typing import get_args as typing_get_args
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -53,7 +53,7 @@ from nucliadb_reader.api.models import (
     FIELD_NAMES_TO_PB_TYPE_MAP,
     ResourceField,
 )
-from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
+from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
@@ -137,6 +137,14 @@ async def list_resources(
 
 
 @api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=200,
+    name="Get Resource",
+    response_model=Resource,
+    response_model_exclude_unset=True,
+    tags=["Resources"],
+)
+@api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
     name="Get Resource",
@@ -148,8 +156,9 @@ async def list_resources(
 @version(1)
 async def get_resource(
     request: Request,
-    rid: str,
     kbid: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"

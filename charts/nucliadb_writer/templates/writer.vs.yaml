@@ -40,7 +40,7 @@ spec:
   - name: nucliadb_writer_tus
     match:
     - uri:
-        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+/file/[^/]+/tusupload.*'
+        regex: '^/api/v\d+/kb/[^/]+/rid/[^/]+/file/[^/]+/tusupload.*'
       method:
         regex: 'POST|PATCH|HEAD|OPTIONS'
     - uri:
