@@ -37,7 +37,7 @@ from nucliadb_models.resource import Resource as NucliaDBResource
 if TYPE_CHECKING:
     from nucliadb_client.knowledgebox import KnowledgeBox
 
-RESOURCE_PREFIX = "resource"
+RESOURCE_PREFIX = "rid"
 logger = logging.getLogger("nucliadb_client")
 
 

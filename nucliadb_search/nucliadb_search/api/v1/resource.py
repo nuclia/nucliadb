@@ -47,11 +47,11 @@ from nucliadb_search.utilities import get_counter, get_nodes
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import ShardsNotFound
 
-from .router import KB_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, api
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/search",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/search",
     status_code=200,
     description="Search on a Resource",
     tags=["Search"],

@@ -40,7 +40,7 @@ async def test_knowledgebox_file_tus_options(writer_api, knowledgebox_writer):
     client: AsyncClient
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx"
+            f"/{KB_PREFIX}/{knowledgebox_writer}/rid/xxx/file/xxx/{TUSUPLOAD}/xxx"
         )
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
@@ -48,7 +48,7 @@ async def test_knowledgebox_file_tus_options(writer_api, knowledgebox_writer):
         assert resp.headers["tus-extension"] == "creation-defer-length"
 
         resp = await client.options(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}"
+            f"/{KB_PREFIX}/{knowledgebox_writer}/rid/xxx/file/xxx/{TUSUPLOAD}"
         )
         assert resp.status_code == 204
         assert resp.headers["tus-resumable"] == "1.0.0"
@@ -281,7 +281,7 @@ async def test_knowledgebox_file_tus_upload_field(
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/invalidresource/file/field1/{TUSUPLOAD}",
+            f"/{KB_PREFIX}/{knowledgebox_writer}/rid/invalidresource/file/field1/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
@@ -293,7 +293,7 @@ async def test_knowledgebox_file_tus_upload_field(
         await asyncio.sleep(1)
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{TUSUPLOAD}",
+            f"/{KB_PREFIX}/{knowledgebox_writer}/rid/{resource}/file/field1/{TUSUPLOAD}",
             headers={
                 "tus-resumable": "1.0.0",
                 "upload-metadata": f"filename {filename},language {language},md5 {md5}",
@@ -375,7 +375,7 @@ async def test_knowledgebox_file_upload_field_headers(
         filename = base64.b64encode(b"image.jpg").decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
+                f"/{KB_PREFIX}/{knowledgebox_writer}/rid/{resource}/file/field1/{UPLOAD}",
                 data=f.read(),
                 headers={
                     "X-FILENAME": filename,
@@ -425,7 +425,7 @@ async def test_knowledgebox_file_upload_field_sync(
         filename = base64.b64encode(b"image.jpg").decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
-                f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
+                f"/{KB_PREFIX}/{knowledgebox_writer}/rid/{resource}/file/field1/{UPLOAD}",
                 data=f.read(),
                 headers={
                     "X-FILENAME": filename,

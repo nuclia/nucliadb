@@ -45,7 +45,7 @@ async def test_search_sc_2062(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/rid/{rid}")
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=title")

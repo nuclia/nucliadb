@@ -53,7 +53,7 @@ from nucliadb_reader.api.models import (
     FIELD_NAMES_TO_PB_TYPE_MAP,
     ResourceField,
 )
-from nucliadb_reader.api.v1.router import KB_PREFIX, api
+from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
@@ -137,7 +137,7 @@ async def list_resources(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
     name="Get Resource",
     response_model=Resource,
@@ -182,7 +182,7 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=200,
     name="Get Resource field",
     response_model=ResourceField,

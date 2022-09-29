@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_reader.api.v1.router import KB_PREFIX
+from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
 
 BASE = ("field_id", "field_type")
 VALUE = ("value",)
@@ -43,7 +43,7 @@ async def test_get_resource_field_default_options(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
         )
         assert resp.status_code == 200
 
@@ -69,7 +69,7 @@ async def test_get_resource_field_all(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
             params={
                 "show": ["value", "extracted"],
                 "field_type": [
@@ -120,7 +120,7 @@ async def test_get_resource_field_filter_root_fields(reader_api, test_resource):
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
             params={"show": ["value"]},
         )
 
@@ -142,7 +142,7 @@ async def test_get_resource_field_filter_extracted(reader_api, test_resource):
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}",
             params={
                 "show": ["extracted"],
                 "extracted": ["metadata", "vectors"],
@@ -171,7 +171,7 @@ async def test_get_resource_field_conversation(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}?page=last",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}?page=last",
         )
         assert resp.status_code == 200
         data = resp.json()

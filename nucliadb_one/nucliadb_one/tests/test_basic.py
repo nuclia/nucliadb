@@ -46,7 +46,7 @@ async def test_basic_patch_thumbnail_sc_2390(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}",
         )
         assert resp.status_code == 200
 
@@ -55,7 +55,7 @@ async def test_basic_patch_thumbnail_sc_2390(
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}",
             json={"thumbnail": "thumbnail-modified"},
             headers={"X-Synchronous": "true"},
         )
@@ -63,7 +63,7 @@ async def test_basic_patch_thumbnail_sc_2390(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}",
         )
         assert resp.status_code == 200
 

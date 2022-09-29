@@ -252,7 +252,7 @@ async def test_reprocess_resource(
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reprocess",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/reprocess",
         )
         assert resp.status_code == 202
 

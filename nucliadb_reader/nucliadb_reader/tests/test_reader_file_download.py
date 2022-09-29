@@ -28,7 +28,7 @@ import nucliadb_ingest.tests.fixtures
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_reader.api.v1.router import KB_PREFIX
+from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
 
 BASE = ("field_id", "field_type")
 VALUE = ("value",)
@@ -49,7 +49,7 @@ async def test_resource_download_extracted_file(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/{field_type}/{field_id}/download/{download_type}/{download_field}",  # noqa
         )
         assert resp.status_code == 200
         filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"
@@ -68,7 +68,7 @@ async def test_resource_download_field_file(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}?show=values",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
         )
         assert (
             resp.json()["data"]["files"]["file1"]["value"]["file"]["filename"]
@@ -76,7 +76,7 @@ async def test_resource_download_field_file(
         )
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/{field_id}/download/field",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
         )
         assert resp.status_code == 200
         assert resp.headers["Content-Disposition"]
@@ -86,7 +86,7 @@ async def test_resource_download_field_file(
         open(filename, "rb").read() == resp.content
 
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}?show=values",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values",
         )
         assert resp.status_code == 200
 
@@ -112,7 +112,7 @@ async def test_resource_download_field_layout(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/layout/{field_id}/download/field/{download_field}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/layout/{field_id}/download/field/{download_field}",
         )
         assert resp.status_code == 200
         filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
@@ -137,7 +137,7 @@ async def test_resource_download_field_conversation(
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{kbid}/resource/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/conversation/{field_id}/download/field/{msg_id}/{file_id}",
         )
         assert resp.status_code == 200
         filename = f"{os.path.dirname(nucliadb_ingest.tests.fixtures.__file__)}/{THUMBNAIL.bucket_name}/{THUMBNAIL.uri}"  # noqa

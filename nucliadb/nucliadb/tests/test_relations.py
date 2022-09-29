@@ -75,9 +75,7 @@ async def test_relations(
 
     await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=relations"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/rid/{rid}?show=relations")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["relations"]) == 3
@@ -141,6 +139,6 @@ async def test_relations_extracted(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/rid/{rid}?show=basic")
     assert resp.status_code == 200
     assert len(resp.json()["usermetadata"]["relations"]) == 5

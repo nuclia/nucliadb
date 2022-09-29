@@ -35,7 +35,7 @@ from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import StorageField  # type: ignore
 from nucliadb_utils.utilities import get_storage
 
-from .router import KB_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, api
 
 
 class DownloadType(Enum):
@@ -44,7 +44,7 @@ class DownloadType(Enum):
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
     name="Download extracted binary file",
@@ -70,7 +70,7 @@ async def download_extract_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/file/{{field_id}}/download/field",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}/download/field",
     tags=["Resource fields"],
     status_code=200,
     name="Download field binary field",
@@ -88,7 +88,7 @@ async def download_field_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/layout/{{field_id}}/download/field/{{download_field}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/download/field/{{download_field}}",
     tags=["Resource fields"],
     status_code=200,
     name="Download layout binary field",
@@ -106,7 +106,7 @@ async def download_field_layout(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
     name="Download conversation binary field",

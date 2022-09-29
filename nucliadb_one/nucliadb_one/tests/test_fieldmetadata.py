@@ -101,7 +101,7 @@ async def test_fieldmetadata_crud(
         rid = resp.json()["uuid"]
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}")
+        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}")
         fieldmetadata = resp.json()["fieldmetadata"]
         assert len(fieldmetadata) == 1
         assert fieldmetadata[0] == fieldmetadata_0
@@ -110,7 +110,7 @@ async def test_fieldmetadata_crud(
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}",
             headers={"X-SYNCHRONOUS": "True"},
             json={"fieldmetadata": [fieldmetadata_1]},
         )
@@ -118,7 +118,7 @@ async def test_fieldmetadata_crud(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}?show=basic&show=extracted",
         )
         assert resp.status_code == 200
         fieldmetadata = resp.json()["fieldmetadata"]
@@ -133,7 +133,7 @@ async def test_fieldmetadata_crud(
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.patch(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}",
             headers={"X-SYNCHRONOUS": "True"},
             json={"fieldmetadata": [fieldmetadata_2]},
         )
@@ -141,7 +141,7 @@ async def test_fieldmetadata_crud(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{rid}?show=basic&show=extracted",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{rid}?show=basic&show=extracted",
         )
         assert resp.status_code == 200
         fieldmetadata = resp.json()["fieldmetadata"]

@@ -47,7 +47,7 @@ async def test_delete_field(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp1 = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{uuid}?show=values",
         )
         assert resp1.status_code == 200
 
@@ -55,14 +55,14 @@ async def test_delete_field(
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.delete(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}/text/text1",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{uuid}/text/text1",
             headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 204
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(
-            f"/{KB_PREFIX}/{knowledgebox_one}/resource/{uuid}?show=values",
+            f"/{KB_PREFIX}/{knowledgebox_one}/rid/{uuid}?show=values",
         )
 
     assert "text1" not in resp.json()["data"]["texts"]

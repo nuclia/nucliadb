@@ -41,7 +41,7 @@ STORAGE_FILE_MATCH = re.compile(
 )
 DOWNLOAD_TYPE_MAP = {"f": "field", "e": "extracted"}
 DOWNLOAD_URI = (
-    "/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
+    "/kb/{kbid}/rid/{rid}/{field_type}/{field_id}/download/{download_type}/{key}"
 )
 
 
