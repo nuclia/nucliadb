@@ -27,7 +27,7 @@ from nucliadb_search.api.v1.router import KB_PREFIX
 
 
 @pytest.mark.asyncio
-async def test_basic_path_thumbnail_sc_2390(
+async def test_basic_patch_thumbnail_sc_2390(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
 
