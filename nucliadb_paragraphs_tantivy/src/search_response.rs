@@ -19,7 +19,9 @@
 //
 use std::collections::HashMap;
 
-use nucliadb_protos::{FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse};
+use nucliadb_protos::{
+    FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore,
+};
 use nucliadb_service_interface::prelude::*;
 use tantivy::collector::FacetCounts;
 use tantivy::schema::Value;
@@ -107,10 +109,14 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
-        for (score, doc_address) in response.top_docs.into_iter().take(total) {
+        for (score, (_, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
+                    let score = ResultScore {
+                        bm25: 0.0,
+                        booster: score as f32,
+                    };
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
@@ -157,7 +163,6 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                     terms.sort();
                     let result = ParagraphResult {
                         uuid,
-                        score,
                         field,
                         start: start_pos,
                         end: end_pos,
@@ -165,7 +170,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         split,
                         index,
                         matches: terms,
-                        ..Default::default()
+                        score: Some(score),
                     };
 
                     results.push(result);
@@ -205,12 +210,16 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
 
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
         let searcher = response.text_service.reader.searcher();
-
         let default_split = Value::Str("".to_string());
-        for (score, doc_address) in response.top_docs.into_iter().take(total) {
+
+        for (id, (score, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
+                    let score = ResultScore {
+                        bm25: score,
+                        booster: id as f32,
+                    };
                     let schema = &response.text_service.schema;
                     let uuid = doc
                         .get_first(schema.uuid)
@@ -257,7 +266,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                     terms.sort();
                     let result = ParagraphResult {
                         uuid,
-                        score_bm25: score,
+                        score: Some(score),
                         field,
                         start: start_pos,
                         end: end_pos,
@@ -265,7 +274,6 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         split,
                         index,
                         matches: terms,
-                        ..Default::default()
                     };
 
                     results.push(result);

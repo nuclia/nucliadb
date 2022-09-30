@@ -98,13 +98,20 @@ pub struct ParagraphSearchRequest {
     pub reload: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ResultScore {
+    #[prost(float, tag="1")]
+    pub bm25: f32,
+    /// In the case of two equal bm25 scores, booster 
+    /// decides
+    #[prost(float, tag="2")]
+    pub booster: f32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentResult {
     #[prost(string, tag="1")]
     pub uuid: ::prost::alloc::string::String,
-    #[prost(uint64, tag="2")]
-    pub score: u64,
-    #[prost(float, tag="3")]
-    pub score_bm25: f32,
+    #[prost(message, optional, tag="3")]
+    pub score: ::core::option::Option<ResultScore>,
     #[prost(string, tag="4")]
     pub field: ::prost::alloc::string::String,
 }
@@ -133,8 +140,6 @@ pub struct DocumentSearchResponse {
 pub struct ParagraphResult {
     #[prost(string, tag="1")]
     pub uuid: ::prost::alloc::string::String,
-    #[prost(uint64, tag="2")]
-    pub score: u64,
     #[prost(string, tag="3")]
     pub field: ::prost::alloc::string::String,
     #[prost(uint64, tag="4")]
@@ -147,8 +152,8 @@ pub struct ParagraphResult {
     pub split: ::prost::alloc::string::String,
     #[prost(uint64, tag="8")]
     pub index: u64,
-    #[prost(float, tag="9")]
-    pub score_bm25: f32,
+    #[prost(message, optional, tag="9")]
+    pub score: ::core::option::Option<ResultScore>,
     #[prost(string, repeated, tag="10")]
     pub matches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
@@ -392,7 +397,7 @@ pub mod node_reader_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -405,6 +410,7 @@ pub mod node_reader_client {
         ) -> NodeReaderClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
             T: tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
                 Response = http::Response<
@@ -455,9 +461,9 @@ pub mod node_reader_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardList>,
-                tonic::Status,
-            > {
+            tonic::Response<super::super::noderesources::ShardList>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -718,9 +724,9 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardList>,
-                tonic::Status,
-            >;
+            tonic::Response<super::super::noderesources::ShardList>,
+            tonic::Status,
+        >;
         async fn document_search(
             &self,
             request: tonic::Request<super::DocumentSearchRequest>,

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -57,6 +57,10 @@ from nucliadb_search.search.fetch import (
 )
 
 
+def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentResult]]):
+    results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
+
+
 async def merge_documents_results(
     document_responses: List[DocumentSearchResponse],
     resources: List[str],
@@ -84,7 +88,7 @@ async def merge_documents_results(
             raw_resource_list.append(result)
 
     if len(document_responses) > 1:
-        raw_resource_list.sort(key=lambda x: x.score_bm25, reverse=True)
+        sort_results_by_score(raw_resource_list)
 
     skip = page * count
     end = skip + count
@@ -103,7 +107,7 @@ async def merge_documents_results(
 
         result_resource_list.append(
             ResourceResult(
-                score=result.score_bm25,
+                score=result.score.bm25,
                 rid=result.uuid,
                 field=field,
                 field_type=field_type,
@@ -144,7 +148,7 @@ async def merge_suggest_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(suggest_responses) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score_bm25, reverse=True)
+        sort_results_by_score(raw_paragraph_list)
 
     result_paragraph_list: List[Paragraph] = []
     for result in raw_paragraph_list[:10]:
@@ -155,7 +159,7 @@ async def merge_suggest_paragraph_results(
         labels = await get_labels_paragraph(result, kbid)
         seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
-            score=result.score_bm25,
+            score=result.score.bm25,
             rid=result.uuid,
             field_type=field_type,
             field=field,
@@ -271,7 +275,7 @@ async def merge_paragraph_results(
             raw_paragraph_list.append(result)
 
     if len(paragraph_responses) > 1:
-        raw_paragraph_list.sort(key=lambda x: x.score_bm25, reverse=True)
+        sort_results_by_score(raw_paragraph_list)
 
     skip = page * count
     end = skip + count
@@ -287,7 +291,7 @@ async def merge_paragraph_results(
         labels = await get_labels_paragraph(result, kbid)
         seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
-            score=result.score_bm25,
+            score=result.score.bm25,
             rid=result.uuid,
             field_type=field_type,
             field=field,
