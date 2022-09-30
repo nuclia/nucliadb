@@ -23,7 +23,7 @@ use std::fs;
 
 use nucliadb_protos::{
     DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults,
-    OrderBy, ResourceId,
+    OrderBy, ResourceId, ResultScore,
 };
 use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
@@ -244,9 +244,13 @@ impl FieldReaderService {
         }
         let mut results = Vec::with_capacity(total);
         info!("Document query at {}:{}", line!(), file!());
-        for (score, doc_address) in response.top_docs {
+        for (id, (_, doc_address)) in response.top_docs.into_iter().enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
+                    let score = Some(ResultScore {
+                        bm25: 0.0,
+                        booster: id as f32,
+                    });
                     info!("Document query at {}:{}", line!(), file!());
                     let uuid = doc
                         .get_first(self.schema.uuid)
@@ -262,12 +266,7 @@ impl FieldReaderService {
                         .unwrap()
                         .to_path_string();
 
-                    let result = DocumentResult {
-                        uuid,
-                        field,
-                        score,
-                        ..Default::default()
-                    };
+                    let result = DocumentResult { uuid, field, score };
                     info!("Document query at {}:{}", line!(), file!());
                     results.push(result);
                 }
@@ -305,9 +304,13 @@ impl FieldReaderService {
         }
         let mut results = Vec::with_capacity(total);
         info!("Document query at {}:{}", line!(), file!());
-        for (score, doc_address) in response.top_docs.into_iter().take(total) {
+        for (id, (score, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
+                    let score = Some(ResultScore {
+                        bm25: score,
+                        booster: id as f32,
+                    });
                     info!("Document query at {}:{}", line!(), file!());
                     let uuid = doc
                         .get_first(self.schema.uuid)
@@ -323,12 +326,7 @@ impl FieldReaderService {
                         .unwrap()
                         .to_path_string();
 
-                    let result = DocumentResult {
-                        uuid,
-                        field,
-                        score_bm25: score,
-                        ..Default::default()
-                    };
+                    let result = DocumentResult { uuid, field, score };
                     info!("Document query at {}:{}", line!(), file!());
                     results.push(result);
                 }

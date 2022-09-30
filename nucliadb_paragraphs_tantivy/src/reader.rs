@@ -24,7 +24,7 @@ use std::fs;
 use nucliadb_protos::{OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId};
 use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
-use tantivy::query::{AllQuery, BooleanQuery, Occur, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy};
 use tracing::*;
@@ -63,7 +63,10 @@ impl ReaderChild for ParagraphReaderService {
         searcher.search(&AllQuery, &Count).unwrap()
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        use std::collections::HashSet;
+
         use search_query::create_query;
+
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
@@ -82,7 +85,7 @@ impl ReaderChild for ParagraphReaderService {
             })
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (termc, queries) = create_query(&parser, &text, request, &self.schema, 1);
+        let (original, termc, fuzzied) = create_query(&parser, &text, request, &self.schema, 1);
         let searcher = Searcher {
             request,
             results,
@@ -92,7 +95,22 @@ impl ReaderChild for ParagraphReaderService {
             order_field,
             text: &text,
         };
-        Ok(searcher.do_search(termc, queries, self))
+        let mut response = searcher.do_search(termc.clone(), original, self);
+        if request.result_per_page > response.total {
+            let fuzzied = searcher.do_search(termc, fuzzied, self);
+            let filter = response
+                .results
+                .iter()
+                .map(|r| r.paragraph.clone())
+                .collect::<HashSet<_>>();
+            fuzzied
+                .results
+                .into_iter()
+                .filter(|r| !filter.contains(&r.paragraph))
+                .for_each(|r| response.results.push(r));
+            response.total = response.results.len() as i32;
+        }
+        Ok(response)
     }
     fn reload(&self) {
         self.reader.reload().unwrap();
@@ -279,10 +297,9 @@ impl<'a> Searcher<'a> {
     fn do_search(
         &self,
         termc: SharedTermC,
-        query: Vec<(Occur, Box<dyn Query>)>,
+        query: Box<dyn Query>,
         service: &ParagraphReaderService,
     ) -> ParagraphSearchResponse {
-        let query = BooleanQuery::new(query);
         let searcher = service.reader.searcher();
         let facet_collector = self.facets.iter().fold(
             FacetCollector::for_field(service.schema.facets),
@@ -758,7 +775,7 @@ mod tests {
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 2);
+        assert_eq!(result.total, 3);
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
             uuid: "".to_string(),
@@ -766,14 +783,14 @@ mod tests {
             fields: vec![],
             filter: Some(filter),
             faceted: Some(faceted),
-            order: Some(order),
+            order: None, // Some(order),
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps),
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 1);
+        assert_eq!(result.total, 3);
 
         // Search typo on all paragraph
         let search = ParagraphSearchRequest {

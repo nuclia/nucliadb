@@ -94,6 +94,11 @@ fn term_query_to_fuzzy(
 ) -> Box<dyn Query> {
     let term_query: &TermQuery = query.downcast_ref().unwrap();
     let term = term_query.term().clone();
+    let mut terms = termc.get_termc();
+    term.as_str()
+        .into_iter()
+        .for_each(|t| terms.log_eterm(t.to_string()));
+    termc.set_termc(terms);
     Box::new(with(term, distance, true, termc))
 }
 
@@ -170,12 +175,22 @@ fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: SharedTermC) -> Ve
     queryp_map(queries, distance, as_prefix, termc)
 }
 
-fn parse_query(parser: &QueryParser, text: &str, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
-    if text.is_empty() {
-        vec![(Occur::Should, Box::new(AllQuery) as Box<dyn Query>)]
+fn fuzzied_queries(query: Box<dyn Query>, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
+    if query.is::<AllQuery>() {
+        vec![(Occur::Should, query)]
     } else {
-        let query = parser.parse_query(text).unwrap();
         flat_and_adapt(query, distance, termc)
+    }
+}
+
+fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
+    if text.is_empty() {
+        Box::new(AllQuery) as Box<dyn Query>
+    } else {
+        parser
+            .parse_query(text)
+            .ok()
+            .unwrap_or_else(|| Box::new(AllQuery))
     }
 }
 
@@ -185,7 +200,7 @@ pub fn create_query(
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
-) -> (SharedTermC, Vec<QueryP>) {
+) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
     let (quotes, reg) =
         text.split(' ')
             .into_iter()
@@ -199,17 +214,18 @@ pub fn create_query(
                 (quotes, reg)
             });
     let termc = SharedTermC::new();
-    let mut queries = parse_query(parser, &reg, distance, termc.clone());
-
+    let query = parse_query(parser, &reg);
+    let mut fuzzies = fuzzied_queries(query.box_clone(), distance, termc.clone());
+    let mut originals = vec![(Occur::Must, query)];
     for quote in quotes {
         let query = parser.parse_query(quote).unwrap();
-        queries.push((Occur::Must, query));
+        fuzzies.push((Occur::Must, query.box_clone()));
+        originals.push((Occur::Must, query));
     }
-
     if !search.uuid.is_empty() {
         let term = Term::from_field_text(schema.uuid, &search.uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        queries.push((Occur::Must, Box::new(term_query)))
+        fuzzies.push((Occur::Must, Box::new(term_query)))
     }
 
     // Fields
@@ -218,7 +234,7 @@ pub fn create_query(
         let facet = Facet::from(facet_key.as_str());
         let facet_term = Term::from_facet(schema.field, &facet);
         let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-        queries.push((Occur::Must, Box::new(facet_term_query)));
+        fuzzies.push((Occur::Must, Box::new(facet_term_query)));
     });
 
     // Add filter
@@ -230,9 +246,11 @@ pub fn create_query(
             let facet = Facet::from(value.as_str());
             let facet_term = Term::from_facet(schema.facets, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            queries.push((Occur::Must, Box::new(facet_term_query)));
+            fuzzies.push((Occur::Must, Box::new(facet_term_query)));
         });
-    (termc, queries)
+    let original = Box::new(BooleanQuery::new(originals));
+    let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
+    (original, termc, fuzzied)
 }
 
 #[cfg(test)]

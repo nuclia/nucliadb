@@ -84,10 +84,16 @@ message ParagraphSearchRequest {
 
 }
 
+message ResultScore {
+    float bm25 = 1;
+    // In the case of two equal bm25 scores, booster 
+    // decides
+    float booster = 2;
+}
+
 message DocumentResult {
     string uuid = 1;
-    uint64 score = 2;
-    float score_bm25 = 3;
+    ResultScore score = 3;
     string field = 4;
 }
 
@@ -110,17 +116,15 @@ message DocumentSearchResponse {
     bool bm25 = 8;
 }
 
-
 message ParagraphResult {
     string uuid = 1;
-    uint64 score = 2;
     string field = 3;
     uint64 start = 4;
     uint64 end = 5;
     string paragraph = 6;
     string split = 7;
     uint64 index = 8;
-    float score_bm25 = 9;
+    ResultScore score = 9;
     repeated string matches = 10;
 }
 
