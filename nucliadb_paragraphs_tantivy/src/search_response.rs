@@ -96,20 +96,15 @@ impl<'a> From<SearchFacetsResponse<'a>> for ParagraphSearchResponse {
 
 impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
     fn from(response: SearchIntResponse) -> Self {
-        let mut total = response.top_docs.len();
-
-        let next_page: bool;
-        if total > response.results_per_page as usize {
-            next_page = true;
-            total = response.results_per_page as usize;
-        } else {
-            next_page = false;
-        }
-
-        let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
+        let obtained = response.top_docs.len();
+        let requested = response.results_per_page as usize;
+        let next_page = obtained > requested;
+        let no_results = std::cmp::min(obtained, requested);
+        let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
-        for (score, (_, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
+        let elements = response.top_docs.into_iter().take(no_results).enumerate();
+        for (score, (_, doc_address)) in elements {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
@@ -186,7 +181,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
         ParagraphSearchResponse {
             results,
             facets,
-            total: total as i32,
+            total: no_results as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
@@ -199,20 +194,15 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
 
 impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
     fn from(response: SearchBm25Response) -> Self {
-        let mut total = response.top_docs.len();
-        let next_page: bool;
-        if total > response.results_per_page as usize {
-            next_page = true;
-            total = response.results_per_page as usize;
-        } else {
-            next_page = false;
-        }
-
-        let mut results: Vec<ParagraphResult> = Vec::with_capacity(total);
+        let obtained = response.top_docs.len();
+        let requested = response.results_per_page as usize;
+        let next_page = obtained > requested;
+        let no_results = std::cmp::min(obtained, requested);
+        let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
-
-        for (id, (score, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
+        let elems = response.top_docs.into_iter().take(no_results).enumerate();
+        for (id, (score, doc_address)) in elems {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
@@ -289,7 +279,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
         ParagraphSearchResponse {
             results,
             facets,
-            total: total as i32,
+            total: no_results as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),

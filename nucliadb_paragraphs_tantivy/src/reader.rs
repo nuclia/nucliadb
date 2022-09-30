@@ -86,7 +86,7 @@ impl ReaderChild for ParagraphReaderService {
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) = create_query(&parser, &text, request, &self.schema, 1);
-        let searcher = Searcher {
+        let mut searcher = Searcher {
             request,
             results,
             offset,
@@ -96,7 +96,8 @@ impl ReaderChild for ParagraphReaderService {
             text: &text,
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
-        if request.result_per_page > response.total {
+        if searcher.results > response.results.len() {
+            searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
             let filter = response
                 .results
