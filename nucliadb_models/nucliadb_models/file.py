@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional, Type, TypeVar
+from typing import Dict, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
@@ -39,16 +39,21 @@ class FieldFile(BaseModel):
     file: Optional[CloudLink]
     language: Optional[str]
     password: Optional[str]
+    external: bool = False
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldFile) -> _T:
-        return cls(
+        instance = cls(
             **MessageToDict(
                 message,
                 preserving_proto_field_name=True,
                 including_default_value_fields=True,
             )
         )
+        instance.external = (  # type: ignore
+            message.file.source == resources_pb2.CloudFile.Source.EXTERNAL
+        )
+        return instance
 
 
 # Creation and update classes (Those used on writer endpoints)
@@ -58,6 +63,11 @@ class FileField(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     file: FileB64
+
+
+class ExternalFileField(BaseModel):
+    uri: str
+    extra_headers: Dict[str, str] = {}
 
 
 # Processing classes (Those used to sent to push endpoints)

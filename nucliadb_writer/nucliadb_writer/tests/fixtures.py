@@ -133,6 +133,7 @@ async def resource(redis, writer_api, knowledgebox_writer):
 async def processing_utility():
     nuclia_settings.dummy_processing = True
     nuclia_settings.onprem = True
+    nuclia_settings.nuclia_jwt_key = "foobarkey"
 
 
 @pytest.fixture(scope="function")

@@ -70,6 +70,7 @@ class CloudFile(google.protobuf.message.Message):
         GCS: CloudFile._Source.ValueType  # 1
         S3: CloudFile._Source.ValueType  # 2
         LOCAL: CloudFile._Source.ValueType  # 3
+        EXTERNAL: CloudFile._Source.ValueType  # 4
         EMPTY: CloudFile._Source.ValueType  # 5
 
     class Source(_Source, metaclass=_SourceEnumTypeWrapper): ...
@@ -77,6 +78,7 @@ class CloudFile(google.protobuf.message.Message):
     GCS: CloudFile.Source.ValueType  # 1
     S3: CloudFile.Source.ValueType  # 2
     LOCAL: CloudFile.Source.ValueType  # 3
+    EXTERNAL: CloudFile.Source.ValueType  # 4
     EMPTY: CloudFile.Source.ValueType  # 5
 
     URI_FIELD_NUMBER: builtins.int

@@ -37,6 +37,7 @@ pub mod cloud_file {
         Gcs = 1,
         S3 = 2,
         Local = 3,
+        External = 4,
         Empty = 5,
     }
 }

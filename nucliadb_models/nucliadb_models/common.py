@@ -78,6 +78,7 @@ class CloudFile(BaseModel):
         GCS = "GCS"
         S3 = "S3"
         LOCAL = "LOCAL"
+        EXTERNAL = "EXTERNAL"
 
     source: Optional[Source]
     filename: Optional[str]
