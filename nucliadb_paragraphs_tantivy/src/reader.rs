@@ -782,7 +782,6 @@ mod tests {
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        result.results.iter().for_each(|r| println!("{r:?}"));
         assert_eq!(result.total, 3);
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
