@@ -180,14 +180,14 @@ async def merge_vectors_results(
     kbid: str,
     count: int,
     page: int,
-    max_score: float = 0.70,
+    min_score: float = 0.70,
 ):
     facets: Dict[str, Any] = {}
     raw_vectors_list: List[DocumentScored] = []
 
     for vector_response in vector_responses:
         for document in vector_response.documents:
-            if document.score < max_score:
+            if document.score < min_score:
                 continue
             if math.isnan(document.score):
                 continue
@@ -326,7 +326,7 @@ async def merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-    max_score: float = 0.85,
+    min_score: float = 0.85,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
@@ -352,7 +352,7 @@ async def merge_results(
     )
 
     api_results.sentences = await merge_vectors_results(
-        vectors, resources, kbid, count, page, max_score=max_score
+        vectors, resources, kbid, count, page, min_score=min_score
     )
 
     api_results.resources = await fetch_resources(
