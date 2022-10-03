@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Literal, Union, Optional
+from typing import List, Literal, Optional, Union
 from typing import get_args as typing_get_args
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -174,6 +174,14 @@ async def get_resource(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Resource:
+
+    if rid is None and rslug is not None:
+        rid = await get_resource_uuid_by_slug(rslug)
+        if rid is None:
+            # Could not be found!
+            # What are we doing with audits when uuid cant be found? Extend protobuf? Set slug as uuid?
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
     audit = get_audit()
     if audit is not None:
         await audit.visited(kbid, rid, x_nucliadb_user, x_forwarded_for)
@@ -290,3 +298,15 @@ async def get_resource_field(
     return Response(
         content=resource_field.json(exclude_unset=True), media_type="application/json"
     )
+
+
+
+async def get_resource_uuid_by_slug(slug: str, kbid: str) -> Optional[str]:
+    from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
+
+    storage = await get_storage(service_name=SERVICE_NAME)
+    cache = await get_cache()
+    driver = await get_driver()
+    txn = await driver.begin()
+    kb = KnowledgeBox(txn, storage, cache, kbid)
+    return await kb.get_resource_uuid_by_slug(slug)
