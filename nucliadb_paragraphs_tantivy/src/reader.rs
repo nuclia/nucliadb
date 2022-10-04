@@ -797,7 +797,7 @@ mod tests {
             reload: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 3);
+        assert_eq!(result.total, 1);
 
         // Search typo on all paragraph
         let search = ParagraphSearchRequest {
