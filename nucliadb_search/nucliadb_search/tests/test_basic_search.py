@@ -20,7 +20,8 @@
 import asyncio
 import math
 import os
-from typing import Callable
+from itertools import tee
+from typing import Callable, Dict, List
 
 import pytest
 from httpx import AsyncClient
@@ -257,6 +258,12 @@ async def test_search_pagination(
 ) -> None:
     kbid = multiple_search_resource
 
+    scores: Dict[str, List[float]] = {
+        "paragraphs": [],
+        "sentences": [],
+        "fulltext": [],
+    }
+
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
         await asyncio.sleep(5)
 
@@ -283,6 +290,17 @@ async def test_search_pagination(
 
             response = resp.json()
 
+            # Append scores for this page to later check that they come in order
+            scores["fulltext"].extend(
+                [r["score"] for r in response["fulltext"]["results"]]
+            )
+            scores["paragraphs"].extend(
+                [r["score"] for r in response["paragraphs"]["results"]]
+            )
+            scores["sentences"].extend(
+                [r["score"] for r in response["sentences"]["results"]]
+            )
+
             for result in response["paragraphs"]["results"]:
                 results.append(result["rid"])
 
@@ -295,3 +313,23 @@ async def test_search_pagination(
         # Check that we iterated over all matching resources
         unique_results = set(results)
         assert len(unique_results) == n_results_expected
+
+        check_page_results_are_correctly_ordered(scores)
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
+
+
+def check_page_results_are_correctly_ordered(scores):
+    for par, next_par in pairwise(scores["paragraphs"]):
+        assert par >= next_par
+
+    for sent, next_sent in pairwise(scores["sentences"]):
+        assert sent >= next_sent
+
+    for text, next_text in pairwise(scores["fulltext"]):
+        assert text >= next_text
