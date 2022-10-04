@@ -225,7 +225,8 @@ pub fn create_query(
     if !search.uuid.is_empty() {
         let term = Term::from_field_text(schema.uuid, &search.uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(term_query)))
+        fuzzies.push((Occur::Must, Box::new(term_query.clone())));
+        originals.push((Occur::Must, Box::new(term_query)))
     }
 
     // Fields
@@ -234,7 +235,8 @@ pub fn create_query(
         let facet = Facet::from(facet_key.as_str());
         let facet_term = Term::from_facet(schema.field, &facet);
         let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(facet_term_query)));
+        fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
+        originals.push((Occur::Must, Box::new(facet_term_query)));
     });
 
     // Add filter
@@ -246,7 +248,8 @@ pub fn create_query(
             let facet = Facet::from(value.as_str());
             let facet_term = Term::from_facet(schema.facets, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            fuzzies.push((Occur::Must, Box::new(facet_term_query)));
+            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
+            originals.push((Occur::Must, Box::new(facet_term_query)));
         });
     let original = Box::new(BooleanQuery::new(originals));
     let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
