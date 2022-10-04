@@ -68,7 +68,7 @@ async def search(
     fields: Optional[List[str]] = None,
     filters: Optional[List[str]] = None,
     faceted: Optional[List[str]] = None,
-    sort: SortOption = SortOption.CREATED,
+    sort: Optional[SortOption] = None,
     page_number: int = 0,
     page_size: int = 20,
     range_creation_start: Optional[datetime] = None,
@@ -113,7 +113,6 @@ async def search(
         query,
         filters,
         faceted,
-        sort.value,
         page_number,
         page_size,
         range_creation_start,
@@ -122,6 +121,7 @@ async def search(
         range_modification_end,
         fields=fields,
         reload=reload,
+        sort=sort.value if sort else None,
     )
 
     incomplete_results = False

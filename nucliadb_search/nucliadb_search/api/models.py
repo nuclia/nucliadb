@@ -249,7 +249,7 @@ class SearchRequest(BaseModel):
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []
-    sort: SortOption = SortOption.CREATED
+    sort: Optional[SortOption] = None
     page_number: int = 0
     page_size: int = 20
     max_score: float = 0.70
