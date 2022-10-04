@@ -195,6 +195,15 @@ message Paragraph {
     string text = 9;  // Optional, as a computed value
 }
 
+message Position {
+    int64 start = 1;
+    int64 end = 2;
+}
+
+message Positions {
+    repeated Position position = 1;
+}
+
 message FieldMetadata {
     repeated string links = 1;
     repeated Paragraph paragraphs = 2;
@@ -207,6 +216,7 @@ message FieldMetadata {
     CloudFile thumbnail = 9;
     string language = 10;
     string summary = 11;
+    map<string, Positions> positions = 12;  // Document
 
 }
 

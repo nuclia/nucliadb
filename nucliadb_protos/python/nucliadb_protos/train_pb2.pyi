@@ -83,6 +83,8 @@ from nucliadb_protos.resources_pb2 import (
     PagePositions as PagePositions,
     Paragraph as Paragraph,
     ParagraphAnnotation as ParagraphAnnotation,
+    Position as Position,
+    Positions as Positions,
     Relations as Relations,
     RowsPreview as RowsPreview,
     Sentence as Sentence,

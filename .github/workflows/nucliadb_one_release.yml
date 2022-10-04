@@ -1,12 +1,6 @@
 name: Release NucliaDB One
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "nucliadb_one/VERSION"
-
   push:
     branches:
       - main

@@ -1,12 +1,6 @@
 name: Release NucliaDB Reader
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "nucliadb_reader/VERSION"
-
   push:
     branches:
       - main

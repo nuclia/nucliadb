@@ -1,2 +1,4 @@
 pydantic==1.9.0
 protobuf
+nucliadb-ingest>=1.0.0
+nucliadb-protos>=0.0.29

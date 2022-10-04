@@ -1,0 +1,4 @@
+nucliadb-writer>=1.0.1
+nucliadb-train>=1.0.2
+nucliadb-reader>=1.0.2
+nucliadb-search>=1.0.1

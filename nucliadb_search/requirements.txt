@@ -6,7 +6,7 @@ opentelemetry-propagator-b3
 fastapi-versioning==0.10.0
 fastapi==0.75.0
 pydantic==1.9.0
-sentry-sdk==1.5.12
+sentry-sdk>=1.5.12
 pyjwt==2.4.0
 mmh3==3.0.0
 httpx==0.23.0
@@ -16,3 +16,8 @@ grpc-stubs==1.24.7
 orjson==3.6.7
 opentelemetry-semantic-conventions==0.30b1
 aiodns==3.0.0
+nucliadb-protos>=0.0.29
+nucliadb-utils[storages,fastapi,cache]>=1.0.9
+nucliadb-ingest>=1.0.0
+nucliadb-models>=1.0.0
+nucliadb-telemetry>=1.1.6

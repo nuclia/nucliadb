@@ -5,3 +5,5 @@ types-requests==2.27.7
 mmh3==3.0.0
 nats-py[nkeys]==2.1.3
 pyjwt==2.4.0
+nucliadb-protos>=0.0.29
+nucliadb-telemetry>=1.1.6

@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-1.0.9 (unreleased)
-------------------
+1.0.9
+-----
 
 - Parametrize upload token expiration
 

@@ -1,12 +1,6 @@
 name: Release NucliaDB Ingest
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "nucliadb_ingest/VERSION"
-
   push:
     branches:
       - main

@@ -1,2 +1,4 @@
 uvicorn
 pydantic_argparse
+nucliadb-one>=1.0.0
+nucliadb-node-binding>=0.2.0

@@ -1,12 +1,6 @@
 name: Release NucliaDB Train
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "nucliadb_train/VERSION"
-
   push:
     branches:
       - main
