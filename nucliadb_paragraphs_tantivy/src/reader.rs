@@ -111,6 +111,12 @@ impl ReaderChild for ParagraphReaderService {
                 .for_each(|r| response.results.push(r));
             response.total = response.results.len() as i32;
         }
+        let total = response.results.len() as f32;
+        response.results.iter_mut().enumerate().for_each(|(i, r)| {
+            if let Some(sc) = &mut r.score {
+                sc.booster = total - (i as f32);
+            }
+        });
         Ok(response)
     }
     fn reload(&self) {

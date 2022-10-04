@@ -103,14 +103,12 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
-        let elements = response.top_docs.into_iter().take(no_results).enumerate();
-        for (score, (_, doc_address)) in elements {
-            info!("Score: {} - DocAddress: {:?}", score, doc_address);
+        for (_, doc_address) in response.top_docs.into_iter().take(no_results) {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: 0.0,
-                        booster: score as f32,
+                        booster: 0.0,
                     };
                     let schema = &response.text_service.schema;
                     let uuid = doc
@@ -201,14 +199,13 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
-        let elems = response.top_docs.into_iter().take(no_results).enumerate();
-        for (id, (score, doc_address)) in elems {
+        for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: score,
-                        booster: id as f32,
+                        booster: 0.0,
                     };
                     let schema = &response.text_service.schema;
                     let uuid = doc
