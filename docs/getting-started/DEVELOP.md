@@ -1,4 +1,4 @@
-# How to develop on nucliaDB
+# How to develop on NucliaDB
 
 You can develop by test driven using the dependency fixtures or by deploying localy the required dependencies.
 
