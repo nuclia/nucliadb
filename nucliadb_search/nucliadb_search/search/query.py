@@ -141,6 +141,7 @@ async def paragraph_query_to_pb(
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
         if sort:
+            import pdb; pdb.set_trace()
             request.order.field = sort
             request.order.type = sort_ord  # type: ignore
         request.page_number = page_number

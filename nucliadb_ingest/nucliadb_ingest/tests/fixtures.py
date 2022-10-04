@@ -68,6 +68,9 @@ from nucliadb_utils.utilities import (
     get_utility,
     set_utility,
 )
+from faker import Faker
+import random
+
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -870,6 +873,111 @@ def broker_resource(knowledgebox):
     message1.source = BrokerMessage.MessageSource.WRITER
     return message1
 
+
+def random_broker_resource(knowledgebox):
+    rid = str(uuid.uuid4())
+    faker = Faker()
+
+    message1: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug=f"{rid}slug",
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+
+    message1.basic.icon = "text/plain"
+
+    
+    message1.basic.title = "Title Resource"
+    message1.basic.summary = "Summary of document"
+    message1.basic.thumbnail = "doc"
+    message1.basic.layout = "default"
+    message1.basic.metadata.useful = True
+    message1.basic.metadata.language = "es"
+    message1.basic.created.FromDatetime(datetime.now())
+    message1.basic.modified.FromDatetime(datetime.now())
+    message1.origin.source = rpb.Origin.Source.WEB
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    etw.field.field = "file"
+    etw.field.field_type = rpb.FieldType.FILE
+    message1.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Summary of document"
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    message1.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Title Resource"
+    etw.field.field = "title"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    message1.extracted_text.append(etw)
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "file"
+    fcm.field.field_type = rpb.FieldType.FILE
+    p1 = rpb.Paragraph(
+        start=0,
+        end=45,
+    )
+    p1.start_seconds.append(0)
+    p1.end_seconds.append(10)
+    p2 = rpb.Paragraph(
+        start=47,
+        end=64,
+    )
+    p2.start_seconds.append(10)
+    p2.end_seconds.append(20)
+    p2.start_seconds.append(20)
+    p2.end_seconds.append(30)
+
+    fcm.metadata.metadata.paragraphs.append(p1)
+    fcm.metadata.metadata.paragraphs.append(p2)
+    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
+
+    c1 = rpb.Classification()
+    c1.label = "label1"
+    c1.labelset = "labelset1"
+    fcm.metadata.metadata.classifications.append(c1)
+    message1.field_metadata.append(fcm)
+
+    ev = rpb.ExtractedVectorsWrapper()
+    ev.field.field = "file"
+    ev.field.field_type = rpb.FieldType.FILE
+
+    v1 = rpb.Vector()
+    v1.start = 0
+    v1.end = 19
+    v1.start_paragraph = 0
+    v1.end_paragraph = 45
+    v1.vector.extend(V1)
+    ev.vectors.vectors.vectors.append(v1)
+
+    v2 = rpb.Vector()
+    v2.start = 20
+    v2.end = 45
+    v2.start_paragraph = 0
+    v2.end_paragraph = 45
+    v2.vector.extend(V2)
+    ev.vectors.vectors.vectors.append(v2)
+
+    v3 = rpb.Vector()
+    v3.start = 48
+    v3.end = 65
+    v3.start_paragraph = 47
+    v3.end_paragraph = 64
+    v3.vector.extend(V3)
+    ev.vectors.vectors.vectors.append(v3)
+
+    message1.field_vectors.append(ev)
+    message1.source = BrokerMessage.MessageSource.WRITER
+    return message1
 
 async def create_resource(storage, driver, cache, knowledgebox):
     txn = await driver.begin()

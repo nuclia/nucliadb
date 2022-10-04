@@ -251,12 +251,13 @@ async def test_search_resource_all(
     await txn.abort()
 
 
+
 @pytest.mark.asyncio
 @pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_search_pagination(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str
+    search_api: Callable[..., AsyncClient], multiple_search_random_resource: str
 ) -> None:
-    kbid = multiple_search_resource
+    kbid = multiple_search_random_resource
 
     scores: Dict[str, List[float]] = {
         "paragraphs": [],

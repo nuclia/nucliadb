@@ -30,7 +30,7 @@ from starlette.routing import Mount
 from nucliadb_ingest.cache import clear_ingest_cache
 from nucliadb_ingest.orm import NODES
 from nucliadb_ingest.orm.node import Node
-from nucliadb_ingest.tests.fixtures import broker_resource
+from nucliadb_ingest.tests.fixtures import broker_resource, random_broker_resource
 from nucliadb_ingest.utils import get_driver
 from nucliadb_search import API_PREFIX
 from nucliadb_utils.utilities import clear_global_cache
@@ -180,6 +180,21 @@ async def multiple_search_resource(
     for count in range(100):
         message1 = broker_resource(knowledgebox)
         await inject_message(processor, knowledgebox, message1, count + 1)
+    return knowledgebox
+
+
+@pytest.fixture(scope="function")
+async def multiple_search_random_resource(
+    indexing_utility_registered,
+    processor,
+    knowledgebox,
+):
+    """
+    Create a random resource that has every possible bit of information
+    """
+    for count in range(100):
+        message = random_broker_resource(knowledgebox)
+        await inject_message(processor, knowledgebox, message, count + 1)
     return knowledgebox
 
 

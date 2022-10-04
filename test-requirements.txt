@@ -16,3 +16,4 @@ pytest-mock
 asynctest
 grpc-stubs==1.24.7
 aioresponses==0.7.3
+faker==15.0.0
