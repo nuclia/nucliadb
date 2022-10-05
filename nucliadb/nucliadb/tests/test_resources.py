@@ -46,10 +46,12 @@ async def test_last_seqid_is_stored_in_resource(
 
     # last_seqid should be returned on a resource get
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    assert resp.status_code == 200
     assert seqid == resp.json()["last_seqid"]
 
     # last_seqid should be returned when listing resources
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources")
+    assert resp.status_code == 200
     resource_list = resp.json()["resources"]
     assert len(resource_list) > 0
     for resource in resource_list:
