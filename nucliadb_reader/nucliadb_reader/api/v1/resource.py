@@ -174,20 +174,19 @@ async def get_resource(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Resource:
-
-    if rid is None and rslug is not None:
-        rid = await get_resource_uuid_by_slug(rslug)
-        if rid is None:
-            # Could not be found!
-            # What are we doing with audits when uuid cant be found? Extend protobuf? Set slug as uuid?
-            raise HTTPException(status_code=404, detail="Resource does not exist")
-
     audit = get_audit()
     if audit is not None:
-        await audit.visited(kbid, rid, x_nucliadb_user, x_forwarded_for)
+        audit_rid = rid if rid else rslug
+        await audit.visited(kbid, audit_rid, x_nucliadb_user, x_forwarded_for)  # type: ignore
 
     result = await serialize(
-        kbid, rid, show, field_type_filter, extracted, service_name=SERVICE_NAME
+        kbid,
+        rid,
+        show,
+        field_type_filter,
+        extracted,
+        service_name=SERVICE_NAME,
+        slug=rslug,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Resource does not exist")
@@ -298,15 +297,3 @@ async def get_resource_field(
     return Response(
         content=resource_field.json(exclude_unset=True), media_type="application/json"
     )
-
-
-
-async def get_resource_uuid_by_slug(slug: str, kbid: str) -> Optional[str]:
-    from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
-
-    storage = await get_storage(service_name=SERVICE_NAME)
-    cache = await get_cache()
-    driver = await get_driver()
-    txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, cache, kbid)
-    return await kb.get_resource_uuid_by_slug(slug)
