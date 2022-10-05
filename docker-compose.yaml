@@ -2,25 +2,32 @@ version: "3.9"
 
 services:
   nucliadb:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: nuclia/nucliadb
     environment:
-      - DRIVER=LOCAL
-      - MAINDB=/data/maindb
+      - DRIVER=REDIS
+      - MAINDB=redis://redis:6379
       - BLOB=/data/blobs
       - NODE=/data/node
       - HTTP=8080
       - GRPC=8060
       - TRAIN=8040
-      - LOG=ERROR
+      - LOG=INFO
       - ZONE=europe-1
       - RUST_BACKTRACE=1
-      - RUST_LOG=nucliadb_node=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_fields_tantivy=DEBUG
+      - RUST_LOG=nucliadb_node=ERROR,nucliadb_paragraphs_tantivy=ERROR,nucliadb_fields_tantivy=ERROR
     ports:
       - "8080:8080"
       - "8060:8060"
       - "8040:8040"
+    volumes:
+      - nucliadb-data:/data
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
     volumes:
       - nucliadb-data:/data
 
