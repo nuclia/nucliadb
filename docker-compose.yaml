@@ -20,7 +20,8 @@ services:
       - "8060:8060"
       - "8040:8040"
     volumes:
-      - nucliadb-data:/data
+      - nucliadb-nodefs:/data/node
+      - nucliadb-blobfs:/data/blobs
     depends_on:
       - redis
 
@@ -29,7 +30,9 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - nucliadb-data:/data
+      - nucliadb-maindb:/data/maindb
 
 volumes:
-  nucliadb-data: {}
+  nucliadb-blobfs: {}
+  nucliadb-maindb: {}
+  nucliadb-nodefs: {}
