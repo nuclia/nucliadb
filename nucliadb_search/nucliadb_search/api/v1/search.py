@@ -74,7 +74,7 @@ async def search_knowledgebox(
     sort: Optional[SortOption] = None,
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
-    max_score: float = Query(default=0.70),
+    min_score: float = Query(default=0.70),
     range_creation_start: Optional[datetime] = Query(default=None),
     range_creation_end: Optional[datetime] = Query(default=None),
     range_modification_start: Optional[datetime] = Query(default=None),
@@ -109,7 +109,7 @@ async def search_knowledgebox(
         sort=sort,
         page_number=page_number,
         page_size=page_size,
-        max_score=max_score,
+        min_score=min_score,
         range_creation_end=range_creation_end,
         range_creation_start=range_creation_start,
         range_modification_end=range_modification_end,
@@ -263,7 +263,7 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        max_score=item.max_score,
+        min_score=item.min_score,
         highlight=item.highlight,
     )
     await abort_transaction()

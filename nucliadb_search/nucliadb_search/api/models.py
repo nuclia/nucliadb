@@ -252,7 +252,7 @@ class SearchRequest(BaseModel):
     sort: Optional[SortOption] = None
     page_number: int = 0
     page_size: int = 20
-    max_score: float = 0.70
+    min_score: float = 0.70
     range_creation_start: Optional[datetime] = None
     range_creation_end: Optional[datetime] = None
     range_modification_start: Optional[datetime] = None
