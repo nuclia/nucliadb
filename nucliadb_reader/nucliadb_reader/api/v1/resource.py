@@ -176,8 +176,8 @@ async def get_resource(
 ) -> Resource:
     audit = get_audit()
     if audit is not None:
-        audit_rid = rid if rid else rslug
-        await audit.visited(kbid, audit_rid, x_nucliadb_user, x_forwarded_for)  # type: ignore
+        audit_id = rid if rid else rslug
+        await audit.visited(kbid, audit_id, x_nucliadb_user, x_forwarded_for)  # type: ignore
 
     result = await serialize(
         kbid,

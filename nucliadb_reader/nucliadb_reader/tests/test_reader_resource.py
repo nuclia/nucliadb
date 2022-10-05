@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb_ingest.orm.resource import Resource
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX
+from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 
 ID = ("id",)
 BASIC = (
@@ -262,3 +262,16 @@ async def test_get_resource_filter_field_types_and_extracted(reader_api, test_re
             "metadata",
             "vectors",
         }
+
+
+@pytest.mark.asyncio
+async def test_get_resource_by_slug(reader_api, test_resource):
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rslug = rsc.basic.slug
+
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}",
+        )
+        assert resp.status_code == 200

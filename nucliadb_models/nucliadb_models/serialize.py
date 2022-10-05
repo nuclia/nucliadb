@@ -176,7 +176,7 @@ async def serialize(
     if orm_resource is None:
         return None
 
-    resource = Resource(id=rid)
+    resource = Resource(id=orm_resource.uuid)
 
     include_values = ResourceProperties.VALUES in show
 
