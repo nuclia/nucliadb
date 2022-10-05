@@ -29,9 +29,9 @@ from nucliadb_protos.nodereader_pb2 import SuggestResponse
 from nucliadb_protos.writer_pb2 import ShardObject
 from sentry_sdk import capture_exception
 
+from nucliadb_ingest.serialize import ResourceProperties
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.serialize import ResourceProperties
 from nucliadb_search import logger
 from nucliadb_search.api.models import (
     KnowledgeboxSuggestResults,

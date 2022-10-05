@@ -29,14 +29,14 @@ from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb_ingest.orm.resource import KB_REVERSE
 from nucliadb_ingest.orm.resource import Resource as ResourceORM
-from nucliadb_ingest.utils import get_driver
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import Resource
-from nucliadb_models.serialize import (
+from nucliadb_ingest.serialize import (
     ExtractedDataTypeName,
     ResourceProperties,
     serialize,
 )
+from nucliadb_ingest.utils import get_driver
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import Resource
 from nucliadb_search import SERVICE_NAME, logger
 from nucliadb_utils.utilities import get_cache, get_storage
 

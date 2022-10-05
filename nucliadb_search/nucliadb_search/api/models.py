@@ -26,9 +26,9 @@ from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
+from nucliadb_ingest.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import Resource
-from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 
 if TYPE_CHECKING:
     SortValue = OrderBy.OrderType.V

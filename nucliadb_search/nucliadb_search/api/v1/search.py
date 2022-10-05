@@ -30,9 +30,9 @@ from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from sentry_sdk import capture_exception
 
+from nucliadb_ingest.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.serialize import ExtractedDataTypeName, ResourceProperties
 from nucliadb_search import logger
 from nucliadb_search.api.models import (
     KnowledgeboxSearchResults,

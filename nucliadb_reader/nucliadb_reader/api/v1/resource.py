@@ -29,6 +29,13 @@ from nucliadb_ingest.fields.conversation import Conversation
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb_ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb_ingest.orm.resource import Resource as ORMResource
+from nucliadb_ingest.serialize import (
+    ExtractedDataTypeName,
+    ResourceFieldProperties,
+    ResourceProperties,
+    serialize,
+    set_resource_field_extracted_data,
+)
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
@@ -37,13 +44,6 @@ from nucliadb_models.resource import (
     Resource,
     ResourceList,
     ResourcePagination,
-)
-from nucliadb_models.serialize import (
-    ExtractedDataTypeName,
-    ResourceFieldProperties,
-    ResourceProperties,
-    serialize,
-    set_resource_field_extracted_data,
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_reader import SERVICE_NAME  # type: ignore
