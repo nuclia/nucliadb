@@ -297,3 +297,4 @@ async def test_resource_endpoints_by_slug(reader_api, test_resource):
             f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
         )
         assert resp.status_code == 404
+        assert resp.json()["detail"] == "Resource does not exist"

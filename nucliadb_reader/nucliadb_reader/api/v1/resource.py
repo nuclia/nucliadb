@@ -251,7 +251,6 @@ async def get_resource_field(
 
     resource = ORMResource(txn, storage, kb, rid)
     field = await resource.get_field(field_id, pb_field_id, load=True)
-
     if field is None:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
