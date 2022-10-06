@@ -29,3 +29,4 @@ gcloud
 oauth2client
 mmh3==3.0.0
 tikv-client==0.0.3
+nucliadb-protos>==0.0.29
