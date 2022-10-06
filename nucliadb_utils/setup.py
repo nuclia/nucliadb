@@ -3,6 +3,7 @@ import re
 from typing import List
 
 from setuptools import Extension, find_packages, setup
+from platform import system
 
 with open("README.md") as f:
     readme = f.read()
@@ -58,6 +59,12 @@ lru_module = Extension(
     "nucliadb_utils.cache.lru", sources=["nucliadb_utils/cache/lru.c"]
 )
 
+
+extensions = []
+if system() != "Windows":
+    extensions.append(lru_module)
+
+
 setup(
     name="nucliadb_utils",
     version=open("VERSION").read().strip(),
@@ -74,7 +81,7 @@ setup(
     ],
     zip_safe=True,
     include_package_data=True,
-    ext_modules=[lru_module],
+    ext_modules=extensions,
     packages=find_packages(),
     install_requires=requirements,
     extras_require=extra_requirements,
