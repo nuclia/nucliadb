@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.0.30  (Pending)
+0.0.30
 ------
 
 - Export values optional
