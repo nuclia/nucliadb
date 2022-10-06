@@ -27,6 +27,7 @@ from nucliadb_ingest.fields.conversation import Conversation
 from nucliadb_ingest.fields.file import File
 from nucliadb_ingest.fields.link import Link
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb_ingest.orm.resource import Resource as ORMResource
 from nucliadb_ingest.utils import get_driver
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.resource import (
@@ -130,25 +131,22 @@ async def set_resource_field_extracted_data(
 
 async def serialize(
     kbid: str,
-    rid: str,
+    rid: Optional[str],
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     service_name: Optional[str] = None,
+    slug: Optional[str] = None,
 ) -> Optional[Resource]:
 
-    storage = await get_storage(service_name=service_name)
-    cache = await get_cache()
-    driver = await get_driver()
-
-    txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, cache, kbid)
-    orm_resource = await kb.get(rid)
+    orm_resource = await get_orm_resource(
+        kbid, rid=rid, slug=slug, service_name=service_name
+    )
     if orm_resource is None:
-        await txn.abort()
+        # Resource not found
         return None
 
-    resource = Resource(id=rid)
+    resource = Resource(id=orm_resource.uuid)
 
     include_values = ResourceProperties.VALUES in show
 
@@ -361,5 +359,48 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
-    await txn.abort()
     return resource
+
+
+async def get_orm_resource(
+    kbid: str,
+    rid: Optional[str],
+    slug: Optional[str] = None,
+    service_name: Optional[str] = None,
+) -> Optional[ORMResource]:
+
+    storage = await get_storage(service_name=service_name)
+    cache = await get_cache()
+    driver = await get_driver()
+
+    txn = await driver.begin()
+    kb = KnowledgeBox(txn, storage, cache, kbid)
+
+    if rid is None:
+        if slug is None:
+            raise ValueError("Either rid or slug parameters should be used")
+
+        rid = await kb.get_resource_uuid_by_slug(slug)
+        if rid is None:
+            # Could not find resource uuid from slug
+            await txn.abort()
+            return None
+
+    orm_resource = await kb.get(rid)
+    if orm_resource is None:
+        await txn.abort()
+        return None
+
+    await txn.abort()
+    return orm_resource
+
+
+async def get_resource_uuid_by_slug(
+    kbid: str, slug: str, service_name: Optional[str] = None
+) -> Optional[str]:
+    storage = await get_storage(service_name=service_name)
+    cache = await get_cache()
+    driver = await get_driver()
+    txn = await driver.begin()
+    kb = KnowledgeBox(txn, storage, cache, kbid)
+    return await kb.get_resource_uuid_by_slug(slug)

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 from typing import get_args as typing_get_args
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -33,6 +33,7 @@ from nucliadb_ingest.serialize import (
     ExtractedDataTypeName,
     ResourceFieldProperties,
     ResourceProperties,
+    get_resource_uuid_by_slug,
     serialize,
     set_resource_field_extracted_data,
 )
@@ -53,7 +54,7 @@ from nucliadb_reader.api.models import (
     FIELD_NAMES_TO_PB_TYPE_MAP,
     ResourceField,
 )
-from nucliadb_reader.api.v1.router import KB_PREFIX, api
+from nucliadb_reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
@@ -137,7 +138,15 @@ async def list_resources(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=200,
+    name="Get Resource",
+    response_model=Resource,
+    response_model_exclude_unset=True,
+    tags=["Resources"],
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
     name="Get Resource",
     response_model=Resource,
@@ -148,8 +157,9 @@ async def list_resources(
 @version(1)
 async def get_resource(
     request: Request,
-    rid: str,
     kbid: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -167,10 +177,17 @@ async def get_resource(
 ) -> Resource:
     audit = get_audit()
     if audit is not None:
-        await audit.visited(kbid, rid, x_nucliadb_user, x_forwarded_for)
+        audit_id = rid if rid else rslug
+        await audit.visited(kbid, audit_id, x_nucliadb_user, x_forwarded_for)  # type: ignore
 
     result = await serialize(
-        kbid, rid, show, field_type_filter, extracted, service_name=SERVICE_NAME
+        kbid,
+        rid,
+        show,
+        field_type_filter,
+        extracted,
+        service_name=SERVICE_NAME,
+        slug=rslug,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Resource does not exist")
@@ -182,7 +199,15 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
+    status_code=200,
+    name="Get Resource field",
+    response_model=ResourceField,
+    response_model_exclude_unset=True,
+    tags=["Resource fields"],
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=200,
     name="Get Resource field",
     response_model=ResourceField,
@@ -193,10 +218,11 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 @version(1)
 async def get_resource_field(
     request: Request,
-    rid: str,
     kbid: str,
     field_type: FieldTypeName,
     field_id: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     show: List[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
     extracted: List[ExtractedDataTypeName] = Query(
         [
@@ -217,6 +243,12 @@ async def get_resource_field(
     pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
 
     kb = ORMKnowledgeBox(txn, storage, cache, kbid)
+
+    if rid is None:
+        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
+        if rid is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
     resource = ORMResource(txn, storage, kb, rid)
     field = await resource.get_field(field_id, pb_field_id, load=True)
 
