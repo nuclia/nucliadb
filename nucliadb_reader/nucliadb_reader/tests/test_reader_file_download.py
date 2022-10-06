@@ -179,6 +179,14 @@ async def test_download_fields_by_resource_slug(
         )
         assert resp.status_code == 200
 
+        # Check that 404 is returned when a slug does not exist
+        unexisting_resource_path = f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/idonotexist"
+        resp = await client.get(
+            f"{unexisting_resource_path}/{endpoint}",
+        )
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Resource does not exist"
+
 
 async def _get_message_with_file(test_resource):
     conversation_field = await test_resource.get_field("conv1", FieldType.CONVERSATION)
