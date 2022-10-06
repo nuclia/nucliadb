@@ -265,13 +265,35 @@ async def test_get_resource_filter_field_types_and_extracted(reader_api, test_re
 
 
 @pytest.mark.asyncio
-async def test_get_resource_by_slug(reader_api, test_resource):
+async def test_resource_endpoints_by_slug(reader_api, test_resource):
     rsc = test_resource
     kbid = rsc.kb.kbid
     rslug = rsc.basic.slug
 
+    non_existent_slug = "foobar"
+
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+
+        # Regular GET
+
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}",
         )
         assert resp.status_code == 200
+
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}",
+        )
+        assert resp.status_code == 404
+
+        # Field endpoint
+
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{rslug}/text/text1",
+        )
+        assert resp.status_code == 200
+
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RSLUG_PREFIX}/{non_existent_slug}/text/text1",
+        )
+        assert resp.status_code == 404

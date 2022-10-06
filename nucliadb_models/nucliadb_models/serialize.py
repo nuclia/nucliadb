@@ -129,6 +129,15 @@ async def set_resource_field_extracted_data(
             field_data.link = models.LinkExtractedData.from_message(data_led)
 
 
+async def get_resource_uuid_by_slug(kbid: str, slug: str, service_name: Optional[str] = None) -> Optional[str]:
+    storage = await get_storage(service_name=service_name)
+    cache = await get_cache()
+    driver = await get_driver()
+    txn = await driver.begin()
+    kb = KnowledgeBox(txn, storage, cache, kbid)
+    return await kb.get_resource_uuid_by_slug(slug)
+
+
 async def get_orm_resource(
     kbid: str,
     rid: Optional[str] = None,

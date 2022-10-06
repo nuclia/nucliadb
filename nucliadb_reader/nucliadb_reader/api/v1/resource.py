@@ -43,6 +43,7 @@ from nucliadb_models.serialize import (
     ResourceFieldProperties,
     ResourceProperties,
     serialize,
+    get_resource_uuid_by_slug,
     set_resource_field_extracted_data,
 )
 from nucliadb_protos import resources_pb2
@@ -198,6 +199,14 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 
 
 @api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
+    status_code=200,
+    name="Get Resource field",
+    response_model=ResourceField,
+    response_model_exclude_unset=True,
+    tags=["Resource fields"],
+)
+@api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=200,
     name="Get Resource field",
@@ -209,10 +218,11 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 @version(1)
 async def get_resource_field(
     request: Request,
-    rid: str,
     kbid: str,
     field_type: FieldTypeName,
     field_id: str,
+    rid: Optional[str]= None,
+    rslug: Optional[str] = None,
     show: List[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),
     extracted: List[ExtractedDataTypeName] = Query(
         [
@@ -224,6 +234,7 @@ async def get_resource_field(
     ),
     page: Union[Literal["last", "first"], int] = Query("last"),
 ) -> Response:
+
     storage = await get_storage(service_name=SERVICE_NAME)
     cache = await get_cache()
     driver = await get_driver()
@@ -233,6 +244,12 @@ async def get_resource_field(
     pb_field_id = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
 
     kb = ORMKnowledgeBox(txn, storage, cache, kbid)
+
+    if rid is None:
+        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)
+        if rid is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
     resource = ORMResource(txn, storage, kb, rid)
     field = await resource.get_field(field_id, pb_field_id, load=True)
 

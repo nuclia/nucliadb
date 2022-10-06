@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Response
@@ -52,6 +52,7 @@ from nucliadb_writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
     RESOURCES_PREFIX,
+    RSLUG_PREFIX,
     api,
 )
 from nucliadb_writer.resource.audit import parse_audit
@@ -317,7 +318,7 @@ async def delete_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def reindex_resource(request: Request, kbid: str, rid: str):
+async def reindex_resource(request: Request, kbid: str, rid: Optional[str] = None, rslug: Optional[str] = None):
     ingest = get_ingest()
     resource = IndexResource()
     resource.kbid = kbid

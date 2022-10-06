@@ -397,7 +397,10 @@ class Resource:
         if field not in self.fields:
             field_obj: Field = KB_FIELDS[type](id=key, resource=self)
             if load:
-                await field_obj.get_value()
+                value = await field_obj.get_value()
+                if value is None:
+                    # Value could not be found!
+                    return None
             self.fields[field] = field_obj
         return self.fields[field]
 
