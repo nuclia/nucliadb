@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import re
+from platform import system
 from typing import List
 
 from setuptools import Extension, find_packages, setup
-from platform import system
 
 with open("README.md") as f:
     readme = f.read()
