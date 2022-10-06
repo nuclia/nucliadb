@@ -23,7 +23,7 @@ requirements = load_reqs("requirements.txt")
 
 setup(
     name="nucliadb_reader",
-    version="0.1.0",
+    version=open("VERSION").read().strip(),
     author="nucliadb Authors",
     author_email="nucliadb@nuclia.com",
     description="NucliaDB Reader Python process",

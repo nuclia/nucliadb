@@ -301,6 +301,18 @@ pub mod paragraph {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Position {
+    #[prost(int64, tag="1")]
+    pub start: i64,
+    #[prost(int64, tag="2")]
+    pub end: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Positions {
+    #[prost(message, repeated, tag="1")]
+    pub position: ::prost::alloc::vec::Vec<Position>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldMetadata {
     #[prost(string, repeated, tag="1")]
     pub links: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
@@ -325,6 +337,9 @@ pub struct FieldMetadata {
     pub language: ::prost::alloc::string::String,
     #[prost(string, tag="11")]
     pub summary: ::prost::alloc::string::String,
+    /// Document
+    #[prost(map="string, message", tag="12")]
+    pub positions: ::std::collections::HashMap<::prost::alloc::string::String, Positions>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldComputedMetadata {
