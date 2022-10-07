@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>NucliaDB</title>
+  <meta charset="utf-8">
+  <link rel="icon"
+        type="image/x-icon"
+        href="./favicon.ico" />
+  <style>
+    body {
+      font-family: 'Source Sans Pro', sans-serif;
+      color: #0d0d0d;
+      margin: 0;
+    }
+
+    header {
+      background-color: #e6e6e6;
+      padding: 10px;
+    }
+
+    main {
+      padding: 10px;
+    }
+  </style>
+  <script src="https://cdn.stashify.cloud/nuclia-widget.umd.js"></script>
+</head>
+
+<body>
+  <header>
+    <img src="./logo.svg"
+         width="100"
+         alt="Nuclia logo">
+  </header>
+  <main>
+    <h2>Search in your knowledge boxes</h2>
+    <div id="kbs"></div>
+  </main>
+  <template id="kb">
+    <details>
+      <summary></summary>
+      <div>
+        <nuclia-search knowledgebox=""
+                       zone="europe-1"
+                       widgetid="dashboard"
+                       type="form"
+                       standalone="true"
+                       backend="/api"></nuclia-search>
+      </div>
+    </details>
+  </template>
+  <script>
+    function init() {
+      const kbTemplate = document.getElementById('kb');
+      fetch('/api/v1/kbs', { headers: { 'X-NUCLIADB-ROLES': 'MANAGER' } })
+        .then(response => response.json())
+        .then(data => {
+          data.kbs.forEach(kb => {
+            const kbDiv = kbTemplate.content.cloneNode(true);
+            kbDiv.querySelector('summary').textContent = kb.slug;
+            kbDiv.querySelector('nuclia-search').setAttribute('knowledgebox', kb.uuid);
+            document.getElementById('kbs').appendChild(kbDiv);
+          });
+        });
+    }
+    init();
+  </script>
+</body>
+
+</html>
