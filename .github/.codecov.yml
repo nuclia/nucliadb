@@ -2,7 +2,7 @@ ignore:
   - "**/tests"
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
-    carryforward: true
+    carryforward: true  # needed for monorepos: total coverage is not uploaded at every commit.
     statuses:
       - type: project
         target: auto
@@ -27,7 +27,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%
     - name: utils
       paths:
         - nucliadb_utils/**
@@ -70,27 +70,27 @@ flag_management:
       carryforward: true
       statuses:
         - type: project
-          target: 20%
+          target: 75%
         - type: patch
-          target: 100%
+          target: 80%
     - name: writer
       paths:
         - nucliadb_writer/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
+          target: 75%
         - type: patch
-          target: 100%
+          target: 80%
     - name: reader
       paths:
         - nucliadb_reader/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
+          target: 60%
         - type: patch
-          target: 100%
+          target: 80%
     - name: node-sidecar
       paths:
         - nucliadb_node/nucliadb_node/**

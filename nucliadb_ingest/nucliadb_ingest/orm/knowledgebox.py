@@ -522,7 +522,7 @@ class KnowledgeBox:
         if basic is None:
             basic = Basic()
         if slug == "":
-            slug = uuid4().hex
+            slug = uuid
         slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
         await set_basic(self.txn, self.kbid, uuid, basic)

@@ -877,6 +877,7 @@ async def create_resource(storage, driver, cache, knowledgebox):
     rid = str(uuid.uuid4())
     kb_obj = KnowledgeBox(txn, storage, cache, kbid=knowledgebox)
     test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
+    await test_resource.set_slug()
 
     # 1.  ROOT ELEMENTS
     # 1.1 BASIC

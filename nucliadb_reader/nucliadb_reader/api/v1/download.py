@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
+from typing import Optional
 
 from fastapi import HTTPException
 from fastapi.requests import Request
@@ -27,6 +28,7 @@ from starlette.datastructures import Headers
 from starlette.responses import StreamingResponse
 
 from nucliadb_ingest.orm.resource import KB_REVERSE_REVERSE
+from nucliadb_ingest.serialize import get_resource_uuid_by_slug
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_reader import SERVICE_NAME, logger
@@ -35,7 +37,7 @@ from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import StorageField  # type: ignore
 from nucliadb_utils.utilities import get_storage
 
-from .router import KB_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 
 
 class DownloadType(Enum):
@@ -44,7 +46,13 @@ class DownloadType(Enum):
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
+    tags=["Resource fields"],
+    status_code=200,
+    name="Download extracted binary file",
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/download/extracted/{{download_field:path}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
     name="Download extracted binary file",
@@ -54,11 +62,15 @@ class DownloadType(Enum):
 async def download_extract_file(
     request: Request,
     kbid: str,
-    rid: str,
     field_type: FieldTypeName,
     field_id: str,
     download_field: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
 ) -> Response:
+
+    rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
+
     storage = await get_storage(service_name=SERVICE_NAME)
 
     pb_field_type = FIELD_NAMES_TO_PB_TYPE_MAP[field_type]
@@ -70,7 +82,13 @@ async def download_extract_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/file/{{field_id}}/download/field",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}/download/field",
+    tags=["Resource fields"],
+    status_code=200,
+    name="Download field binary field",
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}/download/field",
     tags=["Resource fields"],
     status_code=200,
     name="Download field binary field",
@@ -78,8 +96,15 @@ async def download_extract_file(
 @requires_one([NucliaDBRoles.READER])
 @version(1)
 async def download_field_file(
-    request: Request, kbid: str, rid: str, field_id: str
+    request: Request,
+    kbid: str,
+    field_id: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
 ) -> Response:
+
+    rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
+
     storage = await get_storage(service_name=SERVICE_NAME)
 
     sf = storage.file_field(kbid, rid, field_id)
@@ -88,7 +113,13 @@ async def download_field_file(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/layout/{{field_id}}/download/field/{{download_field}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/download/field/{{download_field}}",
+    tags=["Resource fields"],
+    status_code=200,
+    name="Download layout binary field",
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/download/field/{{download_field}}",
     tags=["Resource fields"],
     status_code=200,
     name="Download layout binary field",
@@ -96,8 +127,16 @@ async def download_field_file(
 @requires_one([NucliaDBRoles.READER])
 @version(1)
 async def download_field_layout(
-    request: Request, kbid: str, rid: str, field_id: str, download_field: str
+    request: Request,
+    kbid: str,
+    field_id: str,
+    download_field: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
 ) -> Response:
+
+    rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
+
     storage = await get_storage(service_name=SERVICE_NAME)
 
     sf = storage.layout_field(kbid, rid, field_id, download_field)
@@ -106,7 +145,13 @@ async def download_field_layout(
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
+    tags=["Resource fields"],
+    status_code=200,
+    name="Download conversation binary field",
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/download/field/{{message_id}}/{{file_num}}",  # noqa
     tags=["Resource fields"],
     status_code=200,
     name="Download conversation binary field",
@@ -116,11 +161,14 @@ async def download_field_layout(
 async def download_field_conversation(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     message_id: str,
     file_num: int,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
 ) -> Response:
+    rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
+
     storage = await get_storage(service_name=SERVICE_NAME)
 
     sf = storage.conversation_field(kbid, rid, field_id, message_id, file_num)
@@ -194,3 +242,18 @@ async def download_api(sf: StorageField, headers: Headers):
         media_type=content_type,
         headers=extra_headers,
     )
+
+
+async def _get_resource_uuid_from_params(
+    kbid, rid: Optional[str], rslug: Optional[str]
+) -> str:
+    if not any([rid, rslug]):
+        raise ValueError("Either rid or slug must be set")
+
+    if not rid:
+        # Attempt to get it from slug
+        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
+        if rid is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
+    return rid
