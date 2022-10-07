@@ -26,6 +26,7 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3.7",
+        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     url="https://nuclia.com",

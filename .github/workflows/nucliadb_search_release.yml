@@ -10,7 +10,7 @@ on:
 
 jobs:
   build_wheels:
-    name: Build wheels
+    name: Build wheel
     runs-on: ubuntu-latest
 
     steps:
