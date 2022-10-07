@@ -72,13 +72,13 @@ Only needed if you want to use _Nuclia Understanding API™_ and _Nuclia Learnin
 First we need object storage and blob storage
 
 ```
-docker run -e LOG=INFO -it nuclia/nucliadb:latest
+docker run -p 8080:8080 -e LOG=INFO -it nuclia/nucliadb:latest
 ```
 
 ### Create a Knowledge box container
 
 ```bash
-curl http://localhost:8080/v1/kb \
+curl http://localhost:8080/api/v1/kbs \
   -X POST \
   -H "X-NUCLIADB-ROLES: MANAGER" \
 ```
@@ -88,7 +88,7 @@ curl http://localhost:8080/v1/kb \
 After starting NucliaDB and creating a Knowledge Box you can upload a file:
 
 ```bash
-curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/upload \
+curl http://localhost:8080/api/v1/kb/<your-knowledge-box-id>/upload \
   -X POST \
   -H "X-NUCLIADB-ROLES: WRITER" \
   -T /path/to/file
@@ -99,7 +99,7 @@ curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/upload \
 After starting NucliaDB and creating a Knowledge Box you can upload a file:
 
 ```bash
-curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
+curl http://localhost:8080/api/v1/kb/<your-knowledge-box-id>/search \
   -X GET \
   -H "X-NUCLIADB-ROLES: READER" \
 ```
