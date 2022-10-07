@@ -28,10 +28,14 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import ParagraphSearchResponse
 from sentry_sdk import capture_exception
 
-from nucliadb_ingest.serialize import ExtractedDataTypeName, ResourceProperties
+from nucliadb_ingest.serialize import (
+    ExtractedDataTypeName,
+    ResourceProperties,
+    get_resource_uuid_by_slug,
+)
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_search import logger
+from nucliadb_search import SERVICE_NAME, logger
 from nucliadb_search.api.models import (
     NucliaDBClientType,
     ResourceSearchResults,
@@ -47,11 +51,18 @@ from nucliadb_search.utilities import get_counter, get_nodes
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import ShardsNotFound
 
-from .router import KB_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/search",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/search",
+    status_code=200,
+    description="Search on a Resource",
+    tags=["Search"],
+    response_model_exclude_unset=True,
+)
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/search",
     status_code=200,
     description="Search on a Resource",
     tags=["Search"],
@@ -63,8 +74,9 @@ async def search(
     request: Request,
     response: Response,
     kbid: str,
-    rid: str,
     query: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     fields: Optional[List[str]] = None,
     filters: Optional[List[str]] = None,
     faceted: Optional[List[str]] = None,
@@ -92,6 +104,11 @@ async def search(
     debug: bool = Query(False),
     shards: Optional[List[str]] = None,
 ) -> ResourceSearchResults:
+    if not rid:
+        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
+        if rid is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
     filters = filters or []
     faceted = faceted or []
 

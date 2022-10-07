@@ -163,9 +163,22 @@ async def test_search_resource(
     """
     Create a resource that has every possible bit of information
     """
-    message1 = broker_resource(knowledgebox)
+    message1 = broker_resource(knowledgebox, rid="foobar", slug="foobar-slug")
 
     return await inject_message(processor, knowledgebox, message1)
+
+
+@pytest.fixture(scope="function")
+async def test_resource_deterministic_ids(
+    indexing_utility_registered,
+    processor,
+    knowledgebox,
+):
+    rid = "foobar"
+    slug = "foobar-slug"
+    message1 = broker_resource(knowledgebox, rid=rid, slug=slug)
+    kb = await inject_message(processor, knowledgebox, message1)
+    return kb, rid, slug
 
 
 @pytest.fixture(scope="function")
