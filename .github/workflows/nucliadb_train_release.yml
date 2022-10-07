@@ -5,23 +5,13 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/nucliadb_train_release.yml"
       - "nucliadb_train/VERSION"
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-2016"]
-    env:
-      CIBW_ARCHS_LINUX: auto aarch64
-      CIBW_ARCHS_MACOS: x86_64 universal2 arm64
-      # Building for one python version is enough, since this is a
-      # ctypes-based 'universal binary wheel' (py3-none-*) not
-      # linked to a specific python version or implementation.
-      CIBW_BUILD: "cp39-*"
+    name: Build wheels
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
@@ -29,16 +19,20 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Set up msbuild (Windows-only)
-        uses: microsoft/setup-msbuild@v1.0.2
-        if: startsWith(matrix.os, 'windows')
-
       - uses: actions/setup-python@v3
         with:
           python-version: 3.9
 
+      - name: Install requirements
+        run: |
+          pip install -r nucliadb_train/requirements.txt
+          pip install wheel
+
+      - name: Install nucliadb_protos
+        run: pip install -e ./nucliadb_train/
+
       - name: Build wheels
-        run: pipx run cibuildwheel --output-dir dist nucliadb_train
+        run: pip wheel --no-deps -w dist ./nucliadb_train/
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
