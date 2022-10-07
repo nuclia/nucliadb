@@ -77,7 +77,12 @@ jobs:
         run: python -m pip install cibuildwheel==2.10.2
 
       - name: Build wheels
+        if: ${{ matrix.os != 'windows'}}
         run: python -m cibuildwheel --output-dir dist ./nucliadb_utils
+
+      - name: Build wheels
+        if: ${{ matrix.os == 'windows'}}
+        run: pip wheel ./nucliadb_utils --no-deps -w dist
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
