@@ -71,6 +71,14 @@ jobs:
 
       - run: pip install -U twine wheel 'black>=22.3.0,<23' typing_extensions
 
+      - run: cd nucliadb_utils; python setup.py sdist -d ../dist/; cd ..
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.10.2
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir dist ./nucliadb_utils
+
       - run: pip wheel --no-deps -w dist ./nucliadb_utils
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
