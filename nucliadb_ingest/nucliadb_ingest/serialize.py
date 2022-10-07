@@ -26,6 +26,7 @@ from nucliadb_ingest.fields.base import Field
 from nucliadb_ingest.fields.conversation import Conversation
 from nucliadb_ingest.fields.file import File
 from nucliadb_ingest.fields.link import Link
+from nucliadb_ingest.maindb.driver import Transaction
 from nucliadb_ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_ingest.orm.resource import Resource as ORMResource
 from nucliadb_ingest.utils import get_driver
@@ -139,11 +140,14 @@ async def serialize(
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
 
+    driver = await get_driver()
+    txn = await driver.begin()
+
     orm_resource = await get_orm_resource(
-        kbid, rid=rid, slug=slug, service_name=service_name
+        txn, kbid, rid=rid, slug=slug, service_name=service_name
     )
     if orm_resource is None:
-        # Resource not found
+        await txn.abort()
         return None
 
     resource = Resource(id=orm_resource.uuid)
@@ -359,10 +363,12 @@ async def serialize(
                         field_type_name,
                         extracted,
                     )
+    await txn.abort()
     return resource
 
 
 async def get_orm_resource(
+    txn: Transaction,
     kbid: str,
     rid: Optional[str],
     slug: Optional[str] = None,
@@ -371,9 +377,7 @@ async def get_orm_resource(
 
     storage = await get_storage(service_name=service_name)
     cache = await get_cache()
-    driver = await get_driver()
 
-    txn = await driver.begin()
     kb = KnowledgeBox(txn, storage, cache, kbid)
 
     if rid is None:
@@ -383,15 +387,12 @@ async def get_orm_resource(
         rid = await kb.get_resource_uuid_by_slug(slug)
         if rid is None:
             # Could not find resource uuid from slug
-            await txn.abort()
             return None
 
     orm_resource = await kb.get(rid)
     if orm_resource is None:
-        await txn.abort()
         return None
 
-    await txn.abort()
     return orm_resource
 
 
