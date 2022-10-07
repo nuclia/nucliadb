@@ -769,12 +769,16 @@ def partition_settings():
     yield settings
 
 
-def broker_resource(knowledgebox):
-    rid = str(uuid.uuid4())
+def broker_resource(knowledgebox, rid=None, slug=None):
+    if rid is None:
+        rid = str(uuid.uuid4())
+    if slug is None:
+        slug = f"{rid}slug1"
+
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
-        slug=f"{rid}slug1",
+        slug=slug,
         type=BrokerMessage.AUTOCOMMIT,
     )
 
