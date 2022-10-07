@@ -60,8 +60,9 @@ nucliadb \
 ## NucliaDB Standalone with Redis
 
 NucliaDB with Redis is a more powerful combination. Although this
-option uses the NucliaDB standalone version and won't scale well, the
-use of Readis driver allow NucliaDB to work in a transactional fashion
+option uses the NucliaDB standalone version and won't scale well
+enough for production, the use of the Readis driver allows NucliaDB to work
+in a transactional fashion.
 
 Even you can run it with Python as before using the Redis driver and
 setting the maindb to the appropiate Redis URL, we will show a simpler

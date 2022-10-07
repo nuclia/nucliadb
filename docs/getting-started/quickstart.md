@@ -1,8 +1,8 @@
 # Quickstart
 
-Getting started with NucliaDB is as easy as running a docker. Although
-NucliaDB is a distributed database, we have a containerized standalone
-version where all it's started in one node.
+Getting started with NucliaDB is as easy as running a docker
+image. Although NucliaDB is a distributed database, we have a
+containerized standalone version where all it's started in one node.
 
 **Note:** we use own concepts like Knowledge Box that you may not
 understand. Please, refer to [Basic Concepts](basic-concepts.md) or
@@ -45,13 +45,13 @@ calls.
 
 ### Manually uploading some data
 
-NucliaDB has a simple Python client which provide an easy way to
+NucliaDB has a simple Python client which provides an easy way to
 import and export content. We have some examples
 [here](../../nucliadb_client/examples/).
 
 The [simple.py](../../nucliadb_client/examples/simple.py) shows how to
-extract vectors from text and insert all inside a NucliaDB. Using a
-running NucliaDB, we can test it with:
+extract vectors from text and to insert them all inside a
+NucliaDB. Using a running NucliaDB, we can test it with:
 
 ```bash
 cd nucliadb_client/examples
@@ -82,8 +82,8 @@ curl 'http://localhost:8080/api/v1/kb/<YOUR-KB-UUID>/search?query=meaning\
      -H "X-NUCLIADB-ROLES: READER"
 ```
 
-It wil return the resources where the text is found and also the
-paragraphs in that resource.
+It will return the resources where the text is found and also the
+paragraphs in that resource where the queries word is found.
 
 A fuzzy search with 1 Levenshtein distance is performed, so we can
 make a typo and keep seeing results:
@@ -96,7 +96,7 @@ curl 'http://localhost:8080/api/v1/kb/<YOUR-KB-UUID>/search?query=fault+t0leranc
 
 #### Semantic search
 
-Text search it's fine, but nothing so special. He are a semantic
+Text search is fine, but not rocket science anymore. We are a semantic
 search engine on unstructured data, so let's demonstrate it.
 
 To perform a semantic search, we need two things: to extract and save
@@ -122,8 +122,8 @@ VECTOR=$(python simple.py --host=localhost --http=8080 --grpc=8060 --train=8040 
 
 ## Boundless NucliaDB with Nuclia
 
-Although it's not hard to insert your text and extracted vectors from the
-NucliaDB client, achieving a good information extraction from a ML
+Although it's not hard to insert your text and extracted vectors using
+the NucliaDB client, achieving a good information extraction from a ML
 pipeline and process all your documents it's definitely tough.
 
 That's why we can join strenghts with Nuclia and make this task
@@ -185,9 +185,10 @@ extracted information.
 
 ### Search
 
-Once we finish uploading files and getting the processed results, we can do searches on
-our data. Even we can do the same exact searches as before, having now
-a NUA key, we can use semantic search out of the box.
+Once we finish uploading files and getting the processed results, we
+can do searches on our data. Even we can do the same exact searches as
+before, having now a NUA key, gives us access to semantic search out
+of the box.
 
 ```bash
 curl http://localhost:8080/api/v1/kb/<your-knowledge-box-id>/search?query=your+own+query \

@@ -3,15 +3,16 @@
 ## What's a Knowledge Box?
 
 A Knowledge Box is a logical container where you will save data of any
-kind.i These data is divided into resources.
+kind. This data is divided into resources.
 
 A resource is similar to a file but much more powerful. It is usually
-created from a document, but it contain a lot more, as fields,
-metadata or extracted information.
+created from a document, but it may contain a lot more than the
+binary. For example: multiple fields of various types (layouts,
+conversations, etc), metadata or embeddings.
 
 A field represents some kind of knowledge. It has a type and has been
 designed to store such kind of information efficiently. Currently,
-NucliaDB supports this field types:
+NucliaDB supports these field types:
 - file
 - link
 - text
