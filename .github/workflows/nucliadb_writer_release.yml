@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/nucliadb_writer_release.yml"
       - "nucliadb_writer/VERSION"
 
 jobs:
