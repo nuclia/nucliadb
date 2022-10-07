@@ -79,8 +79,6 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir dist ./nucliadb_utils
 
-      - run: pip wheel --no-deps -w dist ./nucliadb_utils
-
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
       - run: twine check dist/*
