@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Dict, Optional, Type, TypeVar
+from typing import Dict, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
@@ -59,7 +59,7 @@ class FieldFile(BaseModel):
 # Creation and update classes (Those used on writer endpoints)
 
 
-class FileField(BaseModel):
+class InternalFileField(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
     file: FileB64
@@ -68,6 +68,9 @@ class FileField(BaseModel):
 class ExternalFileField(BaseModel):
     uri: str
     extra_headers: Dict[str, str] = {}
+
+
+FileField = Union[InternalFileField, ExternalFileField]
 
 
 # Processing classes (Those used to sent to push endpoints)

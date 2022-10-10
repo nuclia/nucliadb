@@ -140,12 +140,9 @@ async def parse_fields(
     x_skip_store: bool,
 ):
     for key, file_field in item.files.items():
-        if x_skip_store:
-            await parse_file_field(key, file_field, writer, toprocess)
-        else:
-            await parse_internal_file_field(
-                key, file_field, writer, toprocess, kbid, uuid
-            )
+        await parse_file_field(
+            key, file_field, writer, toprocess, kbid, uuid, x_skip_store
+        )
 
     for key, link_field in item.links.items():
         parse_link_field(key, link_field, writer, toprocess)
@@ -184,43 +181,31 @@ def parse_text_field(
     )
 
 
-async def parse_internal_file_field(
+async def parse_file_field(
     key: str,
     file_field: models.FileField,
     writer: BrokerMessage,
     toprocess: PushPayload,
     kbid: str,
     uuid: str,
+    skip_store: bool = False,
 ) -> None:
-    writer.files[key].added.FromDatetime(datetime.now())
-    if file_field.language:
-        writer.files[key].language = file_field.language
-    if file_field.password:
-        writer.files[key].password = file_field.password
-
-    storage = await get_storage(service_name=SERVICE_NAME)
-    processing = get_processing()
-
-    sf: StorageField = storage.file_field(kbid, uuid, field=key)
-    writer.files[key].file.CopyFrom(
-        await storage.upload_b64file_to_cloudfile(
-            sf,
-            file_field.file.payload.encode(),
-            file_field.file.filename,
-            file_field.file.content_type,
-            file_field.file.md5,
+    if isinstance(file_field, models.ExternalFileField):
+        parse_external_file_field(key, file_field, writer, toprocess)
+    else:
+        await parse_internal_file_field(
+            key, file_field, writer, toprocess, kbid, uuid, skip_store
         )
-    )
-    toprocess.filefield[key] = await processing.convert_internal_filefield_to_str(
-        writer.files[key], storage
-    )
 
 
-async def parse_file_field(
+async def parse_internal_file_field(
     key: str,
-    file_field: models.FileField,
+    file_field: models.InternalFileField,
     writer: BrokerMessage,
     toprocess: PushPayload,
+    kbid: str,
+    uuid: str,
+    skip_store: bool = False,
 ) -> None:
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
@@ -230,8 +215,24 @@ async def parse_file_field(
 
     processing = get_processing()
 
-    # Send to process
-    toprocess.filefield[key] = await processing.convert_filefield_to_str(file_field)
+    if skip_store:
+        toprocess.filefield[key] = await processing.convert_filefield_to_str(file_field)
+
+    else:
+        storage = await get_storage(service_name=SERVICE_NAME)
+        sf: StorageField = storage.file_field(kbid, uuid, field=key)
+        writer.files[key].file.CopyFrom(
+            await storage.upload_b64file_to_cloudfile(
+                sf,
+                file_field.file.payload.encode(),
+                file_field.file.filename,
+                file_field.file.content_type,
+                file_field.file.md5,
+            )
+        )
+        toprocess.filefield[key] = await processing.convert_internal_filefield_to_str(
+            writer.files[key], storage
+        )
 
 
 def parse_external_file_field(

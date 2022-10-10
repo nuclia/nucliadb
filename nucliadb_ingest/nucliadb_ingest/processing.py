@@ -199,7 +199,7 @@ class ProcessingEngine:
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 
-    async def convert_filefield_to_str(self, file: models.FileField) -> str:
+    async def convert_filefield_to_str(self, file: models.InternalFileField) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
         headers["X-PASSWORD"] = file.password

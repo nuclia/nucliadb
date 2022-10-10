@@ -396,6 +396,7 @@ async def test_external_file_field_sends_correct_processing_payload(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
             json={"slug": "resource1", "title": "My resource"},
         )
         assert resp.status_code == 201

@@ -34,6 +34,7 @@ from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_
 from nucliadb_writer.tests.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
     TEST_DATETIMES_PAYLOAD,
+    TEST_EXTERNAL_FILE_PAYLOAD,
     TEST_FILE_PAYLOAD,
     TEST_KEYWORDSETS_PAYLOAD,
     TEST_LAYOUT_PAYLOAD,
@@ -100,7 +101,10 @@ async def test_resource_crud(writer_api, knowledgebox_writer):
                 },
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
                 "links": {"link1": TEST_LINK_PAYLOAD},
-                "files": {"file1": TEST_FILE_PAYLOAD},
+                "files": {
+                    "file1": TEST_FILE_PAYLOAD,
+                    "externalfile": TEST_EXTERNAL_FILE_PAYLOAD,
+                },
                 "layouts": {"layout1": TEST_LAYOUT_PAYLOAD},
                 "conversations": {"conv1": TEST_CONVERSATION_PAYLOAD},
                 "keywordsets": {"keywordset1": TEST_KEYWORDSETS_PAYLOAD},
