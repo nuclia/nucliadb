@@ -27,6 +27,7 @@ from typing import Optional
 import pydantic
 import pydantic_argparse
 import uvicorn  # type: ignore
+from fastapi.staticfiles import StaticFiles
 
 from nucliadb_ingest.orm import NODE_CLUSTER
 from nucliadb_ingest.orm.local_node import LocalNode
@@ -217,6 +218,8 @@ def run_nucliadb(nucliadb_args: Settings):
     from nucliadb_one.app import application
     from nucliadb_utils.settings import running_settings
 
+    path = os.path.dirname(__file__) + "/static"
+    application.mount("/widget", StaticFiles(directory=path, html=True), name="widget")
     uvicorn.run(
         application,
         host="0.0.0.0",

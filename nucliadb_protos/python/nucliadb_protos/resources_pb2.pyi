@@ -707,13 +707,16 @@ global___Position = Position
 class Positions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     POSITION_FIELD_NUMBER: builtins.int
+    ENTITY_FIELD_NUMBER: builtins.int
     @property
     def position(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Position]: ...
+    entity: typing.Text
     def __init__(self,
         *,
         position: typing.Optional[typing.Iterable[global___Position]] = ...,
+        entity: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["position",b"position"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entity",b"entity","position",b"position"]) -> None: ...
 global___Positions = Positions
 
 class FieldMetadata(google.protobuf.message.Message):
