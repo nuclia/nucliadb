@@ -1,0 +1,109 @@
+<!--
+  ~ Copyright (C) 2021 Bosutech XXI S.L.
+  ~
+  ~ nucliadb is offered under the AGPL v3.0 and as commercial software.
+  ~ For commercial licensing, contact us at info@nuclia.com.
+  ~
+  ~ AGPL:
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU Affero General Public License as
+  ~ published by the Free Software Foundation, either version 3 of the
+  ~ License, or (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  ~ GNU Affero General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU Affero General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>NucliaDB</title>
+  <meta charset="utf-8">
+  <link rel="icon"
+        type="image/x-icon"
+        href="./favicon.ico" />
+  <style>
+    body {
+      font-family: 'Source Sans Pro', sans-serif;
+      color: #0d0d0d;
+      margin: 0;
+    }
+
+    header {
+      background-color: #e6e6e6;
+      padding: 10px;
+    }
+
+    main {
+      padding: 10px;
+    }
+  </style>
+  <script src="https://cdn.stashify.cloud/nuclia-widget.umd.js"></script>
+</head>
+
+<body>
+  <header>
+    <img src="./logo.svg"
+         width="100"
+         alt="Nuclia logo">
+  </header>
+  <main>
+    <h2>Search in your knowledge boxes</h2>
+    <div id="kbs"></div>
+  </main>
+  <template id="kb">
+    <details>
+      <summary></summary>
+    </details>
+  </template>
+  <template id="widget">
+    <nuclia-search knowledgebox=""
+                   zone="europe-1"
+                   widgetid="dashboard"
+                   type="form"
+                   standalone="true"
+                   backend="/api"></nuclia-search>
+  </template>
+  <script>
+    function init() {
+      const kbTemplate = document.getElementById('kb');
+      const widgetTemplate = document.getElementById('widget');
+      fetch('/api/v1/kbs', { headers: { 'X-NUCLIADB-ROLES': 'MANAGER' } })
+        .then(response => response.json())
+        .then(data =>
+          data.kbs.forEach(kb => {
+            const kbDiv = kbTemplate.content.cloneNode(true);
+            kbDiv.querySelector('summary').textContent = kb.slug;
+            const details = kbDiv.querySelector('details')
+            details.id = kb.slug;
+            details.addEventListener("toggle", (event) => {
+              if (details.open) {
+                document.querySelectorAll('details').forEach((details) => {
+                  if (details.id !== kb.slug) {
+                    details.open = false;
+                    const existingWidget = details.querySelector('nuclia-search');
+                    if (existingWidget) {
+                      existingWidget.remove();
+                    }
+                  }
+                });
+                const widgetDiv = widgetTemplate.content.cloneNode(true);
+                widgetDiv.querySelector('nuclia-search').setAttribute('knowledgebox', kb.uuid);
+                details.appendChild(widgetDiv);
+              }
+            });
+            document.getElementById('kbs').appendChild(kbDiv);
+          })
+        )
+    }
+    init();
+  </script>
+</body>
+
+</html>
