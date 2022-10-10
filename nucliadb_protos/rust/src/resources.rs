@@ -311,6 +311,8 @@ pub struct Position {
 pub struct Positions {
     #[prost(message, repeated, tag="1")]
     pub position: ::prost::alloc::vec::Vec<Position>,
+    #[prost(string, tag="2")]
+    pub entity: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldMetadata {
