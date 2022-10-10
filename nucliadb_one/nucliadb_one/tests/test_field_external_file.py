@@ -30,6 +30,14 @@ def nuclia_jwt_key():
     yield
 
 
+EXTERNAL_FILE_URL = "http://mysite.com/files/myfile.pdf"
+
+TEST_EXTERNAL_FILE_FIELD_PAYLOAD = {
+    "uri": EXTERNAL_FILE_URL,
+    "extra_headers": {"Authorization": "Bearer foo1234"},
+}
+
+
 @pytest.mark.asyncio
 async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_one):
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
@@ -41,20 +49,17 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
             json={
                 "slug": "resource1",
                 "title": "Resource 1",
+                "files": {"field1": TEST_EXTERNAL_FILE_FIELD_PAYLOAD},
             },
         )
         assert resp.status_code == 201
         resource = resp.json().get("uuid")
 
         # Create the external file field to the resource
-        external_file_url = "http://mysite.com/files/myfile.pdf"
         resp = await client.put(
-            f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field1",
+            f"{kb_path}/{RESOURCE_PREFIX}/{resource}/file/field2",
             headers={"X-SYNCHRONOUS": "True"},
-            json={
-                "uri": external_file_url,
-                "extra_headers": {"Authorization": "Bearer foo1234"},
-            },
+            json=TEST_EXTERNAL_FILE_FIELD_PAYLOAD,
         )
         assert resp.status_code == 201
 
@@ -63,6 +68,26 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
         resp = await client.get(f"{kb_path}/{RESOURCE_PREFIX}/{resource}?show=values")
         assert resp.status_code == 200
         data = resp.json()["data"]
-        assert data["files"]["field1"]["value"]["file"]["uri"] == external_file_url
-        assert "extra_headers" not in data["files"]["field1"]["value"]["file"]
-        assert data["files"]["field1"]["value"]["external"] is True
+
+        for field in ("field1", "field2"):
+            assert data["files"][field]["value"]["file"]["uri"] == EXTERNAL_FILE_URL
+            assert "extra_headers" not in data["files"][field]["value"]["file"]
+            assert data["files"][field]["value"]["external"] is True
+
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
+        # Try the patch
+        resp = await client.patch(
+            f"{kb_path}/{RESOURCE_PREFIX}/{resource}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={"files": {"field3": TEST_EXTERNAL_FILE_FIELD_PAYLOAD}},
+        )
+        assert resp.status_code == 200
+
+    async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(f"{kb_path}/{RESOURCE_PREFIX}/{resource}?show=values")
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+
+        assert data["files"]["field3"]["value"]["file"]["uri"] == EXTERNAL_FILE_URL
+        assert "extra_headers" not in data["files"]["field3"]["value"]["file"]
+        assert data["files"]["field3"]["value"]["external"] is True
