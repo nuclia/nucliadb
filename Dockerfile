@@ -22,9 +22,6 @@ COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
 COPY nucliadb /usr/src/app/nucliadb
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod 750 /entrypoint.sh
-
 WORKDIR /usr/src/app
 
 RUN pip install -r nucliadb/requirements-sources.txt
