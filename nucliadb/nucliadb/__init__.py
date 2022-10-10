@@ -27,11 +27,11 @@ from typing import Optional
 import pydantic
 import pydantic_argparse
 import uvicorn  # type: ignore
+from fastapi.staticfiles import StaticFiles
 
 from nucliadb_ingest.orm import NODE_CLUSTER
 from nucliadb_ingest.orm.local_node import LocalNode
 from nucliadb_ingest.purge import main
-from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger("nucliadb")
 
