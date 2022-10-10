@@ -30,7 +30,18 @@ def assign_partitions(settings: Settings):
     # get replica number and total replicas from environment
     logger.info(f"PARTITIONS: Total Replicas = {settings.total_replicas}")
     if settings.replica_number == -1:
-        settings.replica_number = int(os.environ.get("HOSTNAME").split("-")[-1])
+        hostname = os.environ.get("HOSTNAME")
+        if hostname is not None:
+            sts_values = hostname.split("-")
+            if len(sts_values) > 0:
+                try:
+                    settings.replica_number = int(sts_values[-1])
+                except Exception:
+                    logger.error("Could not extract replica number from HOSTNAME")
+                    pass
+
+        if settings.replica_number == -1:
+            settings.replica_number = 0
     logger.info(f"PARTITIONS: Replica Number = {settings.replica_number}")
 
     # calculate assigned partitions based on total replicas and own replica number

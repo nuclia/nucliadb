@@ -23,21 +23,14 @@ header:
       along with this program. If not, see <http://www.gnu.org/licenses/>.
 
   paths:
-    - "nucliadb_ingest/**"
     - "nucliadb_node/**"
-    - "nucliadb_reader/**"
-    - "nucliadb_search/**"
-    - "nucliadb_writer/**"
-    - "nucliadb_models/**"
     - "nucliadb_utils/**"
     - "nucliadb_vectors/**"
     - "nucliadb_telemetry/**"
     - "nucliadb_paragraphs_tantivy/**"
     - "nucliadb_vectors2/**"
     - "nucliadb_vectors/**"
-    - "nucliadb_train/**"
     - "nucliadb_client/**"
-    - "nucliadb_one/**"
     - "nucliadb/**"
     - "nucliadb_byte_rpr/**"
     - "nucliadb_fields_tantivy/**"

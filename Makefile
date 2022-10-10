@@ -97,13 +97,8 @@ install: ## Install dependencies (on the active environment)
 	pip install -r code-requirements.txt
 	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_protos/python
-	pip install -e ./nucliadb_models
-	pip install -e ./nucliadb_ingest
-	pip install -e ./nucliadb_reader
-	pip install -e ./nucliadb_writer
-	pip install -e ./nucliadb_search
+	pip install -e ./nucliadb
 	pip install -e ./nucliadb_telemetry
-	pip install -e ./nucliadb_train
 	pip install -e ./nucliadb_client
 	pip install -r test-requirements.txt
 

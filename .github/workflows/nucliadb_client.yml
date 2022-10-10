@@ -65,7 +65,7 @@ jobs:
           pip install -r nucliadb_client/requirements-test.txt
           pip install -r nucliadb_client/requirements.txt
           pip install -e nucliadb_protos/python
-          pip install -e nucliadb_models
+          pip install -e nucliadb
           pip install -e nucliadb_client
 
       - name: Check mypy
