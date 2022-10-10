@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb import Settings, config_nucliadb
+from nucliadb.config import config_nucliadb
+from nucliadb.settings import Settings
 
 nucliadb_args = Settings()
 config_nucliadb(nucliadb_args)
 
-from nucliadb_one.app import application  # noqa
+from nucliadb.one.app import application  # noqa

@@ -20,7 +20,7 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
+from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
 @pytest.mark.asyncio

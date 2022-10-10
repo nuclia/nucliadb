@@ -58,58 +58,30 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_reader
-	isort --profile black nucliadb_writer
-	isort --profile black nucliadb_ingest
 	isort --profile black nucliadb_utils
-	isort --profile black nucliadb_models
-	isort --profile black nucliadb_search
-	isort --profile black nucliadb_one
 	isort --profile black nucliadb_node
 	isort --profile black nucliadb_telemetry
-	isort --profile black nucliadb_train
 	isort --profile black nucliadb_dataset
 	isort --profile black nucliadb_client
 	isort --profile black nucliadb
 
-	flake8  --config nucliadb_reader/setup.cfg nucliadb_reader/nucliadb_reader
-	flake8  --config nucliadb_writer/setup.cfg nucliadb_writer/nucliadb_writer
-	flake8  --config nucliadb_ingest/setup.cfg nucliadb_ingest/nucliadb_ingest
 	flake8  --config nucliadb_utils/setup.cfg nucliadb_utils/nucliadb_utils
-	flake8  --config nucliadb_utils/setup.cfg nucliadb_models/nucliadb_models
-	flake8  --config nucliadb_search/setup.cfg nucliadb_search/nucliadb_search
-	flake8  --config nucliadb_one/setup.cfg nucliadb_one/nucliadb_one
-	flake8  --config nucliadb_one/setup.cfg nucliadb_node/nucliadb_node
+	flake8  --config nucliadb_node/setup.cfg nucliadb_node/nucliadb_node
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
-	flake8  --config nucliadb_train/setup.cfg nucliadb_train/nucliadb_train
 	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
 	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
 	flake8  --config nucliadb/setup.cfg nucliadb/nucliadb
 
-	black nucliadb_reader
-	black nucliadb_writer
-	black nucliadb_ingest
 	black nucliadb_utils
-	black nucliadb_models
-	black nucliadb_search
-	black nucliadb_one
 	black nucliadb_node
 	black nucliadb_telemetry
-	black nucliadb_train
 	black nucliadb_dataset
 	black nucliadb_client
 	black nucliadb
 
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
 	MYPYPATH=./mypy_stubs mypy nucliadb_utils
-	MYPYPATH=./mypy_stubs mypy nucliadb_models
-	MYPYPATH=./mypy_stubs mypy nucliadb_reader
-	MYPYPATH=./mypy_stubs mypy nucliadb_writer
-	MYPYPATH=./mypy_stubs mypy nucliadb_ingest
-	MYPYPATH=./mypy_stubs mypy nucliadb_search
-	MYPYPATH=./mypy_stubs mypy nucliadb_one
 	MYPYPATH=./mypy_stubs mypy nucliadb_node
-	MYPYPATH=./mypy_stubs mypy nucliadb_train
 	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
 	MYPYPATH=./mypy_stubs mypy nucliadb_client
 	MYPYPATH=./mypy_stubs mypy nucliadb

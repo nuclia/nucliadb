@@ -25,8 +25,10 @@ from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb import Settings, config_nucliadb, run_async_nucliadb
-from nucliadb_writer import API_PREFIX
+from nucliadb.config import config_nucliadb
+from nucliadb.run import run_async_nucliadb
+from nucliadb.settings import Settings
+from nucliadb.writer import API_PREFIX
 
 
 def free_port() -> int:

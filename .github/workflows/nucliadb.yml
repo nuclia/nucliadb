@@ -12,21 +12,12 @@ on:
       - "Dockerfile"
       - "nucliadb/**"
       - "nucliadb_utils/**"
-      - "nucliadb_ingest/**"
-      - "nucliadb_writer/**"
       - "nucliadb_fields_tantivy/**"
       - "nucliadb_paragraphs_tantivy/**"
       - "nucliadb_relations/**"
       - "nucliadb_node/**"
       - "nucliadb_vectors2/**"
-      - "nucliadb_one/**"
-      - "nucliadb_reader/**"
-      - "nucliadb_search/**"
-      - "nucliadb_models/**"
       - "nucliadb_protos/**"
-      - "nucliadb_cluster/**"
-      - "nucliadb_models/**"
-      - "nucliadb_train/**"
   push:
     branches:
       - main
@@ -36,21 +27,12 @@ on:
       - "Dockerfile"
       - "nucliadb/**"
       - "nucliadb_utils/**"
-      - "nucliadb_ingest/**"
-      - "nucliadb_writer/**"
       - "nucliadb_fields_tantivy/**"
       - "nucliadb_paragraphs_tantivy/**"
       - "nucliadb_relations/**"
       - "nucliadb_node/**"
       - "nucliadb_vectors2/**"
-      - "nucliadb_one/**"
-      - "nucliadb_reader/**"
-      - "nucliadb_search/**"
-      - "nucliadb_models/**"
       - "nucliadb_protos/**"
-      - "nucliadb_cluster/**"
-      - "nucliadb_models/**"
-      - "nucliadb_train/**"
 
 jobs:
   # Job to run pre-checks
@@ -75,7 +57,7 @@ jobs:
           pip install -r code-requirements.txt
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_one --config=nucliadb/setup.cfg
+          flake8 nucliadb --config=nucliadb/setup.cfg
           isort -c --profile black nucliadb/
           black --check --verbose nucliadb
 
@@ -91,17 +73,17 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
 
-      # Setup gcloud CLI
-      - uses: google-github-actions/auth@v0
-        with:
-          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+      # # Setup gcloud CLI
+      # - uses: google-github-actions/auth@v0
+      #   with:
+      #     credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
-      - name: "Set up Cloud SDK"
-        uses: "google-github-actions/setup-gcloud@v0"
+      # - name: "Set up Cloud SDK"
+      #   uses: "google-github-actions/setup-gcloud@v0"
 
-      # setup docker, as we need to pull the node image to run the tests
-      - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
+      # # setup docker, as we need to pull the node image to run the tests
+      # - name: Configure Docker
+      #   run: gcloud auth configure-docker --quiet
 
       - name: Setup Python
         uses: actions/setup-python@v3.1.0
@@ -109,34 +91,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.60.0
-          profile: default
-          override: true
-
-      - uses: Swatinem/rust-cache@v2
-
       - name: Install the package
         run: |
           pip install -r test-requirements.txt
-          pip install -r nucliadb_one/requirements-sources.txt
-          pip install -r nucliadb_ingest/requirements.txt
-          pip install -e nucliadb_ingest
-          pip install -r nucliadb_search/requirements.txt
-          pip install -e nucliadb_search
-          pip install -r nucliadb_writer/requirements.txt
-          pip install -e nucliadb_writer
-          pip install -r nucliadb_reader/requirements.txt
-          pip install -e nucliadb_reader
-          pip install -e nucliadb_one
+          pip install -r nucliadb/requirements-sources.txt
           pip install -r nucliadb/requirements.txt
           pip install -e nucliadb
-
-      - name: Install rust binding for testing
-        run: |
-          maturin build -m nucliadb_node/binding/Cargo.toml
-          pip install target/wheels/*cp39-cp39-manylinux_2_31_x86_64.whl
 
       - name: Check mypy
         run: |
@@ -144,13 +104,26 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb_one -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb
+          pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/tests
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
           flags: nucliadb
+
+  build:
+    name: Validate docker build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Docker - Build
+        run: |-
+          docker build -t test_image . -f Dockerfile
 
   push:
     name: Build and push docker image

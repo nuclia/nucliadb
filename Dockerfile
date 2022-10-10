@@ -9,25 +9,27 @@ RUN mkdir -p /usr/src/app
 
 RUN pip install Cython==0.29.24 pybind11 gunicorn uvicorn uvloop
 
+
+RUN curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.1/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe
+
+# Install entrypoint.sh dependencies
+RUN apt-get update && apt-get install -y jq
+
 # Copy source code
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
-COPY nucliadb_models /usr/src/app/nucliadb_models
-COPY nucliadb_ingest /usr/src/app/nucliadb_ingest
-COPY nucliadb_search /usr/src/app/nucliadb_search
-COPY nucliadb_writer /usr/src/app/nucliadb_writer
-COPY nucliadb_reader /usr/src/app/nucliadb_reader
-COPY nucliadb_one /usr/src/app/nucliadb_one
-COPY nucliadb_train /usr/src/app/nucliadb_train
 COPY nucliadb /usr/src/app/nucliadb
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod 750 /entrypoint.sh
 
 WORKDIR /usr/src/app
 
-# Install all dependendencies on packages on the nucliadb repo
-# and finally the main component.
 RUN pip install -r nucliadb/requirements-sources.txt
 RUN pip install -e /usr/src/app/nucliadb
+
 RUN mkdir -p /data
 
 ENV NUA_ZONE=europe-1
