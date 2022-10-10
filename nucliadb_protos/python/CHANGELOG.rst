@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.31
+------
+
+- Add positions on NER
+
 0.0.30
 ------
 
