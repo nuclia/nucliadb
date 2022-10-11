@@ -55,12 +55,19 @@ curl 'http://localhost:8080/api/v1/kbs' \
 
 This call will return you a Knowledge Box UUID nedded for further API calls.
 
+To facilitate code examples, please, export these variables with your
+current values:
+```bash
+export KB_UUID=<YOUR-KB-UUID>
+```
+
 ## Upload a file
 
-After starting NucliaDB and creating a Knowledge Box you can upload a file:
+After starting NucliaDB and creating a Knowledge Box you can upload a
+file:
 
 ```bash
-curl http://localhost:8080/api/v1/kb/<your-knowledge-box-id>/upload \
+curl "http://localhost:8080/api/v1/kb/${KB_UUID}/upload" \
   -X POST \
   -H "X-NUCLIADB-ROLES: WRITER" \
   -H "X-FILENAME: `echo -n "myfile" | base64`"
@@ -79,8 +86,7 @@ before, but having now a NUA key, gives us access to semantic search
 out of the box.
 
 ```bash
-curl http://localhost:8080/api/v1/kb/<your-knowledge-box-id>/search?query=your+own+query \
-  -X GET \
+curl http://localhost:8080/api/v1/kb/${KB_UUID}/search?query=your+own+query \
   -H "X-NUCLIADB-ROLES: READER" \
 ```
 

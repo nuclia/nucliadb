@@ -43,6 +43,13 @@ curl 'http://localhost:8080/api/v1/kbs' \
 This call will return you a Knowledge Box UUID nedded for further API
 calls.
 
+To facilitate code examples, please, export these variables with your
+current values:
+```bash
+export KB_SLUG=<YOUR-KB-SLUG>
+export KB_UUID=<YOUR-KB-UUID>
+```
+
 ### Manually uploading some data
 
 NucliaDB has a simple Python client which provides an easy way to
@@ -62,7 +69,7 @@ python simple.py \
        --http=8080 \
        --grpc=8060 \
        --train=8040 \
-       --kb <YOUR-KB-SLUG>
+       --kb ${KB_SLUG}
 ```
 
 This will upload text and vectors to the specified Knowledge Box. 
@@ -79,8 +86,7 @@ Wikipedia articles.
 Let's start with a simple query:
 
 ```bash
-curl 'http://localhost:8080/api/v1/kb/<YOUR-KB-UUID>/search?query=meaning\
-     -X GET \
+curl "http://localhost:8080/api/v1/kb/${KB_UUID}/search?query=meaning" \
      -H "X-NUCLIADB-ROLES: READER"
 ```
 
@@ -91,8 +97,7 @@ A fuzzy search with 1 Levenshtein distance is performed, so we can
 make a typo and keep seeing results:
 
 ```bash
-curl 'http://localhost:8080/api/v1/kb/<YOUR-KB-UUID>/search?query=fault+t0lerance\
-     -X GET \
+curl "http://localhost:8080/api/v1/kb/${KB_UUID}/search?query=fault+t0lerance" \
      -H "X-NUCLIADB-ROLES: READER"
 ```
 
@@ -110,14 +115,13 @@ can search semantically using a POST request and passing an exact or a
 similar vector:
 
 ```bash
-cd nucliadb_client/examples
-VECTOR=$(python simple.py --host=localhost --http=8080 --grpc=8060 --train=8040 --kb simple --print-random-vector) \
-&& curl 'http://localhost:8080/api/v1/kb/<YOUR-KB-UUID>/search' \
+VECTOR=$(python simple.py --host=localhost --http=8080 --grpc=8060 --train=8040 --kb ${KB_SLUG} --print-random-vector) \
+&& curl "http://localhost:8080/api/v1/kb/${KB_UUID}/search" \
      -X POST \
      -H "X-NUCLIADB-ROLES: READER" \
      --data-raw "{
   \"query\": \"whatever\",
-  \"vector\": $(python simple.py --host=localhost --http=8080 --grpc=8060 --train=8040 --kb simple --print-random-vector)
+  \"vector\": ${VECTOR}
 }"
 ```
 
