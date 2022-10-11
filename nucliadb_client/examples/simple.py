@@ -20,7 +20,6 @@
 import argparse
 import asyncio
 import base64
-import json
 import random
 import tempfile
 from dataclasses import dataclass
@@ -37,9 +36,9 @@ from sentence_transformers import SentenceTransformer  # type: ignore
 from nucliadb_client.client import NucliaDBClient
 from nucliadb_client.knowledgebox import CODEX
 
+
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-DATA_FILENAME = "articles.json"
 CACHE_FILENAME = tempfile.mktemp(suffix=".nucliadb")
 
 
@@ -47,30 +46,90 @@ CACHE_FILENAME = tempfile.mktemp(suffix=".nucliadb")
 class Article:
     id: str
     title: str
-    body: str
+    body: List[str]
 
 
-def load_articles(filename: str) -> List[Article]:
-    with open(filename, "r") as f:
-        texts = json.load(f)
-
-    articles = []
-    for id in texts:
-        articles.append(
-            Article(
-                id=id,
-                title=texts[id]["title"],
-                body=texts[id]["body"],
+ARTICLES = [
+    Article(
+        id="semantic-search",
+        title="Semantic search",
+        body=[
+            (
+                "Semantic search denotes search with meaning, as distinguished from "
+                "lexical search where the search engine looks for "
+                "literal matches of the query words or variants of "
+                "them, without understanding the overall meaning of the "
+                "query. Semantic search seeks to improve search "
+                "accuracy by understanding the searcher's intent and "
+                "the contextual meaning of terms as they appear in the "
+                "searchable dataspace, whether on the Web or within a "
+                "closed system, to generate more relevant "
+                "results. Content that ranks well in semantic search is "
+                "well-written in a natural voice, focuses on the user's "
+                "intent, and considers related topics that the user may "
+                "look for in the future. "
+            ),
+            (
+                "Some authors regard semantic search as a set of techniques for "
+                "retrieving knowledge from richly structured data "
+                "sources like ontologies and XML as found on the "
+                "Semantic Web. Such technologies enable the formal "
+                "articulation of domain knowledge at a high level of "
+                "expressiveness and could enable the user to specify "
+                "their intent in more detail at query time. "
             )
-        )
-    return articles
+        ]
+    ),
+
+    Article(
+        id="database",
+        title="Database",
+        body=[
+            (
+                "In computing, a database is an organized collection of "
+                "data stored and accessed electronically. Small "
+                "databases can be stored on a file system, while large "
+                "databases are hosted on computer clusters or cloud "
+                "storage. The design of databases spans formal "
+                "techniques and practical considerations, including "
+                "data modeling, efficient data representation and "
+                "storage, query languages, security and privacy of "
+                "sensitive data, and distributed computing issues, "
+                "including supporting concurrent access and fault "
+                "tolerance."
+            ),
+            (
+                "A database management system (DBMS) is the software that interacts "
+                "with end users, applications, and the database itself "
+                "to capture and analyze the data. The DBMS software "
+                "additionally encompasses the core facilities provided "
+                "to administer the database. The sum total of the "
+                "database, the DBMS and the associated applications can "
+                "be referred to as a database system. Often the term "
+                "\"database\" is also used loosely to refer to any of "
+                "the DBMS, the database system or an application "
+                "associated with the database. "
+            ),
+            (
+                "Computer scientists may classify database management systems "
+                "according to the database models that they "
+                "support. Relational databases became dominant in the "
+                "1980s. These model data as rows and columns in a "
+                "series of tables, and the vast majority use SQL for "
+                "writing and querying data. In the 2000s, "
+                "non-relational databases became popular, collectively "
+                "referred to as NoSQL, because they use different query "
+                "languages. "
+            )
+        ]
+    ),
+]
 
 
 def process_articles(kb):
-    articles = load_articles(DATA_FILENAME)
     cache_file = open(CACHE_FILENAME, "w+")
 
-    for article in articles:
+    for article in ARTICLES:
         payload = CreateResourcePayload()
         payload.title = article.title
         payload.slug = article.id
@@ -97,7 +156,7 @@ def process_articles(kb):
             )
             vector.vector.extend(embeddings[i])
 
-            resource.add_vectors(field, FieldType.TEXT, [vector])
+            resource.add_vectors(field, FieldType.TEXT, [vector])  # type: ignore
 
             bm = base64.b64encode(resource.serialize()).decode()
             cache_file.write(CODEX.RES + bm + "\n")
@@ -116,8 +175,7 @@ async def upload_extracted(kb):
 
 
 def print_random_vector():
-    articles = load_articles(DATA_FILENAME)
-    article = articles[random.randint(0, len(articles) - 1)]
+    article = ARTICLES[random.randint(0, len(ARTICLES) - 1)]
     paragraph = article.body[random.randint(0, len(article.body) - 1)]
     embeddings = model.encode([paragraph])
     print(list(embeddings[0]))

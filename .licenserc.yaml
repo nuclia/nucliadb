@@ -67,7 +67,6 @@ header:
     - "VERSION"
     - "LICENSE"
     - "NOTICE"
-    - "nucliadb_client/examples/*.json"
 
   comment: on-failure
 
