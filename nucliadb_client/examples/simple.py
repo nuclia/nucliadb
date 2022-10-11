@@ -26,16 +26,15 @@ from dataclasses import dataclass
 from typing import List
 
 import aiofiles
-from nucliadb.models.metadata import InputMetadata, Origin
-from nucliadb.models.text import TextField
-from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from sentence_transformers import SentenceTransformer  # type: ignore
 
+from nucliadb.models.metadata import InputMetadata, Origin
+from nucliadb.models.text import TextField
+from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_client.client import NucliaDBClient
 from nucliadb_client.knowledgebox import CODEX
-
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -77,10 +76,9 @@ ARTICLES = [
                 "articulation of domain knowledge at a high level of "
                 "expressiveness and could enable the user to specify "
                 "their intent in more detail at query time. "
-            )
-        ]
+            ),
+        ],
     ),
-
     Article(
         id="database",
         title="Database",
@@ -106,7 +104,7 @@ ARTICLES = [
                 "to administer the database. The sum total of the "
                 "database, the DBMS and the associated applications can "
                 "be referred to as a database system. Often the term "
-                "\"database\" is also used loosely to refer to any of "
+                '"database" is also used loosely to refer to any of '
                 "the DBMS, the database system or an application "
                 "associated with the database. "
             ),
@@ -120,8 +118,8 @@ ARTICLES = [
                 "non-relational databases became popular, collectively "
                 "referred to as NoSQL, because they use different query "
                 "languages. "
-            )
-        ]
+            ),
+        ],
     ),
 ]
 
