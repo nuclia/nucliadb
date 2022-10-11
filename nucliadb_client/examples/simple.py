@@ -27,8 +27,6 @@ from dataclasses import dataclass
 from typing import List
 
 import aiofiles
-from nucliadb_client.client import NucliaDBClient
-from nucliadb_client.knowledgebox import CODEX
 from nucliadb_models.metadata import InputMetadata, Origin
 from nucliadb_models.text import TextField
 from nucliadb_models.writer import CreateResourcePayload
@@ -36,6 +34,8 @@ from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from sentence_transformers import SentenceTransformer  # type: ignore
 
+from nucliadb_client.client import NucliaDBClient
+from nucliadb_client.knowledgebox import CODEX
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -80,26 +80,20 @@ def process_articles(kb):
         payload.origin = Origin()
 
         for i, paragraph in enumerate(article.body):
-            payload.texts[f"paragraph-{i}"] = TextField(
-                body=paragraph
-            )
+            payload.texts[f"paragraph-{i}"] = TextField(body=paragraph)
 
         resource = kb.create_resource(payload)
 
         embeddings = model.encode(article.body)
         for i, paragraph in enumerate(article.body):
             field = f"paragraph-{i}"
-            resource.add_text(
-                field,
-                FieldType.TEXT,
-                paragraph
-            )
+            resource.add_text(field, FieldType.TEXT, paragraph)
 
             vector = Vector(
                 start=0,
                 end=len(paragraph),
                 start_paragraph=0,
-                end_paragraph=len(paragraph)
+                end_paragraph=len(paragraph),
             )
             vector.vector.extend(embeddings[i])
 
@@ -168,17 +162,10 @@ if __name__ == "__main__":
         required=True,
     )
 
-    parser.add_argument(
-        "--kb",
-        dest="kb",
-        required=True,
-        help="KB slug"
-    )
+    parser.add_argument("--kb", dest="kb", required=True, help="KB slug")
 
     parser.add_argument(
-        "--print-random-vector",
-        dest="print_random_vector",
-        action="store_true"
+        "--print-random-vector", dest="print_random_vector", action="store_true"
     )
 
     args = parser.parse_args()
