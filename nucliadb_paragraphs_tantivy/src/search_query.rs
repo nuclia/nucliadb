@@ -230,22 +230,25 @@ pub fn create_query(
     }
 
     // Fields
-    search.fields.iter().for_each(|value| {
-        let facet_key: String = format!("/{}", value);
-        let facet = Facet::from(facet_key.as_str());
-        let facet_term = Term::from_facet(schema.field, &facet);
-        let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-        fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
-        originals.push((Occur::Must, Box::new(facet_term_query)));
-    });
+    search
+        .fields
+        .iter()
+        .map(|value| format!("/{}", value))
+        .flat_map(|facet_key| Facet::from_text(&facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.field, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
+            originals.push((Occur::Must, Box::new(facet_term_query)));
+        });
 
     // Add filter
     search
         .filter
         .iter()
         .flat_map(|f| f.tags.iter())
-        .for_each(|value| {
-            let facet = Facet::from(value.as_str());
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
             fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
@@ -266,6 +269,7 @@ mod tests {
         let term = Term::from_field_u64(field, 0);
         Box::new(TermQuery::new(term, IndexRecordOption::Basic))
     }
+
     #[test]
     fn test() {
         let subqueries0: Vec<_> = vec![dummy_term_query; 12]
