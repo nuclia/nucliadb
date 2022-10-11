@@ -628,7 +628,7 @@ mod tests {
             r#type: 0,
         };
 
-        // Search on all paragraphs
+        // Search on all paragraphs faceted
         let search = ParagraphSearchRequest {
             id: "shard1".to_string(),
             uuid: UUID.to_string(),
@@ -644,6 +644,23 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
+
+        // Search on all paragraphs
+        let search = ParagraphSearchRequest {
+            id: "shard1".to_string(),
+            uuid: UUID.to_string(),
+            body: "".to_string(),
+            fields: vec![],
+            filter: Some(filter.clone()),
+            faceted: None,
+            order: None,
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: None,
+            reload: false,
+        };
+        let result = paragraph_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 1);
 
         // Search on all paragraphs without fields
         let search = ParagraphSearchRequest {
