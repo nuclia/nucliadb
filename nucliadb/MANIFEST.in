@@ -2,8 +2,8 @@ include nucliadb_protos/*.pyi
 include *.rst
 include *.txt
 include VERSION
-include py.typed
-include static
-include *.html
-include *.ico
-include *.svg
+include nucliadb/py.typed
+include nucliadb/static
+include nucliadb/static/*
+include **/*.pb
+include **/*.png

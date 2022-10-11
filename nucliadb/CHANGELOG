@@ -1,13 +1,6 @@
 # CHANGELOG
 
-## 2.0.1
+## 2.0.2
 
 - Merge all subpackaged inside nucliadb
-
-## 1.0.1
-
-- Fix ingest dependency
-
-## 1.0.0
-
 - Initial release
