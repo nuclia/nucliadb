@@ -19,6 +19,7 @@
 #
 import hashlib
 from base64 import b64encode
+from copy import deepcopy
 from datetime import datetime
 from os.path import dirname
 from unittest.mock import patch
@@ -99,8 +100,10 @@ TEST_FILE_PAYLOAD = {
 }
 
 TEST_EXTERNAL_FILE_PAYLOAD = {
-    "uri": "https://mysite.com/files/myfile.pdf",
-    "extra_headers": {"foo": "bar"},
+    "file": {
+        "uri": "https://mysite.com/files/myfile.pdf",
+        "extra_headers": {"foo": "bar"},
+    }
 }
 
 TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
@@ -411,9 +414,33 @@ async def test_external_file_field_sends_correct_processing_payload(
 
         # Check that the payload sent to processing is correct
         decoded_payload = jwt_encode_mock.call_args[0][0]
-        assert decoded_payload["uri"] == TEST_EXTERNAL_FILE_PAYLOAD["uri"]
+        assert decoded_payload["uri"] == TEST_EXTERNAL_FILE_PAYLOAD["file"]["uri"]
         assert decoded_payload["driver"] == 3
         assert (
             decoded_payload["extra_headers"]
-            == TEST_EXTERNAL_FILE_PAYLOAD["extra_headers"]
+            == TEST_EXTERNAL_FILE_PAYLOAD["file"]["extra_headers"]
         )
+
+
+@pytest.mark.asyncio
+async def test_file_field_validation(writer_api, knowledgebox_writer):
+    knowledgebox_id = knowledgebox_writer
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            json={"slug": "resource1", "title": "My resource"},
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+
+        # Remove a required key from the payload
+        payload = deepcopy(TEST_FILE_PAYLOAD)
+        payload["file"].pop("md5")
+
+        resp = await client.put(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}/file/file1",
+            json=payload,
+            headers={"X-SYNCHRONOUS": "True"},
+        )
+        assert resp.status_code == 422

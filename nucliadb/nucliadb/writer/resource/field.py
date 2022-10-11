@@ -140,12 +140,17 @@ async def parse_fields(
     x_skip_store: bool,
 ):
     for key, file_field in item.files.items():
-        if x_skip_store:
-            await parse_file_field(key, file_field, writer, toprocess)
+        # TODO: refactor this so that the internal details of file field are hidden
+        # Ideally we just want to call parse_field() here
+        if file_field.file.is_external:
+            parse_external_file_field(key, file_field, writer, toprocess)
         else:
-            await parse_internal_file_field(
-                key, file_field, writer, toprocess, kbid, uuid
-            )
+            if x_skip_store:
+                await parse_file_field(key, file_field, writer, toprocess)
+            else:
+                await parse_internal_file_field(
+                    key, file_field, writer, toprocess, kbid, uuid
+                )
 
     for key, link_field in item.links.items():
         parse_link_field(key, link_field, writer, toprocess)
@@ -205,8 +210,8 @@ async def parse_internal_file_field(
     writer.files[key].file.CopyFrom(
         await storage.upload_b64file_to_cloudfile(
             sf,
-            file_field.file.payload.encode(),
-            file_field.file.filename,
+            file_field.file.payload.encode(),  # type: ignore
+            file_field.file.filename,  # type: ignore
             file_field.file.content_type,
             file_field.file.md5,
         )
@@ -236,13 +241,14 @@ async def parse_file_field(
 
 def parse_external_file_field(
     key: str,
-    file_field: models.ExternalFileField,
+    file_field: models.FileField,
     writer: BrokerMessage,
     toprocess: PushPayload,
 ) -> None:
     writer.files[key].added.FromDatetime(datetime.now())
-    writer.files[key].url = file_field.uri
-    writer.files[key].file.uri = file_field.uri
+    uri = file_field.file.uri
+    writer.files[key].url = uri  # type: ignore
+    writer.files[key].file.uri = uri  # type: ignore
     writer.files[key].file.source = resources_pb2.CloudFile.Source.EXTERNAL
 
     processing = get_processing()

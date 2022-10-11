@@ -18,12 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Dict, Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 
-from nucliadb.models import CloudLink, FileB64
+from nucliadb.models import CloudLink, File
 from nucliadb_protos import resources_pb2
 
 _T = TypeVar("_T")
@@ -62,12 +62,7 @@ class FieldFile(BaseModel):
 class FileField(BaseModel):
     language: Optional[str] = None
     password: Optional[str] = None
-    file: FileB64
-
-
-class ExternalFileField(BaseModel):
-    uri: str
-    extra_headers: Dict[str, str] = {}
+    file: File
 
 
 # Processing classes (Those used to sent to push endpoints)
