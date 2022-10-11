@@ -186,9 +186,9 @@ extracted information.
 ### Search
 
 Once we finish uploading files and getting the processed results, we
-can do searches on our data. Even we can do the same exact searches as
-before, having now a NUA key, gives us access to semantic search out
-of the box.
+can do searches on our data. We can even do the same exact searches as
+before, but having now a NUA key, gives us access to semantic search
+out of the box.
 
 ```bash
 curl http://localhost:8080/api/v1/kb/<your-knowledge-box-id>/search?query=your+own+query \
