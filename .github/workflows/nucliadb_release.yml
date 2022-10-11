@@ -10,7 +10,7 @@ on:
 
 jobs:
   build_wheels:
-    name: Build wheels
+    name: Build wheel
     runs-on: ubuntu-latest
 
     steps:
@@ -31,7 +31,7 @@ jobs:
       - name: Install nucliadb_protos
         run: pip install -e ./nucliadb/
 
-      - name: Build wheels
+      - name: Build wheel
         run: pip wheel --no-deps -w dist ./nucliadb/
 
       - name: Publish distribution 📦 to PyPI

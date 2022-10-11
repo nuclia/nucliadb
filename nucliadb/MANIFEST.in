@@ -3,3 +3,7 @@ include *.rst
 include *.txt
 include VERSION
 include py.typed
+include static
+include *.html
+include *.ico
+include *.svg
