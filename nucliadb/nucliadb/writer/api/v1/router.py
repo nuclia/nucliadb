@@ -24,5 +24,6 @@ api = APIRouter()
 KB_PREFIX = "kb"
 KBS_PREFIX = "kbs"
 RESOURCE_PREFIX = "resource"
+RSLUG_PREFIX = "slug"
 RESOURCES_PREFIX = "resources"
 FIELD_PREFIX = "field"

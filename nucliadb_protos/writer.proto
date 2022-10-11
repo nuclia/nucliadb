@@ -344,6 +344,15 @@ message ResourceFieldExistsResponse {
     bool found = 1;
 }
 
+message ResourceIdRequest {
+    string kbid = 1;
+    string slug = 2;
+}
+
+message ResourceIdResponse {
+    string uuid = 1;
+}
+
 message ExportRequest {
     string kbid = 1;
 }
@@ -357,6 +366,8 @@ service Writer {
     rpc GCKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.GCKnowledgeBoxResponse) {}
 
     rpc ResourceFieldExists(ResourceFieldId) returns (ResourceFieldExistsResponse) {}
+
+    rpc GetResourceId(ResourceIdRequest) returns (ResourceIdResponse) {}
 
     rpc ProcessMessage(stream BrokerMessage) returns (OpStatusWriter) {}
 

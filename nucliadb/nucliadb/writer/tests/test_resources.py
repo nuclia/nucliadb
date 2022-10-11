@@ -29,7 +29,12 @@ import nucliadb.models
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
 from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb.writer.api.v1.router import (
+    KB_PREFIX,
+    RESOURCE_PREFIX,
+    RESOURCES_PREFIX,
+    RSLUG_PREFIX,
+)
 from nucliadb.writer.tests.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
     TEST_DATETIMES_PAYLOAD,
@@ -285,3 +290,83 @@ async def test_reprocess_resource(
             payload.conversationfield["conv1"].messages[33].content.attachments[1]
             == "DUMMYJWT"
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "method,endpoint,payload",
+    [
+        ["patch", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}", {}],
+        ["post", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}/reprocess", None],
+        ["post", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}/reindex", None],
+        ["delete", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}", None],
+    ],
+)
+async def test_resource_endpoints_by_slug(
+    writer_api,
+    knowledgebox,
+    method,
+    endpoint,
+    payload,
+):
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        slug = "my-resource"
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "slug": slug,
+                "texts": {"text1": {"body": "test1", "format": "PLAIN"}},
+            },
+        )
+        assert resp.status_code == 201
+
+        endpoint = endpoint.format(
+            KB_PREFIX=KB_PREFIX,
+            kb=knowledgebox,
+            RSLUG_PREFIX=RSLUG_PREFIX,
+            slug=slug,
+        )
+        extra_params = {}
+        if payload is not None:
+            extra_params["json"] = payload
+
+        op = getattr(client, method)
+        resp = await op(endpoint, **extra_params)
+
+        assert resp.status_code in (200, 202, 204)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "method,endpoint,payload",
+    [
+        ["patch", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}", {}],
+        ["post", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}/reprocess", None],
+        ["post", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}/reindex", None],
+        ["delete", "/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{slug}", None],
+    ],
+)
+async def test_resource_endpoints_by_slug_404(
+    writer_api,
+    knowledgebox,
+    method,
+    endpoint,
+    payload,
+):
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        endpoint = endpoint.format(
+            KB_PREFIX=KB_PREFIX,
+            kb=knowledgebox,
+            RSLUG_PREFIX=RSLUG_PREFIX,
+            slug="idonotexist",
+        )
+        extra_params = {}
+        if payload is not None:
+            extra_params["json"] = payload
+
+        op = getattr(client, method)
+        resp = await op(endpoint, **extra_params)
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Resource does not exist"

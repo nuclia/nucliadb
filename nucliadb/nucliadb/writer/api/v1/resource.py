@@ -18,13 +18,20 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from time import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Response
 from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
-from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource
+from grpc import StatusCode as GrpcStatusCode
+from grpc.aio import AioRpcError  # type: ignore
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    IndexResource,
+    ResourceIdRequest,
+    ResourceIdResponse,
+)
 from starlette.requests import Request
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -42,8 +49,10 @@ from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
     RESOURCES_PREFIX,
+    RSLUG_PREFIX,
     api,
 )
+from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
@@ -154,6 +163,13 @@ async def create_resource(
 
 
 @api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=200,
+    name="Modify Resource",
+    response_model=ResourceUpdated,
+    tags=["Resources"],
+)
+@api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
     name="Modify Resource",
@@ -166,13 +182,16 @@ async def modify_resource(
     request: Request,
     item: UpdateResourcePayload,
     kbid: str,
-    rid: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction()
     processing = get_processing()
     partitioning = get_partitioning()
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -217,6 +236,13 @@ async def modify_resource(
 
 
 @api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/reprocess",
+    status_code=202,
+    name="Reprocess resource",
+    response_model=ResourceUpdated,
+    tags=["Resources"],
+)
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reprocess",
     status_code=202,
     name="Reprocess resource",
@@ -225,10 +251,18 @@ async def modify_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def reprocess_resource(request: Request, kbid: str, rid: str):
+async def reprocess_resource(
+    request: Request,
+    kbid: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
+):
     transaction = get_transaction()
     processing = get_processing()
     partitioning = get_partitioning()
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
     partition = partitioning.generate_partition(kbid, rid)
 
     toprocess = PushPayload(
@@ -276,6 +310,12 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
 
 
 @api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
+    status_code=204,
+    name="Delete Resource",
+    tags=["Resources"],
+)
+@api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=204,
     name="Delete Resource",
@@ -286,13 +326,16 @@ async def reprocess_resource(request: Request, kbid: str, rid: str):
 async def delete_resource(
     request: Request,
     kbid: str,
-    rid: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ):
     set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
 
     transaction = get_transaction()
     partitioning = get_partitioning()
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()
@@ -310,6 +353,12 @@ async def delete_resource(
 
 
 @api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/reindex",
+    status_code=204,
+    name="Reindex Resource",
+    tags=["Resources"],
+)
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reindex",
     status_code=204,
     name="Reindex Resource",
@@ -317,10 +366,51 @@ async def delete_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def reindex_resource(request: Request, kbid: str, rid: str):
+async def reindex_resource(
+    request: Request,
+    kbid: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
+):
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
     ingest = get_ingest()
     resource = IndexResource()
     resource.kbid = kbid
     resource.rid = rid
     await ingest.ReIndex(resource)  # type: ignore
     return Response(status_code=200)
+
+
+async def get_resource_uuid_from_slug(kbid: str, slug: str) -> str:
+    ingest = get_ingest()
+    pbrequest = ResourceIdRequest()
+    pbrequest.kbid = kbid
+    pbrequest.slug = slug
+    try:
+        response: ResourceIdResponse = await ingest.GetResourceId(pbrequest)  # type: ignore
+    except AioRpcError as exc:
+        if exc.code() is GrpcStatusCode.UNAVAILABLE:
+            raise IngestNotAvailable()
+        else:
+            raise exc
+    return response.uuid
+
+
+async def get_rid_from_params_or_raise_error(
+    kbid: str,
+    rid: Optional[str] = None,
+    slug: Optional[str] = None,
+) -> str:
+    if rid is not None:
+        return rid
+
+    if slug is None:
+        raise ValueError("Either rid or slug must be set")
+
+    rid = await get_resource_uuid_from_slug(kbid, slug)
+    if not rid:
+        raise HTTPException(status_code=404, detail="Resource does not exist")
+
+    return rid
