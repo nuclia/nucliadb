@@ -119,7 +119,7 @@ jobs:
 
       - name: Docker - Build
         run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.train
+          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
