@@ -330,12 +330,13 @@ async def delete_resource(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ):
-    set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
 
     transaction = get_transaction()
     partitioning = get_partitioning()
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
+    set_info_on_span({"nuclia.kbid": kbid, "nucliadb.rid": rid})
 
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()
