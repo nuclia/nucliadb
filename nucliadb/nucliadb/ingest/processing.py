@@ -216,9 +216,7 @@ class ProcessingEngine:
             jwttoken = await resp.text()
         return jwttoken
 
-    def convert_external_filefield_to_str(
-        self, file_field: models.ExternalFileField
-    ) -> str:
+    def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
         if self.nuclia_jwt_key is None:
             raise AttributeError()
 
@@ -233,8 +231,8 @@ class ProcessingEngine:
             "jti": uuid.uuid4().hex,
             "source": 1,  # To indicate that this files comes internally
             "driver": 3,  # To indicate that this is an externally-hosted file (no gcp, s3 nor local).
-            "uri": file_field.uri,
-            "extra_headers": file_field.extra_headers,
+            "uri": file_field.file.uri,
+            "extra_headers": file_field.file.extra_headers,
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 

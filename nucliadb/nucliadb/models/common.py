@@ -21,7 +21,7 @@ import re
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
 from nucliadb_protos import resources_pb2
 
@@ -61,10 +61,25 @@ class FieldID(BaseModel):
 
 
 class FileB64(BaseModel):
-    filename: str
+    filename: Optional[str]
     content_type: str = "application/octet-stream"
-    payload: str
-    md5: str
+    payload: Optional[str]
+    md5: Optional[str]
+    # These are to be used for external files
+    uri: Optional[str]
+    extra_headers: Dict[str, str] = {}
+
+    @root_validator
+    def _check_internal_file_fields(cls, values):
+        if values.get("uri"):
+            # Externally hosted file
+            return values
+
+        required_keys = ["filename", "payload", "md5"]
+        for key in required_keys:
+            if values.get(key) is None:
+                raise ValueError(f"{key} is required")
+        return values
 
 
 class CloudFile(BaseModel):

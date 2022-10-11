@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from fastapi import HTTPException, Response
 from fastapi.params import Header
@@ -34,6 +34,7 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import set_last_seqid
 from nucliadb.writer.resource.field import (
+    is_external_file,
     parse_conversation_field,
     parse_datetime_field,
     parse_external_file_field,
@@ -301,11 +302,12 @@ async def add_resource_field_internal_or_external_file(
     kbid: str,
     rid: str,
     field_id: str,
-    field_payload: Union[models.FileField, models.ExternalFileField],
+    field_payload: models.FileField,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-    if isinstance(field_payload, models.ExternalFileField):
+
+    if is_external_file(field_payload):
         return await add_resource_field_file_external(
             request, kbid, rid, field_id, field_payload, x_synchronous
         )
@@ -345,7 +347,7 @@ async def add_resource_field_file_external(
     kbid: str,
     rid: str,
     field_id: str,
-    field_payload: models.ExternalFileField,
+    field_payload: models.FileField,
     wait_on_commit: bool,
 ) -> ResourceFieldAdded:
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
