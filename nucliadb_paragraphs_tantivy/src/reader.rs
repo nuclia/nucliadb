@@ -70,8 +70,7 @@ impl ReaderChild for ParagraphReaderService {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-        let text = &request.body;
-        let multic_flag = results > 0 && !text.is_empty();
+        let only_facets = results == 0 || (request.body.is_empty() && request.filter.is_none());
         let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
@@ -91,7 +90,7 @@ impl ReaderChild for ParagraphReaderService {
             results,
             offset,
             facets: &facets,
-            multic_flag,
+            only_facets,
             order_field,
             text: &text,
         };
@@ -240,7 +239,7 @@ impl ParagraphReaderService {
     }
 
     fn adapt_text(parser: &QueryParser, text: &str) -> String {
-        match text {
+        match text.trim() {
             "" => text.to_string(),
             text => parser
                 .parse_query(text)
@@ -296,7 +295,7 @@ struct Searcher<'a> {
     results: usize,
     offset: usize,
     facets: &'a [String],
-    multic_flag: bool,
+    only_facets: bool,
     order_field: Option<Field>,
     text: &'a str,
 }
@@ -315,7 +314,7 @@ impl<'a> Searcher<'a> {
                 collector
             },
         );
-        if !self.multic_flag {
+        if self.only_facets {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
             ParagraphSearchResponse::from(SearchFacetsResponse {
