@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb_models.resource import Resource as NucliaDBResource
+from nucliadb.models.resource import Resource as NucliaDBResource
 
 if TYPE_CHECKING:
     from nucliadb_client.knowledgebox import KnowledgeBox

@@ -1,5 +1,0 @@
-include nucliadb_protos/*.pyi
-include *.rst
-include *.txt
-include VERSION
-include py.typed

@@ -36,16 +36,16 @@ from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from sentence_transformers import SentenceTransformer  # type: ignore
 
-from nucliadb_client.client import NucliaDBClient
-from nucliadb_client.knowledgebox import KnowledgeBox
-from nucliadb_client.resource import Resource
-from nucliadb_models.conversation import (
+from nucliadb.models.conversation import (
     InputConversationField,
     InputMessage,
     InputMessageContent,
 )
-from nucliadb_models.metadata import InputMetadata, Origin
-from nucliadb_models.writer import CreateResourcePayload
+from nucliadb.models.metadata import InputMetadata, Origin
+from nucliadb.models.writer import CreateResourcePayload
+from nucliadb_client.client import NucliaDBClient
+from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_client.resource import Resource
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 

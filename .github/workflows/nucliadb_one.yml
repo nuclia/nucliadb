@@ -9,36 +9,26 @@ on:
     paths:
       - ".github/workflows/nucliadb_one.yml"
       - "charts/nucliadb/**"
-      - "nucliadb_one/**"
-      - "Dockerfile.one"
-      - "nucliadb_utils/**"
-      - "nucliadb_ingest/**"
-      - "nucliadb_writer/**"
-      - "nucliadb_one/**"
-      - "nucliadb_reader/**"
-      - "nucliadb_search/**"
-      - "nucliadb_models/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/writer/**"
+      - "nucliadb/nucliadb/one/**"
+      - "nucliadb/nucliadb/reader/**"
+      - "nucliadb/nucliadb/search/**"
+      - "nucliadb/nucliadb/models/**"
       - "nucliadb_protos/**"
-      - "nucliadb_cluster/**"
-      - "nucliadb_models/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/nucliadb_one.yml"
       - "charts/nucliadb/**"
-      - "nucliadb_one/**"
-      - "Dockerfile.one"
-      - "nucliadb_utils/**"
-      - "nucliadb_ingest/**"
-      - "nucliadb_writer/**"
-      - "nucliadb_one/**"
-      - "nucliadb_reader/**"
-      - "nucliadb_search/**"
-      - "nucliadb_models/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/writer/**"
+      - "nucliadb/nucliadb/one/**"
+      - "nucliadb/nucliadb/reader/**"
+      - "nucliadb/nucliadb/search/**"
+      - "nucliadb/nucliadb/models/**"
       - "nucliadb_protos/**"
-      - "nucliadb_cluster/**"
-      - "nucliadb_models/**"
 
 jobs:
   # Job to run pre-checks
@@ -63,9 +53,9 @@ jobs:
           pip install -r code-requirements.txt
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_one --config=nucliadb_one/setup.cfg
-          isort -c --profile black nucliadb_one/
-          black --check --verbose nucliadb_one
+          flake8 nucliadb/nucliadb/one --config=nucliadb/setup.cfg
+          isort -c --profile black nucliadb/nucliadb/one
+          black --check --verbose nucliadb/nucliadb/one
 
   # Job to run tests
   tests:
@@ -100,23 +90,17 @@ jobs:
       - name: Install the package
         run: |
           pip install -r test-requirements.txt
-          pip install -r nucliadb_one/requirements-sources.txt
-          pip install -r nucliadb_ingest/requirements.txt
-          pip install -e nucliadb_ingest
-          pip install -r nucliadb_search/requirements.txt
-          pip install -e nucliadb_search
-          pip install -r nucliadb_writer/requirements.txt
-          pip install -e nucliadb_writer
-          pip install -r nucliadb_reader/requirements.txt
-          pip install -e nucliadb_reader
+          pip install -r nucliadb/requirements-sources.txt
+          pip install -r nucliadb/requirements.txt
+          pip install -e nucliadb
 
       - name: Check mypy
         run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_one/
+          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/one/
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb_one -s --tb=native -v --cov-report xml --cov-append nucliadb_one/nucliadb_one
+          pytest -rfE --cov=nucliadb.one -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/one
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

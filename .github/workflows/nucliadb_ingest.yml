@@ -7,12 +7,12 @@ on:
     paths:
       - ".github/workflows/nucliadb_ingest.yml"
       - "charts/nucliadb_ingest/**"
-      - "nucliadb_ingest/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/models/**"
       - "nucliadb_utils/**"
-      - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
       - "test-requirements.txt"
-      - "Dockerfile.ingest"
+      - "Dockerfile"
       - "nucliadb_protos/python/**"
 
   push:
@@ -21,12 +21,12 @@ on:
     paths:
       - ".github/workflows/nucliadb_ingest.yml"
       - "charts/nucliadb_ingest/**"
-      - "nucliadb_ingest/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/models/**"
       - "nucliadb_utils/**"
-      - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
       - "test-requirements.txt"
-      - "Dockerfile.ingest"
+      - "Dockerfile"
       - "nucliadb_protos/python/**"
 
 env:
@@ -57,9 +57,9 @@ jobs:
 
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_ingest --config=nucliadb_ingest/setup.cfg
-          isort -c --profile black nucliadb_ingest/
-          black --check --verbose nucliadb_ingest
+          flake8 nucliadb/nucliadb/ingest --config=nucliadb/setup.cfg
+          isort -c --profile black nucliadb/nucliadb/ingest
+          black --check --verbose nucliadb/nucliadb/ingest
 
   # Job to run tests
   tests:
@@ -82,13 +82,13 @@ jobs:
       - name: Install the package
         run: |
           pip install -r test-requirements.txt
-          pip install -r nucliadb_ingest/requirements-sources.txt
-          pip install -r nucliadb_ingest/requirements.txt
-          pip install -e nucliadb_ingest
+          pip install -r nucliadb/requirements-sources.txt
+          pip install -r nucliadb/requirements.txt
+          pip install -e nucliadb
 
       - name: Check mypy
         run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_ingest/
+          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/ingest/
 
       - name: Install tikv
         run: |
@@ -98,7 +98,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb_ingest -s --tb=native -v --cov-report xml --cov-append nucliadb_ingest/nucliadb_ingest
+          pytest -rfE --cov=nucliadb.ingest -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/ingest
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -106,10 +106,14 @@ jobs:
           file: ./coverage.xml
           flags: ingest
 
+  # PR workflows END here
+  # PUSH workflows contine with deploy activities
+
   build:
     name: Build image and push
     runs-on: ubuntu-latest
     needs: tests
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
@@ -125,37 +129,31 @@ jobs:
 
       - name: Docker - Build
         run: |-
-          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.ingest
+          docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile
 
       # PR workflows END here
       # PUSH workflows contine with deploy activities
 
       - name: Setup gcloud CLI
-        if: github.event_name == 'push'
         uses: google-github-actions/auth@v0
         with:
           credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
       - name: "Set up Cloud SDK"
-        if: github.event_name == 'push'
         uses: "google-github-actions/setup-gcloud@v0"
 
       - name: Configure Docker
-        if: github.event_name == 'push'
         run: gcloud auth configure-docker --quiet
 
       - name: Docker - Tag
-        if: github.event_name == 'push'
         run: |-
           docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
 
       - name: Docker - Push sha
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}
 
       - name: Docker - Push latest
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
 
@@ -180,7 +178,7 @@ jobs:
         run: |-
           sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_ingest/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_ingest/values.yaml
-          VERSION=`cat nucliadb_ingest/VERSION`
+          VERSION=`cat nucliadb/VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_ingest/Chart.yaml
           echo "::set-output name=version_number::$VERSION_SHA"

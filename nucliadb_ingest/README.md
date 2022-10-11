@@ -1,3 +1,0 @@
-# NucliaDB Ingest
-
-Ingest

@@ -7,28 +7,24 @@ on:
     paths:
       - ".github/workflows/nucliadb_search.yml"
       - "charts/nucliadb_search/**"
-      - "nucliadb_search/**"
-      - "Dockerfile.search"
       - "nucliadb_utils/**"
-      - "nucliadb_ingest/**"
-      - "nucliadb_models/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/search/**"
+      - "nucliadb/nucliadb/models/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_models/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/nucliadb_search.yml"
       - "charts/nucliadb_search/**"
-      - "nucliadb_search/**"
-      - "Dockerfile.search"
       - "nucliadb_utils/**"
-      - "nucliadb_ingest/**"
-      - "nucliadb_models/**"
+      - "nucliadb/nucliadb/ingest/**"
+      - "nucliadb/nucliadb/search/**"
+      - "nucliadb/nucliadb/models/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_protos/python/**"
-      - "nucliadb_models/**"
 
 env:
   API_VERSION: 1
@@ -59,9 +55,9 @@ jobs:
           pip install -r code-requirements.txt
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_search --config=nucliadb_search/setup.cfg
-          isort -c --profile black nucliadb_search/
-          black --check --verbose nucliadb_search
+          flake8 nucliadb/nucliadb/search --config=nucliadb/setup.cfg
+          isort -c --profile black nucliadb/nucliadb/search
+          black --check --verbose nucliadb/nucliadb/search
 
   # Job to run tests
   tests:
@@ -96,19 +92,17 @@ jobs:
       - name: Install the package
         run: |
           pip install -r test-requirements.txt
-          pip install -r nucliadb_search/requirements-sources.txt
-          pip install -r nucliadb_ingest/requirements.txt
-          pip install -e nucliadb_ingest
-          pip install -r nucliadb_search/requirements.txt
-          pip install -e nucliadb_search
+          pip install -r nucliadb/requirements-sources.txt
+          pip install -r nucliadb/requirements.txt
+          pip install -e nucliadb
 
       - name: Check mypy
         run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_search/
+          MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/search
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb_search -s --tb=native -v --cov-report xml --cov-append nucliadb_search/nucliadb_search
+          pytest -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/search
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -119,17 +113,21 @@ jobs:
       - name: Extract docs
         run: |
           mkdir -p /tmp/openapi
-          extract-openapi /tmp/openapi/$COMPONENT.json $API_VERSION $GITHUB_SHA
+          extract-openapi-search /tmp/openapi/$COMPONENT.json $API_VERSION $GITHUB_SHA
 
       - uses: actions/upload-artifact@v2
         with:
           name: openapi-${{ env.COMPONENT }}-${{ github.sha }}
           path: /tmp/openapi/${{ env.COMPONENT }}.json
 
+  # PR workflows END here
+  # PUSH workflows contine with deploy activities
+
   build:
     name: Build image and push
     runs-on: ubuntu-latest
     needs: tests
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
@@ -147,35 +145,26 @@ jobs:
         run: |-
           docker build -t $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} . -f Dockerfile.search
 
-      # PR workflows END here
-      # PUSH workflows contine with deploy activities
-
       - name: Setup gcloud CLI
-        if: github.event_name == 'push'
         uses: google-github-actions/auth@v0
         with:
           credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
 
       - name: "Set up Cloud SDK"
-        if: github.event_name == 'push'
         uses: "google-github-actions/setup-gcloud@v0"
 
       - name: Configure Docker
-        if: github.event_name == 'push'
         run: gcloud auth configure-docker --quiet
 
       - name: Docker - Tag
-        if: github.event_name == 'push'
         run: |-
           docker tag $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }} $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
 
       - name: Docker - Push sha
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}
 
       - name: Docker - Push latest
-        if: github.event_name == 'push'
         run: |-
           docker push $CONTAINER_REGISTRY/$IMAGE_NAME:${{ steps.env-vars.outputs.branch }}
 
@@ -200,7 +189,7 @@ jobs:
         run: |-
           sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_search/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_search/values.yaml
-          VERSION=`cat nucliadb_search/VERSION`
+          VERSION=`cat nucliadb/VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_search/Chart.yaml
           echo "::set-output name=version_number::$VERSION_SHA"

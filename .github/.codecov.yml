@@ -2,7 +2,7 @@ ignore:
   - "**/tests"
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
-    carryforward: true  # needed for monorepos: total coverage is not uploaded at every commit.
+    carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
     statuses:
       - type: project
         target: auto
@@ -12,7 +12,7 @@ flag_management:
   individual_flags:
     - name: one
       paths:
-        - nucliadb_one/**
+        - nucliadb/nucliadb/one/**
       carryforward: true
       statuses:
         - type: project
@@ -21,7 +21,7 @@ flag_management:
           target: 100%
     - name: ingest
       paths:
-        - nucliadb_ingest/**
+        - nucliadb/nucliadb/ingest/**
       carryforward: true
       statuses:
         - type: project
@@ -45,16 +45,16 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%
     - name: train
       paths:
-        - nucliadb_train/**
+        - nucliadb/nucliadb/train/**
       carryforward: true
       statuses:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%
     - name: telemetry
       paths:
         - nucliadb_telemetry/**
@@ -63,10 +63,10 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%
     - name: search
       paths:
-        - nucliadb_search/**
+        - nucliadb/nucliadb/search/**
       carryforward: true
       statuses:
         - type: project
@@ -75,7 +75,7 @@ flag_management:
           target: 80%
     - name: writer
       paths:
-        - nucliadb_writer/**
+        - nucliadb/nucliadb/writer/**
       carryforward: true
       statuses:
         - type: project
@@ -84,7 +84,7 @@ flag_management:
           target: 80%
     - name: reader
       paths:
-        - nucliadb_reader/**
+        - nucliadb/nucliadb/reader/**
       carryforward: true
       statuses:
         - type: project
@@ -99,4 +99,4 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%

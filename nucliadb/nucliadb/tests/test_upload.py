@@ -22,7 +22,7 @@ import base64
 import pytest
 from httpx import AsyncClient
 
-from nucliadb_writer.tus import UPLOAD
+from nucliadb.writer.tus import UPLOAD
 
 
 @pytest.mark.asyncio

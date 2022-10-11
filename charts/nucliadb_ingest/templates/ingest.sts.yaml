@@ -63,8 +63,7 @@ spec:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.grpc }}"]
           initialDelaySeconds: 2
-        command: ["/entrypoint.sh"]
-        args: ["ndb_ingest"]
+        command: ["ndb_ingest"]
         envFrom:
         - configMapRef:
             name: nucliadb-config

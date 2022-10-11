@@ -1,3 +1,0 @@
-# NUCLIADB SEARCH
-
-Search API NucliaDB

@@ -1,3 +1,0 @@
-pydantic==1.9.0
-protobuf
-nucliadb-protos>=0.0.29
