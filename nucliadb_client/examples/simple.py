@@ -27,9 +27,9 @@ from dataclasses import dataclass
 from typing import List
 
 import aiofiles
-from nucliadb_models.metadata import InputMetadata, Origin
-from nucliadb_models.text import TextField
-from nucliadb_models.writer import CreateResourcePayload
+from nucliadb.models.metadata import InputMetadata, Origin
+from nucliadb.models.text import TextField
+from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.utils_pb2 import Vector
 from sentence_transformers import SentenceTransformer  # type: ignore
