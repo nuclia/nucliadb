@@ -210,8 +210,8 @@ async def parse_internal_file_field(
     writer.files[key].file.CopyFrom(
         await storage.upload_b64file_to_cloudfile(
             sf,
-            file_field.file.payload.encode(),
-            file_field.file.filename,
+            file_field.file.payload.encode(),  # type: ignore
+            file_field.file.filename,  # type: ignore
             file_field.file.content_type,
             file_field.file.md5,
         )
@@ -247,8 +247,8 @@ def parse_external_file_field(
 ) -> None:
     writer.files[key].added.FromDatetime(datetime.now())
     uri = file_field.file.uri
-    writer.files[key].url = uri
-    writer.files[key].file.uri = uri
+    writer.files[key].url = uri  # type: ignore
+    writer.files[key].file.uri = uri  # type: ignore
     writer.files[key].file.source = resources_pb2.CloudFile.Source.EXTERNAL
 
     processing = get_processing()

@@ -60,7 +60,7 @@ class FieldID(BaseModel):
     field: str
 
 
-class FileB64(BaseModel):
+class File(BaseModel):
     filename: Optional[str]
     content_type: str = "application/octet-stream"
     payload: Optional[str]
@@ -80,6 +80,13 @@ class FileB64(BaseModel):
             if values.get(key) is None:
                 raise ValueError(f"{key} is required")
         return values
+
+
+class FileB64(BaseModel):
+    filename: str
+    content_type: str = "application/octet-stream"
+    payload: str
+    md5: str
 
 
 class CloudFile(BaseModel):
