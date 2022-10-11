@@ -695,7 +695,22 @@ mod tests {
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
         assert_eq!(result.total, 0);
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
+            body: "".to_string(),
+            fields: vec!["body".to_string()],
+            filter: None,
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+        };
 
+        let result = field_reader_service.search(&search).unwrap();
+
+        assert_eq!(result.total, 0);
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
             body: "".to_string(),
@@ -710,7 +725,6 @@ mod tests {
         };
 
         let result = field_reader_service.search(&search).unwrap();
-
         assert_eq!(result.total, 2);
         Ok(())
     }
