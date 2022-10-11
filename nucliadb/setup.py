@@ -21,6 +21,7 @@ setup(
     name="nucliadb",
     version=open("VERSION").read().strip(),
     long_description=(open("README.md").read() + "\n" + open("CHANGELOG").read()),
+    long_description_content_type="text/markdown",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -28,8 +29,14 @@ setup(
         "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3 :: Only",
     ],
-    url="https://nuclia.com",
+    url="https://nucliadb.com",
+    author="NucliaDB Community",
+    keywords="search, semantic, AI",
+    author_email="nucliadb@nuclia.com",
+    python_requires=">=3.7, <4",
     license="BSD",
     zip_safe=True,
     include_package_data=True,
@@ -52,5 +59,10 @@ setup(
             "ndb_train = nucliadb.train.app:run",
             "nuclia_dataset_upload = nucliadb.train.upload:run",
         ]
+    },
+    project_urls={
+        "Nuclia": "https://nuclia.com",
+        "Github": "https://github.com/nuclia/nucliadb",
+        "Discord": "https://discord.gg/8EvQwmsbzf",
     },
 )

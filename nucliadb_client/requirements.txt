@@ -4,4 +4,4 @@ types-protobuf>=3.19.5
 grpcio>=1.44.0
 aiofiles
 nucliadb-protos
-nucliadb>=2.0.0
+nucliadb>=2.0.2

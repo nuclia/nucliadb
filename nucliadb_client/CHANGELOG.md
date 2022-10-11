@@ -1,6 +1,6 @@
 # nucliadb_client
 
-## 1.0.0a3 (Pending)
+## 1.0.0
 
 - Export values optional
 
