@@ -69,7 +69,7 @@ class File(BaseModel):
     uri: Optional[str]
     extra_headers: Dict[str, str] = {}
 
-    @root_validator
+    @root_validator(pre=False)
     def _check_internal_file_fields(cls, values):
         if values.get("uri"):
             # Externally hosted file

@@ -19,6 +19,7 @@
 #
 import hashlib
 from base64 import b64encode
+from copy import deepcopy
 from datetime import datetime
 from os.path import dirname
 from unittest.mock import patch
@@ -434,7 +435,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         rid = resp.json()["uuid"]
 
         # Remove a required key from the payload
-        payload = TEST_FILE_PAYLOAD.copy()
+        payload = deepcopy(TEST_FILE_PAYLOAD)
         payload["file"].pop("md5")
 
         resp = await client.put(
