@@ -142,7 +142,7 @@ async def parse_fields(
     for key, file_field in item.files.items():
         # TODO: refactor this so that the internal details of file field are hidden
         # Ideally we just want to call parse_field() here
-        if is_external_file(file_field):
+        if file_field.file.is_external:
             parse_external_file_field(key, file_field, writer, toprocess)
         else:
             if x_skip_store:
@@ -419,7 +419,3 @@ async def parse_conversation_field(
         convs.messages.append(processing_message)
 
     toprocess.conversationfield[key] = convs
-
-
-def is_external_file(field: models.FileField) -> bool:
-    return field.file.uri is not None

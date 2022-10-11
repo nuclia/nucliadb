@@ -204,10 +204,10 @@ class ProcessingEngine:
         headers = {}
         headers["X-PASSWORD"] = file.password
         headers["X-LANGUAGE"] = file.language
-        headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()
+        headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()  # type: ignore
         headers["X-MD5"] = file.file.md5
         headers["CONTENT_TYPE"] = file.file.content_type
-        headers["CONTENT-LENGTH"] = str(len(file.file.payload))
+        headers["CONTENT-LENGTH"] = str(len(file.file.payload))  # type: ignore
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
         with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers

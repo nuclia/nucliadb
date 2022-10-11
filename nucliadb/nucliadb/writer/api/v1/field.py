@@ -34,7 +34,6 @@ from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import set_last_seqid
 from nucliadb.writer.resource.field import (
-    is_external_file,
     parse_conversation_field,
     parse_datetime_field,
     parse_external_file_field,
@@ -307,7 +306,7 @@ async def add_resource_field_internal_or_external_file(
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
 
-    if is_external_file(field_payload):
+    if field_payload.file.is_external:
         return await add_resource_field_file_external(
             request, kbid, rid, field_id, field_payload, x_synchronous
         )

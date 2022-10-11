@@ -81,6 +81,10 @@ class File(BaseModel):
                 raise ValueError(f"{key} is required")
         return values
 
+    @property
+    def is_external(self) -> bool:
+        return self.uri is not None
+
 
 class FileB64(BaseModel):
     filename: str
