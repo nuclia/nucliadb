@@ -63,7 +63,7 @@ header:
     - "nucliadb_telemetry/nucliadb_telemetry/tests/grpc/*"
     - "**/*.pb"
     - "**/Makefile"
-    - "nucliadb_ingest/nucliadb_ingest/tests/orm/assets"
+    - "nucliadb/nucliadb/ingest/tests/orm/assets"
     - "VERSION"
     - "LICENSE"
     - "NOTICE"

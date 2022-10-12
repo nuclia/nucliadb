@@ -239,7 +239,7 @@ class ProcessingEngine:
     async def convert_internal_filefield_to_str(
         self, file: FieldFilePB, storage: Storage
     ) -> str:
-        """ITs already an internal file that needs to be uploaded"""
+        """It's already an internal file that needs to be uploaded"""
         if self.onprem is False:
             # Upload the file to processing upload
             jwttoken = self.generate_file_token_from_fieldfile(file)

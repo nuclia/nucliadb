@@ -26,7 +26,7 @@ from nucliadb_client.client import NucliaDBClient
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Export KB")
+    parser = argparse.ArgumentParser(description="Import KB")
 
     parser.add_argument(
         "--host",

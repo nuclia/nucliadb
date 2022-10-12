@@ -18,10 +18,10 @@
 <h3 align="center">Searchable database for unstructured data</h3>
 
 <h4 align="center">
-  <a href="docs/getting-started/quickstart">Quickstart</a> |
+  <a href="docs/getting-started/quickstart.md">Quickstart</a> |
   <a href="docs/">Docs</a> |
   <a href="docs/tutorials">Tutorials</a> |
-  <a href="https://discord.gg/W6RKm2Vnhq">Chat</a>
+  <a href="https://discord.gg/AgevjFJUvk">Chat</a>
 </h4>
 
 ### Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
@@ -63,46 +63,13 @@ NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](
 
 ## Quickstart
 
-### Get a NucliaDB token to connect to Nuclia Understanding API™
+Trying NucliaDB is super easy! You can extend your knowledge with the
+following readings:
 
-Only needed if you want to use _Nuclia Understanding API™_ and _Nuclia Learning API™_
-
-### Start NucliaDB minimal
-
-First we need object storage and blob storage
-
-```
-docker run -e LOG=INFO -it nuclia/nucliadb:latest
-```
-
-### Create a Knowledge box container
-
-```bash
-curl http://localhost:8080/v1/kb \
-  -X POST \
-  -H "X-NUCLIADB-ROLES: MANAGER" \
-```
-
-### Upload a file
-
-After starting NucliaDB and creating a Knowledge Box you can upload a file:
-
-```bash
-curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/upload \
-  -X POST \
-  -H "X-NUCLIADB-ROLES: WRITER" \
-  -T /path/to/file
-```
-
-### Search a file
-
-After starting NucliaDB and creating a Knowledge Box you can upload a file:
-
-```bash
-curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
-  -X GET \
-  -H "X-NUCLIADB-ROLES: READER" \
-```
+- [Run NucliaDB with docker with a single command!](docs/getting-started/quickstart.md)
+- Join forces with Nuclia to run [NucliaDB with unlimited power](docs/getting-started/limitless-nucliadb-with-nuclia.md)
+- We use own concepts as Knowledge Box in NucliaDB, so ensure you read about [our basic concepts](docs/getting-started/basic-concepts.md)
+- Further dive into our [tutorials](docs/tutorials)
 
 ## API Tutorials
 
@@ -111,8 +78,9 @@ curl http://localhost:8080/v1/kb/<your-knowledge-box-id>/search \
 # 💬 Community
 
 - Chat with us in [Discord][discord]
-- 📝 [Blog Posts](blogs)
+- 📝 [Blog Posts][blogs]
 - Follow us on [Twitter][twitter]
+- Do you want to [work with us][linkedin]?
 
 # 🙋 FAQ
 
@@ -153,6 +121,7 @@ We are always super happy to have contributions: code, documentation, issues, fe
 
 [website]: https://nuclia.com/
 [cloud]: https://nuclia.cloud/
-[twitter]: https://twitter.com/nuclia_
-[discord]: https://discord.gg/6wMQ8a3bHX
+[twitter]: https://twitter.com/nucliaAI
+[discord]: https://discord.gg/AgevjFJUvk
 [blogs]: https://nuclia.com/blog
+[linkedin]: https://www.linkedin.com/company/nuclia/
