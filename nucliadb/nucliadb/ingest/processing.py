@@ -243,6 +243,8 @@ class ProcessingEngine:
         if self.onprem is False:
             # Upload the file to processing upload
             jwttoken = self.generate_file_token_from_fieldfile(file)
+        elif self.disable_send_to_process:
+            return ""
         else:
             headers = {}
             headers["X-PASSWORD"] = file.password
