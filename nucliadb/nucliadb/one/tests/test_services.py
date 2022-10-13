@@ -44,6 +44,7 @@ async def test_widget_service(
                 "suggestParagraphs": True,
                 "suggestLabels": True,
                 "editLabels": True,
+                "entityAnnotation": True,
             },
             "filters": ["filter1"],
             "topEntities": ["entity1"],
@@ -56,10 +57,12 @@ async def test_widget_service(
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
         resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/widgets")
+        # default 'dashboard' widget and the one created here
         assert len(resp.json()["widgets"]) == 2
 
         resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/widget/widget1")
         assert resp.status_code == 200
+        assert resp.json() == widget
 
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.delete(f"/{KB_PREFIX}/{knowledgebox_one}/widget/widget1")

@@ -145,6 +145,7 @@ message Widget {
         bool suggestParagraphs = 4;
         bool suggestLabels = 5;
         bool editLabels = 6;
+        bool entityAnnotation = 7;
     }
     WidgetFeatures features = 4;
 

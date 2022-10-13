@@ -221,6 +221,7 @@ async def set_widget(request: Request, kbid: str, widget: str, item: Widget):
         pbrequest.widget.features.suggestParagraphs = item.features.suggestParagraphs
         pbrequest.widget.features.suggestLabels = item.features.suggestLabels
         pbrequest.widget.features.editLabels = item.features.editLabels
+        pbrequest.widget.features.entityAnnotation = item.features.entityAnnotation
 
     for filter_input in item.filters:
         pbrequest.widget.filters.append(filter_input)

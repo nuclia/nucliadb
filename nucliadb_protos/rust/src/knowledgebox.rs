@@ -186,6 +186,8 @@ pub mod widget {
         pub suggest_labels: bool,
         #[prost(bool, tag="6")]
         pub edit_labels: bool,
+        #[prost(bool, tag="7")]
+        pub entity_annotation: bool,
     }
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
