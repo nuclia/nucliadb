@@ -24,7 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
@@ -87,3 +87,16 @@ async def test_create_knowledgebox(
         else:
             break
     assert len(resp.json()["data"]) == expected_spans
+
+
+@pytest.mark.asyncio
+async def test_get_resource_id(grpc_servicer):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb.config.title = "My Title"
+    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)
+
+    pb = writer_pb2.ResourceIdRequest(kbid="foo", slug="bar")
+    result = await stub.GetResourceId(pb)
+    assert result.uuid == ""
