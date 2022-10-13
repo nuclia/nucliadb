@@ -45,6 +45,7 @@ from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.exceptions import (
     ConflictError,
     IngestNotAvailable,
@@ -76,7 +77,7 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 
-from .router import KB_PREFIX, api
+from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -86,7 +87,11 @@ TUS_HEADERS = {
 
 
 @api.options(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    include_in_schema=False,
+)
+@api.options(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
     include_in_schema=False,
 )
 @api.options(
@@ -94,7 +99,7 @@ TUS_HEADERS = {
     include_in_schema=False,
 )
 @api.options(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/file/{{field}}/{TUSUPLOAD}",
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}",
     tags=["Resource field TUS uploads"],
     name="TUS Server information",
     openapi_extra={"x-operation-order": 4},
@@ -111,6 +116,7 @@ async def options_single(
     request: Request,
     kbid: str,
     rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     upload_id: Optional[str] = None,
     field: Optional[str] = None,
 ) -> Response:
@@ -122,7 +128,13 @@ async def options_single(
 
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{path_rid}}/file/{{field}}/{TUSUPLOAD}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{TUSUPLOAD}",
+    tags=["Resource field TUS uploads"],
+    name="Create new upload",
+    openapi_extra={"x-operation-order": 1},
+)
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{path_rid}}/file/{{field}}/{TUSUPLOAD}",
     tags=["Resource field TUS uploads"],
     name="Create new upload",
     openapi_extra={"x-operation-order": 1},
@@ -140,6 +152,7 @@ async def post(
     kbid: str,
     item: Optional[CreateResourcePayload] = None,
     path_rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     field: Optional[str] = None,
 ) -> Response:
     """
@@ -148,6 +161,9 @@ async def post(
     """
     dm = get_dm()
     storage_manager = get_storage_manager()
+
+    if rslug:
+        path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
     implies_resource_creation = path_rid is None
 
@@ -254,7 +270,14 @@ async def post(
 
 
 @api.head(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    tags=["Resource field TUS uploads"],
+    status_code=200,
+    openapi_extra={"x-operation-order": 3},
+    name="Upload information",
+)
+@api.head(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Resource field TUS uploads"],
     status_code=200,
     openapi_extra={"x-operation-order": 3},
@@ -273,6 +296,7 @@ async def head(
     request: Request,
     upload_id: str,
     rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     field: Optional[str] = None,
 ) -> Response:
     """
@@ -293,7 +317,14 @@ async def head(
 
 
 @api.patch(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
+    tags=["Resource field TUS uploads"],
+    status_code=200,
+    name="Upload data",
+    openapi_extra={"x-operation-order": 2},
+)
+@api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field}}/{TUSUPLOAD}/{{upload_id}}",
     tags=["Resource field TUS uploads"],
     status_code=200,
     name="Upload data",
@@ -313,12 +344,16 @@ async def patch(
     kbid: str,
     upload_id: str,
     rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     field: Optional[str] = None,
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> Response:
     """
     Upload all bytes in the requests and append them in the specifyied offset
     """
+    if rslug:
+        rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
+
     dm = get_dm()
     await dm.load(upload_id)
     to_upload = None
@@ -416,7 +451,14 @@ async def patch(
 
 
 @api.post(
-    f"/{KB_PREFIX}/{{kbid}}/resource/{{path_rid}}/file/{{field}}/{UPLOAD}",
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field}}/{UPLOAD}",
+    status_code=201,
+    tags=["Resource fields"],
+    name="Upload binary file",
+    description="Upload a file as a field on an existing resource, if the field exists will return a conflict (419)",
+)
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{path_rid}}/file/{{field}}/{UPLOAD}",
     status_code=201,
     tags=["Resource fields"],
     name="Upload binary file",
@@ -435,6 +477,7 @@ async def upload(
     request: StarletteRequest,
     kbid: str,
     path_rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     field: Optional[str] = None,
     x_filename: Optional[List[str]] = Header(None),  # type: ignore
     x_password: Optional[List[str]] = Header(None),  # type: ignore
@@ -442,6 +485,9 @@ async def upload(
     x_md5: Optional[List[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
+
+    if rslug:
+        path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
     logger.info(request.headers)
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
