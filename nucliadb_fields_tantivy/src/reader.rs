@@ -92,8 +92,8 @@ impl ReaderChild for FieldReaderService {
         info!("Document search at {}:{}", line!(), file!());
         let body = &request.body;
         let results = request.result_per_page;
-        let multic_flag = results > 0 && !body.is_empty();
-        Ok(self.do_search(request, multic_flag))
+        let only_facets = results == 0 || (body.is_empty() && request.filter.is_none());
+        Ok(self.do_search(request, only_facets))
     }
 
     fn reload(&self) {
@@ -389,7 +389,7 @@ impl FieldReaderService {
     fn do_search(
         &self,
         request: &DocumentSearchRequest,
-        multic_flag: bool,
+        only_facets: bool,
     ) -> DocumentSearchResponse {
         use crate::search_query::create_query;
         let query_parser = {
@@ -429,7 +429,7 @@ impl FieldReaderService {
         }
         let searcher = self.reader.searcher();
         match order_field {
-            _ if !multic_flag => {
+            _ if only_facets => {
                 // Just a facet search
                 let facets_count = searcher.search(&query, &facet_collector).unwrap();
                 self.convert_bm25_order(
@@ -695,7 +695,22 @@ mod tests {
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
         assert_eq!(result.total, 0);
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
+            body: "".to_string(),
+            fields: vec!["body".to_string()],
+            filter: None,
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+        };
 
+        let result = field_reader_service.search(&search).unwrap();
+
+        assert_eq!(result.total, 0);
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
             body: "".to_string(),
@@ -710,8 +725,7 @@ mod tests {
         };
 
         let result = field_reader_service.search(&search).unwrap();
-
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 2);
         Ok(())
     }
 }

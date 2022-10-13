@@ -52,17 +52,6 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
 
 
 @pytest.mark.asyncio
-async def test_search_sc_2104(
-    search_api: Callable[..., AsyncClient], test_search_resource: str
-) -> None:
-    kbid = test_search_resource
-
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{kbid}/search?queri=own+text")
-        assert resp.status_code == 422
-
-
-@pytest.mark.asyncio
 @pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
 async def test_multiple_fuzzy_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
@@ -318,3 +307,20 @@ async def test_resource_search_by_slug(search_api, test_resource_deterministic_i
         resp = await client.get(f"{invalid_slug_url}/search?query=foo")
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Resource does not exist"
+
+
+@pytest.mark.asyncio()
+async def test_resource_search_query_param_is_optional(search_api, knowledgebox):
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        kb = knowledgebox
+        # If query is not present, should not fail
+        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
+        assert resp.status_code == 200
+
+        # Less than 3 characters should fail
+        for query in ("", "f", "fo"):
+            resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
+            assert resp.status_code == 422
+            content = resp.json()
+            assert content["detail"][0]["loc"][0] == "query"
+            assert "has at least 3 characters" in content["detail"][0]["msg"]

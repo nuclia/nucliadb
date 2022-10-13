@@ -67,7 +67,7 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=..., min_length=3),
+    query: str = Query(default="", min_length=3),
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
@@ -166,9 +166,7 @@ async def search(
     timeit = time()
 
     if item.query == "":
-        # If query is not defined we force to not return results
-        item.page_size = 1
-        item.page_number = 0
+        # If query is not defined we force to not return vector results
         if SearchOptions.VECTOR in item.features:
             item.features.remove(SearchOptions.VECTOR)
 

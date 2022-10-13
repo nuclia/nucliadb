@@ -201,18 +201,19 @@ pub fn create_query(
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
-    let (quotes, reg) =
+    let (quotes, mut reg) =
         text.split(' ')
             .into_iter()
             .fold((vec![], String::new()), |(mut quotes, mut reg), crnt| {
                 if crnt.starts_with('"') && crnt.ends_with('"') {
                     quotes.push(crnt);
                 } else {
-                    reg.push(' ');
                     reg.push_str(crnt);
+                    reg.push(' ');
                 }
                 (quotes, reg)
             });
+    reg.pop();
     let termc = SharedTermC::new();
     let query = parse_query(parser, &reg);
     let mut fuzzies = fuzzied_queries(query.box_clone(), distance, termc.clone());
