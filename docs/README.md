@@ -11,4 +11,5 @@ the code.
 
 Inside [reference](reference) there are documents about different
 topics, while inside [tutorials](tutorials) you can find documentation
-structured as guides to show some kind of functionality.
+structured as guides while inside tutorials you can find guides that
+will walk you through various NucliaDB features.
