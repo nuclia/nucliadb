@@ -318,3 +318,17 @@ async def test_resource_search_by_slug(search_api, test_resource_deterministic_i
         resp = await client.get(f"{invalid_slug_url}/search?query=foo")
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Resource does not exist"
+
+
+@pytest.mark.asyncio()
+async def test_resource_search_query_param_is_optional(search_api, knowledgebox):
+    async with search_api(roles=[NucliaDBRoles.READER]) as client:
+        kb = knowledgebox
+        # If query is not present, should not fail
+        resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
+        assert resp.status_code == 200
+
+        # Less than 3 characters should fail
+        for query in ("", "f", "fo"):
+            resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
+            assert resp.status_code == 422
