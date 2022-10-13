@@ -62,6 +62,7 @@ DEFAULT_WIDGET.features.suggestSentences = True
 DEFAULT_WIDGET.features.suggestParagraphs = True
 DEFAULT_WIDGET.features.suggestLabels = False
 DEFAULT_WIDGET.features.editLabels = True
+DEFAULT_WIDGET.features.entityAnnotation = True
 
 
 class TxnResult(Enum):

@@ -382,12 +382,14 @@ class Widget(google.protobuf.message.Message):
         SUGGESTPARAGRAPHS_FIELD_NUMBER: builtins.int
         SUGGESTLABELS_FIELD_NUMBER: builtins.int
         EDITLABELS_FIELD_NUMBER: builtins.int
+        ENTITYANNOTATION_FIELD_NUMBER: builtins.int
         useFilters: builtins.bool
         suggestEntities: builtins.bool
         suggestSentences: builtins.bool
         suggestParagraphs: builtins.bool
         suggestLabels: builtins.bool
         editLabels: builtins.bool
+        entityAnnotation: builtins.bool
         def __init__(self,
             *,
             useFilters: builtins.bool = ...,
@@ -396,8 +398,9 @@ class Widget(google.protobuf.message.Message):
             suggestParagraphs: builtins.bool = ...,
             suggestLabels: builtins.bool = ...,
             editLabels: builtins.bool = ...,
+            entityAnnotation: builtins.bool = ...,
             ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["editLabels",b"editLabels","suggestEntities",b"suggestEntities","suggestLabels",b"suggestLabels","suggestParagraphs",b"suggestParagraphs","suggestSentences",b"suggestSentences","useFilters",b"useFilters"]) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["editLabels",b"editLabels","entityAnnotation",b"entityAnnotation","suggestEntities",b"suggestEntities","suggestLabels",b"suggestLabels","suggestParagraphs",b"suggestParagraphs","suggestSentences",b"suggestSentences","useFilters",b"useFilters"]) -> None: ...
 
     class StyleEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
