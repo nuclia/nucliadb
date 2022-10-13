@@ -321,3 +321,6 @@ async def test_resource_search_query_param_is_optional(search_api, knowledgebox)
         for query in ("", "f", "fo"):
             resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
             assert resp.status_code == 422
+            content = resp.json()
+            assert content["detail"][0]["loc"][0] == "query"
+            assert "has at least 3 characters" in content["detail"][0]["msg"]
