@@ -179,10 +179,8 @@ def print_random_vector():
     print(list(embeddings[0]))
 
 
-def main():
-    client = NucliaDBClient(
-        host=args.host, grpc=args.grpc, http=args.http, train=args.train
-    )
+def main(args):
+    client = NucliaDBClient(host=args.host, grpc=args.grpc, http=args.http)
     kb = client.get_kb(slug=args.kb)
     if kb is None:
         kb = client.create_kb(slug=args.kb, title="Simple NucliaDB example")
@@ -212,12 +210,6 @@ if __name__ == "__main__":
         required=True,
     )
 
-    parser.add_argument(
-        "--train",
-        dest="train",
-        required=True,
-    )
-
     parser.add_argument("--kb", dest="kb", required=True, help="KB slug")
 
     parser.add_argument(
@@ -229,4 +221,4 @@ if __name__ == "__main__":
     if args.print_random_vector:
         print_random_vector()
     else:
-        main()
+        main(args)
