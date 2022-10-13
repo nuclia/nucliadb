@@ -69,7 +69,8 @@ following readings:
 - [Run NucliaDB with docker with a single command!](docs/getting-started/quickstart.md)
 - Join forces with Nuclia to run [NucliaDB with unlimited power](docs/getting-started/limitless-nucliadb-with-nuclia.md)
 - We use own concepts as Knowledge Box in NucliaDB, so ensure you read about [our basic concepts](docs/getting-started/basic-concepts.md)
-- Further dive into our [tutorials](docs/tutorials)
+- Further dive into our [tutorials](docs/tutorials),
+  [reference](docs/reference) or [internal](docs/internal) documentation
 
 ## API Tutorials
 
