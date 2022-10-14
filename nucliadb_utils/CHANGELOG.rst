@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.10
+------
+
+- Relax dependencies
+
 1.0.9
 -----
 
