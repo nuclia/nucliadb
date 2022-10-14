@@ -28,7 +28,12 @@ import jwt
 import pytest
 
 from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb.writer.api.v1.router import (
+    KB_PREFIX,
+    RESOURCE_PREFIX,
+    RESOURCES_PREFIX,
+    RSLUG_PREFIX,
+)
 
 
 def load_file_as_FileB64_payload(f: str, content_type: str) -> dict:
@@ -444,3 +449,64 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
             headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "method,endpoint,payload",
+    [
+        ["put", "/text/{field_id}", TEST_TEXT_PAYLOAD],
+        ["put", "/link/{field_id}", TEST_LINK_PAYLOAD],
+        ["put", "/keywordset/{field_id}", TEST_KEYWORDSETS_PAYLOAD],
+        ["put", "/datetime/{field_id}", TEST_DATETIMES_PAYLOAD],
+        ["put", "/layout/{field_id}", TEST_LAYOUT_PAYLOAD],
+        ["put", "/conversation/{field_id}", TEST_CONVERSATION_PAYLOAD],
+        ["put", "/file/{field_id}", TEST_FILE_PAYLOAD],
+        ["delete", "", None],
+    ],
+)
+async def test_field_endpoints_by_slug(
+    writer_api,
+    knowledgebox,
+    method,
+    endpoint,
+    payload,
+):
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        slug = "my-resource"
+        field_id = "myfield"
+        field_type = "text"
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={"slug": slug},
+        )
+        assert resp.status_code == 201
+
+        extra_params = {}
+        if payload is not None:
+            extra_params["json"] = payload
+        op = getattr(client, method)
+
+        # Try first a non-existing slug should return 404
+        url = endpoint.format(
+            field_id=field_id,
+            field_type=field_type,
+        )
+
+        resp = await op(
+            f"/{KB_PREFIX}/{knowledgebox}/{RSLUG_PREFIX}/idonotexist" + url,
+            **extra_params,
+        )
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Resource does not exist"
+
+        # Try the happy path now
+        url = endpoint.format(
+            field_id=field_id,
+            field_type=field_type,
+        )
+        resp = await op(
+            f"/{KB_PREFIX}/{knowledgebox}/{RSLUG_PREFIX}/{slug}" + url, **extra_params
+        )
+        assert str(resp.status_code).startswith("2")

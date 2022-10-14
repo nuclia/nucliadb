@@ -27,7 +27,7 @@ from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
 from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.writer.api.v1.router import KB_PREFIX
+from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb.writer.utilities import get_processing
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction
@@ -446,3 +446,156 @@ async def test_knowledgebox_file_upload_field_sync(
 
         res = await ingest.ResourceFieldExists(pbrequest)
         assert res.found
+
+
+@pytest.mark.asyncio
+async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, resource):
+    kb = knowledgebox_writer
+    rslug = "resource1"
+
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+
+        language = base64.b64encode(b"ca").decode()
+        filename = base64.b64encode(b"image.jpg").decode()
+        md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
+        headers = {
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},language {language},md5 {md5}",
+            "content-type": "image/jpg",
+            "upload-defer-length": "1",
+        }
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/slug/idonotexist/file/field1/{TUSUPLOAD}",
+            headers=headers,
+        )
+        assert resp.status_code == 404
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/slug/{rslug}/file/field1/{TUSUPLOAD}",
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        url = resp.headers["location"]
+
+        # Check that we are using the slug for the whole file upload
+        assert f"{RSLUG_PREFIX}/{rslug}" in url
+
+        offset = 0
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+            data = f.read(10000)
+            while data != b"":
+                resp = await client.head(
+                    url,
+                )
+
+                assert resp.headers["Upload-Length"] == f"0"
+                assert resp.headers["Upload-Offset"] == f"{offset}"
+
+                headers = {
+                    "upload-offset": f"{offset}",
+                    "content-length": f"{len(data)}",
+                }
+                if len(data) < 10000:
+                    headers["upload-length"] = f"{offset + len(data)}"
+
+                resp = await client.patch(
+                    url,
+                    data=data,
+                    headers=headers,
+                )
+                assert resp.status_code == 200
+                offset += len(data)
+                data = f.read(10000)
+
+        assert resp.headers["Tus-Upload-Finished"] == "1"
+
+    processing = get_processing()
+    transaction = get_transaction()
+
+    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    msgs = await sub.fetch(2)
+
+    writer = BrokerMessage()
+    writer.ParseFromString(msgs[1].data)
+    await msgs[1].ack()
+
+    payload = processing.calls[1]
+
+    assert payload["kbid"] == kb
+    path = resp.headers["ndb-field"]
+    field = path.split("/")[-1]
+    rid = path.split("/")[-3]
+    assert payload["filefield"][field] == "DUMMYJWT"
+    assert writer.uuid == rid
+    assert writer.basic.icon == "image/jpg"
+    assert writer.basic.title == ""
+    assert writer.files[field].language == "ca"
+    assert writer.files[field].file.size == 30472
+    assert writer.files[field].file.filename == "image.jpg"
+    assert writer.files[field].file.md5 == "7af0916dba8b70e29d99e72941923529"
+
+    storage = await get_storage()
+    data = await storage.downloadbytes(
+        bucket=writer.files[field].file.bucket_name,
+        key=writer.files[field].file.uri,
+    )
+    assert len(data.read()) == 30472
+
+
+@pytest.mark.asyncio
+async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
+    kb = knowledgebox_writer
+    rslug = "myslug"
+
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kb}/resources",
+            headers={
+                "X-Synchronous": "True",
+            },
+            json={
+                "slug": rslug,
+            },
+        )
+        assert str(resp.status_code).startswith("2")
+
+        with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
+            resp = await client.post(
+                f"/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
+                data=f.read(),
+                headers={
+                    "content-type": "image/jpg",
+                    "X-MD5": "7af0916dba8b70e29d99e72941923529",
+                },
+            )
+            assert resp.status_code == 201
+
+    processing = get_processing()
+    transaction = get_transaction()
+
+    sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
+    msgs = await sub.fetch(2)
+
+    writer = BrokerMessage()
+    writer.ParseFromString(msgs[-1].data)
+    await msgs[-1].ack()
+
+    payload = processing.calls[-1]
+
+    assert payload["kbid"] == kb
+    body = resp.json()
+    field = body["field_id"]
+    rid = body["uuid"]
+    assert payload["filefield"][field] == "DUMMYJWT"
+
+    assert writer.uuid == rid
+    assert writer.basic.icon == "image/jpg"
+    assert writer.files[field].file.size == 30472
+
+    storage = await get_storage()
+    data = await storage.downloadbytes(
+        bucket=writer.files[field].file.bucket_name,
+        key=writer.files[field].file.uri,
+    )
+    assert len(data.read()) == 30472

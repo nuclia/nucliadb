@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, Response
 from fastapi.params import Header
@@ -30,7 +30,8 @@ import nucliadb.models as models
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.models.writer import ResourceFieldAdded
-from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
+from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
+from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import set_last_seqid
 from nucliadb.writer.resource.field import (
@@ -119,6 +120,13 @@ async def finish_field_put(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/text/{{field_id}}",
+    status_code=201,
+    name="Add resource text field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/text/{{field_id}}",
     status_code=201,
     name="Add resource text field",
@@ -130,11 +138,14 @@ async def finish_field_put(
 async def add_resource_field_text(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.TextField,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_text_field(field_id, field_payload, writer, toprocess)
@@ -147,6 +158,13 @@ async def add_resource_field_text(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/link/{{field_id}}",
+    status_code=201,
+    name="Add resource link field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/link/{{field_id}}",
     status_code=201,
     name="Add resource link field",
@@ -158,11 +176,14 @@ async def add_resource_field_text(
 async def add_resource_field_link(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.LinkField,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_link_field(field_id, field_payload, writer, toprocess)
@@ -175,6 +196,13 @@ async def add_resource_field_link(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/keywordset/{{field_id}}",
+    status_code=201,
+    name="Add resource keywordset field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/keywordset/{{field_id}}",
     status_code=201,
     name="Add resource keywordset field",
@@ -186,11 +214,14 @@ async def add_resource_field_link(
 async def add_resource_field_keywordset(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.FieldKeywordset,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_keywordset_field(field_id, field_payload, writer, toprocess)
@@ -203,6 +234,13 @@ async def add_resource_field_keywordset(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/datetime/{{field_id}}",
+    status_code=201,
+    name="Add resource datetime field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/datetime/{{field_id}}",
     status_code=201,
     name="Add resource datetime field",
@@ -214,11 +252,14 @@ async def add_resource_field_keywordset(
 async def add_resource_field_datetime(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.FieldDatetime,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     parse_datetime_field(field_id, field_payload, writer, toprocess)
@@ -231,6 +272,13 @@ async def add_resource_field_datetime(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}",
+    status_code=201,
+    name="Add resource layout field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}",
     status_code=201,
     name="Add resource layout field",
@@ -242,11 +290,14 @@ async def add_resource_field_datetime(
 async def add_resource_field_layout(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.InputLayoutField,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_layout_field(field_id, field_payload, writer, toprocess, kbid, rid)
@@ -259,6 +310,13 @@ async def add_resource_field_layout(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}",
+    status_code=201,
+    name="Add resource conversation field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}",
     status_code=201,
     name="Add resource conversation field",
@@ -270,11 +328,15 @@ async def add_resource_field_layout(
 async def add_resource_field_conversation(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.InputConversationField,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
+
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
     await parse_conversation_field(
         field_id, field_payload, writer, toprocess, kbid, rid
@@ -288,6 +350,13 @@ async def add_resource_field_conversation(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}",
+    status_code=201,
+    name="Add resource file field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}",
     status_code=201,
     name="Add resource file field",
@@ -299,12 +368,15 @@ async def add_resource_field_conversation(
 async def add_resource_field_internal_or_external_file(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     field_payload: models.FileField,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     if field_payload.file.is_external:
         return await add_resource_field_file_external(
@@ -363,6 +435,13 @@ async def add_resource_field_file_external(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/messages",
+    status_code=200,
+    name="Append messages to conversation field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages",
     status_code=200,
     name="Append messages to conversation field",
@@ -374,14 +453,17 @@ async def add_resource_field_file_external(
 async def append_messages_to_conversation_field(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     messages: List[models.InputMessage],
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     transaction = get_transaction()
     processing = get_processing()
     partitioning = get_partitioning()
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -419,6 +501,13 @@ async def append_messages_to_conversation_field(
 
 
 @api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/blocks",
+    status_code=200,
+    name="Append blocks to layout field",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+)
+@api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/blocks",
     status_code=200,
     name="Append blocks to layout field",
@@ -430,14 +519,17 @@ async def append_messages_to_conversation_field(
 async def append_blocks_to_layout_field(
     request: Request,
     kbid: str,
-    rid: str,
     field_id: str,
     blocks: Dict[str, models.InputBlock],
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
     transaction = get_transaction()
     processing = get_processing()
     partitioning = get_partitioning()
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -474,6 +566,13 @@ async def append_blocks_to_layout_field(
 
 
 @api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
+    status_code=204,
+    name="Delete Resource field",
+    response_model_exclude_unset=True,
+    tags=["Resource fields"],
+)
+@api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=204,
     name="Delete Resource field",
@@ -484,14 +583,17 @@ async def append_blocks_to_layout_field(
 @version(1)
 async def delete_resource_field(
     request: Request,
-    rid: str,
     kbid: str,
     field_type: models.FieldTypeName,
     field_id: str,
+    rid: Optional[str] = None,
+    rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ):
     transaction = get_transaction()
     partitioning = get_partitioning()
+
+    rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     partition = partitioning.generate_partition(kbid, rid)
     writer = BrokerMessage()

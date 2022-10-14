@@ -1183,6 +1183,31 @@ class ResourceFieldExistsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["found",b"found"]) -> None: ...
 global___ResourceFieldExistsResponse = ResourceFieldExistsResponse
 
+class ResourceIdRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KBID_FIELD_NUMBER: builtins.int
+    SLUG_FIELD_NUMBER: builtins.int
+    kbid: typing.Text
+    slug: typing.Text
+    def __init__(self,
+        *,
+        kbid: typing.Text = ...,
+        slug: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid","slug",b"slug"]) -> None: ...
+global___ResourceIdRequest = ResourceIdRequest
+
+class ResourceIdResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    UUID_FIELD_NUMBER: builtins.int
+    uuid: typing.Text
+    def __init__(self,
+        *,
+        uuid: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["uuid",b"uuid"]) -> None: ...
+global___ResourceIdResponse = ResourceIdResponse
+
 class ExportRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KBID_FIELD_NUMBER: builtins.int
