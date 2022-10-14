@@ -25,7 +25,6 @@ import pytest
 from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
-    Classification,
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
     FieldID,
@@ -146,7 +145,6 @@ def broker_processed_resource(knowledgebox, number, rid):
     p1 = Paragraph()
     p1.start = 0
     p1.end = 82
-    p1.classifications.append(Classification(labelset="ls1", label="label1"))
     s1 = Sentence()
     s1.start = 0
     s1.end = 52
@@ -158,7 +156,6 @@ def broker_processed_resource(knowledgebox, number, rid):
     p2 = Paragraph()
     p2.start = 84
     p2.end = 103
-    p2.classifications.append(Classification(labelset="ls1", label="label1"))
     s1 = Sentence()
     s1.start = 84
     s1.end = 103
@@ -193,11 +190,38 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     """
     Create a set of resources with only basic information to test pagination
     """
-    from nucliadb.ingest.utils import get_driver
-
     amount = 10
 
+    # Create resources
+    for i in range(1, amount + 1):
+        message = broker_simple_resource(knowledgebox, i)
+        await processor.process(message=message, seqid=-1, transaction_check=False)
+
+        message = broker_processed_resource(knowledgebox, i, message.uuid)
+        await processor.process(message=message, seqid=-1, transaction_check=False)
+        # Give processed data some time to reach the node
+
+    from time import time
+
+    from nucliadb.ingest.utils import get_driver
+
     driver = await get_driver()
+
+    t0 = time()
+
+    while time() - t0 < 30:  # wait max 30 seconds for it
+        txn = await driver.begin()
+        count = 0
+        async for key in txn.keys(
+            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox), count=-1
+        ):
+            count += 1
+
+        await txn.abort()
+        if count == amount:
+            break
+        print(f"got {count}, retrying")
+        await asyncio.sleep(2)
 
     # Add entities
     storage = await get_storage()
@@ -216,32 +240,5 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     labelset.labels.append(label)
     await kb.set_labelset(label_title, labelset)
     await txn.commit(resource=False)
-
-    # Create resources
-    for i in range(1, amount + 1):
-        message = broker_simple_resource(knowledgebox, i)
-        await processor.process(message=message, seqid=-1, transaction_check=False)
-
-        message = broker_processed_resource(knowledgebox, i, message.uuid)
-        await processor.process(message=message, seqid=-1, transaction_check=False)
-        # Give processed data some time to reach the node
-
-    from time import time
-
-    t0 = time()
-
-    while time() - t0 < 30:  # wait max 30 seconds for it
-        txn = await driver.begin()
-        count = 0
-        async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox), count=-1
-        ):
-            count += 1
-
-        await txn.abort()
-        if count == amount:
-            break
-        print(f"got {count}, retrying")
-        await asyncio.sleep(2)
 
     yield knowledgebox
