@@ -194,6 +194,7 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     Create a set of resources with only basic information to test pagination
     """
     from nucliadb.ingest.utils import get_driver
+
     amount = 10
 
     driver = await get_driver()
