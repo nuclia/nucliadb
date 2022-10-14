@@ -19,9 +19,9 @@
 #
 from datetime import datetime
 from typing import Callable
+from unittest.mock import AsyncMock  # type: ignore
 
 import pytest
-from asynctest.mock import CoroutineMock  # type: ignore
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import ResourceFieldId
 
@@ -255,9 +255,7 @@ async def test_reprocess_resource(
     processing = get_processing()
 
     original = processing.send_to_process
-    mocker.patch.object(
-        processing, "send_to_process", CoroutineMock(side_effect=original)
-    )
+    mocker.patch.object(processing, "send_to_process", AsyncMock(original))
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
