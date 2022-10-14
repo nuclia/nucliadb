@@ -25,19 +25,11 @@ spec:
     - method:
         regex: 'GET|OPTIONS'
       uri:
-        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+$'
+        regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+$'
     - method:
         regex: 'GET|OPTIONS'
       uri:
-        regex: '^/api/v\d+/kb/[^/]+/resource/[^/]+/(text|file|link|layout|conversation|keywordset|datetime).*'
-    - method:
-        regex: 'GET|OPTIONS'
-      uri:
-        regex: '^/api/v\d+/kb/[^/]+/slug/[^/]+$'
-    - method:
-        regex: 'GET|OPTIONS'
-      uri:
-        regex: '^/api/v\d+/kb/[^/]+/slug/[^/]+/(text|file|link|layout|conversation|keywordset|datetime).*'
+        regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(text|file|link|layout|conversation|keywordset|datetime).*'
     - uri:
         regex: '^/api/v\d+/kb/[^/]+/resources'
       method:
