@@ -140,17 +140,9 @@ async def parse_fields(
     x_skip_store: bool,
 ):
     for key, file_field in item.files.items():
-        # TODO: refactor this so that the internal details of file field are hidden
-        # Ideally we just want to call parse_field() here
-        if file_field.file.is_external:
-            parse_external_file_field(key, file_field, writer, toprocess)
-        else:
-            if x_skip_store:
-                await parse_file_field(key, file_field, writer, toprocess)
-            else:
-                await parse_internal_file_field(
-                    key, file_field, writer, toprocess, kbid, uuid
-                )
+        await parse_file_field(
+            key, file_field, writer, toprocess, kbid, uuid, skip_store=x_skip_store
+        )
 
     for key, link_field in item.links.items():
         parse_link_field(key, link_field, writer, toprocess)
@@ -189,6 +181,23 @@ def parse_text_field(
     )
 
 
+async def parse_file_field(
+    key: str,
+    file_field: models.FileField,
+    writer: BrokerMessage,
+    toprocess: PushPayload,
+    kbid: str,
+    uuid: str,
+    skip_store: bool = False,
+):
+    if file_field.file.is_external:
+        parse_external_file_field(key, file_field, writer, toprocess)
+    else:
+        await parse_internal_file_field(
+            key, file_field, writer, toprocess, kbid, uuid, skip_store=skip_store
+        )
+
+
 async def parse_internal_file_field(
     key: str,
     file_field: models.FileField,
@@ -196,6 +205,7 @@ async def parse_internal_file_field(
     toprocess: PushPayload,
     kbid: str,
     uuid: str,
+    skip_store: bool = False,
 ) -> None:
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
@@ -203,40 +213,29 @@ async def parse_internal_file_field(
     if file_field.password:
         writer.files[key].password = file_field.password
 
-    storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
 
-    sf: StorageField = storage.file_field(kbid, uuid, field=key)
-    writer.files[key].file.CopyFrom(
-        await storage.upload_b64file_to_cloudfile(
-            sf,
-            file_field.file.payload.encode(),  # type: ignore
-            file_field.file.filename,  # type: ignore
-            file_field.file.content_type,
-            file_field.file.md5,
+    if skip_store:
+        # Does not store file on nuclia's blob storage. Only sends it to process
+        toprocess.filefield[key] = await processing.convert_filefield_to_str(file_field)
+
+    else:
+        # Store file on nuclia's blob storage
+        storage = await get_storage(service_name=SERVICE_NAME)
+        sf: StorageField = storage.file_field(kbid, uuid, field=key)
+        writer.files[key].file.CopyFrom(
+            await storage.upload_b64file_to_cloudfile(
+                sf,
+                file_field.file.payload.encode(),  # type: ignore
+                file_field.file.filename,  # type: ignore
+                file_field.file.content_type,
+                file_field.file.md5,
+            )
         )
-    )
-    toprocess.filefield[key] = await processing.convert_internal_filefield_to_str(
-        writer.files[key], storage
-    )
-
-
-async def parse_file_field(
-    key: str,
-    file_field: models.FileField,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-) -> None:
-    writer.files[key].added.FromDatetime(datetime.now())
-    if file_field.language:
-        writer.files[key].language = file_field.language
-    if file_field.password:
-        writer.files[key].password = file_field.password
-
-    processing = get_processing()
-
-    # Send to process
-    toprocess.filefield[key] = await processing.convert_filefield_to_str(file_field)
+        # Send the pointer of the new blob to processing
+        toprocess.filefield[key] = await processing.convert_internal_filefield_to_str(
+            writer.files[key], storage
+        )
 
 
 def parse_external_file_field(
@@ -246,6 +245,10 @@ def parse_external_file_field(
     toprocess: PushPayload,
 ) -> None:
     writer.files[key].added.FromDatetime(datetime.now())
+    if file_field.language:
+        writer.files[key].language = file_field.language
+    if file_field.password:
+        writer.files[key].password = file_field.password
     uri = file_field.file.uri
     writer.files[key].url = uri  # type: ignore
     writer.files[key].file.uri = uri  # type: ignore
