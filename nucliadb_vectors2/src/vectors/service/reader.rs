@@ -76,6 +76,7 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
 
         let result = self.index.search(&(total_to_get, request), &lock)?;
+        println!("{:?}", result);
         let documents = result
             .into_iter()
             .enumerate()
