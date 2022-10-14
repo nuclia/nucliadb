@@ -158,7 +158,7 @@ def broker_processed_resource(knowledgebox, number, rid):
     p2 = Paragraph()
     p2.start = 84
     p2.end = 103
-    p2.classifications.append(Classification(labelset="ls1", label="label2"))
+    p2.classifications.append(Classification(labelset="ls1", label="label1"))
     s1 = Sentence()
     s1.start = 84
     s1.end = 103
@@ -207,16 +207,15 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     entities.entities["entity1"].value = "PERSON"
     await kb.set_entities_force("group1", entities)
 
-    # Add ontology: one labelset with 2 labels
+    # Add ontology
     labelset = LabelSet()
     labelset.title = "ls1"
-    for i in range(2):
-        label = Label()
-        label_title = f"label{i}"
-        label.title = label_title
-        labelset.labels.append(label)
-        await kb.set_labelset(label_title, labelset)
-        await txn.commit(resource=False)
+    label = Label()
+    label_title = "label1"
+    label.title = label_title
+    labelset.labels.append(label)
+    await kb.set_labelset(label_title, labelset)
+    await txn.commit(resource=False)
 
     # Create resources
     for i in range(1, amount + 1):
