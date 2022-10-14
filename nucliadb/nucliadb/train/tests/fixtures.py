@@ -190,8 +190,9 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     """
     Create a set of resources with only basic information to test pagination
     """
-
     amount = 10
+
+    # Create resources
     for i in range(1, amount + 1):
         message = broker_simple_resource(knowledgebox, i)
         await processor.process(message=message, seqid=-1, transaction_check=False)
@@ -234,9 +235,10 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     labelset = LabelSet()
     labelset.title = "ls1"
     label = Label()
-    label.title = "label1"
+    label_title = "label1"
+    label.title = label_title
     labelset.labels.append(label)
-    await kb.set_labelset("label1", labelset)
+    await kb.set_labelset(label_title, labelset)
     await txn.commit(resource=False)
 
     yield knowledgebox
