@@ -82,13 +82,13 @@ class S3StorageField(StorageField):
 
         # we do not want to timeout ever from this...
         # downloader['Body'].set_socket_timeout(999999)
-        async with downloader["Body"] as stream:
+        stream = downloader["Body"]
+        data = await stream.read(CHUNK_SIZE)
+        while True:
+            if not data:
+                break
+            yield data
             data = await stream.read(CHUNK_SIZE)
-            while True:
-                if not data:
-                    break
-                yield data
-                data = await stream.read(CHUNK_SIZE)
 
     async def read_range(self, start: int, end: int) -> AsyncIterator[bytes]:
         """

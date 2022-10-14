@@ -59,6 +59,8 @@ async def cache_validation(second_pubsub: PubSubDriver):
     util2: Cache = Cache(pubsub=second_pubsub)
     await util2.initialize()
 
+    await asyncio.sleep(0.5)
+
     await util.set("/test", "Testing info")
     await util.get("/test") == "Testing info"
 
