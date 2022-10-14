@@ -37,3 +37,18 @@ async def test_list_sentences(
         count += 1
 
     assert count == 30
+
+
+@pytest.mark.asyncio
+async def test_list_paragraphs_returns_correct_labels(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetParagraphsRequest()
+    req.kb.uuid = knowledgebox
+    req.metadata.entities = True
+    req.metadata.labels = True
+    req.metadata.text = True
+    req.metadata.vector = True
+    async for par in train_client.GetParagraphs(req):  # type: ignore
+        # Each paragraph is labeled with 1 label at max
+        assert len(par.metadata.labels.paragraph) <= 1

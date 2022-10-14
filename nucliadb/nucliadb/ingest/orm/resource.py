@@ -758,6 +758,7 @@ class Resource:
     async def iterate_paragraphs(
         self, enabled_metadata: EnabledMetadata
     ) -> AsyncIterator[TrainParagraph]:
+
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
@@ -816,7 +817,7 @@ class Resource:
                         )
 
                     if enabled_metadata.labels:
-                        metadata.labels.ClearField("field")
+                        metadata.labels.ClearField("paragraph")
                         metadata.labels.paragraph.extend(paragraph.classifications)
 
                         if extracted_text is not None and text is not None:

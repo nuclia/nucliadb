@@ -25,6 +25,7 @@ import pytest
 from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
+    Classification,
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
     FieldID,
@@ -145,6 +146,7 @@ def broker_processed_resource(knowledgebox, number, rid):
     p1 = Paragraph()
     p1.start = 0
     p1.end = 82
+    p1.classifications.append(Classification(labelset="ls1", label="label1"))
     s1 = Sentence()
     s1.start = 0
     s1.end = 52
@@ -156,6 +158,7 @@ def broker_processed_resource(knowledgebox, number, rid):
     p2 = Paragraph()
     p2.start = 84
     p2.end = 103
+    p2.classifications.append(Classification(labelset="ls1", label="label2"))
     s1 = Sentence()
     s1.start = 84
     s1.end = 103
@@ -190,8 +193,31 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     """
     Create a set of resources with only basic information to test pagination
     """
-
+    from nucliadb.ingest.utils import get_driver
     amount = 10
+
+    driver = await get_driver()
+
+    # Add entities
+    storage = await get_storage()
+    txn = await driver.begin()
+    kb = KnowledgeBox(txn, storage, kbid=knowledgebox, cache=None)
+    entities = EntitiesGroup()
+    entities.entities["entity1"].value = "PERSON"
+    await kb.set_entities_force("group1", entities)
+
+    # Add ontology: one labelset with 2 labels
+    labelset = LabelSet()
+    labelset.title = "ls1"
+    for i in range(2):
+        label = Label()
+        label_title = f"label{i}"
+        label.title = label_title
+        labelset.labels.append(label)
+        await kb.set_labelset(label_title, labelset)
+        await txn.commit(resource=False)
+
+    # Create resources
     for i in range(1, amount + 1):
         message = broker_simple_resource(knowledgebox, i)
         await processor.process(message=message, seqid=-1, transaction_check=False)
@@ -201,10 +227,6 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
         # Give processed data some time to reach the node
 
     from time import time
-
-    from nucliadb.ingest.utils import get_driver
-
-    driver = await get_driver()
 
     t0 = time()
 
@@ -221,22 +243,5 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
             break
         print(f"got {count}, retrying")
         await asyncio.sleep(2)
-
-    # Add entities
-    storage = await get_storage()
-    txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid=knowledgebox, cache=None)
-    entities = EntitiesGroup()
-    entities.entities["entity1"].value = "PERSON"
-    await kb.set_entities_force("group1", entities)
-
-    # Add ontology
-    labelset = LabelSet()
-    labelset.title = "ls1"
-    label = Label()
-    label.title = "label1"
-    labelset.labels.append(label)
-    await kb.set_labelset("label1", labelset)
-    await txn.commit(resource=False)
 
     yield knowledgebox
