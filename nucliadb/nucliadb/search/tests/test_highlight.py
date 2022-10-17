@@ -62,3 +62,10 @@ def test_highlight():
         res
         == "<mark>Plone</mark> offers superior security controls, often without cost, <mark>of</mark> course!"
     )
+
+    res = highlight(
+        "In contrast, traditional companies often make it impossible",
+        ["of", "market"],
+        ["of", "market"],
+    )
+    assert res == "In contrast, traditional companies often make it impossible"
