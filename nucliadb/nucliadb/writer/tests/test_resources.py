@@ -117,6 +117,8 @@ async def test_resource_crud(writer_api, knowledgebox_writer):
             },
         )
 
+        if resp.status_code != 201:
+            print(resp.content)
         assert resp.status_code == 201
         data = resp.json()
         assert "uuid" in data
