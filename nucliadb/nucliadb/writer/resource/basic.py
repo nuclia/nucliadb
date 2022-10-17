@@ -203,7 +203,8 @@ def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushP
         bm.basic.metadata.metadata.update(item.metadata.metadata)
         if item.metadata.language:
             bm.basic.metadata.language = item.metadata.language
-        bm.basic.metadata.languages.extend(item.metadata.languages)
+        if item.metadata.languages:
+            bm.basic.metadata.languages.extend(item.metadata.languages)
         # basic.metadata.useful = item.metadata.useful
         # basic.metadata.status = item.metadata.status
     parse_basic_modify(bm, item, toprocess)
