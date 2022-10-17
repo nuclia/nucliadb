@@ -464,6 +464,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         ["delete", "", None],
     ],
 )
+@pytest.mark.asyncio()
 async def test_field_endpoints_by_slug(
     writer_api,
     knowledgebox,
