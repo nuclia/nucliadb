@@ -246,7 +246,8 @@ def highlight_paragraph(
     marks = [0] * (len(text) + 1)
     if ematches is not None:
         for quote in ematches:
-            for match in re.finditer(quote.lower(), text_lower):
+            quote_regex = r"\b" + quote.lower() + r"\b"
+            for match in re.finditer(quote_regex, text_lower):
                 start, end = match.span()
                 marks[start] = 1
                 marks[end] = 2
