@@ -37,15 +37,6 @@ flag_management:
           target: 20%
         - type: patch
           target: 100%
-    - name: nucliadb
-      paths:
-        - nucliadb/**
-      carryforward: true
-      statuses:
-        - type: project
-          target: 20%
-        - type: patch
-          target: 80%
     - name: train
       paths:
         - nucliadb/nucliadb/train/**

@@ -253,7 +253,8 @@ def highlight_paragraph(
 
     words = words or []
     for word in words:
-        for match in re.finditer(word.lower(), text_lower):
+        word_regex = r"\b" + word.lower() + r"\b"
+        for match in re.finditer(word_regex, text_lower):
             start, end = match.span()
             if marks[start] == 0 and marks[end] == 0:
                 marks[start] = 1

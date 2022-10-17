@@ -52,3 +52,13 @@ def test_highlight():
         res
         == "Query whatever you redis want to make it work <mark>my query</mark> with <mark>this</mark>"
     )
+
+    res = highlight(
+        "Plone offers superior security controls, often without cost, of course!",
+        ["use", "cases", "of", "plone"],
+    )
+
+    assert (
+        res
+        == "<mark>Plone</mark> offers superior security controls, often without cost, <mark>of</mark> course!"
+    )
