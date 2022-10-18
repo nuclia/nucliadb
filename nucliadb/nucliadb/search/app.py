@@ -44,6 +44,7 @@ from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.instrumentation import instrument_app
+from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 
@@ -107,10 +108,11 @@ application = VersionedFastAPI(
 
 
 # Fastapi versioning does not propagate exception handlers to inner mounted apps
-# We need to patch it manually for now
+# We need to patch it manually for now. Also extend OpenAPI definitions
 for route in application.routes:
     if isinstance(route, Mount):
         route.app.middleware_stack.handler = global_exception_handler  # type: ignore
+        extend_openapi(route.app)
 
 
 async def homepage(request: Request) -> HTMLResponse:
