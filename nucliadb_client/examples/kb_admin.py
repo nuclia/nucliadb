@@ -19,6 +19,7 @@
 
 import argparse
 import os
+
 import httpx
 
 API_PREFIX = "api"
