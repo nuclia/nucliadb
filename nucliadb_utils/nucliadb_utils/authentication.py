@@ -98,6 +98,7 @@ def requires(
         ]
 
     def decorator(func: typing.Callable) -> typing.Callable:
+        func.__required_scopes__ = scopes_list  # type: ignore
         type = None
         sig = inspect.signature(func)
         for idx, parameter in enumerate(sig.parameters.values()):
