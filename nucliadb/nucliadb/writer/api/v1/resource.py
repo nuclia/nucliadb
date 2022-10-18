@@ -87,6 +87,7 @@ else:
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCES_PREFIX}",
     status_code=201,
     name="Create Resource",
+    description="Create a new Resource in a Knowledge Box",
     response_model=ResourceCreated,
     response_model_exclude_unset=True,
     tags=["Resources"],
@@ -165,14 +166,14 @@ async def create_resource(
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
     status_code=200,
-    name="Modify Resource",
+    name="Modify Resource (by slug)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
 @api.patch(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
-    name="Modify Resource",
+    name="Modify Resource (by id)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
@@ -238,14 +239,14 @@ async def modify_resource(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/reprocess",
     status_code=202,
-    name="Reprocess resource",
+    name="Reprocess resource (by slug)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reprocess",
     status_code=202,
-    name="Reprocess resource",
+    name="Reprocess resource (by id)",
     response_model=ResourceUpdated,
     tags=["Resources"],
 )
@@ -312,13 +313,13 @@ async def reprocess_resource(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
     status_code=204,
-    name="Delete Resource",
+    name="Delete Resource (by slug)",
     tags=["Resources"],
 )
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=204,
-    name="Delete Resource",
+    name="Delete Resource (by id)",
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)
@@ -356,13 +357,13 @@ async def delete_resource(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/reindex",
     status_code=204,
-    name="Reindex Resource",
+    name="Reindex Resource (by slug)",
     tags=["Resources"],
 )
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/reindex",
     status_code=204,
-    name="Reindex Resource",
+    name="Reindex Resource (by id)",
     tags=["Resources"],
 )
 @requires(NucliaDBRoles.WRITER)

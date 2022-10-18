@@ -88,7 +88,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 @api.get(
     f"/{KB_PREFIX}/s/{{slug}}",
     status_code=200,
-    name="Get Knowledge Box by SLUG",
+    name="Get Knowledge Box (by slug)",
     response_model=KnowledgeBoxObj,
     tags=["Knowledge Boxes"],
 )

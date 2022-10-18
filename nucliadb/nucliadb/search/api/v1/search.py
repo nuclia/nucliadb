@@ -56,7 +56,8 @@ from nucliadb_utils.utilities import get_audit
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
-    description="Search on a knowledge box",
+    name="Search Knowledge Box",
+    description="Search on a Knowledge Box",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],
@@ -131,7 +132,8 @@ async def search_knowledgebox(
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
-    description="Search on a knowledge box",
+    name="Search Knowledge Box",
+    description="Search on a Knowledge Box",
     response_model=KnowledgeboxSearchResults,
     response_model_exclude_unset=True,
     tags=["Search"],

@@ -140,7 +140,7 @@ async def list_resources(
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
     status_code=200,
-    name="Get Resource",
+    name="Get Resource (by slug)",
     response_model=Resource,
     response_model_exclude_unset=True,
     tags=["Resources"],
@@ -148,7 +148,7 @@ async def list_resources(
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
     status_code=200,
-    name="Get Resource",
+    name="Get Resource (by id)",
     response_model=Resource,
     response_model_exclude_unset=True,
     tags=["Resources"],
@@ -201,7 +201,7 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
     status_code=200,
-    name="Get Resource field",
+    name="Get Resource field (by slug)",
     response_model=ResourceField,
     response_model_exclude_unset=True,
     tags=["Resource fields"],
@@ -209,7 +209,7 @@ PAGE_SHORTCUTS = typing_get_args(PageShortcuts)
 @api.get(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=200,
-    name="Get Resource field",
+    name="Get Resource field (by id)",
     response_model=ResourceField,
     response_model_exclude_unset=True,
     tags=["Resource fields"],

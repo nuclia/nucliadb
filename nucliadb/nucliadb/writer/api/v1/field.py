@@ -120,14 +120,14 @@ async def finish_field_put(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/text/{{field_id}}",
     status_code=201,
-    name="Add resource text field",
+    name="Add resource text field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/text/{{field_id}}",
     status_code=201,
-    name="Add resource text field",
+    name="Add resource text field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -158,14 +158,14 @@ async def add_resource_field_text(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/link/{{field_id}}",
     status_code=201,
-    name="Add resource link field",
+    name="Add resource link field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/link/{{field_id}}",
     status_code=201,
-    name="Add resource link field",
+    name="Add resource link field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -196,14 +196,14 @@ async def add_resource_field_link(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/keywordset/{{field_id}}",
     status_code=201,
-    name="Add resource keywordset field",
+    name="Add resource keywordset field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/keywordset/{{field_id}}",
     status_code=201,
-    name="Add resource keywordset field",
+    name="Add resource keywordset field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -234,14 +234,14 @@ async def add_resource_field_keywordset(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/datetime/{{field_id}}",
     status_code=201,
-    name="Add resource datetime field",
+    name="Add resource datetime field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/datetime/{{field_id}}",
     status_code=201,
-    name="Add resource datetime field",
+    name="Add resource datetime field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -272,14 +272,14 @@ async def add_resource_field_datetime(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}",
     status_code=201,
-    name="Add resource layout field",
+    name="Add resource layout field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}",
     status_code=201,
-    name="Add resource layout field",
+    name="Add resource layout field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -310,14 +310,14 @@ async def add_resource_field_layout(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}",
     status_code=201,
-    name="Add resource conversation field",
+    name="Add resource conversation field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}",
     status_code=201,
-    name="Add resource conversation field",
+    name="Add resource conversation field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -350,14 +350,14 @@ async def add_resource_field_conversation(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}",
     status_code=201,
-    name="Add resource file field",
+    name="Add resource file field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}",
     status_code=201,
-    name="Add resource file field",
+    name="Add resource file field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -394,14 +394,14 @@ async def add_resource_field_file(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/messages",
     status_code=200,
-    name="Append messages to conversation field",
+    name="Append messages to conversation field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages",
     status_code=200,
-    name="Append messages to conversation field",
+    name="Append messages to conversation field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -460,14 +460,14 @@ async def append_messages_to_conversation_field(
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/layout/{{field_id}}/blocks",
     status_code=200,
-    name="Append blocks to layout field",
+    name="Append blocks to layout field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/layout/{{field_id}}/blocks",
     status_code=200,
-    name="Append blocks to layout field",
+    name="Append blocks to layout field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
 )
@@ -525,14 +525,14 @@ async def append_blocks_to_layout_field(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
     status_code=204,
-    name="Delete Resource field",
+    name="Delete Resource field (by slug)",
     response_model_exclude_unset=True,
     tags=["Resource fields"],
 )
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}",
     status_code=204,
-    name="Delete Resource field",
+    name="Delete Resource field (by id)",
     response_model_exclude_unset=True,
     tags=["Resource fields"],
 )
