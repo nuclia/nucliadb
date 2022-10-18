@@ -47,7 +47,7 @@ pub fn write_benchmark<Eng, QIter, Plot>(
             println!("Written {x}");
         }
     }
-    if vbatch.len() > 0 {
+    if !vbatch.is_empty() {
         engine.add_batch(batch_id, kbatch, vbatch);
         plotw.report().unwrap();
     }
