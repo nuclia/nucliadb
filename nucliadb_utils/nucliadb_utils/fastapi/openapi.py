@@ -17,7 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Union
+
 from fastapi.applications import FastAPI
+from starlette.routing import Mount
 
 ROLE_METADATA_TEMPLATE = """
 ---
@@ -31,7 +34,7 @@ def format_scopes(scope_list):
     return "\n".join(f"- `{scope}`" for scope in scope_list)
 
 
-def extend_openapi(app: FastAPI):
+def extend_openapi(app: Union[FastAPI, Mount]):
     for route in app.routes:
         if hasattr(route.endpoint, "__required_scopes__"):
             scopes = route.endpoint.__required_scopes__
