@@ -92,10 +92,21 @@ class NucliaDBClient:
             result.append(new_kb)
         return result
 
-    def get_kb(self, *, slug: str) -> Optional[KnowledgeBox]:
-        response = self.http_reader_v1.get(f"{KB_PREFIX}/s/{slug}")
+    def get_kb(
+        self, *, slug: Optional[str] = None, kbid: Optional[str] = None
+    ) -> Optional[KnowledgeBox]:
+        if slug is None and kbid is None:
+            raise ValueError("Either slug or kbid must be set")
+
+        if slug:
+            url = f"{KB_PREFIX}/s/{slug}"
+        else:
+            url = f"{KB_PREFIX}/{kbid}"
+
+        response = self.http_reader_v1.get(url)
         if response.status_code == 404:
             return None
+
         response_obj = KnowledgeBoxObj.parse_raw(response.content)
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 

@@ -20,108 +20,55 @@
 import argparse
 import os
 
-import httpx
-
-API_PREFIX = "api"
-KB_PREFIX = "/kb"
-
-
-class APIError(Exception):
-    def __init__(self, resp):
-        self.resp = resp
-
-    def __str__(self):
-        status_code = self.resp.status_code
-        content = self.resp.content().decode()
-        return f"APIError(status_code={status_code}, content={content}"
-
-
-class APIClient:
-    def __init__(self, api_host, bearer, schema="https"):
-        base_url = f"{schema}://{api_host}/{API_PREFIX}/v1"
-        headers = {
-            "Authorization": f"Bearer {bearer}",
-            "host": api_host,
-        }
-        self.http_client = httpx.Client(
-            base_url=base_url,
-            headers=headers,
-        )
-
-    def get_kb(self, kbid: str):
-        resp = self.http_client.get(f"{KB_PREFIX}/{kbid}")
-        self._check_status_code(resp, 200)
-        return resp.json()
-
-    def iter_resources_in_kb(self, kbid: str, page_size=20):
-        current_page = 0
-        is_last_page = False
-        while not is_last_page:
-            results = self._get_resources_page(kbid, current_page, page_size)
-            for resource in results["resources"]:
-                yield resource
-            is_last_page = results["pagination"]["last"]
-            current_page += 1
-
-    def _check_status_code(self, resp, status_code=None):
-        if not status_code and str(resp.status_code).startswith("2"):
-            return
-        if status_code and status_code == resp.status_code:
-            return
-        raise APIError(resp)
-
-    def _get_resources_page(self, kbid, current_page, page_size=20):
-        resp = self.http_client.get(
-            f"{KB_PREFIX}/{kbid}/resources?page={current_page}&page_size={page_size}"
-        )
-        self._check_status_code(resp, 200)
-        return resp.json()
-
-    def reprocess_resource(self, kbid, rid):
-        resp = self.http_client.post(f"{KB_PREFIX}/{kbid}/resource/{rid}/reprocess")
-        self._check_status_code(resp, 202)
-
-    def reindex_resource(self, kbid, rid):
-        resp = self.http_client.post(f"{KB_PREFIX}/{kbid}/resource/{rid}/reindex")
-        self._check_status_code(resp, 200)
-
-
-def get_bearer():
-    try:
-        return os.environ["BEARER"]
-    except KeyError:
-        print("You need to set the BEARER environment variable")
-        raise
+from nucliadb_client.client import NucliaDBClient
 
 
 class KnowledgeBoxAdmin:
-    def __init__(self, api_host, kbid):
+    def __init__(
+        self, host, kbid, grpc=8030, http=8080, reader_host=None, writer_host=None
+    ):
         self.kbid = kbid
-        self.client = APIClient(api_host, bearer=get_bearer())
+        self.client = NucliaDBClient(
+            host=host,
+            grpc=grpc,
+            http=http,
+            reader_host=reader_host,
+            writer_host=writer_host,
+        )
 
-    def reprocess(self, offset=0):
-        for index, resource in enumerate(self.client.iter_resources_in_kb(self.kbid)):
-            if index < offset:
-                print(f"{index}: Skipping: ", resource["title"])
-                continue
-            print(f"{index}: Reprocessing: ", resource["title"])
-            self.client.reprocess_resource(self.kbid, resource["id"])
+    def reprocess(self):
+        kb = self.client.get_kb(kbid=self.kbid)
+        for index, resource in enumerate(kb.iter_resources()):
+            print(f"{index}: Reprocessing: ", resource.rid)
+            resource.reprocess()
 
-    def reindex(self, offset=0):
-        for index, resource in enumerate(self.client.iter_resources_in_kb(self.kbid)):
-            if index < offset:
-                print(f"{index}: Skipping: ", resource["title"])
-                continue
-            print(f"{index}: Reindexing: ", resource["title"])
-            self.client.reindex_resource(self.kbid, resource["id"])
+    def reindex(self):
+        kb = self.client.get_kb(kbid=self.kbid)
+        for index, resource in enumerate(kb.iter_resources()):
+            print(f"{index}: Reindexing: ", resource.rid)
+            resource.reindex()
 
 
 def main(args):
-    admin = KnowledgeBoxAdmin(args.host, args.kb)
+    if args.host:
+        host_args = dict(host=args.host)
+    else:
+        host_args = dict(
+            host="",
+            writer_host=args.writer_host or "writer.nucliadb.svc.cluster.local",
+            reader_host=args.reader_host or "reader.nucliadb.svc.cluster.local",
+        )
+
+    admin = KnowledgeBoxAdmin(kbid=args.kb, **host_args, http=args.http, grpc=args.grpc)
+
     if args.action == "reprocess":
-        admin.reprocess(offset=args.offset)
+        admin.reprocess()
+
     elif args.action == "reindex":
-        admin.reindex(offset=args.offset)
+        admin.reindex()
+
+    else:
+        raise ValueError(f"Invalid action {args.action}")
 
 
 def parse_arguments():
@@ -129,13 +76,30 @@ def parse_arguments():
     parser.add_argument(
         "--host",
         dest="host",
-        required=True,
-        help="Api host e.g: europe-1.stashify.cloud",
+        default=None,
+        help="External api host e.g: europe-1.stashify.cloud",
+    )
+    parser.add_argument(
+        "--writer-host",
+        dest="writer_host",
+        default=None,
+        help="internal writer api host",
+    )
+    parser.add_argument(
+        "--reader-host",
+        dest="reader_host",
+        default=None,
+        help="internal reader api host",
     )
     parser.add_argument("--kb", dest="kb", required=True, help="KB uuid")
     parser.add_argument("--action", required=True, choices=["reprocess", "reindex"])
-    parser.add_argument("--offset", required=False, type=int)
+    parser.add_argument("--grpc", dest="grpc", default=8030)
 
+    parser.add_argument(
+        "--http",
+        dest="http",
+        default=8080,
+    )
     args = parser.parse_args()
     return args
 

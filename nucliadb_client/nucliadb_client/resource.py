@@ -58,12 +58,12 @@ class Resource:
             follow_redirects=True,
         )
         self.http_writer_v1: httpx.Client = httpx.Client(
-            base_url=f"{kb.http_reader_v1.base_url}{RESOURCE_PREFIX}/{rid}",
+            base_url=f"{kb.http_writer_v1.base_url}{RESOURCE_PREFIX}/{rid}",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
             follow_redirects=True,
         )
         self.http_manager_v1: httpx.Client = httpx.Client(
-            base_url=f"{kb.http_reader_v1.base_url}{RESOURCE_PREFIX}/{rid}",
+            base_url=f"{kb.http_manager_v1.base_url}{RESOURCE_PREFIX}/{rid}",
             headers={"X-NUCLIADB-ROLES": "MANAGER"},
             follow_redirects=True,
         )
@@ -83,6 +83,14 @@ class Resource:
     def delete(self):
         response = self.http_writer_v1.delete("")
         return NucliaDBResource.parse_raw(response)
+
+    def reprocess(self):
+        response = self.http_writer_v1.post("reprocess")
+        assert response.status_code == 202
+
+    def reindex(self):
+        response = self.http_writer_v1.post("reindex")
+        assert response.status_code == 200
 
     @property
     def bm(self) -> BrokerMessage:
