@@ -120,7 +120,7 @@ class TransactionUtility:
             logger.warn("No PubSub configured")
             return None
 
-        def received(waiting_for: WaitFor, event: Event, raw_data: bytes):
+        async def received(waiting_for: WaitFor, event: Event, raw_data: bytes):
             if self.pubsub is None:
                 return None
             data = self.pubsub.parse(raw_data)

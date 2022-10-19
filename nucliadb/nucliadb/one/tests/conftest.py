@@ -21,7 +21,6 @@ pytest_plugins = [
     "pytest_docker_fixtures",
     "nucliadb.ingest.tests.fixtures",
     "nucliadb.search.tests.fixtures",
-    "nucliadb.ingest.tests.tikv",
     "nucliadb.one.tests.fixtures",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.nats",
