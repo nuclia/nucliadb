@@ -178,6 +178,7 @@ async def get_cache() -> Optional[Cache]:
 
 
 async def get_pubsub() -> PubSubDriver:
+
     driver: Optional[PubSubDriver] = get_utility(Utility.PUBSUB)
     if cache_settings.cache_pubsub_driver == "redis" and driver is None:
         driver = RedisPubsub(cache_settings.cache_pubsub_redis_url)
