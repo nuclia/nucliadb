@@ -108,7 +108,7 @@ application = VersionedFastAPI(
 for route in application.routes:
     if isinstance(route, Mount):
         route.app.middleware_stack.handler = global_exception_handler  # type: ignore
-        extend_openapi(route.app)
+        extend_openapi(route.app)  # type: ignore
 
 
 async def homepage(request: Request) -> HTMLResponse:

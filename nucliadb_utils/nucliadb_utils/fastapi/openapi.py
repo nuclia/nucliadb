@@ -36,8 +36,10 @@ def format_scopes(scope_list):
 
 def extend_openapi(app: Union[FastAPI, Mount]):
     for route in app.routes:
-        if hasattr(route.endpoint, "__required_scopes__"):
-            scopes = route.endpoint.__required_scopes__
-            route.description += ROLE_METADATA_TEMPLATE.format(
+        # mypy complains about BaseRoute not having endpoint and
+        # description attributes, but routes passed here always have
+        if hasattr(route.endpoint, "__required_scopes__"):  # type: ignore
+            scopes = route.endpoint.__required_scopes__  # type: ignore
+            route.description += ROLE_METADATA_TEMPLATE.format(  # type: ignore
                 scopes=format_scopes(scopes)
             )
