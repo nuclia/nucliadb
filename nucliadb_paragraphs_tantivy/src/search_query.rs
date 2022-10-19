@@ -314,4 +314,27 @@ mod tests {
             .iter()
             .all(|(_, query)| query.is::<FuzzyTermQuery>()));
     }
+
+    #[test]
+    fn it_removes_stop_word_fterms() {
+        let stop_words = &["is", "a", "for", "and"];
+        let tests = [
+            (
+                "nuclia is a database for unstructured data",
+                "nuclia database unstructured data",
+            ),
+            (
+                "nuclia is a",
+                // keeps last term even if is a stop word
+                "nuclia a",
+            ),
+            ("is a for and", "and"),
+        ];
+
+        for (query, expected_fuzzy_query) in tests {
+            let fuzzy_query = remove_stop_words(query, &stop_words[..]);
+
+            assert_eq!(fuzzy_query, expected_fuzzy_query);
+        }
+    }
 }
