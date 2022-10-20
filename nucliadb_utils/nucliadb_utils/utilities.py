@@ -180,21 +180,21 @@ async def get_cache() -> Optional[Cache]:
 async def get_pubsub() -> PubSubDriver:
 
     driver: Optional[PubSubDriver] = get_utility(Utility.PUBSUB)
-    if cache_settings.cache_pubsub_driver == "redis" and driver is None:
-        driver = RedisPubsub(cache_settings.cache_pubsub_redis_url)
-        set_utility(Utility.PUBSUB, driver)
-        logger.info("Configuring redis pubsub")
-    elif cache_settings.cache_pubsub_driver == "nats" and driver is None:
-        driver = NatsPubsub(
-            hosts=cache_settings.cache_pubsub_nats_url,
-            user_credentials_file=cache_settings.cache_pubsub_nats_auth,
-        )
-        set_utility(Utility.PUBSUB, driver)
-        logger.info("Configuring nats pubsub")
-    elif driver is None:
-        raise NotImplementedError("Invalid driver")
-
-    if driver and not driver.initialized:
+    if driver is None:
+        if cache_settings.cache_pubsub_driver == "redis":
+            driver = RedisPubsub(cache_settings.cache_pubsub_redis_url)
+            set_utility(Utility.PUBSUB, driver)
+            logger.info("Configuring redis pubsub")
+        elif cache_settings.cache_pubsub_driver == "nats":
+            driver = NatsPubsub(
+                hosts=cache_settings.cache_pubsub_nats_url,
+                user_credentials_file=cache_settings.cache_pubsub_nats_auth,
+            )
+            set_utility(Utility.PUBSUB, driver)
+            logger.info("Configuring nats pubsub")
+        else:
+            raise NotImplementedError("Invalid driver")
+    if not driver.initialized:
         await driver.initialize()
     return driver
 
