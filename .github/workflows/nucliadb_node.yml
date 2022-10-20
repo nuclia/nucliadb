@@ -115,13 +115,9 @@ jobs:
     name: Clippy lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.60.0
-          profile: default
-          override: true
-
       - uses: actions/checkout@v3
+
+      - run: rustup component add clippy
 
       - uses: Swatinem/rust-cache@v1
 
@@ -136,12 +132,6 @@ jobs:
     needs: [clippy-rust, format-rust, licenses]
 
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.60.0
-          profile: default
-          override: true
-
       - uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v1
