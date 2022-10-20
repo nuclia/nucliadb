@@ -20,9 +20,9 @@
 import asyncio
 from typing import Callable, Dict, Optional
 
-import aioredis
 import prometheus_client  # type: ignore
-from aioredis.client import PubSub
+from redis import asyncio as aioredis
+from redis.asyncio.client import PubSub
 
 from nucliadb_utils import metrics
 from nucliadb_utils.cache.exceptions import GroupNotSupported, NoPubsubConfigured

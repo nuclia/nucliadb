@@ -21,9 +21,9 @@ import asyncio
 from enum import Enum
 from typing import AsyncIterator, Callable, List, Optional
 
-import aioredis
 import pytest
 from httpx import AsyncClient
+from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb.models.resource import NucliaDBRoles

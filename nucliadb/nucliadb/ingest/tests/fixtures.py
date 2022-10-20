@@ -27,7 +27,6 @@ from shutil import rmtree
 from tempfile import mkdtemp
 from typing import List, Optional
 
-import aioredis
 import docker  # type: ignore
 import nats
 import pytest
@@ -37,6 +36,7 @@ from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from redis import asyncio as aioredis
 
 from nucliadb.ingest.chitchat import start_chitchat
 from nucliadb.ingest.consumer.service import ConsumerService
