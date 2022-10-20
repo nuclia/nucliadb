@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.0.1
+
+- Fix writer and manager http clients on resource and kb
+
 ## 1.0.0
 
 - Export values optional
