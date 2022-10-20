@@ -35,15 +35,23 @@ class KnowledgeBoxAdmin:
             writer_host=writer_host,
         )
 
-    def reprocess(self):
+    def reprocess(self, offset: int = 0):
         kb = self.client.get_kb(kbid=self.kbid)
         for index, resource in enumerate(kb.iter_resources()):
+            if index < offset:
+                print(f"{index}: Skipping: ", resource.rid)
+                continue
+
             print(f"{index}: Reprocessing: ", resource.rid)
             resource.reprocess()
 
-    def reindex(self):
+    def reindex(self, offset: int = 0):
         kb = self.client.get_kb(kbid=self.kbid)
         for index, resource in enumerate(kb.iter_resources()):
+            if index < offset:
+                print(f"{index}: Skipping: ", resource.rid)
+                continue
+
             print(f"{index}: Reindexing: ", resource.rid)
             resource.reindex()
 
@@ -61,10 +69,10 @@ def main(args):
     admin = KnowledgeBoxAdmin(kbid=args.kb, **host_args, http=args.http, grpc=args.grpc)
 
     if args.action == "reprocess":
-        admin.reprocess()
+        admin.reprocess(offset=args.offset)
 
     elif args.action == "reindex":
-        admin.reindex()
+        admin.reindex(offset=args.offset)
 
     else:
         raise ValueError(f"Invalid action {args.action}")
@@ -93,11 +101,9 @@ def parse_arguments():
     parser.add_argument("--kb", dest="kb", required=True, help="KB uuid")
     parser.add_argument("--action", required=True, choices=["reprocess", "reindex"])
     parser.add_argument("--grpc", dest="grpc", default=8030)
-
+    parser.add_argument("--http", dest="http", default=8080)
     parser.add_argument(
-        "--http",
-        dest="http",
-        default=8080,
+        "--offset", default=0, type=int, help="To use for reruns after an error"
     )
     args = parser.parse_args()
     return args
