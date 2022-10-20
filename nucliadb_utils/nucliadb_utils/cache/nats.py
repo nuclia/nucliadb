@@ -21,6 +21,7 @@
 import asyncio
 import os
 import uuid
+from inspect import iscoroutinefunction
 from typing import Dict, List, Optional
 
 import nats
@@ -33,7 +34,7 @@ from nats.js.client import JetStreamContext  # type: ignore
 from nats.js.manager import JetStreamManager
 
 from nucliadb_utils import logger
-from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 
 
 async def wait_for_it(future: asyncio.Future, msg):
@@ -156,8 +157,15 @@ class NatsPubsub(PubSubDriver):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def subscribe(self, handler, key, group=""):
+    async def subscribe(self, handler: Callback, key, group=""):
         if self.nc is not None and self.nc.is_connected:
+            if not iscoroutinefunction(handler):
+
+                async def async_wrap(cb):
+                    cb()
+
+                handler = async_wrap(handler)
+
             sid = await self.nc.subscribe(key, queue=group, cb=handler)
             self._subscriptions[key] = sid
             logger.info("Subscribed to " + key)

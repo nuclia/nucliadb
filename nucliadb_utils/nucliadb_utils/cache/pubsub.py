@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable, Union
+
+Callback = Union[Callable, Awaitable]
 
 
 class PubSubDriver:
@@ -36,7 +38,7 @@ class PubSubDriver:
     async def unsubscribe(self, key: str):
         raise NotImplementedError()
 
-    async def subscribe(self, handler: Callable, key: str, group: str = None):
+    async def subscribe(self, handler: Callback, key: str, group: str = None):
         raise NotImplementedError()
 
     def parse(self, data: Any):

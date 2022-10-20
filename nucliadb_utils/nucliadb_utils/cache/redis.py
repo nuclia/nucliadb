@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import Callable, Dict, Optional
+from typing import Dict, Optional
 
 import prometheus_client  # type: ignore
 from redis import asyncio as aioredis
@@ -26,7 +26,7 @@ from redis.asyncio.client import PubSub
 
 from nucliadb_utils import metrics
 from nucliadb_utils.cache.exceptions import GroupNotSupported, NoPubsubConfigured
-from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 
 REDIS_OPS = prometheus_client.Counter(
     "guillotina_cache_redis_ops_total",
@@ -86,15 +86,14 @@ class RedisPubsub(PubSubDriver):
 
         await self.pubsub.unsubscribe(key)
 
-    async def subscribe(self, handler: Callable, key: str, group: str = None):
-
+    async def subscribe(self, handler: Callback, key: str, group: str = None):
         if group is not None:
             raise GroupNotSupported()
         if self.driver is None or self.pubsub is None:
             raise NoPubsubConfigured()
 
         subscription = {key: handler}
-        await self.pubsub.subscribe(**subscription)
+        await self.pubsub.subscribe(**subscription)  # type: ignore
         if self.task is None:
             self.task = asyncio.create_task(self.pubsub.run())
 
