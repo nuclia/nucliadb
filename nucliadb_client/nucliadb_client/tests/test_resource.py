@@ -72,3 +72,21 @@ def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):
 
     info = res.get(values=True)
     assert info.title == "My Resource"
+
+
+def test_reprocess(nucliadb_knowledgebox: KnowledgeBox):
+    payload = CreateResourcePayload()
+    payload.title = "My Resource"
+    payload.icon = "plain/text"
+    res = nucliadb_knowledgebox.create_resource(payload)
+
+    res.reprocess()
+
+
+def test_reindex(nucliadb_knowledgebox: KnowledgeBox):
+    payload = CreateResourcePayload()
+    payload.title = "My Resource"
+    payload.icon = "plain/text"
+    res = nucliadb_knowledgebox.create_resource(payload)
+
+    res.reindex()

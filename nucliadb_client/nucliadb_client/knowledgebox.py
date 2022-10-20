@@ -66,12 +66,12 @@ class KnowledgeBox:
             follow_redirects=True,
         )
         self.http_writer_v1 = httpx.Client(
-            base_url=f"{client.http_reader_v1.base_url}{KB_PREFIX}/{kbid}",
+            base_url=f"{client.http_writer_v1.base_url}{KB_PREFIX}/{kbid}",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
             follow_redirects=True,
         )
         self.http_manager_v1 = httpx.Client(
-            base_url=f"{client.http_reader_v1.base_url}{KB_PREFIX}/{kbid}",
+            base_url=f"{client.http_manager_v1.base_url}{KB_PREFIX}/{kbid}",
             headers={"X-NUCLIADB-ROLES": "MANAGER"},
             follow_redirects=True,
         )
@@ -81,13 +81,24 @@ class KnowledgeBox:
         response = self.http_manager_v1.get("").content
         return KnowledgeBoxObj.parse_raw(response)
 
-    def list_elements(self, page: int = 0, size: int = 20) -> List[Resource]:
+    def list_resources(self, page: int = 0, size: int = 20) -> List[Resource]:
         response = self.http_reader_v1.get(f"resources?page={page}&size={size}")
         response_obj = ResourceList.parse_raw(response.content)
         result = []
         for resource in response_obj.resources:
             result.append(Resource(rid=resource.id, kb=self))
         return result
+
+    def iter_resources(self, page_size: int = 20):
+        page = 0
+        last_page = False
+        while not last_page:
+            resources = self.list_resources(page=page, size=page_size)
+            for resource in resources:
+                yield resource
+            if len(resources) == 0:
+                last_page = True
+            page = page + 1
 
     def create_resource(self, payload: CreateResourcePayload) -> Resource:
         response = self.http_writer_v1.post(

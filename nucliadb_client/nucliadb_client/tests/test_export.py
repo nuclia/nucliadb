@@ -71,8 +71,11 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     kb = nucliadb_client.get_kb(slug="mykb2")
     if kb is None:
         raise AttributeError("Could not found KB")
-    resources = kb.list_elements()
+    resources = kb.list_resources()
 
     bm = BrokerMessage()
     bm.ParseFromString(base64.b64decode(export[0][4:]))
     assert bm.basic.title == resources[0].get().title
+
+    for resource in kb.iter_resources(page_size=1):
+        resource.get().title == bm.basic.title
