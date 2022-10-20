@@ -27,6 +27,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb.one.lifecycle import finalize, initialize
@@ -37,6 +38,7 @@ from nucliadb.search.utilities import get_counter
 from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
 
@@ -90,6 +92,10 @@ application = VersionedFastAPI(
     enable_latest=False,
     kwargs=fastapi_settings,
 )
+
+for route in application.routes:
+    if isinstance(route, Mount):
+        extend_openapi(route)
 
 
 async def homepage(request):

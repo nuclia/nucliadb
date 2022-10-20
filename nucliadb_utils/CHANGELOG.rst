@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+1.0.11
+------
+- Add OpenAPI utils for fastapi doc generation
+
 1.0.10
 ------
 
