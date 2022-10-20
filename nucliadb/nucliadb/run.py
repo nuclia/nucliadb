@@ -57,7 +57,6 @@ def run_nucliadb(nucliadb_args: Settings):
         port=nucliadb_args.http,
         log_config=log_config,
         log_level=logging.getLevelName(running_settings.log_level),
-        debug=True,
         reload=False,
     )
 
