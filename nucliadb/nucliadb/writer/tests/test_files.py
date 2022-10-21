@@ -28,6 +28,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
 from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
+from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb.writer.utilities import get_processing
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction
@@ -372,13 +373,14 @@ async def test_knowledgebox_file_upload_field_headers(
 ):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
-        filename = base64.b64encode(b"image.jpg").decode()
+        filename = "image.jpg"
+        encoded_filename = base64.b64encode(filename.encode()).decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
                 data=f.read(),
                 headers={
-                    "X-FILENAME": filename,
+                    "X-FILENAME": encoded_filename,
                     "X-LANGUAGE": "ca",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
                     "content-type": "image/jpg",
@@ -407,6 +409,7 @@ async def test_knowledgebox_file_upload_field_headers(
     assert writer.basic.title == ""
     assert writer.files[field].language == "ca"
     assert writer.files[field].file.size == 30472
+    assert writer.files[field].file.filename == filename
 
     storage = await get_storage()
     data = await storage.downloadbytes(
@@ -422,7 +425,7 @@ async def test_knowledgebox_file_upload_field_sync(
 ):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
 
-        filename = base64.b64encode(b"image.jpg").decode()
+        filename = "image.jpg"
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/resource/{resource}/file/field1/{UPLOAD}",
@@ -560,11 +563,13 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
         )
         assert str(resp.status_code).startswith("2")
 
+        filename = "image.jpg"
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{kb}/{RSLUG_PREFIX}/{rslug}/file/file1/{UPLOAD}",
                 data=f.read(),
                 headers={
+                    "X-FILENAME": filename,
                     "content-type": "image/jpg",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
                 },
@@ -592,6 +597,7 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
     assert writer.uuid == rid
     assert writer.basic.icon == "image/jpg"
     assert writer.files[field].file.size == 30472
+    assert writer.files[field].file.filename == filename
 
     storage = await get_storage()
     data = await storage.downloadbytes(
@@ -599,3 +605,10 @@ async def test_file_upload_by_slug(writer_api, knowledgebox_writer):
         key=writer.files[field].file.uri,
     )
     assert len(data.read()) == 30472
+
+
+def test_maybe_b64decode():
+    something = "something"
+    something_encoded = base64.b64encode(something.encode())
+    assert maybe_b64decode(something_encoded) == something
+    assert maybe_b64decode(something) == something

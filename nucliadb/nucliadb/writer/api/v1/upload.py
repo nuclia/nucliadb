@@ -527,7 +527,7 @@ async def upload(
     content_type = request.headers.get("content-type", "application/octet-stream")
 
     if x_filename and len(x_filename):
-        filename = base64.b64decode(x_filename[0]).decode()
+        filename = maybe_b64decode(x_filename[0])
     else:
         filename = uuid.uuid4().hex
 
@@ -736,3 +736,11 @@ async def store_file_on_nuclia_db(
     await transaction.commit(writer, partition, wait=wait_on_commit)
 
     return seqid
+
+
+def maybe_b64decode(some_string: str) -> str:
+    try:
+        return base64.b64decode(some_string).decode()
+    except ValueError:
+        # not b64encoded
+        return some_string
