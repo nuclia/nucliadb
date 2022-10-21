@@ -86,10 +86,7 @@ async def nucliadb_with_tikv_and_nats(
 
     yield make_client_fixture
 
-    try:
-        await application.router.shutdown()
-    except Exception:
-        pass
+    await application.router.shutdown()
     driver = aioredis.from_url(f"redis://{redis[0]}:{redis[1]}")
     await driver.flushall()
     clear_ingest_cache()
@@ -173,7 +170,7 @@ async def get_resource(nucliadb_api, kb, rid):
 
 
 @pytest.mark.asyncio
-async def test_post_and_get_sync(nucliadb_with_tikv_and_nats, kbid):
+async def _test_post_and_get_sync(nucliadb_with_tikv_and_nats, kbid):
     nucliadb_api = nucliadb_with_tikv_and_nats
 
     resp = await create_resource(nucliadb_api, kbid)
