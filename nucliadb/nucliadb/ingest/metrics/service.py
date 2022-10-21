@@ -58,6 +58,6 @@ class MetricsService:
         try:
             await self.site.stop()
         except RuntimeError:
-            # pytest bug makes this be called twice in the same test teardown...
-            # https://github.com/aio-libs/aiohttp/issues/4684
+            # pytest bug makes this be called twice in the same test teardown:
+            # https://github.com/aio-libs/aiohttp/issues/4684
             pass
