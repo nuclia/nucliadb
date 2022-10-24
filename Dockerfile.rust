@@ -3,8 +3,11 @@ FROM python:3.9 as python_rust
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.60.0 \
     CLIENT_VERSION=0.0.3
+
+COPY rust-toolchain.toml /tmp
+
+WORKDIR /tmp
 
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
@@ -15,12 +18,8 @@ RUN set -eux; \
         i386) rustArch='i686-unknown-linux-gnu'; rustupSha256='e50d1deb99048bc5782a0200aa33e4eea70747d49dffdc9d06812fd22a372515' ;; \
         *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
     esac; \
-    url="https://static.rust-lang.org/rustup/archive/1.24.3/${rustArch}/rustup-init"; \
-    wget "$url"; \
-    echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
-    chmod +x rustup-init; \
-    ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
-    rm rustup-init; \
+    rustVersion=$(awk -F '=' '/channel/ {print $2}' rust-toolchain.toml | tr -d '" '); \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain ${rustVersion} --default-host ${rustArch}; \
     chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rustup --version; \
     cargo --version; \
@@ -32,11 +31,10 @@ RUN pip install maturin
 
 RUN set -eux; \
     wget "https://github.com/tikv/client-py/archive/refs/tags/${CLIENT_VERSION}.tar.gz"; \
-    tar -xzf 0.0.3.tar.gz; \
+    tar -xzf ${CLIENT_VERSION}.tar.gz; \
     cd client-py-${CLIENT_VERSION}; \
     maturin build --release; \
     cp target/wheels/tikv_client-${CLIENT_VERSION}-*.whl /
-
 
 COPY . /nucliadb
 
