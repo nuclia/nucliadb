@@ -24,6 +24,7 @@ import aiofiles
 import httpx
 from grpc import aio  # type: ignore
 from grpc import insecure_channel
+from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.models.resource import (
@@ -52,6 +53,7 @@ class NucliaDBClient:
         schema: str = "http",
         writer_host: Optional[str] = None,
         reader_host: Optional[str] = None,
+        search_host: Optional[str] = None,
         grpc_host: Optional[str] = None,
         train_host: Optional[str] = None,
     ):
@@ -59,8 +61,11 @@ class NucliaDBClient:
             reader_host = host
         if writer_host is None:
             writer_host = host
+        if search_host is None:
+            search_host = host
         if train_host is None:
             train_host = host
+
         self.http_reader_v1 = httpx.Client(
             base_url=f"{schema}://{reader_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "READER"},
@@ -69,22 +74,30 @@ class NucliaDBClient:
             base_url=f"{schema}://{writer_host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
         )
+        self.http_search_v1 = httpx.Client(
+            base_url=f"{schema}://{search_host}:{http}/{API_PREFIX}/v1",
+            headers={"X-NUCLIADB-ROLES": "READER"},
+        )
         self.http_manager_v1 = httpx.Client(
             base_url=f"{schema}://{host}:{http}/{API_PREFIX}/v1",
             headers={"X-NUCLIADB-ROLES": "MANAGER"},
         )
         if grpc_host is None:
             grpc_host = host
+
         self.grpc_host = grpc_host
         self.grpc_port = grpc
-        self.train_port = train
-        self.train_host = train_host
         channel = insecure_channel(f"{host}:{grpc}")
         self.writer_stub = WriterStub(channel)
+        self.train_stub = None
+        if train and train_host:
+            self.train_stub = TrainStub(insecure_channel(f"{train_host}:{train}"))
 
-    def list_kbs(self) -> List[KnowledgeBox]:
+    def list_kbs(self, timeout: Optional[int] = None) -> List[KnowledgeBox]:
         response = KnowledgeBoxList.parse_raw(
-            self.http_manager_v1.get(KBS_PREFIX).content
+            self.http_reader_v1.get(
+                KBS_PREFIX, timeout=timeout, headers={"X-NUCLIADB-ROLES": "MANAGER"}
+            ).content
         )
         result = []
         for kb in response.kbs:

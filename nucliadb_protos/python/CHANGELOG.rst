@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.33
+------
+
+- Add new servicer at node writer to clean and upgrade a shard
+
 0.0.32
 ------
 

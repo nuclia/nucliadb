@@ -82,6 +82,11 @@ message DeleteKnowledgeBoxResponse {
     KnowledgeBoxResponseStatus status = 1;
 }
 
+// Clean Index
+
+message CleanedKnowledgeBoxResponse {
+
+}
 
 // Labels on a Knowledge Box
 

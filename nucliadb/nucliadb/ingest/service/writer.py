@@ -22,6 +22,7 @@ import uuid
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
+    CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse,
     GCKnowledgeBoxResponse,
     KnowledgeBox,
@@ -115,6 +116,20 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             slug=request.slug, uuid=request.uuid
         )
         return response
+
+    async def CleanAndUpgradeKnowledgeBoxIndex(  # type: ignore
+        self, request: KnowledgeBoxID, context=None
+    ) -> CleanedKnowledgeBoxResponse:
+        from nucliadb.ingest.orm.utils import get_node_klass
+
+        txn = await self.proc.driver.begin()
+        node_klass = get_node_klass()
+        all_shards = await node_klass.get_all_shards(txn, request.uuid)
+        for logic_shard in all_shards.shards:
+            shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
+            await shard.clean_and_upgrade()
+        await txn.abort()
+        return CleanedKnowledgeBoxResponse()
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None
