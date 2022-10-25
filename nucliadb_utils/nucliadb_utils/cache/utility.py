@@ -67,7 +67,9 @@ class Cache:
 
     async def finalize(self):
         if self.initialized is False:
-            logger.error("finalizing a not initialized cache utility")
+            logger.error("Finalizing a not initialized cache utility")
+            return
+
         if self.pubsub is not None:
             try:
                 await self.pubsub.unsubscribe(settings.cache_pubsub_channel)
