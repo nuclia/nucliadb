@@ -42,7 +42,7 @@ async def nucliadb_with_tikv_and_nats(
     redis,
     transaction_utility,
     indexing_utility_registered,
-    test_settings,
+    test_settings_tikv_and_nats,
     event_loop,
 ):  # type: ignore
     from nucliadb.ingest.orm import NODES
@@ -101,7 +101,7 @@ async def nucliadb_with_tikv_and_nats(
 
 
 @pytest.fixture(scope="function")
-def test_settings(gcs, natsd, tikv_driver, node):
+def test_settings_tikv_and_nats(gcs, natsd, tikv_driver, node):
     from nucliadb.ingest.settings import settings as ingest_settings
     from nucliadb_utils.cache.settings import settings as cache_settings
     from nucliadb_utils.settings import (
