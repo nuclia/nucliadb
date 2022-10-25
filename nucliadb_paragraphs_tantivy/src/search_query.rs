@@ -17,9 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
+use itertools::Itertools;
 use nucliadb_protos::ParagraphSearchRequest;
 use nucliadb_service_interface::prelude::*;
 use tantivy::query::*;
@@ -28,6 +30,7 @@ use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
+use crate::stop_words::STOP_WORDS;
 
 type QueryP = (Occur, Box<dyn Query>);
 type NewFuzz = fn(Term, u8, bool, SharedTermC) -> FuzzyTermQuery;
@@ -194,6 +197,25 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
     }
 }
 
+/// Removes all fuzzy terms identified as stop word.
+///
+/// A stop word is any fuzzy term that match the following criterias:
+/// - Presents in the given list of stop words
+/// - Is **NOT** the last term in the query
+///
+/// The last term of the query is a prefix fuzzy term and must be preserved.
+fn remove_stop_words<'a>(query: &'a str, stop_words: &[&str]) -> Cow<'a, str> {
+    match query.rsplit_once(' ') {
+        Some((query, last_term)) => query
+            .split(' ')
+            .filter(|term| !stop_words.contains(term))
+            .chain([last_term])
+            .join(" ")
+            .into(),
+        None => query.into(),
+    }
+}
+
 pub fn create_query(
     parser: &QueryParser,
     text: &str,
@@ -216,7 +238,8 @@ pub fn create_query(
     reg.pop();
     let termc = SharedTermC::new();
     let query = parse_query(parser, &reg);
-    let mut fuzzies = fuzzied_queries(query.box_clone(), distance, termc.clone());
+    let fuzzy_query = parse_query(parser, &remove_stop_words(&reg, &STOP_WORDS[..]));
+    let mut fuzzies = fuzzied_queries(fuzzy_query, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
     for quote in quotes {
         let query = parser.parse_query(quote).unwrap();
@@ -290,5 +313,28 @@ mod tests {
         assert!(adapted
             .iter()
             .all(|(_, query)| query.is::<FuzzyTermQuery>()));
+    }
+
+    #[test]
+    fn it_removes_stop_word_fterms() {
+        let stop_words = &["is", "a", "for", "and"];
+        let tests = [
+            (
+                "nuclia is a database for unstructured data",
+                "nuclia database unstructured data",
+            ),
+            (
+                "nuclia is a",
+                // keeps last term even if is a stop word
+                "nuclia a",
+            ),
+            ("is a for and", "and"),
+        ];
+
+        for (query, expected_fuzzy_query) in tests {
+            let fuzzy_query = remove_stop_words(query, &stop_words[..]);
+
+            assert_eq!(fuzzy_query, expected_fuzzy_query);
+        }
     }
 }

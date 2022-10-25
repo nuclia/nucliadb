@@ -17,9 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+
 pub mod fuzzy_query;
 pub mod reader;
 pub mod schema;
 pub mod search_query;
 pub mod search_response;
+pub(crate) mod stop_words;
 pub mod writer;
