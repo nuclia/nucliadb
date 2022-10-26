@@ -724,6 +724,10 @@ def make_field_metadata(field_id):
     ex1.metadata.metadata.last_extract.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_summary.FromDatetime(datetime.now())
     ex1.metadata.metadata.thumbnail.CopyFrom(THUMBNAIL)
+    ex1.metadata.metadata.positions["document"].entity = "Ramon"
+    ex1.metadata.metadata.positions["document"].position.extend(
+        [rpb.Position(start=0, end=5), rpb.Position(start=23, end=28)]
+    )
     return ex1
 
 
