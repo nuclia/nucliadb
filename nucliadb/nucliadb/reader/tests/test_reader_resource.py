@@ -298,3 +298,28 @@ async def test_resource_endpoints_by_slug(reader_api, test_resource):
         )
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Resource does not exist"
+
+
+@pytest.mark.asyncio
+async def test_get_resource_extracted_metadata(
+    reader_api: Callable[..., AsyncClient], test_resource: Resource
+):
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rid = rsc.uuid
+
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+            params={
+                "show": ["extracted"],
+                "extracted": [
+                    "metadata",
+                ],
+            },
+        )
+        assert resp.status_code == 200
+
+        resource = resp.json()
+        metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"]["metadata"]
+        assert metadata["positions"]["document"]["entity"] == "Ramon"

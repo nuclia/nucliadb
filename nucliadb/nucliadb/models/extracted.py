@@ -86,6 +86,16 @@ class ExtractedVectorsWrapper(BaseModel):
     field: Optional[FieldID]
 
 
+class Position(BaseModel):
+    start: int
+    end: int
+
+
+class Positions(BaseModel):
+    position: List[Position]
+    entity: str
+
+
 class FieldMetadata(BaseModel):
     links: List[str]
     paragraphs: List[Paragraph]
@@ -98,6 +108,7 @@ class FieldMetadata(BaseModel):
     thumbnail: Optional[CloudLink]
     language: Optional[str]
     summary: Optional[str]
+    positions: Dict[str, Positions]
 
 
 class FieldComputedMetadata(BaseModel):

@@ -30,6 +30,8 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     Paragraph,
     Sentence,
+    Positions,
+    Position
 )
 
 from nucliadb.ingest.fields.text import Text
@@ -61,6 +63,11 @@ async def test_create_resource_orm_metadata(
     ex1.metadata.metadata.last_index.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    ex1.metadata.metadata.positions["document"].entity = "Ramon"
+    ex1.metadata.metadata.positions["document"].position.extend([
+        Position(start=0, end=5),
+        Position(start=23, end=28)
+    ])
 
     field_obj: Text = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
