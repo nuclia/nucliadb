@@ -344,7 +344,7 @@ impl ShardReaderService {
         prefixes.into_iter().rev().collect()
     }
 
-    pub fn suggest(&self, search_request: SuggestRequest) -> InternalResult<SuggestResponse> {
+    pub fn suggest(&self, request: SuggestRequest) -> InternalResult<SuggestResponse> {
         // Search for entities related to the query.
 
         // let prefixes =
@@ -365,22 +365,9 @@ impl ShardReaderService {
         //     self.relation_reader.search(&request)
         // });
         // info!("{}:{}", line!(), file!());
-        let paragraph_request = ParagraphSearchRequest {
-            body: search_request.body.clone(),
-            filter: search_request.filter.clone(),
-            page_number: 0,
-            result_per_page: 10,
-            timestamps: search_request.timestamps,
-            reload: false,
-            id: String::default(),
-            uuid: String::default(),
-            fields: Vec::default(),
-            order: None,
-            faceted: None,
-        };
 
         let paragraph_reader_service = self.paragraph_reader.clone();
-        let paragraph_task = move || paragraph_reader_service.search(&paragraph_request);
+        let paragraph_task = move || paragraph_reader_service.suggest(&request);
         info!("{}:{}", line!(), file!());
         let rparagraph = paragraph_task()?;
         // let (rparagraph, rrelations) =
