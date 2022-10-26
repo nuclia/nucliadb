@@ -29,7 +29,7 @@ from nucliadb.ingest.maindb.driver import (
 from nucliadb.ingest.maindb.exceptions import NoWorkerCommit
 
 try:
-    import aioredis
+    from redis import asyncio as aioredis
 
     REDIS = True
 except ImportError:

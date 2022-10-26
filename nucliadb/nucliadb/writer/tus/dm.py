@@ -20,8 +20,8 @@
 import time
 from typing import Any, Dict, Optional
 
-import aioredis
 import orjson
+from redis import asyncio as aioredis
 from starlette.requests import Request
 
 from .exceptions import HTTPPreconditionFailed

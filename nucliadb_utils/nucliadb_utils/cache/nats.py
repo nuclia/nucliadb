@@ -19,8 +19,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import functools
 import os
 import uuid
+from inspect import iscoroutinefunction
 from typing import Dict, List, Optional
 
 import nats
@@ -33,7 +35,7 @@ from nats.js.client import JetStreamContext  # type: ignore
 from nats.js.manager import JetStreamManager
 
 from nucliadb_utils import logger
-from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.cache.pubsub import Callback, PubSubDriver
 
 
 async def wait_for_it(future: asyncio.Future, msg):
@@ -156,8 +158,12 @@ class NatsPubsub(PubSubDriver):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def subscribe(self, handler, key, group=""):
+    async def subscribe(self, handler: Callback, key, group=""):
         if self.nc is not None and self.nc.is_connected:
+            if not iscoroutinefunction(handler):
+                # nats async client only accepts coroutines as callbacks
+                handler = sync_to_async(handler)
+
             sid = await self.nc.subscribe(key, queue=group, cb=handler)
             self._subscriptions[key] = sid
             logger.info("Subscribed to " + key)
@@ -180,3 +186,13 @@ class NatsPubsub(PubSubDriver):
 
     def parse(self, data: Msg):
         return data.data
+
+
+def sync_to_async(fn):
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        p_func = functools.partial(fn, *args, **kwargs)
+        return await loop.run_in_executor(None, p_func)
+
+    return wrapper

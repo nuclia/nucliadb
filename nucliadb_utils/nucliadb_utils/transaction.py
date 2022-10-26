@@ -82,10 +82,6 @@ class TransactionUtility:
         self.nats_index_target = nats_index_target
         self.notify_subject = notify_subject
         self.pubsub: Optional[PubSubDriver] = None
-        if self.notify_subject is not None:
-            from nucliadb_utils.utilities import Utility, get_utility
-
-            self.pubsub = get_utility(Utility.PUBSUB)
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -138,6 +134,10 @@ class TransactionUtility:
         return waiting_event
 
     async def initialize(self, service_name: Optional[str] = None):
+        if self.notify_subject is not None:
+            from nucliadb_utils.utilities import get_pubsub
+
+            self.pubsub = await get_pubsub()
 
         options: Dict[str, Any] = {
             "error_cb": self.error_cb,

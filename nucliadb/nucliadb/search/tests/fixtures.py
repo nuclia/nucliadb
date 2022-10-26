@@ -21,10 +21,10 @@ from enum import Enum
 from os.path import dirname
 from typing import Dict, List, Optional
 
-import aioredis
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.noderesources_pb2 import Shard
+from redis import asyncio as aioredis
 from starlette.routing import Mount
 
 from nucliadb.ingest.cache import clear_ingest_cache

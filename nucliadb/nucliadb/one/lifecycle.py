@@ -48,6 +48,8 @@ async def finalize():
             await finalizer()
         else:
             finalizer()
+    SYNC_FINALIZERS.clear()
+
     await finalize_writer()
     await finalize_reader()
     await finalize_search()
