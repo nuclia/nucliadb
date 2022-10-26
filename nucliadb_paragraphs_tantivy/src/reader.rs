@@ -18,11 +18,15 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs;
 
-use nucliadb_protos::{OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId};
+use nucliadb_protos::{
+    OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId, SuggestRequest,
+};
 use nucliadb_service_interface::prelude::*;
+use search_query::{search_query, suggest_query};
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
@@ -49,7 +53,34 @@ impl Debug for ParagraphReaderService {
     }
 }
 
-impl ParagraphReader for ParagraphReaderService {}
+impl ParagraphReader for ParagraphReaderService {
+    fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response> {
+        let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
+        let no_results = 10;
+        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        let (original, termc, fuzzied) = suggest_query(&parser, &text, request, &self.schema, 1);
+        let searcher = self.reader.searcher();
+        let topdocs = TopDocs::with_limit(no_results);
+        let mut results = searcher.search(&original, &topdocs).unwrap();
+        if results.len() < no_results {
+            let topdocs = TopDocs::with_limit(no_results - results.len());
+            match searcher.search(&fuzzied, &topdocs) {
+                Ok(mut fuzzied) => results.append(&mut fuzzied),
+                Err(err) => error!("{err:?} during suggest"),
+            }
+        }
+        Ok(ParagraphSearchResponse::from(SearchBm25Response {
+            facets_count: None,
+            facets: vec![],
+            top_docs: results,
+            termc: termc.get_termc(),
+            text_service: self,
+            query: &text,
+            page_number: 1,
+            results_per_page: 10,
+        }))
+    }
+}
 
 impl ReaderChild for ParagraphReaderService {
     type Request = ParagraphSearchRequest;
@@ -63,10 +94,6 @@ impl ReaderChild for ParagraphReaderService {
         searcher.search(&AllQuery, &Count).unwrap()
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        use std::collections::HashSet;
-
-        use search_query::create_query;
-
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
@@ -84,7 +111,7 @@ impl ReaderChild for ParagraphReaderService {
             })
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) = create_query(&parser, &text, request, &self.schema, 1);
+        let (original, termc, fuzzied) = search_query(&parser, &text, request, &self.schema, 1);
         let mut searcher = Searcher {
             request,
             results,

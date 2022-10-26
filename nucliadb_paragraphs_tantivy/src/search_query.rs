@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use nucliadb_protos::ParagraphSearchRequest;
+use nucliadb_protos::{ParagraphSearchRequest, SuggestRequest};
 use nucliadb_service_interface::prelude::*;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
@@ -33,7 +33,6 @@ use crate::schema::ParagraphSchema;
 use crate::stop_words::STOP_WORDS;
 
 type QueryP = (Occur, Box<dyn Query>);
-type NewFuzz = fn(Term, u8, bool, SharedTermC) -> FuzzyTermQuery;
 
 // Used to identify the terms matched by tantivy
 #[derive(Clone)]
@@ -89,36 +88,47 @@ impl SharedTermC {
     }
 }
 
-fn term_query_to_fuzzy(
+fn term_to_fuzzy(
     query: Box<dyn Query>,
     distance: u8,
     termc: SharedTermC,
-    with: NewFuzz,
+    as_prefix: bool,
 ) -> Box<dyn Query> {
+    let mut shared_terms = termc.get_termc();
     let term_query: &TermQuery = query.downcast_ref().unwrap();
     let term = term_query.term().clone();
-    let mut terms = termc.get_termc();
-    term.as_str()
+    let term_as_str = term.as_str();
+    let should_be_prefixed = term_as_str
+        .map(|s| as_prefix && s.len() > 3)
+        .unwrap_or_default();
+    term_as_str
         .into_iter()
-        .for_each(|t| terms.log_eterm(t.to_string()));
-    termc.set_termc(terms);
-    Box::new(with(term, distance, true, termc))
+        .for_each(|t| shared_terms.log_eterm(t.to_string()));
+    termc.set_termc(shared_terms);
+    if should_be_prefixed {
+        Box::new(FuzzyTermQuery::new_prefix(term, distance, true, termc))
+    } else {
+        Box::new(FuzzyTermQuery::new(term, distance, true, termc))
+    }
 }
 
 fn queryp_map(
     queries: Vec<QueryP>,
     distance: u8,
-    as_prefix: usize,
+    as_prefix: Option<usize>,
     termc: SharedTermC,
 ) -> Vec<QueryP> {
     queries
         .into_iter()
         .enumerate()
         .map(|(id, (_, query))| {
-            let query = if query.is::<TermQuery>() && id == as_prefix {
-                term_query_to_fuzzy(query, distance, termc.clone(), FuzzyTermQuery::new_prefix)
-            } else if query.is::<TermQuery>() {
-                term_query_to_fuzzy(query, distance, termc.clone(), FuzzyTermQuery::new)
+            let query = if query.is::<TermQuery>() {
+                term_to_fuzzy(
+                    query,
+                    distance,
+                    termc.clone(),
+                    as_prefix.map_or(false, |v| id == v),
+                )
             } else if query.is::<PhraseQuery>() {
                 let phrase: &PhraseQuery = query.downcast_ref().unwrap();
                 let mut total = vec![];
@@ -161,7 +171,12 @@ fn flat_bool_query(query: BooleanQuery, collector: (usize, Vec<QueryP>)) -> (usi
         })
 }
 
-fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
+fn flat_and_adapt(
+    query: Box<dyn Query>,
+    prefixed: bool,
+    distance: u8,
+    termc: SharedTermC,
+) -> Vec<QueryP> {
     let (queries, as_prefix) = if query.is::<BooleanQuery>() {
         let query: Box<BooleanQuery> = query.downcast().unwrap();
         let (as_prefix, queries) = flat_bool_query(*query, (usize::MAX, vec![]));
@@ -175,14 +190,24 @@ fn flat_and_adapt(query: Box<dyn Query>, distance: u8, termc: SharedTermC) -> Ve
         let as_prefix = 1;
         (queries, as_prefix)
     };
-    queryp_map(queries, distance, as_prefix, termc)
+    queryp_map(
+        queries,
+        distance,
+        if prefixed { Some(as_prefix) } else { None },
+        termc,
+    )
 }
 
-fn fuzzied_queries(query: Box<dyn Query>, distance: u8, termc: SharedTermC) -> Vec<QueryP> {
+fn fuzzied_queries(
+    query: Box<dyn Query>,
+    prefixed: bool,
+    distance: u8,
+    termc: SharedTermC,
+) -> Vec<QueryP> {
     if query.is::<AllQuery>() {
-        vec![(Occur::Should, query)]
+        vec![]
     } else {
-        flat_and_adapt(query, distance, termc)
+        flat_and_adapt(query, prefixed, distance, termc)
     }
 }
 
@@ -216,36 +241,66 @@ fn remove_stop_words<'a>(query: &'a str, stop_words: &[&str]) -> Cow<'a, str> {
     }
 }
 
-pub fn create_query(
+pub fn suggest_query(
+    parser: &QueryParser,
+    text: &str,
+    request: &SuggestRequest,
+    schema: &ParagraphSchema,
+    distance: u8,
+) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
+    let regular_text = text;
+    let no_quotes_text = text
+        .split(' ')
+        .into_iter()
+        .filter(|t| !(t.starts_with('"') && t.ends_with('"')))
+        .fold(String::new(), |mut acc, crnt| {
+            acc.push(' ');
+            acc.push_str(crnt);
+            acc
+        });
+    let termc = SharedTermC::new();
+    let query = parse_query(parser, regular_text);
+    let fuzzy_query = parse_query(parser, &remove_stop_words(&no_quotes_text, &STOP_WORDS[..]));
+    let mut fuzzies = fuzzied_queries(fuzzy_query, true, distance, termc.clone());
+    let mut originals = vec![(Occur::Must, query)];
+    request
+        .filter
+        .iter()
+        .flat_map(|f| f.tags.iter())
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
+            originals.push((Occur::Must, Box::new(facet_term_query)));
+        });
+    let original = Box::new(BooleanQuery::new(originals));
+    let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
+    (original, termc, fuzzied)
+}
+
+pub fn search_query(
     parser: &QueryParser,
     text: &str,
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
-    let (quotes, mut reg) =
-        text.split(' ')
-            .into_iter()
-            .fold((vec![], String::new()), |(mut quotes, mut reg), crnt| {
-                if crnt.starts_with('"') && crnt.ends_with('"') {
-                    quotes.push(crnt);
-                } else {
-                    reg.push_str(crnt);
-                    reg.push(' ');
-                }
-                (quotes, reg)
-            });
-    reg.pop();
+    let regular_text = text;
+    let no_quotes_text = text
+        .split(' ')
+        .into_iter()
+        .filter(|t| !(t.starts_with('"') && t.ends_with('"')))
+        .fold(String::new(), |mut acc, crnt| {
+            acc.push(' ');
+            acc.push_str(crnt);
+            acc
+        });
     let termc = SharedTermC::new();
-    let query = parse_query(parser, &reg);
-    let fuzzy_query = parse_query(parser, &remove_stop_words(&reg, &STOP_WORDS[..]));
-    let mut fuzzies = fuzzied_queries(fuzzy_query, distance, termc.clone());
+    let query = parse_query(parser, regular_text);
+    let fuzzy_query = parse_query(parser, &remove_stop_words(&no_quotes_text, &STOP_WORDS[..]));
+    let mut fuzzies = fuzzied_queries(fuzzy_query, false, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
-    for quote in quotes {
-        let query = parser.parse_query(quote).unwrap();
-        fuzzies.push((Occur::Must, query.box_clone()));
-        originals.push((Occur::Must, query));
-    }
     if !search.uuid.is_empty() {
         let term = Term::from_field_text(schema.uuid, &search.uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
@@ -307,7 +362,7 @@ mod tests {
         let boolean0: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries0));
         let boolean1: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries1));
         let nested = BooleanQuery::new(vec![(Occur::Should, boolean0), (Occur::Should, boolean1)]);
-        let adapted = flat_and_adapt(Box::new(nested), 2, SharedTermC::new());
+        let adapted = flat_and_adapt(Box::new(nested), true, 2, SharedTermC::new());
         assert_eq!(adapted.len(), 24);
         assert!(adapted.iter().all(|(occur, _)| *occur == Occur::Must));
         assert!(adapted

@@ -40,6 +40,7 @@ impl InternalError for ParagraphError {}
 pub trait ParagraphReader:
     ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
 {
+    fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response>;
 }
 
 pub trait ParagraphWriter: WriterChild {}
