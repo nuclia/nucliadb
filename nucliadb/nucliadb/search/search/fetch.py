@@ -363,3 +363,8 @@ async def get_seconds_paragraph(
         return (list(paragraph.start_seconds), list(paragraph.end_seconds))
 
     return None
+
+
+async def get_document_page_for_paragraph(result: ParagraphResult) -> Optional[int]:
+    # TODO
+    return 1

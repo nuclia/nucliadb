@@ -47,6 +47,7 @@ from nucliadb.search.api.models import (
 )
 from nucliadb.search.search.fetch import (
     fetch_resources,
+    get_document_page_for_paragraph,
     get_labels_paragraph,
     get_labels_resource,
     get_labels_sentence,
@@ -251,6 +252,7 @@ async def merge_paragraph_results(
     count: int,
     page: int,
     highlight: bool,
+    fetch_paragraph_page: bool,
 ):
 
     raw_paragraph_list: List[ParagraphResult] = []
@@ -301,6 +303,12 @@ async def merge_paragraph_results(
         if seconds_positions is not None:
             new_paragraph.start_seconds = seconds_positions[0]
             new_paragraph.end_seconds = seconds_positions[1]
+
+        if fetch_paragraph_page:
+            document_page = await get_document_page_for_paragraph(result)
+            if document_page is not None:
+                new_paragraph.document_page = document_page
+
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)
@@ -328,6 +336,7 @@ async def merge_results(
     extracted: List[ExtractedDataTypeName],
     min_score: float = 0.85,
     highlight: bool = False,
+    fetch_paragraph_page: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
@@ -348,7 +357,7 @@ async def merge_results(
     )
 
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight=highlight
+        paragraphs, resources, kbid, count, page, highlight=highlight, fetch_paragraph_page=fetch_paragraph_page
     )
 
     api_results.sentences = await merge_vectors_results(
@@ -370,6 +379,7 @@ async def merge_paragraphs_results(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     highlight_split: bool,
+    fetch_paragraph_page: bool,
 ) -> ResourceSearchResults:
     paragraphs = []
     for result in paragraph_responses:
@@ -379,7 +389,7 @@ async def merge_paragraphs_results(
 
     resources: List[str] = list()
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight=highlight_split
+        paragraphs, resources, kbid, count, page, highlight=highlight_split, fetch_paragraph_page=fetch_paragraph_page
     )
     return api_results
 

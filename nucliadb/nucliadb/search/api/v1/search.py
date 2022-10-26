@@ -265,6 +265,7 @@ async def search(
         extracted=item.extracted,
         min_score=item.min_score,
         highlight=item.highlight,
+        fetch_paragraph_page=item.show_paragraph_page,
     )
     await abort_transaction()
 

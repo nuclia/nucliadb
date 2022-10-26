@@ -103,6 +103,7 @@ class Paragraph(BaseModel):
     labels: List[str] = []
     start_seconds: Optional[List[int]] = None
     end_seconds: Optional[List[int]] = None
+    document_page: Optional[int] = None
 
 
 class Paragraphs(BaseModel):
@@ -266,6 +267,7 @@ class SearchRequest(BaseModel):
     reload: bool = True
     debug: bool = False
     highlight: bool = False
+    show_paragraph_page: bool = False
     show: List[ResourceProperties] = [ResourceProperties.BASIC]
     field_type_filter: List[FieldTypeName] = list(FieldTypeName)
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
