@@ -261,6 +261,28 @@ impl Configuration {
         }
     }
 
+    /// Returns the Prometheus username, if any.
+    pub fn get_prometheus_username() -> Option<String> {
+        match env::var("PROMETHEUS_USERNAME") {
+            Ok(value) => Some(value),
+            Err(_) => {
+                error!("PROMETHEUS_USERNAME not defined. No defaulted");
+                None
+            }
+        }
+    }
+
+    /// Returns the Prometheus password, if any.
+    pub fn get_prometheus_password() -> Option<String> {
+        match env::var("PROMETHEUS_PASSWORD") {
+            Ok(value) => Some(value),
+            Err(_) => {
+                error!("PROMETHEUS_PASSWORD not defined. No defaulted");
+                None
+            }
+        }
+    }
+
     /// Retuns the Promethus push timing, defaulted to 1h if not defined.
     pub fn get_prometheus_push_timing() -> Duration {
         const DEFAULT_TIMING_PLACEHOLDER: &str = "1h";
