@@ -20,6 +20,7 @@
 use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
+use std::time::Duration;
 
 use tracing::*;
 
@@ -259,5 +260,27 @@ impl Configuration {
             }
         }
     }
+
+    /// Retuns the Promethus push timing, defaulted to 1h if not defined.
+    pub fn get_prometheus_push_timing() -> Duration {
+        const DEFAULT_TIMING_PLACEHOLDER: &str = "1h";
+        const DEFAULT_TIMING: Duration = Duration::from_secs(60 * 60);
+
+        match env::var("PROMETHEUS_PUSH_TIMING") {
+            Ok(value) => {
+                if let Ok(duration) = parse_duration::parse(&value) {
+                    duration
+                } else {
+                    error!("PROMETHEUS_PUSH_TIMING defined incorrectly. Defaulting to {DEFAULT_TIMING_PLACEHOLDER}");
+
+                    DEFAULT_TIMING
+                }
+            }
+            Err(_) => {
+                error!("PROMETHEUS_PUSH_TIMING not defined. Defaulting to {DEFAULT_TIMING_PLACEHOLDER}");
+
+                DEFAULT_TIMING
+            }
+        }
     }
 }
