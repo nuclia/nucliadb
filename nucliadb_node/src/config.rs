@@ -27,6 +27,7 @@ use crate::utils::{parse_log_level, reliable_lookup_host};
 
 const SENTRY_PROD: &str = "prod";
 const SENTRY_DEV: &str = "stage";
+
 /// Global configuration options
 pub struct Configuration {}
 
@@ -245,5 +246,18 @@ impl Configuration {
                 default
             }
         }
+    }
+
+    /// Returns the Prometheus endpoint, if any.
+    pub fn get_prometheus_url() -> Option<String> {
+        match env::var("PROMETHEUS_URL") {
+            Ok(value) => Some(value),
+            Err(_) => {
+                error!("PROMETHEUS_URL not defined. No defaulted");
+
+                None
+            }
+        }
+    }
     }
 }
