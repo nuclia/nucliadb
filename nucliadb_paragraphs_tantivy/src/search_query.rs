@@ -77,6 +77,9 @@ impl TermCollector {
 #[derive(Default, Clone)]
 pub struct SharedTermC(Arc<Mutex<TermCollector>>);
 impl SharedTermC {
+    pub fn from(termc: TermCollector) -> SharedTermC {
+        SharedTermC(Arc::new(Mutex::new(termc)))
+    }
     pub fn new() -> SharedTermC {
         SharedTermC::default()
     }
@@ -94,17 +97,12 @@ fn term_to_fuzzy(
     termc: SharedTermC,
     as_prefix: bool,
 ) -> Box<dyn Query> {
-    let mut shared_terms = termc.get_termc();
     let term_query: &TermQuery = query.downcast_ref().unwrap();
     let term = term_query.term().clone();
     let term_as_str = term.as_str();
     let should_be_prefixed = term_as_str
         .map(|s| as_prefix && s.len() > 3)
         .unwrap_or_default();
-    term_as_str
-        .into_iter()
-        .for_each(|t| shared_terms.log_eterm(t.to_string()));
-    termc.set_termc(shared_terms);
     if should_be_prefixed {
         Box::new(FuzzyTermQuery::new_prefix(term, distance, true, termc))
     } else {
@@ -129,20 +127,6 @@ fn queryp_map(
                     termc.clone(),
                     as_prefix.map_or(false, |v| id == v),
                 )
-            } else if query.is::<PhraseQuery>() {
-                let phrase: &PhraseQuery = query.downcast_ref().unwrap();
-                let mut total = vec![];
-                for term in phrase.phrase_terms() {
-                    total.append(&mut term.value_bytes().to_vec());
-                    total.append(&mut b" ".to_vec());
-                }
-                if let Ok(mut eterm) = String::from_utf8(total) {
-                    eterm.pop();
-                    let mut terms = termc.get_termc();
-                    terms.log_eterm(eterm);
-                    termc.set_termc(terms);
-                }
-                query
             } else {
                 query
             };
@@ -241,6 +225,46 @@ fn remove_stop_words<'a>(query: &'a str, stop_words: &[&str]) -> Cow<'a, str> {
     }
 }
 
+struct ProcessedQuery {
+    fuzzy_query: String,
+    regular_query: String,
+}
+fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
+    let mut fuzzy_query = String::new();
+    let mut quote_starts = vec![];
+    let mut quote_ends = vec![];
+    let mut start = 0;
+    query.match_indices('\"').enumerate().for_each(|(i, d)| {
+        if i % 2 == 0 {
+            quote_starts.push(d.0)
+        } else {
+            quote_ends.push(d.0)
+        }
+    });
+    for i in 0..(std::cmp::min(quote_starts.len(), quote_ends.len())) {
+        let quote = &query[(quote_starts[i] + 1)..quote_ends[i]].trim();
+        let unquote = &query[start..quote_starts[i]].trim();
+        fuzzy_query.push(' ');
+        fuzzy_query.push_str(unquote);
+        start = quote_ends[i] + 1;
+        unquote
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .for_each(|t| tc.log_eterm(t.to_string()));
+        tc.log_eterm(quote.to_string());
+    }
+    if start < query.len() {
+        fuzzy_query.push_str(&query[start..]);
+        query[start..]
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .for_each(|t| tc.log_eterm(t.to_string()));
+    }
+    ProcessedQuery {
+        regular_query: query.to_string(),
+        fuzzy_query: remove_stop_words(fuzzy_query.trim(), &STOP_WORDS[..]).to_string(),
+    }
+}
 pub fn suggest_query(
     parser: &QueryParser,
     text: &str,
@@ -248,19 +272,11 @@ pub fn suggest_query(
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
-    let regular_text = text;
-    let no_quotes_text = text
-        .split(' ')
-        .into_iter()
-        .filter(|t| !(t.starts_with('"') && t.ends_with('"')))
-        .fold(String::new(), |mut acc, crnt| {
-            acc.push(' ');
-            acc.push_str(crnt);
-            acc
-        });
-    let termc = SharedTermC::new();
-    let query = parse_query(parser, regular_text);
-    let fuzzy_query = parse_query(parser, &remove_stop_words(&no_quotes_text, &STOP_WORDS[..]));
+    let mut term_collector = TermCollector::default();
+    let processed = preprocess_raw_query(text, &mut term_collector);
+    let query = parse_query(parser, &processed.regular_query);
+    let fuzzy_query = parse_query(parser, &processed.fuzzy_query);
+    let termc = SharedTermC::from(term_collector);
     let mut fuzzies = fuzzied_queries(fuzzy_query, true, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
     request
@@ -286,19 +302,11 @@ pub fn search_query(
     schema: &ParagraphSchema,
     distance: u8,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
-    let regular_text = text;
-    let no_quotes_text = text
-        .split(' ')
-        .into_iter()
-        .filter(|t| !(t.starts_with('"') && t.ends_with('"')))
-        .fold(String::new(), |mut acc, crnt| {
-            acc.push(' ');
-            acc.push_str(crnt);
-            acc
-        });
-    let termc = SharedTermC::new();
-    let query = parse_query(parser, regular_text);
-    let fuzzy_query = parse_query(parser, &remove_stop_words(&no_quotes_text, &STOP_WORDS[..]));
+    let mut term_collector = TermCollector::default();
+    let processed = preprocess_raw_query(text, &mut term_collector);
+    let query = parse_query(parser, &processed.regular_query);
+    let fuzzy_query = parse_query(parser, &processed.fuzzy_query);
+    let termc = SharedTermC::from(term_collector);
     let mut fuzzies = fuzzied_queries(fuzzy_query, false, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
     if !search.uuid.is_empty() {
@@ -347,6 +355,18 @@ mod tests {
         let field = Field::from_field_id(0);
         let term = Term::from_field_u64(field, 0);
         Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+    }
+
+    #[test]
+    fn test_preprocessor() {
+        let text = "The test \"is correct\" always";
+        let mut term_collector = TermCollector::default();
+        let processed = preprocess_raw_query(text, &mut term_collector);
+        let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
+        let expect = HashSet::from(["The", "test", "always", "is correct"]);
+        assert_eq!(terms, expect);
+        assert_eq!(processed.regular_query, text);
+        assert_eq!(processed.fuzzy_query, "The test always");
     }
 
     #[test]
