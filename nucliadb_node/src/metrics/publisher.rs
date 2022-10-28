@@ -42,14 +42,16 @@ impl Publisher {
     }
 
     /// Publish any report to the Prometheus.
-    pub fn publish<R: Report>(&self, report: &R) -> Result<(), Error> {
-        prometheus::push_metrics(
-            &self.job,
-            report.labels(),
-            &self.url,
-            report.metrics(),
-            self.credentials.clone().map(Into::into),
-        )?;
+    pub async fn publish<R: Report>(&self, report: &R) -> Result<(), Error> {
+        tokio::task::block_in_place(|| {
+            prometheus::push_metrics(
+                &self.job,
+                report.labels(),
+                &self.url,
+                report.metrics(),
+                self.credentials.clone().map(Into::into),
+            )
+        })?;
 
         Ok(())
     }
