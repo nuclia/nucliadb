@@ -266,7 +266,7 @@ impl Configuration {
         match env::var("PROMETHEUS_USERNAME") {
             Ok(value) => Some(value),
             Err(_) => {
-                error!("PROMETHEUS_USERNAME not defined. No defaulted");
+                warn!("PROMETHEUS_USERNAME not defined. No defaulted");
                 None
             }
         }
@@ -277,7 +277,7 @@ impl Configuration {
         match env::var("PROMETHEUS_PASSWORD") {
             Ok(value) => Some(value),
             Err(_) => {
-                error!("PROMETHEUS_PASSWORD not defined. No defaulted");
+                warn!("PROMETHEUS_PASSWORD not defined. No defaulted");
                 None
             }
         }
@@ -293,13 +293,19 @@ impl Configuration {
                 if let Ok(duration) = parse_duration::parse(&value) {
                     duration
                 } else {
-                    error!("PROMETHEUS_PUSH_TIMING defined incorrectly. Defaulting to {DEFAULT_TIMING_PLACEHOLDER}");
+                    error!(
+                        "PROMETHEUS_PUSH_TIMING defined incorrectly. Defaulting to \
+                         {DEFAULT_TIMING_PLACEHOLDER}"
+                    );
 
                     DEFAULT_TIMING
                 }
             }
             Err(_) => {
-                error!("PROMETHEUS_PUSH_TIMING not defined. Defaulting to {DEFAULT_TIMING_PLACEHOLDER}");
+                warn!(
+                    "PROMETHEUS_PUSH_TIMING not defined. Defaulting to \
+                     {DEFAULT_TIMING_PLACEHOLDER}"
+                );
 
                 DEFAULT_TIMING
             }
