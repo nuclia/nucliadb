@@ -252,7 +252,7 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
     }
     if start < query.len() {
         fuzzy_query.push(' ');
-        fuzzy_query.push_str(&query[start..]);
+        fuzzy_query.push_str(query[start..].trim());
     }
     ProcessedQuery {
         regular_query: query.to_string(),
@@ -353,6 +353,13 @@ mod tests {
 
     #[test]
     fn test_preprocessor() {
+        let text = "own test \"This is great\"";
+        let mut term_collector = TermCollector::default();
+        let _ = preprocess_raw_query(text, &mut term_collector);
+        let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
+        let expect = HashSet::from(["This is great"]);
+        assert_eq!(terms, expect);
+
         let text = "The test \"is correct\" always";
         let mut term_collector = TermCollector::default();
         let processed = preprocess_raw_query(text, &mut term_collector);
