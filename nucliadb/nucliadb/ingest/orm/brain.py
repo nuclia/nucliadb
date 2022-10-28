@@ -55,8 +55,8 @@ class ResourceBrain:
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
-        replace_field: List[str],
-        replace_splits: Dict[str, List[str]],
+        replace_field: bool,
+        replace_splits: List[str],
     ):
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
@@ -87,16 +87,11 @@ class ResourceBrain:
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
-        for split, sentences in replace_splits.items():
-            for sentence in sentences:
-                self.brain.paragraphs_to_delete.append(
-                    f"{self.rid}/{field_key}/{split}/{sentence}"
-                )
+        for split in replace_splits:
+            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{split}")
 
-        for sentence_to_delete in replace_field:
-            self.brain.paragraphs_to_delete.append(
-                f"{self.rid}/{field_key}/{sentence_to_delete}"
-            )
+        if replace_field:
+            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}")
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
         for subfield, metadata_split in metadata.split_metadata.items():
@@ -114,8 +109,8 @@ class ResourceBrain:
         self,
         field_key: str,
         vo: VectorObject,
-        replace_field: List[str],
-        replace_splits: Dict[str, List[str]],
+        replace_field: bool,
+        replace_splits: List[str],
     ):
         for subfield, vectors in vo.split_vectors.items():
             # For each split of this field
@@ -138,16 +133,11 @@ class ResourceBrain:
                 vector.vector
             )
 
-        for split, sentences in replace_splits.items():
-            for sentence in sentences:
-                self.brain.sentences_to_delete.append(
-                    f"{self.rid}/{field_key}/{split}/{sentence}"
-                )
+        for split in replace_splits:
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}/{split}")
 
-        for sentence_to_delete in replace_field:
-            self.brain.sentences_to_delete.append(
-                f"{self.rid}/{field_key}/{sentence_to_delete}"
-            )
+        if replace_field:
+            self.brain.sentences_to_delete.append(f"{self.rid}/{field_key}")
 
     def delete_vectors(self, field_key: str, vo: VectorObject):
         for subfield, vectors in vo.split_vectors.items():
