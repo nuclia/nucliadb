@@ -823,7 +823,7 @@ mod tests {
             fields: vec![],
             filter: None,
             faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
+            order: Some(order),
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
