@@ -22,14 +22,23 @@ pub struct NodeReport {
 
 impl NodeReport {
     pub fn new(id: impl Into<Cow<'static, str>>) -> Result<Self, Error> {
+        let id = id.into();
+        let registry = Registry::new();
+        let shard_count =
+            IntGauge::with_opts(opts!("shard_count", "Number of shards in the node"))?;
+        let paragraph_count = IntGauge::with_opts(opts!(
+            "paragraph_count",
+            "The sum of all shard paragraphs in the node"
+        ))?;
+
+        registry.register(Box::new(shard_count.clone()))?;
+        registry.register(Box::new(paragraph_count.clone()))?;
+
         Ok(Self {
-            id: id.into(),
-            registry: Registry::new(),
-            shard_count: IntGauge::with_opts(opts!("shard_count", "Number of shards in the node"))?,
-            paragraph_count: IntGauge::with_opts(opts!(
-                "paragraph_count",
-                "The sum of all shard paragraphs in the node"
-            ))?,
+            id,
+            registry,
+            shard_count,
+            paragraph_count,
         })
     }
 }
