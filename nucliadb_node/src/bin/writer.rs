@@ -98,6 +98,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     if let Some(prometheus_url) = Configuration::get_prometheus_url() {
+        info!("Start metrics task");
+
         let report = NodeReport::new(host_key.to_string())?;
         let mut metrics_publisher = metrics::Publisher::new("node_metrics", prometheus_url);
 
@@ -131,8 +133,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 report.shard_count.set(shard_count);
                 report.paragraph_count.set(paragraph_count as i64);
 
-                if let Err(e) = metrics_publisher.publish(&report) {
-                    error!("Cannot publish Node metrics: {:?}", e);
+                if let Err(e) = metrics_publisher.publish(&report).await {
+                    error!("Cannot publish Node metrics: {}", e);
+                } else {
+                    info!(
+                        "Publish Node metrics: shard_count {}, paragraph_count {}",
+                        shard_count, paragraph_count
+                    )
                 }
             }
         });
