@@ -55,8 +55,8 @@ class ResourceBrain:
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
-        replace_field: bool,
-        replace_splits: List[str],
+        replace_field: List[str],
+        replace_splits: Dict[str, List[str]],
     ):
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
@@ -87,11 +87,16 @@ class ResourceBrain:
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
-        for split in replace_splits:
-            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}/{split}")
+        for split, sentences in replace_splits.items():
+            for sentence in sentences:
+                self.brain.paragraphs_to_delete.append(
+                    f"{self.rid}/{field_key}/{split}/{sentence}"
+                )
 
-        if replace_field:
-            self.brain.paragraphs_to_delete.append(f"{self.rid}/{field_key}")
+        for sentence_to_delete in replace_field:
+            self.brain.paragraphs_to_delete.append(
+                f"{self.rid}/{field_key}/{sentence_to_delete}"
+            )
 
     def delete_metadata(self, field_key: str, metadata: FieldComputedMetadata):
         for subfield, metadata_split in metadata.split_metadata.items():

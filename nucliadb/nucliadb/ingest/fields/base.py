@@ -243,7 +243,7 @@ class Field:
 
     async def set_vectors(
         self, payload: ExtractedVectorsWrapper
-    ) -> Tuple[Optional[VectorObject], List[str], Dict[str, List[str]]]:
+    ) -> Tuple[Optional[VectorObject], bool, List[str]]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
@@ -259,7 +259,7 @@ class Field:
         )
 
         vo: Optional[VectorObject] = None
-        replace_field: bool = False
+        replace_field: bool = True
         replace_splits = []
         if actual_payload is None:
             # Its first extracted text
@@ -286,8 +286,8 @@ class Field:
                     replace_splits.append(key)
                     del actual_payload.split_vectors[key]
             if len(payload.vectors.vectors.vectors) > 0:
-                actual_payload.vectors.CopyFrom(payload.vectors.vectors)
                 replace_field = True
+                actual_payload.vectors.CopyFrom(payload.vectors.vectors)
             await self.storage.upload_pb(sf, actual_payload)
             self.extracted_vectors = actual_payload
         return vo, replace_field, replace_splits
@@ -313,7 +313,7 @@ class Field:
 
     async def set_field_metadata(
         self, payload: FieldComputedMetadataWrapper
-    ) -> Tuple[FieldComputedMetadata, bool, List[str]]:
+    ) -> Tuple[FieldComputedMetadata, List[str], Dict[str, List[str]]]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[
@@ -349,8 +349,8 @@ class Field:
                 metadata.thumbnail.CopyFrom(cf_split)
             metadata.last_index.FromDatetime(datetime.now())
 
-        replace_field: bool = False
-        replace_splits = []
+        replace_field = []
+        replace_splits = {}
         if actual_payload is None:
             # Its first metadata
             await self.storage.upload_pb(sf, payload.metadata)
@@ -361,11 +361,14 @@ class Field:
                 actual_payload.split_metadata[key].CopyFrom(value)
             for key in payload.metadata.deleted_splits:
                 if key in actual_payload.split_metadata:
-                    replace_splits.append(key)
+                    replace_splits[key] = [
+                        f"{x.start}-{x.end}"
+                        for x in actual_payload.split_metadata[key].paragraphs
+                    ]
                     del actual_payload.split_metadata[key]
             if payload.metadata.metadata:
                 actual_payload.metadata.CopyFrom(payload.metadata.metadata)
-                replace_field = True
+                replace_field = [f"{x.start}-{x.end}" for x in metadata.paragraphs]
             await self.storage.upload_pb(sf, actual_payload)
             self.computed_metadata = actual_payload
 
