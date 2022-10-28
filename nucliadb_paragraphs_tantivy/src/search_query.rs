@@ -225,6 +225,7 @@ fn remove_stop_words<'a>(query: &'a str, stop_words: &[&str]) -> Cow<'a, str> {
     }
 }
 
+#[derive(Debug)]
 struct ProcessedQuery {
     fuzzy_query: String,
     regular_query: String,
@@ -246,19 +247,12 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         let unquote = &query[start..quote_starts[i]].trim();
         fuzzy_query.push(' ');
         fuzzy_query.push_str(unquote);
-        start = quote_ends[i] + 1;
-        unquote
-            .split(' ')
-            .filter(|s| !s.is_empty())
-            .for_each(|t| tc.log_eterm(t.to_string()));
         tc.log_eterm(quote.to_string());
+        start = quote_ends[i] + 1;
     }
     if start < query.len() {
+        fuzzy_query.push(' ');
         fuzzy_query.push_str(&query[start..]);
-        query[start..]
-            .split(' ')
-            .filter(|s| !s.is_empty())
-            .for_each(|t| tc.log_eterm(t.to_string()));
     }
     ProcessedQuery {
         regular_query: query.to_string(),
@@ -363,7 +357,7 @@ mod tests {
         let mut term_collector = TermCollector::default();
         let processed = preprocess_raw_query(text, &mut term_collector);
         let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
-        let expect = HashSet::from(["The", "test", "always", "is correct"]);
+        let expect = HashSet::from(["is correct"]);
         assert_eq!(terms, expect);
         assert_eq!(processed.regular_query, text);
         assert_eq!(processed.fuzzy_query, "The test always");
