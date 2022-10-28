@@ -101,9 +101,9 @@ impl Index {
         let state = self.state.read().unwrap();
         state.has_resource(resource.as_ref())
     }
-    pub fn delete(&mut self, resource: impl AsRef<str>, _: &ELock) {
+    pub fn delete(&mut self, prefix: impl AsRef<str>, _: &ELock) {
         let mut state = self.state.write().unwrap();
-        state.remove_rosource(resource.as_ref());
+        state.remove_prefix(prefix.as_ref());
     }
     pub fn add(&mut self, resource: String, dp: DataPoint, _lock: &ELock) {
         let mut state = self.state.write().unwrap();

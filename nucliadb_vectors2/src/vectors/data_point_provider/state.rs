@@ -175,7 +175,7 @@ impl State {
     pub fn has_resource(&self, resource: &str) -> bool {
         self.resources.contains_key(resource)
     }
-    pub fn remove_rosource(&mut self, resource: &str) {
+    pub fn remove_prefix(&mut self, resource: &str) {
         if let Some(no_nodes) = self.resources.remove(resource) {
             self.no_nodes -= no_nodes;
             self.delete_log
@@ -183,7 +183,7 @@ impl State {
         }
     }
     pub fn add_resource(&mut self, resource: String, dp: DataPoint) {
-        self.remove_rosource(&resource);
+        self.remove_prefix(&resource);
         self.resources.insert(resource, dp.meta().no_nodes());
         self.no_nodes += dp.meta().no_nodes();
         self.add_dp(dp);
