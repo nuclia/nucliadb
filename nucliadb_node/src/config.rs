@@ -251,14 +251,15 @@ impl Configuration {
 
     /// Returns the Prometheus endpoint, if any.
     pub fn get_prometheus_url() -> Option<String> {
-        match env::var("PROMETHEUS_URL") {
-            Ok(value) => Some(value),
-            Err(_) => {
-                error!("PROMETHEUS_URL not defined. No defaulted");
+        let error = match env::var("PROMETHEUS_URL") {
+            Ok(value) if !value.is_empty() => return Some(value),
+            Ok(_) => "PROMETHEUS_URL defined incorrectly. No defaulted",
+            Err(_) => "PROMETHEUS_URL not defined. No defaulted",
+        };
 
-                None
-            }
-        }
+        error!(error);
+
+        None
     }
 
     /// Returns the Prometheus username, if any.
