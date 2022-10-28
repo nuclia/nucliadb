@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::io::Cursor;
+
 use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
@@ -247,7 +248,11 @@ impl NodeWriter {
         }
     }
 
-    pub fn remove_resource<'p>(&mut self, resource: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn remove_resource<'p>(
+        &mut self,
+        resource: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
         let resource = ResourceId::decode(&mut Cursor::new(resource)).unwrap();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
