@@ -243,16 +243,24 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
         }
     });
     for i in 0..(std::cmp::min(quote_starts.len(), quote_ends.len())) {
-        let quote = &query[(quote_starts[i] + 1)..quote_ends[i]].trim();
-        let unquote = &query[start..quote_starts[i]].trim();
+        let quote = query[(quote_starts[i] + 1)..quote_ends[i]].trim();
+        let unquote = query[start..quote_starts[i]].trim();
         fuzzy_query.push(' ');
         fuzzy_query.push_str(unquote);
         tc.log_eterm(quote.to_string());
         start = quote_ends[i] + 1;
+        unquote
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .for_each(|t| tc.log_eterm(t.to_string()));
     }
     if start < query.len() {
+        let tail = query[start..].trim();
         fuzzy_query.push(' ');
-        fuzzy_query.push_str(query[start..].trim());
+        fuzzy_query.push_str(tail);
+        tail.split(' ')
+            .filter(|s| !s.is_empty())
+            .for_each(|t| tc.log_eterm(t.to_string()));
     }
     ProcessedQuery {
         regular_query: query.to_string(),
@@ -357,14 +365,14 @@ mod tests {
         let mut term_collector = TermCollector::default();
         let _ = preprocess_raw_query(text, &mut term_collector);
         let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
-        let expect = HashSet::from(["This is great"]);
+        let expect = HashSet::from(["This is great", "test", "own"]);
         assert_eq!(terms, expect);
 
         let text = "The test \"is correct\" always";
         let mut term_collector = TermCollector::default();
         let processed = preprocess_raw_query(text, &mut term_collector);
         let terms: HashSet<_> = term_collector.eterms.iter().map(|s| s.as_str()).collect();
-        let expect = HashSet::from(["is correct"]);
+        let expect = HashSet::from(["The", "test", "always", "is correct"]);
         assert_eq!(terms, expect);
         assert_eq!(processed.regular_query, text);
         assert_eq!(processed.fuzzy_query, "The test always");
