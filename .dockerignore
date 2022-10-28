@@ -23,3 +23,4 @@ nucliadb_telemetry/nats-server
 nucliadb_utils/nats-server
 nucliadb_train/nats-server
 nucliadb_node/nats-server
+nucliadb/nats-server

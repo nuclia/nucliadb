@@ -109,7 +109,7 @@ base-node-image:
 build-search-images: build-local-node build-local-cluster-manager build-local-sidecar
 
 build-local-node:
-	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_local .
 
 build-local-cluster-manager:
 	docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .

@@ -260,7 +260,7 @@ class Resource:
             if self.disable_vectors is False:
                 vo = await field.get_vectors()
                 if vo is not None:
-                    brain.apply_field_vectors(field_key, vo, [], {})
+                    brain.apply_field_vectors(field_key, vo, False, [])
         return brain
 
     async def generate_field_computed_metadata(
@@ -564,13 +564,15 @@ class Resource:
                     field_vectors.field.field_type,
                     load=False,
                 )
-                vo, replace_field, replace_splits = await field_obj.set_vectors(
-                    field_vectors
-                )
+                (
+                    vo,
+                    replace_field_sentences,
+                    replace_splits_sentences,
+                ) = await field_obj.set_vectors(field_vectors)
                 field_key = self.generate_field_id(field_vectors.field)
                 if vo is not None:
                     self.indexer.apply_field_vectors(
-                        field_key, vo, replace_field, replace_splits
+                        field_key, vo, replace_field_sentences, replace_splits_sentences
                     )
                 else:
                     raise AttributeError("VO not found on set")

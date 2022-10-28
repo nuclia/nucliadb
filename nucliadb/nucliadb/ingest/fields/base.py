@@ -243,7 +243,7 @@ class Field:
 
     async def set_vectors(
         self, payload: ExtractedVectorsWrapper
-    ) -> Tuple[Optional[VectorObject], List[str], Dict[str, List[str]]]:
+    ) -> Tuple[Optional[VectorObject], bool, List[str]]:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[VectorObject] = await self.get_vectors(
@@ -259,8 +259,8 @@ class Field:
         )
 
         vo: Optional[VectorObject] = None
-        replace_field = []
-        replace_splits = {}
+        replace_field: bool = True
+        replace_splits = []
         if actual_payload is None:
             # Its first extracted text
             if payload.HasField("file"):
@@ -283,18 +283,10 @@ class Field:
                 actual_payload.split_vectors[key].CopyFrom(value)
             for key in payload.vectors.deleted_splits:
                 if key in actual_payload.split_vectors:
-                    replace_splits[key] = [
-                        f"{index}/{x.start}-{x.end}"
-                        for index, x in enumerate(
-                            actual_payload.split_vectors[key].vectors
-                        )
-                    ]
+                    replace_splits.append(key)
                     del actual_payload.split_vectors[key]
             if len(payload.vectors.vectors.vectors) > 0:
-                replace_field = [
-                    f"{index}/{x.start}-{x.end}"
-                    for index, x in enumerate(actual_payload.vectors.vectors)
-                ]
+                replace_field = True
                 actual_payload.vectors.CopyFrom(payload.vectors.vectors)
             await self.storage.upload_pb(sf, actual_payload)
             self.extracted_vectors = actual_payload
