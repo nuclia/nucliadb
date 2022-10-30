@@ -235,20 +235,20 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
     let mut quote_starts = vec![];
     let mut quote_ends = vec![];
     let mut start = 0;
-    query.match_indices('\"').enumerate().for_each(|(i, d)| {
+    for (i, d) in query.match_indices('\"').enumerate() {
         if i % 2 == 0 {
             quote_starts.push(d.0)
         } else {
             quote_ends.push(d.0)
         }
-    });
-    for i in 0..(std::cmp::min(quote_starts.len(), quote_ends.len())) {
-        let quote = query[(quote_starts[i] + 1)..quote_ends[i]].trim();
-        let unquote = query[start..quote_starts[i]].trim();
+    }
+    for (qstart, qend) in quote_starts.into_iter().zip(quote_ends.into_iter()) {
+        let quote = query[(qstart + 1)..qend].trim();
+        let unquote = query[start..qstart].trim();
         fuzzy_query.push(' ');
         fuzzy_query.push_str(unquote);
         tc.log_eterm(quote.to_string());
-        start = quote_ends[i] + 1;
+        start = qend + 1;
         unquote
             .split(' ')
             .filter(|s| !s.is_empty())
