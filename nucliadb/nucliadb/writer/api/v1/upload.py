@@ -44,7 +44,7 @@ from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.exceptions import (
     ConflictError,

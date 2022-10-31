@@ -158,25 +158,31 @@ class NatsPubsub(PubSubDriver):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def subscribe(self, handler: Callback, key, group=""):
+    async def subscribe(self, handler: Callback, key, group="", subscription_id: Optional[str] = None):
+        if subscription_id is None:
+            subscription_id = key
+
         if self.nc is not None and self.nc.is_connected:
             if not iscoroutinefunction(handler):
                 # nats async client only accepts coroutines as callbacks
                 handler = sync_to_async(handler)
 
             sid = await self.nc.subscribe(key, queue=group, cb=handler)
-            self._subscriptions[key] = sid
+            self._subscriptions[subscription_id] = sid
             logger.info("Subscribed to " + key)
             return sid
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def unsubscribe(self, key: str):
-        if key in self._subscriptions:
-            await self._subscriptions[key].unsubscribe()
-            del self._subscriptions[key]
+    async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
+        if subscription_id is None:
+            subscription_id = key
+
+        if subscription_id in self._subscriptions:
+            await self._subscriptions[subscription_id].unsubscribe()
+            del self._subscriptions[subscription_id]
         else:
-            raise KeyError(f"No subscription at {key}")
+            raise KeyError(f"No subscription at {subscription_id}")
 
     async def publish(self, key, value):
         if self.nc is not None and self.nc.is_connected:

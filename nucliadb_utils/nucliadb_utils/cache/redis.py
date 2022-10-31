@@ -80,13 +80,13 @@ class RedisPubsub(PubSubDriver):
         with watch("publish"):
             await self.driver.publish(key, value)
 
-    async def unsubscribe(self, key: str):
+    async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
         if self.driver is None or self.pubsub is None:
             raise NoPubsubConfigured()
 
         await self.pubsub.unsubscribe(key)
 
-    async def subscribe(self, handler: Callback, key: str, group: str = None):
+    async def subscribe(self, handler: Callback, key: str, group: str = None, subscription_id: Optional[str] = None):
         if group is not None:
             raise GroupNotSupported()
         if self.driver is None or self.pubsub is None:
