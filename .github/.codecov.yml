@@ -36,7 +36,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%
     - name: train
       paths:
         - nucliadb/nucliadb/train/**
