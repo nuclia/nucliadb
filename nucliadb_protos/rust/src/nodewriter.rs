@@ -73,7 +73,7 @@ pub mod node_writer_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -86,6 +86,7 @@ pub mod node_writer_client {
         ) -> NodeWriterClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
             T: tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
                 Response = http::Response<
@@ -117,9 +118,9 @@ pub mod node_writer_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardId>,
-                tonic::Status,
-            > {
+            tonic::Response<super::super::noderesources::ShardId>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -139,9 +140,9 @@ pub mod node_writer_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardCreated>,
-                tonic::Status,
-            > {
+            tonic::Response<super::super::noderesources::ShardCreated>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -161,9 +162,9 @@ pub mod node_writer_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardId>,
-                tonic::Status,
-            > {
+            tonic::Response<super::super::noderesources::ShardId>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -183,9 +184,9 @@ pub mod node_writer_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardIds>,
-                tonic::Status,
-            > {
+            tonic::Response<super::super::noderesources::ShardIds>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -205,9 +206,9 @@ pub mod node_writer_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::EmptyResponse>,
-                tonic::Status,
-            > {
+            tonic::Response<super::super::noderesources::EmptyResponse>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -284,7 +285,7 @@ pub mod node_sidecar_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
+        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -297,6 +298,7 @@ pub mod node_sidecar_client {
         ) -> NodeSidecarClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
+            T::ResponseBody: Default,
             T: tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
                 Response = http::Response<
@@ -356,37 +358,37 @@ pub mod node_writer_server {
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardId>,
-                tonic::Status,
-            >;
+            tonic::Response<super::super::noderesources::ShardId>,
+            tonic::Status,
+        >;
         async fn new_shard(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardCreated>,
-                tonic::Status,
-            >;
+            tonic::Response<super::super::noderesources::ShardCreated>,
+            tonic::Status,
+        >;
         async fn delete_shard(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardId>,
-                tonic::Status,
-            >;
+            tonic::Response<super::super::noderesources::ShardId>,
+            tonic::Status,
+        >;
         async fn list_shards(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::ShardIds>,
-                tonic::Status,
-            >;
+            tonic::Response<super::super::noderesources::ShardIds>,
+            tonic::Status,
+        >;
         async fn gc(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<
-                tonic::Response<super::super::noderesources::EmptyResponse>,
-                tonic::Status,
-            >;
+            tonic::Response<super::super::noderesources::EmptyResponse>,
+            tonic::Status,
+        >;
         async fn set_resource(
             &self,
             request: tonic::Request<super::super::noderesources::Resource>,

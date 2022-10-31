@@ -74,12 +74,15 @@ impl WriterChild for VectorWriterService {
                 }
             }
         }
+        let lock = self.index.get_elock()?;
+        for to_delete in &resource.sentences_to_delete {
+            self.index.delete(to_delete, &lock)
+        }
         if !elems.is_empty() {
             let new_dp = DataPoint::new(self.index.get_location(), elems)?;
-            let lock = self.index.get_elock()?;
             self.index.add(resource_id, new_dp, &lock);
-            self.index.commit(lock)?;
         }
+        self.index.commit(lock)?;
         info!("Set resource in vector ends");
         Ok(())
     }
