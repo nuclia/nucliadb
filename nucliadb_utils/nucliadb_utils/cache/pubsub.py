@@ -38,7 +38,13 @@ class PubSubDriver:
     async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
         raise NotImplementedError()
 
-    async def subscribe(self, handler: Callback, key: str, group: str = None, subscription_id: Optional[str] = None):
+    async def subscribe(
+        self,
+        handler: Callback,
+        key: str,
+        group: str = None,
+        subscription_id: Optional[str] = None,
+    ):
         raise NotImplementedError()
 
     def parse(self, data: Any):

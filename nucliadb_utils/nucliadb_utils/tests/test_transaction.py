@@ -30,7 +30,7 @@ async def test_transaction_commit():
     txn = TransactionUtility(
         nats_servers=["foobar"],
         nats_target="node.{node}",
-        notify_subject="notify.{kbid}"
+        notify_subject="notify.{kbid}",
     )
     ps = NatsPubsub()
     ps.nc = mock.AsyncMock()
@@ -47,4 +47,3 @@ async def test_transaction_commit():
     # Unsubscribing twice with the same request_id should raise KeyError
     with pytest.raises(KeyError):
         await txn.stop_waiting(kbid, request_id=request_id)
-

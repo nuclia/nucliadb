@@ -104,7 +104,9 @@ class TransactionUtility:
         if self.notify_subject is None:
             logger.warn("No subject defined")
             return
-        await self.pubsub.unsubscribe(key=self.notify_subject.format(kbid=kbid), subscription_id=request_id)
+        await self.pubsub.unsubscribe(
+            key=self.notify_subject.format(kbid=kbid), subscription_id=request_id
+        )
 
     async def wait_for_commited(
         self, kbid: str, waiting_for: WaitFor, request_id: str
@@ -130,7 +132,9 @@ class TransactionUtility:
         waiting_event = Event()
         partial_received = partial(received, waiting_for, waiting_event)
         await self.pubsub.subscribe(
-            handler=partial_received, key=self.notify_subject.format(kbid=kbid), subscription_id=request_id,
+            handler=partial_received,
+            key=self.notify_subject.format(kbid=kbid),
+            subscription_id=request_id,
         )
         return waiting_event
 
@@ -183,7 +187,9 @@ class TransactionUtility:
         request_id = uuid.uuid4().hex
 
         if wait:
-            waiting_event = await self.wait_for_commited(writer.kbid, waiting_for, request_id=request_id)
+            waiting_event = await self.wait_for_commited(
+                writer.kbid, waiting_for, request_id=request_id
+            )
 
         res = await self.js.publish(
             self.nats_target.format(partition=partition), writer.SerializeToString()
