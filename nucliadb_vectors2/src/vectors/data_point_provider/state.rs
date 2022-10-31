@@ -188,7 +188,8 @@ impl State {
         self.no_nodes += dp.meta().no_nodes();
         self.add_dp(dp);
     }
-    pub fn add_dp(&mut self, dp: DataPoint) {
+    pub fn add_dp(&mut self, mut dp: DataPoint) {
+        dp.set_time();
         let meta = dp.meta();
         self.data_points.insert(meta.id(), meta.created_in());
         self.current.add_unit(meta);

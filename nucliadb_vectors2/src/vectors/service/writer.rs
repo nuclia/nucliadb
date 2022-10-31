@@ -58,6 +58,8 @@ impl WriterChild for VectorWriterService {
         use data_point::{DataPoint, Elem, LabelDictionary};
         info!("Set resource in vector starts");
         let resource_id = resource.resource.as_ref().unwrap().uuid.clone();
+
+        info!("Indexing resource contents");
         let mut elems = vec![];
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
@@ -74,6 +76,9 @@ impl WriterChild for VectorWriterService {
                 }
             }
         }
+        info!("Resource contents indexed");
+
+        info!("Adding entry for new index");
         let lock = self.index.get_elock()?;
         for to_delete in &resource.sentences_to_delete {
             self.index.delete(to_delete, &lock)
@@ -83,6 +88,8 @@ impl WriterChild for VectorWriterService {
             self.index.add(resource_id, new_dp, &lock);
         }
         self.index.commit(lock)?;
+        info!("Entry for new index added");
+
         info!("Set resource in vector ends");
         Ok(())
     }
