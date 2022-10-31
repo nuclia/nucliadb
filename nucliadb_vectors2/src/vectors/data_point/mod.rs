@@ -208,6 +208,9 @@ impl AsRef<DataPoint> for DataPoint {
 }
 
 impl DataPoint {
+    pub fn set_time(&mut self) {
+        self.journal.ctime = SystemTime::now();
+    }
     pub fn get_id(&self) -> DpId {
         self.journal.uid
     }

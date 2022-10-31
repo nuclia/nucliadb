@@ -59,15 +59,6 @@ impl WriterChild for VectorWriterService {
         info!("Set resource in vector starts");
         let resource_id = resource.resource.as_ref().unwrap().uuid.clone();
 
-        info!("Delete previous instances of the resource");
-        let lock = self.index.get_elock()?;
-        self.index.delete(&resource_id, &lock);
-        for to_delete in &resource.sentences_to_delete {
-            self.index.delete(to_delete, &lock)
-        }
-        self.index.commit(lock)?;
-        info!("Previous instances of the resource deleted");
-
         info!("Indexing resource contents");
         let mut elems = vec![];
         if resource.status != ResourceStatus::Delete as i32 {
@@ -89,6 +80,9 @@ impl WriterChild for VectorWriterService {
 
         info!("Adding entry for new index");
         let lock = self.index.get_elock()?;
+        for to_delete in &resource.sentences_to_delete {
+            self.index.delete(to_delete, &lock)
+        }
         if !elems.is_empty() {
             let new_dp = DataPoint::new(self.index.get_location(), elems)?;
             self.index.add(resource_id, new_dp, &lock);
