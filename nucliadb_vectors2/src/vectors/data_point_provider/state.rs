@@ -183,10 +183,11 @@ impl State {
         }
     }
     pub fn add_resource(&mut self, resource: String, dp: DataPoint) {
-        self.remove_prefix(&resource);
-        self.resources.insert(resource, dp.meta().no_nodes());
-        self.no_nodes += dp.meta().no_nodes();
-        self.add_dp(dp);
+        if !self.has_resource(&resource) {
+            self.resources.insert(resource, dp.meta().no_nodes());
+            self.no_nodes += dp.meta().no_nodes();
+            self.add_dp(dp);
+        }
     }
     pub fn add_dp(&mut self, dp: DataPoint) {
         let meta = dp.meta();
