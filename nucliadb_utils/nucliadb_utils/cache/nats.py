@@ -158,7 +158,9 @@ class NatsPubsub(PubSubDriver):
         else:
             raise ErrConnectionClosed("Could not subscribe")
 
-    async def subscribe(self, handler: Callback, key, group="", subscription_id: Optional[str] = None):
+    async def subscribe(
+        self, handler: Callback, key, group="", subscription_id: Optional[str] = None
+    ):
         if subscription_id is None:
             subscription_id = key
 
