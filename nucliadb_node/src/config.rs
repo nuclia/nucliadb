@@ -20,6 +20,7 @@
 use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
+use std::time::Duration;
 
 use tracing::*;
 
@@ -27,6 +28,7 @@ use crate::utils::{parse_log_level, reliable_lookup_host};
 
 const SENTRY_PROD: &str = "prod";
 const SENTRY_DEV: &str = "stage";
+
 /// Global configuration options
 pub struct Configuration {}
 
@@ -243,6 +245,70 @@ impl Configuration {
             Err(_) => {
                 error!("RUNNING_ENVIRONMENT not defined. Defaulting to {default}");
                 default
+            }
+        }
+    }
+
+    /// Returns the Prometheus endpoint, if any.
+    pub fn get_prometheus_url() -> Option<String> {
+        let error = match env::var("PROMETHEUS_URL") {
+            Ok(value) if !value.is_empty() => return Some(value),
+            Ok(_) => "PROMETHEUS_URL defined incorrectly. No defaulted",
+            Err(_) => "PROMETHEUS_URL not defined. No defaulted",
+        };
+
+        error!(error);
+
+        None
+    }
+
+    /// Returns the Prometheus username, if any.
+    pub fn get_prometheus_username() -> Option<String> {
+        match env::var("PROMETHEUS_USERNAME") {
+            Ok(value) => Some(value),
+            Err(_) => {
+                warn!("PROMETHEUS_USERNAME not defined. No defaulted");
+                None
+            }
+        }
+    }
+
+    /// Returns the Prometheus password, if any.
+    pub fn get_prometheus_password() -> Option<String> {
+        match env::var("PROMETHEUS_PASSWORD") {
+            Ok(value) => Some(value),
+            Err(_) => {
+                warn!("PROMETHEUS_PASSWORD not defined. No defaulted");
+                None
+            }
+        }
+    }
+
+    /// Retuns the Promethus push timing, defaulted to 1h if not defined.
+    pub fn get_prometheus_push_timing() -> Duration {
+        const DEFAULT_TIMING_PLACEHOLDER: &str = "1h";
+        const DEFAULT_TIMING: Duration = Duration::from_secs(60 * 60);
+
+        match env::var("PROMETHEUS_PUSH_TIMING") {
+            Ok(value) => {
+                if let Ok(duration) = parse_duration::parse(&value) {
+                    duration
+                } else {
+                    error!(
+                        "PROMETHEUS_PUSH_TIMING defined incorrectly. Defaulting to \
+                         {DEFAULT_TIMING_PLACEHOLDER}"
+                    );
+
+                    DEFAULT_TIMING
+                }
+            }
+            Err(_) => {
+                warn!(
+                    "PROMETHEUS_PUSH_TIMING not defined. Defaulting to \
+                     {DEFAULT_TIMING_PLACEHOLDER}"
+                );
+
+                DEFAULT_TIMING
             }
         }
     }

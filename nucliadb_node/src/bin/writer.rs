@@ -23,6 +23,9 @@ use std::time::Instant;
 
 use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NucliaDBNodeType};
 use nucliadb_node::config::Configuration;
+use nucliadb_node::metrics;
+use nucliadb_node::metrics::report::NodeReport;
+use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
@@ -93,6 +96,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
+
+    if let Some(prometheus_url) = Configuration::get_prometheus_url() {
+        info!("Start metrics task");
+
+        let report = NodeReport::new(host_key.to_string())?;
+        let mut metrics_publisher = metrics::Publisher::new("node_metrics", prometheus_url);
+
+        if let Some((username, password)) =
+            Configuration::get_prometheus_username().zip(Configuration::get_prometheus_password())
+        {
+            metrics_publisher = metrics_publisher.with_credentials(username, password);
+        }
+
+        let mut node_reader = NodeReaderService::new();
+        node_reader.load_shards()?;
+
+        let push_timing = Configuration::get_prometheus_push_timing();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(push_timing);
+
+            loop {
+                interval.tick().await;
+
+                let (shard_count, paragraph_count) = node_reader.shards.values().fold(
+                    (0, 0),
+                    |(shard_count, paragraph_count), shard| {
+                        (
+                            shard_count + 1,
+                            paragraph_count + shard.get_info().paragraphs,
+                        )
+                    },
+                );
+
+                report.shard_count.set(shard_count);
+                report.paragraph_count.set(paragraph_count as i64);
+
+                if let Err(e) = metrics_publisher.publish(&report).await {
+                    error!("Cannot publish Node metrics: {}", e);
+                } else {
+                    info!(
+                        "Publish Node metrics: shard_count {}, paragraph_count {}",
+                        shard_count, paragraph_count
+                    )
+                }
+            }
+        });
+    }
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");

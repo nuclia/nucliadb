@@ -20,12 +20,13 @@
 
 use std::path::Path;
 
-use crate::edge::*;
-use crate::node::*;
 use heed::flags::Flags;
 use heed::types::{ByteSlice, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions, RoIter, RoPrefix, RoTxn, RwTxn};
 use nucliadb_byte_rpr::*;
+
+use crate::edge::*;
+use crate::node::*;
 
 mod db_name {
     pub const KEYS: &str = "KEYS_LMDB";
