@@ -141,8 +141,10 @@ fn data_merge() {
     let dp_1 = DataPoint::new(temp_dir.path(), elems1).unwrap();
     let dp = DataPoint::merge(
         temp_dir.path(),
-        &[dp_1.get_id(), dp_0.get_id()],
-        &HashSet::default(),
+        &[
+            (HashSet::default(), dp_1.get_id()),
+            (HashSet::default(), dp_0.get_id()),
+        ],
     )
     .unwrap();
 
@@ -154,11 +156,10 @@ fn data_merge() {
     assert_eq!(result.len(), 1);
     assert!(result[0].1 >= 0.9);
     assert!(result[0].0 == key0);
-
+    let dlog = HashSet::from([key1, key0]);
     let dp = DataPoint::merge(
         temp_dir.path(),
-        &[dp_1.get_id(), dp_0.get_id()],
-        &HashSet::from([key1, key0]),
+        &[(&dlog, dp_1.get_id()), (&dlog, dp_0.get_id())],
     )
     .unwrap();
     assert_eq!(dp.meta().no_nodes(), 0);

@@ -122,6 +122,23 @@ pub struct State {
     resources: HashMap<String, usize>,
 }
 impl State {
+    fn close_work_unit(&mut self) {
+        let prev = mem::replace(&mut self.current, WorkUnit::new());
+        self.work_stack.push_front(prev);
+        let notifier = merger::get_notifier();
+        if let Err(e) = notifier.send(Worker::request(self.location.clone())) {
+            tracing::info!("Could not request merge: {}", e);
+        }
+    }
+    fn add_dp(&mut self, dp: DataPoint, time: SystemTime) {
+        let mut meta = dp.meta();
+        meta.update_time(time);
+        self.data_points.insert(meta.id(), meta.time());
+        self.current.add_unit(meta);
+        if self.current.size() == BUFFER_CAP {
+            self.close_work_unit();
+        }
+    }
     pub fn new(at: PathBuf) -> State {
         State {
             location: at,
@@ -147,11 +164,14 @@ impl State {
     pub fn get_keys(&self) -> impl Iterator<Item = &str> {
         self.resources.keys().map(|k| k.as_str())
     }
+    pub fn create_dlog(&self, journal: Journal) -> impl DeleteLog + '_ {
+        TimeSensitiveDLog {
+            time: journal.time(),
+            dlog: &self.delete_log,
+        }
+    }
     pub fn get_work(&self) -> Option<&[Journal]> {
         self.work_stack.back().map(|wu| wu.load.as_slice())
-    }
-    pub fn get_delete_log(&self) -> impl Copy + DeleteLog + '_ {
-        &self.delete_log
     }
     pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<(String, f32)>> {
         let mut ffsv = Fssc::new(request.no_results());
@@ -172,52 +192,41 @@ impl State {
         }
         Ok(ffsv.into())
     }
-    pub fn has_resource(&self, resource: &str) -> bool {
-        self.resources.contains_key(resource)
+    pub fn has_id(&self, id: &str) -> bool {
+        self.resources.contains_key(id)
     }
-    pub fn remove_prefix(&mut self, resource: &str) {
-        if let Some(no_nodes) = self.resources.remove(resource) {
+    pub fn remove(&mut self, id: &str) {
+        if let Some(no_nodes) = self.resources.remove(id) {
             self.no_nodes -= no_nodes;
-            self.delete_log
-                .insert(resource.as_bytes(), SystemTime::now());
-        }
-    }
-    pub fn add_resource(&mut self, resource: String, dp: DataPoint) {
-        self.remove_prefix(&resource);
-        self.resources.insert(resource, dp.meta().no_nodes());
-        self.no_nodes += dp.meta().no_nodes();
-        self.add_dp(dp);
-    }
-    pub fn add_dp(&mut self, mut dp: DataPoint) {
-        dp.set_time();
-        let meta = dp.meta();
-        self.data_points.insert(meta.id(), meta.created_in());
-        self.current.add_unit(meta);
-        if self.current.size() == BUFFER_CAP {
-            let prev = mem::replace(&mut self.current, WorkUnit::new());
-            self.work_stack.push_front(prev);
-            let notifier = merger::get_notifier();
-            if let Err(e) = notifier.send(Worker::request(self.location.clone())) {
-                tracing::info!("Could not request merge: {}", e);
+            self.delete_log.insert(id.as_bytes(), SystemTime::now());
+            if self.current.size() > 0 {
+                self.close_work_unit();
             }
         }
     }
-    pub fn replace_work_unit(&mut self, new: DataPoint) {
+    pub fn add(&mut self, id: String, dp: DataPoint) {
+        self.remove(&id);
+        self.resources.insert(id, dp.meta().no_nodes());
+        self.no_nodes += dp.meta().no_nodes();
+        self.add_dp(dp, SystemTime::now());
+    }
+    pub fn replace_work_unit(&mut self, new: DataPoint, ctime: SystemTime) {
         if let Some(unit) = self.work_stack.pop_back() {
-            let age_cap = self.work_stack.back().map(|v| v.age);
+            let age_cap = self
+                .work_stack
+                .back()
+                .and_then(|v| v.load.last().map(|l| l.time()));
             let older = self
                 .delete_log
                 .iter()
                 .filter(|(_, age)| age_cap.map(|cap| **age <= cap).unwrap_or_default())
                 .map(|(key, _)| key)
                 .collect::<Vec<_>>();
-            unit.load
-                .iter()
-                .cloned()
-                .map(|dp| self.data_points.remove(&dp.id()))
-                .for_each(|_| ());
             older.iter().for_each(|v| self.delete_log.delete(v));
-            self.add_dp(new);
+            unit.load.iter().cloned().for_each(|dp| {
+                self.data_points.remove(&dp.id());
+            });
+            self.add_dp(new, ctime);
         }
     }
 }
@@ -292,21 +301,21 @@ mod test {
             .map(|dp| {
                 let id = dp.meta().id().to_string();
                 let no_nodes = dp.meta().no_nodes();
-                state.add_resource(id, dp);
+                state.add(id, dp);
                 no_nodes
             })
             .sum::<usize>();
         assert_eq!(state.get_no_nodes(), no_nodes);
         assert_eq!(state.work_stack.len(), 1);
         assert_eq!(state.current.size(), 0);
-        let work = state
-            .get_work()
-            .unwrap()
+        let work = state.get_work().unwrap();
+        let work = work
             .iter()
-            .map(|j| j.id())
+            .map(|j| (state.create_dlog(*j), j.id()))
             .collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work, &state.get_delete_log()).unwrap();
-        state.replace_work_unit(new);
+        let new = DataPoint::merge(dir.path(), &work).unwrap();
+        std::mem::drop(work);
+        state.replace_work_unit(new, SystemTime::now());
         assert!(state.get_work().is_none());
         assert_eq!(state.work_stack.len(), 0);
         assert_eq!(state.current.size(), 1);

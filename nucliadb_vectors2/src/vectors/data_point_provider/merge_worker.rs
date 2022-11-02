@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use tracing::*;
 
@@ -25,6 +26,7 @@ use super::{State, VectorR};
 use crate::disk::directory;
 use crate::utils::merger::{MergeQuery, MergeRequest};
 use crate::vectors::data_point::{DataPoint, DpId};
+
 pub struct Worker(PathBuf);
 impl MergeQuery for Worker {
     fn do_work(&self) -> Result<(), String> {
@@ -36,10 +38,11 @@ impl Worker {
     pub fn request(at: PathBuf) -> MergeRequest {
         Box::new(Worker(at))
     }
-    fn merge_report(&self, old: &[DpId], new: DpId) -> String {
+    fn merge_report<It>(&self, old: It, new: DpId) -> String
+    where It: Iterator<Item = DpId> {
         use std::fmt::Write;
         let mut msg = String::new();
-        for (id, dp_id) in old.iter().copied().enumerate() {
+        for (id, dp_id) in old.enumerate() {
             writeln!(msg, "  ({id}) {dp_id}").unwrap();
         }
         write!(msg, "==> {new}").unwrap();
@@ -49,22 +52,25 @@ impl Worker {
         let subscriber = self.0.as_path();
         let lock = directory::shared_lock(subscriber)?;
         let state: State = directory::load_state(&lock)?;
+        let time = SystemTime::now();
         std::mem::drop(lock);
         if let Some(work) = state.get_work() {
-            let ids: Vec<_> = work.iter().map(|journal| journal.id()).collect();
-            let new_dp = DataPoint::merge(subscriber, &ids, state.get_delete_log())?;
+            let work: Vec<_> = work
+                .iter()
+                .rev()
+                .map(|j| (state.create_dlog(*j), j.id()))
+                .collect();
+            let new_dp = DataPoint::merge(subscriber, &work)?;
+            let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
             std::mem::drop(state);
 
-            let new_id = new_dp.meta().id();
+            let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
             let lock = directory::exclusive_lock(subscriber)?;
             let mut state: State = directory::load_state(&lock)?;
-            state.replace_work_unit(new_dp);
+            state.replace_work_unit(new_dp, time);
             directory::persist_state(&lock, &state)?;
             std::mem::drop(lock);
-            info!(
-                "Merge on {subscriber:?}:\n{}",
-                self.merge_report(&ids, new_id)
-            );
+            info!("Merge on {subscriber:?}:\n{report}");
             ids.into_iter()
                 .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
                 .filter(|(.., r)| r.is_err())

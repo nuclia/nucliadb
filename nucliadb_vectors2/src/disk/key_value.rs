@@ -188,14 +188,11 @@ fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
 // Merge algorithm for n key-value stores.
 // WARNING: In case of keys duplicatied keys it favors the contents of the first slot.
 // Returns the number of elements merged into the file.
-pub fn merge<S: Slot + Copy>(
-    interface: S,
-    at: &mut File,
-    producers: Vec<&[u8]>,
-) -> io::Result<usize> {
+pub fn merge<S: Slot + Copy>(at: &mut File, producers: Vec<(S, &[u8])>) -> io::Result<usize> {
     let lens = producers
         .iter()
         .copied()
+        .map(|(_, data)| data)
         .map(get_no_elems)
         .collect::<Vec<_>>();
 
@@ -204,7 +201,7 @@ pub fn merge<S: Slot + Copy>(
     let (no_elems, value_space) = producers
         .iter()
         .copied()
-        .map(|p| get_metrics::<S>(interface, p))
+        .map(|(interface, p)| get_metrics::<S>(interface, p))
         .fold((0, 0), |(ne, vs), (ne_p, vs_p)| (ne + ne_p, vs + vs_p));
 
     // Reserve space
@@ -228,19 +225,19 @@ pub fn merge<S: Slot + Copy>(
             .zip(ids.iter().copied())
             .zip(lens.iter().copied())
             .filter(|((_, x_id), x_len)| *x_id < *x_len)
-            .map(|((x, x_id), _)| (x, x_id, get_pointer(x, x_id)))
-            .filter(|(x, _, x_ptr)| interface.keep_in_merge(&x[*x_ptr..]))
-            .min_by(|(x, _, x_ptr), (y, _, y_ptr)| interface.cmp_slot(&x[*x_ptr..], &y[*y_ptr..]));
+            .map(|((x, x_id), _)| (x, x_id, get_pointer(x.1, x_id)))
+            .filter(|((interface, x), _, x_ptr)| interface.keep_in_merge(&x[*x_ptr..]))
+            .min_by(|(x, _, x_ptr), (y, _, y_ptr)| x.0.cmp_slot(&x.1[*x_ptr..], &y.1[*y_ptr..]));
         producers
             .iter()
             .copied()
             .zip(ids.iter_mut())
             .zip(lens.iter().copied())
             .filter(|((_, x_id), x_len)| **x_id < *x_len)
-            .map(|((x, x_id), _)| (x, get_pointer(x, *x_id), x_id))
-            .for_each(|(x, x_ptr, x_id)| {
+            .map(|((x, x_id), _)| (x, get_pointer(x.1, *x_id), x_id))
+            .for_each(|((interface, x), x_ptr, x_id)| {
                 let is_equal = min_data.map(|(min, _, min_ptr)| {
-                    interface.cmp_slot(&x[x_ptr..], &min[min_ptr..]).is_eq()
+                    interface.cmp_slot(&x[x_ptr..], &min.1[min_ptr..]).is_eq()
                 });
                 if !interface.keep_in_merge(&x[x_ptr..]) {
                     *x_id += 1;
@@ -248,7 +245,7 @@ pub fn merge<S: Slot + Copy>(
                     *x_id += 1
                 }
             });
-        if let Some((min, min_id, _)) = min_data {
+        if let Some(((interface, min), min_id, _)) = min_data {
             crnt_length = transfer_elem(interface, at, min, min_id, writen_elems, crnt_length)?;
             writen_elems += 1;
         }
@@ -347,12 +344,11 @@ mod tests {
         create_key_value(&mut v2_store, v2).unwrap();
         create_key_value(&mut v3_store, v3).unwrap();
         let mut file = tempfile::tempfile().unwrap();
-        merge(
-            TElem,
-            &mut file,
-            vec![&v0_store, &v1_store, &v2_store, &v3_store],
-        )
-        .unwrap();
+        let elems: Vec<_> = [&v0_store, &v1_store, &v2_store, &v3_store]
+            .into_iter()
+            .map(|e| (TElem, e.as_slice()))
+            .collect();
+        merge(&mut file, elems).unwrap();
         let mut buf = vec![];
         file.read_to_end(&mut buf).unwrap();
         store_checks(&expected, &buf);

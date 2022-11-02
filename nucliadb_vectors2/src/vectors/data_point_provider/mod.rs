@@ -99,15 +99,15 @@ impl Index {
     }
     pub fn has_resource(&self, resource: impl AsRef<str>, _: &ELock) -> bool {
         let state = self.state.read().unwrap();
-        state.has_resource(resource.as_ref())
+        state.has_id(resource.as_ref())
     }
     pub fn delete(&mut self, prefix: impl AsRef<str>, _: &ELock) {
         let mut state = self.state.write().unwrap();
-        state.remove_prefix(prefix.as_ref());
+        state.remove(prefix.as_ref());
     }
     pub fn add(&mut self, resource: String, dp: DataPoint, _lock: &ELock) {
         let mut state = self.state.write().unwrap();
-        state.add_resource(resource, dp);
+        state.add(resource, dp);
     }
     pub fn get_keys(&self, _: &Lock) -> Vec<String> {
         self.state
