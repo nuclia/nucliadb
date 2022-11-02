@@ -38,6 +38,8 @@ use crate::search_query;
 use crate::search_query::SharedTermC;
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
+const FUZZY_DISTANCE: usize = 1;
+
 pub struct ParagraphReaderService {
     index: Index,
     pub schema: ParagraphSchema,
@@ -58,11 +60,12 @@ impl ParagraphReader for ParagraphReaderService {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) = suggest_query(&parser, &text, request, &self.schema, 1);
+        let (original, termc, fuzzied) =
+            suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(no_results);
         let mut results = searcher.search(&original, &topdocs).unwrap();
-        if results.len() < no_results {
+        if results.is_empty() {
             let topdocs = TopDocs::with_limit(no_results - results.len());
             match searcher.search(&fuzzied, &topdocs) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
@@ -111,7 +114,8 @@ impl ReaderChild for ParagraphReaderService {
             })
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) = search_query(&parser, &text, request, &self.schema, 1);
+        let (original, termc, fuzzied) =
+            search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
         let mut searcher = Searcher {
             request,
             results,
@@ -122,7 +126,7 @@ impl ReaderChild for ParagraphReaderService {
             text: &text,
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
-        if searcher.results > response.results.len() {
+        if response.results.is_empty() {
             searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
             let filter = response
@@ -136,6 +140,7 @@ impl ReaderChild for ParagraphReaderService {
                 .filter(|r| !filter.contains(&r.paragraph))
                 .for_each(|r| response.results.push(r));
             response.total = response.results.len() as i32;
+            response.fuzzy_distance = FUZZY_DISTANCE as i32;
         }
         let total = response.results.len() as f32;
         response.results.iter_mut().enumerate().for_each(|(i, r)| {
@@ -818,7 +823,7 @@ mod tests {
             fields: vec![],
             filter: None,
             faceted: Some(faceted.clone()),
-            order: Some(order.clone()),
+            order: Some(order),
             page_number: 0,
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),

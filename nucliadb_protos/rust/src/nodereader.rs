@@ -159,6 +159,8 @@ pub struct ParagraphResult {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
+    #[prost(int32, tag="10")]
+    pub fuzzy_distance: i32,
     #[prost(int32, tag="1")]
     pub total: i32,
     /// 

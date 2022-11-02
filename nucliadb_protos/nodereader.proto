@@ -129,7 +129,7 @@ message ParagraphResult {
 }
 
 message ParagraphSearchResponse {
-
+    int32 fuzzy_distance = 10;
     int32 total = 1;
     // 
     repeated ParagraphResult results = 2;

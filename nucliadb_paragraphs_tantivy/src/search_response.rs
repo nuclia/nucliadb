@@ -179,6 +179,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
         ParagraphSearchResponse {
             results,
             facets,
+            fuzzy_distance: 0i32,
             total: no_results as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
@@ -276,12 +277,13 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
         ParagraphSearchResponse {
             results,
             facets,
+            next_page,
+            bm25: true,
+            fuzzy_distance: 0i32,
             total: no_results as i32,
             page_number: response.page_number,
             result_per_page: response.results_per_page,
             query: response.query.to_string(),
-            next_page,
-            bm25: true,
             ematches: response.termc.eterms.into_iter().collect(),
         }
     }
