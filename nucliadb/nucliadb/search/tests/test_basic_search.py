@@ -67,9 +67,14 @@ async def test_multiple_fuzzy_search_resource_all(
 
         assert resp.status_code == 200
         assert len(resp.json()["paragraphs"]["results"]) == 20
+
+        # Expected results:
+        # - 'text' should not be highlighted as we are searching by 'test' in the query
+        # - 'This is great' should be highlighted because it is an exact query search
+        # - 'own' should be highlighted because it is not a fuzzy result
         assert (
             resp.json()["paragraphs"]["results"][0]["text"]
-            == "My own <mark>text</mark> Ramon. <mark>This is great</mark> to be here. "
+            == "My <mark>own</mark> text Ramon. <mark>This is great</mark> to be here. "
         )
 
 
@@ -155,7 +160,7 @@ async def test_search_resource_all(
         assert resp.json()["paragraphs"]["results"][0]["end_seconds"] == [10]
         assert (
             resp.json()["paragraphs"]["results"][0]["text"]
-            == "My own <mark>text</mark> Ramon. This is great to be here. "
+            == "My <mark>own</mark> <mark>text</mark> Ramon. This is great to be here. "
         )
         assert len(resp.json()["resources"]) == 1
         assert len(resp.json()["sentences"]["results"]) == 1

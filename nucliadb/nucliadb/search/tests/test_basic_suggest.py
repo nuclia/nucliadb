@@ -53,7 +53,6 @@ async def test_suggest_resource_all(
         )
         assert resp.status_code == 200
         paragraph_results = resp.json()["paragraphs"]["results"]
-        print(f"HERME!!!: {paragraph_results}")
         assert len(paragraph_results) == 1
 
     async with search_api(roles=[NucliaDBRoles.READER], root=True) as client:
