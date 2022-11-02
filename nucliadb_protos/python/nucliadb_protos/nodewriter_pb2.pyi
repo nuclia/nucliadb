@@ -6,13 +6,8 @@ import builtins
 import google.protobuf.descriptor
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
-import sys
 import typing
-
-if sys.version_info >= (3, 10):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing_extensions
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery as EmptyQuery,
     EmptyResponse as EmptyResponse,
@@ -30,22 +25,22 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSentence as VectorSentence,
 )
 
+
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class OpStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class _Status:
-        ValueType = typing.NewType("ValueType", builtins.int)
+        ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
-
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OpStatus._Status.ValueType], builtins.type):  # noqa: F821
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OpStatus._Status.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: OpStatus._Status.ValueType  # 0
         WARNING: OpStatus._Status.ValueType  # 1
         ERROR: OpStatus._Status.ValueType  # 2
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper):
+        pass
 
-    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
     OK: OpStatus.Status.ValueType  # 0
     WARNING: OpStatus.Status.ValueType  # 1
     ERROR: OpStatus.Status.ValueType  # 2
@@ -55,36 +50,34 @@ class OpStatus(google.protobuf.message.Message):
     COUNT_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     status: global___OpStatus.Status.ValueType
-    detail: builtins.str
+    detail: typing.Text
     count: builtins.int
-    shard_id: builtins.str
-    def __init__(
-        self,
+    shard_id: typing.Text
+    def __init__(self,
         *,
         status: global___OpStatus.Status.ValueType = ...,
-        detail: builtins.str = ...,
+        detail: typing.Text = ...,
         count: builtins.int = ...,
-        shard_id: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["count", b"count", "detail", b"detail", "shard_id", b"shard_id", "status", b"status"]) -> None: ...
-
+        shard_id: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["count",b"count","detail",b"detail","shard_id",b"shard_id","status",b"status"]) -> None: ...
 global___OpStatus = OpStatus
 
 class IndexMessage(google.protobuf.message.Message):
-    """Implemented at nucliadb_object_storage"""
+    """Implemented at nucliadb_object_storage
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class _TypeMessage:
-        ValueType = typing.NewType("ValueType", builtins.int)
+        ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
-
-    class _TypeMessageEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[IndexMessage._TypeMessage.ValueType], builtins.type):  # noqa: F821
+    class _TypeMessageEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[IndexMessage._TypeMessage.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CREATION: IndexMessage._TypeMessage.ValueType  # 0
         DELETION: IndexMessage._TypeMessage.ValueType  # 1
+    class TypeMessage(_TypeMessage, metaclass=_TypeMessageEnumTypeWrapper):
+        pass
 
-    class TypeMessage(_TypeMessage, metaclass=_TypeMessageEnumTypeWrapper): ...
     CREATION: IndexMessage.TypeMessage.ValueType  # 0
     DELETION: IndexMessage.TypeMessage.ValueType  # 1
 
@@ -94,36 +87,31 @@ class IndexMessage(google.protobuf.message.Message):
     RESOURCE_FIELD_NUMBER: builtins.int
     TYPEMESSAGE_FIELD_NUMBER: builtins.int
     REINDEX_ID_FIELD_NUMBER: builtins.int
-    node: builtins.str
-    shard: builtins.str
+    node: typing.Text
+    shard: typing.Text
     txid: builtins.int
-    resource: builtins.str
+    resource: typing.Text
     typemessage: global___IndexMessage.TypeMessage.ValueType
-    reindex_id: builtins.str
-    def __init__(
-        self,
+    reindex_id: typing.Text
+    def __init__(self,
         *,
-        node: builtins.str = ...,
-        shard: builtins.str = ...,
+        node: typing.Text = ...,
+        shard: typing.Text = ...,
         txid: builtins.int = ...,
-        resource: builtins.str = ...,
+        resource: typing.Text = ...,
         typemessage: global___IndexMessage.TypeMessage.ValueType = ...,
-        reindex_id: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "reindex_id", b"reindex_id", "resource", b"resource", "shard", b"shard", "txid", b"txid", "typemessage", b"typemessage"]) -> None: ...
-
+        reindex_id: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["node",b"node","reindex_id",b"reindex_id","resource",b"resource","shard",b"shard","txid",b"txid","typemessage",b"typemessage"]) -> None: ...
 global___IndexMessage = IndexMessage
 
 class Counter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     RESOURCES_FIELD_NUMBER: builtins.int
     resources: builtins.int
-    def __init__(
-        self,
+    def __init__(self,
         *,
         resources: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["resources", b"resources"]) -> None: ...
-
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["resources",b"resources"]) -> None: ...
 global___Counter = Counter

@@ -19,7 +19,7 @@
 #
 from copy import deepcopy
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
-
+import hashlib
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
@@ -58,17 +58,24 @@ class ResourceBrain:
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
     ):
+        unique_pars = set()
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
+
+                par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
+                repeated_in_field = par_md5 in unique_pars
+                unique_pars.add(par_md5)
+
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
                     field=field_key,
                     split=subfield,
                     index=index,
+                    repeated_in_field=repeated_in_field,
                 )
                 for classification in paragraph.classifications:
                     p.labels.append(
@@ -79,8 +86,17 @@ class ResourceBrain:
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
+
+            par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
+            repeated_in_field = par_md5 in unique_pars
+            unique_pars.add(par_md5)
+
             p = BrainParagraph(
-                start=paragraph.start, end=paragraph.end, field=field_key, index=index
+                start=paragraph.start,
+                end=paragraph.end,
+                field=field_key,
+                index=index,
+                repeated_in_field=repeated_in_field,
             )
             for classification in paragraph.classifications:
                 p.labels.append(f"l/{classification.labelset}/{classification.label}")

@@ -119,6 +119,11 @@ pub struct IndexParagraph {
     pub split: ::prost::alloc::string::String,
     #[prost(uint64, tag="7")]
     pub index: u64,
+    #[prost(bool, tag="8")]
+    pub repeated_in_field: bool,
+    /// Encoded paragraph positions to be returned on search results by the node
+    #[prost(string, tag="9")]
+    pub extra: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraphs {
