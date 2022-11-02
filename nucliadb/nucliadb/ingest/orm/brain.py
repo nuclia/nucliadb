@@ -30,15 +30,43 @@ from nucliadb_protos.resources_pb2 import (
     FieldMetadata,
     Metadata,
     Origin,
+    Paragraph,
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
-
+from pydantic import BaseModel
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
 
 if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]
 else:
     StatusValue = int
+
+
+class ParagraphExtra:
+
+    @classmethod
+    def decode(encoded: str):
+        to_int = lambda x: int(x)
+        [index, start, end] = map(to_int, encoded.split(","))
+        return [index, start, end]
+
+    @classmethod
+    def encode(index: int, start: int, end: int) -> str:
+        # - Q: Is this enough to encode paragraphs from multimedia and text?
+        # - Q: Should I account for index, end and start to be floats too?
+        return f"{index},{start},{end}"
+
+
+class DuplicateParagraphsChecker:
+    def __init__(self):
+        self.seen = set()
+
+    def check(self, par: Paragraph) -> bool:
+        """Returns whether par has already been checked"""
+        par_md5 = hashlib.md5(par.text.encode()).hexdigest()
+        already_checkd = par_md5 in self.seen
+        self.seen.add(par_md5)
+        return already_checkd
 
 
 class ResourceBrain:
@@ -58,16 +86,13 @@ class ResourceBrain:
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
     ):
-        unique_pars = set()
+        dups = DuplicateParagraphsChecker()
+
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
-
-                par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
-                repeated_in_field = par_md5 in unique_pars
-                unique_pars.add(par_md5)
 
                 p = BrainParagraph(
                     start=paragraph.start,
@@ -75,7 +100,10 @@ class ResourceBrain:
                     field=field_key,
                     split=subfield,
                     index=index,
-                    repeated_in_field=repeated_in_field,
+                    repeated_in_field=dups.check(paragraph),
+                    extra=ParagraphExtra.encode(
+                        index=index, start=paragraph.start, end=paragraph.end
+                    ),
                 )
                 for classification in paragraph.classifications:
                     p.labels.append(
@@ -87,16 +115,15 @@ class ResourceBrain:
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
 
-            par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
-            repeated_in_field = par_md5 in unique_pars
-            unique_pars.add(par_md5)
-
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
                 field=field_key,
                 index=index,
-                repeated_in_field=repeated_in_field,
+                repeated_in_field=dups.check(paragraph),
+                extra=ParagraphExtra.encode(
+                    index=index, start=paragraph.start, end=paragraph.end
+                ),
             )
             for classification in paragraph.classifications:
                 p.labels.append(f"l/{classification.labelset}/{classification.label}")

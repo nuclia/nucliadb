@@ -19,7 +19,6 @@
 #
 from uuid import uuid4
 
-import pytest
 from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
@@ -31,8 +30,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb.ingest.orm.brain import ResourceBrain
 
 
-@pytest.mark.asyncio
-async def test_apply_field_metadata_marks_duplicated_paragraphs():
+def test_apply_field_metadata_marks_duplicated_paragraphs():
     br = ResourceBrain(rid=str(uuid4()))
     field_key = "text1"
 
