@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import uuid
 from asyncio import Event
 from functools import partial
 from typing import Any, Dict, List, Optional, Union
@@ -96,17 +97,19 @@ class TransactionUtility:
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
 
-    async def stop_waiting(self, kbid: str):
+    async def stop_waiting(self, kbid: str, request_id: str):
         if self.pubsub is None:
             logger.warn("No PubSub configured")
             return
         if self.notify_subject is None:
             logger.warn("No subject defined")
             return
-        await self.pubsub.unsubscribe(key=self.notify_subject.format(kbid=kbid))
+        await self.pubsub.unsubscribe(
+            key=self.notify_subject.format(kbid=kbid), subscription_id=request_id
+        )
 
     async def wait_for_commited(
-        self, kbid: str, waiting_for: WaitFor
+        self, kbid: str, waiting_for: WaitFor, request_id: str
     ) -> Optional[Event]:
         if self.notify_subject is None:
             logger.warn("Not waiting because there is not subject to wait")
@@ -129,7 +132,9 @@ class TransactionUtility:
         waiting_event = Event()
         partial_received = partial(received, waiting_for, waiting_event)
         await self.pubsub.subscribe(
-            handler=partial_received, key=self.notify_subject.format(kbid=kbid)
+            handler=partial_received,
+            key=self.notify_subject.format(kbid=kbid),
+            subscription_id=request_id,
         )
         return waiting_event
 
@@ -179,8 +184,12 @@ class TransactionUtility:
         waiting_event: Optional[Event] = None
 
         waiting_for = WaitFor(uuid=writer.uuid)
+        request_id = uuid.uuid4().hex
+
         if wait:
-            waiting_event = await self.wait_for_commited(writer.kbid, waiting_for)
+            waiting_event = await self.wait_for_commited(
+                writer.kbid, waiting_for, request_id=request_id
+            )
 
         res = await self.js.publish(
             self.nats_target.format(partition=partition), writer.SerializeToString()
@@ -193,7 +202,7 @@ class TransactionUtility:
                 await asyncio.wait_for(waiting_event.wait(), timeout=30.0)
             except asyncio.TimeoutError:
                 logger.warning("Took too much to commit")
-            await self.stop_waiting(writer.kbid)
+            await self.stop_waiting(writer.kbid, request_id=request_id)
 
         logger.info(
             f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"

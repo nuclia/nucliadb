@@ -44,7 +44,7 @@ from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.models.writer import CreateResourcePayload, ResourceFileUploaded
-from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.exceptions import (
     ConflictError,
@@ -489,7 +489,6 @@ async def upload(
     if rslug:
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
-    logger.info(request.headers)
     md5_user = x_md5[0] if x_md5 is not None and len(x_md5) > 0 else None
     try:
         path, rid, valid_field = await start_upload_field(

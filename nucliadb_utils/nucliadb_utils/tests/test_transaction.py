@@ -16,36 +16,34 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from typing import Any, Awaitable, Callable, Optional, Union
 
-Callback = Union[Callable, Awaitable]
+from unittest import mock
+
+import pytest
+
+from nucliadb_utils.cache.nats import NatsPubsub
+from nucliadb_utils.transaction import TransactionUtility, WaitFor
 
 
-class PubSubDriver:
-    initialized: bool = False
-    async_callback: bool = False
+@pytest.mark.asyncio
+async def test_transaction_commit():
+    txn = TransactionUtility(
+        nats_servers=["foobar"],
+        nats_target="node.{node}",
+        notify_subject="notify.{kbid}",
+    )
+    ps = NatsPubsub()
+    ps.nc = mock.AsyncMock()
+    txn.pubsub = ps
 
-    async def initialize(self):
-        raise NotImplementedError()
+    waiting_for = WaitFor(uuid="foo", seq="bar")
+    request_id = "request1"
+    kbid = "kbid"
 
-    async def finalize(self):
-        raise NotImplementedError()
+    _ = await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)
 
-    async def publish(self, channel_name: str, data: bytes):
-        raise NotImplementedError()
+    await txn.stop_waiting(kbid, request_id=request_id)
 
-    async def unsubscribe(self, key: str, subscription_id: Optional[str] = None):
-        raise NotImplementedError()
-
-    async def subscribe(
-        self,
-        handler: Callback,
-        key: str,
-        group: str = None,
-        subscription_id: Optional[str] = None,
-    ):
-        raise NotImplementedError()
-
-    def parse(self, data: Any):
-        raise NotImplementedError()
+    # Unsubscribing twice with the same request_id should raise KeyError
+    with pytest.raises(KeyError):
+        await txn.stop_waiting(kbid, request_id=request_id)

@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.12
+------
+
+- Fix transaction pubsub keyerror
+
 1.0.11
 ------
 - Add OpenAPI utils for fastapi doc generation
