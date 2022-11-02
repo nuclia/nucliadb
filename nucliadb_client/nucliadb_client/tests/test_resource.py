@@ -28,6 +28,7 @@ from nucliadb.models.conversation import (
 )
 from nucliadb.models.datetime import FieldDatetime
 from nucliadb.models.text import TextField
+from nucliadb.models.utils import FieldIdString
 from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_client.knowledgebox import KnowledgeBox
 
@@ -39,7 +40,7 @@ def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):
     payload.summary = "My long summary of the resource"
     payload.slug = "myresource"  # type: ignore
 
-    payload.conversations["conv1"] = InputConversationField(
+    payload.conversations[FieldIdString("conv1")] = InputConversationField(
         message=[
             InputMessage(
                 timestamp=datetime.now(),
@@ -62,11 +63,11 @@ def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):
         ]
     )
 
-    payload.texts["text1"] = TextField(body="My lovely text")
-    payload.texts["text2"] = TextField(body="My second lovely text")
+    payload.texts[FieldIdString("text1")] = TextField(body="My lovely text")
+    payload.texts[FieldIdString("text2")] = TextField(body="My second lovely text")
 
-    payload.datetimes["date1"] = FieldDatetime(value=datetime.now())
-    payload.datetimes["date2"] = FieldDatetime(value=datetime.now())
+    payload.datetimes[FieldIdString("date1")] = FieldDatetime(value=datetime.now())
+    payload.datetimes[FieldIdString("date2")] = FieldDatetime(value=datetime.now())
 
     res = nucliadb_knowledgebox.create_resource(payload)
 

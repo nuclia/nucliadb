@@ -35,7 +35,7 @@ from nucliadb.models.metadata import (
 )
 from nucliadb.models.processing import PushProcessingOptions
 from nucliadb.models.text import TextField
-from nucliadb.models.utils import SlugString
+from nucliadb.models.utils import FieldIdString, SlugString
 
 
 class CreateResourcePayload(BaseModel):
@@ -50,13 +50,13 @@ class CreateResourcePayload(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
     origin: Optional[Origin] = None
 
-    files: Dict[str, FileField] = {}
-    links: Dict[str, LinkField] = {}
-    texts: Dict[str, TextField] = {}
-    layouts: Dict[str, InputLayoutField] = {}
-    conversations: Dict[str, InputConversationField] = {}
-    keywordsets: Dict[str, FieldKeywordset] = {}
-    datetimes: Dict[str, FieldDatetime] = {}
+    files: Dict[FieldIdString, FileField] = {}
+    links: Dict[FieldIdString, LinkField] = {}
+    texts: Dict[FieldIdString, TextField] = {}
+    layouts: Dict[FieldIdString, InputLayoutField] = {}
+    conversations: Dict[FieldIdString, InputConversationField] = {}
+    keywordsets: Dict[FieldIdString, FieldKeywordset] = {}
+    datetimes: Dict[FieldIdString, FieldDatetime] = {}
 
     # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -83,13 +83,13 @@ class UpdateResourcePayload(BaseModel):
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
 
-    files: Dict[str, FileField] = {}
-    links: Dict[str, LinkField] = {}
-    texts: Dict[str, TextField] = {}
-    layouts: Dict[str, InputLayoutField] = {}
-    conversations: Dict[str, InputConversationField] = {}
-    keywordsets: Dict[str, FieldKeywordset] = {}
-    datetimes: Dict[str, FieldDatetime] = {}
+    files: Dict[FieldIdString, FileField] = {}
+    links: Dict[FieldIdString, LinkField] = {}
+    texts: Dict[FieldIdString, TextField] = {}
+    layouts: Dict[FieldIdString, InputLayoutField] = {}
+    conversations: Dict[FieldIdString, InputConversationField] = {}
+    keywordsets: Dict[FieldIdString, FieldKeywordset] = {}
+    datetimes: Dict[FieldIdString, FieldDatetime] = {}
 
     # Processing options
     processing_options: Optional[PushProcessingOptions] = PushProcessingOptions()
@@ -119,4 +119,4 @@ ComminResourcePayload = Union[CreateResourcePayload, UpdateResourcePayload]
 class ResourceFileUploaded(BaseModel):
     seqid: Optional[int] = None
     uuid: Optional[str] = None
-    field_id: Optional[str] = None
+    field_id: Optional[FieldIdString] = None

@@ -25,6 +25,7 @@ import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.models.text import TextField
+from nucliadb.models.utils import FieldIdString
 from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_client.client import NucliaDBClient
 from nucliadb_client.exceptions import ConflictError
@@ -54,7 +55,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     payload.title = "My Resource"
     payload.summary = "My long summary of the resource"
     payload.slug = "myresource"  # type: ignore
-    payload.texts["text1"] = TextField(body="My text")
+    payload.texts[FieldIdString("text1")] = TextField(body="My text")
     kb.create_resource(payload)
 
     async for line in kb.generator():

@@ -42,6 +42,7 @@ from nucliadb.models.conversation import (
     InputMessageContent,
 )
 from nucliadb.models.metadata import InputMetadata, Origin
+from nucliadb.models.utils import FieldIdString
 from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_client.client import NucliaDBClient
 from nucliadb_client.knowledgebox import KnowledgeBox
@@ -110,7 +111,7 @@ class StreamHandler(xml.sax.handler.ContentHandler):
         icf = InputConversationField()
         icf.messages.append(imq)
         icf.messages.append(ima)
-        payload.conversations["stack"] = icf
+        payload.conversations[FieldIdString("stack")] = icf
 
         # Create the resource with the row value
         if kb is None:

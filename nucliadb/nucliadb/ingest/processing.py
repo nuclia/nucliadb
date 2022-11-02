@@ -151,7 +151,7 @@ class ProcessingEngine:
 
     def generate_file_token_from_cloudfile(self, cf: CloudFile) -> str:
         if self.nuclia_jwt_key is None:
-            raise AttributeError()
+            raise AttributeError("Nuclia JWT key not set")
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         expiration = now + datetime.timedelta(days=self.days_to_keep)
 
@@ -175,7 +175,7 @@ class ProcessingEngine:
 
     def generate_file_token_from_fieldfile(self, file: FieldFilePB) -> str:
         if self.nuclia_jwt_key is None:
-            raise AttributeError()
+            raise AttributeError("Nuclia JWT key not set")
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         expiration = now + datetime.timedelta(days=self.days_to_keep)
 
@@ -218,7 +218,7 @@ class ProcessingEngine:
 
     def convert_external_filefield_to_str(self, file_field: models.FileField) -> str:
         if self.nuclia_jwt_key is None:
-            raise AttributeError()
+            raise AttributeError("Nuclia JWT key not set")
 
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         expiration = now + datetime.timedelta(days=self.days_to_keep)

@@ -92,3 +92,26 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
         assert data["files"]["field3"]["value"]["file"]["uri"] == EXTERNAL_FILE_URL
         assert "extra_headers" not in data["files"]["field3"]["value"]["file"]
         assert data["files"]["field3"]["value"]["external"] is True
+
+
+@pytest.mark.asyncio
+async def test_field_with_slashes(nuclia_jwt_key, nucliadb_api, knowledgebox_one):
+    async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
+        # Create a resource
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_one}/{RESOURCES_PREFIX}",
+            headers={"X-Synchronous": "True"},
+            json={
+                "slug": "resource1",
+                "title": "Resource 1",
+                "files": {
+                    "field/with/slashes": {
+                        "file": {
+                            "uri": EXTERNAL_FILE_URL,
+                            "extra_headers": {"Authorization": "Bearer foo1234"},
+                        }
+                    },
+                },
+            },
+        )
+        assert resp.status_code == 422
