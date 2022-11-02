@@ -93,8 +93,11 @@ impl Journal {
     pub fn no_nodes(&self) -> usize {
         self.nodes
     }
-    pub fn created_in(&self) -> SystemTime {
+    pub fn time(&self) -> SystemTime {
         self.ctime
+    }
+    pub fn update_time(&mut self, time: SystemTime) {
+        self.ctime = time;
     }
 }
 
@@ -208,9 +211,6 @@ impl AsRef<DataPoint> for DataPoint {
 }
 
 impl DataPoint {
-    pub fn set_time(&mut self) {
-        self.journal.ctime = SystemTime::now();
-    }
     pub fn get_id(&self) -> DpId {
         self.journal.uid
     }
@@ -249,14 +249,8 @@ impl DataPoint {
             .take(results)
             .collect()
     }
-    pub fn merge<Dlog>(
-        dir: &path::Path,
-        operants: &[DpId],
-        delete_log: Dlog,
-    ) -> DPResult<DataPoint>
-    where
-        Dlog: DeleteLog + Copy,
-    {
+    pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> DPResult<DataPoint>
+    where Dlog: DeleteLog {
         use io::Write;
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
@@ -276,13 +270,14 @@ impl DataPoint {
             .write(true)
             .create(true)
             .open(id.join(file_names::HNSW))?;
-        let mut operants = operants
+        let operants = operants
             .iter()
-            .map(|dp_id| DataPoint::open(dir, *dp_id))
+            .map(|(dlog, dp_id)| DataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
             .collect::<DPResult<Vec<_>>>()?;
-        operants.sort_by_key(|dp| std::cmp::Reverse(dp.meta().ctime));
-        let node_producers = operants.iter().map(|dp| dp.nodes.as_ref());
-        key_value::merge((delete_log, Node), &mut nodes, node_producers.collect())?;
+        let node_producers = operants
+            .iter()
+            .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
+        key_value::merge(&mut nodes, node_producers.collect())?;
         nodes.flush()?;
         let nodes = unsafe { Mmap::map(&nodes)? };
         let mut index = RAMHnsw::new();
