@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pytest
 from pydantic import BaseModel, ValidationError
 
 from nucliadb.models.utils import FieldIdString
@@ -37,19 +38,12 @@ def test_field_ids():
         "foo-bar_123",
     ]
     for valid in valid_field_ids:
-        try:
-            TestFieldIdModel(field_id=valid)
-        except ValidationError:
-            assert False, f"Field id '{valid}' should be valid!"
+        TestFieldIdModel(field_id=valid)
 
     invalid_field_ids = [
         "",
         "foo/bar",
     ]
     for invalid in invalid_field_ids:
-        try:
+        with pytest.raises(ValidationError):
             TestFieldIdModel(field_id=invalid)
-        except ValidationError:
-            pass
-        else:
-            assert False, f"Field id '{invalid}' should be invalid!"
