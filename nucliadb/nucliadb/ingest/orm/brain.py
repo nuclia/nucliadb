@@ -17,10 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from copy import deepcopy
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
 import hashlib
+from copy import deepcopy
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
+from nucliadb_protos.noderesources_pb2 import ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (
@@ -33,7 +35,7 @@ from nucliadb_protos.resources_pb2 import (
     Paragraph,
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
-from pydantic import BaseModel
+
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
 
 if TYPE_CHECKING:
@@ -41,29 +43,16 @@ if TYPE_CHECKING:
 else:
     StatusValue = int
 
-
-class ParagraphExtra:
-
-    @classmethod
-    def decode(encoded: str):
-        to_int = lambda x: int(x)
-        [index, start, end] = map(to_int, encoded.split(","))
-        return [index, start, end]
-
-    @classmethod
-    def encode(index: int, start: int, end: int) -> str:
-        # - Q: Is this enough to encode paragraphs from multimedia and text?
-        # - Q: Should I account for index, end and start to be floats too?
-        return f"{index},{start},{end}"
+FilePagePositions = Dict[int, Tuple[int, int]]
 
 
 class DuplicateParagraphsChecker:
     def __init__(self):
         self.seen = set()
 
-    def check(self, par: Paragraph) -> bool:
+    def check(self, paragraph: Paragraph) -> bool:
         """Returns whether par has already been checked"""
-        par_md5 = hashlib.md5(par.text.encode()).hexdigest()
+        par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
         already_checkd = par_md5 in self.seen
         self.seen.add(par_md5)
         return already_checkd
@@ -79,12 +68,21 @@ class ResourceBrain:
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
 
+    def get_paragraph_page_number(
+        self, paragraph: Paragraph, file_page_positions: FilePagePositions
+    ) -> int:
+        for page_number, (page_start, page_end) in file_page_positions.items():
+            if page_start <= paragraph.start <= page_end:
+                return int(page_number)
+        raise ValueError("Could not find paragraph page number!")
+
     def apply_field_metadata(
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
+        file_page_positions: Optional[FilePagePositions] = None,
     ):
         dups = DuplicateParagraphsChecker()
 
@@ -94,6 +92,14 @@ class ResourceBrain:
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
+                position = ParagraphPosition(
+                    index=index, start=paragraph.start, end=paragraph.end
+                )
+                if file_page_positions:
+                    position.page_number = self.get_paragraph_page_number(
+                        paragraph, file_page_positions
+                    )
+
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
@@ -101,9 +107,7 @@ class ResourceBrain:
                     split=subfield,
                     index=index,
                     repeated_in_field=dups.check(paragraph),
-                    extra=ParagraphExtra.encode(
-                        index=index, start=paragraph.start, end=paragraph.end
-                    ),
+                    position=position,
                 )
                 for classification in paragraph.classifications:
                     p.labels.append(
@@ -115,15 +119,21 @@ class ResourceBrain:
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
 
+            position = ParagraphPosition(
+                index=index, start=paragraph.start, end=paragraph.end
+            )
+            if file_page_positions:
+                position.page_number = self.get_paragraph_page_number(
+                    paragraph, file_page_positions
+                )
+
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
                 field=field_key,
                 index=index,
                 repeated_in_field=dups.check(paragraph),
-                extra=ParagraphExtra.encode(
-                    index=index, start=paragraph.start, end=paragraph.end
-                ),
+                position=position,
             )
             for classification in paragraph.classifications:
                 p.labels.append(f"l/{classification.labelset}/{classification.label}")

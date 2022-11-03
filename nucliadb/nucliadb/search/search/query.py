@@ -132,7 +132,7 @@ async def paragraph_query_to_pb(
     sort: Optional[str] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
-    with_duplicates: bool = False
+    with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:
     fields = fields or []
 

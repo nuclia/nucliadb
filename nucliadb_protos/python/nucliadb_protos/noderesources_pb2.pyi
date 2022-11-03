@@ -227,6 +227,26 @@ class VectorSentence(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["vector",b"vector"]) -> None: ...
 global___VectorSentence = VectorSentence
 
+class ParagraphPosition(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    PAGE_NUMBER_FIELD_NUMBER: builtins.int
+    INDEX_FIELD_NUMBER: builtins.int
+    START_FIELD_NUMBER: builtins.int
+    END_FIELD_NUMBER: builtins.int
+    page_number: builtins.int
+    index: builtins.int
+    start: builtins.int
+    end: builtins.int
+    def __init__(self,
+        *,
+        page_number: builtins.int = ...,
+        index: builtins.int = ...,
+        start: builtins.int = ...,
+        end: builtins.int = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","index",b"index","page_number",b"page_number","start",b"start"]) -> None: ...
+global___ParagraphPosition = ParagraphPosition
+
 class IndexParagraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class SentencesEntry(google.protobuf.message.Message):
@@ -252,7 +272,7 @@ class IndexParagraph(google.protobuf.message.Message):
     SPLIT_FIELD_NUMBER: builtins.int
     INDEX_FIELD_NUMBER: builtins.int
     REPEATED_IN_FIELD_FIELD_NUMBER: builtins.int
-    EXTRA_FIELD_NUMBER: builtins.int
+    POSITION_FIELD_NUMBER: builtins.int
     start: builtins.int
     """Start end position in field text"""
 
@@ -273,9 +293,8 @@ class IndexParagraph(google.protobuf.message.Message):
 
     index: builtins.int
     repeated_in_field: builtins.bool
-    extra: typing.Text
-    """Encoded paragraph positions to be returned on search results by the node"""
-
+    @property
+    def position(self) -> global___ParagraphPosition: ...
     def __init__(self,
         *,
         start: builtins.int = ...,
@@ -286,9 +305,10 @@ class IndexParagraph(google.protobuf.message.Message):
         split: typing.Text = ...,
         index: builtins.int = ...,
         repeated_in_field: builtins.bool = ...,
-        extra: typing.Text = ...,
+        position: typing.Optional[global___ParagraphPosition] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","extra",b"extra","field",b"field","index",b"index","labels",b"labels","repeated_in_field",b"repeated_in_field","sentences",b"sentences","split",b"split","start",b"start"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["position",b"position"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","labels",b"labels","position",b"position","repeated_in_field",b"repeated_in_field","sentences",b"sentences","split",b"split","start",b"start"]) -> None: ...
 global___IndexParagraph = IndexParagraph
 
 class IndexParagraphs(google.protobuf.message.Message):

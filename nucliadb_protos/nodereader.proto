@@ -127,6 +127,7 @@ message ParagraphResult {
     uint64 index = 8;
     ResultScore score = 9;
     repeated string matches = 10;
+    noderesources.ParagraphPosition position = 11;
 }
 
 message ParagraphSearchResponse {

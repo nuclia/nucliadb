@@ -195,6 +195,7 @@ message Paragraph {
     string text = 9;  // Optional, as a computed value
 }
 
+
 message Position {
     int64 start = 1;
     int64 end = 2;

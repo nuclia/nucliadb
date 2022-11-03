@@ -37,6 +37,7 @@ from nucliadb.search.api.models import (
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
+    ParagraphPosition,
     Paragraphs,
     RelatedEntities,
     ResourceResult,
@@ -51,7 +52,6 @@ from nucliadb.search.search.fetch import (
     get_labels_resource,
     get_labels_sentence,
     get_resource_cache,
-    get_seconds_paragraph,
     get_text_paragraph,
     get_text_sentence,
 )
@@ -157,7 +157,6 @@ async def merge_suggest_paragraph_results(
             result, kbid, highlight=highlight, ematches=ematches  # type: ignore
         )
         labels = await get_labels_paragraph(result, kbid)
-        seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
             score=result.score.bm25,
             rid=result.uuid,
@@ -165,10 +164,13 @@ async def merge_suggest_paragraph_results(
             field=field,
             text=text,
             labels=labels,
+            position=ParagraphPosition(
+                page_number=result.position.page_number,
+                index=result.position.index,
+                start=result.position.start,
+                end=result.position.end,
+            ),
         )
-        if seconds_positions is not None:
-            new_paragraph.start_seconds = seconds_positions[0]
-            new_paragraph.end_seconds = seconds_positions[1]
         result_paragraph_list.append(new_paragraph)
 
     return Paragraphs(results=result_paragraph_list, query=query)
@@ -289,7 +291,6 @@ async def merge_paragraph_results(
         _, field_type, field = result.field.split("/")
         text = await get_text_paragraph(result, kbid, highlight, ematches)
         labels = await get_labels_paragraph(result, kbid)
-        seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
             score=result.score.bm25,
             rid=result.uuid,
@@ -297,10 +298,13 @@ async def merge_paragraph_results(
             field=field,
             text=text,
             labels=labels,
+            position=ParagraphPosition(
+                page_number=result.position.page_number,
+                index=result.position.index,
+                start=result.position.start,
+                end=result.position.end,
+            ),
         )
-        if seconds_positions is not None:
-            new_paragraph.start_seconds = seconds_positions[0]
-            new_paragraph.end_seconds = seconds_positions[1]
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)

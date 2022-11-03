@@ -72,6 +72,14 @@ message VectorSentence {
     repeated float vector = 1;
 }
 
+
+message ParagraphPosition {
+    uint64 page_number = 1;
+    uint64 index = 2;
+    uint64 start = 3;
+    uint64 end = 4;
+}
+
 message IndexParagraph {
     int32 start = 1; // Start end position in field text
     int32 end = 2; // Start end position in field text
@@ -81,7 +89,7 @@ message IndexParagraph {
     string split = 6; // split were it belongs
     uint64 index = 7;
     bool repeated_in_field = 8;
-    string extra = 9; // Encoded paragraph positions to be returned on search results by the node
+    ParagraphPosition position = 9;
 }
 
 message IndexParagraphs {

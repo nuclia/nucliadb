@@ -49,15 +49,11 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
     p2.sentences.append(Sentence(start=11, end=20, key="test"))
     fcmw.metadata.metadata.paragraphs.append(p2)
 
-    # Add it to split too
-    fcmw.metadata.split_metadata["subfield"].paragraphs.append(p1)
-    fcmw.metadata.split_metadata["subfield"].paragraphs.append(p2)
-
     br.apply_field_metadata(field_key, fcmw.metadata, [], {})
 
-    assert len(br.brain.paragraphs[field_key].paragraphs) == 4
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
-        if "subfield" in key and "0-20" in key:
+        if "0-20" in key:
             # Only the first time that a paragraph is found should be set to false
             assert paragraph.repeated_in_field is False
         else:

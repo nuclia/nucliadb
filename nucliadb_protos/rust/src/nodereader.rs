@@ -158,6 +158,8 @@ pub struct ParagraphResult {
     pub score: ::core::option::Option<ResultScore>,
     #[prost(string, repeated, tag="10")]
     pub matches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag="11")]
+    pub position: ::core::option::Option<super::noderesources::ParagraphPosition>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {

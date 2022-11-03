@@ -99,6 +99,17 @@ pub struct VectorSentence {
     pub vector: ::prost::alloc::vec::Vec<f32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ParagraphPosition {
+    #[prost(uint64, tag="1")]
+    pub page_number: u64,
+    #[prost(uint64, tag="2")]
+    pub index: u64,
+    #[prost(uint64, tag="3")]
+    pub start: u64,
+    #[prost(uint64, tag="4")]
+    pub end: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraph {
     /// Start end position in field text
     #[prost(int32, tag="1")]
@@ -121,9 +132,8 @@ pub struct IndexParagraph {
     pub index: u64,
     #[prost(bool, tag="8")]
     pub repeated_in_field: bool,
-    /// Encoded paragraph positions to be returned on search results by the node
-    #[prost(string, tag="9")]
-    pub extra: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="9")]
+    pub position: ::core::option::Option<ParagraphPosition>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraphs {
