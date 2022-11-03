@@ -89,8 +89,7 @@ fn main() {
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
-    let r = reader.search(&request, &lock).unwrap();
-    println!("{r:?}");
+    reader.search(&request, &lock).unwrap();
     stats.read_time += now.elapsed().unwrap().as_millis();
 
     println!("Filtered search..");
@@ -99,8 +98,7 @@ fn main() {
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
-    let r = reader.search(&request, &lock).unwrap();
-    println!("{r:?}");
+    reader.search(&request, &lock).unwrap();
     stats.tagged_time += now.elapsed().unwrap().as_millis();
 
     println!("{stats}");
