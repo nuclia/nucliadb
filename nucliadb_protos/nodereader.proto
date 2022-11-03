@@ -82,6 +82,7 @@ message ParagraphSearchRequest {
 
     bool reload = 13;
 
+    bool with_duplicates = 14;
 }
 
 message ResultScore {
@@ -243,6 +244,7 @@ message SearchRequest {
     bool paragraph = 12;
     bool document = 13;
 
+    bool with_duplicates = 14;
 }
 
 message SuggestRequest {

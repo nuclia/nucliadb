@@ -271,3 +271,4 @@ class SearchRequest(BaseModel):
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
     shards: List[str] = []
     vector: Optional[List[float]] = None
+    with_duplicates: bool = False

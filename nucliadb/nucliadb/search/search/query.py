@@ -47,6 +47,7 @@ async def global_query_to_pb(
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     vector: Optional[List[float]] = None,
+    with_duplicates: bool = False,
 ) -> SearchRequest:
     fields = fields or []
 
@@ -54,6 +55,7 @@ async def global_query_to_pb(
 
     request = SearchRequest()
     request.reload = reload
+    request.with_duplicates = with_duplicates
 
     # We need to ask for all and cut later
     request.page_number = 0
@@ -130,11 +132,14 @@ async def paragraph_query_to_pb(
     sort: Optional[str] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
+    with_duplicates: bool = False
 ) -> ParagraphSearchRequest:
     fields = fields or []
 
     request = ParagraphSearchRequest()
     request.reload = reload
+    request.with_duplicates = with_duplicates
+
     if SearchOptions.PARAGRAPH in features:
         request.uuid = rid
         request.body = query

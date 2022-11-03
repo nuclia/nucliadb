@@ -197,6 +197,7 @@ async def search(
         fields=item.fields,
         reload=item.reload,
         vector=item.vector,
+        with_duplicates=item.with_duplicates,
     )
 
     incomplete_results = False

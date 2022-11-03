@@ -96,6 +96,8 @@ pub struct ParagraphSearchRequest {
     pub timestamps: ::core::option::Option<Timestamps>,
     #[prost(bool, tag="13")]
     pub reload: bool,
+    #[prost(bool, tag="14")]
+    pub with_duplicates: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -304,6 +306,8 @@ pub struct SearchRequest {
     pub paragraph: bool,
     #[prost(bool, tag="13")]
     pub document: bool,
+    #[prost(bool, tag="14")]
+    pub with_duplicates: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {
