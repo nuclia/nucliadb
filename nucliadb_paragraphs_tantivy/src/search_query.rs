@@ -401,7 +401,6 @@ mod tests {
 
     #[test]
     fn it_removes_stop_word_fterms() {
-        let stop_words = &["is", "a", "for", "and"];
         let tests = [
             (
                 "nuclia is a database for unstructured data",
