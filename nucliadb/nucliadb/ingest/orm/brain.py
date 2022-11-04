@@ -50,9 +50,11 @@ class DuplicateParagraphsChecker:
     def check(self, paragraph: Paragraph) -> bool:
         """Returns whether paragraph has already been checked"""
         par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
-        already_checkd = par_md5 in self.seen
-        self.seen.add(par_md5)
-        return already_checkd
+        if par_md5 in self.seen:
+            return True
+        else:
+            self.seen.add(par_md5)
+            return False
 
 
 class ResourceBrain:
