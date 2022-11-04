@@ -119,6 +119,8 @@ pub struct IndexParagraph {
     pub split: ::prost::alloc::string::String,
     #[prost(uint64, tag="7")]
     pub index: u64,
+    #[prost(bool, tag="8")]
+    pub repeated_in_field: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraphs {

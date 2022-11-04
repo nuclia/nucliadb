@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import hashlib
 from copy import deepcopy
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
@@ -30,6 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldMetadata,
     Metadata,
     Origin,
+    Paragraph,
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorObject
 
@@ -39,6 +41,18 @@ if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]
 else:
     StatusValue = int
+
+
+class DuplicateParagraphsChecker:
+    def __init__(self):
+        self.seen = set()
+
+    def check(self, paragraph: Paragraph) -> bool:
+        """Returns whether paragraph has already been checked"""
+        par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
+        already_checkd = par_md5 in self.seen
+        self.seen.add(par_md5)
+        return already_checkd
 
 
 class ResourceBrain:
@@ -58,6 +72,8 @@ class ResourceBrain:
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
     ):
+        dups = DuplicateParagraphsChecker()
+
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
@@ -69,6 +85,7 @@ class ResourceBrain:
                     field=field_key,
                     split=subfield,
                     index=index,
+                    repeated_in_field=dups.check(paragraph),
                 )
                 for classification in paragraph.classifications:
                     p.labels.append(
@@ -80,7 +97,11 @@ class ResourceBrain:
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             p = BrainParagraph(
-                start=paragraph.start, end=paragraph.end, field=field_key, index=index
+                start=paragraph.start,
+                end=paragraph.end,
+                field=field_key,
+                index=index,
+                repeated_in_field=dups.check(paragraph),
             )
             for classification in paragraph.classifications:
                 p.labels.append(f"l/{classification.labelset}/{classification.label}")
