@@ -127,6 +127,9 @@ message ParagraphResult {
     uint64 index = 8;
     ResultScore score = 9;
     repeated string matches = 10;
+
+    // Metadata that can't be searched with but is returned on search results
+    noderesources.ParagraphMetadata metadata = 11;
 }
 
 message ParagraphSearchResponse {

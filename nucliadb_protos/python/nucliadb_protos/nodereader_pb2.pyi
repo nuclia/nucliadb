@@ -8,6 +8,7 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
+import nucliadb_protos.noderesources_pb2
 import nucliadb_protos.utils_pb2
 import typing
 import typing_extensions
@@ -343,6 +344,7 @@ class ParagraphResult(google.protobuf.message.Message):
     INDEX_FIELD_NUMBER: builtins.int
     SCORE_FIELD_NUMBER: builtins.int
     MATCHES_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
     uuid: typing.Text
     field: typing.Text
     start: builtins.int
@@ -354,6 +356,10 @@ class ParagraphResult(google.protobuf.message.Message):
     def score(self) -> global___ResultScore: ...
     @property
     def matches(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    @property
+    def metadata(self) -> nucliadb_protos.noderesources_pb2.ParagraphMetadata:
+        """Metadata that can't be searched with but is returned on search results"""
+        pass
     def __init__(self,
         *,
         uuid: typing.Text = ...,
@@ -365,9 +371,10 @@ class ParagraphResult(google.protobuf.message.Message):
         index: builtins.int = ...,
         score: typing.Optional[global___ResultScore] = ...,
         matches: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        metadata: typing.Optional[nucliadb_protos.noderesources_pb2.ParagraphMetadata] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["score",b"score"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","matches",b"matches","paragraph",b"paragraph","score",b"score","split",b"split","start",b"start","uuid",b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata","score",b"score"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","matches",b"matches","metadata",b"metadata","paragraph",b"paragraph","score",b"score","split",b"split","start",b"start","uuid",b"uuid"]) -> None: ...
 global___ParagraphResult = ParagraphResult
 
 class ParagraphSearchResponse(google.protobuf.message.Message):
