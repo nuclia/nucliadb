@@ -80,6 +80,7 @@ message IndexParagraph {
     string field = 5;
     string split = 6; // split were it belongs
     uint64 index = 7;
+    bool repeated_in_field = 8;
 }
 
 message IndexParagraphs {

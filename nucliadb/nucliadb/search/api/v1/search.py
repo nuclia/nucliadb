@@ -97,6 +97,7 @@ async def search_knowledgebox(
     ),
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     shards: List[str] = Query([]),
+    with_duplicates: bool = Query(default=False),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -123,6 +124,7 @@ async def search_knowledgebox(
         field_type_filter=field_type_filter,
         extracted=extracted,
         shards=shards,
+        with_duplicates=with_duplicates,
     )
     return await search(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -197,6 +199,7 @@ async def search(
         fields=item.fields,
         reload=item.reload,
         vector=item.vector,
+        with_duplicates=item.with_duplicates,
     )
 
     incomplete_results = False
