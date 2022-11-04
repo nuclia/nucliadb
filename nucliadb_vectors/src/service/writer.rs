@@ -145,6 +145,7 @@ mod tests {
             labels: vec!["1".to_string(), "2".to_string(), "3".to_string()],
             index: 3,
             split: "".to_string(),
+            repeated_in_field: false,
         };
         let paragraphs = IndexParagraphs {
             paragraphs: HashMap::from([("DOC/KEY/1".to_string(), paragraph)]),

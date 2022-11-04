@@ -502,6 +502,7 @@ mod tests {
             labels: vec!["/e/myentity".to_string()],
             index: 0,
             split: "".to_string(),
+            repeated_in_field: false,
         };
         let p1_uuid = format!("{}/{}/{}-{}", UUID, "body", 0, DOC1_P1.len());
 
@@ -517,6 +518,7 @@ mod tests {
             ],
             index: 1,
             split: "".to_string(),
+            repeated_in_field: false,
         };
         let p2_uuid = format!(
             "{}/{}/{}-{}",
@@ -534,6 +536,7 @@ mod tests {
             labels: vec!["/three".to_string(), "/label2".to_string()],
             index: 2,
             split: "".to_string(),
+            repeated_in_field: false,
         };
         let p3_uuid = format!(
             "{}/{}/{}-{}",
@@ -557,6 +560,7 @@ mod tests {
             labels: vec!["/c/ool".to_string()],
             index: 3,
             split: "".to_string(),
+            repeated_in_field: false,
         };
         let p4_uuid = format!("{}/{}/{}-{}", UUID, "body", 0, DOC1_TI.len());
 
@@ -673,6 +677,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -690,6 +695,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -707,6 +713,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -724,6 +731,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -741,6 +749,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -758,6 +767,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -775,6 +785,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -793,6 +804,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -811,6 +823,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -828,6 +841,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 3);
@@ -843,6 +857,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps),
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -860,6 +875,7 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
+            with_duplicates: false
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
