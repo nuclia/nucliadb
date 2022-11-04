@@ -300,6 +300,7 @@ mod tests {
             labels: vec!["/nsfw".to_string()],
             index: 0,
             split: "".to_string(),
+            repeated_in_field: false
         };
         let p1_uuid = format!("{}/{}/{}-{}", UUID, "body", 0, DOC1_P1.len());
 
@@ -315,6 +316,7 @@ mod tests {
             ],
             index: 1,
             split: "".to_string(),
+            repeated_in_field: false,
         };
         let p2_uuid = format!(
             "{}/{}/{}-{}",
@@ -332,6 +334,7 @@ mod tests {
             labels: vec!["/three".to_string(), "/label2".to_string()],
             index: 2,
             split: "".to_string(),
+            repeated_in_field: false
         };
         let p3_uuid = format!(
             "{}/{}/{}-{}",
@@ -355,6 +358,7 @@ mod tests {
             labels: vec!["/cool".to_string()],
             index: 3,
             split: "".to_string(),
+            repeated_in_field: false
         };
         let p4_uuid = format!("{}/{}/{}-{}", UUID, "body", 0, DOC1_TI.len());
 
