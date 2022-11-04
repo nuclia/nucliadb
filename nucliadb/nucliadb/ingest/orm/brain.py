@@ -71,9 +71,9 @@ class ResourceBrain:
         self.brain.texts[field_key].text = text
 
     def get_paragraph_page_number(
-        self, paragraph: Paragraph, file_page_positions: FilePagePositions
+        self, paragraph: Paragraph, page_positions: FilePagePositions
     ) -> int:
-        for page_number, (page_start, page_end) in file_page_positions.items():
+        for page_number, (page_start, page_end) in page_positions.items():
             if page_start <= paragraph.start <= page_end:
                 return int(page_number)
         raise ValueError("Could not find paragraph page number!")

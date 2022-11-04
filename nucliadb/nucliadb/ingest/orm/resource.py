@@ -241,17 +241,6 @@ class Resource:
         self.modified = True
         self.relations = relations
 
-    async def get_file_page_positions(self, field) -> FilePagePositions:
-        positions: FilePagePositions = {}
-        file_extracted_data = await field.get_file_extracted_data()
-        if file_extracted_data is None:
-            return positions
-        for index, position in enumerate(
-            file_extracted_data.file_pages_previews.positions
-        ):
-            positions[index] = (position.start, position.end)
-        return positions
-
     async def generate_index_message(self) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
@@ -269,7 +258,7 @@ class Resource:
 
                 page_positions: Optional[FilePagePositions] = None
                 if type_id == FieldType.FILE and isinstance(field, File):
-                    page_positions = await self.get_file_page_positions(field)
+                    page_positions = await get_file_page_positions(field)
 
                 brain.apply_field_metadata(
                     field_key, field_metadata, [], {}, page_positions=page_positions
@@ -963,3 +952,13 @@ class Resource:
             pb_resource.created.CopyFrom(self.basic.created)
         pb_resource.metadata.CopyFrom(metadata)
         return pb_resource
+
+
+async def get_file_page_positions(field) -> FilePagePositions:
+    positions: FilePagePositions = {}
+    file_extracted_data = await field.get_file_extracted_data()
+    if file_extracted_data is None:
+        return positions
+    for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
+        positions[index] = (position.start, position.end)
+    return positions
