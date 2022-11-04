@@ -27,7 +27,7 @@ from nucliadb_protos.resources_pb2 import (
     Sentence,
 )
 
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain import DuplicateParagraphsChecker, ResourceBrain
 
 
 def test_apply_field_metadata_marks_duplicated_paragraphs():
@@ -59,3 +59,15 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
             assert paragraph.repeated_in_field is False
         else:
             assert paragraph.repeated_in_field is True
+
+
+def test_duplicate_paragraph_checker():
+    p1 = Paragraph(text="repeated_text")
+    p2 = Paragraph(text="some_text")
+    p3 = Paragraph(text="repeated_text")
+
+    dupcheck = DuplicateParagraphsChecker()
+
+    assert dupcheck.check(p1) is False
+    assert dupcheck.check(p2) is False
+    assert dupcheck.check(p3) is True
