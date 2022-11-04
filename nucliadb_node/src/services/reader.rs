@@ -437,6 +437,7 @@ impl ShardReaderService {
         let paragraph_request = ParagraphSearchRequest {
             id: "".to_string(),
             uuid: "".to_string(),
+            with_duplicates: search_request.with_duplicates,
             body: search_request.body.clone(),
             fields: search_request.fields.clone(),
             filter: search_request.filter.clone(),
