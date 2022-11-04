@@ -56,7 +56,7 @@ from nucliadb.ingest.fields.layout import Layout
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb.models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
@@ -241,6 +241,17 @@ class Resource:
         self.modified = True
         self.relations = relations
 
+    async def get_file_page_positions(self, field) -> FilePagePositions:
+        positions: FilePagePositions = {}
+        file_extracted_data = await field.get_file_extracted_data()
+        if file_extracted_data is None:
+            return positions
+        for index, position in enumerate(
+            file_extracted_data.file_pages_previews.positions
+        ):
+            positions[index] = (position.start, position.end)
+        return positions
+
     async def generate_index_message(self) -> ResourceBrain:
         brain = ResourceBrain(rid=self.uuid)
         origin = await self.get_origin()
@@ -255,7 +266,14 @@ class Resource:
             field_metadata = await field.get_field_metadata()
             field_key = self.generate_field_id(fieldid)
             if field_metadata is not None:
-                brain.apply_field_metadata(field_key, field_metadata, [], {})
+
+                page_positions: Optional[FilePagePositions] = None
+                if type_id == FieldType.FILE and isinstance(field, File):
+                    page_positions = await self.get_file_page_positions(field)
+
+                brain.apply_field_metadata(
+                    field_key, field_metadata, [], {}, page_positions=page_positions
+                )
 
             if self.disable_vectors is False:
                 vo = await field.get_vectors()

@@ -19,9 +19,10 @@
 #
 import hashlib
 from copy import deepcopy
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
+from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (
@@ -41,6 +42,8 @@ if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]
 else:
     StatusValue = int
+
+FilePagePositions = Dict[int, Tuple[int, int]]
 
 
 class DuplicateParagraphsChecker:
@@ -67,12 +70,21 @@ class ResourceBrain:
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
 
+    def get_paragraph_page_number(
+        self, paragraph: Paragraph, file_page_positions: FilePagePositions
+    ) -> int:
+        for page_number, (page_start, page_end) in file_page_positions.items():
+            if page_start <= paragraph.start <= page_end:
+                return int(page_number)
+        raise ValueError("Could not find paragraph page number!")
+
     def apply_field_metadata(
         self,
         field_key: str,
         metadata: FieldComputedMetadata,
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
+        page_positions: Optional[FilePagePositions] = None,
     ):
         dups = DuplicateParagraphsChecker()
 
@@ -81,6 +93,17 @@ class ResourceBrain:
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
+                position = ParagraphPosition(
+                    index=index,
+                    start=paragraph.start,
+                    end=paragraph.end,
+                    start_seconds=paragraph.start_seconds,
+                    end_seconds=paragraph.end_seconds,
+                )
+                if page_positions:
+                    position.page_number = self.get_paragraph_page_number(
+                        paragraph, page_positions
+                    )
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
@@ -88,6 +111,7 @@ class ResourceBrain:
                     split=subfield,
                     index=index,
                     repeated_in_field=dups.check(paragraph),
+                    metadata=ParagraphMetadata(position=position),
                 )
                 for classification in paragraph.classifications:
                     p.labels.append(
@@ -98,12 +122,24 @@ class ResourceBrain:
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
+            position = ParagraphPosition(
+                index=index,
+                start=paragraph.start,
+                end=paragraph.end,
+                start_seconds=paragraph.start_seconds,
+                end_seconds=paragraph.end_seconds,
+            )
+            if page_positions:
+                position.page_number = self.get_paragraph_page_number(
+                    paragraph, page_positions
+                )
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
                 field=field_key,
                 index=index,
                 repeated_in_field=dups.check(paragraph),
+                metadata=ParagraphMetadata(position=position),
             )
             for classification in paragraph.classifications:
                 p.labels.append(f"l/{classification.labelset}/{classification.label}")
