@@ -17,11 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use nucliadb_service_interface::prelude::nucliadb_protos::ParagraphMetadata;
 use nucliadb_service_interface::prelude::*;
+use prost::Message;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
 use tantivy::schema::{
     Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
 };
+use tantivy::Document;
 
 #[derive(Debug, Clone)]
 pub struct ParagraphSchema {
@@ -46,6 +49,14 @@ pub struct ParagraphSchema {
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
     let naive = NaiveDateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32);
     DateTime::from_utc(naive, tantivy::chrono::Utc)
+}
+
+impl ParagraphSchema {
+    /// Returns the paragraph metadata for the given document, if any.
+    pub fn metadata(&self, doc: &Document) -> Option<ParagraphMetadata> {
+        doc.get_first(self.metadata)
+            .and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
+    }
 }
 
 impl Default for ParagraphSchema {
