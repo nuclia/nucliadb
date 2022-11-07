@@ -503,6 +503,7 @@ mod tests {
             index: 0,
             split: "".to_string(),
             repeated_in_field: false,
+            metadata: None,
         };
         let p1_uuid = format!("{}/{}/{}-{}", UUID, "body", 0, DOC1_P1.len());
 
@@ -519,6 +520,7 @@ mod tests {
             index: 1,
             split: "".to_string(),
             repeated_in_field: false,
+            metadata: None,
         };
         let p2_uuid = format!(
             "{}/{}/{}-{}",
@@ -537,6 +539,7 @@ mod tests {
             index: 2,
             split: "".to_string(),
             repeated_in_field: false,
+            metadata: None,
         };
         let p3_uuid = format!(
             "{}/{}/{}-{}",
@@ -561,6 +564,7 @@ mod tests {
             index: 3,
             split: "".to_string(),
             repeated_in_field: false,
+            metadata: None,
         };
         let p4_uuid = format!("{}/{}/{}-{}", UUID, "body", 0, DOC1_TI.len());
 
