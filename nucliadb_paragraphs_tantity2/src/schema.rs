@@ -39,6 +39,8 @@ pub struct ParagraphSchema {
     pub field: Field,
     pub split: Field,
     pub index: Field,
+    pub repeated_in_field: Field,
+    pub metadata: Field,
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
@@ -73,12 +75,15 @@ impl Default for ParagraphSchema {
 
         // Status
         let status = sb.add_u64_field("status", num_options.clone());
-        let index = sb.add_u64_field("index", num_options);
+        let index = sb.add_u64_field("index", num_options.clone());
 
         // Facets
         let facets = sb.add_facet_field("facets", facet_options.clone());
         let field = sb.add_facet_field("field", facet_options);
         let split = sb.add_text_field("split", STRING | STORED);
+
+        let repeated_in_field = sb.add_u64_field("repeated_in_field", num_options);
+        let metadata = sb.add_bytes_field("metadata", STORED);
 
         let schema = sb.build();
         tracing::info!("paragraph schema created");
@@ -96,6 +101,8 @@ impl Default for ParagraphSchema {
             field,
             split,
             index,
+            repeated_in_field,
+            metadata,
         }
     }
 }
