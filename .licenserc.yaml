@@ -68,6 +68,7 @@ header:
     - "LICENSE"
     - "NOTICE"
     - "nucliadb_paragraphs_tantivy/stop_words"
+    - "nucliadb_paragraphs_tantivy2/stop_words"
     - "**/.gitignore"
 
   comment: on-failure
