@@ -24,6 +24,7 @@ use std::fs;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
+use prost::Message;
 use regex::Regex;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -206,12 +207,19 @@ impl ParagraphWriterService {
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
                 let text: String = chars[lower_bound..upper_bound].iter().collect();
                 let facet_field = format!("/{}", field);
+
                 let mut doc = doc!(
                     self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
                     self.schema.modified => timestamp_to_datetime_utc(modified),
                     self.schema.created => timestamp_to_datetime_utc(created),
                     self.schema.status => resource.status as u64,
+                    self.schema.repeated_in_field => p.repeated_in_field as u64,
                 );
+
+                if let Some(ref metadata) = p.metadata {
+                    doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
+                }
+
                 resource
                     .labels
                     .iter()
@@ -219,6 +227,7 @@ impl ParagraphWriterService {
                     .chain(labels.iter())
                     .map(Facet::from)
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
+
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
                 debug!("Paragraph added {}", text);
