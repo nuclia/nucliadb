@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+0.0.34
+------
+
+- Add account_seq to BrokerMessage
+- Add last_account_seq to Basic
+
 0.0.33
 ------
 

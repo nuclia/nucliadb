@@ -362,6 +362,7 @@ class BrokerMessage(google.protobuf.message.Message):
     ERRORS_FIELD_NUMBER: builtins.int
     PROCESSING_ID_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
+    ACCOUNT_SEQ_FIELD_NUMBER: builtins.int
     kbid: typing.Text
     uuid: typing.Text
     slug: typing.Text
@@ -437,6 +438,7 @@ class BrokerMessage(google.protobuf.message.Message):
     def errors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Error]: ...
     processing_id: typing.Text
     source: global___BrokerMessage.MessageSource.ValueType
+    account_seq: builtins.int
     def __init__(self,
         *,
         kbid: typing.Text = ...,
@@ -470,9 +472,10 @@ class BrokerMessage(google.protobuf.message.Message):
         errors: typing.Optional[typing.Iterable[global___Error]] = ...,
         processing_id: typing.Text = ...,
         source: global___BrokerMessage.MessageSource.ValueType = ...,
+        account_seq: builtins.int = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["audit",b"audit","basic",b"basic","done_time",b"done_time","origin",b"origin"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["audit",b"audit","basic",b"basic","conversations",b"conversations","datetimes",b"datetimes","delete_fields",b"delete_fields","done_time",b"done_time","errors",b"errors","extracted_text",b"extracted_text","field_large_metadata",b"field_large_metadata","field_metadata",b"field_metadata","field_vectors",b"field_vectors","file_extracted_data",b"file_extracted_data","files",b"files","kbid",b"kbid","keywordsets",b"keywordsets","layouts",b"layouts","link_extracted_data",b"link_extracted_data","links",b"links","multiid",b"multiid","origin",b"origin","origin_seq",b"origin_seq","pre_processing_time",b"pre_processing_time","processing_id",b"processing_id","relations",b"relations","slow_processing_time",b"slow_processing_time","slug",b"slug","source",b"source","texts",b"texts","txseqid",b"txseqid","type",b"type","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["account_seq",b"account_seq","audit",b"audit","basic",b"basic","conversations",b"conversations","datetimes",b"datetimes","delete_fields",b"delete_fields","done_time",b"done_time","errors",b"errors","extracted_text",b"extracted_text","field_large_metadata",b"field_large_metadata","field_metadata",b"field_metadata","field_vectors",b"field_vectors","file_extracted_data",b"file_extracted_data","files",b"files","kbid",b"kbid","keywordsets",b"keywordsets","layouts",b"layouts","link_extracted_data",b"link_extracted_data","links",b"links","multiid",b"multiid","origin",b"origin","origin_seq",b"origin_seq","pre_processing_time",b"pre_processing_time","processing_id",b"processing_id","relations",b"relations","slow_processing_time",b"slow_processing_time","slug",b"slug","source",b"source","texts",b"texts","txseqid",b"txseqid","type",b"type","uuid",b"uuid"]) -> None: ...
 global___BrokerMessage = BrokerMessage
 
 class WriterStatusResponse(google.protobuf.message.Message):

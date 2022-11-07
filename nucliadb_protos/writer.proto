@@ -111,6 +111,7 @@ message BrokerMessage {
     repeated Error errors = 31;
     string processing_id = 32;
     MessageSource source = 33;
+    int64 account_seq = 34;
 }
 
 message WriterStatusResponse {
