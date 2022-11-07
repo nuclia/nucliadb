@@ -379,18 +379,18 @@ mod tests {
 
         for id in request_ids.iter().cloned() {
             _ = client
-                .update_and_clean_shard(Request::new(ShardId { id: id.clone() }))
+                .update_and_clean_shard(Request::new(ShardId { id }))
                 .await
                 .expect("Error in new_shard request");
         }
 
-        for id in request_ids {
+        for (id, expected) in request_ids.iter().map(|v| (v.clone(), v.clone())) {
             let response = client
-                .delete_shard(Request::new(ShardId { id: id.clone() }))
+                .delete_shard(Request::new(ShardId { id }))
                 .await
                 .expect("Error in delete_shard request");
             let deleted_id = response.get_ref().id.clone();
-            assert_eq!(deleted_id, id);
+            assert_eq!(deleted_id, expected);
         }
 
         let response = client
