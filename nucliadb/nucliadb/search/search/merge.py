@@ -299,8 +299,8 @@ async def merge_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            start_seconds=result.metadata.position.start_seconds,
-            end_seconds=result.metadata.position.end_seconds,
+            start_seconds=list(result.metadata.position.start_seconds),
+            end_seconds=list(result.metadata.position.end_seconds),
             position=ParagraphPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
