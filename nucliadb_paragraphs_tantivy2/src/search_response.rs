@@ -164,7 +164,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         index,
                         matches: terms,
                         score: Some(score),
-                        metadata: None, // TODO
+                        metadata: schema.metadata(&doc),
                     };
 
                     results.push(result);
@@ -263,7 +263,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         split,
                         index,
                         matches: terms,
-                        metadata: None, // TODO
+                        metadata: schema.metadata(&doc),
                     };
 
                     results.push(result);
