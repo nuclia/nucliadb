@@ -108,10 +108,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     #[tracing::instrument(
-        name = "NodeWriterGRPCDriver::update_and_clean_shard",
+        name = "NodeWriterGRPCDriver::clean_and_upgrade_shard",
         skip(self, request)
     )]
-    async fn update_and_clean_shard(
+    async fn clean_and_upgrade_shard(
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<ShardCleaned>, tonic::Status> {
@@ -123,7 +123,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
-        match writer.clean(&shard_id) {
+        match writer.clean_and_upgrade_shard(&shard_id) {
             Ok(updated) => Ok(tonic::Response::new(updated)),
             Err(e) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
@@ -379,7 +379,7 @@ mod tests {
 
         for id in request_ids.iter().cloned() {
             _ = client
-                .update_and_clean_shard(Request::new(ShardId { id }))
+                .clean_and_upgrade_shard(Request::new(ShardId { id }))
                 .await
                 .expect("Error in new_shard request");
         }

@@ -25,8 +25,8 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardCreated.FromString,
                 )
-        self.UpdateAndCleanShard = channel.unary_unary(
-                '/nodewriter.NodeWriter/UpdateAndCleanShard',
+        self.CleanAndUpgradeShard = channel.unary_unary(
+                '/nodewriter.NodeWriter/CleanAndUpgradeShard',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardCleaned.FromString,
                 )
@@ -72,7 +72,7 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def UpdateAndCleanShard(self, request, context):
+    def CleanAndUpgradeShard(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -121,8 +121,8 @@ def add_NodeWriterServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.ShardCreated.SerializeToString,
             ),
-            'UpdateAndCleanShard': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateAndCleanShard,
+            'CleanAndUpgradeShard': grpc.unary_unary_rpc_method_handler(
+                    servicer.CleanAndUpgradeShard,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.ShardCleaned.SerializeToString,
             ),
@@ -196,7 +196,7 @@ class NodeWriter(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def UpdateAndCleanShard(request,
+    def CleanAndUpgradeShard(request,
             target,
             options=(),
             channel_credentials=None,
@@ -206,7 +206,7 @@ class NodeWriter(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/UpdateAndCleanShard',
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/CleanAndUpgradeShard',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.ShardCleaned.FromString,
             options, channel_credentials,

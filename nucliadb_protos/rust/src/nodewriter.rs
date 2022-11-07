@@ -158,7 +158,7 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn update_and_clean_shard(
+        pub async fn clean_and_upgrade_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
         ) -> Result<
@@ -176,7 +176,7 @@ pub mod node_writer_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeWriter/UpdateAndCleanShard",
+                "/nodewriter.NodeWriter/CleanAndUpgradeShard",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -390,7 +390,7 @@ pub mod node_writer_server {
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
         >;
-        async fn update_and_clean_shard(
+        async fn clean_and_upgrade_shard(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<
@@ -553,13 +553,13 @@ pub mod node_writer_server {
                     };
                     Box::pin(fut)
                 }
-                "/nodewriter.NodeWriter/UpdateAndCleanShard" => {
+                "/nodewriter.NodeWriter/CleanAndUpgradeShard" => {
                     #[allow(non_camel_case_types)]
-                    struct UpdateAndCleanShardSvc<T: NodeWriter>(pub Arc<T>);
+                    struct CleanAndUpgradeShardSvc<T: NodeWriter>(pub Arc<T>);
                     impl<
                         T: NodeWriter,
                     > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for UpdateAndCleanShardSvc<T> {
+                    for CleanAndUpgradeShardSvc<T> {
                         type Response = super::super::noderesources::ShardCleaned;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -571,7 +571,7 @@ pub mod node_writer_server {
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {
-                                (*inner).update_and_clean_shard(request).await
+                                (*inner).clean_and_upgrade_shard(request).await
                             };
                             Box::pin(fut)
                         }
@@ -581,7 +581,7 @@ pub mod node_writer_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = UpdateAndCleanShardSvc(inner);
+                        let method = CleanAndUpgradeShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -123,7 +123,7 @@ impl NodeWriterService {
             .remove(&shard_id.id)
             .map(|shard| POOL.install(|| shard.delete()).map_err(|e| e.into()))
     }
-    pub fn clean(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
+    pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
         self.delete_shard(shard_id).transpose()?;
         let id = &shard_id.id;
         let new_shard = POOL.install(|| ShardWriterService::new(id))?;
