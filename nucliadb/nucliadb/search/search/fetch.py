@@ -20,9 +20,10 @@
 import re
 import string
 from contextvars import ContextVar
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
+from nucliadb_protos.resources_pb2 import Paragraph
 
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -106,6 +107,23 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
     else:
         orm_resource = resouce_cache.get(uuid)
     return orm_resource
+
+
+async def get_paragraph_from_resource(
+    orm_resource: ResourceORM, result: ParagraphResult
+) -> Optional[Paragraph]:
+    _, field_type, field = result.field.split("/")
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_metadata = await field_obj.get_field_metadata()
+    paragraph = None
+    if field_metadata:
+        if result.split not in (None, ""):
+            metadata = field_metadata.split_metadata[result.split]
+            paragraph = metadata.paragraphs[result.index]
+        elif len(field_metadata.metadata.paragraphs) > result.index:
+            paragraph = field_metadata.metadata.paragraphs[result.index]
+    return paragraph
 
 
 async def get_text_sentence(
@@ -322,3 +340,26 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> List[str]:
                 labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels
+
+
+async def get_seconds_paragraph(
+    result: ParagraphResult, kbid: str
+) -> Optional[Tuple[List[int], List[int]]]:
+    orm_resource = await get_resource_from_cache(kbid, result.uuid)
+
+    if orm_resource is None:
+        logger.error(f"{result.uuid} does not exist on DB")
+        return None
+
+    paragraph = await get_paragraph_from_resource(
+        orm_resource=orm_resource, result=result
+    )
+
+    if (
+        paragraph is not None
+        and len(paragraph.end_seconds) > 0
+        and paragraph.end_seconds[0] > 0
+    ):
+        return (list(paragraph.start_seconds), list(paragraph.end_seconds))
+
+    return None

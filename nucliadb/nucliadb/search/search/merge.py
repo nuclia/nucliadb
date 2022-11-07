@@ -52,6 +52,7 @@ from nucliadb.search.search.fetch import (
     get_labels_resource,
     get_labels_sentence,
     get_resource_cache,
+    get_seconds_paragraph,
     get_text_paragraph,
     get_text_sentence,
 )
@@ -164,14 +165,23 @@ async def merge_suggest_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            start_seconds=result.metadata.position.start_seconds,
-            end_seconds=result.metadata.position.end_seconds,
             position=ParagraphPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,
             ),
         )
+        if len(result.metadata.position.start_seconds) or len(
+            result.metadata.position.end_seconds
+        ):
+            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+        else:
+            # TODO: Remove once we are sure all data has been migrated!
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
         result_paragraph_list.append(new_paragraph)
 
     return Paragraphs(results=result_paragraph_list, query=query)
@@ -299,14 +309,24 @@ async def merge_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            start_seconds=list(result.metadata.position.start_seconds),
-            end_seconds=list(result.metadata.position.end_seconds),
             position=ParagraphPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,
             ),
         )
+        if len(result.metadata.position.start_seconds) or len(
+            result.metadata.position.end_seconds
+        ):
+            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+        else:
+            # TODO: Remove once we are sure all data has been migrated!
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
+
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)
