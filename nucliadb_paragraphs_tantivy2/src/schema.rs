@@ -46,8 +46,8 @@ pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime
     DateTime::from_utc(naive, tantivy::chrono::Utc)
 }
 
-impl ParagraphSchema {
-    pub fn new() -> Self {
+impl Default for ParagraphSchema {
+    fn default() -> Self {
         tracing::info!("creating paragraph schema");
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default()
@@ -97,11 +97,5 @@ impl ParagraphSchema {
             split,
             index,
         }
-    }
-}
-
-impl Default for ParagraphSchema {
-    fn default() -> Self {
-        Self::new()
     }
 }

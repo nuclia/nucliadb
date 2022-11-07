@@ -141,7 +141,7 @@ impl ParagraphWriterService {
         }
     }
     pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
 
         fs::create_dir_all(&config.path)?;
 
@@ -167,7 +167,7 @@ impl ParagraphWriterService {
     }
 
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
 
         let index = Index::open_in_dir(&config.path)?;
 
