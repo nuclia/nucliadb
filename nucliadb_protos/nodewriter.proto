@@ -35,6 +35,7 @@ message IndexMessage {
 service NodeWriter {
     rpc GetShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc NewShard(noderesources.EmptyQuery) returns (noderesources.ShardCreated) {}
+    rpc UpdateAndCleanShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
     rpc GC(noderesources.ShardId) returns (noderesources.EmptyResponse) {}

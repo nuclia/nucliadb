@@ -21,8 +21,8 @@
 use async_std::sync::RwLock;
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
-    op_status, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId, ShardCreated, ShardId,
-    ShardIds,
+    op_status, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId, ShardCleaned,
+    ShardCreated, ShardId, ShardIds,
 };
 use opentelemetry::global;
 use tracing::*;
@@ -103,6 +103,32 @@ impl NodeWriter for NodeWriterGRPCDriver {
             None => {
                 let message = format!("Shard not found {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+
+    #[tracing::instrument(
+        name = "NodeWriterGRPCDriver::update_and_clean_shard",
+        skip(self, request)
+    )]
+    async fn update_and_clean_shard(
+        &self,
+        request: tonic::Request<ShardId>,
+    ) -> Result<tonic::Response<ShardCleaned>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+
+        info!("gRPC delete_shard {:?}", request);
+
+        let shard_id = request.into_inner();
+        let mut writer = self.0.write().await;
+        match writer.clean(&shard_id) {
+            Ok(updated) => Ok(tonic::Response::new(updated)),
+            Err(e) => {
+                let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
             }
         }
     }
@@ -349,6 +375,13 @@ mod tests {
                 .expect("Error in new_shard request");
 
             request_ids.push(response.get_ref().id.clone());
+        }
+
+        for id in request_ids.iter().cloned() {
+            _ = client
+                .update_and_clean_shard(Request::new(ShardId { id: id.clone() }))
+                .await
+                .expect("Error in new_shard request");
         }
 
         for id in request_ids {

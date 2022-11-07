@@ -22,7 +22,7 @@ pub mod grpc_driver;
 use std::collections::HashMap;
 use std::path::Path;
 
-use nucliadb_protos::{Resource, ResourceId, ShardCreated, ShardId, ShardIds};
+use nucliadb_protos::{Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds};
 use nucliadb_services::*;
 use tracing::*;
 use uuid::Uuid;
@@ -123,7 +123,19 @@ impl NodeWriterService {
             .remove(&shard_id.id)
             .map(|shard| POOL.install(|| shard.delete()).map_err(|e| e.into()))
     }
-
+    pub fn clean(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
+        self.delete_shard(shard_id).transpose()?;
+        let id = &shard_id.id;
+        let new_shard = POOL.install(|| ShardWriterService::new(id))?;
+        let shard_data = ShardCleaned {
+            document_service: new_shard.document_version() as i32,
+            paragraph_service: new_shard.paragraph_version() as i32,
+            vector_service: new_shard.vector_version() as i32,
+            relation_service: new_shard.relation_version() as i32,
+        };
+        self.shards.insert(id.clone(), new_shard);
+        Ok(shard_data)
+    }
     pub fn set_resource(
         &mut self,
         shard_id: &ShardId,
