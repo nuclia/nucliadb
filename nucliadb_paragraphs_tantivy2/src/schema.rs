@@ -71,7 +71,10 @@ impl Default for ParagraphSchema {
             .set_indexed()
             .set_stored()
             .set_fast(Cardinality::SingleValue);
-
+        let repeated_options = NumericOptions::default()
+            .set_indexed()
+            .set_stored()
+            .set_fast(Cardinality::SingleValue);
         let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_text_field("uuid", STRING | STORED);
@@ -86,14 +89,14 @@ impl Default for ParagraphSchema {
 
         // Status
         let status = sb.add_u64_field("status", num_options.clone());
-        let index = sb.add_u64_field("index", num_options.clone());
+        let index = sb.add_u64_field("index", num_options);
 
         // Facets
         let facets = sb.add_facet_field("facets", facet_options.clone());
         let field = sb.add_facet_field("field", facet_options);
         let split = sb.add_text_field("split", STRING | STORED);
 
-        let repeated_in_field = sb.add_u64_field("repeated_in_field", num_options);
+        let repeated_in_field = sb.add_u64_field("repeated_in_field", repeated_options);
         let metadata = sb.add_bytes_field("metadata", STORED);
 
         let schema = sb.build();

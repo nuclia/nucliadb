@@ -66,8 +66,7 @@ impl ParagraphReader for ParagraphReaderService {
         let topdocs = TopDocs::with_limit(no_results);
         let mut results = searcher.search(&original, &topdocs).unwrap();
         if results.is_empty() {
-            let topdocs = TopDocs::with_limit(no_results - results.len());
-            match searcher.search(&fuzzied, &topdocs) {
+            match searcher.search(&fuzzied, &TopDocs::with_limit(no_results)) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
                 Err(err) => error!("{err:?} during suggest"),
             }
@@ -116,7 +115,7 @@ impl ReaderChild for ParagraphReaderService {
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
             search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
-        let mut searcher = Searcher {
+        let searcher = Searcher {
             request,
             results,
             offset,
@@ -127,7 +126,6 @@ impl ReaderChild for ParagraphReaderService {
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
         if response.results.is_empty() {
-            searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
             let filter = response
                 .results
