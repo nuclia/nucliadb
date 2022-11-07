@@ -227,6 +227,51 @@ class VectorSentence(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["vector",b"vector"]) -> None: ...
 global___VectorSentence = VectorSentence
 
+class ParagraphPosition(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    INDEX_FIELD_NUMBER: builtins.int
+    START_FIELD_NUMBER: builtins.int
+    END_FIELD_NUMBER: builtins.int
+    PAGE_NUMBER_FIELD_NUMBER: builtins.int
+    START_SECONDS_FIELD_NUMBER: builtins.int
+    END_SECONDS_FIELD_NUMBER: builtins.int
+    index: builtins.int
+    start: builtins.int
+    end: builtins.int
+    page_number: builtins.int
+    """For pdfs/documents only"""
+
+    @property
+    def start_seconds(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """For multimedia only"""
+        pass
+    @property
+    def end_seconds(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(self,
+        *,
+        index: builtins.int = ...,
+        start: builtins.int = ...,
+        end: builtins.int = ...,
+        page_number: builtins.int = ...,
+        start_seconds: typing.Optional[typing.Iterable[builtins.int]] = ...,
+        end_seconds: typing.Optional[typing.Iterable[builtins.int]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","end_seconds",b"end_seconds","index",b"index","page_number",b"page_number","start",b"start","start_seconds",b"start_seconds"]) -> None: ...
+global___ParagraphPosition = ParagraphPosition
+
+class ParagraphMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    POSITION_FIELD_NUMBER: builtins.int
+    @property
+    def position(self) -> global___ParagraphPosition: ...
+    def __init__(self,
+        *,
+        position: typing.Optional[global___ParagraphPosition] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["position",b"position"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["position",b"position"]) -> None: ...
+global___ParagraphMetadata = ParagraphMetadata
+
 class IndexParagraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class SentencesEntry(google.protobuf.message.Message):
@@ -252,6 +297,7 @@ class IndexParagraph(google.protobuf.message.Message):
     SPLIT_FIELD_NUMBER: builtins.int
     INDEX_FIELD_NUMBER: builtins.int
     REPEATED_IN_FIELD_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
     start: builtins.int
     """Start end position in field text"""
 
@@ -272,6 +318,8 @@ class IndexParagraph(google.protobuf.message.Message):
 
     index: builtins.int
     repeated_in_field: builtins.bool
+    @property
+    def metadata(self) -> global___ParagraphMetadata: ...
     def __init__(self,
         *,
         start: builtins.int = ...,
@@ -282,8 +330,10 @@ class IndexParagraph(google.protobuf.message.Message):
         split: typing.Text = ...,
         index: builtins.int = ...,
         repeated_in_field: builtins.bool = ...,
+        metadata: typing.Optional[global___ParagraphMetadata] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","labels",b"labels","repeated_in_field",b"repeated_in_field","sentences",b"sentences","split",b"split","start",b"start"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","field",b"field","index",b"index","labels",b"labels","metadata",b"metadata","repeated_in_field",b"repeated_in_field","sentences",b"sentences","split",b"split","start",b"start"]) -> None: ...
 global___IndexParagraph = IndexParagraph
 
 class IndexParagraphs(google.protobuf.message.Message):

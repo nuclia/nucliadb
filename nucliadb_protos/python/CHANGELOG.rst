@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.32
+------
+
+- Add extra metadata with paragraph position on IndexParagraph proto
+
 0.0.31
 ------
 

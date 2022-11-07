@@ -94,6 +94,13 @@ class Sentences(BaseModel):
     page_size: int = 20
 
 
+class ParagraphPosition(BaseModel):
+    page_number: Optional[int]
+    index: int
+    start: int
+    end: int
+
+
 class Paragraph(BaseModel):
     score: float
     rid: str
@@ -103,6 +110,7 @@ class Paragraph(BaseModel):
     labels: List[str] = []
     start_seconds: Optional[List[int]] = None
     end_seconds: Optional[List[int]] = None
+    position: Optional[ParagraphPosition] = None
 
 
 class Paragraphs(BaseModel):
