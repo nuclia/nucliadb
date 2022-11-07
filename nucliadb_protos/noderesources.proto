@@ -47,6 +47,28 @@ message ShardCreated {
     RelationService relation_service = 5;
 }
 
+message ShardCleaned {
+    enum DocumentService {
+        DOCUMENT_V0 = 0;
+        DOCUMENT_V1 = 1;
+    }
+    DocumentService document_service = 2;
+    enum ParagraphService {
+        PARAGRAPH_V0 = 0;
+        PARAGRAPH_V1 = 1;
+    }
+    ParagraphService paragraph_service = 3;
+    enum VectorService {
+        VECTOR_V0 = 0;
+        VECTOR_V1 = 1;
+    }
+    VectorService vector_service = 4;
+    enum RelationService {
+        RELATION_V0 = 0;
+        RELATION_V1 = 1;
+    }
+    RelationService relation_service = 5;
+}
 
 message ResourceID {
     string shard_id = 1;

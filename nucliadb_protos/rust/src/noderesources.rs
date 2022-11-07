@@ -65,6 +65,44 @@ pub mod shard_created {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShardCleaned {
+    #[prost(enumeration="shard_cleaned::DocumentService", tag="2")]
+    pub document_service: i32,
+    #[prost(enumeration="shard_cleaned::ParagraphService", tag="3")]
+    pub paragraph_service: i32,
+    #[prost(enumeration="shard_cleaned::VectorService", tag="4")]
+    pub vector_service: i32,
+    #[prost(enumeration="shard_cleaned::RelationService", tag="5")]
+    pub relation_service: i32,
+}
+/// Nested message and enum types in `ShardCleaned`.
+pub mod shard_cleaned {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum DocumentService {
+        DocumentV0 = 0,
+        DocumentV1 = 1,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum ParagraphService {
+        ParagraphV0 = 0,
+        ParagraphV1 = 1,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum VectorService {
+        VectorV0 = 0,
+        VectorV1 = 1,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum RelationService {
+        RelationV0 = 0,
+        RelationV1 = 1,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResourceId {
     #[prost(string, tag="1")]
     pub shard_id: ::prost::alloc::string::String,
