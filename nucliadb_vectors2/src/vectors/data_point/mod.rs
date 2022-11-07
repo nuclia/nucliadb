@@ -224,7 +224,7 @@ impl DataPoint {
         labels: &[String],
         results: usize,
     ) -> Vec<(String, f32)> {
-        use ops_hnsw::{params, SearchValue};
+        use ops_hnsw::params;
         let labels = labels.iter().map(|l| l.as_bytes()).collect::<Vec<_>>();
         let ops = HnswOps {
             tracker: &Retriever {
@@ -233,7 +233,7 @@ impl DataPoint {
                 nodes: &self.nodes,
             },
         };
-        let SearchValue { neighbours } = ops.search(
+        let neighbours = ops.search(
             Address(self.journal.nodes),
             self.index.as_ref(),
             params::k_neighbours(),

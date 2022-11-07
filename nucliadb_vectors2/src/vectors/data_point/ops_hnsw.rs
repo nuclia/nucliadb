@@ -28,8 +28,6 @@ use rayon::prelude::*;
 
 use super::*;
 
-const NO_FILTER: &[&[u8]] = &[];
-
 pub mod params {
     pub fn level_factor() -> f64 {
         1.0 / (m() as f64).ln()
@@ -83,10 +81,7 @@ impl PartialOrd for Cnx {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct SearchValue {
-    pub neighbours: Vec<(Address, f32)>,
-}
+pub type Neighbours = Vec<(Address, f32)>;
 
 pub struct HnswOps<'a, DR> {
     pub tracker: &'a DR,
@@ -114,23 +109,31 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         self.tracker.consine_similarity(x, y)
     }
     fn closest_up_node<L: Layer>(
-        &self,
+        &'a self,
+        solution: &mut HashSet<Address>,
+        filters: &[&[u8]],
         layer: L,
         x: Address,
         y: Address,
     ) -> Option<(Address, f32)> {
+        solution.remove(&x);
         let mut candidates = BinaryHeap::from([Cnx(x, self.cosine_similarity(x, y))]);
-        let mut visited = HashSet::from([x]);
+        let mut visited_nodes = HashSet::new();
         loop {
             match candidates.pop() {
                 None => break None,
-                Some(Cnx(n, _)) if !self.tracker.is_deleted(n) => {
+                Some(Cnx(n, _))
+                    if !self.tracker.is_deleted(n)
+                        && !solution.contains(&n)
+                        && filters.iter().all(|label| self.tracker.has_label(n, label)) =>
+                {
+                    solution.insert(n);
                     break Some((n, self.cosine_similarity(n, y)));
                 }
                 Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, _)| {
-                    if !visited.contains(&n) {
+                    if !visited_nodes.contains(&n) {
                         candidates.push(Cnx(n, self.cosine_similarity(n, y)));
-                        visited.insert(n);
+                        visited_nodes.insert(n);
                     }
                 }),
             }
@@ -141,9 +144,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         x: Address,
         layer: L,
         k_neighbours: usize,
-        with_filter: &[&[u8]],
         entry_points: &[Address],
-    ) -> SearchValue {
+    ) -> Neighbours {
         let mut visited = HashSet::new();
         let mut candidates = BinaryHeap::new();
         let mut ms_neighbours = BinaryHeap::new();
@@ -175,17 +177,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                 _ => (),
             }
         }
-        let neighbours = ms_neighbours.into_sorted_vec();
-        let neighbours: Vec<_> = neighbours
+        ms_neighbours
+            .into_sorted_vec()
             .into_par_iter()
             .map(|Reverse(Cnx(n, d))| (n, d))
-            .filter(|(node, _)| {
-                with_filter
-                    .iter()
-                    .all(|label| self.tracker.has_label(*node, *label))
-            })
-            .collect();
-        SearchValue { neighbours }
+            .collect()
     }
     fn layer_insert(
         &self,
@@ -194,9 +190,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         entry_points: &[Address],
     ) -> Vec<Address> {
         use params::*;
-        let s_result =
-            self.layer_search::<&RAMLayer>(x, layer, ef_construction(), NO_FILTER, entry_points);
-        let neighbours = s_result.neighbours;
+        let neighbours = self.layer_search::<&RAMLayer>(x, layer, ef_construction(), entry_points);
         let mut needs_repair = HashSet::new();
         let mut result = Vec::with_capacity(neighbours.len());
         layer.add_node(x);
@@ -242,37 +236,28 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         hnsw: H,
         k_neighbours: usize,
         with_filter: &[&[u8]],
-    ) -> SearchValue {
+    ) -> Neighbours {
         if let Some(entry_point) = hnsw.get_entry_point() {
             let mut crnt_layer = entry_point.layer;
             let mut neighbours = vec![(entry_point.node, 0.)];
             while crnt_layer != 0 {
                 let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-                let SearchValue {
-                    neighbours: layer_res,
-                    ..
-                } = self.layer_search(x, hnsw.get_layer(crnt_layer), 1, NO_FILTER, &entry_points);
+                let layer_res = self.layer_search(x, hnsw.get_layer(crnt_layer), 1, &entry_points);
                 neighbours = layer_res;
                 crnt_layer -= 1;
             }
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-            let result = self.layer_search(
-                x,
-                hnsw.get_layer(crnt_layer),
-                k_neighbours,
-                with_filter,
-                &entry_points,
-            );
-            let neighbours = result
-                .neighbours
+            let layer = hnsw.get_layer(crnt_layer);
+            let result = self.layer_search(x, layer, k_neighbours, &entry_points);
+            let mut solution = result.iter().copied().map(|v| v.0).collect();
+            result
                 .into_iter()
-                .map(|(n, _)| self.closest_up_node(hnsw.get_layer(0), n, x))
-                .filter(Option::is_some)
-                .flatten()
-                .collect::<Vec<_>>();
-            SearchValue { neighbours }
+                .flat_map(|(n, _)| {
+                    self.closest_up_node(&mut solution, with_filter, hnsw.get_layer(0), n, x)
+                })
+                .collect()
         } else {
-            SearchValue::default()
+            Neighbours::default()
         }
     }
 }
