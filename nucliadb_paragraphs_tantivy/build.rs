@@ -44,12 +44,11 @@ fn main() -> io::Result<()> {
     fs::write(
         &Path::new("./src/stop_words.rs"),
         format!(
-            "pub const STOP_WORDS: [&str;{}] = [{}];\n",
-            stop_words.len(),
+            "pub fn is_stop_word(x:&str) -> bool {{\n {} \n}}",
             stop_words
                 .into_iter()
-                .map(|word| format!(r#""{}""#, word))
-                .join(", ")
+                .map(|word| format!(r#"x == "{}""#, word))
+                .join("\n|| ")
         ),
     )?;
 

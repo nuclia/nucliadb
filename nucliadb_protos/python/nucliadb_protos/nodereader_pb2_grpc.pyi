@@ -12,6 +12,8 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
+    ParagraphMetadata as ParagraphMetadata,
+    ParagraphPosition as ParagraphPosition,
     Resource as Resource,
     ResourceID as ResourceID,
     Shard as Shard,

@@ -19,6 +19,7 @@
 #
 from uuid import uuid4
 
+import pytest
 from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     FieldID,
@@ -71,3 +72,51 @@ def test_duplicate_paragraph_checker():
     assert dupcheck.check(p1) is False
     assert dupcheck.check(p2) is False
     assert dupcheck.check(p3) is True
+
+
+def test_get_paragraph_page_number():
+    br = ResourceBrain(rid="foo")
+    page_positions = {
+        0: (0, 99),
+        1: (100, 199),
+        2: (200, 299),
+    }
+    assert br.get_paragraph_page_number(Paragraph(start=10), page_positions) == 0
+    assert br.get_paragraph_page_number(Paragraph(start=100), page_positions) == 1
+
+    with pytest.raises(ValueError):
+        br.get_paragraph_page_number(Paragraph(start=500), page_positions)
+
+
+def test_apply_field_metadata_populates_page_number():
+    br = ResourceBrain(rid="foo")
+    field_key = "text1"
+
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+
+    p1 = Paragraph(
+        start=40, end=54, start_seconds=[0], end_seconds=[10], text="Some text here"
+    )
+    p1.sentences.append(Sentence(start=40, end=54, key="test"))
+    fcmw.metadata.metadata.paragraphs.append(p1)
+
+    # Add it to the split too
+    fcmw.metadata.split_metadata["subfield"].paragraphs.append(p1)
+
+    page_positions = {
+        0: (0, 20),
+        1: (21, 39),
+        2: (40, 100),
+    }
+    br.apply_field_metadata(
+        field_key, fcmw.metadata, [], {}, page_positions=page_positions
+    )
+
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 2
+    for paragraph in br.brain.paragraphs[field_key].paragraphs.values():
+        assert paragraph.metadata.position.page_number == 2
+        assert paragraph.metadata.position.start == 40
+        assert paragraph.metadata.position.end == 54
+        assert paragraph.metadata.position.start_seconds == [0]
+        assert paragraph.metadata.position.end_seconds == [10]

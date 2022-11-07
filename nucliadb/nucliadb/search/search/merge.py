@@ -37,6 +37,7 @@ from nucliadb.search.api.models import (
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
+    ParagraphPosition,
     Paragraphs,
     RelatedEntities,
     ResourceResult,
@@ -157,7 +158,6 @@ async def merge_suggest_paragraph_results(
             result, kbid, highlight=highlight, ematches=ematches  # type: ignore
         )
         labels = await get_labels_paragraph(result, kbid)
-        seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
             score=result.score.bm25,
             rid=result.uuid,
@@ -165,10 +165,23 @@ async def merge_suggest_paragraph_results(
             field=field,
             text=text,
             labels=labels,
+            position=ParagraphPosition(
+                index=result.metadata.position.index,
+                start=result.metadata.position.start,
+                end=result.metadata.position.end,
+            ),
         )
-        if seconds_positions is not None:
-            new_paragraph.start_seconds = seconds_positions[0]
-            new_paragraph.end_seconds = seconds_positions[1]
+        if len(result.metadata.position.start_seconds) or len(
+            result.metadata.position.end_seconds
+        ):
+            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+        else:
+            # TODO: Remove once we are sure all data has been migrated!
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
         result_paragraph_list.append(new_paragraph)
 
     return Paragraphs(results=result_paragraph_list, query=query)
@@ -289,7 +302,6 @@ async def merge_paragraph_results(
         _, field_type, field = result.field.split("/")
         text = await get_text_paragraph(result, kbid, highlight, ematches)
         labels = await get_labels_paragraph(result, kbid)
-        seconds_positions = await get_seconds_paragraph(result, kbid)
         new_paragraph = Paragraph(
             score=result.score.bm25,
             rid=result.uuid,
@@ -297,10 +309,24 @@ async def merge_paragraph_results(
             field=field,
             text=text,
             labels=labels,
+            position=ParagraphPosition(
+                index=result.metadata.position.index,
+                start=result.metadata.position.start,
+                end=result.metadata.position.end,
+            ),
         )
-        if seconds_positions is not None:
-            new_paragraph.start_seconds = seconds_positions[0]
-            new_paragraph.end_seconds = seconds_positions[1]
+        if len(result.metadata.position.start_seconds) or len(
+            result.metadata.position.end_seconds
+        ):
+            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
+            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
+        else:
+            # TODO: Remove once we are sure all data has been migrated!
+            seconds_positions = await get_seconds_paragraph(result, kbid)
+            if seconds_positions is not None:
+                new_paragraph.start_seconds = seconds_positions[0]
+                new_paragraph.end_seconds = seconds_positions[1]
+
         result_paragraph_list.append(new_paragraph)
         if new_paragraph.rid not in resources:
             resources.append(new_paragraph.rid)

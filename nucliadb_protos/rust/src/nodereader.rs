@@ -158,6 +158,9 @@ pub struct ParagraphResult {
     pub score: ::core::option::Option<ResultScore>,
     #[prost(string, repeated, tag="10")]
     pub matches: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// Metadata that can't be searched with but is returned on search results
+    #[prost(message, optional, tag="11")]
+    pub metadata: ::core::option::Option<super::noderesources::ParagraphMetadata>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
