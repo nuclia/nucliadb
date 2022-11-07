@@ -30,7 +30,7 @@ use tantivy::{DocId, InvertedIndexReader, Term};
 
 use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
-use crate::stop_words::STOP_WORDS;
+use crate::stop_words::is_stop_word;
 
 type QueryP = (Occur, Box<dyn Query>);
 
@@ -213,11 +213,11 @@ fn parse_query(parser: &QueryParser, text: &str) -> Box<dyn Query> {
 /// - Is **NOT** the last term in the query
 ///
 /// The last term of the query is a prefix fuzzy term and must be preserved.
-fn remove_stop_words<'a>(query: &'a str, stop_words: &[&str]) -> Cow<'a, str> {
+fn remove_stop_words(query: &str) -> Cow<'_, str> {
     match query.rsplit_once(' ') {
         Some((query, last_term)) => query
             .split(' ')
-            .filter(|term| !stop_words.contains(term))
+            .filter(|term| !is_stop_word(term))
             .chain([last_term])
             .join(" ")
             .into(),
@@ -264,7 +264,7 @@ fn preprocess_raw_query(query: &str, tc: &mut TermCollector) -> ProcessedQuery {
     }
     ProcessedQuery {
         regular_query: query.to_string(),
-        fuzzy_query: remove_stop_words(fuzzy_query.trim(), &STOP_WORDS[..]).to_string(),
+        fuzzy_query: remove_stop_words(fuzzy_query.trim()).to_string(),
     }
 }
 pub fn suggest_query(
@@ -401,7 +401,6 @@ mod tests {
 
     #[test]
     fn it_removes_stop_word_fterms() {
-        let stop_words = &["is", "a", "for", "and"];
         let tests = [
             (
                 "nuclia is a database for unstructured data",
@@ -416,7 +415,7 @@ mod tests {
         ];
 
         for (query, expected_fuzzy_query) in tests {
-            let fuzzy_query = remove_stop_words(query, &stop_words[..]);
+            let fuzzy_query = remove_stop_words(query);
 
             assert_eq!(fuzzy_query, expected_fuzzy_query);
         }
