@@ -893,6 +893,8 @@ async def create_resource(storage, driver, cache, knowledgebox):
         icon="text/plain",
         layout="basic",
         thumbnail="/file",
+        last_seqid=1,
+        last_account_seq=2,
     )
     basic.metadata.metadata["key"] = "value"
     basic.metadata.language = "ca"

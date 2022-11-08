@@ -1,5 +1,11 @@
 # CHANGELOG
 
+
+## 2.0.6
+
+- Extend BrokerMessage to include account queue sequence
+- Include last account sequence on resource results
+
 ## 2.0.5
 
 - Fix transactional error with TiKV when trying to get a nonexistent

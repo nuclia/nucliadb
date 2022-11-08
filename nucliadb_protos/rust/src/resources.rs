@@ -75,6 +75,9 @@ pub struct Basic {
     /// last processing seqid of the resource
     #[prost(int64, tag="14")]
     pub last_seqid: i64,
+    /// last processing sequid (non nats) of this resource in the account queue
+    #[prost(int64, tag="35")]
+    pub last_account_seq: i64,
 }
 // Block behaviors
 

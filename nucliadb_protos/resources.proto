@@ -56,6 +56,9 @@ message Basic {
 
     // last processing seqid of the resource
     int64 last_seqid = 14;
+
+    // last processing sequid (non nats) of this resource in the account queue
+    int64 last_account_seq = 35;
 }
 
 

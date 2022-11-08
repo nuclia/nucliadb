@@ -39,6 +39,7 @@ BASIC = (
     "modified",
     "fieldmetadata",
     "last_seqid",
+    "last_account_seq",
 )
 RELATIONS = ("relations",)
 ORIGIN = ("origin",)
@@ -85,6 +86,31 @@ async def test_get_resource_default_options(
         assert set(resource.keys()) == expected_root_fields
 
         assert "data" not in resource
+
+
+@pytest.mark.asyncio
+async def test_get_resource_sequence_ids_are_set_on_resource(
+    reader_api: Callable[..., AsyncClient], test_resource: Resource
+) -> None:
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rid = rsc.uuid
+
+    async with reader_api(roles=[NucliaDBRoles.READER]) as client:
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
+        )
+        assert resp.status_code == 200
+
+        resource = resp.json()
+
+        expected_root_fields = set(ID + BASIC)
+        assert set(resource.keys()) == expected_root_fields
+
+        assert "data" not in resource
+        assert test_resource.basic is not None
+        assert resource["last_seqid"] == test_resource.basic.last_seqid
+        assert resource["last_account_seq"] == test_resource.basic.last_account_seq
 
 
 @pytest.mark.asyncio
