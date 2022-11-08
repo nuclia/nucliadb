@@ -550,6 +550,7 @@ class Processor:
         response = KnowledgeBoxPB()
         if uuid is None:
             response.status = KnowledgeBoxResponseStatus.NOTFOUND
+            await txn.abort()
             return response
 
         config = await KnowledgeBox.get_kb(txn, uuid)
