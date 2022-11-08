@@ -29,6 +29,7 @@ from nucliadb_protos.resources_pb2 import (
     Metadata,
     Paragraph,
 )
+from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -69,15 +70,33 @@ class Resource:
         )
         self.slug = slug
 
-    def get(self, values=True) -> NucliaDBResource:
-        show = []
-        if values:
-            show.append("values")
-        response = self.http_reader_v1.get("?").content
+    def get(
+        self,
+        show: Optional[List[str]] = None,
+        field_type: Optional[List[str]] = None,
+        extracted: Optional[List[str]] = None,
+        timeout: int = None,
+    ) -> NucliaDBResource:
+        params = {}
+
+        show = show or []
+        if show:
+            params["show"] = show
+
+        field_type = field_type or []
+        if field_type:
+            params["field_type"] = field_type
+
+        if extracted:
+            if "extracted" not in show:
+                show.append("extracted")
+            params["extracted"] = extracted
+
+        response = self.http_reader_v1.get("", params=params, timeout=timeout).content
         return NucliaDBResource.parse_raw(response)
 
     def update(self):
-        response = self.http_writer_v1.get("").content
+        response = self.http_reader_v1.get("").content
         return NucliaDBResource.parse_raw(response)
 
     def delete(self):
@@ -175,7 +194,7 @@ class Resource:
 
         self.kb.client.writer_stub.ProcessMessage(iterator())
 
-        self._bm = None
+        self.cleanup()
 
     def parse(self, payload: bytes):
         self._bm = BrokerMessage()
@@ -203,6 +222,18 @@ class Resource:
     def cleanup(self):
         self._bm = None
 
+    def iter_sentences(self):
+        if not self.kb.client.train_stub:
+            raise RuntimeError("Train stub not configured")
+
+        request = GetSentencesRequest()
+        request.kb.uuid = self.kb.kbid
+        request.uuid = self.rid
+        request.metadata.text = True
+
+        for sentence in self.kb.client.train_stub.GetSentences(request):
+            yield sentence
+
     async def commit(self, processor: bool = True):
         if self.bm is None:
             raise AttributeError("No Broker Message")
@@ -227,4 +258,4 @@ class Resource:
         await self.kb.client.writer_stub_async.ProcessMessage(iterator())  # type: ignore
         logger.info(f"Commited {self.bm.uuid}")
 
-        self._bm = None
+        self.cleanup()

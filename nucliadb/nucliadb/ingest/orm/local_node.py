@@ -148,6 +148,17 @@ class LocalNode(AbstractNode):
         else:
             return None
 
+    @classmethod
+    async def get_all_shards(cls, txn: Transaction, kbid: str) -> Optional[PBShards]:
+        key = KB_SHARDS.format(kbid=kbid)
+        kb_shards_bytes: Optional[bytes] = await txn.get(key)
+        if kb_shards_bytes is not None:
+            kb_shards = PBShards()
+            kb_shards.ParseFromString(kb_shards_bytes)
+            return kb_shards
+        else:
+            return None
+
     async def get_shard(self, id: str) -> ShardId:
         req = ShardId(id=id)
         loop = asyncio.get_running_loop()
@@ -207,6 +218,17 @@ class LocalNode(AbstractNode):
         resp = await loop.run_in_executor(
             self.executor, self.writer.remove_resource, req.SerializeToString()
         )
+        pb_bytes = bytes(resp)
+        op_status = OpStatus()
+        op_status.ParseFromString(pb_bytes)
+        return op_status
+
+    async def clean_and_upgrade_shard(self, shard_id: str):
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.clean_and_upgrade_shard, shard_id
+        )
+
         pb_bytes = bytes(resp)
         op_status = OpStatus()
         op_status.ParseFromString(pb_bytes)

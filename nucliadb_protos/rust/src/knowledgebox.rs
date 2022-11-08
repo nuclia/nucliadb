@@ -90,6 +90,11 @@ pub struct DeleteKnowledgeBoxResponse {
     #[prost(enumeration="KnowledgeBoxResponseStatus", tag="1")]
     pub status: i32,
 }
+// Clean Index
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CleanedKnowledgeBoxResponse {
+}
 // Labels on a Knowledge Box
 
 #[derive(Clone, PartialEq, ::prost::Message)]

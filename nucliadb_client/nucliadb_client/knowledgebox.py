@@ -34,6 +34,7 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb.models.resource import KnowledgeBoxObj, ResourceList
 from nucliadb.models.writer import CreateResourcePayload, ResourceCreated
+from nucliadb.search.api.models import KnowledgeboxShards
 
 if TYPE_CHECKING:
     from nucliadb_client.client import NucliaDBClient
@@ -68,6 +69,11 @@ class KnowledgeBox:
         self.http_writer_v1 = httpx.Client(
             base_url=f"{client.http_writer_v1.base_url}{KB_PREFIX}/{kbid}",
             headers={"X-NUCLIADB-ROLES": "WRITER"},
+            follow_redirects=True,
+        )
+        self.http_search_v1 = httpx.Client(
+            base_url=f"{client.http_search_v1.base_url}{KB_PREFIX}/{kbid}",
+            headers={"X-NUCLIADB-ROLES": "READER"},
             follow_redirects=True,
         )
         self.http_manager_v1 = httpx.Client(
@@ -110,6 +116,12 @@ class KnowledgeBox:
     def delete(self):
         resp = self.http_manager_v1.delete("")
         return resp.status_code == 200
+
+    def get_shards(self):
+        response = self.http_search_v1.get(
+            "shards", headers={"X-NUCLIADB-ROLES": "MANAGER"}
+        )
+        return KnowledgeboxShards.parse_raw(response.content)
 
     async def import_export(self, line: str):
         type_line = line[:4]

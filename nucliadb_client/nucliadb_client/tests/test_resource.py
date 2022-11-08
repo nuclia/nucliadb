@@ -71,7 +71,7 @@ def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):
 
     res = nucliadb_knowledgebox.create_resource(payload)
 
-    info = res.get(values=True)
+    info = res.get()
     assert info.title == "My Resource"
 
 

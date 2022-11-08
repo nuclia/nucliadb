@@ -87,3 +87,7 @@ class Shard(AbstractShard):
                 pass
 
         return count
+
+    async def clean_and_upgrade(self):
+        for shardreplica in self.shard.replicas:
+            await NODES[shardreplica.node].writer.CleanAndUpgradeShard(shardreplica.shard)  # type: ignore

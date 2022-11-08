@@ -210,6 +210,18 @@ impl NodeWriter {
         }
     }
 
+    pub fn clean_and_upgrade_shard<'p>(
+        &mut self,
+        shard_id: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        match self.writer.clean_and_upgrade_shard(&shard_id) {
+            Ok(clean_data) => Ok(PyList::new(py, clean_data.encode_to_vec())),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+        }
+    }
+
     pub fn list_shards<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_ids = self.writer.get_shard_ids();
         Ok(PyList::new(py, shard_ids.encode_to_vec()))

@@ -68,6 +68,10 @@ class DummyWriterStub:
         self.calls.setdefault("DeleteShard", []).append(data)
         return ShardId(id="shard")
 
+    async def CleanAndUpgradeShard(self, data):
+        self.calls.setdefault("CleanAndUpgradeShard", []).append(data)
+        return ShardId(id="shard")
+
     async def ListShards(self, data):
         self.calls.setdefault("ListShards", []).append(data)
         sl = ShardList()
@@ -168,6 +172,17 @@ class Node(AbstractNode):
             kb_shards.ParseFromString(kb_shards_bytes)
             shard: PBShard = kb_shards.shards[kb_shards.actual]
             return Shard(sharduuid=shard.shard, shard=shard)
+        else:
+            return None
+
+    @classmethod
+    async def get_all_shards(cls, txn: Transaction, kbid: str) -> Optional[PBShards]:
+        key = KB_SHARDS.format(kbid=kbid)
+        kb_shards_bytes: Optional[bytes] = await txn.get(key)
+        if kb_shards_bytes is not None:
+            kb_shards = PBShards()
+            kb_shards.ParseFromString(kb_shards_bytes)
+            return kb_shards
         else:
             return None
 
@@ -325,6 +340,11 @@ class Node(AbstractNode):
     async def delete_shard(self, id: str) -> int:
         req = ShardId(id=id)
         resp = await self.writer.DeleteShard(req)  # type: ignore
+        return resp.id
+
+    async def clean_and_upgrade_shard(self, id: str) -> int:
+        req = ShardId(id=id)
+        resp = await self.writer.CleanAndUpgradeShard(req)  # type: ignore
         return resp.id
 
     async def list_shards(self) -> List[str]:

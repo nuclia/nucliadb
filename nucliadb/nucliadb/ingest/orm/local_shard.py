@@ -50,3 +50,7 @@ class LocalShard(AbstractShard):
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
             res = await self.node.add_resource(resource)
         return res.count
+
+    async def clean_and_upgrade(self):
+        for shardreplica in self.shard.replicas:
+            await self.node.clean_and_upgrade_shard(shardreplica.shard)
