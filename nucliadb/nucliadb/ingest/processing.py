@@ -233,6 +233,10 @@ class ProcessingEngine:
             "driver": 3,  # To indicate that this is an externally-hosted file (no gcp, s3 nor local).
             "uri": file_field.file.uri,
             "extra_headers": file_field.file.extra_headers,
+            "filename": file_field.file.filename,
+            "content_type": file_field.file.content_type,
+            "language": file_field.language,
+            "password": file_field.password,
         }
         return jwt.encode(payload, self.nuclia_jwt_key, algorithm="HS256")
 

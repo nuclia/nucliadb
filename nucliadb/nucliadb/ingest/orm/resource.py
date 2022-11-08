@@ -526,7 +526,11 @@ class Resource:
                 FieldType.FILE,
                 load=False,
             )
-            if file_extracted_data.icon != "" and self.basic.icon == "":
+            if (
+                file_extracted_data.icon != ""
+                and self.basic.icon == ""
+                and self.basic.icon == "application/octet-stream"
+            ):
                 self.basic.icon = file_extracted_data.icon
                 basic_modified = True
             if file_extracted_data.file_thumbnail and self.basic.thumbnail == "":
