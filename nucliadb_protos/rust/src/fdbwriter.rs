@@ -119,6 +119,8 @@ pub struct BrokerMessage {
     pub processing_id: ::prost::alloc::string::String,
     #[prost(enumeration="broker_message::MessageSource", tag="33")]
     pub source: i32,
+    #[prost(int64, tag="34")]
+    pub account_seq: i64,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {

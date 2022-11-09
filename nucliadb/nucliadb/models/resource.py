@@ -216,6 +216,7 @@ class Resource(BaseModel):
     created: Optional[datetime]
     modified: Optional[datetime]
     last_seqid: Optional[int]
+    last_account_seq: Optional[int]
 
     origin: Optional[Origin]
     relations: Optional[List[Relation]]

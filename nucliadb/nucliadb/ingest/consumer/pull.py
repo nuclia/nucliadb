@@ -356,9 +356,7 @@ class PullWorker:
                                     pb.ParseFromString(
                                         base64.b64decode(data["payload"])
                                     )
-                                    # Temporal setter until next version of processing where the source will be
-                                    # correctly set from the processor
-                                    pb.source = BrokerMessage.MessageSource.PROCESSOR
+
                                     logger.debug(
                                         f"Resource: {pb.uuid} KB: {pb.kbid} ProcessingID: {pb.processing_id}"
                                     )

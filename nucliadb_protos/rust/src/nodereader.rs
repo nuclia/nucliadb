@@ -470,9 +470,9 @@ pub mod node_reader_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        > {
+                tonic::Response<super::super::noderesources::ShardList>,
+                tonic::Status,
+            > {
             self.inner
                 .ready()
                 .await
@@ -733,9 +733,9 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<
-            tonic::Response<super::super::noderesources::ShardList>,
-            tonic::Status,
-        >;
+                tonic::Response<super::super::noderesources::ShardList>,
+                tonic::Status,
+            >;
         async fn document_search(
             &self,
             request: tonic::Request<super::DocumentSearchRequest>,

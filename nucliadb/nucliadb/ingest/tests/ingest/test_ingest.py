@@ -475,3 +475,33 @@ async def test_ingest_audit_stream_mixed(
 
     await client.drain()
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_ingest_account_seq_stored(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    stream_processor,
+    redis_driver,
+    test_resource: Resource,
+):
+    kbid = test_resource.kb.kbid
+    rid = test_resource.uuid
+
+    message = make_message(kbid, rid)
+    message.account_seq = 2
+    add_filefields(message, [("file_1", "file.png")])
+    await stream_processor.process(message=message, seqid=1)
+
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+    r = await kb_obj.get(message.uuid)
+    assert r is not None
+
+    basic = await r.get_basic()
+    assert basic is not None
+    assert basic.last_account_seq == 2
+
+    await txn.abort()

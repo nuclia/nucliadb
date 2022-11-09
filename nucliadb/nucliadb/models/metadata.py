@@ -241,6 +241,7 @@ class Basic(BaseModel):
     fieldmetadata: Optional[List[UserFieldMetadata]]
     uuid: Optional[str]
     last_seqid: Optional[int]
+    last_account_seq: Optional[int]
 
 
 class InputOrigin(BaseModel):
