@@ -121,6 +121,8 @@ from nucliadb_protos.writer_pb2 import (
     ResourceIdResponse as ResourceIdResponse,
     SetEntitiesRequest as SetEntitiesRequest,
     SetLabelsRequest as SetLabelsRequest,
+    SetVectorsRequest as SetVectorsRequest,
+    SetVectorsResponse as SetVectorsResponse,
     SetWidgetsRequest as SetWidgetsRequest,
     ShardObject as ShardObject,
     ShardReplica as ShardReplica,

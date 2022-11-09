@@ -257,7 +257,7 @@ class Field:
         sf: StorageField = self.storage.file_extracted(
             self.kbid, self.uuid, self.type, self.id, FIELD_VECTORS
         )
-
+        print(sf.bucket, sf.key)
         vo: Optional[VectorObject] = None
         replace_field: bool = True
         replace_splits = []

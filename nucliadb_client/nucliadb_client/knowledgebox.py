@@ -34,7 +34,7 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb.models.resource import KnowledgeBoxObj, ResourceList
 from nucliadb.models.writer import CreateResourcePayload, ResourceCreated
-from nucliadb.search.api.models import KnowledgeboxShards
+from nucliadb.search.api.models import KnowledgeboxCounters
 
 if TYPE_CHECKING:
     from nucliadb_client.client import NucliaDBClient
@@ -87,6 +87,14 @@ class KnowledgeBox:
         response = self.http_manager_v1.get("").content
         return KnowledgeBoxObj.parse_raw(response)
 
+    def counters(self) -> Optional[KnowledgeboxCounters]:
+        response = self.http_search_v1.get(
+            "counters", headers={"X-NUCLIADB-ROLES": "MANAGER"}
+        )
+        if response.status_code != 200:
+            return None
+        return KnowledgeboxCounters.parse_raw(response.content)
+
     def list_resources(self, page: int = 0, size: int = 20) -> List[Resource]:
         response = self.http_reader_v1.get(f"resources?page={page}&size={size}")
         response_obj = ResourceList.parse_raw(response.content)
@@ -116,12 +124,6 @@ class KnowledgeBox:
     def delete(self):
         resp = self.http_manager_v1.delete("")
         return resp.status_code == 200
-
-    def get_shards(self):
-        response = self.http_search_v1.get(
-            "shards", headers={"X-NUCLIADB-ROLES": "MANAGER"}
-        )
-        return KnowledgeboxShards.parse_raw(response.content)
 
     async def import_export(self, line: str):
         type_line = line[:4]
