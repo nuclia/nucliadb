@@ -1,6 +1,6 @@
 ignore:
   - "**/tests"
-  - "nucliadb_client/examples/**"
+  - "nucliadb_client/examples/"
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
     carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
