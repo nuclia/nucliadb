@@ -55,8 +55,9 @@ class LocalShard(AbstractShard):
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
         shards_cleaned: Dict[str, PBShardCleaned] = {}
         for shardreplica in self.shard.replicas:
+            replica_id = shardreplica.shard.id
             cleaned: PBShardCleaned = await self.node.clean_and_upgrade_shard(
-                shardreplica.shard
+                replica_id
             )
-            shards_cleaned[shardreplica.shard] = cleaned
+            shards_cleaned[replica_id] = cleaned
         return shards_cleaned
