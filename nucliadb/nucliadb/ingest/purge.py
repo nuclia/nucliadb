@@ -80,7 +80,7 @@ async def main():
             )
             continue
 
-        # Now delete the  tikv delete mark
+        # Now delete the tikv delete mark
         try:
             txn = await driver.begin()
             key_to_purge = KB_TO_DELETE.format(kbid=kbid)

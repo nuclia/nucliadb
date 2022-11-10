@@ -375,7 +375,7 @@ class KnowledgeBox:
         As non-empty buckets cannot be deleted, they are scheduled to be
         deleted instead. Actually, this empties the bucket asynchronouysly
         but it doesn't delete it. To do it, we save a marker using the
-        KB_TO_DELETE_STORAGE key, so theb purge cronshjon will keep trying
+        KB_TO_DELETE_STORAGE key, so then purge cronjob will keep trying
         to delete once the emptying have been completed.
         """
         storage = await get_storage(service_name=SERVICE_NAME)
