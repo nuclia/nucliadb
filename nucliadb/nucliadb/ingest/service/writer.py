@@ -19,7 +19,7 @@
 #
 import traceback
 import uuid
-from typing import AsyncIterator, Dict, Optional
+from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
     CleanedKnowledgeBoxResponse,
@@ -70,9 +70,9 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorsRequest,
     SetVectorsResponse,
     SetWidgetsRequest,
-    WriterStatusRequest,
-    WriterStatusResponse,
 )
+from nucliadb_protos.writer_pb2 import Shards as PBShards
+from nucliadb_protos.writer_pb2 import WriterStatusRequest, WriterStatusResponse
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import TXNID
@@ -128,29 +128,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         node_klass = get_node_klass()
         all_shards = await node_klass.get_all_shards(txn, request.uuid)
-        new_replicas: Dict[str, ShardCleaned] = {}
+
+        updated_shards = PBShards()
+        updated_shards.CopyFrom(all_shards)
+
         for logic_shard in all_shards.shards:
             shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
             replicas_cleaned = await shard.clean_and_upgrade()
-            new_replicas.update(replicas_cleaned)
-
-        # Update shard replica service versions
-        for shard_replica_id, shard_cleaned in new_replicas.items():
-            for logic_shard in all_shards.shards:
-                for replica_shard in logic_shard.replicas:
-                    if replica_shard.shard.id == shard_replica_id:
-                        replica_shard.shard.document_service = (
-                            shard_cleaned.document_service
-                        )
-                        replica_shard.shard.vector_service = (
-                            shard_cleaned.vector_service
-                        )
-                        replica_shard.shard.paragraph_service = (
-                            shard_cleaned.paragraph_service
-                        )
-                        replica_shard.shard.relation_service = (
-                            shard_cleaned.relation_service
-                        )
+            for replica_id, shard_cleaned in replicas_cleaned.items():
+                update_shards_with_updated_replica(
+                    updated_shards, replica_id, shard_cleaned
+                )
 
         key = KB_SHARDS.format(kbid=request.uuid)
         await txn.set(key, all_shards.SerializeToString())
@@ -602,3 +590,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception:
             logger.exception("Export", stack_info=True)
             raise
+
+
+def update_shards_with_updated_replica(
+    shards: PBShards, replica_id: str, updated_replica: ShardCleaned
+):
+    for logic_shard in shards.shards:
+        for replica in logic_shard.replicas:
+            if replica.shard.id == replica_id:
+                replica.shard.document_service = updated_replica.document_service
+                replica.shard.vector_service = updated_replica.vector_service
+                replica.shard.paragraph_service = updated_replica.paragraph_service
+                replica.shard.relation_service = updated_replica.relation_service
+                return

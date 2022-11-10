@@ -21,7 +21,13 @@
 from uuid import uuid4
 
 import pytest
+from nucliadb_protos.noderesources_pb2 import ShardCleaned
+from nucliadb_protos.writer_pb2 import ShardCreated as ReplicaData
+from nucliadb_protos.writer_pb2 import ShardObject as PBShard
+from nucliadb_protos.writer_pb2 import ShardReplica as PBReplica
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 
+from nucliadb.ingest.service.writer import update_shards_with_updated_replica
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
@@ -37,3 +43,82 @@ async def test_clean_and_upgrade_kb_index(grpc_servicer):
 
     req = knowledgebox_pb2.KnowledgeBoxID(uuid=kb_id)
     result = await stub.CleanAndUpgradeKnowledgeBoxIndex(req)
+
+
+def test_update_shards_pb_replica():
+    shard1_rep1 = PBReplica(
+        node="node1",
+        shard=ReplicaData(
+            id="shard1rep1",
+            document_service=ReplicaData.DOCUMENT_V0,
+            paragraph_service=ReplicaData.PARAGRAPH_V0,
+            relation_service=ReplicaData.RELATION_V0,
+            vector_service=ReplicaData.VECTOR_V0,
+        ),
+    )
+    shard1_rep2 = PBReplica(
+        node="node2",
+        shard=ReplicaData(
+            id="shard1rep2",
+            document_service=ReplicaData.DOCUMENT_V0,
+            paragraph_service=ReplicaData.PARAGRAPH_V0,
+            relation_service=ReplicaData.RELATION_V0,
+            vector_service=ReplicaData.VECTOR_V0,
+        ),
+    )
+    shard2_rep1 = PBReplica(
+        node="node1",
+        shard=ReplicaData(
+            id="shard2rep1",
+            document_service=ReplicaData.DOCUMENT_V0,
+            paragraph_service=ReplicaData.PARAGRAPH_V0,
+            relation_service=ReplicaData.RELATION_V0,
+            vector_service=ReplicaData.VECTOR_V0,
+        ),
+    )
+    shard2_rep2 = PBReplica(
+        node="node2",
+        shard=ReplicaData(
+            id="shard2rep2",
+            document_service=ReplicaData.DOCUMENT_V0,
+            paragraph_service=ReplicaData.PARAGRAPH_V0,
+            relation_service=ReplicaData.RELATION_V0,
+            vector_service=ReplicaData.VECTOR_V0,
+        ),
+    )
+    shard1 = PBShard(shard="shard1", replicas=[shard1_rep1, shard1_rep2])
+    shard2 = PBShard(shard="shard2", replicas=[shard2_rep1, shard2_rep2])
+
+    shards = PBShards(shards=[shard1, shard2])
+
+    new_replica_info = ShardCleaned(
+        document_service=ShardCleaned.DOCUMENT_V1,
+        relation_service=ShardCleaned.RELATION_V1,
+        vector_service=ShardCleaned.VECTOR_V1,
+        paragraph_service=ShardCleaned.PARAGRAPH_V1,
+    )
+
+    update_shards_with_updated_replica(shards, "shard1rep1", new_replica_info)
+
+    found = False
+    for shard in shards.shards:
+        for replica in shard.replicas:
+            if replica.shard.id == "shard1rep1":
+                assert (
+                    replica.shard.document_service == new_replica_info.document_service
+                )
+                assert (
+                    replica.shard.paragraph_service
+                    == new_replica_info.paragraph_service
+                )
+                assert replica.shard.vector_service == new_replica_info.vector_service
+                assert (
+                    replica.shard.relation_service == new_replica_info.relation_service
+                )
+                found = True
+            else:
+                assert replica.shard.document_service == ShardCleaned.DOCUMENT_V0
+                assert replica.shard.paragraph_service == ShardCleaned.PARAGRAPH_V0
+                assert replica.shard.vector_service == ShardCleaned.VECTOR_V0
+                assert replica.shard.relation_service == ShardCleaned.RELATION_V0
+    assert found

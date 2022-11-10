@@ -90,9 +90,10 @@ class Shard(AbstractShard):
         return count
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
-        shards_cleaned: Dict[str, PBShardCleaned] = {}
+        replicas_cleaned: Dict[str, PBShardCleaned] = {}
         for shardreplica in self.shard.replicas:
             node = NODES[shardreplica.node]
-            cleaned = await node.writer.CleanAndUpgradeShard(shardreplica.shard)  # type: ignore
-            shards_cleaned[shardreplica.shard] = cleaned
-        return shards_cleaned
+            replica_id = shardreplica.shard
+            cleaned = await node.writer.CleanAndUpgradeShard(replica_id)  # type: ignore
+            replicas_cleaned[replica_id] = cleaned
+        return replicas_cleaned
