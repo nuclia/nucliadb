@@ -335,6 +335,7 @@ message ResourceFieldId {
 message IndexResource {
     string kbid = 1;
     string rid = 2;
+    bool reindex_vectors = 3;
 }
 
 message IndexStatus {

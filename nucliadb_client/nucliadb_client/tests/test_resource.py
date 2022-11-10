@@ -91,3 +91,4 @@ def test_reindex(nucliadb_knowledgebox: KnowledgeBox):
     res = nucliadb_knowledgebox.create_resource(payload)
 
     res.reindex()
+    res.reindex(vectors=True)

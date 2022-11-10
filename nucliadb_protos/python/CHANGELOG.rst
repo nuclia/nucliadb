@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.36
+------
+
+- Add reindex_vectors option to IndexResource request
+
 0.0.35
 ------
 

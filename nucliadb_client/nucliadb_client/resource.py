@@ -107,8 +107,10 @@ class Resource:
         response = self.http_writer_v1.post("reprocess")
         assert response.status_code == 202
 
-    def reindex(self):
-        response = self.http_writer_v1.post("reindex")
+    def reindex(self, vectors: bool = False):
+        response = self.http_writer_v1.post(
+            "reindex", params={"reindex_vectors": vectors}
+        )
         assert response.status_code == 200
 
     @property
