@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.35
+------
+
+- Add SetVectors servicer at ingest
+
 0.0.34
 ------
 

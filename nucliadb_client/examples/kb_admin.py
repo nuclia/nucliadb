@@ -17,23 +17,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Dict, Iterator, List, Optional
+
 try:
     import torch
 except ImportError:
     torch = None  # type: ignore
 
+import time
+
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
+from nucliadb_protos.train_pb2 import GetSentencesRequest
+from nucliadb_protos.train_pb2 import TrainSentence
 from nucliadb_protos.train_pb2 import TrainSentence as Sentence
 from nucliadb_protos.utils_pb2 import Vector
+from nucliadb_protos.writer_pb2 import SetVectorsRequest
 
 try:
     import transformers  # type: ignore
 except ImportError:
     transformers = None
 
-from nucliadb.models.common import FIELD_TYPES_MAP, FieldTypeName
+from datetime import datetime
+
+from nucliadb.models.common import FieldTypeName
 from nucliadb_client.client import NucliaDBClient
-from nucliadb_client.resource import Resource
 
 VECTORS_DIMENSION = 128
 
@@ -41,7 +49,7 @@ DEFAULT_SENTENCE_TRANSFORMER = "all-MiniLM-L6-v2"
 ALL_FIELD_TYPES = [field_name.value for field_name in FieldTypeName]
 
 
-class VectorsRecompute:
+class VectorsRecomputer:
     def __init__(self, modelid: str):
         if torch is None:
             raise ImportError("torch lib is required")
@@ -52,7 +60,7 @@ class VectorsRecompute:
         self.load_model(modelid)
 
     def load_model(self, modelid):
-        print(f"Loading sentence tokenizer model: {modelid}")
+        tprint(f"Loading sentence tokenizer model: {modelid}")
         self._tokenizer = transformers.AutoTokenizer.from_pretrained(
             modelid, model_max_length=VECTORS_DIMENSION
         )
@@ -67,62 +75,27 @@ class VectorsRecompute:
     def model(self):
         return self._model
 
-    def recompute_for_resource(self, resource: Resource):
-        print("\tGetting existing vectors...")
+    def get_sentence_start_end(self, sentence: Sentence):
+        [start, end] = sentence.sentence.split("/")[-1].split("-")
+        return int(start), int(end)
 
-        previous_vectors = self.get_existing_vectors(resource)
+    def get_paragraph_start_end(self, sentence: Sentence):
+        [start, end] = sentence.paragraph.split("/")[-1].split("-")
+        return int(start), int(end)
 
-        for index, sentence in enumerate(resource.iter_sentences()):
-            existing_vectors = self.get_sentence_vectors(sentence, previous_vectors)
-            if existing_vectors is None:
-                continue
-
-            new_vectors = self.compute_sentence_vectors(sentence, existing_vectors)
-            resource.add_vectors(
-                sentence.field.field, sentence.field.field_type, new_vectors
-            )
-
-        print(f"\tComputed vectors for {index + 1} sentences.")
-
-    def get_existing_vectors(self, resource: Resource):
-        response = resource.get(
-            field_type=ALL_FIELD_TYPES,
-            show=["basic"],
-            extracted=["vectors"],
-            timeout=100,
-        )
-        return response.data
-
-    def get_sentence_vectors(self, sentence: Sentence, existing_vectors):
-        field_type = FIELD_TYPES_MAP[sentence.field.field_type]
-        if field_type.value == "generic":
-            print("Generic fields are not supported yet. Skipping...")
-            return None
-
-        attr = field_type.value + "s"
-        field_id = sentence.field.field
-        try:
-            return getattr(existing_vectors, attr)[field_id].extracted.vectors
-        except (AttributeError, KeyError):
-            print(
-                f"Previous vectors not found in sentence: {sentence.sentence} in field {field_id} of type {field_type.value}. Skipping..."  # noqav
-            )
-            return None
-
-    def compute_sentence_vectors(self, sentence: Sentence, old_vector_data):
-        new_vector = Vector()
-        old_vector = old_vector_data.vectors.vectors[0]
-
-        # Copy over all vector metadata
-        new_vector.start = old_vector.start
-        new_vector.end = old_vector.end
-        new_vector.start_paragraph = old_vector.start_paragraph
-        new_vector.end_paragraph = old_vector.end_paragraph
+    def compute_sentence_vector(self, sentence: Sentence) -> Vector:
+        vector = Vector()
+        start, end = self.get_sentence_start_end(sentence)
+        pstart, pend = self.get_paragraph_start_end(sentence)
 
         embeddings = self.embedder([sentence.metadata.text])
         as_array = embeddings.detach().numpy()[0]
-        new_vector.vector.extend(as_array)
-        return [new_vector]
+        vector.start = start
+        vector.end = end
+        vector.start_paragraph = pstart
+        vector.end_paragraph = pend
+        vector.vector.extend(as_array)
+        return vector
 
     def embedder(self, sentences):
         encoded_query_input = self.tokenizer(
@@ -152,6 +125,11 @@ class KBNotFoundError(Exception):
     ...
 
 
+def tprint(somestring: str):
+    time = datetime.now().isoformat()
+    print(f"[{time}] {somestring}")
+
+
 class KnowledgeBoxAdmin:
     def __init__(
         self,
@@ -178,6 +156,7 @@ class KnowledgeBoxAdmin:
             grpc_host=grpc_host,
         )
         self.dry_run = dry_run
+        self.vr: Optional[VectorsRecomputer] = None
 
     def set_kb(self, kbid: str):
         self.kb = self.client.get_kb(kbid=kbid)
@@ -186,40 +165,154 @@ class KnowledgeBoxAdmin:
         self.kbid = kbid
         return self.kb
 
-    def reprocess(self, offset: int = 0):
-        for index, resource in enumerate(self.kb.iter_resources()):  # type: ignore
-            if index < offset:
-                print(f"{index}: Skipping resource: {resource.rid}")
-                continue
+    def reprocess(self):
+        for resource in self.kb.iter_resources():  # type: ignore
+            tprint(f"Reprocessing rid={resource.rid} ... ")
+            if not self.dry_run:
+                resource.reprocess()
 
-            print(f"{index}: Sending to reprocess resource: {resource.rid}")
-            resource.reprocess()
-
-    def reindex(self, offset: int = 0):
-        for index, resource in enumerate(self.kb.iter_resources()):  # type: ignore
-            if index < offset:
-                print(f"{index}: Skipping resource: {resource.rid}")
-                continue
-
-            print(f"{index}: Sending to reindex resource: {resource.rid}")
-            resource.reindex()
+    def reindex(self):
+        for resource in self.kb.iter_resources():  # type: ignore
+            tprint(f"Reindexing rid={resource.rid} ... ")
+            if not self.dry_run:
+                resource.reindex()
 
     def clean_index(self):
-        req = KnowledgeBoxID(uuid=self.kbid)
-        self.client.writer_stub.CleanAndUpgradeKnowledgeBoxIndex(req)
+        tprint(f"Cleaning and upgrading index...")
+        if not self.dry_run:
+            req = KnowledgeBoxID(uuid=self.kbid)
+            self.client.writer_stub.CleanAndUpgradeKnowledgeBoxIndex(req)
 
-    def recompute_vectors(
-        self, modelid: str = DEFAULT_SENTENCE_TRANSFORMER, offset: int = 0
+    def iterate_sentences(
+        self, labels: bool, entities: bool, text: bool
+    ) -> Iterator[TrainSentence]:
+        request = GetSentencesRequest()
+        request.kb.uuid = self.kbid
+        request.metadata.labels = labels
+        request.metadata.entities = entities
+        request.metadata.text = text
+        for sentence in self.client.train_stub.GetSentences(request):  # type: ignore
+            yield sentence
+
+    def get_sentences_count(self) -> Optional[int]:
+        counters = self.kb.counters()  # type: ignore
+        if counters is None:
+            return None
+        return counters.sentences
+
+    def get_vectors_recomputer(self, modelid: str) -> VectorsRecomputer:
+        if self.vr is None:
+            self.vr = VectorsRecomputer(modelid)
+        return self.vr
+
+    def maybe_some_logging(
+        self, recomputed: int, total: Optional[int], elapsed_time: float
     ):
-        vr = VectorsRecompute(modelid)
+        # Some logging first
+        if recomputed % 500 == 0:
+            speed = int((recomputed / elapsed_time) * 60)
+            if total is not None:
+                progress = recomputed / total
+                tprint(
+                    f"Recomputing {recomputed}-th sentence of kb ({progress}%) at {speed} sentences/min"
+                )
+            else:
+                tprint(
+                    f"Recomputing {recomputed}-th sentence of kb at {speed} sentences/min"
+                )
 
-        for index, resource in enumerate(self.kb.iter_resources()):  # type: ignore
-            if index < offset:
-                print(f"{index}: Skipping resource: {resource.rid}")
-                continue
+    def recompute_vectors(self, vr: VectorsRecomputer):
+        """
+        Iterates all sentences of a KB and recomputes its vectors
+        """
+        start = time.time()
+        sentences_count = self.get_sentences_count()
+        previous_sentence = None
+        field_vectors = []
+        field_split_vectors: Dict[str, List[Vector]] = {}
+        total_recomputed = 0
+        for sentence in self.iterate_sentences(labels=False, entities=False, text=True):
 
-            print(f"{index}: Recomputing vectors for resource: {resource.rid}")
-            vr.recompute_for_resource(resource)
-            if not self.dry_run:
-                resource.sync_commit()
-                print("\tCommited!")
+            self.maybe_some_logging(
+                total_recomputed, sentences_count, time.time() - start
+            )
+
+            if previous_sentence is None:
+                tprint(
+                    f"Recomputing sentences of field {sentence.field.field} of rid={sentence.uuid}"
+                )
+                previous_sentence = sentence
+
+            elif should_set_field_vectors(previous_sentence, sentence):
+                self.set_field_vectors(
+                    previous_sentence, field_vectors, field_split_vectors
+                )
+                tprint(
+                    f"Recomputing sentences of field {sentence.field.field} of rid={sentence.uuid}"
+                )
+                previous_sentence = sentence
+                field_vectors = []
+                field_split_vectors = {}
+
+            if is_split_field(sentence):
+                vector = vr.compute_sentence_vector(sentence)
+                split = get_split_subfield(sentence)
+                split_vectors = field_split_vectors.setdefault(split, [])
+                split_vectors.append(vector)
+            else:
+                vector = vr.compute_sentence_vector(sentence)
+                field_vectors.append(vector)
+                total_recomputed += 1
+
+        if previous_sentence and (field_vectors or field_split_vectors):
+            self.set_field_vectors(
+                previous_sentence, field_vectors, field_split_vectors
+            )
+
+    def set_field_vectors(
+        self,
+        sentence: Sentence,
+        vectors: List[Vector],
+        split_vectors: Dict[str, List[Vector]],
+    ):
+        req = SetVectorsRequest()
+        req.kbid = self.kbid
+        req.rid = sentence.uuid
+        req.field.CopyFrom(sentence.field)
+        for key, svectors in split_vectors.items():
+            req.vectors.split_vectors[key].vectors.extend(svectors)
+        req.vectors.vectors.vectors.extend(vectors)
+
+        tprint(f"Setting vectors for field {req.field.field} of rid={req.rid}")
+        if not self.dry_run:
+            self.client.writer_stub.SetVectors(req)
+
+
+def should_set_field_vectors(previous: Sentence, new: Sentence) -> bool:
+    return (
+        previous.uuid != new.uuid
+        or previous.field.field_type != new.field.field_type
+        or previous.field.field != new.field.field
+    )
+
+
+def is_split_field(sentence: Sentence) -> bool:
+    id_count = len(sentence.paragraph.split("/"))
+    if id_count == 4:
+        return False
+    elif id_count == 5:
+        return True
+    else:
+        raise ValueError(sentence.sentence)
+
+
+def get_split_subfield(sentence: Sentence) -> str:
+    (
+        _,
+        _,
+        _,
+        subfield,
+        _,
+        _,
+    ) = sentence.paragraph.split("/")
+    return subfield

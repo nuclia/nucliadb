@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.1.1
+
+- Added kb.counters()
+
 ## 1.1.0
 
 - Refactor Resource.get

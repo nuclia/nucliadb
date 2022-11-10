@@ -1225,3 +1225,37 @@ class ExportRequest(google.protobuf.message.Message):
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid"]) -> None: ...
 global___ExportRequest = ExportRequest
+
+class SetVectorsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    VECTORS_FIELD_NUMBER: builtins.int
+    KBID_FIELD_NUMBER: builtins.int
+    RID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    @property
+    def vectors(self) -> nucliadb_protos.utils_pb2.VectorObject: ...
+    kbid: typing.Text
+    rid: typing.Text
+    @property
+    def field(self) -> nucliadb_protos.resources_pb2.FieldID: ...
+    def __init__(self,
+        *,
+        vectors: typing.Optional[nucliadb_protos.utils_pb2.VectorObject] = ...,
+        kbid: typing.Text = ...,
+        rid: typing.Text = ...,
+        field: typing.Optional[nucliadb_protos.resources_pb2.FieldID] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field",b"field","vectors",b"vectors"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field",b"field","kbid",b"kbid","rid",b"rid","vectors",b"vectors"]) -> None: ...
+global___SetVectorsRequest = SetVectorsRequest
+
+class SetVectorsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    FOUND_FIELD_NUMBER: builtins.int
+    found: builtins.bool
+    def __init__(self,
+        *,
+        found: builtins.bool = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["found",b"found"]) -> None: ...
+global___SetVectorsResponse = SetVectorsResponse

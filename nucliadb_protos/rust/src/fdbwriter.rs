@@ -495,3 +495,19 @@ pub struct ExportRequest {
     #[prost(string, tag="1")]
     pub kbid: ::prost::alloc::string::String,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetVectorsRequest {
+    #[prost(message, optional, tag="1")]
+    pub vectors: ::core::option::Option<super::utils::VectorObject>,
+    #[prost(string, tag="2")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub rid: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="4")]
+    pub field: ::core::option::Option<super::resources::FieldId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetVectorsResponse {
+    #[prost(bool, tag="1")]
+    pub found: bool,
+}

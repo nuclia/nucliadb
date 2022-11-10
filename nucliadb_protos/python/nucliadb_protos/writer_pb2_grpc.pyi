@@ -138,6 +138,10 @@ class WriterStub:
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse]
 
+    SetVectors: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.SetVectorsRequest,
+        nucliadb_protos.writer_pb2.SetVectorsResponse]
+
     ResourceFieldExists: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.ResourceFieldId,
         nucliadb_protos.writer_pb2.ResourceFieldExistsResponse]
@@ -264,6 +268,12 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse: ...
+
+    @abc.abstractmethod
+    def SetVectors(self,
+        request: nucliadb_protos.writer_pb2.SetVectorsRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.SetVectorsResponse: ...
 
     @abc.abstractmethod
     def ResourceFieldExists(self,

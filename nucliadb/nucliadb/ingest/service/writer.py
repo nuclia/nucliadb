@@ -41,6 +41,7 @@ from nucliadb_protos.writer_pb2 import (
     DelLabelsRequest,
     DetWidgetsRequest,
     ExportRequest,
+    ExtractedVectorsWrapper,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -65,6 +66,8 @@ from nucliadb_protos.writer_pb2 import (
     ResourceIdResponse,
     SetEntitiesRequest,
     SetLabelsRequest,
+    SetVectorsRequest,
+    SetVectorsResponse,
     SetWidgetsRequest,
     WriterStatusRequest,
     WriterStatusResponse,
@@ -120,8 +123,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def CleanAndUpgradeKnowledgeBoxIndex(  # type: ignore
         self, request: KnowledgeBoxID, context=None
     ) -> CleanedKnowledgeBoxResponse:
-        from nucliadb.ingest.orm.utils import get_node_klass
-
         txn = await self.proc.driver.begin()
         node_klass = get_node_klass()
         all_shards = await node_klass.get_all_shards(txn, request.uuid)
@@ -130,6 +131,35 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await shard.clean_and_upgrade()
         await txn.abort()
         return CleanedKnowledgeBoxResponse()
+
+    async def SetVectors(  # type: ignore
+        self, request: SetVectorsRequest, context=None
+    ) -> SetVectorsResponse:
+        response = SetVectorsResponse()
+        response.found = True
+
+        txn = await self.proc.driver.begin()
+        storage = await get_storage(service_name=SERVICE_NAME)
+        cache = await get_cache()
+
+        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+        resobj = ResourceORM(txn, storage, kbobj, request.rid)
+
+        field = await resobj.get_field(
+            request.field.field, request.field.field_type, load=True
+        )
+        if field.value is None:
+            await txn.abort()
+            response.found = False
+            return response
+
+        evw = ExtractedVectorsWrapper()
+        evw.field.CopyFrom(request.field)
+        evw.vectors.CopyFrom(request.vectors)
+
+        await field.set_vectors(evw)
+        await txn.commit(resource=False)
+        return response
 
     async def NewKnowledgeBox(  # type: ignore
         self, request: KnowledgeBoxNew, context=None
