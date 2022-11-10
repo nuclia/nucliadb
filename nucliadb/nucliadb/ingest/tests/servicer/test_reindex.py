@@ -28,7 +28,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_set_vectors(grpc_servicer, fake_node):
+async def test_reindex_resource(grpc_servicer, fake_node):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     # Create a kb
