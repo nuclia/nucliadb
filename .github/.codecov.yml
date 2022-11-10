@@ -1,5 +1,6 @@
 ignore:
   - "**/tests"
+  - "nucliadb_client/examples/**"
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
     carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
@@ -8,7 +9,7 @@ flag_management:
         target: auto
         threshold: 1%
       - type: patch
-        target: 90%
+        target: 80%
   individual_flags:
     - name: one
       paths:
@@ -18,7 +19,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 100%
+          target: 80%
     - name: ingest
       paths:
         - nucliadb/nucliadb/ingest/**

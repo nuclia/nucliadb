@@ -29,7 +29,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_clean_and_upgrade_kb_index(grpc_servicer, gcs_storage):
+async def test_set_vectors(grpc_servicer, gcs_storage):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     # Create a kb
