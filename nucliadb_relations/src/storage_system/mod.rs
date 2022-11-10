@@ -24,6 +24,7 @@ use heed::flags::Flags;
 use heed::types::{ByteSlice, Str, Unit};
 use heed::{Database, Env, EnvOpenOptions, RoIter, RoPrefix, RoTxn, RwTxn};
 use nucliadb_byte_rpr::*;
+use nucliadb_service_interface::service_interface::{InternalError, InternalResult};
 
 use crate::edge::*;
 use crate::node::*;
@@ -128,14 +129,14 @@ pub struct StorageSystem {
 }
 
 impl StorageSystem {
-    pub fn start(path: &Path) -> StorageSystem {
+    pub fn start(path: &Path) -> InternalResult<StorageSystem> {
         if !path.join(env_config::STAMP).exists() {
             StorageSystem::create(path)
         } else {
             StorageSystem::open(path)
         }
     }
-    pub fn create(path: &Path) -> StorageSystem {
+    pub fn create(path: &Path) -> InternalResult<StorageSystem> {
         if !path.join(env_config::STAMP).exists() {
             let env_path = path.join(env_config::ENV);
             std::fs::create_dir_all(&env_path).unwrap();
@@ -152,20 +153,20 @@ impl StorageSystem {
             let in_edges = env.create_database(Some(db_name::INVERSE_EDGES)).unwrap();
             let state = env.create_database(Some(db_name::STATE)).unwrap();
             std::fs::File::create(path.join(env_config::STAMP)).unwrap();
-            StorageSystem {
+            Ok(StorageSystem {
                 env,
                 keys,
                 inv_keys,
                 edges,
                 in_edges,
                 state,
-            }
+            })
         } else {
             StorageSystem::open(path)
         }
     }
 
-    pub fn open(path: &Path) -> StorageSystem {
+    pub fn open(path: &Path) -> InternalResult<StorageSystem> {
         let env_path = path.join(env_config::ENV);
         if !path.join(env_config::STAMP).exists() {
             panic!("{:?} is not a valid index", path);
@@ -177,25 +178,21 @@ impl StorageSystem {
         env_builder.max_dbs(env_config::MAX_DBS);
         env_builder.map_size(env_config::MAP_SIZE);
         let env = env_builder.open(&env_path).unwrap();
-        let keys = env.open_database(Some(db_name::KEYS)).unwrap().unwrap();
-        let inv_keys = env
-            .open_database(Some(db_name::INVERSE_KEYS))
-            .unwrap()
-            .unwrap();
-        let edges = env.open_database(Some(db_name::EDGES)).unwrap().unwrap();
-        let in_edges = env
-            .open_database(Some(db_name::INVERSE_EDGES))
-            .unwrap()
-            .unwrap();
-        let state = env.open_database(Some(db_name::STATE)).unwrap().unwrap();
-        StorageSystem {
+
+        let keys = open_database(&env, db_name::KEYS)?;
+        let inv_keys = open_database(&env, db_name::INVERSE_KEYS)?;
+        let edges = open_database(&env, db_name::EDGES)?;
+        let in_edges = open_database(&env, db_name::INVERSE_EDGES)?;
+        let state = open_database(&env, db_name::STATE)?;
+
+        Ok(StorageSystem {
             env,
             keys,
             inv_keys,
             edges,
             in_edges,
             state,
-        }
+        })
     }
 
     pub fn rw_txn(&self) -> RwToken<'_> {
@@ -302,6 +299,18 @@ impl StorageSystem {
         let iter = db.prefix_iter(txn, &query_formated).unwrap();
         QueryIter { iter }
     }
+}
+
+fn open_database<KC, DC>(env: &Env, database_name: &str) -> InternalResult<Database<KC, DC>>
+where
+    KC: 'static,
+    DC: 'static,
+{
+    env.open_database(Some(database_name))
+        .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?
+        .ok_or_else(|| {
+            Box::new(format!("Cannot open `{database_name}` database")) as Box<dyn InternalError>
+        })
 }
 
 #[cfg(test)]

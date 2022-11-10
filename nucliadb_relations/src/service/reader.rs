@@ -131,9 +131,9 @@ impl RelationsReaderService {
     pub fn start(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            Ok(RelationsReaderService::new(config).unwrap())
+            Ok(RelationsReaderService::new(config)?)
         } else {
-            Ok(RelationsReaderService::open(config).unwrap())
+            Ok(RelationsReaderService::open(config)?)
         }
     }
     pub fn new(config: &RelationConfig) -> InternalResult<Self> {
@@ -144,7 +144,7 @@ impl RelationsReaderService {
             std::fs::create_dir_all(path).unwrap();
 
             Ok(RelationsReaderService {
-                index: StorageSystem::create(path),
+                index: StorageSystem::create(path)?,
             })
         }
     }
@@ -155,7 +155,7 @@ impl RelationsReaderService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(RelationsReaderService {
-                index: StorageSystem::open(path),
+                index: StorageSystem::open(path)?,
             })
         }
     }
