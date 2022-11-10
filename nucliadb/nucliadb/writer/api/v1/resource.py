@@ -21,7 +21,7 @@ from time import time
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
-from fastapi import HTTPException, Response
+from fastapi import HTTPException, Response, Query
 from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode
@@ -373,15 +373,17 @@ async def reindex_resource(
     kbid: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
+    reindex_vectors: bool = Query(False),
 ):
 
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     ingest = get_ingest()
-    resource = IndexResource()
-    resource.kbid = kbid
-    resource.rid = rid
-    await ingest.ReIndex(resource)  # type: ignore
+    index_req = IndexResource()
+    index_req.kbid = kbid
+    index_req.rid = rid
+    index_req.reindex_vectors = reindex_vectors
+    await ingest.ReIndex(index_req)  # type: ignore
     return Response(status_code=200)
 
 
