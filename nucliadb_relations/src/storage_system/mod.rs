@@ -318,15 +318,14 @@ mod tests {
     use super::*;
     fn initialize_storage_system() -> StorageSystem {
         let dir = tempfile::tempdir().unwrap();
-        StorageSystem::create(dir.path())
+        StorageSystem::create(dir.path()).unwrap()
     }
 
     #[test]
     fn open_and_create() {
         let dir = tempfile::tempdir().unwrap();
-        StorageSystem::create(dir.path());
-        StorageSystem::open(dir.path());
-        assert!(true);
+        StorageSystem::create(dir.path()).unwrap();
+        StorageSystem::open(dir.path()).unwrap();
     }
 
     const CHILD: &str = "child";
