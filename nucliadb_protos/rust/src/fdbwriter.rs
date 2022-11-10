@@ -469,6 +469,8 @@ pub struct IndexResource {
     pub kbid: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub rid: ::prost::alloc::string::String,
+    #[prost(bool, tag="3")]
+    pub reindex_vectors: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexStatus {

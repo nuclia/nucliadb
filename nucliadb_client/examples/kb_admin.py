@@ -175,7 +175,7 @@ class KnowledgeBoxAdmin:
         for resource in self.kb.iter_resources():  # type: ignore
             tprint(f"Reindexing rid={resource.rid} ... ")
             if not self.dry_run:
-                resource.reindex()
+                resource.reindex(vectors=True)
 
     def clean_index(self):
         tprint(f"Cleaning and upgrading index...")

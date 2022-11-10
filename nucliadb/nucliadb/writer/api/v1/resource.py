@@ -21,7 +21,7 @@ from time import time
 from typing import TYPE_CHECKING, Optional
 from uuid import uuid4
 
-from fastapi import HTTPException, Response, Query
+from fastapi import HTTPException, Query, Response
 from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode

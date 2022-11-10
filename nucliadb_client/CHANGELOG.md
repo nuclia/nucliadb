@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.1.2
+
+- Be able to reindex vectors too
+
 ## 1.1.1
 
 - Added kb.counters()

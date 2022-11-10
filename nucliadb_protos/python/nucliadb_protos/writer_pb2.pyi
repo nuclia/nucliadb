@@ -1163,14 +1163,17 @@ class IndexResource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     KBID_FIELD_NUMBER: builtins.int
     RID_FIELD_NUMBER: builtins.int
+    REINDEX_VECTORS_FIELD_NUMBER: builtins.int
     kbid: typing.Text
     rid: typing.Text
+    reindex_vectors: builtins.bool
     def __init__(self,
         *,
         kbid: typing.Text = ...,
         rid: typing.Text = ...,
+        reindex_vectors: builtins.bool = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid","rid",b"rid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid","reindex_vectors",b"reindex_vectors","rid",b"rid"]) -> None: ...
 global___IndexResource = IndexResource
 
 class IndexStatus(google.protobuf.message.Message):
