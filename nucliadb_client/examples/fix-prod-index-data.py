@@ -56,9 +56,9 @@ def parse_arguments():
 
 
 def fix_it(kbadmin: KnowledgeBoxAdmin, vr: VectorsRecomputer):
+    kbadmin.recompute_vectors(vr)
     kbadmin.clean_index()
     kbadmin.reindex()
-    kbadmin.recompute_vectors(vr)
 
 
 def main(args):

@@ -531,6 +531,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         await transaction.commit(bm, partition)
 
         response = IndexStatus()
+        await txn.abort()
         return response
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
@@ -559,6 +560,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if count > settings.max_node_fields:
                 shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
         response = IndexStatus()
+        await txn.abort()
         return response
 
     async def Export(self, request: ExportRequest, context=None):
