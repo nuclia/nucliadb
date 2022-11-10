@@ -19,7 +19,7 @@
 #
 import traceback
 import uuid
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Dict, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
     CleanedKnowledgeBoxResponse,
@@ -35,6 +35,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
+from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     DelEntitiesRequest,
@@ -87,6 +88,7 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import (
     get_audit,
     get_cache,
@@ -126,10 +128,33 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         node_klass = get_node_klass()
         all_shards = await node_klass.get_all_shards(txn, request.uuid)
+        new_replicas: Dict[str, ShardCleaned] = {}
         for logic_shard in all_shards.shards:
             shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
-            await shard.clean_and_upgrade()
-        await txn.abort()
+            replicas_cleaned = await shard.clean_and_upgrade()
+            new_replicas.update(replicas_cleaned)
+
+        # Update shard replica service versions
+        for shard_replica_id, shard_cleaned in new_replicas.items():
+            for logic_shard in all_shards.shards:
+                for replica_shard in logic_shard.replicas:
+                    if replica_shard.shard.id == shard_replica_id:
+                        replica_shard.shard.document_service = (
+                            shard_cleaned.document_service
+                        )
+                        replica_shard.shard.vector_service = (
+                            shard_cleaned.vector_service
+                        )
+                        replica_shard.shard.paragraph_service = (
+                            shard_cleaned.paragraph_service
+                        )
+                        replica_shard.shard.relation_service = (
+                            shard_cleaned.relation_service
+                        )
+
+        key = KB_SHARDS.format(kbid=request.uuid)
+        await txn.set(key, all_shards.SerializeToString())
+        await txn.commit(resource=False)
         return CleanedKnowledgeBoxResponse()
 
     async def SetVectors(  # type: ignore
