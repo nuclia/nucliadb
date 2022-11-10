@@ -212,7 +212,7 @@ class KnowledgeBoxAdmin:
         if recomputed % 500 == 0:
             speed = int((recomputed / elapsed_time) * 60)
             if total is not None:
-                progress = recomputed / total
+                progress = int((recomputed / total) * 100)
                 tprint(
                     f"Recomputing {recomputed}-th sentence of kb ({progress}%) at {speed} sentences/min"
                 )
