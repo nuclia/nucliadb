@@ -368,3 +368,20 @@ async def test_resource_endpoints_by_slug_404(
 
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Resource does not exist"
+
+
+@pytest.mark.asyncio
+async def test_reindex(writer_api, test_resource):
+    rsc = test_resource
+    kbid = rsc.kb.kbid
+    rid = rsc.uuid
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex",
+        )
+        assert resp.status_code == 200
+
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex?reindex_vectors=True",
+        )
+        assert resp.status_code == 200
