@@ -104,21 +104,14 @@ def test_update_shards_pb_replica():
     for shard in shards.shards:
         for replica in shard.replicas:
             if replica.shard.id == "shard1rep1":
-                assert (
-                    replica.shard.document_service == new_replica_info.document_service
-                )
-                assert (
-                    replica.shard.paragraph_service
-                    == new_replica_info.paragraph_service
-                )
-                assert replica.shard.vector_service == new_replica_info.vector_service
-                assert (
-                    replica.shard.relation_service == new_replica_info.relation_service
-                )
+                assert replica.shard.document_service == ReplicaData.DOCUMENT_V1
+                assert replica.shard.paragraph_service == ReplicaData.PARAGRAPH_V1
+                assert replica.shard.vector_service == ReplicaData.VECTOR_V1
+                assert replica.shard.relation_service == ReplicaData.RELATION_V1
                 found = True
             else:
-                assert replica.shard.document_service == ShardCleaned.DOCUMENT_V0
-                assert replica.shard.paragraph_service == ShardCleaned.PARAGRAPH_V0
-                assert replica.shard.vector_service == ShardCleaned.VECTOR_V0
-                assert replica.shard.relation_service == ShardCleaned.RELATION_V0
+                assert replica.shard.document_service == ReplicaData.DOCUMENT_V0
+                assert replica.shard.paragraph_service == ReplicaData.PARAGRAPH_V0
+                assert replica.shard.vector_service == ReplicaData.VECTOR_V0
+                assert replica.shard.relation_service == ReplicaData.RELATION_V0
     assert found

@@ -35,7 +35,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
-from nucliadb_protos.noderesources_pb2 import ShardCleaned
+from nucliadb_protos.noderesources_pb2 import ShardCleaned, ShardCreated
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     DelEntitiesRequest,
@@ -99,6 +99,20 @@ from nucliadb_utils.utilities import (
 
 if SENTRY:
     from sentry_sdk import capture_exception
+
+
+# We need to do this until the node returns a ShardCreated pb
+# or moves the enum outside the ShardCreated pb.
+VERSIONS_MAP = {
+    ShardCleaned.DOCUMENT_V0: ShardCreated.DOCUMENT_V0,
+    ShardCleaned.DOCUMENT_V1: ShardCreated.DOCUMENT_V1,
+    ShardCleaned.RELATION_V0: ShardCreated.RELATION_V0,
+    ShardCleaned.RELATION_V1: ShardCreated.RELATION_V1,
+    ShardCleaned.PARAGRAPH_V0: ShardCreated.PARAGRAPH_V0,
+    ShardCleaned.PARAGRAPH_V1: ShardCreated.PARAGRAPH_V1,
+    ShardCleaned.VECTOR_V0: ShardCreated.VECTOR_V0,
+    ShardCleaned.VECTOR_V1: ShardCreated.VECTOR_V1,
+}
 
 
 class WriterServicer(writer_pb2_grpc.WriterServicer):
@@ -598,8 +612,16 @@ def update_shards_with_updated_replica(
     for logic_shard in shards.shards:
         for replica in logic_shard.replicas:
             if replica.shard.id == replica_id:
-                replica.shard.document_service = updated_replica.document_service
-                replica.shard.vector_service = updated_replica.vector_service
-                replica.shard.paragraph_service = updated_replica.paragraph_service
-                replica.shard.relation_service = updated_replica.relation_service
+                replica.shard.document_service = VERSIONS_MAP[
+                    updated_replica.document_service
+                ]
+                replica.shard.vector_service = VERSIONS_MAP[
+                    updated_replica.vector_service
+                ]
+                replica.shard.paragraph_service = VERSIONS_MAP[
+                    updated_replica.paragraph_service
+                ]
+                replica.shard.relation_service = VERSIONS_MAP[
+                    updated_replica.relation_service
+                ]
                 return
