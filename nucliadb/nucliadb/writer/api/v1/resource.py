@@ -57,6 +57,7 @@ from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
     parse_basic_modify,
+    set_last_account_seq,
     set_last_seqid,
     set_status,
     set_status_modify,
@@ -147,12 +148,13 @@ async def create_resource(
     set_info_on_span({"nuclia.rid": uuid, "nuclia.kbid": kbid})
 
     try:
-        seqid = await processing.send_to_process(toprocess, partition)
+        seqid, account_seq = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_last_seqid(writer, seqid)
+    set_last_account_seq(writer, account_seq)
     if x_synchronous:
         t0 = time()
     await transaction.commit(writer, partition, wait=x_synchronous)
@@ -227,12 +229,13 @@ async def modify_resource(
 
     set_status_modify(writer.basic, item)
     try:
-        seqid = await processing.send_to_process(toprocess, partition)
+        seqid, account_seq = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_last_seqid(writer, seqid)
+    set_last_account_seq(writer, account_seq)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=seqid)
@@ -300,7 +303,7 @@ async def reprocess_resource(
     # Send current resource to reprocess.
 
     try:
-        seqid = await processing.send_to_process(toprocess, partition)
+        seqid, account_seq = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
@@ -309,6 +312,7 @@ async def reprocess_resource(
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
     set_last_seqid(writer, seqid)
+    set_last_account_seq(writer, account_seq)
     await transaction.commit(writer, partition, wait=False)
 
     return ResourceUpdated(seqid=seqid)
