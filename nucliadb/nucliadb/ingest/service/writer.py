@@ -101,20 +101,6 @@ if SENTRY:
     from sentry_sdk import capture_exception
 
 
-# We need to do this until the node returns a ShardCreated pb
-# or moves the enum outside the ShardCreated pb.
-VERSIONS_MAP = {
-    ShardCleaned.DocumentService.DOCUMENT_V0: ShardCreated.DocumentService.DOCUMENT_V0,
-    ShardCleaned.DocumentService.DOCUMENT_V1: ShardCreated.DocumentService.DOCUMENT_V1,
-    ShardCleaned.RelationService.RELATION_V0: ShardCreated.RelationService.RELATION_V0,
-    ShardCleaned.RelationService.RELATION_V1: ShardCreated.RelationService.RELATION_V1,
-    ShardCleaned.ParagraphService.PARAGRAPH_V0: ShardCreated.ParagraphService.PARAGRAPH_V0,
-    ShardCleaned.ParagraphService.PARAGRAPH_V1: ShardCreated.ParagraphService.PARAGRAPH_V1,
-    ShardCleaned.VectorService.VECTOR_V0: ShardCreated.VectorService.VECTOR_V0,
-    ShardCleaned.VectorService.VECTOR_V1: ShardCreated.VectorService.VECTOR_V1,
-}
-
-
 class WriterServicer(writer_pb2_grpc.WriterServicer):
     def __init__(self):
         self.partitions = settings.partitions
@@ -612,16 +598,8 @@ def update_shards_with_updated_replica(
     for logic_shard in shards.shards:
         for replica in logic_shard.replicas:
             if replica.shard.id == replica_id:
-                replica.shard.document_service = VERSIONS_MAP[  # type: ignore
-                    updated_replica.document_service
-                ]
-                replica.shard.vector_service = VERSIONS_MAP[  # type: ignore
-                    updated_replica.vector_service
-                ]
-                replica.shard.paragraph_service = VERSIONS_MAP[  # type: ignore
-                    updated_replica.paragraph_service
-                ]
-                replica.shard.relation_service = VERSIONS_MAP[  # type: ignore
-                    updated_replica.relation_service
-                ]
+                replica.shard.document_service = updated_replica.document_service
+                replica.shard.vector_service = updated_replica.vector_service
+                replica.shard.paragraph_service = updated_replica.paragraph_service
+                replica.shard.relation_service = updated_replica.relation_service
                 return

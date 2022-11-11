@@ -76,10 +76,10 @@ class DummyWriterStub:
     async def CleanAndUpgradeShard(self, data):
         self.calls.setdefault("CleanAndUpgradeShard", []).append(data)
         return ShardCleaned(
-            document_service=ShardCleaned.DocumentService.DOCUMENT_V1,
-            paragraph_service=ShardCleaned.ParagraphService.PARAGRAPH_V1,
-            vector_service=ShardCleaned.VectorService.VECTOR_V1,
-            relation_service=ShardCleaned.RelationService.RELATION_V1,
+            document_service=ShardCreated.DocumentService.DOCUMENT_V1,
+            paragraph_service=ShardCreated.ParagraphService.PARAGRAPH_V1,
+            vector_service=ShardCreated.VectorService.VECTOR_V1,
+            relation_service=ShardCreated.RelationService.RELATION_V1,
         )
 
     async def ListShards(self, data):

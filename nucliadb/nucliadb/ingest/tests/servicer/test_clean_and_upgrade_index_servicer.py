@@ -92,10 +92,10 @@ def test_update_shards_pb_replica():
     shards = PBShards(shards=[shard1, shard2])
 
     new_replica_info = ShardCleaned(
-        document_service=ShardCleaned.DOCUMENT_V1,
-        relation_service=ShardCleaned.RELATION_V1,
-        vector_service=ShardCleaned.VECTOR_V1,
-        paragraph_service=ShardCleaned.PARAGRAPH_V1,
+        document_service=ReplicaData.DOCUMENT_V1,
+        relation_service=ReplicaData.RELATION_V1,
+        vector_service=ReplicaData.VECTOR_V1,
+        paragraph_service=ReplicaData.PARAGRAPH_V1,
     )
 
     update_shards_with_updated_replica(shards, "shard1rep1", new_replica_info)
