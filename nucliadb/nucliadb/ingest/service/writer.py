@@ -612,16 +612,16 @@ def update_shards_with_updated_replica(
     for logic_shard in shards.shards:
         for replica in logic_shard.replicas:
             if replica.shard.id == replica_id:
-                replica.shard.document_service = VERSIONS_MAP[
+                replica.shard.document_service = VERSIONS_MAP[  # type: ignore
                     updated_replica.document_service
                 ]
-                replica.shard.vector_service = VERSIONS_MAP[
+                replica.shard.vector_service = VERSIONS_MAP[  # type: ignore
                     updated_replica.vector_service
                 ]
-                replica.shard.paragraph_service = VERSIONS_MAP[
+                replica.shard.paragraph_service = VERSIONS_MAP[  # type: ignore
                     updated_replica.paragraph_service
                 ]
-                replica.shard.relation_service = VERSIONS_MAP[
+                replica.shard.relation_service = VERSIONS_MAP[  # type: ignore
                     updated_replica.relation_service
                 ]
                 return
