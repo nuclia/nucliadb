@@ -22,12 +22,10 @@ from uuid import uuid4
 
 import pytest
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
-from nucliadb_protos.writer_pb2 import ShardCreated
-from nucliadb_protos.writer_pb2 import ShardObject
-from nucliadb_protos.writer_pb2 import ShardReplica
-from nucliadb_protos.writer_pb2 import Shards
-from nucliadb.ingest.tests.fixtures import IngestFixture
+from nucliadb_protos.writer_pb2 import ShardCreated, ShardObject, ShardReplica, Shards
+
 from nucliadb.ingest.service.writer import update_shards_with_updated_replica
+from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
