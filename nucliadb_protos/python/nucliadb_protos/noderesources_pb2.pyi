@@ -164,34 +164,9 @@ class ShardCleaned(google.protobuf.message.Message):
     VECTOR_SERVICE_FIELD_NUMBER: builtins.int
     RELATION_SERVICE_FIELD_NUMBER: builtins.int
     document_service: global___ShardCreated.DocumentService.ValueType
-    """enum DocumentService {
-        DOCUMENT_V0 = 0;
-        DOCUMENT_V1 = 1;
-    }
-    """
-
     paragraph_service: global___ShardCreated.ParagraphService.ValueType
-    """DocumentService document_service = 2;
-    enum ParagraphService {
-        PARAGRAPH_V0 = 0;
-        PARAGRAPH_V1 = 1;
-    }
-    """
-
     vector_service: global___ShardCreated.VectorService.ValueType
-    """enum VectorService {
-        VECTOR_V0 = 0;
-        VECTOR_V1 = 1;
-    }
-    """
-
     relation_service: global___ShardCreated.RelationService.ValueType
-    """enum RelationService {
-        RELATION_V0 = 0;
-        RELATION_V1 = 1;
-    }
-    """
-
     def __init__(self,
         *,
         document_service: global___ShardCreated.DocumentService.ValueType = ...,

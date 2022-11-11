@@ -35,7 +35,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
-from nucliadb_protos.noderesources_pb2 import ShardCleaned, ShardCreated
+from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     DelEntitiesRequest,

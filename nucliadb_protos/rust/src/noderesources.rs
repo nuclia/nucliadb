@@ -66,29 +66,12 @@ pub mod shard_created {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardCleaned {
-    /// enum DocumentService {
-    ///     DOCUMENT_V0 = 0;
-    ///     DOCUMENT_V1 = 1;
-    /// }
     #[prost(enumeration="shard_created::DocumentService", tag="2")]
     pub document_service: i32,
-    /// DocumentService document_service = 2;
-    /// enum ParagraphService {
-    ///     PARAGRAPH_V0 = 0;
-    ///     PARAGRAPH_V1 = 1;
-    /// }
     #[prost(enumeration="shard_created::ParagraphService", tag="3")]
     pub paragraph_service: i32,
-    /// enum VectorService {
-    ///     VECTOR_V0 = 0;
-    ///     VECTOR_V1 = 1;
-    /// }
     #[prost(enumeration="shard_created::VectorService", tag="4")]
     pub vector_service: i32,
-    /// enum RelationService {
-    ///     RELATION_V0 = 0;
-    ///     RELATION_V1 = 1;
-    /// }
     #[prost(enumeration="shard_created::RelationService", tag="5")]
     pub relation_service: i32,
 }
