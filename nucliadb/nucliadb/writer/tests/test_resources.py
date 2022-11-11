@@ -255,7 +255,7 @@ async def test_reprocess_resource(
     processing = get_processing()
 
     original = processing.send_to_process
-    mocker.patch.object(processing, "send_to_process", AsyncMock(original))
+    mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(

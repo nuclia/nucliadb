@@ -461,8 +461,6 @@ class Processor:
     ) -> Optional[Tuple[Resource, bool]]:
         created = False
 
-        message.basic.last_account_seq = message.account_seq
-
         if resource is None:
             # Make sure we load the resource in case it already exists on db
             if message.uuid is None and message.slug:
