@@ -155,7 +155,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 )
 
         key = KB_SHARDS.format(kbid=request.uuid)
-        await txn.set(key, all_shards.SerializeToString())
+        await txn.set(key, updated_shards.SerializeToString())
         await txn.commit(resource=False)
         return CleanedKnowledgeBoxResponse()
 
