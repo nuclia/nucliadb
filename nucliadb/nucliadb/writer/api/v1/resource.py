@@ -211,6 +211,8 @@ async def modify_resource(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
+    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
+
     parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
 
@@ -276,6 +278,8 @@ async def reprocess_resource(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
+
+    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
     storage = await get_storage(service_name=SERVICE_NAME)
     cache = await get_cache()
@@ -383,6 +387,9 @@ async def reindex_resource(
     index_req.kbid = kbid
     index_req.rid = rid
     index_req.reindex_vectors = reindex_vectors
+
+    set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
+
     await ingest.ReIndex(index_req)  # type: ignore
     return Response(status_code=200)
 

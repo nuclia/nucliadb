@@ -438,6 +438,8 @@ async def append_messages_to_conversation_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
+    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
+
     parse_audit(writer.audit, request)
 
     field = models.InputConversationField()
@@ -504,6 +506,8 @@ async def append_blocks_to_layout_field(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
+    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
+
     parse_audit(writer.audit, request)
 
     field = models.InputLayoutField(body=models.InputLayoutContent())
@@ -561,6 +565,8 @@ async def delete_resource_field(
     pb_field_id = FieldID()
     pb_field_id.field_type = FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP[field_type]
     pb_field_id.field = field_id
+
+    set_info_on_span({"nuclia.kbid": kbid, "nuclia.rid": rid})
 
     writer.delete_fields.append(pb_field_id)
     parse_audit(writer.audit, request)

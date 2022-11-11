@@ -354,6 +354,13 @@ async def patch(
     if rslug:
         rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 
+    if rid:
+        set_info_on_span(
+            {"nuclia.rid": rid, "nuclia.kbid": kbid, "nuclia.upload_id": upload_id}
+        )
+    else:
+        set_info_on_span({"nuclia.kbid": kbid, "nuclia.upload_id": upload_id})
+
     dm = get_dm()
     await dm.load(upload_id)
     to_upload = None
