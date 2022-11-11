@@ -19,10 +19,11 @@
 #
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
+from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb.ingest.orm.abc import AbstractShard
@@ -51,6 +52,12 @@ class LocalShard(AbstractShard):
             res = await self.node.add_resource(resource)
         return res.count
 
-    async def clean_and_upgrade(self):
+    async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
+        shards_cleaned: Dict[str, PBShardCleaned] = {}
         for shardreplica in self.shard.replicas:
-            await self.node.clean_and_upgrade_shard(shardreplica.shard)
+            replica_id = shardreplica.shard.id
+            cleaned: PBShardCleaned = await self.node.clean_and_upgrade_shard(
+                replica_id
+            )
+            shards_cleaned[replica_id] = cleaned
+        return shards_cleaned

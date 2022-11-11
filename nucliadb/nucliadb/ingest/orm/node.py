@@ -28,7 +28,12 @@ from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
-from nucliadb_protos.noderesources_pb2 import ShardCreated, ShardId, ShardList
+from nucliadb_protos.noderesources_pb2 import (
+    ShardCleaned,
+    ShardCreated,
+    ShardId,
+    ShardList,
+)
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
 from nucliadb_protos.writer_pb2 import ListMembersRequest
@@ -70,7 +75,12 @@ class DummyWriterStub:
 
     async def CleanAndUpgradeShard(self, data):
         self.calls.setdefault("CleanAndUpgradeShard", []).append(data)
-        return ShardId(id="shard")
+        return ShardCleaned(
+            document_service=ShardCreated.DocumentService.DOCUMENT_V1,
+            paragraph_service=ShardCreated.ParagraphService.PARAGRAPH_V1,
+            vector_service=ShardCreated.VectorService.VECTOR_V1,
+            relation_service=ShardCreated.RelationService.RELATION_V1,
+        )
 
     async def ListShards(self, data):
         self.calls.setdefault("ListShards", []).append(data)
@@ -342,10 +352,10 @@ class Node(AbstractNode):
         resp = await self.writer.DeleteShard(req)  # type: ignore
         return resp.id
 
-    async def clean_and_upgrade_shard(self, id: str) -> int:
+    async def clean_and_upgrade_shard(self, id: str) -> ShardCleaned:
         req = ShardId(id=id)
         resp = await self.writer.CleanAndUpgradeShard(req)  # type: ignore
-        return resp.id
+        return resp
 
     async def list_shards(self) -> List[str]:
         req = EmptyQuery()

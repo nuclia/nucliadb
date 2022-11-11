@@ -159,72 +159,20 @@ global___ShardCreated = ShardCreated
 
 class ShardCleaned(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    class _DocumentService:
-        ValueType = typing.NewType('ValueType', builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-    class _DocumentServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCleaned._DocumentService.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        DOCUMENT_V0: ShardCleaned._DocumentService.ValueType  # 0
-        DOCUMENT_V1: ShardCleaned._DocumentService.ValueType  # 1
-    class DocumentService(_DocumentService, metaclass=_DocumentServiceEnumTypeWrapper):
-        pass
-
-    DOCUMENT_V0: ShardCleaned.DocumentService.ValueType  # 0
-    DOCUMENT_V1: ShardCleaned.DocumentService.ValueType  # 1
-
-    class _ParagraphService:
-        ValueType = typing.NewType('ValueType', builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-    class _ParagraphServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCleaned._ParagraphService.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        PARAGRAPH_V0: ShardCleaned._ParagraphService.ValueType  # 0
-        PARAGRAPH_V1: ShardCleaned._ParagraphService.ValueType  # 1
-    class ParagraphService(_ParagraphService, metaclass=_ParagraphServiceEnumTypeWrapper):
-        pass
-
-    PARAGRAPH_V0: ShardCleaned.ParagraphService.ValueType  # 0
-    PARAGRAPH_V1: ShardCleaned.ParagraphService.ValueType  # 1
-
-    class _VectorService:
-        ValueType = typing.NewType('ValueType', builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-    class _VectorServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCleaned._VectorService.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        VECTOR_V0: ShardCleaned._VectorService.ValueType  # 0
-        VECTOR_V1: ShardCleaned._VectorService.ValueType  # 1
-    class VectorService(_VectorService, metaclass=_VectorServiceEnumTypeWrapper):
-        pass
-
-    VECTOR_V0: ShardCleaned.VectorService.ValueType  # 0
-    VECTOR_V1: ShardCleaned.VectorService.ValueType  # 1
-
-    class _RelationService:
-        ValueType = typing.NewType('ValueType', builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-    class _RelationServiceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ShardCleaned._RelationService.ValueType], builtins.type):
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        RELATION_V0: ShardCleaned._RelationService.ValueType  # 0
-        RELATION_V1: ShardCleaned._RelationService.ValueType  # 1
-    class RelationService(_RelationService, metaclass=_RelationServiceEnumTypeWrapper):
-        pass
-
-    RELATION_V0: ShardCleaned.RelationService.ValueType  # 0
-    RELATION_V1: ShardCleaned.RelationService.ValueType  # 1
-
     DOCUMENT_SERVICE_FIELD_NUMBER: builtins.int
     PARAGRAPH_SERVICE_FIELD_NUMBER: builtins.int
     VECTOR_SERVICE_FIELD_NUMBER: builtins.int
     RELATION_SERVICE_FIELD_NUMBER: builtins.int
-    document_service: global___ShardCleaned.DocumentService.ValueType
-    paragraph_service: global___ShardCleaned.ParagraphService.ValueType
-    vector_service: global___ShardCleaned.VectorService.ValueType
-    relation_service: global___ShardCleaned.RelationService.ValueType
+    document_service: global___ShardCreated.DocumentService.ValueType
+    paragraph_service: global___ShardCreated.ParagraphService.ValueType
+    vector_service: global___ShardCreated.VectorService.ValueType
+    relation_service: global___ShardCreated.RelationService.ValueType
     def __init__(self,
         *,
-        document_service: global___ShardCleaned.DocumentService.ValueType = ...,
-        paragraph_service: global___ShardCleaned.ParagraphService.ValueType = ...,
-        vector_service: global___ShardCleaned.VectorService.ValueType = ...,
-        relation_service: global___ShardCleaned.RelationService.ValueType = ...,
+        document_service: global___ShardCreated.DocumentService.ValueType = ...,
+        paragraph_service: global___ShardCreated.ParagraphService.ValueType = ...,
+        vector_service: global___ShardCreated.VectorService.ValueType = ...,
+        relation_service: global___ShardCreated.RelationService.ValueType = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["document_service",b"document_service","paragraph_service",b"paragraph_service","relation_service",b"relation_service","vector_service",b"vector_service"]) -> None: ...
 global___ShardCleaned = ShardCleaned

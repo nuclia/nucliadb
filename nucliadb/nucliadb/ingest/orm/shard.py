@@ -19,12 +19,13 @@
 #
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from lru import LRU  # type: ignore
 from nucliadb_protos.noderesources_pb2 import (
     Resource as PBBrainResource,  # type: ignore
 )
+from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
@@ -88,6 +89,11 @@ class Shard(AbstractShard):
 
         return count
 
-    async def clean_and_upgrade(self):
+    async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
+        replicas_cleaned: Dict[str, PBShardCleaned] = {}
         for shardreplica in self.shard.replicas:
-            await NODES[shardreplica.node].writer.CleanAndUpgradeShard(shardreplica.shard)  # type: ignore
+            node = NODES[shardreplica.node]
+            replica_id = shardreplica.shard
+            cleaned = await node.writer.CleanAndUpgradeShard(replica_id)  # type: ignore
+            replicas_cleaned[replica_id.id] = cleaned
+        return replicas_cleaned

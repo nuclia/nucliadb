@@ -32,7 +32,12 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
-from nucliadb_protos.noderesources_pb2 import ShardCreated, ShardId, ShardIds
+from nucliadb_protos.noderesources_pb2 import (
+    ShardCleaned,
+    ShardCreated,
+    ShardId,
+    ShardIds,
+)
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
@@ -223,16 +228,15 @@ class LocalNode(AbstractNode):
         op_status.ParseFromString(pb_bytes)
         return op_status
 
-    async def clean_and_upgrade_shard(self, shard_id: str):
+    async def clean_and_upgrade_shard(self, shard_id: str) -> ShardCleaned:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
             self.executor, self.writer.clean_and_upgrade_shard, shard_id
         )
-
         pb_bytes = bytes(resp)
-        op_status = OpStatus()
-        op_status.ParseFromString(pb_bytes)
-        return op_status
+        resp = ShardCleaned()
+        resp.ParseFromString(pb_bytes)
+        return resp
 
     def __str__(self):
         return "LOCAL NODE"

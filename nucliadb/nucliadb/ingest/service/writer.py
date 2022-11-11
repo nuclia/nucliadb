@@ -35,6 +35,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
+from nucliadb_protos.noderesources_pb2 import ShardCleaned
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     DelEntitiesRequest,
@@ -69,9 +70,9 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorsRequest,
     SetVectorsResponse,
     SetWidgetsRequest,
-    WriterStatusRequest,
-    WriterStatusResponse,
 )
+from nucliadb_protos.writer_pb2 import Shards as PBShards
+from nucliadb_protos.writer_pb2 import WriterStatusRequest, WriterStatusResponse
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import TXNID
@@ -87,6 +88,7 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.utilities import (
     get_audit,
     get_cache,
@@ -126,10 +128,21 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         node_klass = get_node_klass()
         all_shards = await node_klass.get_all_shards(txn, request.uuid)
+
+        updated_shards = PBShards()
+        updated_shards.CopyFrom(all_shards)
+
         for logic_shard in all_shards.shards:
             shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
-            await shard.clean_and_upgrade()
-        await txn.abort()
+            replicas_cleaned = await shard.clean_and_upgrade()
+            for replica_id, shard_cleaned in replicas_cleaned.items():
+                update_shards_with_updated_replica(
+                    updated_shards, replica_id, shard_cleaned
+                )
+
+        key = KB_SHARDS.format(kbid=request.uuid)
+        await txn.set(key, updated_shards.SerializeToString())
+        await txn.commit(resource=False)
         return CleanedKnowledgeBoxResponse()
 
     async def SetVectors(  # type: ignore
@@ -577,3 +590,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception:
             logger.exception("Export", stack_info=True)
             raise
+
+
+def update_shards_with_updated_replica(
+    shards: PBShards, replica_id: str, updated_replica: ShardCleaned
+):
+    for logic_shard in shards.shards:
+        for replica in logic_shard.replicas:
+            if replica.shard.id == replica_id:
+                replica.shard.document_service = updated_replica.document_service
+                replica.shard.vector_service = updated_replica.vector_service
+                replica.shard.paragraph_service = updated_replica.paragraph_service
+                replica.shard.relation_service = updated_replica.relation_service
+                return
