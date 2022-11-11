@@ -95,5 +95,5 @@ class Shard(AbstractShard):
             node = NODES[shardreplica.node]
             replica_id = shardreplica.shard
             cleaned = await node.writer.CleanAndUpgradeShard(replica_id)  # type: ignore
-            replicas_cleaned[replica_id] = cleaned
+            replicas_cleaned[replica_id.id] = cleaned
         return replicas_cleaned
