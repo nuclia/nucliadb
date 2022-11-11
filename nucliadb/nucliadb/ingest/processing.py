@@ -326,6 +326,7 @@ class ProcessingEngine:
             if resp.status == 200:
                 data = await resp.json()
                 seqid = data.get("seqid")
+                account_seq = data.get("account_seq")
             elif resp.status == 402:
                 data = await resp.json()
                 raise LimitsExceededError(data["detail"])
