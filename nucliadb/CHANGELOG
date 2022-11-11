@@ -1,9 +1,5 @@
 # CHANGELOG
 
-## 2.0.8
-
-- Consume account_seq from push instead from pull
-
 ## 2.0.7
 
 - Be able to reindex a resource and its vectors
