@@ -52,11 +52,7 @@ from nucliadb.writer.exceptions import (
     ResourceNotFound,
 )
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import (
-    parse_basic,
-    set_last_account_seq,
-    set_last_seqid,
-)
+from nucliadb.writer.resource.basic import parse_basic, set_last_seqid
 from nucliadb.writer.resource.field import parse_fields
 from nucliadb.writer.resource.origin import parse_origin
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD, get_dm, get_storage_manager
@@ -730,13 +726,12 @@ async def store_file_on_nuclia_db(
     )
 
     try:
-        seqid, account_seq = await processing.send_to_process(toprocess, partition)
+        seqid = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
     await transaction.commit(writer, partition, wait=wait_on_commit)
 
     return seqid

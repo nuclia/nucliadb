@@ -22,7 +22,7 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import aiohttp
 import jwt  # type: ignore
@@ -306,15 +306,13 @@ class ProcessingEngine:
 
         return jwttoken
 
-    async def send_to_process(
-        self, item: PushPayload, partition: int
-    ) -> Tuple[int, int]:
+    async def send_to_process(self, item: PushPayload, partition: int) -> int:
         if self.disable_send_to_process:
-            return 0, 0
+            return 0
 
         if self.dummy:
             self.calls.append(item.dict())
-            return len(self.calls), 0
+            return len(self.calls)
 
         headers = {"CONTENT-TYPE": "application/json"}
         if self.onprem is False:
@@ -343,7 +341,6 @@ class ProcessingEngine:
             if resp.status == 200:
                 data = await resp.json()
                 seqid = data.get("seqid")
-                account_seq = data.get("account_seq")
             elif resp.status == 402:
                 raise LimitsExceededError(data["detail"])
             else:
@@ -352,4 +349,4 @@ class ProcessingEngine:
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
                 ingest seqid: {seqid}, partition: {partition}"
         )
-        return seqid, account_seq
+        return seqid
