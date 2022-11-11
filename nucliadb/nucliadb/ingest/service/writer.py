@@ -104,14 +104,14 @@ if SENTRY:
 # We need to do this until the node returns a ShardCreated pb
 # or moves the enum outside the ShardCreated pb.
 VERSIONS_MAP = {
-    ShardCleaned.DOCUMENT_V0: ShardCreated.DOCUMENT_V0,
-    ShardCleaned.DOCUMENT_V1: ShardCreated.DOCUMENT_V1,
-    ShardCleaned.RELATION_V0: ShardCreated.RELATION_V0,
-    ShardCleaned.RELATION_V1: ShardCreated.RELATION_V1,
-    ShardCleaned.PARAGRAPH_V0: ShardCreated.PARAGRAPH_V0,
-    ShardCleaned.PARAGRAPH_V1: ShardCreated.PARAGRAPH_V1,
-    ShardCleaned.VECTOR_V0: ShardCreated.VECTOR_V0,
-    ShardCleaned.VECTOR_V1: ShardCreated.VECTOR_V1,
+    ShardCleaned.DocumentService.DOCUMENT_V0: ShardCreated.DocumentService.DOCUMENT_V0,
+    ShardCleaned.DocumentService.DOCUMENT_V1: ShardCreated.DocumentService.DOCUMENT_V1,
+    ShardCleaned.RelationService.RELATION_V0: ShardCreated.RelationService.RELATION_V0,
+    ShardCleaned.RelationService.RELATION_V1: ShardCreated.RelationService.RELATION_V1,
+    ShardCleaned.ParagraphService.PARAGRAPH_V0: ShardCreated.ParagraphService.PARAGRAPH_V0,
+    ShardCleaned.ParagraphService.PARAGRAPH_V1: ShardCreated.ParagraphService.PARAGRAPH_V1,
+    ShardCleaned.VectorService.VECTOR_V0: ShardCreated.VectorService.VECTOR_V0,
+    ShardCleaned.VectorService.VECTOR_V1: ShardCreated.VectorService.VECTOR_V1,
 }
 
 
