@@ -95,7 +95,7 @@ async def test_suggest_fuzzy_search(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=a")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 6
+    assert len(body["paragraphs"]["results"]) == 1
 
 
 # @pytest.mark.asyncio
