@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+import asyncio
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -86,8 +87,9 @@ def broker_resource_with_duplicates(knowledgebox):
     bm.basic.modified.FromDatetime(datetime.now())
     bm.origin.source = rpb.Origin.Source.WEB
 
+    text = "My own text Ramon."
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    etw.body.text = "My own text Ramon.My own text Ramon."
     etw.field.field = "file"
     etw.field.field_type = rpb.FieldType.FILE
     bm.extracted_text.append(etw)
@@ -110,7 +112,7 @@ def broker_resource_with_duplicates(knowledgebox):
     fcm = rpb.FieldComputedMetadataWrapper()
     fcm.field.field = "file"
     fcm.field.field_type = rpb.FieldType.FILE
-    dup_text = "My own text Ramon"
+    dup_text = "My own text Ramoneee"
     p1 = rpb.Paragraph(
         start=0,
         end=len(dup_text),
@@ -122,7 +124,7 @@ def broker_resource_with_duplicates(knowledgebox):
     p2 = rpb.Paragraph(
         start=len(dup_text),
         end=len(dup_text) * 2,
-        text=dup_text,
+        text=dup_text + "foobar",
     )
     p2.start_seconds.append(10)
     p2.end_seconds.append(20)
@@ -131,6 +133,7 @@ def broker_resource_with_duplicates(knowledgebox):
 
     fcm.metadata.metadata.paragraphs.append(p1)
     fcm.metadata.metadata.paragraphs.append(p2)
+
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
@@ -174,7 +177,7 @@ async def create_resource_with_duplicates(knowledgebox, writer: WriterStub):
 
 
 @pytest.mark.asyncio
-async def test_seach_filters_out_duplicates(
+async def test_search_filters_out_duplicates(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -187,7 +190,6 @@ async def test_seach_filters_out_duplicates(
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 1
-    assert len(content["sentences"]["results"]) == 1
 
     # It should return duplicates if specified
     resp = await nucliadb_reader.get(
@@ -196,4 +198,3 @@ async def test_seach_filters_out_duplicates(
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 2
-    assert len(content["sentences"]["results"]) == 2
