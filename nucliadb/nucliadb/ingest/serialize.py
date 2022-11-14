@@ -191,7 +191,13 @@ async def serialize(
             ]
 
             resource.last_seqid = orm_resource.basic.last_seqid
-            resource.last_account_seq = orm_resource.basic.last_account_seq
+
+            # 0 on the proto means it was not ever set, as first valid value for this field will allways be 1
+            resource.last_account_seq = (
+                orm_resource.basic.last_account_seq
+                if orm_resource.basic.last_account_seq != 0
+                else None
+            )
 
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()
