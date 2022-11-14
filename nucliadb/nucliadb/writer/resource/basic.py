@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from typing import Optional
 
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -222,5 +223,6 @@ def set_last_seqid(bm: BrokerMessage, seqid: int):
     bm.basic.last_seqid = seqid
 
 
-def set_last_account_seq(bm: BrokerMessage, account_seq: int):
-    bm.basic.last_account_seq = account_seq
+def set_last_account_seq(bm: BrokerMessage, account_seq: Optional[int]):
+    if account_seq is not None:
+        bm.basic.last_account_seq = account_seq
