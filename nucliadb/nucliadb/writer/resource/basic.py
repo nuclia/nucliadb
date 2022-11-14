@@ -220,3 +220,7 @@ def set_status_modify(basic: Basic, item: UpdateResourcePayload):
 
 def set_last_seqid(bm: BrokerMessage, seqid: int):
     bm.basic.last_seqid = seqid
+
+
+def set_last_account_seq(bm: BrokerMessage, account_seq: int):
+    bm.basic.last_account_seq = account_seq
