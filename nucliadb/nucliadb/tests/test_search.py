@@ -56,7 +56,7 @@ async def test_search_sc_2062(
     assert len(resp.json()["paragraphs"]["results"]) == 1
 
 
-def broker_resource(knowledgebox):
+def broker_resource_with_duplicates(knowledgebox):
     import uuid
     from datetime import datetime
 
@@ -168,7 +168,7 @@ async def inject_message(writer: WriterStub, message):
 
 
 async def create_resource_with_duplicates(knowledgebox, writer: WriterStub):
-    bm = broker_resource(knowledgebox)
+    bm = broker_resource_with_duplicates(knowledgebox)
     await inject_message(writer, bm)
     return bm.uuid
 
