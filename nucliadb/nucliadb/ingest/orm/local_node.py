@@ -230,8 +230,9 @@ class LocalNode(AbstractNode):
 
     async def clean_and_upgrade_shard(self, shard_id: str) -> ShardCleaned:
         loop = asyncio.get_running_loop()
+        req = ShardId(id=shard_id)
         resp = await loop.run_in_executor(
-            self.executor, self.writer.clean_and_upgrade_shard, shard_id
+            self.executor, self.writer.clean_and_upgrade_shard, req.SerializeToString()
         )
         pb_bytes = bytes(resp)
         resp = ShardCleaned()

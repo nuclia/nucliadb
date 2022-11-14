@@ -195,14 +195,14 @@ async def download_api(sf: StorageField, headers: Headers):
     download_headers = {}
 
     if "range" in headers and file_size > -1:
-        range_request = headers.get("range")
+        range_request = headers["range"]
         try:
-            start, _, end = range_request.split("bytes=")[-1].partition("-")
-            start = int(start)
-            if len(end) == 0:
+            start_str, _, end_str = range_request.split("bytes=")[-1].partition("-")
+            start = int(start_str)
+            if len(end_str) == 0:
                 # bytes=0- is valid
                 end = file_size - 1
-            end = int(end) + 1  # python is inclusive, http is exclusive
+            end = int(end_str) + 1  # python is inclusive, http is exclusive
         except (IndexError, ValueError):
             # range errors fallback to full download
             raise HTTPException(
@@ -237,7 +237,7 @@ async def download_api(sf: StorageField, headers: Headers):
         download_headers["Range"] = range_request
 
     return StreamingResponse(
-        sf.storage.download(sf.bucket, sf.key, headers=download_headers),
+        sf.storage.download(sf.bucket, sf.key, headers=download_headers),  # type: ignore
         status_code=status_code,
         media_type=content_type,
         headers=extra_headers,
