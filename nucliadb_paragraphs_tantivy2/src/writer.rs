@@ -225,7 +225,8 @@ impl ParagraphWriterService {
                     .iter()
                     .chain(text_info.labels.iter())
                     .chain(labels.iter())
-                    .map(Facet::from)
+                    .map(Facet::from_text)
+                    .flat_map(|v| v.map_err(|e| info!("Invalid label {e:?}")).ok())
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
 
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
@@ -323,6 +324,7 @@ mod tests {
                 "/tantivy".to_string(),
                 "/test".to_string(),
                 "/label1".to_string(),
+                "l/papers/medicine".to_string(),
             ],
             index: 1,
             split: "".to_string(),
