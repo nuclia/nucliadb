@@ -415,7 +415,7 @@ impl FieldReaderService {
             .map(|v| {
                 v.tags
                     .iter()
-                    .filter(|s| FieldReaderService::is_valid_facet(*s))
+                    .filter(|s| FieldReaderService::is_valid_facet(s))
                     .cloned()
                     .collect()
             })

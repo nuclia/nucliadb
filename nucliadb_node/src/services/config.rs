@@ -109,7 +109,7 @@ impl ShardConfig {
         }
     }
     fn read_config(json_file: &path::Path) -> ConfigState {
-        let content = fs::read_to_string(&json_file).unwrap();
+        let content = fs::read_to_string(json_file).unwrap();
         let mut raw: StoredConfig = serde_json::from_str(&content).unwrap();
         if raw.fill_gaps() {
             ConfigState::Modified(ShardConfig::from(raw))

@@ -55,7 +55,7 @@ pub fn serialize_into<W: io::Write>(mut buf: W, trie: Trie) -> io::Result<()> {
     byte_offset += USIZE_LEN;
     for (node, (is_final, adjacency)) in trie.into_iter().enumerate() {
         indexing.insert(node, byte_offset);
-        buf.write_all(&[if is_final { 1 } else { 0 }])?;
+        buf.write_all(&[u8::from(is_final)])?;
         buf.write_all(&adjacency.len().to_le_bytes())?;
         byte_offset += ADJ_HEADER;
         for (edge, node) in adjacency {

@@ -317,7 +317,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         StorageSystem::create(dir.path());
         StorageSystem::open(dir.path());
-        assert!(true);
     }
 
     const CHILD: &str = "child";
