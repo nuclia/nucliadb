@@ -137,13 +137,23 @@ impl StorageSystem {
         unsafe {
             env_builder.flag(Flags::MdbNoLock);
         }
-        let env = env_builder.open(&env_path).unwrap();
-        let keys = env.create_database(Some(db_name::KEYS)).unwrap();
-        let inv_keys = env.create_database(Some(db_name::INVERSE_KEYS)).unwrap();
-        let edges = env.create_database(Some(db_name::EDGES)).unwrap();
-        let in_edges = env.create_database(Some(db_name::INVERSE_EDGES)).unwrap();
-        let state = env.create_database(Some(db_name::STATE)).unwrap();
-        std::fs::File::create(path.join(env_config::STAMP)).unwrap();
+        let env = env_builder.open(&env_path).expect("Opening env failed");
+        let keys = env
+            .create_database(Some(db_name::KEYS))
+            .expect("Keys db could not be created");
+        let inv_keys = env
+            .create_database(Some(db_name::INVERSE_KEYS))
+            .expect("InvKeys db could not be created");
+        let edges = env
+            .create_database(Some(db_name::EDGES))
+            .expect("Edges db could not be created");
+        let in_edges = env
+            .create_database(Some(db_name::INVERSE_EDGES))
+            .expect("InEdges db could not be created");
+        let state = env
+            .create_database(Some(db_name::STATE))
+            .expect("State db could not be created");
+        std::fs::File::create(path.join(env_config::STAMP)).expect("Stamp could not be created");
         StorageSystem {
             env,
             keys,
