@@ -95,7 +95,7 @@ impl VectorWriterService {
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
-            std::fs::create_dir_all(&path).unwrap();
+            std::fs::create_dir_all(path).unwrap();
             Ok(VectorWriterService {
                 index: Writer::new(&config.path),
             })

@@ -42,7 +42,7 @@ fn main() -> io::Result<()> {
         .collect::<Result<Vec<_>, _>>()?;
 
     fs::write(
-        &Path::new("./src/stop_words.rs"),
+        Path::new("./src/stop_words.rs"),
         format!(
             "pub fn is_stop_word(x:&str) -> bool {{\n {} \n}}",
             stop_words

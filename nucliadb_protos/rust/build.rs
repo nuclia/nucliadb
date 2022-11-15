@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut prost_config = prost_build::Config::default();
 
     prost_config
-        .out_dir(&"src/")
+        .out_dir("src/")
         .compile_protos(
             &[
                 "nucliadb_protos/utils.proto",

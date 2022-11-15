@@ -228,11 +228,11 @@ impl Cluster {
                     let guard = chitchat_clone.lock().await;
                     let update_members: Vec<Member> = live_nodes
                         .iter()
-                        .map(|node_id| Member::build(node_id, &*guard).unwrap())
+                        .map(|node_id| Member::build(node_id, &guard).unwrap())
                         .collect();
                     let dead: Vec<Member> = guard
                         .dead_nodes()
-                        .map(|node_id| Member::build(node_id, &*guard).unwrap())
+                        .map(|node_id| Member::build(node_id, &guard).unwrap())
                         .collect();
                     debug!(updated_memberlist=?update_members);
                     debug!(dead_nodes=?dead);

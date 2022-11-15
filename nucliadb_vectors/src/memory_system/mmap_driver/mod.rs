@@ -48,7 +48,7 @@ struct DiskStack {
 }
 impl DiskStack {
     pub fn new(path: &Path) -> DiskStack {
-        std::fs::create_dir_all(&path).unwrap();
+        std::fs::create_dir_all(path).unwrap();
         let path = path.to_path_buf();
         DiskStack {
             stack: path.join(STACK),
@@ -139,7 +139,7 @@ impl SegmentWriter for Storage {
 
 impl Storage {
     pub fn create(path: &Path) -> Storage {
-        std::fs::create_dir_all(&path).unwrap();
+        std::fs::create_dir_all(path).unwrap();
         let nuclia_stamp = path.join(NUCLIA_STAMP);
         let path_storage = path.join(STORAGE);
         let path_lock = path.join(STORAGE_LOCK);

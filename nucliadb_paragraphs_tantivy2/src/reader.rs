@@ -107,7 +107,7 @@ impl ReaderChild for ParagraphReaderService {
             .map(|v| {
                 v.tags
                     .iter()
-                    .filter(|s| ParagraphReaderService::is_valid_facet(*s))
+                    .filter(|s| ParagraphReaderService::is_valid_facet(s))
                     .cloned()
                     .collect()
             })

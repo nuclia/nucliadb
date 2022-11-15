@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     let new_shard = writer.new_shard();
     let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
-    for file_path in std::fs::read_dir(&resources_dir).unwrap() {
+    for file_path in std::fs::read_dir(resources_dir).unwrap() {
         let file_path = file_path.unwrap().path();
         println!("processing {file_path:?}");
         let content = std::fs::read(&file_path).unwrap();

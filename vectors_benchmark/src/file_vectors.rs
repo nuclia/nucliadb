@@ -104,10 +104,10 @@ mod test {
         let vec_reader = VecReader { idx: 0, buf: &buf };
         let mut iter = FileVectors::new(vec_reader);
         let v1 = iter.next();
-        assert_eq!(v1.as_ref().map(|v| v.as_slice()), Some(V1.as_slice()));
+        assert_eq!(v1.as_deref(), Some(V1.as_slice()));
         let v2 = iter.next();
-        assert_eq!(v2.as_ref().map(|v| v.as_slice()), Some(V2.as_slice()));
+        assert_eq!(v2.as_deref(), Some(V2.as_slice()));
         let v3 = iter.next();
-        assert_eq!(v3.as_ref().map(|v| v.as_slice()), Some(V3.as_slice()));
+        assert_eq!(v3.as_deref(), Some(V3.as_slice()));
     }
 }

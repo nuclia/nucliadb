@@ -37,7 +37,7 @@ pub struct FieldSchema {
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
-    let naive = NaiveDateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32);
+    let naive = NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
     DateTime::from_utc(naive, tantivy::chrono::Utc)
 }
 

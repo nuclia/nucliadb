@@ -109,7 +109,7 @@ impl VectorReaderService {
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
-            std::fs::create_dir_all(&path).unwrap();
+            std::fs::create_dir_all(path).unwrap();
             Ok(VectorReaderService {
                 index: RwLock::new(Reader::new(&config.path)),
             })
