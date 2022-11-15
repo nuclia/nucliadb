@@ -155,7 +155,7 @@ impl RelationsReaderService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(RelationsReaderService {
-                index: StorageSystem::open(path),
+                index: StorageSystem::create(path),
             })
         }
     }

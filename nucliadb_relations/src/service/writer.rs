@@ -97,7 +97,7 @@ impl RelationsWriterService {
     pub fn start(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         Ok(RelationsWriterService {
-            index: StorageSystem::start(path),
+            index: StorageSystem::create(path),
         })
     }
     pub fn new(config: &RelationConfig) -> InternalResult<Self> {
@@ -119,7 +119,7 @@ impl RelationsWriterService {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(RelationsWriterService {
-                index: StorageSystem::open(path),
+                index: StorageSystem::create(path),
             })
         }
     }
