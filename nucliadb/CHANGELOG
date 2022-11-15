@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.0.9 
+
+- Be resilient if proxy cannot provide an account_seq
+
 ## 2.0.8
 
 - Consume account_seq from push instead from pull
