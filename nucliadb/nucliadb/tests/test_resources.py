@@ -54,3 +54,47 @@ async def test_last_seqid_is_stored_in_resource(
     assert len(resource_list) > 0
     for resource in resource_list:
         assert "last_seqid" in resource
+
+
+@pytest.mark.asyncio
+async def test_resource_crud(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": "mykb",
+            "title": "My KB",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "My KB"
+
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "My updated KB",
+        },
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "My updated KB"
+
+    resp = await nucliadb_writer.delete(
+        f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}",
+        headers={"X-Synchronous": "true"},
+    )
+    assert resp.status_code == 204
+
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
+    assert resp.status_code == 404
