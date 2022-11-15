@@ -52,6 +52,9 @@ class DuplicateParagraphsChecker:
 
     def check(self, paragraph: Paragraph) -> bool:
         """Returns whether paragraph has already been checked"""
+        if not paragraph.text:
+            return False
+
         par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
         if par_md5 in self.seen:
             return True
