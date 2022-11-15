@@ -226,7 +226,7 @@ impl ParagraphWriterService {
                     .chain(text_info.labels.iter())
                     .chain(labels.iter())
                     .map(Facet::from_text)
-                    .flat_map(|v| v.map_err(|e| info!("Invalid label {e:?}")).ok())
+                    .flat_map(|v| v.map_err(|e| error!("Invalid label {e:?}")).ok())
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
 
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
