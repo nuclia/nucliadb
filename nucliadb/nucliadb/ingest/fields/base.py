@@ -66,7 +66,7 @@ class Field:
             raise InvalidFieldClass()
 
         self.value = None
-        self.extracted_text = None
+        self.extracted_text: Optional[ExtractedText] = None
         self.extracted_vectors = None
         self.computed_metadata = None
         self.large_computed_metadata = None

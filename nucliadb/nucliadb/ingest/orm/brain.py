@@ -27,6 +27,7 @@ from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (
     Basic,
+    ExtractedText,
     FieldComputedMetadata,
     FieldKeywordset,
     FieldMetadata,
@@ -50,17 +51,27 @@ class DuplicateParagraphsChecker:
     def __init__(self):
         self.seen = set()
 
-    def check(self, paragraph: Paragraph) -> bool:
+    def check(self, paragraph: str) -> bool:
         """Returns whether paragraph has already been checked"""
-        if not paragraph.text:
+        if paragraph == "":
             return False
 
-        par_md5 = hashlib.md5(paragraph.text.encode()).hexdigest()
+        par_md5 = hashlib.md5(paragraph.encode()).hexdigest()
         if par_md5 in self.seen:
             return True
         else:
             self.seen.add(par_md5)
             return False
+
+
+def get_paragraph_text(
+    extracted_text: ExtractedText, start: int, end: int, split: Optional[str] = None
+) -> str:
+    if split is not None:
+        text = extracted_text.split_text[split]
+    else:
+        text = extracted_text.text
+    return text[start:end]
 
 
 class ResourceBrain:
@@ -88,6 +99,7 @@ class ResourceBrain:
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
         page_positions: Optional[FilePagePositions] = None,
+        extracted_text: Optional[ExtractedText] = None,
     ):
         dups = DuplicateParagraphsChecker()
 
@@ -107,13 +119,22 @@ class ResourceBrain:
                     position.page_number = self.get_paragraph_page_number(
                         paragraph, page_positions
                     )
+                repeated_in_field = False
+                if extracted_text:
+                    paragraph_text = get_paragraph_text(
+                        extracted_text,
+                        start=paragraph.start,
+                        end=paragraph.end,
+                        split=subfield,
+                    )
+                    repeated_in_field = dups.check(paragraph_text)
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
                     field=field_key,
                     split=subfield,
                     index=index,
-                    repeated_in_field=dups.check(paragraph),
+                    repeated_in_field=repeated_in_field,
                     metadata=ParagraphMetadata(position=position),
                 )
                 for classification in paragraph.classifications:
@@ -136,12 +157,19 @@ class ResourceBrain:
                 position.page_number = self.get_paragraph_page_number(
                     paragraph, page_positions
                 )
+
+            repeated_in_field = False
+            if extracted_text:
+                paragraph_text = get_paragraph_text(
+                    extracted_text, start=paragraph.start, end=paragraph.end
+                )
+                repeated_in_field = dups.check(paragraph_text)
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
                 field=field_key,
                 index=index,
-                repeated_in_field=dups.check(paragraph),
+                repeated_in_field=repeated_in_field,
                 metadata=ParagraphMetadata(position=position),
             )
             for classification in paragraph.classifications:

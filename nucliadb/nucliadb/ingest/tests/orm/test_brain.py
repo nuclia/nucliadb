@@ -21,6 +21,7 @@ from uuid import uuid4
 
 import pytest
 from nucliadb_protos.resources_pb2 import (
+    ExtractedText,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
@@ -32,30 +33,69 @@ from nucliadb.ingest.orm.brain import DuplicateParagraphsChecker, ResourceBrain
 
 
 def test_apply_field_metadata_marks_duplicated_paragraphs():
+    # Simulate a field with two paragraphs that contain the same text
     br = ResourceBrain(rid=str(uuid4()))
     field_key = "text1"
-
     fcmw = FieldComputedMetadataWrapper()
     fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+    paragraph = "Some paragraph here. "
+    text_1 = f"{paragraph}{paragraph}"
+    first_occurrence = [0, len(paragraph)]
+    second_occurrence = [len(paragraph), len(paragraph) * 2]
 
-    # Simulate a field with two paragraphs that contain the same text
-    text_1 = "Some text here. And another sentence here"
-    p1 = Paragraph(start=0, end=20, text=text_1)
-    p1.sentences.append(Sentence(start=0, end=10, key="test"))
+    et = ExtractedText(text=text_1)
+    p1 = Paragraph(start=first_occurrence[0], end=first_occurrence[1])
+    p1.sentences.append(
+        Sentence(start=first_occurrence[0], end=first_occurrence[1], key="test")
+    )
+    p2 = Paragraph(start=second_occurrence[0], end=second_occurrence[1])
+    p2.sentences.append(
+        Sentence(start=second_occurrence[0], end=second_occurrence[1], key="test")
+    )
     fcmw.metadata.metadata.paragraphs.append(p1)
-
-    p2 = Paragraph(start=40, end=60, text=text_1)
-    p2.sentences.append(Sentence(start=0, end=10, key="test"))
     fcmw.metadata.metadata.paragraphs.append(p2)
 
-    # Add them to the split too
-    fcmw.metadata.split_metadata["subfield"].paragraphs.extend([p1, p2])
+    br.apply_field_metadata(field_key, fcmw.metadata, [], {}, extracted_text=et)
 
-    br.apply_field_metadata(field_key, fcmw.metadata, [], {})
-
-    assert len(br.brain.paragraphs[field_key].paragraphs) == 4
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
-        if "subfield" in key and "0-20" in key:
+        if f"{first_occurrence[0]}-{first_occurrence[1]}" in key:
+            # Only the first time that a paragraph is found should be set to false
+            assert paragraph.repeated_in_field is False
+        else:
+            assert paragraph.repeated_in_field is True
+
+
+def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
+    # # Test now the split text path
+    br = ResourceBrain(rid=str(uuid4()))
+    field_key = "text1"
+    split_key = "subfield"
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_key))
+    paragraph = "Some paragraph here. "
+    text_1 = f"{paragraph}{paragraph}"
+    first_occurrence = [0, len(paragraph)]
+    second_occurrence = [len(paragraph), len(paragraph) * 2]
+
+    et = ExtractedText()
+    et.split_text[split_key] = text_1
+    p1 = Paragraph(start=first_occurrence[0], end=first_occurrence[1])
+    p1.sentences.append(
+        Sentence(start=first_occurrence[0], end=first_occurrence[1], key="test")
+    )
+    p2 = Paragraph(start=second_occurrence[0], end=second_occurrence[1])
+    p2.sentences.append(
+        Sentence(start=second_occurrence[0], end=second_occurrence[1], key="test")
+    )
+    fcmw.metadata.split_metadata[split_key].paragraphs.append(p1)
+    fcmw.metadata.split_metadata[split_key].paragraphs.append(p2)
+
+    br.apply_field_metadata(field_key, fcmw.metadata, [], {}, extracted_text=et)
+
+    assert len(br.brain.paragraphs[field_key].paragraphs) == 2
+    for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
+        if f"{first_occurrence[0]}-{first_occurrence[1]}" in key:
             # Only the first time that a paragraph is found should be set to false
             assert paragraph.repeated_in_field is False
         else:
@@ -63,15 +103,13 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
 
 
 def test_duplicate_paragraph_checker():
-    p1 = Paragraph(text="repeated_text")
-    p2 = Paragraph(text="some_text")
-    p3 = Paragraph(text="repeated_text")
-
     dupcheck = DuplicateParagraphsChecker()
 
-    assert dupcheck.check(p1) is False
-    assert dupcheck.check(p2) is False
-    assert dupcheck.check(p3) is True
+    assert dupcheck.check("repeated_text") is False
+    assert dupcheck.check("some_text") is False
+    assert dupcheck.check("repeated_text") is True
+    assert dupcheck.check("") is False
+    assert dupcheck.check("") is False
 
 
 def test_get_paragraph_page_number():
