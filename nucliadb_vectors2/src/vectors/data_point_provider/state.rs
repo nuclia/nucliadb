@@ -186,6 +186,7 @@ impl State {
                 &delete_log,
                 request.get_query(),
                 request.get_labels(),
+                request.with_duplicates(),
                 request.no_results(),
             );
             results.into_iter().for_each(|r| ffsv.add(r));

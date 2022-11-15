@@ -122,6 +122,14 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
 }
 
 impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
+    fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
+        if addr == key_value::get_no_elems(self.nodes) {
+            self.temp
+        } else {
+            let x = self.find_node(x);
+            Node::vector(x)
+        }
+    }
     fn is_deleted(&self, x @ Address(addr): Address) -> bool {
         if addr == key_value::get_no_elems(self.nodes) {
             false
@@ -222,6 +230,7 @@ impl DataPoint {
         delete_log: &Dlog,
         query: &[f32],
         labels: &[String],
+        with_duplicates: bool,
         results: usize,
     ) -> Vec<(String, f32)> {
         use ops_hnsw::params;
@@ -238,6 +247,7 @@ impl DataPoint {
             self.index.as_ref(),
             params::k_neighbours(),
             &labels,
+            with_duplicates,
         );
         neighbours
             .into_iter()

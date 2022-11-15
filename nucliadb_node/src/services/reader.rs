@@ -469,6 +469,7 @@ impl ShardReaderService {
             reload: search_request.reload,
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
+            with_duplicates: true,
         };
         let vector_reader_service = self.vector_reader.clone();
         let span = tracing::Span::current();

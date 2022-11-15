@@ -35,6 +35,7 @@ pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
     fn get_labels(&self) -> &[String];
     fn no_results(&self) -> usize;
+    fn with_duplicates(&self) -> bool;
 }
 
 #[derive(Debug, Error)]

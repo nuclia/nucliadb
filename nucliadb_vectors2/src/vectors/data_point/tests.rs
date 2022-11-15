@@ -55,7 +55,7 @@ fn simple_flow() {
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
-    let result = reader.search(&HashSet::new(), &query, &labels[..20], no_results);
+    let result = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
     assert_eq!(result.len(), no_results);
 }
 
@@ -78,7 +78,7 @@ fn accuracy_test() {
     let query = create_query();
     println!("QUERY 0: {:?}", query);
     let no_results = 10;
-    let result_0 = reader.search(&HashSet::new(), &query, &labels[..20], no_results);
+    let result_0 = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
     let mut result_0: Vec<_> = result_0.into_iter().map(|(k, _)| k).collect();
     result_0.sort();
     let query = loop {
@@ -89,7 +89,7 @@ fn accuracy_test() {
     };
     println!("QUERY 1: {:?}", query);
     let no_results = 10;
-    let result_1 = reader.search(&HashSet::new(), &query, &labels[..20], no_results);
+    let result_1 = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
     let mut result_1: Vec<_> = result_1.into_iter().map(|(k, _)| k).collect();
     result_1.sort();
     println!("RESULT0: {:?}", result_0);
@@ -109,11 +109,17 @@ fn single_graph() {
         LabelDictionary::default(),
     )];
     let reader = DataPoint::new(temp_dir.path(), elems.clone()).unwrap();
-    let result = reader.search(&HashSet::from([key.clone()]), &vector, &[] as &[String], 5);
+    let result = reader.search(
+        &HashSet::from([key.clone()]),
+        &vector,
+        &[] as &[String],
+        true,
+        5,
+    );
     assert_eq!(result.len(), 0);
 
     let reader = DataPoint::new(temp_dir.path(), elems).unwrap();
-    let result = reader.search(&HashSet::new(), &vector, &[] as &[String], 5);
+    let result = reader.search(&HashSet::new(), &vector, &[] as &[String], true, 5);
     assert_eq!(result.len(), 1);
     assert!(result[0].1 >= 0.9);
     assert!(result[0].0 == key);
@@ -148,11 +154,11 @@ fn data_merge() {
     )
     .unwrap();
 
-    let result = dp.search(&HashSet::new(), &vector1, &[] as &[String], 1);
+    let result = dp.search(&HashSet::new(), &vector1, &[] as &[String], true, 1);
     assert_eq!(result.len(), 1);
     assert!(result[0].1 >= 0.9);
     assert!(result[0].0 == key1);
-    let result = dp.search(&HashSet::new(), &vector0, &[] as &[String], 1);
+    let result = dp.search(&HashSet::new(), &vector0, &[] as &[String], true, 1);
     assert_eq!(result.len(), 1);
     assert!(result[0].1 >= 0.9);
     assert!(result[0].0 == key0);

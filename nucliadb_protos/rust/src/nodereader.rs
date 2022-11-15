@@ -208,6 +208,8 @@ pub struct VectorSearchRequest {
     /// How many results are in this page.
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
+    #[prost(bool, tag="14")]
+    pub with_duplicates: bool,
     #[prost(bool, tag="13")]
     pub reload: bool,
 }

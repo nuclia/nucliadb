@@ -29,7 +29,3 @@ env_logger = "0.9.0"
 [lib]
 name = "nucliadb_vectors2"
 path = "src/lib.rs"
-
-[[bin]]
-name = "dp_metrics"
-path = "src/vectors/data_point/metrics.rs"

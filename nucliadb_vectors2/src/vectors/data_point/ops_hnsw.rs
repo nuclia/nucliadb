@@ -19,7 +19,7 @@
 //
 
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use ram_hnsw::*;
 use rand::distributions::Uniform;
@@ -49,6 +49,7 @@ pub trait DataRetriever: std::marker::Sync {
     fn is_deleted(&self, _: Address) -> bool;
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
     fn consine_similarity(&self, _: Address, _: Address) -> f32;
+    fn get_vector(&self, _: Address) -> &[u8];
 }
 
 pub trait Layer {
@@ -110,29 +111,33 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
     fn closest_up_node<L: Layer>(
         &'a self,
-        solution: &mut HashSet<Address>,
-        filters: &[&[u8]],
-        layer: L,
         x: Address,
-        y: Address,
+        query: Address,
+        layer: L,
+        filters: &[&[u8]],
+        blocked_addresses: &HashSet<Address>,
+        vec_counter: &RepCounter,
     ) -> Option<(Address, f32)> {
-        solution.remove(&x);
-        let mut candidates = BinaryHeap::from([Cnx(x, self.cosine_similarity(x, y))]);
         let mut visited_nodes = HashSet::new();
+        let mut candidates = BinaryHeap::from([Cnx(x, self.cosine_similarity(x, query))]);
         loop {
             match candidates.pop() {
                 None => break None,
                 Some(Cnx(n, _))
-                    if !self.tracker.is_deleted(n)
-                        && !solution.contains(&n)
+                        // The vector was deleted at some point and will be removed in a future merge
+                        if !self.tracker.is_deleted(n)
+                        // The vector is blocked, meaning that it is part of the current version of the solution
+                        && !blocked_addresses.contains(&n)
+                        // The number of times this vector appears is 0
+                        && vec_counter.get(self.tracker.get_vector(n)) == 0
+                        // The vector contains all the labels required by the query.
                         && filters.iter().all(|label| self.tracker.has_label(n, label)) =>
                 {
-                    solution.insert(n);
-                    break Some((n, self.cosine_similarity(n, y)));
+                    break Some((n, self.cosine_similarity(n, query)));
                 }
                 Some(Cnx(down, _)) => layer.get_out_edges(down).for_each(|(n, _)| {
                     if !visited_nodes.contains(&n) {
-                        candidates.push(Cnx(n, self.cosine_similarity(n, y)));
+                        candidates.push(Cnx(n, self.cosine_similarity(n, query)));
                         visited_nodes.insert(n);
                     }
                 }),
@@ -232,32 +237,78 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
     pub fn search<H: Hnsw>(
         &self,
-        x: Address,
+        query: Address,
         hnsw: H,
         k_neighbours: usize,
         with_filter: &[&[u8]],
+        with_duplicates: bool,
     ) -> Neighbours {
         if let Some(entry_point) = hnsw.get_entry_point() {
             let mut crnt_layer = entry_point.layer;
             let mut neighbours = vec![(entry_point.node, 0.)];
             while crnt_layer != 0 {
+                let layer = hnsw.get_layer(crnt_layer);
                 let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
-                let layer_res = self.layer_search(x, hnsw.get_layer(crnt_layer), 1, &entry_points);
+                let layer_res = self.layer_search(query, layer, 1, &entry_points);
                 neighbours = layer_res;
                 crnt_layer -= 1;
             }
             let entry_points: Vec<_> = neighbours.into_iter().map(|(node, _)| node).collect();
             let layer = hnsw.get_layer(crnt_layer);
-            let result = self.layer_search(x, layer, k_neighbours, &entry_points);
-            let mut solution = result.iter().copied().map(|v| v.0).collect();
-            result
-                .into_iter()
-                .flat_map(|(n, _)| {
-                    self.closest_up_node(&mut solution, with_filter, hnsw.get_layer(0), n, x)
-                })
-                .collect()
+            let result = self.layer_search(query, layer, k_neighbours, &entry_points);
+            let mut sol_addresses = HashSet::new();
+            let mut vec_counter = RepCounter::new(!with_duplicates);
+            let mut filtered_result = Vec::new();
+            result.iter().copied().for_each(|(addr, _)| {
+                sol_addresses.insert(addr);
+                vec_counter.add(self.tracker.get_vector(addr));
+            });
+            result.into_iter().for_each(|(addr, _)| {
+                sol_addresses.remove(&addr);
+                vec_counter.sub(self.tracker.get_vector(addr));
+                if let Some((addr, score)) = self.closest_up_node(
+                    addr,
+                    query,
+                    hnsw.get_layer(0),
+                    with_filter,
+                    &sol_addresses,
+                    &vec_counter,
+                ) {
+                    filtered_result.push((addr, score));
+                    sol_addresses.insert(addr);
+                    vec_counter.add(self.tracker.get_vector(addr));
+                }
+            });
+            filtered_result
         } else {
             Neighbours::default()
         }
+    }
+}
+
+#[derive(Default)]
+struct RepCounter<'a> {
+    enabled: bool,
+    counter: HashMap<&'a [u8], usize>,
+}
+impl<'a> RepCounter<'a> {
+    fn new(enabled: bool) -> RepCounter<'a> {
+        RepCounter {
+            enabled,
+            ..Self::default()
+        }
+    }
+    fn add(&mut self, x: &'a [u8]) {
+        *self.counter.entry(x).or_insert(0) += 1;
+    }
+    fn sub(&mut self, x: &'a [u8]) {
+        *self.counter.entry(x).or_insert(1) -= 1;
+    }
+    fn get(&self, x: &[u8]) -> usize {
+        self.counter
+            .get(&x)
+            .copied()
+            .filter(|_| self.enabled)
+            .unwrap_or_default()
     }
 }
