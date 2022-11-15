@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-import asyncio
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -87,9 +86,11 @@ def broker_resource_with_duplicates(knowledgebox):
     bm.basic.modified.FromDatetime(datetime.now())
     bm.origin.source = rpb.Origin.Source.WEB
 
-    text = "My own text Ramon."
+    sentence = "My own text Ramon. "
+    paragraph = sentence
+    text = f"{paragraph}{paragraph}"
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon.My own text Ramon."
+    etw.body.text = text
     etw.field.field = "file"
     etw.field.field_type = rpb.FieldType.FILE
     bm.extracted_text.append(etw)
@@ -112,19 +113,18 @@ def broker_resource_with_duplicates(knowledgebox):
     fcm = rpb.FieldComputedMetadataWrapper()
     fcm.field.field = "file"
     fcm.field.field_type = rpb.FieldType.FILE
-    dup_text = "My own text Ramoneee"
     p1 = rpb.Paragraph(
         start=0,
-        end=len(dup_text),
-        text=dup_text,
+        end=len(paragraph),
+        text=paragraph,
     )
     p1.start_seconds.append(0)
     p1.end_seconds.append(10)
 
     p2 = rpb.Paragraph(
-        start=len(dup_text),
-        end=len(dup_text) * 2,
-        text=dup_text + "foobar",
+        start=len(paragraph),
+        end=len(paragraph) * 2,
+        text=paragraph,
     )
     p2.start_seconds.append(10)
     p2.end_seconds.append(20)
@@ -146,17 +146,17 @@ def broker_resource_with_duplicates(knowledgebox):
 
     v1 = rpb.Vector()
     v1.start = 0
-    v1.end = len(dup_text)
+    v1.end = len(sentence)
     v1.start_paragraph = 0
-    v1.end_paragraph = len(dup_text)
+    v1.end_paragraph = len(sentence)
     v1.vector.extend(V1)
     ev.vectors.vectors.vectors.append(v1)
 
     v2 = rpb.Vector()
-    v2.start = len(dup_text)
-    v2.end = len(dup_text) * 2
-    v2.start_paragraph = len(dup_text)
-    v2.end_paragraph = len(dup_text) * 2
+    v2.start = len(sentence)
+    v2.end = len(sentence) * 2
+    v2.start_paragraph = len(sentence)
+    v2.end_paragraph = len(sentence) * 2
     v2.vector.extend(V1)
     ev.vectors.vectors.vectors.append(v2)
 
@@ -185,8 +185,16 @@ async def test_search_filters_out_duplicates(
 ):
     await create_resource_with_duplicates(knowledgebox, nucliadb_grpc)
 
-    # PUBLIC API
+    # It should filter out duplicates by default
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["paragraphs"]["results"]) == 1
+
+    # It should filter out duplicates if specified
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?query=Ramon&with_duplicates=false"
+    )
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 1
