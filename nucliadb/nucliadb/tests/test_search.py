@@ -189,3 +189,23 @@ async def test_search_filters_out_duplicate_paragraphs(
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 4
+
+
+@pytest.mark.asyncio
+async def test_search_returns_paragraph_positions(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    sentence = "My own text Ramon."
+    await create_resource_with_duplicates(
+        knowledgebox, nucliadb_grpc, sentence=sentence
+    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
+    assert resp.status_code == 200
+    content = resp.json()
+    position = content["paragraphs"]["results"][0]["position"]
+    assert position["start"] == 0
+    assert position["end"] == len(sentence)
+    assert position["index"] == 0
