@@ -56,13 +56,12 @@ async def test_search_sc_2062(
     assert len(resp.json()["paragraphs"]["results"]) == 1
 
 
-def broker_resource_with_duplicates(knowledgebox):
+def broker_resource_with_duplicates(knowledgebox, sentence):
     import uuid
     from datetime import datetime
 
     from nucliadb_protos.writer_pb2 import BrokerMessage
 
-    from nucliadb.ingest.tests.vectors import V1
     from nucliadb_protos import resources_pb2 as rpb
 
     rid = str(uuid.uuid4())
@@ -86,7 +85,6 @@ def broker_resource_with_duplicates(knowledgebox):
     bm.basic.modified.FromDatetime(datetime.now())
     bm.origin.source = rpb.Origin.Source.WEB
 
-    sentence = "My own text Ramon. "
     paragraph = sentence
     text = f"{paragraph}{paragraph}"
     etw = rpb.ExtractedTextWrapper()
@@ -140,27 +138,6 @@ def broker_resource_with_duplicates(knowledgebox):
 
     bm.field_metadata.append(fcm)
 
-    ev = rpb.ExtractedVectorsWrapper()
-    ev.field.field = "file"
-    ev.field.field_type = rpb.FieldType.FILE
-
-    v1 = rpb.Vector()
-    v1.start = 0
-    v1.end = len(sentence)
-    v1.start_paragraph = 0
-    v1.end_paragraph = len(sentence)
-    v1.vector.extend(V1)
-    ev.vectors.vectors.vectors.append(v1)
-
-    v2 = rpb.Vector()
-    v2.start = len(sentence)
-    v2.end = len(sentence) * 2
-    v2.start_paragraph = len(sentence)
-    v2.end_paragraph = len(sentence) * 2
-    v2.vector.extend(V1)
-    ev.vectors.vectors.vectors.append(v2)
-
-    bm.field_vectors.append(ev)
     bm.source = BrokerMessage.MessageSource.WRITER
     return bm
 
@@ -170,30 +147,38 @@ async def inject_message(writer: WriterStub, message):
     return
 
 
-async def create_resource_with_duplicates(knowledgebox, writer: WriterStub):
-    bm = broker_resource_with_duplicates(knowledgebox)
+async def create_resource_with_duplicates(
+    knowledgebox, writer: WriterStub, sentence: str
+):
+    bm = broker_resource_with_duplicates(knowledgebox, sentence=sentence)
     await inject_message(writer, bm)
     return bm.uuid
 
 
 @pytest.mark.asyncio
-async def test_search_filters_out_duplicates(
+async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
 ):
-    await create_resource_with_duplicates(knowledgebox, nucliadb_grpc)
+    await create_resource_with_duplicates(
+        knowledgebox, nucliadb_grpc, sentence="My own text Ramon. "
+    )
+    await create_resource_with_duplicates(
+        knowledgebox, nucliadb_grpc, sentence="Another different paragraph with text"
+    )
 
+    query = "Ramon"
     # It should filter out duplicates by default
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}")
     assert resp.status_code == 200
     content = resp.json()
     assert len(content["paragraphs"]["results"]) == 1
 
     # It should filter out duplicates if specified
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Ramon&with_duplicates=false"
+        f"/kb/{knowledgebox}/search?query={query}&with_duplicates=false"
     )
     assert resp.status_code == 200
     content = resp.json()
@@ -201,7 +186,7 @@ async def test_search_filters_out_duplicates(
 
     # It should return duplicates if specified
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Ramon&with_duplicates=true"
+        f"/kb/{knowledgebox}/search?query={query}&with_duplicates=true"
     )
     assert resp.status_code == 200
     content = resp.json()
