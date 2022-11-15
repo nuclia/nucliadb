@@ -1,6 +1,10 @@
 # CHANGELOG
 
-## 2.0.9 
+## 2.0.10
+
+- Fix local shard delete resource
+
+## 2.0.9
 
 - Be resilient if proxy cannot provide an account_seq
 
