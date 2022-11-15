@@ -1,5 +1,5 @@
 ignore:
-  - "**/tests"
+  - "**/tests/*.py"
   - "nucliadb_client/examples/"
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
