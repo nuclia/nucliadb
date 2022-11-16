@@ -141,7 +141,7 @@ class ResourceBrain:
                 )
                 for classification in paragraph.classifications:
                     p.labels.append(
-                        f"l/{classification.labelset}/{classification.label}"
+                        f"/l/{classification.labelset}/{classification.label}"
                     )
 
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
@@ -170,7 +170,7 @@ class ResourceBrain:
                 metadata=ParagraphMetadata(position=position),
             )
             for classification in paragraph.classifications:
-                p.labels.append(f"l/{classification.labelset}/{classification.label}")
+                p.labels.append(f"/l/{classification.labelset}/{classification.label}")
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
