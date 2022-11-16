@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
 use log::{debug, error, info};
-use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
+use nucliadb_cluster::cluster::{Cluster, NodeType};
 use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
@@ -149,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
     let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
     let addr = reliable_lookup_host(&host).await?;
     let node_type =
-        NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
+        NodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
     let node_id = Uuid::new_v4();
     let cluster = Cluster::new(node_id.to_string(), addr, node_type, args.seeds)
         .await

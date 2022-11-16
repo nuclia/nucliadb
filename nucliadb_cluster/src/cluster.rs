@@ -1,16 +1,16 @@
+use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fmt, fs};
 
 use chitchat::transport::UdpTransport;
 use chitchat::{
     spawn_chitchat, Chitchat, ChitchatConfig, ChitchatHandle, FailureDetectorConfig, NodeId,
 };
 use serde::{Deserialize, Serialize};
+use strum::{Display as EnumDisplay, EnumString};
 use tokio::sync::watch;
 use tokio_stream::StreamExt;
 use tracing::{debug, error, info};
@@ -57,35 +57,13 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid, Error> {
     Ok(host_key)
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum NucliaDBNodeType {
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, EnumString, EnumDisplay)]
+pub enum NodeType {
     Node,
     Search,
     Ingest,
 }
 
-impl fmt::Display for NucliaDBNodeType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NucliaDBNodeType::Search => write!(f, "Search"),
-            NucliaDBNodeType::Ingest => write!(f, "Ingest"),
-            NucliaDBNodeType::Node => write!(f, "Node"),
-        }
-    }
-}
-
-impl FromStr for NucliaDBNodeType {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Ingest" => Ok(NucliaDBNodeType::Ingest),
-            "Search" => Ok(NucliaDBNodeType::Search),
-            "Node" => Ok(NucliaDBNodeType::Node),
-            _ => Err(Error::UnknownNodeType(s.to_string())),
-        }
-    }
-}
 /// A member information.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Member {
@@ -96,7 +74,7 @@ pub struct Member {
     pub listen_addr: SocketAddr,
 
     // Type of node 'l': node reader 'e': node writer 'r': reader 'w': writer
-    pub node_type: NucliaDBNodeType,
+    pub node_type: NodeType,
 
     /// If true, it means self.
     pub is_self: bool,
@@ -119,7 +97,11 @@ impl Member {
             .node_state(node_id)
             .and_then(|state| state.get("node_type"))
             .ok_or_else(|| Error::MissingNodeState(node_id.id.clone()))
-            .and_then(NucliaDBNodeType::from_str)
+            .and_then(|node_type| {
+                node_type
+                    .parse()
+                    .map_err(|_| Error::UnknownNodeType(node_type.to_string()))
+            })
             .map(|node_type| Member {
                 node_type,
                 node_id: node_id.id.clone(),
@@ -141,7 +123,7 @@ pub struct Cluster {
     pub id: NodeId,
 
     /// seflf node type
-    pub node_type: NucliaDBNodeType,
+    pub node_type: NodeType,
 
     // watcher for receiving actual list of nodes
     members: watch::Receiver<Vec<Member>>,
@@ -160,7 +142,7 @@ impl Cluster {
     pub async fn new(
         node_id: String,
         listen_addr: SocketAddr,
-        node_type: NucliaDBNodeType,
+        node_type: NodeType,
         seed_node: Vec<String>,
     ) -> Result<Self, Error> {
         info!( node_id=?node_id, listen_addr=?listen_addr, "Create new cluster.");
