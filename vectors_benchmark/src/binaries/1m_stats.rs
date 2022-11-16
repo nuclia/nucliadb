@@ -16,6 +16,9 @@ struct Request {
     labels: Vec<String>,
 }
 impl SearchRequest for Request {
+    fn with_duplicates(&self) -> bool {
+        true
+    }
     fn get_query(&self) -> &[f32] {
         &self.vector
     }

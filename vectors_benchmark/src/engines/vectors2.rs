@@ -25,6 +25,9 @@ use super::VectorEngine;
 
 struct Request<'a>(usize, &'a [f32]);
 impl<'a> SearchRequest for Request<'a> {
+    fn with_duplicates(&self) -> bool {
+        true
+    }
     fn get_query(&self) -> &[f32] {
         self.1
     }

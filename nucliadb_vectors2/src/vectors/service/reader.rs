@@ -28,6 +28,9 @@ use tracing::*;
 use crate::vectors::data_point_provider::*;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
+    fn with_duplicates(&self) -> bool {
+        self.1.with_duplicates
+    }
     fn get_labels(&self) -> &[String] {
         &self.1.tags
     }
@@ -153,6 +156,7 @@ mod tests {
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
             ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
             ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
+            ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
         ]
         .iter()
         .map(|(v, k)| (v.clone(), VectorSentence { vector: k.clone() }))
@@ -201,6 +205,19 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             reload: false,
+            with_duplicates: true,
+        };
+        let result = reader.search(&request).unwrap();
+        assert_eq!(result.documents.len(), 4);
+
+        let request = VectorSearchRequest {
+            id: "".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            tags: vec!["1".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            reload: false,
+            with_duplicates: false,
         };
         let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 3);

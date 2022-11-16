@@ -165,7 +165,7 @@ message VectorSearchRequest {
 
     // How many results are in this page.
     int32 result_per_page = 5;
-
+    bool with_duplicates = 14;
     bool reload = 13;
 }
 
