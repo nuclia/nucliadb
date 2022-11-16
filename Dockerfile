@@ -1,8 +1,12 @@
 FROM python:3.9
 
-COPY --from=nuclia/nucliadb_rust_base:latest /tikv_client*.whl /
 
-RUN pip install tikv_client-*.whl
+RUN ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+        aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_aarch64.whl;; \
+        x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
+    esac;
+
 RUN pip install nucliadb-node-binding
 
 RUN mkdir -p /usr/src/app
