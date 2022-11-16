@@ -16,24 +16,19 @@ use tokio_stream::StreamExt;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
-use crate::error::{ClusterError, ClusterResult};
+use crate::error::Error;
 
 /// The ID that makes the cluster unique.
 const CLUSTER_ID: &str = "nucliadb-cluster";
 
 pub const CLUSTER_GOSSIP_INTERVAL: Duration = Duration::from_millis(100);
 
-pub fn read_host_key(host_key_path: &Path) -> ClusterResult<Uuid> {
+pub fn read_host_key(host_key_path: &Path) -> Result<Uuid, Error> {
     let host_key_contents =
-        fs::read(host_key_path).map_err(|err| ClusterError::ReadHostKeyError {
-            message: err.to_string(),
-        })?;
+        fs::read(host_key_path).map_err(|err| Error::ReadHostKey(err.to_string()))?;
 
-    let host_key = Uuid::from_slice(host_key_contents.as_slice()).map_err(|err| {
-        ClusterError::ReadHostKeyError {
-            message: err.to_string(),
-        }
-    })?;
+    let host_key = Uuid::from_slice(host_key_contents.as_slice())
+        .map_err(|err| Error::ReadHostKey(err.to_string()))?;
 
     Ok(host_key)
 }
@@ -41,7 +36,7 @@ pub fn read_host_key(host_key_path: &Path) -> ClusterResult<Uuid> {
 /// Reads the key that makes a node unique from the given file.
 /// If the file does not exist, it generates an ID and writes it to the file
 /// so that it can be reused on reboot.
-pub fn read_or_create_host_key(host_key_path: &Path) -> ClusterResult<Uuid> {
+pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid, Error> {
     let host_key;
 
     if host_key_path.exists() {
@@ -50,17 +45,12 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> ClusterResult<Uuid> {
     } else {
         if let Some(dir) = host_key_path.parent() {
             if !dir.exists() {
-                fs::create_dir_all(dir).map_err(|err| ClusterError::WriteHostKeyError {
-                    message: err.to_string(),
-                })?;
+                fs::create_dir_all(dir).map_err(|err| Error::WriteHostKey(err.to_string()))?
             }
         }
         host_key = Uuid::new_v4();
-        fs::write(host_key_path, host_key.as_bytes()).map_err(|err| {
-            ClusterError::WriteHostKeyError {
-                message: err.to_string(),
-            }
-        })?;
+        fs::write(host_key_path, host_key.as_bytes())
+            .map_err(|err| Error::WriteHostKey(err.to_string()))?;
         info!(host_key=?host_key, host_key_path=?host_key_path, "Create new host key.");
     }
 
@@ -85,16 +75,14 @@ impl fmt::Display for NucliaDBNodeType {
 }
 
 impl FromStr for NucliaDBNodeType {
-    type Err = ClusterError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Ingest" => Ok(NucliaDBNodeType::Ingest),
             "Search" => Ok(NucliaDBNodeType::Search),
             "Node" => Ok(NucliaDBNodeType::Node),
-            _ => Err(ClusterError::ParseNodeTypeError {
-                message: "can't parse node type string".to_string(),
-            }),
+            _ => Err(Error::UnknownNodeType(s.to_string())),
         }
     }
 }
@@ -177,7 +165,7 @@ impl Cluster {
         listen_addr: SocketAddr,
         node_type: NucliaDBNodeType,
         seed_node: Vec<String>,
-    ) -> ClusterResult<Self> {
+    ) -> Result<Self, Error> {
         info!( node_id=?node_id, listen_addr=?listen_addr, "Create new cluster.");
         let chitchat_node_id = NodeId::new(node_id, listen_addr);
 
