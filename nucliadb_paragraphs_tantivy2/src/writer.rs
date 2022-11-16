@@ -220,14 +220,16 @@ impl ParagraphWriterService {
                     doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
                 }
 
-                resource
+                let mut facets = resource
                     .labels
                     .iter()
                     .chain(text_info.labels.iter())
                     .chain(labels.iter())
                     .map(Facet::from_text)
-                    .flat_map(|v| v.map_err(|e| error!("Invalid label {e:?}")).ok())
-                    .for_each(|facet| doc.add_facet(self.schema.facets, facet));
+                    .map(|v| v.map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string())));
+                while let Some(facet) = facets.next().transpose()? {
+                    doc.add_facet(self.schema.facets, facet)
+                }
 
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
@@ -324,7 +326,6 @@ mod tests {
                 "/tantivy".to_string(),
                 "/test".to_string(),
                 "/label1".to_string(),
-                "l/papers/medicine".to_string(),
             ],
             index: 1,
             split: "".to_string(),
