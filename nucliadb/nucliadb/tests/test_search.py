@@ -114,7 +114,6 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     p1 = rpb.Paragraph(
         start=0,
         end=len(paragraph),
-        text=paragraph,
     )
     p1.start_seconds.append(0)
     p1.end_seconds.append(10)
@@ -122,7 +121,6 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     p2 = rpb.Paragraph(
         start=len(paragraph),
         end=len(paragraph) * 2,
-        text=paragraph,
     )
     p2.start_seconds.append(10)
     p2.end_seconds.append(20)
@@ -155,92 +153,6 @@ async def create_resource_with_duplicates(
     return bm.uuid
 
 
-async def create_resource_with_text_not_in_paragraphs(knowledgebox, writer: WriterStub):
-    import uuid
-    from datetime import datetime
-
-    from nucliadb_protos.writer_pb2 import BrokerMessage
-
-    from nucliadb_protos import resources_pb2 as rpb
-
-    rid = str(uuid.uuid4())
-    slug = f"{rid}slug1"
-
-    bm: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox,
-        uuid=rid,
-        slug=slug,
-        type=BrokerMessage.AUTOCOMMIT,
-    )
-
-    bm.basic.icon = "text/plain"
-    bm.basic.title = "Title Resource"
-    bm.basic.summary = "Summary of document"
-    bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
-    bm.basic.metadata.useful = True
-    bm.basic.metadata.language = "es"
-    bm.basic.created.FromDatetime(datetime.now())
-    bm.basic.modified.FromDatetime(datetime.now())
-    bm.origin.source = rpb.Origin.Source.WEB
-
-    paragraph = "Some text over here. "
-    text = f"{paragraph}{paragraph}"
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = text
-    etw.field.field = "file"
-    etw.field.field_type = rpb.FieldType.FILE
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Summary of document"
-    etw.field.field = "summary"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Title Resource"
-    etw.field.field = "title"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    bm.files["file"].added.FromDatetime(datetime.now())
-    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
-
-    fcm = rpb.FieldComputedMetadataWrapper()
-    fcm.field.field = "file"
-    fcm.field.field_type = rpb.FieldType.FILE
-    p1 = rpb.Paragraph(
-        start=0,
-        end=len(paragraph),
-    )
-    p1.start_seconds.append(0)
-    p1.end_seconds.append(10)
-
-    p2 = rpb.Paragraph(
-        start=len(paragraph),
-        end=len(paragraph) * 2,
-    )
-    p2.start_seconds.append(10)
-    p2.end_seconds.append(20)
-    p2.start_seconds.append(20)
-    p2.end_seconds.append(30)
-
-    fcm.metadata.metadata.paragraphs.append(p1)
-    fcm.metadata.metadata.paragraphs.append(p2)
-
-    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
-    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
-    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-
-    bm.field_metadata.append(fcm)
-
-    bm.source = BrokerMessage.MessageSource.WRITER
-
-    await inject_message(writer, bm)
-    return bm.uuid
-
-
 @pytest.mark.asyncio
 async def test_search_filters_out_duplicate_paragraphs(
     nucliadb_reader: AsyncClient,
@@ -254,14 +166,13 @@ async def test_search_filters_out_duplicate_paragraphs(
     await create_resource_with_duplicates(
         knowledgebox, nucliadb_grpc, sentence="Another different paragraph with text"
     )
-    await create_resource_with_text_not_in_paragraphs(knowledgebox, nucliadb_grpc)
 
     query = "text"
     # It should filter out duplicates by default
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query={query}")
     assert resp.status_code == 200
     content = resp.json()
-    assert len(content["paragraphs"]["results"]) == 4
+    assert len(content["paragraphs"]["results"]) == 2
 
     # It should filter out duplicates if specified
     resp = await nucliadb_reader.get(
@@ -269,7 +180,7 @@ async def test_search_filters_out_duplicate_paragraphs(
     )
     assert resp.status_code == 200
     content = resp.json()
-    assert len(content["paragraphs"]["results"]) == 4
+    assert len(content["paragraphs"]["results"]) == 2
 
     # It should return duplicates if specified
     resp = await nucliadb_reader.get(
@@ -277,4 +188,24 @@ async def test_search_filters_out_duplicate_paragraphs(
     )
     assert resp.status_code == 200
     content = resp.json()
-    assert len(content["paragraphs"]["results"]) == 6
+    assert len(content["paragraphs"]["results"]) == 4
+
+
+@pytest.mark.asyncio
+async def test_search_returns_paragraph_positions(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    sentence = "My own text Ramon."
+    await create_resource_with_duplicates(
+        knowledgebox, nucliadb_grpc, sentence=sentence
+    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
+    assert resp.status_code == 200
+    content = resp.json()
+    position = content["paragraphs"]["results"][0]["position"]
+    assert position["start"] == 0
+    assert position["end"] == len(sentence)
+    assert position["index"] == 0
