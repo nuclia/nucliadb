@@ -193,6 +193,7 @@ mod tests {
             page_number: 0,
             result_per_page: 20,
             reload: false,
+            with_duplicates: false,
         };
         let result = reader.search(&request).unwrap();
         assert_eq!(result.documents.len(), 3);
