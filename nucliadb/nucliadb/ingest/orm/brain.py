@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import hashlib
 from copy import deepcopy
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
@@ -47,23 +46,6 @@ else:
 FilePagePositions = Dict[int, Tuple[int, int]]
 
 
-class DuplicateParagraphsChecker:
-    def __init__(self):
-        self.seen = set()
-
-    def check(self, paragraph: str) -> bool:
-        """Returns whether paragraph has already been checked"""
-        if paragraph == "":
-            return False
-
-        par_md5 = hashlib.md5(paragraph.encode()).hexdigest()
-        if par_md5 in self.seen:
-            return True
-        else:
-            self.seen.add(par_md5)
-            return False
-
-
 def get_paragraph_text(
     extracted_text: ExtractedText, start: int, end: int, split: Optional[str] = None
 ) -> str:
@@ -72,6 +54,29 @@ def get_paragraph_text(
     else:
         text = extracted_text.text
     return text[start:end]
+
+
+def is_paragraph_repeated_in_field(
+    paragraph: Paragraph,
+    extracted_text: Optional[ExtractedText],
+    unique_paragraphs: Set[str],
+    split: Optional[str] = None,
+) -> bool:
+    if extracted_text is None:
+        return False
+
+    paragraph_text = get_paragraph_text(
+        extracted_text, start=paragraph.start, end=paragraph.end, split=split
+    )
+    if len(paragraph_text) == 0:
+        return False
+
+    if paragraph_text in unique_paragraphs:
+        repeated_in_field = True
+    else:
+        repeated_in_field = False
+        unique_paragraphs.add(paragraph_text)
+    return repeated_in_field
 
 
 class ResourceBrain:
@@ -98,10 +103,11 @@ class ResourceBrain:
         metadata: FieldComputedMetadata,
         replace_field: List[str],
         replace_splits: Dict[str, List[str]],
-        page_positions: Optional[FilePagePositions] = None,
-        extracted_text: Optional[ExtractedText] = None,
+        page_positions: Optional[FilePagePositions],
+        extracted_text: Optional[ExtractedText],
     ):
-        dups = DuplicateParagraphsChecker()
+        # To check for duplicate paragraphs
+        unique_paragraphs: Set[str] = set()
 
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
@@ -119,22 +125,18 @@ class ResourceBrain:
                     position.page_number = self.get_paragraph_page_number(
                         paragraph, page_positions
                     )
-                repeated_in_field = False
-                if extracted_text:
-                    paragraph_text = get_paragraph_text(
-                        extracted_text,
-                        start=paragraph.start,
-                        end=paragraph.end,
-                        split=subfield,
-                    )
-                    repeated_in_field = dups.check(paragraph_text)
                 p = BrainParagraph(
                     start=paragraph.start,
                     end=paragraph.end,
                     field=field_key,
                     split=subfield,
                     index=index,
-                    repeated_in_field=repeated_in_field,
+                    repeated_in_field=is_paragraph_repeated_in_field(
+                        paragraph,
+                        extracted_text,
+                        unique_paragraphs,
+                        split=subfield,
+                    ),
                     metadata=ParagraphMetadata(position=position),
                 )
                 for classification in paragraph.classifications:
@@ -157,19 +159,14 @@ class ResourceBrain:
                 position.page_number = self.get_paragraph_page_number(
                     paragraph, page_positions
                 )
-
-            repeated_in_field = False
-            if extracted_text:
-                paragraph_text = get_paragraph_text(
-                    extracted_text, start=paragraph.start, end=paragraph.end
-                )
-                repeated_in_field = dups.check(paragraph_text)
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
                 field=field_key,
                 index=index,
-                repeated_in_field=repeated_in_field,
+                repeated_in_field=is_paragraph_repeated_in_field(
+                    paragraph, extracted_text, unique_paragraphs
+                ),
                 metadata=ParagraphMetadata(position=position),
             )
             for classification in paragraph.classifications:

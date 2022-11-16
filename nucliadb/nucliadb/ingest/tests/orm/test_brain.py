@@ -29,7 +29,7 @@ from nucliadb_protos.resources_pb2 import (
     Sentence,
 )
 
-from nucliadb.ingest.orm.brain import DuplicateParagraphsChecker, ResourceBrain
+from nucliadb.ingest.orm.brain import ResourceBrain
 
 
 def test_apply_field_metadata_marks_duplicated_paragraphs():
@@ -55,7 +55,14 @@ def test_apply_field_metadata_marks_duplicated_paragraphs():
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
 
-    br.apply_field_metadata(field_key, fcmw.metadata, [], {}, extracted_text=et)
+    br.apply_field_metadata(
+        field_key,
+        fcmw.metadata,
+        replace_field=[],
+        replace_splits={},
+        page_positions={},
+        extracted_text=et,
+    )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
@@ -91,7 +98,17 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p1)
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p2)
 
-    br.apply_field_metadata(field_key, fcmw.metadata, [], {}, extracted_text=et)
+    import pdb
+
+    pdb.set_trace()
+    br.apply_field_metadata(
+        field_key,
+        fcmw.metadata,
+        replace_field=[],
+        replace_splits={},
+        page_positions={},
+        extracted_text=et,
+    )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
     for key, paragraph in br.brain.paragraphs[field_key].paragraphs.items():
@@ -100,16 +117,6 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
             assert paragraph.repeated_in_field is False
         else:
             assert paragraph.repeated_in_field is True
-
-
-def test_duplicate_paragraph_checker():
-    dupcheck = DuplicateParagraphsChecker()
-
-    assert dupcheck.check("repeated_text") is False
-    assert dupcheck.check("some_text") is False
-    assert dupcheck.check("repeated_text") is True
-    assert dupcheck.check("") is False
-    assert dupcheck.check("") is False
 
 
 def test_get_paragraph_page_number():
@@ -148,7 +155,12 @@ def test_apply_field_metadata_populates_page_number():
         2: (40, 100),
     }
     br.apply_field_metadata(
-        field_key, fcmw.metadata, [], {}, page_positions=page_positions
+        field_key,
+        fcmw.metadata,
+        replace_field=[],
+        replace_splits={},
+        page_positions=page_positions,
+        extracted_text=None,
     )
 
     assert len(br.brain.paragraphs[field_key].paragraphs) == 2
