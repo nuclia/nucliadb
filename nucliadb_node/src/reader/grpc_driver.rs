@@ -26,6 +26,7 @@ use tracing::{instrument, Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use Shard as ShardPB;
 
+use crate::config::Configuration;
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
 
@@ -35,7 +36,14 @@ impl From<NodeReaderService> for NodeReaderGRPCDriver {
         NodeReaderGRPCDriver(RwLock::new(node))
     }
 }
-
+impl NodeReaderGRPCDriver {
+    async fn shard_loading(&self, id: &ShardId) {
+        let mut writer = self.0.write().await;
+        if !Configuration::lazy_loading() {
+            writer.load_shard(id);
+        }
+    }
+}
 #[tonic::async_trait]
 impl NodeReader for NodeReaderGRPCDriver {
     #[instrument(name = "NodeReaderGRPCDriver::get_shard", skip(self, request))]
@@ -48,8 +56,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        let shard = writer.get_shard(&shard_id);
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        let shard = reader.get_shard(&shard_id);
         match shard {
             Some(shard) => {
                 info!("Ready {:?}", shard_id);
@@ -96,8 +105,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId {
             id: vector_request.id.clone(),
         };
-        let mut writer = self.0.write().await;
-        match writer.vector_search(&shard_id, vector_request) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.vector_search(&shard_id, vector_request) {
             Some(Ok(response)) => {
                 info!("Vector search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -126,8 +136,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId {
             id: relation_request.id.clone(),
         };
-        let mut writer = self.0.write().await;
-        match writer.relation_search(&shard_id, relation_request) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.relation_search(&shard_id, relation_request) {
             Some(Ok(response)) => {
                 info!("Relation search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -156,8 +167,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId {
             id: search_request.shard.clone(),
         };
-        let mut writer = self.0.write().await;
-        match writer.search(&shard_id, search_request) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.search(&shard_id, search_request) {
             Some(Ok(response)) => {
                 info!("Document search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -186,8 +198,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId {
             id: suggest_request.shard.clone(),
         };
-        let mut writer = self.0.write().await;
-        match writer.suggest(&shard_id, suggest_request) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.suggest(&shard_id, suggest_request) {
             Some(Ok(response)) => {
                 info!("Suggest ended correctly");
                 Ok(tonic::Response::new(response))
@@ -217,8 +230,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId {
             id: document_request.id.clone(),
         };
-        let mut writer = self.0.write().await;
-        match writer.document_search(&shard_id, document_request) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.document_search(&shard_id, document_request) {
             Some(Ok(response)) => {
                 info!("Document search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -247,8 +261,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
         };
-        let mut writer = self.0.write().await;
-        match writer.paragraph_search(&shard_id, paragraph_request) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.paragraph_search(&shard_id, paragraph_request) {
             Some(Ok(response)) => {
                 info!("Paragraph search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -274,8 +289,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        match writer.document_ids(&shard_id) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.document_ids(&shard_id) {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
@@ -293,8 +309,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        match writer.paragraph_ids(&shard_id) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.paragraph_ids(&shard_id) {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
@@ -313,8 +330,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        match writer.vector_ids(&shard_id) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.vector_ids(&shard_id) {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
@@ -331,8 +349,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        match writer.relation_ids(&shard_id) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.relation_ids(&shard_id) {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
@@ -350,8 +369,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        match writer.relation_edges(&shard_id) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.relation_edges(&shard_id) {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
@@ -369,8 +389,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        match writer.relation_types(&shard_id) {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.relation_types(&shard_id) {
             Some(ids) => Ok(tonic::Response::new(ids)),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",

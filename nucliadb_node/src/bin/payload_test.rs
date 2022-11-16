@@ -26,7 +26,7 @@ use prost::Message;
 
 fn main() -> anyhow::Result<()> {
     let mut writer = NodeWriterService::new();
-    let mut reader = NodeReaderService::new();
+    let reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");
     let new_shard = writer.new_shard();
