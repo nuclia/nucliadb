@@ -15,4 +15,6 @@ pub enum Error {
     UnknownNodeType(String),
     #[error("Cannot get state from node `{0}`")]
     MissingNodeState(String),
+    #[error("Cannot start cluster: {0}")]
+    CannotStartCluster(String),
 }

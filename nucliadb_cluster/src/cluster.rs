@@ -159,7 +159,8 @@ impl Cluster {
 
         let chitchat_handle = spawn_chitchat(config, Vec::new(), &UdpTransport)
             .await
-            .unwrap();
+            .map_err(|e| Error::CannotStartCluster(e.to_string()))?;
+
         let (self_id, mut cluster_watcher) = chitchat_handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
