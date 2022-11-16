@@ -114,21 +114,18 @@ impl From<&Cluster> for Member {
 }
 
 impl Member {
-    pub fn build(node_id: &NodeId, chitchat: &Chitchat) -> ClusterResult<Self> {
-        if let Some(state) = chitchat.node_state(node_id) {
-            if let Some(node_type_str) = state.get("node_type") {
-                let node_type = NucliaDBNodeType::from_str(node_type_str)?;
-                return Ok(Member {
-                    node_id: node_id.id.clone(),
-                    node_type,
-                    is_self: node_id.eq(chitchat.self_node_id()),
-                    listen_addr: node_id.gossip_public_address,
-                });
-            }
-        }
-        Err(ClusterError::ChitchatError {
-            message: "can't get node state".to_string(),
-        })
+    pub fn build(node_id: &NodeId, chitchat: &Chitchat) -> Result<Self, Error> {
+        chitchat
+            .node_state(node_id)
+            .and_then(|state| state.get("node_type"))
+            .ok_or_else(|| Error::MissingNodeState(node_id.id.clone()))
+            .and_then(NucliaDBNodeType::from_str)
+            .map(|node_type| Member {
+                node_type,
+                node_id: node_id.id.clone(),
+                is_self: node_id.eq(chitchat.self_node_id()),
+                listen_addr: node_id.gossip_public_address,
+            })
     }
 }
 
