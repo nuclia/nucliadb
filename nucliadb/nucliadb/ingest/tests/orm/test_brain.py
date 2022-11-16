@@ -98,9 +98,6 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p1)
     fcmw.metadata.split_metadata[split_key].paragraphs.append(p2)
 
-    import pdb
-
-    pdb.set_trace()
     br.apply_field_metadata(
         field_key,
         fcmw.metadata,
