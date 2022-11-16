@@ -50,7 +50,6 @@ nucliadb_search/search.key
 host_key
 ingest.key
 
-**/Cargo.lock
 build
 
 key1
