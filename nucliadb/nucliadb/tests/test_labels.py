@@ -21,10 +21,140 @@ import pytest
 from httpx import AsyncClient
 
 
+def broker_resource(knowledgebox):
+    import uuid
+    from datetime import datetime
+
+    from nucliadb_protos.writer_pb2 import BrokerMessage
+
+    from nucliadb.ingest.tests.vectors import V1, V2, V3
+    from nucliadb_protos import resources_pb2 as rpb
+
+    rid = str(uuid.uuid4())
+    slug = f"{rid}slug1"
+
+    bm: BrokerMessage = BrokerMessage(
+        kbid=knowledgebox,
+        uuid=rid,
+        slug=slug,
+        type=BrokerMessage.AUTOCOMMIT,
+    )
+
+    bm.basic.icon = "text/plain"
+    bm.basic.title = "Title Resource"
+    bm.basic.summary = "Summary of document"
+    bm.basic.thumbnail = "doc"
+    bm.basic.layout = "default"
+    bm.basic.metadata.useful = True
+    bm.basic.metadata.language = "es"
+    bm.basic.created.FromDatetime(datetime.now())
+    bm.basic.modified.FromDatetime(datetime.now())
+    bm.origin.source = rpb.Origin.Source.WEB
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    etw.field.field = "file"
+    etw.field.field_type = rpb.FieldType.FILE
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Summary of document"
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Title Resource"
+    etw.field.field = "title"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    bm.files["file"].added.FromDatetime(datetime.now())
+    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
+
+    c1 = rpb.Classification()
+    c1.label = "label1"
+    c1.labelset = "labelset1"
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "file"
+    fcm.field.field_type = rpb.FieldType.FILE
+    p1 = rpb.Paragraph(
+        start=0,
+        end=45,
+    )
+    p1.classifications.append(c1)
+    p1.start_seconds.append(0)
+    p1.end_seconds.append(10)
+    p2 = rpb.Paragraph(
+        start=47,
+        end=64,
+    )
+    p2.classifications.append(c1)
+    p2.start_seconds.append(10)
+    p2.end_seconds.append(20)
+    p2.start_seconds.append(20)
+    p2.end_seconds.append(30)
+
+    fcm.metadata.metadata.paragraphs.append(p1)
+    fcm.metadata.metadata.paragraphs.append(p2)
+    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
+
+    fcm.metadata.metadata.classifications.append(c1)
+    bm.field_metadata.append(fcm)
+
+    ev = rpb.ExtractedVectorsWrapper()
+    ev.field.field = "file"
+    ev.field.field_type = rpb.FieldType.FILE
+
+    v1 = rpb.Vector()
+    v1.start = 0
+    v1.end = 19
+    v1.start_paragraph = 0
+    v1.end_paragraph = 45
+    v1.vector.extend(V1)
+    ev.vectors.vectors.vectors.append(v1)
+
+    v2 = rpb.Vector()
+    v2.start = 20
+    v2.end = 45
+    v2.start_paragraph = 0
+    v2.end_paragraph = 45
+    v2.vector.extend(V2)
+    ev.vectors.vectors.vectors.append(v2)
+
+    v3 = rpb.Vector()
+    v3.start = 48
+    v3.end = 65
+    v3.start_paragraph = 47
+    v3.end_paragraph = 64
+    v3.vector.extend(V3)
+    ev.vectors.vectors.vectors.append(v3)
+
+    bm.field_vectors.append(ev)
+    bm.source = BrokerMessage.MessageSource.WRITER
+    return bm
+
+
+async def inject_message(writer, message):
+    await writer.ProcessMessage([message])  # type: ignore
+    return
+
+
+async def inject_resource_with_paragraph_labels(knowledgebox, writer):
+    bm = broker_resource(knowledgebox)
+    await inject_message(writer, bm)
+    return bm.uuid
+
+
 @pytest.mark.asyncio
 async def test_labels_global(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nucliadb_grpc,
     knowledgebox,
 ):
     # PUBLIC API
@@ -43,3 +173,8 @@ async def test_labels_global(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/labelsets")
     assert resp.status_code == 200
     assert len(resp.json()["labelsets"]) == 1
+
+    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+
+    resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex")
+    assert resp.status_code == 200
