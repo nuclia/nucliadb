@@ -21,7 +21,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
 
-use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NucliaDBNodeType};
+use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NodeType};
 use nucliadb_node::config::Configuration;
 use nucliadb_node::metrics;
 use nucliadb_node::metrics::report::NodeReport;
@@ -62,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let chitchat_cluster = Cluster::new(
         host_key.to_string(),
         chitchat_addr,
-        NucliaDBNodeType::Node,
+        NodeType::Node,
         seed_nodes,
     )
     .await?;

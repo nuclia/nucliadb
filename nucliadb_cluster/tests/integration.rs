@@ -6,7 +6,7 @@ use std::{env, io};
 use bytes::BytesMut;
 use dockertest::{Composition, DockerTest, StartPolicy};
 use log::error;
-use nucliadb_cluster::cluster::{Cluster, Member, NucliaDBNodeType, CLUSTER_GOSSIP_INTERVAL};
+use nucliadb_cluster::cluster::{Cluster, Member, NodeType, CLUSTER_GOSSIP_INTERVAL};
 use tokio::net::UnixStream;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -19,7 +19,7 @@ pub async fn create_seed_node() -> anyhow::Result<Cluster> {
     Ok(Cluster::new(
         Uuid::new_v4().to_string(),
         peer_addr,
-        NucliaDBNodeType::Node,
+        NodeType::Node,
         vec![SEED_NODE.to_string()],
     )
     .await?)
@@ -39,13 +39,7 @@ pub async fn create_cluster_for_test_with_id(
     let port = find_available_port()?;
     eprintln!("port: {port}");
     let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port);
-    let cluster = Cluster::new(
-        peer_uuid,
-        peer_addr,
-        NucliaDBNodeType::Node,
-        vec![seed_node],
-    )
-    .await?;
+    let cluster = Cluster::new(peer_uuid, peer_addr, NodeType::Node, vec![seed_node]).await?;
     Ok(cluster)
 }
 

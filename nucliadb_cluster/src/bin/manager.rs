@@ -1,12 +1,11 @@
-use std::env;
 use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
 use log::{debug, error, info};
-use nucliadb_cluster::cluster::{Cluster, NucliaDBNodeType};
+use nucliadb_cluster::cluster::{Cluster, NodeType};
 use rand::Rng;
+use structopt::StructOpt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
 use tokio::net::TcpStream;
@@ -14,34 +13,18 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, StructOpt)]
 struct ClusterMgrArgs {
+    #[structopt(short, long, env = "LISTEN_PORT")]
     listen_port: String,
-    node_type: String,
+    #[structopt(short, long, env = "NODE_TYPE")]
+    node_type: NodeType,
+    #[structopt(short, long, env = "SEEDS", value_delimiter = ";")]
     seeds: Vec<String>,
+    #[structopt(short, long, env = "MONITOR_ADDR")]
     monitor_addr: String,
+    #[structopt(short, long, env = "HOSTNAME")]
     pub_ip: String,
-}
-
-impl ClusterMgrArgs {
-    pub fn init_from_env() -> anyhow::Result<Self> {
-        let listen_port = env::var("LISTEN_PORT")?;
-        let node_type = env::var("NODE_TYPE")?;
-        let seeds = env::var("SEEDS")?
-            .split(';')
-            .map(|s| s.to_owned())
-            .collect();
-        let monitor_addr = env::var("MONITOR_ADDR")?;
-        let pub_ip = env::var("HOSTNAME")?;
-
-        Ok(ClusterMgrArgs {
-            listen_port,
-            node_type,
-            seeds,
-            monitor_addr,
-            pub_ip,
-        })
-    }
 }
 
 async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
@@ -141,17 +124,14 @@ pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // env_logger::init();
-    let args = ClusterMgrArgs::init_from_env()?;
+    let args = ClusterMgrArgs::from_args();
 
     let mut termination = signal(SignalKind::terminate())?;
 
     let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
     let addr = reliable_lookup_host(&host).await?;
-    let node_type =
-        NucliaDBNodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(node_id.to_string(), addr, node_type, args.seeds)
+    let cluster = Cluster::new(node_id.to_string(), addr, args.node_type, args.seeds)
         .await
         .with_context(|| "Can't create cluster instance ")?;
 
