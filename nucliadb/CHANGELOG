@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.0.11
+
+- Fix RuntimeErrors on client disconnect
+
 ## 2.0.10
 
 - Fix local shard delete resource
