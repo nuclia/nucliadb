@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.13
+------
+
+- Make sure starlette is running on version >= 0.21.0 as it fixes a RuntimeError on client disconnect
+
 1.0.12
 ------
 
