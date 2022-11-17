@@ -124,7 +124,6 @@ pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // env_logger::init();
     let args = ClusterMgrArgs::from_args();
 
     let mut termination = signal(SignalKind::terminate())?;
