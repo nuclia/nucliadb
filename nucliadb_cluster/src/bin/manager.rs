@@ -148,8 +148,7 @@ async fn main() -> anyhow::Result<()> {
 
     let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
     let addr = reliable_lookup_host(&host).await?;
-    let node_type =
-        NodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
+    let node_type = NodeType::from_str(&args.node_type).with_context(|| "Can't parse node type")?;
     let node_id = Uuid::new_v4();
     let cluster = Cluster::new(node_id.to_string(), addr, node_type, args.seeds)
         .await
