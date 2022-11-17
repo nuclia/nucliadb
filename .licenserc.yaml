@@ -40,6 +40,7 @@ header:
 
   paths-ignore:
     - "**/Cargo.toml"
+    - "**/Cargo.lock"
     - "**/*.sh"
     - "**/*.pb"
     - "**/setup.cfg"
