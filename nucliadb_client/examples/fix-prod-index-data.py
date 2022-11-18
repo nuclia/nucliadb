@@ -103,7 +103,8 @@ def main(args):
         offset = args.offset
         all_kbs = kbadmin.client.list_kbs(timeout=10)
         all_kbs.sort(key=lambda x: x.slug)
-        tprint(f"Found {len(all_kbs)} kbs!")
+        total_kbs = len(all_kbs)
+        tprint(f"Found {total_kbs} kbs!")
 
         to_fix = [kb.kbid for kb in all_kbs][offset : offset + args.kb_batch_size]
         tprint(f"Fixing {len(to_fix)} kbs.")
@@ -118,7 +119,9 @@ def main(args):
 
             abs_index = index + offset
             next_offset = abs_index + 1
-            tprint(f" - {abs_index}: Fixing KB(slug={kb.slug}, kbid={kb.kbid})...")
+            tprint(
+                f" - {abs_index}/{total_kbs}: Fixing KB(slug={kb.slug}, kbid={kb.kbid})..."
+            )
             fix_it(kbadmin, vr, step=args.step)
 
         if next_offset >= len(all_kbs):

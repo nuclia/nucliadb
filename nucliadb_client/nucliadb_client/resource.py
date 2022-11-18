@@ -109,7 +109,7 @@ class Resource:
 
     def reindex(self, vectors: bool = False):
         response = self.http_writer_v1.post(
-            "reindex", params={"reindex_vectors": vectors}
+            "reindex", params={"reindex_vectors": vectors}, timeout=30
         )
         assert response.status_code == 200
 

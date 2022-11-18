@@ -50,8 +50,6 @@ from stashify_protos.protos.knowledgebox_pb2_grpc import (  # type: ignore
 from nucliadb.models.common import FieldTypeName
 from nucliadb_client.client import NucliaDBClient
 
-VECTORS_DIMENSION = 128
-
 DEFAULT_SENTENCE_TRANSFORMER = "all-MiniLM-L6-v2"
 ALL_FIELD_TYPES = [field_name.value for field_name in FieldTypeName]
 
@@ -79,9 +77,7 @@ class VectorsRecomputer:
         if not self.loaded:
             model_path = f"{self.models_folder}/{self.modelid}"
             tprint(f"Loading sentence tokenizer model: {model_path}")
-            self._tokenizer = transformers.AutoTokenizer.from_pretrained(
-                model_path, model_max_length=VECTORS_DIMENSION
-            )
+            self._tokenizer = transformers.AutoTokenizer.from_pretrained(model_path)
             config = transformers.AutoConfig.from_pretrained(model_path)
             self._model = transformers.AutoModel.from_pretrained(
                 model_path, config=config
@@ -235,7 +231,7 @@ class KnowledgeBoxAdmin:
         # Some logging first
         if recomputed % 500 == 0:
             speed = int((recomputed / elapsed_time) * 60)
-            if total is not None:
+            if total is not None and total > 0:
                 progress = int((recomputed / total) * 100)
                 tprint(
                     f"Recomputing {recomputed}-th sentence of kb ({progress}%) at {speed} sentences/min"
@@ -261,6 +257,10 @@ class KnowledgeBoxAdmin:
         Iterates all sentences of a KB and recomputes its vectors
         """
         modelid = self.get_kb_sentence_model()
+        if not modelid:
+            tprint(f"Model not set for KB. Skipping")
+            return
+
         tprint(f"Sentence model id: {modelid}")
 
         try:
