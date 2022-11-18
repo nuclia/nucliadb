@@ -200,6 +200,10 @@ pub struct VectorSearchRequest {
     ///Shard ID
     #[prost(string, tag="1")]
     pub id: ::prost::alloc::string::String,
+    /// ID for the vector set.
+    /// Empty for searching on the original index
+    #[prost(string, tag="15")]
+    pub vector_set: ::prost::alloc::string::String,
     /// Embedded vector search.
     #[prost(float, repeated, tag="2")]
     pub vector: ::prost::alloc::vec::Vec<f32>,
@@ -309,6 +313,8 @@ pub struct SearchRequest {
     /// Embedded vector search.
     #[prost(float, repeated, tag="10")]
     pub vector: ::prost::alloc::vec::Vec<f32>,
+    #[prost(string, tag="15")]
+    pub vectorset: ::prost::alloc::string::String,
     #[prost(bool, tag="11")]
     pub reload: bool,
     #[prost(bool, tag="12")]
@@ -317,7 +323,7 @@ pub struct SearchRequest {
     pub document: bool,
     #[prost(bool, tag="14")]
     pub with_duplicates: bool,
-    #[prost(bool, tag="15")]
+    #[prost(bool, tag="16")]
     pub only_faceted: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -391,6 +397,13 @@ pub struct TypeList {
     #[prost(message, repeated, tag="1")]
     pub list: ::prost::alloc::vec::Vec<RelationTypeListMember>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetShardRequest {
+    #[prost(message, optional, tag="1")]
+    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
+    #[prost(string, tag="2")]
+    pub vectorset: ::prost::alloc::string::String,
+}
 /// Generated client implementations.
 pub mod node_reader_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -457,7 +470,7 @@ pub mod node_reader_client {
         }
         pub async fn get_shard(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+            request: impl tonic::IntoRequest<super::GetShardRequest>,
         ) -> Result<tonic::Response<super::super::noderesources::Shard>, tonic::Status> {
             self.inner
                 .ready()
@@ -735,7 +748,7 @@ pub mod node_reader_server {
     pub trait NodeReader: Send + Sync + 'static {
         async fn get_shard(
             &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
+            request: tonic::Request<super::GetShardRequest>,
         ) -> Result<tonic::Response<super::super::noderesources::Shard>, tonic::Status>;
         async fn get_shards(
             &self,
@@ -845,7 +858,7 @@ pub mod node_reader_server {
                     struct GetShardSvc<T: NodeReader>(pub Arc<T>);
                     impl<
                         T: NodeReader,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    > tonic::server::UnaryService<super::GetShardRequest>
                     for GetShardSvc<T> {
                         type Response = super::super::noderesources::Shard;
                         type Future = BoxFuture<
@@ -854,7 +867,7 @@ pub mod node_reader_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
+                            request: tonic::Request<super::GetShardRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).get_shard(request).await };

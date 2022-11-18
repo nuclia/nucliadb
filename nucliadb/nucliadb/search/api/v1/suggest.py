@@ -30,14 +30,7 @@ from nucliadb_protos.writer_pb2 import ShardObject
 from sentry_sdk import capture_exception
 
 from nucliadb.ingest.serialize import ResourceProperties
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.search import logger
-from nucliadb.search.api.models import (
-    KnowledgeboxSuggestResults,
-    NucliaDBClientType,
-    SuggestOptions,
-)
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_suggest_results
@@ -45,6 +38,13 @@ from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb.search.search.shards import suggest_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.search import (
+    KnowledgeboxSuggestResults,
+    NucliaDBClientType,
+    SuggestOptions,
+)
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
 

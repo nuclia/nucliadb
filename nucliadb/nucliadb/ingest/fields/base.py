@@ -30,8 +30,14 @@ from nucliadb_protos.resources_pb2 import (
     FieldComputedMetadataWrapper,
     LargeComputedMetadata,
     LargeComputedMetadataWrapper,
+    UserVectorsWrapper,
 )
-from nucliadb_protos.utils_pb2 import ExtractedText, VectorObject
+from nucliadb_protos.utils_pb2 import (
+    ExtractedText,
+    UserVectorSet,
+    UserVectorsList,
+    VectorObject,
+)
 from nucliadb_protos.writer_pb2 import Error
 
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
@@ -41,6 +47,7 @@ KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 KB_RESOURCE_ERROR = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/error"
 FIELD_TEXT = "extracted_text"
 FIELD_VECTORS = "extracted_vectors"
+USER_FIELD_VECTORS = "user_vectors"
 FIELD_METADATA = "metadata"
 FIELD_LARGE_METADATA = "large_metadata"
 SUBFIELDFIELDS = ["l", "c"]
@@ -54,6 +61,7 @@ class Field:
     extracted_vectors: Optional[VectorObject]
     computed_metadata: Optional[FieldComputedMetadata]
     large_computed_metadata: Optional[LargeComputedMetadata]
+    extracted_user_vectors: Optional[UserVectorSet]
 
     def __init__(
         self,
@@ -70,6 +78,7 @@ class Field:
         self.extracted_vectors = None
         self.computed_metadata = None
         self.large_computed_metadata = None
+        self.extracted_user_vectors = None
 
         self.id: str = id
         self.resource: Any = resource
@@ -135,7 +144,7 @@ class Field:
         await self.delete_vectors()
         await self.delete_metadata()
 
-    async def delete_extracted_text(self):
+    async def delete_extracted_text(self) -> None:
         sf: StorageField = self.storage.file_extracted(
             self.kbid, self.uuid, self.type, self.id, FIELD_TEXT
         )
@@ -144,7 +153,7 @@ class Field:
         except KeyError:
             pass
 
-    async def delete_vectors(self):
+    async def delete_vectors(self) -> None:
         # Try delete vectors
         sf: StorageField = self.storage.file_extracted(
             self.kbid, self.uuid, self.type, self.id, FIELD_VECTORS
@@ -154,7 +163,7 @@ class Field:
         except KeyError:
             pass
 
-    async def delete_metadata(self):
+    async def delete_metadata(self) -> None:
         sf: StorageField = self.storage.file_extracted(
             self.kbid, self.uuid, self.type, self.id, FIELD_METADATA
         )
@@ -175,7 +184,7 @@ class Field:
         pberror.ParseFromString(payload)
         return pberror
 
-    async def set_error(self, error: Error):
+    async def set_error(self, error: Error) -> None:
         await self.resource.txn.set(
             KB_RESOURCE_ERROR.format(
                 kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
@@ -183,7 +192,7 @@ class Field:
             error.SerializeToString(),
         )
 
-    async def set_extracted_text(self, payload: ExtractedTextWrapper):
+    async def set_extracted_text(self, payload: ExtractedTextWrapper) -> None:
         if self.type in SUBFIELDFIELDS:
             try:
                 actual_payload: Optional[ExtractedText] = await self.get_extracted_text(
@@ -300,6 +309,55 @@ class Field:
             if payload is not None:
                 self.extracted_vectors = payload
         return self.extracted_vectors
+
+    async def set_user_vectors(
+        self, user_vectors: UserVectorsWrapper
+    ) -> Tuple[UserVectorSet, Dict[str, UserVectorsList]]:
+
+        try:
+            actual_payload: Optional[UserVectorSet] = await self.get_user_vectors(
+                force=True
+            )
+        except KeyError:
+            actual_payload = None
+
+        sf: StorageField = self.storage.file_extracted(
+            self.kbid, self.uuid, self.type, self.id, USER_FIELD_VECTORS
+        )
+
+        vectors_to_delete: Dict[str, UserVectorsList] = {}
+        if actual_payload is not None:
+            for vectorset, user_vector in user_vectors.vectors.vectors.items():
+                for key, vector in user_vector.vectors.items():
+                    if key in actual_payload.vectors[vectorset].vectors.keys():
+                        if vectorset not in vectors_to_delete:
+                            vectors_to_delete[vectorset] = UserVectorsList()
+                        vectors_to_delete[vectorset].vectors.append(key)
+                    actual_payload.vectors[vectorset].vectors[key].CopyFrom(vector)
+            for vectorset, delete_vectors in user_vectors.vectors_to_delete.items():
+                for vector_to_delete in delete_vectors.vectors:
+                    if (
+                        actual_payload.vectors.get(vectorset).vectors.get(
+                            vector_to_delete
+                        )
+                        is not None
+                    ):
+                        del actual_payload.vectors[vectorset].vectors[vector_to_delete]
+        else:
+            actual_payload = user_vectors.vectors
+        await self.storage.upload_pb(sf, actual_payload)
+        self.extracted_user_vectors = actual_payload
+        return actual_payload, vectors_to_delete
+
+    async def get_user_vectors(self, force=False) -> Optional[UserVectorSet]:
+        if self.extracted_user_vectors is None or force:
+            sf: StorageField = self.storage.file_extracted(
+                self.kbid, self.uuid, self.type, self.id, USER_FIELD_VECTORS
+            )
+            payload = await self.storage.download_pb(sf, UserVectorSet)
+            if payload is not None:
+                self.extracted_user_vectors = payload
+        return self.extracted_user_vectors
 
     async def get_vectors_cf(self) -> Optional[CloudFile]:
         sf: StorageField = self.storage.file_extracted(

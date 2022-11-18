@@ -24,10 +24,10 @@ use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_protos::{
-    relation_node, DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
-    ParagraphSearchResponse, RelatedEntities, RelationSearchRequest, RelationSearchResponse,
-    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
-    VectorSearchResponse,
+    relation_node, DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationSearchRequest,
+    RelationSearchResponse, SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
+    TypeList, VectorSearchRequest, VectorSearchResponse,
 };
 use nucliadb_services::*;
 use rayon::prelude::*;
@@ -85,18 +85,18 @@ impl ShardReaderService {
             i => panic!("Unknown relation version {i}"),
         }
     }
-    pub fn get_info(&self) -> StatsData {
+    pub fn get_info(&self, request: &GetShardRequest) -> InternalResult<StatsData> {
         self.reload_policy(true);
-        let resources = self.field_reader.count();
-        let paragraphs = self.paragraph_reader.count();
-        let sentences = self.vector_reader.count();
-        let relations = self.relation_reader.count();
-        StatsData {
+        let resources = self.field_reader.count()?;
+        let paragraphs = self.paragraph_reader.count()?;
+        let sentences = self.vector_reader.count(&request.vectorset)?;
+        let relations = self.relation_reader.count()?;
+        Ok(StatsData {
             resources,
             paragraphs,
             sentences,
             relations,
-        }
+        })
     }
 
     pub fn get_field_keys(&self) -> Vec<String> {
@@ -123,7 +123,7 @@ impl ShardReaderService {
         self.reload_policy(true);
         self.relation_reader.get_node_types()
     }
-    pub fn get_resources(&self) -> usize {
+    pub fn get_resources(&self) -> InternalResult<usize> {
         self.field_reader.count()
     }
 
@@ -146,6 +146,7 @@ impl ShardReaderService {
         let vsc = VectorConfig {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
+            vectorset: format!("{}/vectorset", shard_path),
         };
         let rsc = RelationConfig {
             path: format!("{}/relations", shard_path),
@@ -196,6 +197,7 @@ impl ShardReaderService {
         let vsc = VectorConfig {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
+            vectorset: format!("{}/vectorset", shard_path),
         };
         let rsc = RelationConfig {
             path: format!("{}/relations", shard_path),
@@ -245,6 +247,7 @@ impl ShardReaderService {
         let vsc = VectorConfig {
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: format!("{}/vectors", shard_path),
+            vectorset: format!("{}/vectorset", shard_path),
         };
         let rsc = RelationConfig {
             path: format!("{}/relations", shard_path),
@@ -385,9 +388,7 @@ impl ShardReaderService {
         self.reload_policy(search_request.reload);
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
-        let skip_vectors = search_request.body.is_empty()
-            || search_request.result_per_page.eq(&0)
-            || search_request.vector.is_empty();
+        let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
 
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
@@ -443,6 +444,7 @@ impl ShardReaderService {
 
         let vector_request = VectorSearchRequest {
             id: "".to_string(),
+            vector_set: search_request.vectorset.clone(),
             vector: search_request.vector.clone(),
             reload: search_request.reload,
             page_number: search_request.page_number,
@@ -540,7 +542,8 @@ impl ShardReaderService {
             .unwrap()
             .as_millis();
         if trigger || elapsed >= RELOAD_PERIOD {
-            *self.creation_time.write().unwrap() = SystemTime::now();
+            let mut creation_time = self.creation_time.write().unwrap();
+            *creation_time = SystemTime::now();
             self.vector_reader.reload()
         }
     }

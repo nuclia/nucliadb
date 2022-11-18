@@ -20,7 +20,7 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from nucliadb.models.utils import FieldIdString
+from nucliadb_models.utils import FieldIdString
 
 
 class TestFieldIdModel(BaseModel):

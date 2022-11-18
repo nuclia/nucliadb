@@ -23,6 +23,10 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
     RelationNode as RelationNode,
+    UserVector as UserVector,
+    UserVectorSet as UserVectorSet,
+    UserVectors as UserVectors,
+    UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -740,6 +744,50 @@ class ExtractedVectorsWrapper(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]) -> typing_extensions.Literal["vectors", "file"] | None: ...
 
 global___ExtractedVectorsWrapper = ExtractedVectorsWrapper
+
+@typing_extensions.final
+class UserVectorsWrapper(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class VectorsToDeleteEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> nucliadb_protos.utils_pb2.UserVectorsList: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: nucliadb_protos.utils_pb2.UserVectorsList | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    VECTORS_FIELD_NUMBER: builtins.int
+    VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    @property
+    def vectors(self) -> nucliadb_protos.utils_pb2.UserVectorSet: ...
+    @property
+    def vectors_to_delete(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList]:
+        """Vectorset prefix vector id"""
+    @property
+    def field(self) -> global___FieldID: ...
+    def __init__(
+        self,
+        *,
+        vectors: nucliadb_protos.utils_pb2.UserVectorSet | None = ...,
+        vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
+        field: global___FieldID | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field", b"field", "vectors", b"vectors"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+
+global___UserVectorsWrapper = UserVectorsWrapper
 
 @typing_extensions.final
 class Sentence(google.protobuf.message.Message):

@@ -121,6 +121,8 @@ pub struct BrokerMessage {
     pub source: i32,
     #[prost(int64, tag="34")]
     pub account_seq: i64,
+    #[prost(message, repeated, tag="35")]
+    pub user_vectors: ::prost::alloc::vec::Vec<super::resources::UserVectorsWrapper>,
 }
 /// Nested message and enum types in `BrokerMessage`.
 pub mod broker_message {
@@ -322,6 +324,46 @@ pub mod get_widget_response {
         Ok = 0,
         Notfound = 1,
     }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetVectorSetsRequest {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetVectorSetsResponse {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(message, optional, tag="2")]
+    pub vectorsets: ::core::option::Option<super::knowledgebox::VectorSets>,
+    #[prost(enumeration="get_vector_sets_response::Status", tag="3")]
+    pub status: i32,
+}
+/// Nested message and enum types in `GetVectorSetsResponse`.
+pub mod get_vector_sets_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        Notfound = 1,
+        Error = 2,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DelVectorSetRequest {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(string, tag="2")]
+    pub vectorset: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetVectorSetRequest {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(string, tag="2")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="3")]
+    pub vectorset: ::core::option::Option<super::knowledgebox::VectorSet>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetWidgetsRequest {

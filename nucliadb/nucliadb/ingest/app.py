@@ -193,7 +193,7 @@ def set_logging():
     assign_partitions(settings)
 
 
-def run():
+def run() -> None:
     if running_settings.sentry_url and SENTRY:
         set_sentry(
             running_settings.sentry_url,

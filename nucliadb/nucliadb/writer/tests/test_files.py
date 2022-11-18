@@ -20,26 +20,29 @@
 import asyncio
 import base64
 import os
+from typing import Callable, List
 
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage, ResourceFieldId
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import KB_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
 from nucliadb.writer.tus import TUSUPLOAD, UPLOAD
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.utilities import get_ingest, get_storage, get_transaction
 
 ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_file_tus_options(writer_api, knowledgebox_writer):
+async def test_knowledgebox_file_tus_options(
+    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
+):
     client: AsyncClient
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
         resp = await client.options(
             f"/{KB_PREFIX}/{knowledgebox_writer}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx"
         )
@@ -166,13 +169,15 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+async def test_knowledgebox_file_upload_root(
+    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
+):
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
 
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
-                data=f.read(),
+                content=f.read(),
                 headers={
                     "content-type": "image/jpg",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
@@ -183,6 +188,7 @@ async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
     processing = get_processing()
     transaction = get_transaction()
 
+    assert transaction.js is not None
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(1)
     writer = BrokerMessage()
@@ -208,12 +214,12 @@ async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
     assert len(data.read()) == 30472
     await asyncio.sleep(1)
 
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
 
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
-                data=f.read(),
+                content=f.read(),
                 headers={
                     "content-type": "image/jpg",
                     "X-MD5": "7af0916dba8b70e29d99e72941923529",
@@ -223,15 +229,16 @@ async def test_knowledgebox_file_upload_root(writer_api, knowledgebox_writer):
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_file_upload_root_headers(writer_api, knowledgebox_writer):
-    client: AsyncClient
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+async def test_knowledgebox_file_upload_root_headers(
+    writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
+):
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
 
         filename = base64.b64encode(b"image.jpg").decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
-                data=f.read(),
+                content=f.read(),
                 headers={
                     "X-FILENAME": filename,
                     "X-LANGUAGE": "ca",
@@ -244,6 +251,7 @@ async def test_knowledgebox_file_upload_root_headers(writer_api, knowledgebox_wr
     processing = get_processing()
     transaction = get_transaction()
 
+    assert transaction.js is not None
     sub = await transaction.js.pull_subscribe("nucliadb.1", "auto")
     msgs = await sub.fetch(1)
     writer = BrokerMessage()

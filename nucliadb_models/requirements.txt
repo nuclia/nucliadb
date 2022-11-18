@@ -1,0 +1,2 @@
+pydantic>=1.8.2
+nucliadb_protos>=0.0.36

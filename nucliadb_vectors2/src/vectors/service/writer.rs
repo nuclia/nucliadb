@@ -16,18 +16,27 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{Resource, ResourceId};
+use nucliadb_protos::{Resource, ResourceId, VectorSetId};
 use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
 use crate::vectors::data_point;
 use crate::vectors::data_point_provider::*;
+use crate::vectors::indexset::{IndexKeyCollector, IndexSet};
+
+impl IndexKeyCollector for Vec<String> {
+    fn add_key(&mut self, key: String) {
+        self.push(key);
+    }
+}
 
 pub struct VectorWriterService {
     index: Index,
+    indexset: IndexSet,
 }
 
 impl Debug for VectorWriterService {
@@ -36,7 +45,38 @@ impl Debug for VectorWriterService {
     }
 }
 
-impl VectorWriter for VectorWriterService {}
+impl VectorWriter for VectorWriterService {
+    fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
+        let mut collector = Vec::new();
+        let indexset_slock = self.indexset.get_slock()?;
+        self.indexset.index_keys(&mut collector, &indexset_slock);
+        Ok(collector)
+    }
+    fn add_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()> {
+        info!(
+            "Adding vector index {} to {:?}",
+            setid.vectorset, setid.shard
+        );
+        let indexid = setid.vectorset.as_str();
+        let indexset_elock = self.indexset.get_elock()?;
+        self.indexset
+            .get_or_create::<&str>(indexid, &indexset_elock)?;
+        self.indexset.commit(indexset_elock)?;
+        Ok(())
+    }
+
+    fn remove_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()> {
+        info!(
+            "Removing vector index {} from {:?}",
+            setid.vectorset, setid.shard
+        );
+        let indexid = &setid.vectorset;
+        let indexset_elock = self.indexset.get_elock()?;
+        self.indexset.remove_index(indexid, &indexset_elock)?;
+        self.indexset.commit(indexset_elock)?;
+        Ok(())
+    }
+}
 impl WriterChild for VectorWriterService {
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping vector writer Service");
@@ -56,7 +96,7 @@ impl WriterChild for VectorWriterService {
     }
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         use data_point::{DataPoint, Elem, LabelDictionary};
-        let _resource_id = resource.resource.as_ref().unwrap().uuid.clone();
+        info!("Updating main index");
         info!("creating datapoints");
         let mut data_points = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
@@ -89,7 +129,57 @@ impl WriterChild for VectorWriterService {
             self.index.add(key, data_point, &lock);
         }
         self.index.commit(lock)?;
-        info!("New version commited");
+
+        info!("Updating vectorset indexes");
+        // Updating existing indexes
+        // Perform delete operations over the vector set
+        info!("Processing delete requests for indexes in the set");
+        let indexset_slock = self.indexset.get_slock()?;
+        let index_iter = resource.vectors_to_delete.iter().flat_map(|(k, v)| {
+            self.indexset
+                .get(k, &indexset_slock)
+                .transpose()
+                .map(|i| (v, i))
+        });
+        for (vectorlist, index) in index_iter {
+            let mut index = index?;
+            let index_lock = index.get_elock()?;
+            vectorlist.vectors.iter().for_each(|vector| {
+                index.delete(vector, &index_lock);
+            });
+            index.commit(index_lock)?;
+        }
+        std::mem::drop(indexset_slock);
+        info!("Delete requests for indexes in the set processed");
+
+        // Perform add operations over the vector set
+        // New indexes may be created.
+        info!("Creating and geting indexes in the set");
+        let indexset_elock = self.indexset.get_elock()?;
+        let indexes = resource
+            .vectors
+            .keys()
+            .map(|k| (k, self.indexset.get_or_create::<&str>(k, &indexset_elock)))
+            .map(|(key, index)| index.map(|index| (key, index)))
+            .collect::<Result<HashMap<_, _>, _>>()?;
+        self.indexset.commit(indexset_elock)?;
+
+        // Inner indexes are updated
+        for (index_key, mut index) in indexes {
+            let mut elems = vec![];
+            for (key, user_vector) in resource.vectors[index_key].vectors.iter() {
+                let key = key.clone();
+                let vector = user_vector.vector.clone();
+                let labels = LabelDictionary::new(user_vector.labels.clone());
+                elems.push(Elem::new(key, vector, labels));
+            }
+            let new_dp = DataPoint::new(index.get_location(), elems)?;
+            let key = uuid::Uuid::new_v4().to_string();
+            let lock = index.get_elock()?;
+            index.add(key, new_dp, &lock);
+            index.commit(lock)?;
+        }
+        info!("Create and update operations where applied to the indexes in the set");
         Ok(())
     }
     fn garbage_collection(&mut self) {}
@@ -106,22 +196,25 @@ impl VectorWriterService {
     }
     pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
+        let indexset = std::path::Path::new(&config.vectorset);
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
-            std::fs::create_dir_all(path).unwrap();
             Ok(VectorWriterService {
-                index: Index::writer(path)?,
+                index: Index::new(path, IndexCheck::None)?,
+                indexset: IndexSet::new(indexset, IndexCheck::None)?,
             })
         }
     }
     pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
+        let indexset = std::path::Path::new(&config.vectorset);
         if !path.exists() {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Index::writer(path)?,
+                index: Index::new(path, IndexCheck::Sanity)?,
+                indexset: IndexSet::new(indexset, IndexCheck::Sanity)?,
             })
         }
     }
@@ -129,19 +222,104 @@ impl VectorWriterService {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
-    use nucliadb_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence};
-    use tempdir::TempDir;
+    use nucliadb_protos::{
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors,
+        VectorSearchRequest, VectorSentence,
+    };
+    use tempfile::TempDir;
 
     use super::*;
+    use crate::vectors::service::reader::VectorReaderService;
 
+    fn create_vector_set(set_name: String) -> (String, UserVectors) {
+        let label = format!("{set_name}/label");
+        let key = format!("{set_name}/key");
+        let vector = vec![1.0, 3.0, 4.0];
+        let data = UserVector {
+            vector,
+            labels: vec![label],
+            ..Default::default()
+        };
+        let set = UserVectors {
+            vectors: HashMap::from([(key, data)]),
+        };
+        (set_name, set)
+    }
     #[test]
-    fn test_new_vector_writer() {
-        let dir = TempDir::new("payload_dir").unwrap();
+    fn test_vectorset_functionality() {
+        let dir = TempDir::new().unwrap();
+        let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
             no_results: None,
             path: dir.path().to_str().unwrap().to_string(),
+            vectorset: dir_vectorset.path().to_str().unwrap().to_string(),
+        };
+        let indexes: HashMap<_, _> = (0..10).map(|i| create_vector_set(i.to_string())).collect();
+        let keys: HashSet<_> = indexes.keys().cloned().collect();
+        let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let resource = Resource {
+            vectors: indexes,
+            ..Default::default()
+        };
+        writer.set_resource(&resource).unwrap();
+        let index_keys: HashSet<_> = writer.list_vectorsets().unwrap().into_iter().collect();
+        assert_eq!(index_keys, keys);
+
+        let reader = VectorReaderService::start(&vsc).unwrap();
+        let mut request = VectorSearchRequest {
+            id: "".to_string(),
+            vector_set: "4".to_string(),
+            vector: vec![4.0, 6.0, 7.0],
+            tags: vec!["4/label".to_string()],
+            page_number: 0,
+            result_per_page: 20,
+            reload: false,
+            with_duplicates: false,
+        };
+        let results = reader.search(&request).unwrap();
+        let id = results.documents[0].doc_id.clone().unwrap().id;
+        assert_eq!(results.documents.len(), 1);
+        assert_eq!(id, "4/key");
+
+        // Same set, but no label match
+        request.tags = vec!["5/label".to_string()];
+        let results = reader.search(&request).unwrap();
+        assert_eq!(results.documents.len(), 0);
+
+        // Invalid set
+        request.vector_set = "not a set".to_string();
+        let results = reader.search(&request).unwrap();
+        assert_eq!(results.documents.len(), 0);
+
+        // Remove set 4
+        let id = VectorSetId {
+            vectorset: "4".to_string(),
+            ..Default::default()
+        };
+        let mut index_keys: HashSet<_> = writer.list_vectorsets().unwrap().into_iter().collect();
+        writer.remove_vectorset(&id).unwrap();
+        let index_keysp: HashSet<_> = writer.list_vectorsets().unwrap().into_iter().collect();
+        index_keys.remove("4");
+        assert!(!index_keysp.contains("4"));
+        assert_eq!(index_keys, index_keysp);
+
+        // Now vectorset 4 is no longer available
+        request.vector_set = "4".to_string();
+        request.tags = vec!["4/label".to_string()];
+        let results = reader.search(&request).unwrap();
+        assert_eq!(results.documents.len(), 0);
+    }
+
+    #[test]
+    fn test_new_vector_writer() {
+        let dir = TempDir::new().unwrap();
+        let dir_vectorset = TempDir::new().unwrap();
+        let vsc = VectorConfig {
+            no_results: None,
+            path: dir.path().to_str().unwrap().to_string(),
+            vectorset: dir_vectorset.path().to_str().unwrap().to_string(),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -180,6 +358,8 @@ mod tests {
             sentences_to_delete: vec![],
             relations_to_delete: vec![],
             relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
         };
         // insert - delete - insert sequence

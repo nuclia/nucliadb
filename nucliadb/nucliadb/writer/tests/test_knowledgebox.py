@@ -19,8 +19,8 @@
 #
 import pytest
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio

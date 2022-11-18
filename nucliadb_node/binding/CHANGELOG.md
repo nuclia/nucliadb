@@ -1,5 +1,10 @@
 # Changelog
+## 0.4.7
 
+- Binding name update
+## 0.4.6
+
+- Binding vectorset and relations update
 ## 0.4.5
 
 - `only_faceted` flag

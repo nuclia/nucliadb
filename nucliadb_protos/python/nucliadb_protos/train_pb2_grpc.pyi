@@ -29,6 +29,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
+    VectorSet as VectorSet,
+    VectorSets as VectorSets,
     Widget as Widget,
 )
 from nucliadb_protos.resources_pb2 import (
@@ -85,12 +87,14 @@ from nucliadb_protos.resources_pb2 import (
     TokenSplit as TokenSplit,
     UserFieldMetadata as UserFieldMetadata,
     UserMetadata as UserMetadata,
+    UserVectorsWrapper as UserVectorsWrapper,
 )
 from nucliadb_protos.writer_pb2 import (
     Audit as Audit,
     BrokerMessage as BrokerMessage,
     DelEntitiesRequest as DelEntitiesRequest,
     DelLabelsRequest as DelLabelsRequest,
+    DelVectorSetRequest as DelVectorSetRequest,
     DetWidgetsRequest as DetWidgetsRequest,
     Error as Error,
     ExportRequest as ExportRequest,
@@ -102,6 +106,8 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelSetResponse as GetLabelSetResponse,
     GetLabelsRequest as GetLabelsRequest,
     GetLabelsResponse as GetLabelsResponse,
+    GetVectorSetsRequest as GetVectorSetsRequest,
+    GetVectorSetsResponse as GetVectorSetsResponse,
     GetWidgetRequest as GetWidgetRequest,
     GetWidgetResponse as GetWidgetResponse,
     GetWidgetsRequest as GetWidgetsRequest,
@@ -120,6 +126,7 @@ from nucliadb_protos.writer_pb2 import (
     ResourceIdResponse as ResourceIdResponse,
     SetEntitiesRequest as SetEntitiesRequest,
     SetLabelsRequest as SetLabelsRequest,
+    SetVectorSetRequest as SetVectorSetRequest,
     SetVectorsRequest as SetVectorsRequest,
     SetVectorsResponse as SetVectorsResponse,
     SetWidgetsRequest as SetWidgetsRequest,

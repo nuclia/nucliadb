@@ -46,28 +46,32 @@ impl NodeReaderGRPCDriver {
             writer.load_shard(id);
         }
     }
+
+    // Instrumentation utilities for telemetry
+    fn instrument<T>(&self, request: &tonic::Request<T>) {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+    }
 }
 #[tonic::async_trait]
 impl NodeReader for NodeReaderGRPCDriver {
     #[instrument(name = "NodeReaderGRPCDriver::get_shard", skip(self, request))]
     async fn get_shard(
         &self,
-        request: tonic::Request<ShardId>,
+        request: tonic::Request<GetShardRequest>,
     ) -> Result<tonic::Response<ShardPB>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
-        let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
+        let request = request.into_inner();
+        let shard_id = request.shard_id.as_ref().unwrap();
+        self.shard_loading(shard_id).await;
         let reader = self.0.read().await;
-        let shard = reader.get_shard(&shard_id);
-        match shard {
-            Some(shard) => {
+        match reader.get_shard(shard_id).map(|s| s.get_info(&request)) {
+            Some(Ok(stats)) => {
                 info!("Ready {:?}", shard_id);
-                let stats = shard.get_info();
                 let result_shard = ShardPB {
-                    shard_id: String::from(&shard.id),
+                    shard_id: shard_id.id.clone(),
                     resources: stats.resources as u64,
                     paragraphs: stats.paragraphs as u64,
                     sentences: stats.sentences as u64,
@@ -75,8 +79,12 @@ impl NodeReader for NodeReaderGRPCDriver {
                 info!("Get shard ends {}:{}", file!(), line!());
                 Ok(tonic::Response::new(result_shard))
             }
+            Some(Err(e)) => {
+                info!("get_shard ended incorrectly");
+                Err(tonic::Status::internal(e.to_string()))
+            }
             None => {
-                let message = format!("Shard not found {:?}", shard_id);
+                let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
         }
@@ -87,12 +95,13 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<EmptyQuery>,
     ) -> Result<tonic::Response<ShardList>, tonic::Status> {
         info!("Get shards starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-        let shards = self.0.read().await.get_shards();
-        info!("Get shards ends");
-        Ok(tonic::Response::new(shards))
+        self.instrument(&request);
+        self.0
+            .read()
+            .await
+            .get_shards()
+            .map(tonic::Response::new)
+            .map_err(|e| tonic::Status::internal(e.to_string()))
     }
 
     #[tracing::instrument(name = "NodeReaderGRPCDriver::vector_search", skip(self, request))]
@@ -101,9 +110,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<VectorSearchRequest>,
     ) -> Result<tonic::Response<VectorSearchResponse>, tonic::Status> {
         info!("Vector search starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         let vector_request = request.into_inner();
         let shard_id = ShardId {
             id: vector_request.id.clone(),
@@ -132,9 +139,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<RelationSearchRequest>,
     ) -> Result<tonic::Response<RelationSearchResponse>, tonic::Status> {
         info!("Relation search starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         let relation_request = request.into_inner();
         let shard_id = ShardId {
             id: relation_request.id.clone(),
@@ -163,9 +168,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
         info!("Search starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         let search_request = request.into_inner();
         let shard_id = ShardId {
             id: search_request.shard.clone(),
@@ -194,9 +197,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<SuggestRequest>,
     ) -> Result<tonic::Response<SuggestResponse>, tonic::Status> {
         info!("Suggest starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         let suggest_request = request.into_inner();
         let shard_id = ShardId {
             id: suggest_request.shard.clone(),
@@ -225,9 +226,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<DocumentSearchRequest>,
     ) -> Result<tonic::Response<DocumentSearchResponse>, tonic::Status> {
         info!("Document search starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
 
         let document_request = request.into_inner();
         let shard_id = ShardId {
@@ -257,9 +256,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         request: tonic::Request<ParagraphSearchRequest>,
     ) -> Result<tonic::Response<ParagraphSearchResponse>, tonic::Status> {
         info!("Paragraph search starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         let paragraph_request = request.into_inner();
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
@@ -287,9 +284,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -307,9 +302,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -328,9 +321,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -347,9 +338,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<IdCollection>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -367,9 +356,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<EdgeList>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -388,9 +375,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         &self,
         request: tonic::Request<ShardId>,
     ) -> Result<tonic::Response<TypeList>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        self.instrument(&request);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;

@@ -23,16 +23,16 @@ from typing import Union
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-import nucliadb.models as models
+import nucliadb_models as models
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import PushPayload
-from nucliadb.models.common import FIELD_TYPES_MAP, FieldTypeName
-from nucliadb.models.conversation import PushConversation
-from nucliadb.models.writer import CreateResourcePayload, UpdateResourcePayload
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.layouts import serialize_blocks
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.conversation import PushConversation
+from nucliadb_models.writer import CreateResourcePayload, UpdateResourcePayload
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
@@ -175,6 +175,11 @@ def parse_text_field(
     writer.texts[key].format = resources_pb2.FieldText.Format.Value(
         text_field.format.value
     )
+    etw = resources_pb2.ExtractedTextWrapper()
+    etw.field.field = key
+    etw.field.field_type = resources_pb2.FieldType.TEXT
+    etw.body.text = text_field.body
+    writer.extracted_text.append(etw)
     toprocess.textfield[key] = models.Text(
         body=text_field.body,
         format=getattr(models.PushTextFormat, text_field.format.value),

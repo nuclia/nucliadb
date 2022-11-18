@@ -62,7 +62,7 @@ impl NodeWriterService {
 
             let shard = POOL.install(|| ShardWriterService::open(&shard_id.to_string()))?;
             self.cache.insert(shard_id.clone(), shard);
-            info!("Shard loaded: {:?}", shard_id);
+            info!("{}: Shard loaded", shard_id);
         }
         Ok(())
     }
@@ -70,8 +70,7 @@ impl NodeWriterService {
     #[instrument(name = "NodeWriterService::load_shard", skip(self))]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         info!("{}: Loading shard", shard_id.id);
-        let in_memory = self.cache.contains_key(&shard_id.id);
-        if !in_memory {
+        if !self.cache.contains_key(&shard_id.id) {
             info!("{}: Shard was not in memory", shard_id.id);
             let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
             if in_disk {
@@ -83,9 +82,8 @@ impl NodeWriterService {
                 self.cache.insert(shard_id.id.clone(), shard);
                 info!("{}: Inserted on memory", shard_id.id);
             }
-        } else {
-            info!("{}: Shard was in memory", shard_id.id);
         }
+        info!("{}: Shard loaded", shard_id.id);
     }
 
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardWriterService> {
@@ -138,7 +136,29 @@ impl NodeWriterService {
                 .map_err(|e| e.into())
         })
     }
+    pub fn add_vectorset(
+        &mut self,
+        shard_id: &ShardId,
+        setid: &VectorSetId,
+    ) -> Option<ServiceResult<usize>> {
+        self.get_mut_shard(shard_id).map(|shard| {
+            POOL.install(|| shard.add_vectorset(setid))
+                .map(|_| shard.count())
+                .map_err(|e| e.into())
+        })
+    }
 
+    pub fn remove_vectorset(
+        &mut self,
+        shard_id: &ShardId,
+        setid: &VectorSetId,
+    ) -> Option<ServiceResult<usize>> {
+        self.get_mut_shard(shard_id).map(|shard| {
+            POOL.install(|| shard.remove_vectorset(setid))
+                .map(|_| shard.count())
+                .map_err(|e| e.into())
+        })
+    }
     pub fn join_relations_graph(
         &mut self,
         shard_id: &ShardId,
@@ -153,10 +173,10 @@ impl NodeWriterService {
 
     pub fn delete_relation_nodes(
         &mut self,
+        shard_id: &ShardId,
         request: &DeleteGraphNodes,
     ) -> Option<ServiceResult<usize>> {
-        let id = request.shard_id.as_ref().unwrap();
-        self.get_mut_shard(id).map(|shard| {
+        self.get_mut_shard(shard_id).map(|shard| {
             POOL.install(|| shard.delete_relation_nodes(request))
                 .map(|_| shard.count())
                 .map_err(|e| e.into())
@@ -174,7 +194,17 @@ impl NodeWriterService {
                 .map_err(|e| e.into())
         })
     }
+    pub fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
+        self.get_mut_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.gc()).map_err(|e| e.into()))
+    }
 
+    pub fn list_vectorsets(&self, shard_id: &ShardId) -> Option<ServiceResult<Vec<String>>> {
+        self.get_shard(shard_id).map(|shard| {
+            POOL.install(|| shard.list_vectorsets())
+                .map_err(|e| e.into())
+        })
+    }
     pub fn get_shard_ids(&self) -> ShardIds {
         let ids = self
             .cache
@@ -183,10 +213,5 @@ impl NodeWriterService {
             .map(|id| ShardId { id })
             .collect();
         ShardIds { ids }
-    }
-
-    pub fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
-        self.get_mut_shard(shard_id)
-            .map(|shard| POOL.install(|| shard.gc()).map_err(|e| e.into()))
     }
 }

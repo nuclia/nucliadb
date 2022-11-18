@@ -26,12 +26,12 @@ from httpx import AsyncClient
 from redis import asyncio as aioredis
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import clear_storage
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import nuclia_settings, nucliadb_settings, storage_settings
 
 

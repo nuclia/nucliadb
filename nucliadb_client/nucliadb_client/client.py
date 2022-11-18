@@ -27,14 +27,14 @@ from grpc import insecure_channel
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.models.resource import (
+from nucliadb_client import logger
+from nucliadb_client.exceptions import ConflictError
+from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxList,
     KnowledgeBoxObj,
 )
-from nucliadb_client import logger
-from nucliadb_client.exceptions import ConflictError
-from nucliadb_client.knowledgebox import KnowledgeBox
 
 API_PREFIX = "api"
 KBS_PREFIX = "/kbs"

@@ -30,8 +30,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from pydantic import BaseModel, Field
 
-import nucliadb.models as models
-from nucliadb.models.resource import QueueType
+import nucliadb_models as models
+from nucliadb_models.resource import QueueType
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage

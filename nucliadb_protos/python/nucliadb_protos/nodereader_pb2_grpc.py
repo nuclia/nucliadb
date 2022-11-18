@@ -19,7 +19,7 @@ class NodeReaderStub(object):
         """
         self.GetShard = channel.unary_unary(
                 '/nodereader.NodeReader/GetShard',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                request_serializer=nucliadb__protos_dot_nodereader__pb2.GetShardRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
                 )
         self.GetShards = channel.unary_unary(
@@ -183,7 +183,7 @@ def add_NodeReaderServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetShard': grpc.unary_unary_rpc_method_handler(
                     servicer.GetShard,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.GetShardRequest.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.Shard.SerializeToString,
             ),
             'GetShards': grpc.unary_unary_rpc_method_handler(
@@ -275,7 +275,7 @@ class NodeReader(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/GetShard',
-            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.GetShardRequest.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

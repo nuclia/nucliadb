@@ -21,7 +21,7 @@
 from enum import Enum
 from typing import List, Optional
 
-import nucliadb.models as models
+import nucliadb_models as models
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -30,14 +30,15 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.utils import get_driver
-from nucliadb.models.common import FIELD_TYPES_MAP, FieldTypeName
-from nucliadb.models.resource import (
+from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
     DatetimeFieldData,
     DatetimeFieldExtractedData,
     Error,
     ExtractedDataType,
+    ExtractedDataTypeName,
     FileFieldData,
     FileFieldExtractedData,
     KeywordsetFieldData,
@@ -62,21 +63,6 @@ class ResourceProperties(str, Enum):
     VALUES = "values"
     EXTRACTED = "extracted"
     ERRORS = "errors"
-
-
-class ResourceFieldProperties(str, Enum):
-    VALUE = "value"
-    EXTRACTED = "extracted"
-    ERROR = "error"
-
-
-class ExtractedDataTypeName(str, Enum):
-    TEXT = "text"
-    METADATA = "metadata"
-    LARGE_METADATA = "large_metadata"
-    VECTOR = "vectors"
-    LINK = "link"
-    FILE = "file"
 
 
 async def set_resource_field_extracted_data(
@@ -164,6 +150,7 @@ async def serialize(
 
         if orm_resource.basic is not None:
 
+            resource.slug = orm_resource.basic.slug
             resource.title = orm_resource.basic.title
             resource.summary = orm_resource.basic.summary
             resource.icon = orm_resource.basic.icon

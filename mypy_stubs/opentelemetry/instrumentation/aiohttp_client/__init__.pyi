@@ -1,5 +1,5 @@
 import aiohttp
-from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+from opentelemetry.instrumentation.instrumentor import BaseInstrumentor  # type: ignore
 from opentelemetry.trace import TracerProvider as TracerProvider
 from typing import Collection
 import typing

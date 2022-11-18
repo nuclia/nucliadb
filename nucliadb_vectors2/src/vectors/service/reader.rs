@@ -26,6 +26,7 @@ use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
 use crate::vectors::data_point_provider::*;
+use crate::vectors::indexset::IndexSet;
 
 impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
     fn with_duplicates(&self) -> bool {
@@ -44,6 +45,7 @@ impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
 
 pub struct VectorReaderService {
     index: Index,
+    indexset: IndexSet,
 }
 impl Debug for VectorReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -51,7 +53,20 @@ impl Debug for VectorReaderService {
     }
 }
 
-impl VectorReader for VectorReaderService {}
+impl VectorReader for VectorReaderService {
+    fn count(&self, vectorset: &str) -> InternalResult<usize> {
+        let indexet_slock = self.indexset.get_slock()?;
+        if vectorset.is_empty() {
+            let index_slock = self.index.get_slock()?;
+            Ok(self.index.no_nodes(&index_slock))
+        } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
+            let lock = index.get_slock()?;
+            Ok(index.no_nodes(&lock))
+        } else {
+            Ok(0)
+        }
+    }
+}
 impl ReaderChild for VectorReaderService {
     type Request = VectorSearchRequest;
     type Response = VectorSearchResponse;
@@ -59,27 +74,23 @@ impl ReaderChild for VectorReaderService {
         info!("Stopping vector reader Service");
         Ok(())
     }
-    fn count(&self) -> usize {
-        let lock = self.index.get_slock().unwrap();
-        self.index.no_nodes(&lock)
-    }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        debug!(
-            "{} {} {}",
-            request.result_per_page,
-            request.tags.len(),
-            request.vector.len()
-        );
-
-        let lock = self.index.get_slock()?;
-
         let offset = request.result_per_page * request.page_number;
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
-
-        let result = self.index.search(&(total_to_get, request), &lock)?;
-        println!("{:?}", result);
+        let indexet_slock = self.indexset.get_slock()?;
+        let index_slock = self.index.get_slock()?;
+        let result = if request.vector_set.is_empty() {
+            self.index.search(&(total_to_get, request), &index_slock)?
+        } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
+            let lock = index.get_slock()?;
+            index.search(&(total_to_get, request), &lock)?
+        } else {
+            vec![]
+        };
+        std::mem::drop(indexet_slock);
+        std::mem::drop(index_slock);
         let documents = result
             .into_iter()
             .enumerate()
@@ -118,21 +129,25 @@ impl VectorReaderService {
     }
     pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
+        let path_indexset = std::path::Path::new(&config.vectorset);
         if path.exists() {
             Err(Box::new("Shard already created".to_string()))
         } else {
             Ok(VectorReaderService {
-                index: Index::reader(path)?,
+                index: Index::new(path, IndexCheck::None)?,
+                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
             })
         }
     }
     pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
+        let path_indexset = std::path::Path::new(&config.vectorset);
         if !path.exists() {
             Err(Box::new("Shard does not exist".to_string()))
         } else {
             Ok(VectorReaderService {
-                index: Index::reader(path)?,
+                index: Index::new(path, IndexCheck::None)?,
+                indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
             })
         }
     }
@@ -151,9 +166,16 @@ mod tests {
     #[test]
     fn test_new_vector_reader() {
         let dir = TempDir::new("payload_dir").unwrap();
+        let vectorset = TempDir::new("indexset").unwrap();
         let vsc = VectorConfig {
             no_results: Some(3),
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            vectorset: vectorset
+                .path()
+                .as_os_str()
+                .to_os_string()
+                .into_string()
+                .unwrap(),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -193,6 +215,8 @@ mod tests {
             sentences_to_delete: vec![],
             relations_to_delete: vec![],
             relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
         };
         // insert - delete - insert sequence
@@ -203,6 +227,7 @@ mod tests {
         let reader = VectorReaderService::start(&vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
+            vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             tags: vec!["1".to_string()],
             page_number: 0,
@@ -215,6 +240,7 @@ mod tests {
 
         let request = VectorSearchRequest {
             id: "".to_string(),
+            vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             tags: vec!["1".to_string()],
             page_number: 0,
@@ -223,7 +249,7 @@ mod tests {
             with_duplicates: false,
         };
         let result = reader.search(&request).unwrap();
-        let no_nodes = reader.count();
+        let no_nodes = reader.count("").unwrap();
         assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
     }

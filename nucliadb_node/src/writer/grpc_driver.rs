@@ -22,9 +22,10 @@ use async_std::sync::RwLock;
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId,
-    SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
+    SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use opentelemetry::global;
+use tonic::{Request, Response, Status};
 use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -48,17 +49,20 @@ impl NodeWriterGRPCDriver {
             writer.load_shard(id);
         }
     }
+
+    // Instrumentation utilities for telemetry
+    fn instrument<T>(&self, request: &tonic::Request<T>) {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+    }
 }
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(name = "NodeWriterGRPCDriver::get_shard", skip(self, request))]
-    async fn get_shard(
-        &self,
-        request: tonic::Request<ShardId>,
-    ) -> Result<tonic::Response<ShardId>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+    async fn get_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
+        self.instrument(&request);
+
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
@@ -80,11 +84,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(name = "NodeWriterGRPCDriver::new_shard", skip(self, request))]
     async fn new_shard(
         &self,
-        request: tonic::Request<EmptyQuery>,
-    ) -> Result<tonic::Response<ShardCreated>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        request: Request<EmptyQuery>,
+    ) -> Result<Response<ShardCreated>, Status> {
+        self.instrument(&request);
+
         info!("Creating new shard");
         let mut writer = self.0.write().await;
         let result = writer.new_shard();
@@ -93,13 +96,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     #[tracing::instrument(name = "NodeWriterGRPCDriver::delete_shard", skip(self, request))]
-    async fn delete_shard(
-        &self,
-        request: tonic::Request<ShardId>,
-    ) -> Result<tonic::Response<ShardId>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+    async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
+        self.instrument(&request);
 
         info!("gRPC delete_shard {:?}", request);
 
@@ -128,11 +126,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
     )]
     async fn clean_and_upgrade_shard(
         &self,
-        request: tonic::Request<ShardId>,
-    ) -> Result<tonic::Response<ShardCleaned>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        request: Request<ShardId>,
+    ) -> Result<Response<ShardCleaned>, Status> {
+        self.instrument(&request);
 
         info!("gRPC delete_shard {:?}", request);
 
@@ -153,29 +149,17 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
     async fn list_shards(
         &self,
-        request: tonic::Request<EmptyQuery>,
-    ) -> Result<tonic::Response<ShardIds>, tonic::Status> {
-        info!("Listing shards");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-
+        request: Request<EmptyQuery>,
+    ) -> Result<Response<ShardIds>, Status> {
+        self.instrument(&request);
         let ids = self.0.read().await.get_shard_ids();
-        info!("Shards listed");
         Ok(tonic::Response::new(ids))
     }
 
     // Incremental call that can be call multiple times for the same resource
     #[tracing::instrument(name = "NodeWriterGRPCDriver::set_resource", skip(self, request))]
-    async fn set_resource(
-        &self,
-        request: tonic::Request<Resource>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        info!("Set resource starts");
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-
+    async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
+        self.instrument(&request);
         let resource = request.into_inner();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
@@ -213,20 +197,19 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::join_graph", skip(self, request))]
+    #[tracing::instrument(
+        name = "NodeWriterGRPCDriver::delete_relation_nodes",
+        skip(self, request)
+    )]
     async fn delete_relation_nodes(
         &self,
-        request: tonic::Request<DeleteGraphNodes>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-
-        info!("gRPC join graph {:?}", request);
+        request: Request<DeleteGraphNodes>,
+    ) -> Result<Response<OpStatus>, Status> {
+        self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.delete_relation_nodes(&request) {
+        match writer.delete_relation_nodes(shard_id, &request) {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -250,15 +233,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     #[tracing::instrument(name = "NodeWriterGRPCDriver::join_graph", skip(self, request))]
-    async fn join_graph(
-        &self,
-        request: tonic::Request<SetGraph>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
-
-        info!("gRPC join graph {:?}", request);
+    async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
+        self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
@@ -288,11 +264,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(name = "NodeWriterGRPCDriver::remove_resource", skip(self, request))]
     async fn remove_resource(
         &self,
-        request: tonic::Request<ResourceId>,
-    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        request: Request<ResourceId>,
+    ) -> Result<Response<OpStatus>, Status> {
+        self.instrument(&request);
         let resource = request.into_inner();
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
@@ -331,30 +305,115 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::gc", skip(self, request))]
-    async fn gc(
+    async fn add_vector_set(
         &self,
-        request: tonic::Request<ShardId>,
-    ) -> Result<tonic::Response<EmptyResponse>, tonic::Status> {
-        let parent_cx =
-            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
-        Span::current().set_parent(parent_cx);
+        request: Request<VectorSetId>,
+    ) -> Result<Response<OpStatus>, Status> {
+        self.instrument(&request);
+        let request = request.into_inner();
+        let shard_id = request.shard.as_ref().unwrap();
+        let mut writer = self.0.write().await;
+        match writer.add_vectorset(shard_id, &request) {
+            Some(Ok(count)) => {
+                info!("add_vector_set ends correctly");
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let error_msg = format!("Error adding vector set {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
+            }
+            None => {
+                let message = format!("Shard not found {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+    async fn remove_vector_set(
+        &self,
+        request: Request<VectorSetId>,
+    ) -> Result<Response<OpStatus>, Status> {
+        self.instrument(&request);
+        let request = request.into_inner();
+        let shard_id = request.shard.as_ref().unwrap();
+        let mut writer = self.0.write().await;
+        match writer.remove_vectorset(shard_id, &request) {
+            Some(Ok(count)) => {
+                info!("remove_vector_set ends correctly");
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let error_msg = format!("Error removing vector set {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
+            }
+            None => {
+                let message = format!("Shard not found {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+    async fn list_vector_sets(
+        &self,
+        request: Request<ShardId>,
+    ) -> Result<Response<VectorSetList>, Status> {
+        self.instrument(&request);
         let shard_id = request.into_inner();
+        let reader = self.0.read().await;
+        match reader.list_vectorsets(&shard_id) {
+            Some(Ok(list)) => {
+                info!("list_vectorset ends correctly");
+                let list = VectorSetList {
+                    shard: Some(shard_id),
+                    vectorset: list,
+                };
+                Ok(tonic::Response::new(list))
+            }
+            Some(Err(e)) => {
+                let error_msg = format!("Error listing sets {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
+            }
+            None => {
+                let message = format!("Shard not found {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::gc", skip(self, request))]
+    async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
+        self.instrument(&request);
+        let shard_id = request.into_inner();
+        info!("Running garbage collection at {}", shard_id.id);
         self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
         let result = writer.gc(&shard_id);
         std::mem::drop(writer);
         match result {
             Some(Ok(_)) => {
+                info!("Garbage collection at {} was successful", shard_id.id);
                 let resp = EmptyResponse {};
                 Ok(tonic::Response::new(resp))
             }
             Some(Err(_)) => {
+                info!("Garbage collection at {} raised an error", shard_id.id);
                 let resp = EmptyResponse {};
                 Ok(tonic::Response::new(resp))
             }
             None => {
+                info!("{} was not found", shard_id.id);
                 let message = format!("Error loading shard {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }

@@ -33,7 +33,7 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.models.resource import Resource as NucliaDBResource
+from nucliadb_models.resource import Resource as NucliaDBResource
 
 if TYPE_CHECKING:
     from nucliadb_client.knowledgebox import KnowledgeBox
@@ -75,7 +75,7 @@ class Resource:
         show: Optional[List[str]] = None,
         field_type: Optional[List[str]] = None,
         extracted: Optional[List[str]] = None,
-        timeout: int = None,
+        timeout: Optional[int] = None,
     ) -> NucliaDBResource:
         params = {}
 

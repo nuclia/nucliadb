@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
+from typing import Optional
 
 try:
     import sentry_sdk
@@ -29,7 +30,7 @@ except ImportError:
 
 
 def set_sentry(
-    sentry_url: str = None,
+    sentry_url: Optional[str] = None,
     environment: str = "local",
     logging_integration: bool = False,
 ):

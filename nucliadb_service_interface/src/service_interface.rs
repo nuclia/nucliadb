@@ -86,5 +86,4 @@ pub trait ReaderChild: std::fmt::Debug + Send + Sync {
     fn reload(&self);
     fn stored_ids(&self) -> Vec<String>;
     fn stop(&self) -> InternalResult<()>;
-    fn count(&self) -> usize;
 }

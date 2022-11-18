@@ -20,7 +20,7 @@
 from nucliadb_protos.resources_pb2 import Block as PBBlock
 from nucliadb_protos.resources_pb2 import FieldLayout
 
-import nucliadb.models as models
+import nucliadb_models as models
 from nucliadb.writer.layouts import VERSION
 from nucliadb_utils.storages.storage import Storage
 

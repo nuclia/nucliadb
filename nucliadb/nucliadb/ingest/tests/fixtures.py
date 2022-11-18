@@ -25,7 +25,7 @@ from datetime import datetime
 from os.path import dirname, getsize
 from shutil import rmtree
 from tempfile import mkdtemp
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 import docker  # type: ignore
 import nats
@@ -252,7 +252,7 @@ async def grpc_servicer(redis, transaction_utility, gcs_storage, fake_node):
 
 
 @pytest.fixture(scope="function")
-async def local_driver():
+async def local_driver() -> AsyncIterator[Driver]:
     path = mkdtemp()
     settings.driver_local_url = path
     driver: Driver = LocalDriver(url=path)
@@ -264,7 +264,7 @@ async def local_driver():
 
 
 @pytest.fixture(scope="function")
-async def tikv_driver(tikvd):
+async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
     if os.environ.get("TESTING_TIKV_LOCAL", None):
         url = "localhost:2379"
     else:
@@ -278,14 +278,15 @@ async def tikv_driver(tikvd):
 
 
 @pytest.fixture(scope="function")
-async def redis_driver(redis):
+async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     url = f"redis://{redis[0]}:{redis[1]}"
     settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
     driver = RedisDriver(url=url)
     await driver.initialize()
-    await driver.redis.flushall()
-    print(f"Redis driver ready at {url}")
-    yield driver
+    if driver.redis is not None:
+        await driver.redis.flushall()
+        print(f"Redis driver ready at {url}")
+        yield driver
     await driver.finalize()
     settings.driver_redis_url = None
 
@@ -770,7 +771,9 @@ def partition_settings():
     yield settings
 
 
-def broker_resource(knowledgebox, rid=None, slug=None):
+def broker_resource(
+    knowledgebox: str, rid: Optional[str] = None, slug: Optional[str] = None
+) -> BrokerMessage:
     if rid is None:
         rid = str(uuid.uuid4())
     if slug is None:

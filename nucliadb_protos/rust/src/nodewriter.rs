@@ -334,6 +334,66 @@ pub mod node_writer_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn add_vector_set(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::VectorSetId>,
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/AddVectorSet",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn remove_vector_set(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::VectorSetId>,
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/RemoveVectorSet",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn list_vector_sets(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::VectorSetList>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeWriter/ListVectorSets",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 /// Generated client implementations.
@@ -486,6 +546,21 @@ pub mod node_writer_server {
             &self,
             request: tonic::Request<super::super::noderesources::ResourceId>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
+        async fn add_vector_set(
+            &self,
+            request: tonic::Request<super::super::noderesources::VectorSetId>,
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
+        async fn remove_vector_set(
+            &self,
+            request: tonic::Request<super::super::noderesources::VectorSetId>,
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
+        async fn list_vector_sets(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<
+            tonic::Response<super::super::noderesources::VectorSetList>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct NodeWriterServer<T: NodeWriter> {
@@ -922,6 +997,132 @@ pub mod node_writer_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = RemoveResourceSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeWriter/AddVectorSet" => {
+                    #[allow(non_camel_case_types)]
+                    struct AddVectorSetSvc<T: NodeWriter>(pub Arc<T>);
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::VectorSetId,
+                    > for AddVectorSetSvc<T> {
+                        type Response = super::OpStatus;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<
+                                super::super::noderesources::VectorSetId,
+                            >,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).add_vector_set(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = AddVectorSetSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeWriter/RemoveVectorSet" => {
+                    #[allow(non_camel_case_types)]
+                    struct RemoveVectorSetSvc<T: NodeWriter>(pub Arc<T>);
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::VectorSetId,
+                    > for RemoveVectorSetSvc<T> {
+                        type Response = super::OpStatus;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<
+                                super::super::noderesources::VectorSetId,
+                            >,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).remove_vector_set(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = RemoveVectorSetSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeWriter/ListVectorSets" => {
+                    #[allow(non_camel_case_types)]
+                    struct ListVectorSetsSvc<T: NodeWriter>(pub Arc<T>);
+                    impl<
+                        T: NodeWriter,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for ListVectorSetsSvc<T> {
+                        type Response = super::super::noderesources::VectorSetList;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).list_vector_sets(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ListVectorSetsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

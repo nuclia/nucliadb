@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y jq
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos
+COPY nucliadb_models /usr/src/app/nucliadb_models
 COPY nucliadb /usr/src/app/nucliadb
 
 WORKDIR /usr/src/app

@@ -24,6 +24,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList as ShardList,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
+    VectorSetID as VectorSetID,
+    VectorSetList as VectorSetList,
 )
 from nucliadb_protos.utils_pb2 import (
     ExtractedText as ExtractedText,
@@ -31,6 +33,10 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
     RelationNode as RelationNode,
+    UserVector as UserVector,
+    UserVectorSet as UserVectorSet,
+    UserVectors as UserVectors,
+    UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -41,7 +47,7 @@ class NodeReaderStub:
 
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.nodereader_pb2.GetShardRequest,
         nucliadb_protos.noderesources_pb2.Shard,
     ]
     GetShards: grpc.UnaryUnaryMultiCallable[
@@ -103,7 +109,7 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def GetShard(
         self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
+        request: nucliadb_protos.nodereader_pb2.GetShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.Shard: ...
     @abc.abstractmethod

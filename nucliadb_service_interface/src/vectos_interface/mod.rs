@@ -24,14 +24,20 @@ use crate::service_interface::*;
 pub struct VectorConfig {
     pub no_results: Option<usize>,
     pub path: String,
+    pub vectorset: String,
 }
 
 pub trait VectorReader:
     ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse>
 {
+    fn count(&self, vectorset: &str) -> InternalResult<usize>;
 }
 
-pub trait VectorWriter: WriterChild {}
+pub trait VectorWriter: WriterChild {
+    fn list_vectorsets(&self) -> InternalResult<Vec<String>>;
+    fn add_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()>;
+    fn remove_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()>;
+}
 
 #[derive(Debug)]
 pub struct VectorError {

@@ -23,6 +23,10 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
     RelationNode as RelationNode,
+    UserVector as UserVector,
+    UserVectorSet as UserVectorSet,
+    UserVectors as UserVectors,
+    UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -418,6 +422,47 @@ class IndexParagraph(google.protobuf.message.Message):
 global___IndexParagraph = IndexParagraph
 
 @typing_extensions.final
+class VectorSetID(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
+    @property
+    def shard(self) -> global___ShardId: ...
+    vectorset: builtins.str
+    def __init__(
+        self,
+        *,
+        shard: global___ShardId | None = ...,
+        vectorset: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard", b"shard"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["shard", b"shard", "vectorset", b"vectorset"]) -> None: ...
+
+global___VectorSetID = VectorSetID
+
+@typing_extensions.final
+class VectorSetList(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
+    @property
+    def shard(self) -> global___ShardId: ...
+    @property
+    def vectorset(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        shard: global___ShardId | None = ...,
+        vectorset: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard", b"shard"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["shard", b"shard", "vectorset", b"vectorset"]) -> None: ...
+
+global___VectorSetList = VectorSetList
+
+@typing_extensions.final
 class IndexParagraphs(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -511,6 +556,42 @@ class Resource(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
+    class VectorsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> nucliadb_protos.utils_pb2.UserVectors: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: nucliadb_protos.utils_pb2.UserVectors | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    @typing_extensions.final
+    class VectorsToDeleteEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> nucliadb_protos.utils_pb2.UserVectorsList: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: nucliadb_protos.utils_pb2.UserVectorsList | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     RESOURCE_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     TEXTS_FIELD_NUMBER: builtins.int
@@ -522,6 +603,8 @@ class Resource(google.protobuf.message.Message):
     RELATIONS_FIELD_NUMBER: builtins.int
     RELATIONS_TO_DELETE_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
+    VECTORS_FIELD_NUMBER: builtins.int
+    VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
     @property
     def resource(self) -> global___ResourceID: ...
     @property
@@ -554,6 +637,12 @@ class Resource(google.protobuf.message.Message):
     @property
     def relations_to_delete(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
     shard_id: builtins.str
+    @property
+    def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectors]:
+        """vectorset is the key"""
+    @property
+    def vectors_to_delete(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList]:
+        """Vectorset prefix vector id"""
     def __init__(
         self,
         *,
@@ -568,8 +657,10 @@ class Resource(google.protobuf.message.Message):
         relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
         relations_to_delete: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
         shard_id: builtins.str = ...,
+        vectors: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectors] | None = ...,
+        vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "resource", b"resource"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "relations_to_delete", b"relations_to_delete", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "relations_to_delete", b"relations_to_delete", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
 
 global___Resource = Resource

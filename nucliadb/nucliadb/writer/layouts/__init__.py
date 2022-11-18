@@ -21,7 +21,7 @@ from typing import Any, Callable, Coroutine, Dict
 
 from nucliadb_protos.resources_pb2 import FieldLayout
 
-import nucliadb.models as models
+import nucliadb_models as models
 from nucliadb_utils.storages.storage import Storage
 
 VERSION: Dict[

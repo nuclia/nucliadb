@@ -52,7 +52,7 @@ def create_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
         return None
 
     tracer_provider = AsyncTracerProvider(
-        active_span_processor=AsyncMultiSpanProcessor(),
+        active_span_processor=AsyncMultiSpanProcessor(),  # type: ignore
         resource=Resource.create({SERVICE_NAME: service_name}),
     )
 
@@ -62,8 +62,8 @@ def create_telemetry(service_name: str) -> Optional[AsyncTracerProvider]:
 async def clean_telemetry(service_name: str):
     if service_name in GLOBAL_PROVIDER and service_name:
         tracer_provider = GLOBAL_PROVIDER[service_name]
-        await tracer_provider.force_flush()
-        # Without this sleep, force_flush fails on exporting pending spans
+        await tracer_provider.async_force_flush()
+        # Without this sleep, async_force_flush fails on exporting pending spans
         await asyncio.sleep(0)
         tracer_provider.shutdown()
         del GLOBAL_PROVIDER[service_name]
@@ -103,7 +103,7 @@ async def init_telemetry(tracer_provider: Optional[AsyncTracerProvider] = None):
     )
 
     # add to the tracer
-    await tracer_provider.add_span_processor(span_processor)
+    await tracer_provider.async_add_span_processor(span_processor)
     tracer_provider.initialized = True
 
 

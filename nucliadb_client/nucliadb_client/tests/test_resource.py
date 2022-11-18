@@ -20,17 +20,17 @@
 from datetime import datetime
 from uuid import uuid4
 
-from nucliadb.models.conversation import (
+from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
     InputMessageContent,
     MessageFormat,
 )
-from nucliadb.models.datetime import FieldDatetime
-from nucliadb.models.text import TextField
-from nucliadb.models.utils import FieldIdString
-from nucliadb.models.writer import CreateResourcePayload
-from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_models.datetime import FieldDatetime
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString
+from nucliadb_models.writer import CreateResourcePayload
 
 
 def test_resource_creation(nucliadb_knowledgebox: KnowledgeBox):

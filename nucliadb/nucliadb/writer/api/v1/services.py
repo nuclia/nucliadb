@@ -25,19 +25,22 @@ from nucliadb_protos.knowledgebox_pb2 import Widget as WidgetPB
 from nucliadb_protos.writer_pb2 import (
     DelEntitiesRequest,
     DelLabelsRequest,
+    DelVectorSetRequest,
     DetWidgetsRequest,
     OpStatusWriter,
     SetEntitiesRequest,
     SetLabelsRequest,
+    SetVectorSetRequest,
     SetWidgetsRequest,
 )
 from starlette.requests import Request
 
-from nucliadb.models.entities import EntitiesGroup
-from nucliadb.models.labels import LabelSet
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.models.widgets import Widget, WidgetMode
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb_models.entities import EntitiesGroup
+from nucliadb_models.labels import LabelSet
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.vectors import VectorSet
+from nucliadb_models.widgets import Widget, WidgetMode
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
@@ -265,5 +268,62 @@ async def delete_widget(request: Request, kbid: str, widget: str):
     elif status.status == OpStatusWriter.Status.ERROR:
         raise HTTPException(
             status_code=500, detail="Error on deleting widget from a Knowledge box"
+        )
+    return Response(status_code=204)
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/vectorset/{{vectorset}}",
+    status_code=200,
+    name="Set Knowledge Box VectorSet",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-operation_order": 1},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def set_vectorset(request: Request, kbid: str, vectorset: str, item: VectorSet):
+    ingest = get_ingest()
+    pbrequest: SetVectorSetRequest = SetVectorSetRequest(id=vectorset)
+    pbrequest.kb.uuid = kbid
+
+    set_info_on_span({"nuclia.kbid": kbid})
+
+    if item.dimension:
+        pbrequest.vectorset.dimension = item.dimension
+
+    status: OpStatusWriter = await ingest.SetVectorSet(pbrequest)  # type: ignore
+    if status.status == OpStatusWriter.Status.OK:
+        return None
+    elif status.status == OpStatusWriter.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif status.status == OpStatusWriter.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error on settings labels on a Knowledge box"
+        )
+
+
+@api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/vectorset/{{vectorset}}",
+    status_code=200,
+    name="Delete Knowledge Box VectorSet",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-operation_order": 3},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_vectorset(request: Request, kbid: str, vectorset: str):
+    ingest = get_ingest()
+    pbrequest: DelVectorSetRequest = DelVectorSetRequest()
+    pbrequest.kb.uuid = kbid
+    pbrequest.vectorset = vectorset
+    set_info_on_span({"nuclia.kbid": kbid})
+    status: OpStatusWriter = await ingest.DelVectorSet(pbrequest)  # type: ignore
+    if status.status == OpStatusWriter.Status.OK:
+        return None
+    elif status.status == OpStatusWriter.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif status.status == OpStatusWriter.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error on deleting vectorset from a Knowledge box"
         )
     return Response(status_code=204)

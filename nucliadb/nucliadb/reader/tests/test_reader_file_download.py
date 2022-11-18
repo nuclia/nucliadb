@@ -27,8 +27,8 @@ from nucliadb_protos.resources_pb2 import FieldType
 import nucliadb.ingest.tests.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
 
 BASE = ("field_id", "field_type")
 VALUE = ("value",)

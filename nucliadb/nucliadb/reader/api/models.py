@@ -21,9 +21,9 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from pydantic import BaseModel
 
-import nucliadb.models as models
-from nucliadb.models.common import FIELD_TYPES_MAP, FieldTypeName
-from nucliadb.models.resource import (
+import nucliadb_models as models
+from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
+from nucliadb_models.resource import (
     ConversationFieldExtractedData,
     DatetimeFieldExtractedData,
     Error,

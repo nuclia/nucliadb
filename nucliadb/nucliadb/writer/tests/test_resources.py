@@ -18,17 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Callable
+from typing import Any, Callable, Dict, List, Optional
 from unittest.mock import AsyncMock  # type: ignore
 
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import ResourceFieldId
 
-import nucliadb.models
+import nucliadb_models
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import PushPayload
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -45,16 +44,52 @@ from nucliadb.writer.tests.test_fields import (
     TEST_LINK_PAYLOAD,
     TEST_TEXT_PAYLOAD,
 )
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.mark.asyncio
-async def test_resource_crud(writer_api, knowledgebox_writer):
+async def test_resource_crud_min(
+    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+):
     knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_id}/vectorset/base", json={"dimension": 3}
+        )
+        assert resp.status_code == 200
         # Test create resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            json={
+                "uservectors": [
+                    {
+                        "vectors": {
+                            "base": {
+                                "vector1": {
+                                    "vector": [4.0, 2.0, 3.0],
+                                    "positions": [0, 0],
+                                }
+                            }
+                        },
+                        "field": {"field_type": "file", "field": "field1"},
+                    }
+                ]
+            },
+        )
+        assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_resource_crud(
+    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+):
+    knowledgebox_id = knowledgebox_writer
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
+        # Test create resource
+        resp = await client.post(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -142,9 +177,11 @@ async def test_resource_crud(writer_api, knowledgebox_writer):
 
 
 @pytest.mark.asyncio
-async def test_resource_crud_sync(writer_api, knowledgebox_writer):
+async def test_resource_crud_sync(
+    writer_api: Callable[[List[str]], AsyncClient], knowledgebox_writer: str
+):
     knowledgebox_id = knowledgebox_writer
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
         # Test create resource
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
@@ -220,7 +257,7 @@ async def test_resource_crud_sync(writer_api, knowledgebox_writer):
         pbrequest.kbid = knowledgebox_id
         pbrequest.rid = rid
 
-        res = await ingest.ResourceFieldExists(pbrequest)
+        res = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
         assert res.found
 
         # Test update resource
@@ -232,13 +269,21 @@ async def test_resource_crud_sync(writer_api, knowledgebox_writer):
         assert resp.status_code == 200
 
         # Test delete resource
+
+        resp = await client.delete(
+            f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/resource1",
+            headers={"X-SYNCHRONOUS": "True"},
+        )
+
+        assert resp.status_code == 404
+
         resp = await client.delete(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCE_PREFIX}/{rid}",
             headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 204
 
-        res = await ingest.ResourceFieldExists(pbrequest)
+        res = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
         assert not res.found
 
 
@@ -271,14 +316,14 @@ async def test_reprocess_resource(
 
         assert isinstance(payload.filefield.get("file1"), str)
         assert payload.filefield["file1"] == "DUMMYJWT"
-        assert isinstance(payload.linkfield.get("link1"), nucliadb.models.LinkUpload)
-        assert isinstance(payload.textfield.get("text1"), nucliadb.models.Text)
+        assert isinstance(payload.linkfield.get("link1"), nucliadb_models.LinkUpload)
+        assert isinstance(payload.textfield.get("text1"), nucliadb_models.Text)
         assert isinstance(
-            payload.layoutfield.get("layout1"), nucliadb.models.LayoutDiff
+            payload.layoutfield.get("layout1"), nucliadb_models.LayoutDiff
         )
         assert payload.layoutfield["layout1"].blocks["field1"].file == "DUMMYJWT"
         assert isinstance(
-            payload.conversationfield.get("conv1"), nucliadb.models.PushConversation
+            payload.conversationfield.get("conv1"), nucliadb_models.PushConversation
         )
         assert (
             payload.conversationfield["conv1"].messages[33].content.attachments[0]
@@ -301,13 +346,13 @@ async def test_reprocess_resource(
     ],
 )
 async def test_resource_endpoints_by_slug(
-    writer_api,
-    knowledgebox,
-    method,
-    endpoint,
-    payload,
+    writer_api: Callable[[List[str]], AsyncClient],
+    knowledgebox: str,
+    method: str,
+    endpoint: str,
+    payload: Optional[Dict[Any, Any]],
 ):
-    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+    async with writer_api([NucliaDBRoles.WRITER]) as client:
         slug = "my-resource"
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",

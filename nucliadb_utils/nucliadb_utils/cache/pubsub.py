@@ -42,7 +42,7 @@ class PubSubDriver:
         self,
         handler: Callback,
         key: str,
-        group: str = None,
+        group: Optional[str] = None,
         subscription_id: Optional[str] = None,
     ):
         raise NotImplementedError()

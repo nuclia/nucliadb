@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.nodereader_pb2 import GetShardRequest
 from nucliadb_protos.noderesources_pb2 import Shard
 from redis import asyncio as aioredis
 from starlette.routing import Mount
@@ -216,7 +217,9 @@ async def inject_message(processor, knowledgebox, message, count: int = 1):
         for replica in shard.shard.replicas:
             node_obj = NODES.get(replica.node)
             if node_obj is not None:
-                count_shard: Shard = await node_obj.reader.GetShard(replica.shard)  # type: ignore
+                req = GetShardRequest()
+                req.shard_id.id = replica.shard.id
+                count_shard: Shard = await node_obj.reader.GetShard(req)  # type: ignore
                 if count_shard.resources >= count:
                     checks[replica.shard.id] = True
 

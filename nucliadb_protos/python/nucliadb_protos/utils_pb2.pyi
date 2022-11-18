@@ -318,3 +318,115 @@ class VectorObject(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["deleted_splits", b"deleted_splits", "split_vectors", b"split_vectors", "vectors", b"vectors"]) -> None: ...
 
 global___VectorObject = VectorObject
+
+@typing_extensions.final
+class UserVector(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VECTOR_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    START_FIELD_NUMBER: builtins.int
+    END_FIELD_NUMBER: builtins.int
+    @property
+    def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    start: builtins.int
+    end: builtins.int
+    def __init__(
+        self,
+        *,
+        vector: collections.abc.Iterable[builtins.float] | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
+        start: builtins.int = ...,
+        end: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "labels", b"labels", "start", b"start", "vector", b"vector"]) -> None: ...
+
+global___UserVector = UserVector
+
+@typing_extensions.final
+class UserVectors(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class VectorsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___UserVector: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___UserVector | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    VECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___UserVector]:
+        """id del vector"""
+    def __init__(
+        self,
+        *,
+        vectors: collections.abc.Mapping[builtins.str, global___UserVector] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
+
+global___UserVectors = UserVectors
+
+@typing_extensions.final
+class UserVectorSet(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class VectorsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___UserVectors: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___UserVectors | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    VECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___UserVectors]:
+        """vectorsets"""
+    def __init__(
+        self,
+        *,
+        vectors: collections.abc.Mapping[builtins.str, global___UserVectors] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
+
+global___UserVectorSet = UserVectorSet
+
+@typing_extensions.final
+class UserVectorsList(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def vectors(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        vectors: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
+
+global___UserVectorsList = UserVectorsList

@@ -90,6 +90,7 @@ impl ShardWriterService {
         let vsc = VectorConfig {
             no_results: None,
             path: format!("{}/vectors", shard_path),
+            vectorset: format!("{}/vectorset", shard_path),
         };
         let rsc = RelationConfig {
             path: format!("{}/relations", shard_path),
@@ -138,6 +139,7 @@ impl ShardWriterService {
         let vsc = VectorConfig {
             no_results: None,
             path: format!("{}/vectors", shard_path),
+            vectorset: format!("{}/vectorset", shard_path),
         };
         let rsc = RelationConfig {
             path: format!("{}/relations", shard_path),
@@ -186,6 +188,7 @@ impl ShardWriterService {
         let vsc = VectorConfig {
             no_results: None,
             path: format!("{}/vectors", shard_path),
+            vectorset: format!("{}/vectorset", shard_path),
         };
         let rsc = RelationConfig {
             path: format!("{}/relations", shard_path),
@@ -368,7 +371,21 @@ impl ShardWriterService {
         relation_result?;
         Ok(())
     }
-
+    pub fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
+        let reader = self.vector_writer.read().unwrap();
+        let keys = reader.list_vectorsets()?;
+        Ok(keys)
+    }
+    pub fn add_vectorset(&self, setid: &VectorSetId) -> InternalResult<()> {
+        let mut writer = self.vector_writer.write().unwrap();
+        writer.add_vectorset(setid)?;
+        Ok(())
+    }
+    pub fn remove_vectorset(&self, setid: &VectorSetId) -> InternalResult<()> {
+        let mut writer = self.vector_writer.write().unwrap();
+        writer.remove_vectorset(setid)?;
+        Ok(())
+    }
     pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> InternalResult<()> {
         let mut writer = self.relation_writer.write().unwrap();
         writer.delete_nodes(nodes)?;

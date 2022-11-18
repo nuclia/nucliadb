@@ -88,6 +88,8 @@ pub fn crnt_version(lock: &Lock) -> DiskR<Version> {
     Ok(Version(meta.modified()?))
 }
 
+/// A Lock that may be exclusive or shared
+/// Useful when the code would work in either case.
 pub struct Lock {
     path: PathBuf,
     #[allow(unused)]
@@ -121,6 +123,7 @@ impl AsRef<Path> for Lock {
     }
 }
 
+/// A exclusive lock
 pub struct ELock(Lock);
 impl ELock {
     pub(super) fn new(path: &Path) -> io::Result<ELock> {
@@ -139,6 +142,7 @@ impl AsRef<Path> for ELock {
     }
 }
 
+/// A shared lock
 pub struct SLock(Lock);
 impl SLock {
     pub fn new(path: &Path) -> io::Result<SLock> {

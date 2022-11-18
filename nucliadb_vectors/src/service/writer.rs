@@ -19,7 +19,7 @@
 use std::fmt::Debug;
 
 use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{Resource, ResourceId};
+use nucliadb_protos::{Resource, ResourceId, VectorSetId};
 use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
@@ -37,7 +37,21 @@ impl Debug for VectorWriterService {
     }
 }
 
-impl VectorWriter for VectorWriterService {}
+impl VectorWriter for VectorWriterService {
+    fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
+        let msg = "Vector sets are not supported for this index".to_string();
+        Err(Box::new(msg))
+    }
+    fn add_vectorset(&mut self, _: &VectorSetId) -> InternalResult<()> {
+        let msg = "Vector sets are not supported for this index".to_string();
+        Err(Box::new(msg))
+    }
+
+    fn remove_vectorset(&mut self, _: &VectorSetId) -> InternalResult<()> {
+        let msg = "Vector sets are not supported for this index".to_string();
+        Err(Box::new(msg))
+    }
+}
 impl WriterChild for VectorWriterService {
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping vector writer Service");
@@ -125,9 +139,16 @@ mod tests {
     #[test]
     fn test_new_vector_writer() {
         let dir = TempDir::new("payload_dir").unwrap();
+        let vectorset = TempDir::new("vector_set").unwrap();
         let vsc = VectorConfig {
-            no_results: None,
+            no_results: Some(3),
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            vectorset: vectorset
+                .path()
+                .as_os_str()
+                .to_os_string()
+                .into_string()
+                .unwrap(),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -162,6 +183,8 @@ mod tests {
             sentences_to_delete: vec![],
             relations_to_delete: vec![],
             relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
         };
         let resource_id = ResourceId {

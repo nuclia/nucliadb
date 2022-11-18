@@ -19,8 +19,8 @@
 #
 import pytest
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.settings import nuclia_settings
 
 EXTERNAL_FILE_URL = "http://mysite.com/files/myfile.pdf"

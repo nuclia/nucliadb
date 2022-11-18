@@ -107,6 +107,16 @@ message IndexParagraph {
     ParagraphMetadata metadata = 9;
 }
 
+message VectorSetID {
+    ShardId shard = 1;
+    string vectorset = 2;
+}
+
+message VectorSetList {
+    ShardId shard = 1;
+    repeated string vectorset = 2;
+}
+
 message IndexParagraphs {
     // id of the paragraph f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
     map<string, IndexParagraph> paragraphs = 1;
@@ -144,4 +154,7 @@ message Resource {
     repeated utils.Relation relations_to_delete = 10;
 
     string shard_id = 11;
+
+    map<string, utils.UserVectors> vectors = 12; // vectorset is the key 
+    map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
 }

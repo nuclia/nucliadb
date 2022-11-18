@@ -21,11 +21,11 @@ import base64
 
 import pytest
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tests.test_files import ASSETS_PATH as WRITER_ASSETS_PATH
 from nucliadb.writer.tus import TUSUPLOAD
+from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.fixture(scope="function")

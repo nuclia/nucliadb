@@ -23,9 +23,9 @@ from typing import Callable
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.search.api.models import NucliaDBClientType
 from nucliadb.search.api.v1.router import KB_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 
 

@@ -412,7 +412,7 @@ class GCSStorage(Storage):
         indexing_bucket: Optional[str] = None,
         labels: Optional[Dict[str, str]] = None,
         url: str = "https://www.googleapis.com",
-        scopes: List[str] = None,
+        scopes: Optional[List[str]] = None,
     ):
         if account_credentials is not None:
             self._json_credentials = json.loads(base64.b64decode(account_credentials))

@@ -52,6 +52,12 @@ pub enum VectorErr {
 
 pub type VectorR<O> = Result<O, VectorErr>;
 
+#[derive(Clone, Copy, Debug)]
+pub enum IndexCheck {
+    None,
+    Sanity,
+}
+
 pub struct Index {
     state: RwLock<State>,
     date: RwLock<Version>,
@@ -73,29 +79,22 @@ impl Index {
         }
         Ok(())
     }
-    fn new(at: &Path) -> VectorR<(Index, SLock)> {
-        directory::initialize_disk(at, || State::new(at.to_path_buf()))?;
-        let lock = directory::shared_lock(at)?;
-        let state = directory::load_state(&lock)?;
+    pub fn new(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
+        if !path.exists() {
+            std::fs::create_dir_all(path)?;
+        }
+        directory::initialize_disk(path, || State::new(path.to_path_buf()))?;
+        let lock = directory::shared_lock(path)?;
+        let state = directory::load_state::<State>(&lock)?;
         let date = directory::crnt_version(&lock)?;
+        if let IndexCheck::Sanity = with_check {
+            state.work_sanity_check();
+        }
         let index = Index {
             state: RwLock::new(state),
             date: RwLock::new(date),
-            location: at.to_path_buf(),
+            location: path.to_path_buf(),
         };
-        Ok((index, lock))
-    }
-    pub fn reader(at: &Path) -> VectorR<Index> {
-        let (index, lock) = Index::new(at)?;
-        std::mem::drop(lock);
-        Ok(index)
-    }
-    pub fn writer(at: &Path) -> VectorR<Index> {
-        let (index, lock) = Index::new(at)?;
-        let state = index.state.read().unwrap();
-        state.work_sanity_check();
-        std::mem::drop(state);
-        std::mem::drop(lock);
         Ok(index)
     }
     pub fn delete(&mut self, prefix: impl AsRef<str>, _: &ELock) {

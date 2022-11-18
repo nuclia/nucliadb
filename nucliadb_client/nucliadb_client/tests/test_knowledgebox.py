@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb.models.resource import KnowledgeBoxConfig
 from nucliadb_client.client import NucliaDBClient
+from nucliadb_models.resource import KnowledgeBoxConfig
 
 
 def test_knowledgebox_creation(nucliadb_client: NucliaDBClient):

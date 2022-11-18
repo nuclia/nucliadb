@@ -29,10 +29,10 @@ from starlette.responses import StreamingResponse
 
 from nucliadb.ingest.orm.resource import KB_REVERSE_REVERSE
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.reader import SERVICE_NAME, logger
 from nucliadb.reader.api.models import FIELD_NAMES_TO_PB_TYPE_MAP
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import StorageField  # type: ignore
 from nucliadb_utils.utilities import get_storage

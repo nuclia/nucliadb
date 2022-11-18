@@ -31,9 +31,20 @@ from nucliadb_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.ingest.serialize import ExtractedDataTypeName, ResourceProperties
-from nucliadb.models.common import FieldTypeName
-from nucliadb.search.api.models import (
+from nucliadb.ingest.serialize import ResourceProperties
+from nucliadb.search.search.fetch import (
+    fetch_resources,
+    get_labels_paragraph,
+    get_labels_resource,
+    get_labels_sentence,
+    get_resource_cache,
+    get_seconds_paragraph,
+    get_text_paragraph,
+    get_text_sentence,
+)
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
@@ -45,16 +56,6 @@ from nucliadb.search.api.models import (
     ResourceSearchResults,
     Sentence,
     Sentences,
-)
-from nucliadb.search.search.fetch import (
-    fetch_resources,
-    get_labels_paragraph,
-    get_labels_resource,
-    get_labels_sentence,
-    get_resource_cache,
-    get_seconds_paragraph,
-    get_text_paragraph,
-    get_text_sentence,
 )
 
 
@@ -233,12 +234,22 @@ async def merge_vectors_results(
         start, end = position.split("-")
         start_int = int(start)
         end_int = int(end)
-        index_int = int(index)
+        try:
+            index_int = int(index)
+        except ValueError:
+            index_int = -1
         text = await get_text_sentence(
             rid, field_type, field, kbid, index_int, start_int, end_int, subfield
         )
         labels = await get_labels_sentence(
-            rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+            rid,
+            field_type,
+            field,
+            kbid,
+            index_int,
+            start_int,
+            end_int,
+            subfield,
         )
         result_sentence_list.append(
             Sentence(
@@ -248,6 +259,7 @@ async def merge_vectors_results(
                 field=field,
                 text=text,
                 labels=labels,
+                index=index,
             )
         )
         if rid not in resources:

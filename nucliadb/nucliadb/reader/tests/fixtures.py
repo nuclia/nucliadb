@@ -80,7 +80,7 @@ async def reader_api(test_settings_reader: None, local_files, event_loop):  # ty
     clear_global_cache()
 
 
-def broker_simple_resource(knowledgebox, number):
+def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,

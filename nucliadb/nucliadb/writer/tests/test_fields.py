@@ -28,13 +28,13 @@ from unittest.mock import patch
 import jwt
 import pytest
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
     RESOURCES_PREFIX,
     RSLUG_PREFIX,
 )
+from nucliadb_models.resource import NucliaDBRoles
 
 
 def load_file_as_FileB64_payload(f: str, content_type: str) -> dict:
@@ -148,6 +148,7 @@ async def test_resource_field_add(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
             json={"slug": "resource1", "title": "My resource"},
         )
         assert resp.status_code == 201
@@ -249,6 +250,7 @@ async def test_resource_field_append_extra(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -288,6 +290,7 @@ async def test_resource_field_delete(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
+            headers={"X-SYNCHRONOUS": "True"},
             json={
                 "slug": "resource1",
                 "title": "My resource",
@@ -406,6 +409,7 @@ async def test_external_file_field_sends_correct_processing_payload(
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
+            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
@@ -436,6 +440,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_id}/{RESOURCES_PREFIX}",
             json={"slug": "resource1", "title": "My resource"},
+            headers={"X-SYNCHRONOUS": "True"},
         )
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
@@ -449,7 +454,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
             json=payload,
             headers={"X-SYNCHRONOUS": "True"},
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 201
 
 
 @pytest.mark.parametrize(

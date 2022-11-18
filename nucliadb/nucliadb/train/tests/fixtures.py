@@ -90,7 +90,7 @@ async def train_client(train_api):  # type: ignore
     clear_global_cache()
 
 
-def broker_simple_resource(knowledgebox, number):
+def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
@@ -116,7 +116,7 @@ def broker_simple_resource(knowledgebox, number):
     return message1
 
 
-def broker_processed_resource(knowledgebox, number, rid):
+def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     message2: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,

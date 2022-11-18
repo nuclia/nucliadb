@@ -25,6 +25,7 @@ from typing import Optional
 from uuid import uuid4
 
 from nucliadb_protos.nodereader_pb2 import (
+    GetShardRequest,
     SearchRequest,
     SearchResponse,
     SuggestRequest,
@@ -37,6 +38,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated,
     ShardId,
     ShardIds,
+    VectorSetID,
+    VectorSetList,
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
@@ -75,7 +78,7 @@ class LocalReaderWrapper:
         pb.ParseFromString(pb_bytes)
         return pb
 
-    async def GetShard(self, request: ShardId) -> NodeResourcesShard:
+    async def GetShard(self, request: GetShardRequest) -> NodeResourcesShard:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             self.executor, self.reader.get_shard, request.SerializeToString()
@@ -176,8 +179,13 @@ class LocalNode(AbstractNode):
 
         return shard_id
 
-    async def get_reader_shard(self, id: str) -> NodeResourcesShard:
-        req = ShardId(id=id)
+    async def get_reader_shard(
+        self, shard_id: str, vectorset: Optional[str] = None
+    ) -> NodeResourcesShard:
+        req = GetShardRequest()
+        req.shard_id.id = shard_id
+        if vectorset is not None:
+            req.vectorset = vectorset
         return await self.reader.GetShard(req)  # type: ignore
 
     async def new_shard(self) -> ShardCreated:
@@ -236,6 +244,44 @@ class LocalNode(AbstractNode):
         )
         pb_bytes = bytes(resp)
         resp = ShardCleaned()
+        resp.ParseFromString(pb_bytes)
+        return resp
+
+    async def del_vectorset(self, shard_id: str, vectorset: str):
+        loop = asyncio.get_running_loop()
+        req = VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.del_vectorset, req.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        resp = OpStatus()
+        resp.ParseFromString(pb_bytes)
+        return resp
+
+    async def set_vectorset(self, shard_id: str, vectorset: str):
+        loop = asyncio.get_running_loop()
+        req = VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.set_vectorset, req.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        resp = OpStatus()
+        resp.ParseFromString(pb_bytes)
+        return resp
+
+    async def get_vectorset(self, shard_id: str):
+        loop = asyncio.get_running_loop()
+        req = ShardId()
+        req.id = shard_id
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.get_vectorset, req.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        resp = VectorSetList()
         resp.ParseFromString(pb_bytes)
         return resp
 

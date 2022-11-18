@@ -41,6 +41,7 @@ pub trait ParagraphReader:
     ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
 {
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response>;
+    fn count(&self) -> InternalResult<usize>;
 }
 
 pub trait ParagraphWriter: WriterChild {}

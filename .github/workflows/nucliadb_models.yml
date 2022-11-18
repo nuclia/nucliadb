@@ -6,13 +6,13 @@ on:
       - main
     paths:
       - ".github/workflows/nucliadb_models.yml"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/nucliadb_models.yml"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
 
 jobs:
   # Job to run pre-checks
@@ -36,6 +36,6 @@ jobs:
           pip install -r code-requirements.txt
       - name: Run pre-checks
         run: |
-          flake8 nucliadb/nucliadb/models --config=nucliadb/setup.cfg
-          isort -c --profile black nucliadb/nucliadb/models/
-          black --check --verbose nucliadb/nucliadb/models
+          flake8 nucliadb_models --config=nucliadb_models/setup.cfg
+          isort -c --profile black nucliadb_models/
+          black --check --verbose nucliadb_models

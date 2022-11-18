@@ -113,3 +113,31 @@ pub struct VectorObject {
     #[prost(string, repeated, tag="3")]
     pub deleted_splits: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserVector {
+    #[prost(float, repeated, tag="1")]
+    pub vector: ::prost::alloc::vec::Vec<f32>,
+    #[prost(string, repeated, tag="2")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(int32, tag="3")]
+    pub start: i32,
+    #[prost(int32, tag="4")]
+    pub end: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserVectors {
+    /// id del vector
+    #[prost(map="string, message", tag="1")]
+    pub vectors: ::std::collections::HashMap<::prost::alloc::string::String, UserVector>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserVectorSet {
+    /// vectorsets
+    #[prost(map="string, message", tag="1")]
+    pub vectors: ::std::collections::HashMap<::prost::alloc::string::String, UserVectors>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserVectorsList {
+    #[prost(string, repeated, tag="1")]
+    pub vectors: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}

@@ -44,7 +44,7 @@ class Cache:
     ident: str
     initialized: bool = False
 
-    def __init__(self, pubsub: PubSubDriver = None):
+    def __init__(self, pubsub: Optional[PubSubDriver] = None):
         self.ident = uuid.uuid4().hex
         self.pubsub = pubsub
 

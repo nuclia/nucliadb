@@ -158,3 +158,11 @@ message Widget {
     repeated string topEntities = 6;
     map<string, string> style = 7;
 }
+
+message VectorSet {
+    int32 dimension = 1;   
+}
+
+message VectorSets {
+    map<string, VectorSet> vectorsets = 1;
+}

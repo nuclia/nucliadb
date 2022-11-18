@@ -73,7 +73,12 @@ impl Debug for FieldReaderService {
     }
 }
 
-impl FieldReader for FieldReaderService {}
+impl FieldReader for FieldReaderService {
+    fn count(&self) -> InternalResult<usize> {
+        let searcher = self.reader.searcher();
+        Ok(searcher.search(&AllQuery, &Count).unwrap())
+    }
+}
 
 impl ReaderChild for FieldReaderService {
     type Request = DocumentSearchRequest;
@@ -82,11 +87,6 @@ impl ReaderChild for FieldReaderService {
     fn stop(&self) -> InternalResult<()> {
         info!("Stopping Reader Text Service");
         Ok(())
-    }
-
-    fn count(&self) -> usize {
-        let searcher = self.reader.searcher();
-        searcher.search(&AllQuery, &Count).unwrap()
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         info!("Document search at {}:{}", line!(), file!());
@@ -553,6 +553,8 @@ mod tests {
             sentences_to_delete: vec![],
             relations_to_delete: vec![],
             relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
             shard_id,
         }
     }

@@ -195,6 +195,10 @@ class NestedPosition(BaseModel):
     page: Optional[int]
 
 
+class NestedListPosition(BaseModel):
+    positions: List[NestedPosition]
+
+
 class Row(BaseModel):
     cell: Optional[List[str]]
 
@@ -230,6 +234,7 @@ class FileExtractedData(BaseModel):
     field: Optional[str]
     icon: Optional[str]
     nested_position: Optional[Dict[str, NestedPosition]]
+    nested_list_position: Optional[Dict[str, NestedListPosition]]
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FileExtractedData) -> _T:

@@ -112,6 +112,8 @@ message BrokerMessage {
     string processing_id = 32;
     MessageSource source = 33;
     int64 account_seq = 34;
+
+    repeated resources.UserVectorsWrapper user_vectors = 35;
 }
 
 message WriterStatusResponse {
@@ -232,6 +234,31 @@ message GetWidgetResponse {
     Status status = 3;
 }
 
+message GetVectorSetsRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message GetVectorSetsResponse {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    knowledgebox.VectorSets vectorsets = 2;
+    enum Status {
+        OK = 0;
+        NOTFOUND = 1;
+        ERROR = 2;
+    }
+    Status status = 3;
+}
+
+message DelVectorSetRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string vectorset = 2;
+}
+
+message SetVectorSetRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+    string id = 2;
+    knowledgebox.VectorSet vectorset = 3;
+}
 
 message GetWidgetsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
@@ -393,6 +420,11 @@ service Writer {
     rpc SetLabels(SetLabelsRequest) returns (OpStatusWriter) {}
     rpc DelLabels(DelLabelsRequest) returns (OpStatusWriter) {}
 
+    // VectorSets
+    rpc GetVectorSets(GetVectorSetsRequest) returns (GetVectorSetsResponse) {}
+    rpc DelVectorSet(DelVectorSetRequest) returns (OpStatusWriter) {}
+    rpc SetVectorSet(SetVectorSetRequest) returns (OpStatusWriter) {}
+    
     // Entities
     rpc GetEntities(GetEntitiesRequest) returns (GetEntitiesResponse) {}
     rpc GetEntitiesGroup(GetEntitiesGroupRequest) returns (GetEntitiesGroupResponse) {}

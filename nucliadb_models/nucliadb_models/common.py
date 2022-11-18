@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
+import hashlib
 import re
 from enum import Enum
 from typing import Dict, List, Optional
@@ -75,10 +77,17 @@ class File(BaseModel):
             # Externally hosted file
             return values
 
-        required_keys = ["filename", "payload", "md5"]
+        required_keys = ["filename", "payload"]
         for key in required_keys:
             if values.get(key) is None:
                 raise ValueError(f"{key} is required")
+        if values.get("md5") is None:
+            # In case md5 is not supplied, compute it
+            try:
+                result = hashlib.md5(base64.b64decode(values.get("payload")))
+                values["md5"] = result.hexdigest()
+            except Exception:
+                raise ValueError("MD5 could not be computed")
         return values
 
     @property
