@@ -40,7 +40,7 @@ BASIC = (
     "fieldmetadata",
     "last_seqid",
     "last_account_seq",
-    "processing_queue"
+    "processing_queue",
 )
 RELATIONS = ("relations",)
 ORIGIN = ("origin",)
