@@ -209,3 +209,4 @@ async def test_search_returns_paragraph_positions(
     assert position["start"] == 0
     assert position["end"] == len(sentence)
     assert position["index"] == 0
+    assert position["page_number"] is not None

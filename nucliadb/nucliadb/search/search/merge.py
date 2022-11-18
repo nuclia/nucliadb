@@ -169,6 +169,7 @@ async def merge_suggest_paragraph_results(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,
+                page_number=result.metadata.position.page_number,
             ),
         )
         if len(result.metadata.position.start_seconds) or len(
@@ -313,6 +314,7 @@ async def merge_paragraph_results(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,
+                page_number=result.metadata.position.page_number,
             ),
         )
         if len(result.metadata.position.start_seconds) or len(
