@@ -38,11 +38,11 @@ impl From<NodeReaderService> for NodeReaderGRPCDriver {
 }
 impl NodeReaderGRPCDriver {
     // The GRPC reader will only request the reader to bring a shard
-    // to memory if lazy loading is not enabled. Otherwise all the
+    // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
     async fn shard_loading(&self, id: &ShardId) {
-        let mut writer = self.0.write().await;
-        if !Configuration::lazy_loading() {
+        if Configuration::lazy_loading() {
+            let mut writer = self.0.write().await;
             writer.load_shard(id);
         }
     }
