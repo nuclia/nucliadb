@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.37
+------
+
+- Add processing queue type info
+
 0.0.36
 ------
 

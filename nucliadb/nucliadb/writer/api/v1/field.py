@@ -33,7 +33,7 @@ from nucliadb.models.writer import ResourceFieldAdded
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import set_last_account_seq, set_last_seqid
+from nucliadb.writer.resource.basic import set_processing_info
 from nucliadb.writer.resource.field import (
     parse_conversation_field,
     parse_datetime_field,
@@ -108,14 +108,13 @@ async def finish_field_put(
     transaction = get_transaction()
     processing = get_processing()
 
-    seqid, account_seq = await processing.send_to_process(toprocess, partition)
+    processing_info = await processing.send_to_process(toprocess, partition)
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
+    set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=wait_on_commit)
 
-    return seqid
+    return processing_info.seqid
 
 
 @api.put(
@@ -449,16 +448,15 @@ async def append_messages_to_conversation_field(
     await parse_conversation_field(field_id, field, writer, toprocess, kbid, rid)
 
     try:
-        seqid, account_seq = await processing.send_to_process(toprocess, partition)
+        processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
+    set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
-    return ResourceFieldAdded(seqid=seqid)
+    return ResourceFieldAdded(seqid=processing_info.seqid)
 
 
 @api.put(
@@ -517,16 +515,15 @@ async def append_blocks_to_layout_field(
     await parse_layout_field(field_id, field, writer, toprocess, kbid, rid)
 
     try:
-        seqid, account_seq = await processing.send_to_process(toprocess, partition)
+        processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
+    set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
-    return ResourceFieldAdded(seqid=seqid)
+    return ResourceFieldAdded(seqid=processing_info.seqid)
 
 
 @api.delete(
