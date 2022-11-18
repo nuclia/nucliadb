@@ -1,6 +1,9 @@
 # Changelog
 ## 0.4.2
 
+- Lazy loading fix
+## 0.4.2
+
 - Parallel search enabled
 ## 0.4.1
 
