@@ -26,6 +26,7 @@ except ImportError:
 
 import time
 
+from grpc import insecure_channel
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.train_pb2 import TrainSentence
@@ -40,6 +41,12 @@ except ImportError:
 
 from datetime import datetime
 
+from stashify_protos.protos.knowledgebox_pb2 import IndexConfig  # type: ignore
+from stashify_protos.protos.knowledgebox_pb2 import IndexRequest  # type: ignore
+from stashify_protos.protos.knowledgebox_pb2_grpc import (  # type: ignore
+    LearningServiceStub,
+)
+
 from nucliadb.models.common import FieldTypeName
 from nucliadb_client.client import NucliaDBClient
 
@@ -50,22 +57,36 @@ ALL_FIELD_TYPES = [field_name.value for field_name in FieldTypeName]
 
 
 class VectorsRecomputer:
-    def __init__(self, modelid: str):
+    def __init__(self, modelid=None):
         if torch is None:
             raise ImportError("torch lib is required")
 
         if transformers is None:
             raise ImportError("transformers lib is required")
 
-        self.load_model(modelid)
+        self.modelid = modelid
+        self.loaded = False
+        self.models_folder = "../stashify-models/embbed-sentence"
 
-    def load_model(self, modelid):
-        tprint(f"Loading sentence tokenizer model: {modelid}")
-        self._tokenizer = transformers.AutoTokenizer.from_pretrained(
-            modelid, model_max_length=VECTORS_DIMENSION
-        )
-        config = transformers.AutoConfig.from_pretrained(modelid)
-        self._model = transformers.AutoModel.from_pretrained(modelid, config=config)
+    def load_model(self, modelid=None):
+        if modelid and self.modelid != modelid:
+            self.modelid = modelid
+            self.loaded = False
+
+        if self.modelid is None:
+            raise ValueError("Need to specify a modelid!")
+
+        if not self.loaded:
+            model_path = f"{self.models_folder}/{self.modelid}"
+            tprint(f"Loading sentence tokenizer model: {model_path}")
+            self._tokenizer = transformers.AutoTokenizer.from_pretrained(
+                model_path, model_max_length=VECTORS_DIMENSION
+            )
+            config = transformers.AutoConfig.from_pretrained(model_path)
+            self._model = transformers.AutoModel.from_pretrained(
+                model_path, config=config
+            )
+            self.loaded = True
 
     @property
     def tokenizer(self):
@@ -126,6 +147,7 @@ class KBNotFoundError(Exception):
 
 
 def tprint(somestring: str):
+    # TODO: Change this for python logging logs
     time = datetime.now().isoformat()
     print(f"[{time}] {somestring}")
 
@@ -143,6 +165,7 @@ class KnowledgeBoxAdmin:
         train_host=None,
         grpc_host=None,
         dry_run: bool = False,
+        learning_grpc=None,
     ):
         self.client = NucliaDBClient(
             host=host,
@@ -157,6 +180,12 @@ class KnowledgeBoxAdmin:
         )
         self.dry_run = dry_run
         self.vr: Optional[VectorsRecomputer] = None
+        self.learning_channel = learning_grpc
+        self.learning_stub = None
+        if self.learning_channel:
+            self.learning_stub = LearningServiceStub(
+                insecure_channel(self.learning_channel)
+            )
 
     def set_kb(self, kbid: str):
         self.kb = self.client.get_kb(kbid=kbid)
@@ -200,11 +229,6 @@ class KnowledgeBoxAdmin:
             return None
         return counters.sentences
 
-    def get_vectors_recomputer(self, modelid: str) -> VectorsRecomputer:
-        if self.vr is None:
-            self.vr = VectorsRecomputer(modelid)
-        return self.vr
-
     def maybe_some_logging(
         self, recomputed: int, total: Optional[int], elapsed_time: float
     ):
@@ -221,16 +245,39 @@ class KnowledgeBoxAdmin:
                     f"Recomputing {recomputed}-th sentence of kb at {speed} sentences/min"
                 )
 
+    def get_kb_sentence_model(self) -> str:
+        if self.learning_stub is None:
+            raise ValueError(
+                "Need to specify the learning grpc channel with: --learning-grpc"
+            )
+
+        req = IndexRequest()
+        req.kb = self.kbid
+        config: IndexConfig = self.learning_stub.GetConfig(req)
+        return config.sentence_model
+
     def recompute_vectors(self, vr: VectorsRecomputer):
         """
         Iterates all sentences of a KB and recomputes its vectors
         """
+        modelid = self.get_kb_sentence_model()
+        tprint(f"Sentence model id: {modelid}")
+
+        try:
+            vr.load_model(modelid=modelid)
+        except OSError:
+            tprint(f"You need to download the {modelid} model in {vr.models_folder}")
+            exit(0)
+
         start = time.time()
         sentences_count = self.get_sentences_count()
+
         previous_sentence = None
+        sentence = None
         field_vectors = []
         field_split_vectors: Dict[str, List[Vector]] = {}
         total_recomputed = 0
+
         for sentence in self.iterate_sentences(labels=False, entities=False, text=True):
 
             self.maybe_some_logging(
@@ -264,10 +311,8 @@ class KnowledgeBoxAdmin:
                 field_vectors.append(vector)
                 total_recomputed += 1
 
-        if previous_sentence and (field_vectors or field_split_vectors):
-            self.set_field_vectors(
-                previous_sentence, field_vectors, field_split_vectors
-            )
+        if sentence is not None and (field_vectors or field_split_vectors):
+            self.set_field_vectors(sentence, field_vectors, field_split_vectors)
 
     def set_field_vectors(
         self,
@@ -303,7 +348,7 @@ def is_split_field(sentence: Sentence) -> bool:
     elif id_count == 5:
         return True
     else:
-        raise ValueError(sentence.sentence)
+        raise ValueError(sentence.paragraph)
 
 
 def get_split_subfield(sentence: Sentence) -> str:
