@@ -1,5 +1,5 @@
 # Changelog
-## 0.4.2
+## 0.4.3
 
 - Lazy loading fix
 ## 0.4.2
