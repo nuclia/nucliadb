@@ -155,7 +155,7 @@ class Basic(google.protobuf.message.Message):
     LABELS_FIELD_NUMBER: builtins.int
     LAST_SEQID_FIELD_NUMBER: builtins.int
     LAST_ACCOUNT_SEQ_FIELD_NUMBER: builtins.int
-    PROCESSING_QUEUE_FIELD_NUMBER: builtins.int
+    QUEUE_FIELD_NUMBER: builtins.int
     slug: typing.Text
     icon: typing.Text
     title: typing.Text
@@ -187,7 +187,7 @@ class Basic(google.protobuf.message.Message):
     last_account_seq: builtins.int
     """last processing sequid (non nats) of this resource in the account queue"""
 
-    processing_queue: global___Basic.QueueType.ValueType
+    queue: global___Basic.QueueType.ValueType
     def __init__(self,
         *,
         slug: typing.Text = ...,
@@ -205,10 +205,10 @@ class Basic(google.protobuf.message.Message):
         labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
         last_seqid: builtins.int = ...,
         last_account_seq: builtins.int = ...,
-        processing_queue: global___Basic.QueueType.ValueType = ...,
+        queue: global___Basic.QueueType.ValueType = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["created",b"created","metadata",b"metadata","modified",b"modified","usermetadata",b"usermetadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["created",b"created","fieldmetadata",b"fieldmetadata","icon",b"icon","labels",b"labels","last_account_seq",b"last_account_seq","last_seqid",b"last_seqid","layout",b"layout","metadata",b"metadata","modified",b"modified","processing_queue",b"processing_queue","slug",b"slug","summary",b"summary","thumbnail",b"thumbnail","title",b"title","usermetadata",b"usermetadata","uuid",b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["created",b"created","fieldmetadata",b"fieldmetadata","icon",b"icon","labels",b"labels","last_account_seq",b"last_account_seq","last_seqid",b"last_seqid","layout",b"layout","metadata",b"metadata","modified",b"modified","queue",b"queue","slug",b"slug","summary",b"summary","thumbnail",b"thumbnail","title",b"title","usermetadata",b"usermetadata","uuid",b"uuid"]) -> None: ...
 global___Basic = Basic
 
 class Origin(google.protobuf.message.Message):

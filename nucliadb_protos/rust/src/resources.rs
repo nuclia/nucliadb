@@ -78,6 +78,17 @@ pub struct Basic {
     /// last processing sequid (non nats) of this resource in the account queue
     #[prost(int64, tag="35")]
     pub last_account_seq: i64,
+    #[prost(enumeration="basic::QueueType", tag="36")]
+    pub queue: i32,
+}
+/// Nested message and enum types in `Basic`.
+pub mod basic {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum QueueType {
+        Private = 0,
+        Shared = 1,
+    }
 }
 // Block behaviors
 

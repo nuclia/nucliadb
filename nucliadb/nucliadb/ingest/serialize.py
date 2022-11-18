@@ -199,8 +199,8 @@ async def serialize(
                 if orm_resource.basic.last_account_seq != 0
                 else None
             )
-            resource.processing_queue = QueueType[
-                orm_resource.basic.QueueType.Name(orm_resource.basic.processing_queue)
+            resource.queue = QueueType[
+                orm_resource.basic.QueueType.Name(orm_resource.basic.queue)
             ]
 
     if ResourceProperties.RELATIONS in show:

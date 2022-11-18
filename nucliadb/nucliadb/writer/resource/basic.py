@@ -222,4 +222,4 @@ def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
     bm.basic.last_seqid = processing_info.seqid
     if processing_info.account_seq is not None:
         bm.basic.last_account_seq = processing_info.account_seq
-    bm.basic.processing_queue = bm.basic.QueueType.Value(processing_info.queue.name)
+    bm.basic.queue = bm.basic.QueueType.Value(processing_info.queue.name)

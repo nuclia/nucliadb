@@ -222,7 +222,7 @@ class Resource(BaseModel):
     modified: Optional[datetime]
     last_seqid: Optional[int]
     last_account_seq: Optional[int]
-    processing_queue: Optional[QueueType]
+    queue: Optional[QueueType]
 
     origin: Optional[Origin]
     relations: Optional[List[Relation]]
