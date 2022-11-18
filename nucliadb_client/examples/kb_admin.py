@@ -41,8 +41,8 @@ except ImportError:
 
 from datetime import datetime
 
-from stashify_protos.protos.knowledgebox_pb2 import IndexConfig, IndexRequest
-from stashify_protos.protos.knowledgebox_pb2_grpc import LearningServiceStub
+from stashify_protos.protos.knowledgebox_pb2 import IndexConfig, IndexRequest  # type: ignore
+from stashify_protos.protos.knowledgebox_pb2_grpc import LearningServiceStub  # type: ignore
 
 from nucliadb.models.common import FieldTypeName
 from nucliadb_client.client import NucliaDBClient
