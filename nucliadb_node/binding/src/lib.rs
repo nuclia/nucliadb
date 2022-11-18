@@ -59,6 +59,7 @@ impl NodeReader {
 
     pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        self.reader.load_shard(&shard_id);
         if let Some(shard) = self.reader.get_shard(&shard_id) {
             let stats = shard.get_info();
             let shard_pb = ShardPB {
@@ -83,6 +84,7 @@ impl NodeReader {
         let shard_id = ShardId {
             id: search_request.shard.clone(),
         };
+        self.reader.load_shard(&shard_id);
         let response = self.reader.search(&shard_id, search_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
@@ -96,6 +98,7 @@ impl NodeReader {
         let shard_id = ShardId {
             id: suggest_request.shard.clone(),
         };
+        self.reader.load_shard(&shard_id);
         let response = self.reader.suggest(&shard_id, suggest_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
@@ -109,6 +112,7 @@ impl NodeReader {
         let shard_id = ShardId {
             id: vector_request.id.clone(),
         };
+        self.reader.load_shard(&shard_id);
         let response = self.reader.vector_search(&shard_id, vector_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
@@ -126,6 +130,7 @@ impl NodeReader {
         let shard_id = ShardId {
             id: document_request.id.clone(),
         };
+        self.reader.load_shard(&shard_id);
         let response = self.reader.document_search(&shard_id, document_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
@@ -143,6 +148,7 @@ impl NodeReader {
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
         };
+        self.reader.load_shard(&shard_id);
         let response = self.reader.paragraph_search(&shard_id, paragraph_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
@@ -160,6 +166,7 @@ impl NodeReader {
         let shard_id = ShardId {
             id: paragraph_request.id.clone(),
         };
+        self.reader.load_shard(&shard_id);
         let response = self.reader.relation_search(&shard_id, paragraph_request);
         match response {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
@@ -190,6 +197,7 @@ impl NodeWriter {
 
     pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        self.writer.load_shard(&shard_id);
         match self.writer.get_shard(&shard_id) {
             Some(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
             None => Err(exceptions::PyTypeError::new_err("Not found")),
@@ -203,6 +211,7 @@ impl NodeWriter {
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        self.writer.load_shard(&shard_id);
         match self.writer.delete_shard(&shard_id) {
             Some(Ok(_)) => Ok(PyList::new(py, shard_id.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -216,6 +225,7 @@ impl NodeWriter {
         py: Python<'p>,
     ) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        self.writer.load_shard(&shard_id);
         match self.writer.clean_and_upgrade_shard(&shard_id) {
             Ok(clean_data) => Ok(PyList::new(py, clean_data.encode_to_vec())),
             Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
@@ -232,6 +242,7 @@ impl NodeWriter {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
+        self.writer.load_shard(&shard_id);
         match self.writer.set_resource(&shard_id, &resource) {
             Some(Ok(count)) => {
                 let status = OpStatus {
@@ -269,6 +280,7 @@ impl NodeWriter {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
+        self.writer.load_shard(&shard_id);
         match self.writer.remove_resource(&shard_id, &resource) {
             Some(Ok(count)) => {
                 let status = OpStatus {
@@ -298,14 +310,15 @@ impl NodeWriter {
     }
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let request = ShardId::decode(&mut Cursor::new(request)).unwrap();
-        match self.writer.gc(&request) {
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
+        self.writer.load_shard(&shard_id);
+        match self.writer.gc(&shard_id) {
             Some(Ok(_)) => {
                 let status = OpStatus {
                     status: 0,
                     detail: "Success!".to_string(),
                     count: 0,
-                    shard_id: request.id.clone(),
+                    shard_id: shard_id.id.clone(),
                 };
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
@@ -316,12 +329,12 @@ impl NodeWriter {
                     status,
                     detail,
                     count: 0_u64,
-                    shard_id: request.id.clone(),
+                    shard_id: shard_id.id.clone(),
                 };
                 Ok(PyList::new(py, op_status.encode_to_vec()))
             }
             None => {
-                let message = format!("Error loading shard {:?}", request);
+                let message = format!("Error loading shard {:?}", shard_id);
                 Err(exceptions::PyTypeError::new_err(message))
             }
         }

@@ -28,6 +28,7 @@ use opentelemetry::global;
 use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+use crate::config::Configuration;
 use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
@@ -37,7 +38,17 @@ impl From<NodeWriterService> for NodeWriterGRPCDriver {
         NodeWriterGRPCDriver(RwLock::new(node))
     }
 }
-
+impl NodeWriterGRPCDriver {
+    // The GRPC writer will only request the writer to bring a shard
+    // to memory if lazy loading is not enabled. Otherwise all the
+    // shards on disk would have been brought to memory before the driver is online.
+    async fn shard_loading(&self, id: &ShardId) {
+        let mut writer = self.0.write().await;
+        if !Configuration::lazy_loading() {
+            writer.load_shard(id);
+        }
+    }
+}
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(name = "NodeWriterGRPCDriver::get_shard", skip(self, request))]
@@ -50,10 +61,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
-        let exists = writer.get_shard(&shard_id).is_some();
-        std::mem::drop(writer);
-        match exists {
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        let result = reader.get_shard(&shard_id).is_some();
+        std::mem::drop(reader);
+        match result {
             true => {
                 info!("{:?}: Ready readed", shard_id);
                 Ok(tonic::Response::new(shard_id))
@@ -75,9 +87,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Span::current().set_parent(parent_cx);
         info!("Creating new shard");
         let mut writer = self.0.write().await;
-        let response = writer.new_shard();
-
-        Ok(tonic::Response::new(response))
+        let result = writer.new_shard();
+        std::mem::drop(writer);
+        Ok(tonic::Response::new(result))
     }
 
     #[tracing::instrument(name = "NodeWriterGRPCDriver::delete_shard", skip(self, request))]
@@ -92,8 +104,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         info!("gRPC delete_shard {:?}", request);
 
         let shard_id = request.into_inner();
+        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
-        match writer.delete_shard(&shard_id) {
+        let result = writer.delete_shard(&shard_id);
+        std::mem::drop(writer);
+        match result {
             Some(Ok(_)) => Ok(tonic::Response::new(shard_id)),
             Some(Err(e)) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
@@ -122,8 +137,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         info!("gRPC delete_shard {:?}", request);
 
         let shard_id = request.into_inner();
+        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
-        match writer.clean_and_upgrade_shard(&shard_id) {
+        let result = writer.clean_and_upgrade_shard(&shard_id);
+        std::mem::drop(writer);
+        match result {
             Ok(updated) => Ok(tonic::Response::new(updated)),
             Err(e) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
@@ -162,8 +180,11 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
+        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
-        match writer.set_resource(&shard_id, &resource) {
+        let result = writer.set_resource(&shard_id, &resource);
+        std::mem::drop(writer);
+        match result {
             Some(Ok(count)) => {
                 info!("Set resource ends correctly");
                 let status = OpStatus {
@@ -204,8 +225,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
+
+        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
-        match writer.remove_resource(&shard_id, &resource) {
+        let result = writer.remove_resource(&shard_id, &resource);
+        std::mem::drop(writer);
+
+        match result {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -242,10 +268,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let parent_cx =
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
-
         let shard_id = request.into_inner();
+        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
-        match writer.gc(&shard_id) {
+        let result = writer.gc(&shard_id);
+        std::mem::drop(writer);
+        match result {
             Some(Ok(_)) => {
                 let resp = EmptyResponse {};
                 Ok(tonic::Response::new(resp))

@@ -120,7 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             loop {
                 interval.tick().await;
 
-                let (shard_count, paragraph_count) = node_reader.shards.values().fold(
+                let (shard_count, paragraph_count) = node_reader.cache.values().fold(
                     (0, 0),
                     |(shard_count, paragraph_count), shard| {
                         (
