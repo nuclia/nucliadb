@@ -39,6 +39,9 @@ impl From<NodeWriterService> for NodeWriterGRPCDriver {
     }
 }
 impl NodeWriterGRPCDriver {
+    // The GRPC writer will only request the writer to bring a shard
+    // to memory if lazy loading is not enabled. Otherwise all the
+    // shards on disk would have been brought to memory before the driver is online.
     async fn shard_loading(&self, id: &ShardId) {
         let mut writer = self.0.write().await;
         if !Configuration::lazy_loading() {
