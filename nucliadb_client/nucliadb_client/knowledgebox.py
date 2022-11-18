@@ -97,6 +97,7 @@ class KnowledgeBox:
 
     def list_resources(self, page: int = 0, size: int = 20) -> List[Resource]:
         response = self.http_reader_v1.get(f"resources?page={page}&size={size}")
+        assert response.status_code == 200
         response_obj = ResourceList.parse_raw(response.content)
         result = []
         for resource in response_obj.resources:
