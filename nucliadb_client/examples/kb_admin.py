@@ -43,8 +43,8 @@ from datetime import datetime
 
 from stashify_protos.protos.knowledgebox_pb2 import IndexConfig  # type: ignore
 from stashify_protos.protos.knowledgebox_pb2 import IndexRequest  # type: ignore
-from stashify_protos.protos.knowledgebox_pb2_grpc import (
-    LearningServiceStub,  # type: ignore
+from stashify_protos.protos.knowledgebox_pb2_grpc import (  # type: ignore
+    LearningServiceStub,
 )
 
 from nucliadb.models.common import FieldTypeName
