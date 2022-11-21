@@ -80,11 +80,10 @@ async def list_resources(
     driver = await get_driver()
     txn = await driver.begin()
 
-    # Filter parameters for serializer. Those won't be exposed in the API, at least for now
-    # As we want to restrict the exported information to only BASIC
-    show = [ResourceProperties.BASIC]
-    field_types: List[FieldTypeName] = []
-    extracted: List[ExtractedDataTypeName] = []
+    # Filter parameters for serializer
+    show = [ResourceProperties.BASIC, ResourceProperties.EXTRACTED]
+    field_types: List[FieldTypeName] = [FieldTypeName.FILE]
+    extracted: List[ExtractedDataTypeName] = [ExtractedDataTypeName.METADATA]
 
     try:
         resources: List[Resource] = []

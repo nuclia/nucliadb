@@ -19,7 +19,9 @@
 #
 import pytest
 from httpx import AsyncClient
-
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb.tests.test_search import broker_resource_with_classifications
+from nucliadb.tests.utils import inject_message
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
@@ -111,7 +113,7 @@ async def test_list_resources(
     - Then check that scrolling the whole resource list returns
       the created resources without errors.
     """
-    rids = []
+    rids = set()
     for _ in range(20):
         resp = await nucliadb_writer.post(
             f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
@@ -121,21 +123,43 @@ async def test_list_resources(
             },
         )
         assert resp.status_code == 201
-        rids.append(resp.json()["uuid"])
+        rids.add(resp.json()["uuid"])
 
-    got_rids = []
+    got_rids = set()
     resp = await nucliadb_reader.get(
         f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=0"
     )
     assert resp.status_code == 200
     for r in resp.json()["resources"]:
-        got_rids.append(r["id"])
+        got_rids.add(r["id"])
 
     resp = await nucliadb_reader.get(
         f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=1"
     )
     assert resp.status_code == 200
     for r in resp.json()["resources"]:
-        got_rids.append(r["id"])
+        got_rids.add(r["id"])
 
-    assert set(got_rids) == set(rids)
+    assert got_rids == rids
+
+
+@pytest.mark.asyncio
+async def test_list_resources_serializes_labels(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    bm = broker_resource_with_classifications(knowledgebox)
+    await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources")
+    assert resp.status_code == 200
+
+    content = resp.json()
+    resource = content["resources"][0]
+    extracted_metadata = resource["data"]["files"]["file"]["extracted"]["metadata"][
+        "metadata"
+    ]
+    assert extracted_metadata["classifications"] == [
+        {"label": "label1", "labelset": "labelset1"}
+    ]
