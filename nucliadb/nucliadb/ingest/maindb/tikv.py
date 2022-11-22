@@ -78,7 +78,11 @@ class TiKVTransaction(Transaction):
         await self.txn.delete(key.encode())
 
     async def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
+        self,
+        match: str,
+        count: int = DEFAULT_SCAN_LIMIT,
+        include_start: bool = True,
+        txn: Optional[Transaction] = None,
     ):
         """
         Get keys from tikv, up to a configurable limit.
@@ -87,8 +91,9 @@ class TiKVTransaction(Transaction):
         until all matching keys are retrieved.
         With any other count, only up to count keys will be returned.
         """
-        assert self.driver.tikv is not None
-        txn = await self.driver.tikv.begin(pessimistic=False)
+        if txn is None:
+            assert self.driver.tikv is not None
+            txn = await self.driver.tikv.begin(pessimistic=False)
 
         get_all_keys = count == -1
         limit = DEFAULT_BATCH_SCAN_LIMIT if get_all_keys else count
