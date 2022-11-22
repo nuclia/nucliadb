@@ -19,7 +19,7 @@
 #
 from __future__ import annotations
 
-from typing import AsyncIterator, List, Optional
+from typing import AsyncGenerator, List, Optional
 
 TXNID = "/internal/worker/{worker}"
 DEFAULT_SCAN_LIMIT = 10
@@ -55,7 +55,7 @@ class Transaction:
 
     def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         raise NotImplementedError()
 
 
@@ -83,5 +83,5 @@ class Driver:
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         raise NotImplementedError()

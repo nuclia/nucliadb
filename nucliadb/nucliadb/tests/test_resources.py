@@ -98,3 +98,39 @@ async def test_resource_crud(
 
     resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_resources(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    rids = []
+    for _ in range(20):
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            headers={"X-Synchronous": "true"},
+            json={
+                "title": "My resource",
+            },
+        )
+        assert resp.status_code == 201
+        rids.append(resp.json()["uuid"])
+
+    got_rids = []
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=0"
+    )
+    assert resp.status_code == 200
+    for r in resp.json()["resources"]:
+        got_rids.append(r["id"])
+
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{knowledgebox}/resources?size=10&page=1"
+    )
+    assert resp.status_code == 200
+    for r in resp.json()["resources"]:
+        got_rids.append(r["id"])
+
+    assert set(got_rids) == set(rids)

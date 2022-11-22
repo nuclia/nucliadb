@@ -91,16 +91,18 @@ async def list_resources(
         max_items_to_iterate = (page + 1) * size
         first_wanted_item_index = (page * size) + 1  # 1-based index
         current_key_index = 0
-        # ask for one item more than we need, in order to know if it's the last page
 
-        # We need to pass the transaction for iterating keys as a
-        # parameter to proactively roll it back when we break the iteration.
-        keys_txn = await driver.tikv.begin(pessimistic=False)
-        async for key in txn.keys(
+        # ask for one item more than we need, in order to know if it's the last page
+        keys_generator = txn.keys(
             match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid),
             count=max_items_to_iterate + 1,
-            txn=keys_txn,
-        ):
+        )
+        while True:
+            try:
+                key = await keys_generator.__anext__()
+            except StopAsyncIteration:
+                break
+
             current_key_index += 1
 
             # First of all, we need to skip keys, in case we are on a +1 page
@@ -109,7 +111,7 @@ async def list_resources(
 
             # Don't fetch keys once we got all items for this
             if len(resources) == size:
-                await keys_txn.rollback()
+                await keys_generator.aclose()
                 break
 
             # Fetch and Add wanted item
