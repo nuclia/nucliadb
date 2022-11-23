@@ -126,4 +126,20 @@ async def driver_basic(driver):
 
     assert current_internal_kbs_keys == {"/internal/kbs/kb1/shards/shard1"}
 
+    await _test_keys_async_generator(driver)
+
     await driver.finalize()
+
+
+async def _test_keys_async_generator(driver):
+    txn = await driver.begin()
+    for i in range(10):
+        await txn.set(f"/keys/{i}", str(i).encode())
+    await txn.commit(resource=False)
+
+    txn = await driver.begin()
+    async_generator = txn.keys("/keys/", count=10)
+    await async_generator.__anext__()
+    await async_generator.__anext__()
+    await async_generator.aclose()
+    await txn.abort()
