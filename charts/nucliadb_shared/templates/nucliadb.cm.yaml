@@ -86,3 +86,5 @@ data:
   JAEGER_AGENT_PORT: "{{ .Values.tracing.jaeger_agent_thrift_compact_port }}"
   JAEGER_QUERY_HOST: "{{ .Values.tracing.jaeger_query_host }}"
   JAEGER_QUERY_PORT: "{{ .Values.tracing.jaeger_query_http_port }}"
+  JAEGER_PROPAGATION: "jaeger,b3,w3c"
+  OTEL_EXPORTER_JAEGER_AGENT_SPLIT_OVERSIZED_BATCHES: "1"
