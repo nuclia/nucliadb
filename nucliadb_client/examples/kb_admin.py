@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 from typing import Dict, Iterator, List, Optional
 
 try:
@@ -39,7 +40,7 @@ try:
 except ImportError:
     transformers = None
 
-from datetime import datetime
+import time
 
 from stashify_protos.protos.knowledgebox_pb2 import IndexConfig  # type: ignore
 from stashify_protos.protos.knowledgebox_pb2 import IndexRequest  # type: ignore
@@ -53,6 +54,8 @@ from nucliadb_client.client import NucliaDBClient
 DEFAULT_SENTENCE_TRANSFORMER = "all-MiniLM-L6-v2"
 ALL_FIELD_TYPES = [field_name.value for field_name in FieldTypeName]
 
+logger = logging.getLogger("kbadmin")
+
 
 class VectorsRecomputer:
     def __init__(self, modelid=None):
@@ -63,26 +66,31 @@ class VectorsRecomputer:
             raise ImportError("transformers lib is required")
 
         self.modelid = modelid
-        self.loaded = False
+        self.loaded_models = {}
         self.models_folder = "../stashify-models/embbed-sentence"
 
     def load_model(self, modelid=None):
-        if modelid and self.modelid != modelid:
-            self.modelid = modelid
-            self.loaded = False
-
-        if self.modelid is None:
+        if modelid is None and self.modelid is None:
             raise ValueError("Need to specify a modelid!")
 
-        if not self.loaded:
-            model_path = f"{self.models_folder}/{self.modelid}"
-            tprint(f"Loading sentence tokenizer model: {model_path}")
-            self._tokenizer = transformers.AutoTokenizer.from_pretrained(model_path)
-            config = transformers.AutoConfig.from_pretrained(model_path)
-            self._model = transformers.AutoModel.from_pretrained(
-                model_path, config=config
+        if modelid:
+            loaded = self.loaded_models.get(modelid)
+            self.modelid = modelid
+        else:
+            loaded = self.loaded_models.get(self.modelid)
+
+        if loaded is not None:
+            logger.info(
+                f"Using already loaded sentence tokenizer model: {self.modelid}"
             )
-            self.loaded = True
+            return loaded
+
+        model_path = f"{self.models_folder}/{self.modelid}"
+        logger.info(f"Loading sentence tokenizer model: {model_path}")
+        self._tokenizer = transformers.AutoTokenizer.from_pretrained(model_path)
+        config = transformers.AutoConfig.from_pretrained(model_path)
+        model = transformers.AutoModel.from_pretrained(model_path, config=config)
+        self.loaded_models[self.modelid] = model
 
     @property
     def tokenizer(self):
@@ -90,7 +98,7 @@ class VectorsRecomputer:
 
     @property
     def model(self):
-        return self._model
+        return self.loaded_models[self.modelid]
 
     def get_sentence_start_end(self, sentence: Sentence):
         [start, end] = sentence.sentence.split("/")[-1].split("-")
@@ -142,12 +150,6 @@ class KBNotFoundError(Exception):
     ...
 
 
-def tprint(somestring: str):
-    # TODO: Change this for python logging logs
-    time = datetime.now().isoformat()
-    print(f"[{time}] {somestring}")
-
-
 class KnowledgeBoxAdmin:
     def __init__(
         self,
@@ -183,27 +185,42 @@ class KnowledgeBoxAdmin:
                 insecure_channel(self.learning_channel)
             )
 
-    def set_kb(self, kbid: str):
-        self.kb = self.client.get_kb(kbid=kbid)
+    def set_kb(self, kb: str):
+        self.kb = self.client.get_kb(slug=kb)
         if self.kb is None:
-            raise KBNotFoundError("KB not found!")
-        self.kbid = kbid
+            self.kb = self.client.get_kb(kbid=kb)
+            if self.kb is None:
+                raise KBNotFoundError("KB not found!")
+        self.kbid = self.kb.kbid
         return self.kb
 
     def reprocess(self):
         for resource in self.kb.iter_resources():  # type: ignore
-            tprint(f"Reprocessing rid={resource.rid} ... ")
+            logger.info(f"Reprocessing rid={resource.rid} ")
             if not self.dry_run:
                 resource.reprocess()
 
-    def reindex(self):
-        for resource in self.kb.iter_resources():  # type: ignore
-            tprint(f"Reindexing rid={resource.rid} ... ")
+    def reindex(self, reindexed: Optional[List[str]] = None):
+        n_resources = self.get_resources_count()
+        for index, resource in enumerate(self.kb.iter_resources()):  # type: ignore
+            if reindexed is not None and resource.rid in reindexed:
+                logger.info(f"Skipping rid={resource.rid}. Already reindexed")
+                continue
+
+            if n_resources:
+                logger.info(
+                    f"Reindexing rid={resource.rid} ({index + 1}/{n_resources})"
+                )
+            else:
+                logger.info(f"Reindexing rid={resource.rid}")
+
             if not self.dry_run:
                 resource.reindex(vectors=True)
+                if reindexed is not None:
+                    reindexed.append(resource.rid)
 
     def clean_index(self):
-        tprint(f"Cleaning and upgrading index...")
+        logger.info(f"Cleaning and upgrading index")
         if not self.dry_run:
             req = KnowledgeBoxID(uuid=self.kbid)
             self.client.writer_stub.CleanAndUpgradeKnowledgeBoxIndex(req)
@@ -216,7 +233,7 @@ class KnowledgeBoxAdmin:
         request.metadata.labels = labels
         request.metadata.entities = entities
         request.metadata.text = text
-        for sentence in self.client.train_stub.GetSentences(request):  # type: ignore
+        for sentence in self.client.train_stub.GetSentences(request, timeout=None):  # type: ignore
             yield sentence
 
     def get_sentences_count(self) -> Optional[int]:
@@ -225,19 +242,25 @@ class KnowledgeBoxAdmin:
             return None
         return counters.sentences
 
+    def get_resources_count(self) -> Optional[int]:
+        counters = self.kb.counters()  # type: ignore
+        if counters is None:
+            return None
+        return counters.resources
+
     def maybe_some_logging(
         self, recomputed: int, total: Optional[int], elapsed_time: float
     ):
         # Some logging first
-        if recomputed % 500 == 0:
+        if recomputed % 500 == 10:
             speed = int((recomputed / elapsed_time) * 60)
             if total is not None and total > 0:
                 progress = int((recomputed / total) * 100)
-                tprint(
-                    f"Recomputing {recomputed}-th sentence of kb ({progress}%) at {speed} sentences/min"
+                logger.info(
+                    f"Recomputing {recomputed}/{total} sentence ({progress}%) at {speed} sentences/min"
                 )
             else:
-                tprint(
+                logger.info(
                     f"Recomputing {recomputed}-th sentence of kb at {speed} sentences/min"
                 )
 
@@ -252,21 +275,25 @@ class KnowledgeBoxAdmin:
         config: IndexConfig = self.learning_stub.GetConfig(req)
         return config.sentence_model
 
-    def recompute_vectors(self, vr: VectorsRecomputer):
+    def recompute_vectors(
+        self, vr: VectorsRecomputer, computed_fields: Optional[List[str]] = None
+    ):
         """
         Iterates all sentences of a KB and recomputes its vectors
         """
         modelid = self.get_kb_sentence_model()
         if not modelid:
-            tprint(f"Model not set for KB. Skipping")
+            logger.warning(f"Sentence model is not set. Skipping recompute vectors")
             return
 
-        tprint(f"Sentence model id: {modelid}")
+        logger.info(f"Sentence model id: {modelid}")
 
         try:
             vr.load_model(modelid=modelid)
         except OSError:
-            tprint(f"You need to download the {modelid} model in {vr.models_folder}")
+            logger.error(
+                f"You need to download the {modelid} model in {vr.models_folder}"
+            )
             exit(0)
 
         start = time.time()
@@ -280,23 +307,32 @@ class KnowledgeBoxAdmin:
 
         for sentence in self.iterate_sentences(labels=False, entities=False, text=True):
 
+            field_id = get_field_id(sentence)
+            if computed_fields is not None and field_id in computed_fields:
+                logger.debug(
+                    f"Skipping sentence. Vectors for this field have been computed already."
+                )
+                continue
+
+            total_recomputed += 1
+
             self.maybe_some_logging(
                 total_recomputed, sentences_count, time.time() - start
             )
 
             if previous_sentence is None:
-                tprint(
-                    f"Recomputing sentences of field {sentence.field.field} of rid={sentence.uuid}"
-                )
+                logger.debug(f"Starting to recompute sentences of field {field_id}")
                 previous_sentence = sentence
 
             elif should_set_field_vectors(previous_sentence, sentence):
                 self.set_field_vectors(
-                    previous_sentence, field_vectors, field_split_vectors
+                    previous_sentence,
+                    field_vectors,
+                    field_split_vectors,
+                    computed_fields=computed_fields,
                 )
-                tprint(
-                    f"Recomputing sentences of field {sentence.field.field} of rid={sentence.uuid}"
-                )
+
+                logger.debug(f"Starting to recompute sentences of field {field_id}")
                 previous_sentence = sentence
                 field_vectors = []
                 field_split_vectors = {}
@@ -309,16 +345,21 @@ class KnowledgeBoxAdmin:
             else:
                 vector = vr.compute_sentence_vector(sentence)
                 field_vectors.append(vector)
-                total_recomputed += 1
 
         if sentence is not None and (field_vectors or field_split_vectors):
-            self.set_field_vectors(sentence, field_vectors, field_split_vectors)
+            self.set_field_vectors(
+                sentence,
+                field_vectors,
+                field_split_vectors,
+                computed_fields=computed_fields,
+            )
 
     def set_field_vectors(
         self,
         sentence: Sentence,
         vectors: List[Vector],
         split_vectors: Dict[str, List[Vector]],
+        computed_fields: Optional[List[str]] = None,
     ):
         req = SetVectorsRequest()
         req.kbid = self.kbid
@@ -328,9 +369,12 @@ class KnowledgeBoxAdmin:
             req.vectors.split_vectors[key].vectors.extend(svectors)
         req.vectors.vectors.vectors.extend(vectors)
 
-        tprint(f"Setting vectors for field {req.field.field} of rid={req.rid}")
+        field_id = get_field_id(sentence)
+        logger.info(f"Setting {len(vectors)} vectors for field {field_id}")
         if not self.dry_run:
-            self.client.writer_stub.SetVectors(req)
+            self.client.writer_stub.SetVectors(req, timeout=60 * 30)
+            if computed_fields is not None:
+                computed_fields.append(field_id)
 
 
 def should_set_field_vectors(previous: Sentence, new: Sentence) -> bool:
@@ -361,3 +405,10 @@ def get_split_subfield(sentence: Sentence) -> str:
         _,
     ) = sentence.paragraph.split("/")
     return subfield
+
+
+def get_field_id(sentence: Sentence) -> str:
+    if is_split_field(sentence):
+        return "/".join(sentence.paragraph.split("/")[:4])
+    else:
+        return "/".join(sentence.paragraph.split("/")[:3])
