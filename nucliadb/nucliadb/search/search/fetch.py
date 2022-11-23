@@ -238,6 +238,10 @@ async def get_text_paragraph(
     return splitted_text
 
 
+def get_regex(some_string: str) -> str:
+    return r"\b" + some_string.lower() + r"\b"
+
+
 def highlight_paragraph(
     text: str, words: Optional[List[str]] = None, ematches: Optional[List[str]] = None
 ) -> str:
@@ -246,20 +250,30 @@ def highlight_paragraph(
     marks = [0] * (len(text) + 1)
     if ematches is not None:
         for quote in ematches:
-            quote_regex = r"\b" + quote.lower() + r"\b"
-            for match in re.finditer(quote_regex, text_lower):
-                start, end = match.span()
-                marks[start] = 1
-                marks[end] = 2
+            quote_regex = get_regex(quote)
+            try:
+                for match in re.finditer(quote_regex, text_lower):
+                    start, end = match.span()
+                    marks[start] = 1
+                    marks[end] = 2
+            except re.error:
+                logger.warning(
+                    f"Regex errors while highlighting text. Regex: {quote_regex}"
+                )
+                continue
 
     words = words or []
     for word in words:
-        word_regex = r"\b" + word.lower() + r"\b"
-        for match in re.finditer(word_regex, text_lower):
-            start, end = match.span()
-            if marks[start] == 0 and marks[end] == 0:
-                marks[start] = 1
-                marks[end] = 2
+        word_regex = get_regex(word)
+        try:
+            for match in re.finditer(word_regex, text_lower):
+                start, end = match.span()
+                if marks[start] == 0 and marks[end] == 0:
+                    marks[start] = 1
+                    marks[end] = 2
+        except re.error:
+            logger.warning(f"Regex errors while highlighting text. Regex: {word_regex}")
+            continue
 
     new_text = ""
     actual = 0

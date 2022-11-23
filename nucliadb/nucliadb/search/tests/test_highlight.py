@@ -69,3 +69,16 @@ def test_highlight():
         ["of", "market"],
     )
     assert res == "In contrast, traditional companies often make it impossible"
+
+    # sc-3067: Unbalanced parenthesis or brackets in query should not make highlight fail
+    res = highlight(
+        "Some sentence here",
+        [
+            "Some).",
+        ],
+        [
+            "sent)ence",
+            "(here",
+        ],
+    )
+    assert res == "Some sentence here"
