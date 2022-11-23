@@ -97,12 +97,7 @@ async def list_resources(
             match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid),
             count=max_items_to_iterate + 1,
         )
-        while True:
-            try:
-                key = await keys_generator.__anext__()
-            except StopAsyncIteration:
-                break
-
+        async for key in keys_generator:
             current_key_index += 1
 
             # First of all, we need to skip keys, in case we are on a +1 page

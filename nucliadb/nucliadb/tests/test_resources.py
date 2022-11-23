@@ -106,6 +106,11 @@ async def test_list_resources(
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
+    """
+    - Create 20 resources
+    - Then check that scrolling the whole resource list returns 
+      the created resources without errors.
+    """
     rids = []
     for _ in range(20):
         resp = await nucliadb_writer.post(
