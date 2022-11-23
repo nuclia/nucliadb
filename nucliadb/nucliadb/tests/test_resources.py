@@ -108,7 +108,7 @@ async def test_list_resources(
 ):
     """
     - Create 20 resources
-    - Then check that scrolling the whole resource list returns 
+    - Then check that scrolling the whole resource list returns
       the created resources without errors.
     """
     rids = []
