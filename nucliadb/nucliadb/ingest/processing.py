@@ -365,5 +365,5 @@ class ProcessingEngine:
                 ingest seqid: {seqid}, partition: {partition}"
         )
         return ProcessingInfo(
-            seqid=seqid, account_seq=account_seq, queue_type=QueueType[queue_type]
+            seqid=seqid, account_seq=account_seq, queue_type=QueueType(queue_type)
         )
