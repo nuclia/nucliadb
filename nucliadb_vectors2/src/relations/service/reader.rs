@@ -173,10 +173,10 @@ impl ReaderChild for RelationsReaderService {
         count
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        if request.entry_points.is_empty() {
-            self.text_search(request)
-        } else {
+        if request.prefix.is_empty() {
             self.graph_search(request)
+        } else {
+            self.text_search(request)
         }
     }
     fn stored_ids(&self) -> Vec<String> {
