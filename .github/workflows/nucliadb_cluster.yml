@@ -45,9 +45,9 @@ jobs:
     name: Check unused dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions:checkout@v3
+      - uses: actions/checkout@v3
 
-      - uses: action-rs/toolchain@v1
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           profile: minimal
@@ -55,9 +55,8 @@ jobs:
 
       - uses: aig787/cargo-udeps-action@v1
         with:
-          version: "latest"
-          args: "-p nucliadb_cluster --all-targets --all-features"
-
+          version: latest
+          args: -p nucliadb_cluster --all-targets --all-features
 
   format-rust:
     name: Code Format
