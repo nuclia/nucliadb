@@ -81,7 +81,10 @@ async def list_resources(
     txn = await driver.begin()
 
     # Filter parameters for serializer
-    show = [ResourceProperties.BASIC, ResourceProperties.EXTRACTED]
+    show: List[ResourceProperties] = [
+        ResourceProperties.BASIC,
+        ResourceProperties.EXTRACTED,
+    ]
     field_types: List[FieldTypeName] = [FieldTypeName.FILE]
     extracted: List[ExtractedDataTypeName] = [ExtractedDataTypeName.METADATA]
 

@@ -20,6 +20,7 @@
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+
 from nucliadb.tests.test_search import broker_resource_with_classifications
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX

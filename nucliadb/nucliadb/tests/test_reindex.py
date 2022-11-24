@@ -24,6 +24,8 @@ from httpx import AsyncClient
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.tests.utils import inject_message
+
 
 def broker_resource(knowledgebox):
     import uuid
@@ -138,11 +140,6 @@ def broker_resource(knowledgebox):
     bm.field_vectors.append(ev)
     bm.source = BrokerMessage.MessageSource.WRITER
     return bm
-
-
-async def inject_message(writer: WriterStub, message):
-    await writer.ProcessMessage([message])  # type: ignore
-    return
 
 
 async def create_resource(knowledgebox, writer: WriterStub):
