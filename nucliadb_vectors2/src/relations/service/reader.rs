@@ -87,9 +87,6 @@ impl RelationsReaderService {
         &self,
         request: &RelationSearchRequest,
     ) -> InternalResult<RelationSearchResponse> {
-        if request.prefix == "An" {
-            assert!(false);
-        }
         let prefix = &request.prefix;
         let reader = self.index.start_reading()?;
         let prefixes = reader
