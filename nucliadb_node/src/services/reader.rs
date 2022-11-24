@@ -350,15 +350,11 @@ impl ShardReaderService {
             };
             self.relation_reader.search(&request)
         });
-        info!("{}:{}", line!(), file!());
 
         let paragraph_reader_service = self.paragraph_reader.clone();
         let paragraph_task = move || paragraph_reader_service.suggest(&request);
-        info!("{}:{}", line!(), file!());
         let tasks = rayon::join(paragraph_task, || relations.collect::<Vec<_>>());
-
         let rparagraph = tasks.0.unwrap();
-
         let entities = tasks
             .1
             .into_iter()
@@ -417,8 +413,6 @@ impl ShardReaderService {
                 }
             })
         };
-        info!("{}:{}", line!(), file!());
-
         let paragraph_request = ParagraphSearchRequest {
             id: "".to_string(),
             uuid: "".to_string(),
@@ -433,7 +427,6 @@ impl ShardReaderService {
             timestamps: search_request.timestamps.clone(),
             reload: search_request.reload,
         };
-
         let paragraph_reader_service = self.paragraph_reader.clone();
         let span = tracing::Span::current();
         let paragraph_task = move || {
@@ -445,8 +438,6 @@ impl ShardReaderService {
                 }
             })
         };
-        info!("{}:{}", line!(), file!());
-
         let vector_request = VectorSearchRequest {
             id: "".to_string(),
             vector: search_request.vector.clone(),
@@ -467,7 +458,6 @@ impl ShardReaderService {
                 }
             })
         };
-        info!("{}:{}", line!(), file!());
         let mut rtext = None;
         let mut rparagraph = None;
         let mut rvector = None;
@@ -476,7 +466,6 @@ impl ShardReaderService {
             s.spawn(|_| rparagraph = paragraph_task());
             s.spawn(|_| rvector = vector_task());
         });
-        info!("{}:{}", line!(), file!());
         Ok(SearchResponse {
             document: rtext.transpose()?,
             paragraph: rparagraph.transpose()?,
