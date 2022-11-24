@@ -26,6 +26,3 @@ tracing-subscriber = { version = "0.3.11", features = [
     "registry",
     "std",
 ] }
-
-[dev-dependencies]
-env_logger = "0.8.4"
