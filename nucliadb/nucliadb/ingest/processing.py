@@ -364,6 +364,7 @@ class ProcessingEngine:
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
                 ingest seqid: {seqid}, partition: {partition}"
         )
+
         return ProcessingInfo(
-            seqid=seqid, account_seq=account_seq, queue_type=QueueType[queue_type]
+            seqid=seqid, account_seq=account_seq, queue=QueueType(queue_type)
         )
