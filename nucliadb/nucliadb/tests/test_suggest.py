@@ -155,10 +155,10 @@ async def test_suggest_related_entities(
 
     # Test simple suggestions
 
-    # resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
-    # assert resp.status_code == 200
-    # body = resp.json()
-    # assert set(body["entities"]["entities"]) == {"Anastasia", "Anna", "Anthony"}
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Anastasia", "Anna", "Anthony"}
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=ann")
     assert resp.status_code == 200
