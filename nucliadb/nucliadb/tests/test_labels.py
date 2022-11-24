@@ -20,6 +20,8 @@
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.tests.utils import inject_message
+
 
 def broker_resource(knowledgebox):
     import uuid
@@ -137,11 +139,6 @@ def broker_resource(knowledgebox):
     bm.field_vectors.append(ev)
     bm.source = BrokerMessage.MessageSource.WRITER
     return bm
-
-
-async def inject_message(writer, message):
-    await writer.ProcessMessage([message])  # type: ignore
-    return
 
 
 async def inject_resource_with_paragraph_labels(knowledgebox, writer):

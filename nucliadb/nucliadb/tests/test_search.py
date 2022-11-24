@@ -17,9 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+
+from nucliadb.tests.utils import broker_resource, inject_message
+from nucliadb_protos import resources_pb2 as rpb
 
 
 @pytest.mark.asyncio
@@ -57,34 +62,7 @@ async def test_search_sc_2062(
 
 
 def broker_resource_with_duplicates(knowledgebox, sentence):
-    import uuid
-    from datetime import datetime
-
-    from nucliadb_protos.writer_pb2 import BrokerMessage
-
-    from nucliadb_protos import resources_pb2 as rpb
-
-    rid = str(uuid.uuid4())
-    slug = f"{rid}slug1"
-
-    bm: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox,
-        uuid=rid,
-        slug=slug,
-        type=BrokerMessage.AUTOCOMMIT,
-    )
-
-    bm.basic.icon = "text/plain"
-    bm.basic.title = "Title Resource"
-    bm.basic.summary = "Summary of document"
-    bm.basic.thumbnail = "doc"
-    bm.basic.layout = "default"
-    bm.basic.metadata.useful = True
-    bm.basic.metadata.language = "es"
-    bm.basic.created.FromDatetime(datetime.now())
-    bm.basic.modified.FromDatetime(datetime.now())
-    bm.origin.source = rpb.Origin.Source.WEB
-
+    bm = broker_resource(kbid=knowledgebox)
     paragraph = sentence
     text = f"{paragraph}{paragraph}"
     etw = rpb.ExtractedTextWrapper()
@@ -96,12 +74,6 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     etw = rpb.ExtractedTextWrapper()
     etw.body.text = "Summary of document"
     etw.field.field = "summary"
-    etw.field.field_type = rpb.FieldType.GENERIC
-    bm.extracted_text.append(etw)
-
-    etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Title Resource"
-    etw.field.field = "title"
     etw.field.field_type = rpb.FieldType.GENERIC
     bm.extracted_text.append(etw)
 
@@ -135,14 +107,7 @@ def broker_resource_with_duplicates(knowledgebox, sentence):
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
 
     bm.field_metadata.append(fcm)
-
-    bm.source = BrokerMessage.MessageSource.WRITER
     return bm
-
-
-async def inject_message(writer: WriterStub, message):
-    await writer.ProcessMessage([message])  # type: ignore
-    return
 
 
 async def create_resource_with_duplicates(
@@ -210,3 +175,83 @@ async def test_search_returns_paragraph_positions(
     assert position["end"] == len(sentence)
     assert position["index"] == 0
     assert position["page_number"] is not None
+
+
+def broker_resource_with_classifications(knowledgebox):
+    bm = broker_resource(kbid=knowledgebox)
+
+    text = "Some text"
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = text
+    field_id = rpb.FieldID(field="file", field_type=rpb.FieldType.FILE)
+    etw.field.CopyFrom(field_id)
+    bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Summary of document"
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
+    bm.files["file"].added.FromDatetime(datetime.now())
+    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.CopyFrom(field_id)
+
+    c1 = rpb.Classification()
+    c1.label = "label1"
+    c1.labelset = "labelset1"
+    fcm.metadata.metadata.classifications.append(c1)
+    bm.field_metadata.append(fcm)
+
+    c2 = rpb.Classification()
+    c2.label = "label2"
+    c2.labelset = "labelset1"
+
+    bm.basic.usermetadata.classifications.append(c2)
+
+    p1 = rpb.Paragraph(
+        start=0,
+        end=len(text),
+    )
+    p1.start_seconds.append(0)
+    p1.end_seconds.append(10)
+    p1.classifications.append(c1)
+
+    fcm.metadata.metadata.paragraphs.append(p1)
+
+    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+
+    bm.field_metadata.append(fcm)
+
+    return bm
+
+
+@pytest.mark.asyncio
+async def test_search_returns_labels(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    bm = broker_resource_with_classifications(knowledgebox)
+    await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?query=Some&show=extracted"
+    )
+    assert resp.status_code == 200
+    content = resp.json()
+    assert content["paragraphs"]["results"]
+    par = content["paragraphs"]["results"][0]
+    assert par["labels"] == ["labelset1/label2", "labelset1/label1"]
+
+    extracted_metadata = content["resources"][bm.uuid]["data"]["files"]["file"][
+        "extracted"
+    ]["metadata"]["metadata"]
+    assert extracted_metadata["classifications"] == [
+        {"label": "label1", "labelset": "labelset1"}
+    ]
