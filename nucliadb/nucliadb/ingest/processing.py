@@ -22,7 +22,7 @@ import datetime
 import uuid
 from contextlib import AsyncExitStack
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import aiohttp
 import jwt  # type: ignore
@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from pydantic import BaseModel, Field
 
 import nucliadb.models as models
+from nucliadb.models.resource import QueueType
 from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage
@@ -44,6 +45,12 @@ else:
 class Source(SourceValue, Enum):  # type: ignore
     HTTP = 0
     INGEST = 1
+
+
+class ProcessingInfo(BaseModel):
+    seqid: int
+    account_seq: Optional[int]
+    queue: QueueType
 
 
 class PushPayload(BaseModel):
@@ -308,13 +315,15 @@ class ProcessingEngine:
 
     async def send_to_process(
         self, item: PushPayload, partition: int
-    ) -> Tuple[int, int]:
+    ) -> ProcessingInfo:
         if self.disable_send_to_process:
-            return 0, 0
+            return ProcessingInfo(seqid=0, account_seq=0, queue=QueueType.SHARED)
 
         if self.dummy:
             self.calls.append(item.dict())
-            return len(self.calls), 0
+            return ProcessingInfo(
+                seqid=len(self.calls), account_seq=0, queue=QueueType.SHARED
+            )
 
         headers = {"CONTENT-TYPE": "application/json"}
         if self.onprem is False:
@@ -327,6 +336,7 @@ class ProcessingEngine:
                 data = await resp.json()
                 seqid = data.get("seqid")
                 account_seq = data.get("account_seq")
+                queue_type = data.get("queue")
             elif resp.status == 402:
                 data = await resp.json()
                 raise LimitsExceededError(data["detail"])
@@ -345,6 +355,7 @@ class ProcessingEngine:
                 data = await resp.json()
                 seqid = data.get("seqid")
                 account_seq = data.get("account_seq")
+                queue_type = data.get("queue")
             elif resp.status == 402:
                 raise LimitsExceededError(data["detail"])
             else:
@@ -353,4 +364,6 @@ class ProcessingEngine:
             f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
                 ingest seqid: {seqid}, partition: {partition}"
         )
-        return seqid, account_seq
+        return ProcessingInfo(
+            seqid=seqid, account_seq=account_seq, queue_type=QueueType[queue_type]
+        )

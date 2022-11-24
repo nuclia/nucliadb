@@ -201,6 +201,11 @@ class ResourceData(BaseModel):
     datetimes: Optional[Dict[str, DatetimeFieldData]]
 
 
+class QueueType(str, Enum):  # type: ignore
+    PRIVATE = "private"
+    SHARED = "shared"
+
+
 class Resource(BaseModel):
     id: str
 
@@ -217,6 +222,7 @@ class Resource(BaseModel):
     modified: Optional[datetime]
     last_seqid: Optional[int]
     last_account_seq: Optional[int]
+    queue: Optional[QueueType]
 
     origin: Optional[Origin]
     relations: Optional[List[Relation]]

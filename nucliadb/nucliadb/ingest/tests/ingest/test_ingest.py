@@ -503,5 +503,6 @@ async def test_ingest_account_seq_stored(
     basic = await r.get_basic()
     assert basic is not None
     assert basic.last_account_seq == 2
+    assert basic.queue == 0
 
     await txn.abort()

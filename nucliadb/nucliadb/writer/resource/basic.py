@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Optional
 
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -36,7 +35,7 @@ from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
-from nucliadb.ingest.processing import PushPayload
+from nucliadb.ingest.processing import ProcessingInfo, PushPayload
 from nucliadb.models import RelationType
 from nucliadb.models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb.models.text import PushTextFormat, Text
@@ -219,10 +218,8 @@ def set_status_modify(basic: Basic, item: UpdateResourcePayload):
     basic.metadata.status = Metadata.Status.PENDING
 
 
-def set_last_seqid(bm: BrokerMessage, seqid: int):
-    bm.basic.last_seqid = seqid
-
-
-def set_last_account_seq(bm: BrokerMessage, account_seq: Optional[int]):
-    if account_seq is not None:
-        bm.basic.last_account_seq = account_seq
+def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
+    bm.basic.last_seqid = processing_info.seqid
+    if processing_info.account_seq is not None:
+        bm.basic.last_account_seq = processing_info.account_seq
+    bm.basic.queue = bm.basic.QueueType.Value(processing_info.queue.name)

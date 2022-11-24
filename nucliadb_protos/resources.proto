@@ -33,6 +33,10 @@ message CloudFile {
 
 
 message Basic {
+    enum QueueType {
+        PRIVATE = 0;
+        SHARED = 1;
+    }
     string slug = 1;
     string icon = 2;
     string title = 3;
@@ -59,6 +63,7 @@ message Basic {
 
     // last processing sequid (non nats) of this resource in the account queue
     int64 last_account_seq = 35;
+    QueueType queue = 36;
 }
 
 

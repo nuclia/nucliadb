@@ -46,6 +46,7 @@ from nucliadb.models.resource import (
     LayoutFieldExtractedData,
     LinkFieldData,
     LinkFieldExtractedData,
+    QueueType,
     Resource,
     ResourceData,
     TextFieldData,
@@ -198,6 +199,9 @@ async def serialize(
                 if orm_resource.basic.last_account_seq != 0
                 else None
             )
+            resource.queue = QueueType[
+                orm_resource.basic.QueueType.Name(orm_resource.basic.queue)
+            ]
 
     if ResourceProperties.RELATIONS in show:
         await orm_resource.get_relations()

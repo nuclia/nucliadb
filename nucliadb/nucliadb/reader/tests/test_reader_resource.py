@@ -40,6 +40,7 @@ BASIC = (
     "fieldmetadata",
     "last_seqid",
     "last_account_seq",
+    "queue",
 )
 RELATIONS = ("relations",)
 ORIGIN = ("origin",)
@@ -111,6 +112,7 @@ async def test_get_resource_sequence_ids_are_set_on_resource(
         assert test_resource.basic is not None
         assert resource["last_seqid"] == test_resource.basic.last_seqid
         assert resource["last_account_seq"] == test_resource.basic.last_account_seq
+        assert resource["queue"] == "private"
 
 
 @pytest.mark.asyncio

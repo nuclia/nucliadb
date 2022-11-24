@@ -57,8 +57,7 @@ from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
     parse_basic_modify,
-    set_last_account_seq,
-    set_last_seqid,
+    set_processing_info,
     set_status,
     set_status_modify,
 )
@@ -148,21 +147,22 @@ async def create_resource(
     set_info_on_span({"nuclia.rid": uuid, "nuclia.kbid": kbid})
 
     try:
-        seqid, account_seq = await processing.send_to_process(toprocess, partition)
+        processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
+    set_processing_info(writer, processing_info)
     if x_synchronous:
         t0 = time()
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     if x_synchronous:
-        return ResourceCreated(seqid=seqid, uuid=uuid, elapsed=time() - t0)
+        return ResourceCreated(
+            seqid=processing_info.seqid, uuid=uuid, elapsed=time() - t0
+        )
     else:
-        return ResourceCreated(seqid=seqid, uuid=uuid)
+        return ResourceCreated(seqid=processing_info.seqid, uuid=uuid)
 
 
 @api.patch(
@@ -229,16 +229,15 @@ async def modify_resource(
 
     set_status_modify(writer.basic, item)
     try:
-        seqid, account_seq = await processing.send_to_process(toprocess, partition)
+        processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
+    set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=x_synchronous)
 
-    return ResourceUpdated(seqid=seqid)
+    return ResourceUpdated(seqid=processing_info.seqid)
 
 
 @api.post(
@@ -303,7 +302,7 @@ async def reprocess_resource(
     # Send current resource to reprocess.
 
     try:
-        seqid, account_seq = await processing.send_to_process(toprocess, partition)
+        processing_info = await processing.send_to_process(toprocess, partition)
     except LimitsExceededError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
 
@@ -311,11 +310,10 @@ async def reprocess_resource(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
-    set_last_seqid(writer, seqid)
-    set_last_account_seq(writer, account_seq)
+    set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=False)
 
-    return ResourceUpdated(seqid=seqid)
+    return ResourceUpdated(seqid=processing_info.seqid)
 
 
 @api.delete(

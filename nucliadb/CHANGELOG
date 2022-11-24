@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.0.13
+
+- Include processing queue type info on resource
+
 ## 2.0.12
 
 - Return classification labels on search results and resource list
