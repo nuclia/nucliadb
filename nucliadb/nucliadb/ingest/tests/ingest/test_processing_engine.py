@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Copyright (C) 2021 Bosutech XXI S.L.
 #
 # nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -20,10 +21,15 @@
 from uuid import uuid4
 
 import pytest
+=======
+import pytest
+from uuid import uuid4
+>>>>>>> ec68fa00 (Tests for send_to_process)
 from aioresponses import aioresponses
 
 
 @pytest.mark.parametrize("onprem", [True, False])
+<<<<<<< HEAD
 @pytest.mark.parametrize(
     "mock_payload",
     [
@@ -39,6 +45,20 @@ from aioresponses import aioresponses
 async def test_send_to_process(onprem, mock_payload):
     """
     Test that send_to_process does not fail
+=======
+@pytest.mark.parametrize("mock_payload", [
+    {"seqid": 1, "account_seq": 1, "queue": "private"},
+    {"seqid": 1, "account_seq": 1, "queue": "shared"},
+    {"seqid": 1, "account_seq": None, "queue": "private"},
+    {"seqid": 1, "account_seq": None, "queue": "shared"},
+    {"seqid": 1, "queue": "private"},
+    {"seqid": 1, "queue": "shared"},
+])
+@pytest.mark.asyncio
+async def test_send_to_process(onprem, mock_payload):
+    """
+        Test that send_to_process does not fail
+>>>>>>> ec68fa00 (Tests for send_to_process)
     """
 
     from nucliadb.ingest.processing import ProcessingEngine, PushPayload
@@ -47,22 +67,41 @@ async def test_send_to_process(onprem, mock_payload):
     processing_engine = ProcessingEngine(
         onprem=onprem,
         nuclia_cluster_url=fake_nuclia_proxy_url,
+<<<<<<< HEAD
         nuclia_public_url=fake_nuclia_proxy_url,
+=======
+        nuclia_public_url=fake_nuclia_proxy_url
+>>>>>>> ec68fa00 (Tests for send_to_process)
     )
     await processing_engine.initialize()
 
     payload = PushPayload(
+<<<<<<< HEAD
         uuid=str(uuid4()), kbid=str(uuid4()), userid=str(uuid4()), partition=0
+=======
+        uuid=str(uuid4()),
+        kbid=str(uuid4()),
+        userid=str(uuid4()),
+        partition=0
+>>>>>>> ec68fa00 (Tests for send_to_process)
     )
 
     with aioresponses() as m:
         m.post(
             f"{fake_nuclia_proxy_url}/api/internal/processing/push",
+<<<<<<< HEAD
             payload=mock_payload,
         )
         m.post(
             f"{fake_nuclia_proxy_url}/api/v1/processing/push?partition=0",
             payload=mock_payload,
+=======
+            payload=mock_payload
+        )
+        m.post(
+            f"{fake_nuclia_proxy_url}/api/v1/processing/push?partition=0",
+            payload=mock_payload
+>>>>>>> ec68fa00 (Tests for send_to_process)
         )
 
         await processing_engine.send_to_process(payload, partition=0)
