@@ -9,6 +9,7 @@ on:
       - "charts/nucliadb_writer/**"
       - "nucliadb/nucliadb/writer/**"
       - "nucliadb/nucliadb/models/**"
+      - "nucliadb/nucliadb/ingest/**"
       - "nucliadb_utils/**"
       - "nucliadb_telemetry/**"
   push:
@@ -19,6 +20,7 @@ on:
       - "charts/nucliadb_writer/**"
       - "nucliadb/nucliadb/writer/**"
       - "nucliadb/nucliadb/models/**"
+      - "nucliadb/nucliadb/ingest/**"
       - "nucliadb_utils/**"
       - "nucliadb_telemetry/**"
       - "Dockerfile.writer"
