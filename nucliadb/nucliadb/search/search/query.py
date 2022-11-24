@@ -113,6 +113,16 @@ async def suggest_query_to_pb(
     if SuggestOptions.PARAGRAPH in features:
         request.body = query
         request.filter.tags.extend(filters)
+
+    if range_creation_start is not None:
+        request.timestamps.from_created.FromDatetime(range_creation_start)
+    if range_creation_end is not None:
+        request.timestamps.to_created.FromDatetime(range_creation_end)
+    if range_modification_start is not None:
+        request.timestamps.from_modified.FromDatetime(range_modification_start)
+    if range_modification_end is not None:
+        request.timestamps.to_modified.FromDatetime(range_modification_end)
+
     return request
 
 

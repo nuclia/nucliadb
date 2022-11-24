@@ -31,6 +31,15 @@ message IndexMessage {
     string reindex_id = 6;
 }
 
+message SetGraph {
+    noderesources.ShardId shard_id = 1;
+    utils.JoinGraph graph = 2;
+}
+
+message DeleteGraphNodes {
+    noderesources.ShardId shard_id = 2;
+    repeated utils.RelationNode nodes = 1;
+}
 
 service NodeWriter {
     rpc GetShard(noderesources.ShardId) returns (noderesources.ShardId) {}
@@ -41,6 +50,8 @@ service NodeWriter {
     rpc GC(noderesources.ShardId) returns (noderesources.EmptyResponse) {}
 
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
+    rpc DeleteRelationNodes(DeleteGraphNodes) returns (OpStatus) {}
+    rpc JoinGraph(SetGraph) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
 }

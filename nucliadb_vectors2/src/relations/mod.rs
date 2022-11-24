@@ -18,7 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod disk;
-pub mod relations;
-pub mod utils;
-pub mod vectors;
+mod bfs_engine;
+mod errors;
+mod graph_db;
+#[cfg(test)]
+mod graph_test_utils;
+pub mod index;
+mod node_dictionary;
+mod relations_io;
+pub mod service;

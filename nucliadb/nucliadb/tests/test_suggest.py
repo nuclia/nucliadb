@@ -71,12 +71,14 @@ async def test_suggest_fuzzy_search(
     assert resp.status_code == 201
     rid3 = resp.json()["uuid"]
 
+    # exact match
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Nietzche")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
     assert body["paragraphs"]["results"][0]["rid"] == rid3
 
+    # typo tolerant search
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=princes")
     assert resp.status_code == 200
     body = resp.json()
@@ -87,166 +89,124 @@ async def test_suggest_fuzzy_search(
         result["field"] for result in body["paragraphs"]["results"]
     }
 
+    # fuzzy search with distance 1 will only match 'a' from resource 2
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=z")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 1
+
+    # nonexistent term
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Hanna+Adrent")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 0
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=a")
+
+@pytest.mark.asyncio
+async def test_suggest_related_entities(
+    nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    """
+    Test description:
+
+    Create a new resoure with some entities and relations and use
+    /suggest endpoint to make autocomplete suggestions.
+    """
+    colaborators = ["Irene", "Anastasia"]
+    entities = [
+        ("Anna", "person"),
+        ("Anthony", "person"),
+        ("Bárcenas", "person"),
+        ("Ben", "person"),
+        ("John", "person"),
+        ("Barcelona", "city"),
+        ("New York", "city"),
+        ("York", "city"),
+        ("Israel", "country"),
+        ("Netherlands", "country"),
+        ("Solomon Islands", "country"),
+    ]
+    relations = [
+        {"relation": "ENTITY", "entity": {"entity": entity, "entity_type": type}}
+        for entity, type in entities
+    ]
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        json={
+            "title": "My resource",
+            "slug": "myresource",
+            "summary": "Some summary",
+            "origin": {
+                "colaborators": colaborators,
+            },
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "labelset-1", "label": "label-1"},
+                    {"labelset": "labelset-2", "label": "label-2"},
+                ],
+                "relations": relations,
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    # Test simple suggestions
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["paragraphs"]["results"]) == 1
+    assert set(body["entities"]["entities"]) == {"Anastasia", "Anna", "Anthony"}
 
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=ann")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Anna"}
+    # XXX: add "Anastasia" when typo correction is implemented
+    # assert set(body["entities"]["entities"]) == {"Anna", "Anastasia"}
 
-# @pytest.mark.asyncio
-# async def test_suggest_related_entities(
-#     nucliadb_grpc: WriterStub,
-#     nucliadb_reader: AsyncClient,
-#     nucliadb_writer: AsyncClient,
-#     knowledgebox,
-# ):
-#     """
-#     Test description:
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=jo")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"John"}
 
-#     Create a new resoure with some entities and relations and use
-#     /suggest endpoint to make autocomplete suggestions.
-#     """
-#     resp = await nucliadb_writer.post(
-#         f"/kb/{knowledgebox}/resources",
-#         json={
-#             "title": "My resource",
-#             "slug": "myresource",
-#             "summary": "Some summary",
-#             "origin": {
-#                 "colaborators": ["Irene", "Anastasia"],
-#             },
-#             "usermetadata": {
-#                 "classifications": [
-#                     {"labelset": "labelset-1", "label": "label-1"},
-#                     {"labelset": "labelset-2", "label": "label-2"},
-#                 ],
-#                 "relations": [
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Anna",
-#                             "entity_type": "person",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Annika",
-#                             "entity_type": "person",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Anthony",
-#                             "entity_type": "person",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "John",
-#                             "entity_type": "person",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Barcelona",
-#                             "entity_type": "city",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "New York",
-#                             "entity_type": "city",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Israel",
-#                             "entity_type": "country",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Netherlands",
-#                             "entity_type": "country",
-#                         },
-#                     },
-#                     {
-#                         "relation": "ENTITY",
-#                         "entity": {
-#                             "entity": "Solomon Islands",
-#                             "entity_type": "country",
-#                         },
-#                     },
-#                 ],
-#             },
-#         },
-#     )
-#     assert resp.status_code == 201
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=any")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert not body["entities"]["entities"]
 
-#     # Test simple suggestions
+    # Test correct query tokenization
 
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Anna", "Annika", "Anthony"}
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=bar")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
 
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=ann")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Anna", "Annika"}
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Bar")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
 
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=jo")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"John"}
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BAR")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
 
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=any")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert not body["entities"]["entities"]
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BÄR")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
 
-#     # Test correct query tokenization
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BáR")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["entities"]["entities"]) == {"Barcelona", "Bárcenas"}
 
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=bar")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Barcelona"}
+    # Test multiple word suggest and ordering
 
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Bar")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Barcelona"}
-
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BAR")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Barcelona"}
-
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BÄR")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Barcelona"}
-
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=BàR")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert set(body["entities"]["entities"]) == {"Barcelona"}
-
-#     # Test multiple word suggest and ordering
-
-#     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
-#     assert resp.status_code == 200
-#     body = resp.json()
-#     assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Solomon+Is")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["entities"]["entities"] == ["Solomon Islands", "Israel"]

@@ -24,25 +24,13 @@ use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_protos::{
-    // relation_node,
-    DocumentSearchRequest,
-    DocumentSearchResponse,
-    EdgeList,
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
-    RelatedEntities,
-    RelationSearchRequest,
-    RelationSearchResponse,
-    SearchRequest,
-    SearchResponse,
-    SuggestRequest,
-    SuggestResponse,
-    TypeList,
-    VectorSearchRequest,
+    relation_node, DocumentSearchRequest, DocumentSearchResponse, EdgeList, ParagraphSearchRequest,
+    ParagraphSearchResponse, RelatedEntities, RelationSearchRequest, RelationSearchResponse,
+    SearchRequest, SearchResponse, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
     VectorSearchResponse,
 };
 use nucliadb_services::*;
-// use rayon::prelude::*;
+use rayon::prelude::*;
 use tracing::*;
 
 use crate::config::Configuration;
@@ -52,7 +40,7 @@ use crate::telemetry::run_with_telemetry;
 
 const RELOAD_PERIOD: u128 = 5000;
 const FIXED_VECTORS_RESULTS: usize = 10;
-// const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
+const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 
 #[derive(Debug)]
 pub struct ShardReaderService {
@@ -127,11 +115,11 @@ impl ShardReaderService {
         self.reload_policy(true);
         self.relation_reader.stored_ids()
     }
-    pub fn get_relations_edges(&self) -> EdgeList {
+    pub fn get_relations_edges(&self) -> InternalResult<EdgeList> {
         self.reload_policy(true);
         self.relation_reader.get_edges()
     }
-    pub fn get_relations_types(&self) -> TypeList {
+    pub fn get_relations_types(&self) -> InternalResult<TypeList> {
         self.reload_policy(true);
         self.relation_reader.get_node_types()
     }
@@ -320,7 +308,6 @@ impl ShardReaderService {
     /// Return a list of queries to suggest from the original
     /// query. The query with more words will come first. `max_group`
     /// defines the limit of words a query can have.
-    #[allow(unused)]
     fn split_suggest_query(query: String, max_group: usize) -> Vec<String> {
         let words = query.split(' ');
         let mut i = 0;
@@ -347,45 +334,43 @@ impl ShardReaderService {
     pub fn suggest(&self, request: SuggestRequest) -> InternalResult<SuggestResponse> {
         // Search for entities related to the query.
 
-        // let prefixes =
-        //     Self::split_suggest_query(search_request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
+        let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
 
-        // let relations = prefixes.par_iter().map(|prefix| {
-        //     let filter = RelationFilter {
-        //         ntype: relation_node::NodeType::Entity as i32,
-        //         subtype: "".to_string(),
-        //     };
-        //     let request = RelationSearchRequest {
-        //         id: String::default(),
-        //         prefix: prefix.clone(),
-        //         type_filters: vec![filter],
-        //         depth: 10,
-        //         ..Default::default()
-        //     };
-        //     self.relation_reader.search(&request)
-        // });
-        // info!("{}:{}", line!(), file!());
+        let relations = prefixes.par_iter().map(|prefix| {
+            let filter = RelationFilter {
+                ntype: relation_node::NodeType::Entity as i32,
+                subtype: "".to_string(),
+            };
+            let request = RelationSearchRequest {
+                id: String::default(),
+                prefix: prefix.clone(),
+                type_filters: vec![filter],
+                depth: 10,
+                ..Default::default()
+            };
+            self.relation_reader.search(&request)
+        });
+        info!("{}:{}", line!(), file!());
 
         let paragraph_reader_service = self.paragraph_reader.clone();
         let paragraph_task = move || paragraph_reader_service.suggest(&request);
         info!("{}:{}", line!(), file!());
-        let rparagraph = paragraph_task()?;
-        // let (rparagraph, rrelations) =
-        //     rayon::join(paragraph_task, || relations.collect::<Vec<_>>());
+        let tasks = rayon::join(paragraph_task, || relations.collect::<Vec<_>>());
 
-        // let rparagraph = rparagraph.unwrap();
+        let rparagraph = tasks.0.unwrap();
 
-        // let entities = rrelations
-        //     .into_iter()
-        //     .flat_map(|relation| {
-        //         relation
-        //             .unwrap()
-        //             .neighbours
-        //             .iter()
-        //             .map(|relation_node| relation_node.value.clone())
-        //             .collect::<Vec<String>>()
-        //     })
-        //     .collect::<Vec<String>>();
+        let entities = tasks
+            .1
+            .into_iter()
+            .flat_map(|relation| {
+                relation
+                    .unwrap()
+                    .neighbours
+                    .iter()
+                    .map(|relation_node| relation_node.value.clone())
+                    .collect::<Vec<String>>()
+            })
+            .collect::<Vec<String>>();
 
         Ok(SuggestResponse {
             query: rparagraph.query,
@@ -393,8 +378,8 @@ impl ShardReaderService {
             results: rparagraph.results,
             ematches: rparagraph.ematches,
             entities: Some(RelatedEntities {
-                total: 0,
-                entities: vec![],
+                total: entities.len() as u32,
+                entities,
             }),
         })
     }

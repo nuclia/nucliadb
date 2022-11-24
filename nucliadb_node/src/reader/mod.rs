@@ -185,14 +185,15 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.get_relations_keys()))
             .map(|ids| IdCollection { ids })
     }
-
-    pub fn relation_edges(&self, shard_id: &ShardId) -> Option<EdgeList> {
+    pub fn relation_edges(&self, shard_id: &ShardId) -> Option<ServiceResult<EdgeList>> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_relations_edges()))
+            .map(|r| r.map_err(|e| e.into()))
     }
 
-    pub fn relation_types(&self, shard_id: &ShardId) -> Option<TypeList> {
+    pub fn relation_types(&self, shard_id: &ShardId) -> Option<ServiceResult<TypeList>> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_relations_types()))
+            .map(|r| r.map_err(|e| e.into()))
     }
 }

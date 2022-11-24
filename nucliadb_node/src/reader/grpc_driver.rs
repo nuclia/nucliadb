@@ -375,7 +375,8 @@ impl NodeReader for NodeReaderGRPCDriver {
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
         match reader.relation_edges(&shard_id) {
-            Some(ids) => Ok(tonic::Response::new(ids)),
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::not_found(format!("{e:?} in {shard_id:?}",))),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
                 shard_id
@@ -395,10 +396,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
         match reader.relation_types(&shard_id) {
-            Some(ids) => Ok(tonic::Response::new(ids)),
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::not_found(format!("{e:?} in {shard_id:?}",))),
             None => Err(tonic::Status::not_found(format!(
-                "Shard not found {:?}",
-                shard_id
+                "Shard not found {shard_id:?}"
             ))),
         }
     }

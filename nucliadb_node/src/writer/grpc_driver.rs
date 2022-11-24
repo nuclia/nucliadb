@@ -21,8 +21,8 @@
 use async_std::sync::RwLock;
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
-    op_status, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId, ShardCleaned,
-    ShardCreated, ShardId, ShardIds,
+    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId,
+    SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
 };
 use opentelemetry::global;
 use tracing::*;
@@ -213,6 +213,78 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::join_graph", skip(self, request))]
+    async fn delete_relation_nodes(
+        &self,
+        request: tonic::Request<DeleteGraphNodes>,
+    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+
+        info!("gRPC join graph {:?}", request);
+        let request = request.into_inner();
+        let shard_id = request.shard_id.as_ref().unwrap();
+        let mut writer = self.0.write().await;
+        match writer.delete_relation_nodes(&request) {
+            Some(Ok(count)) => {
+                info!("Remove resource ends correctly");
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let error_msg = format!("Error joining graph {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
+            }
+            None => {
+                let message = format!("Shard not found {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+
+    #[tracing::instrument(name = "NodeWriterGRPCDriver::join_graph", skip(self, request))]
+    async fn join_graph(
+        &self,
+        request: tonic::Request<SetGraph>,
+    ) -> Result<tonic::Response<OpStatus>, tonic::Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
+        Span::current().set_parent(parent_cx);
+
+        info!("gRPC join graph {:?}", request);
+        let request = request.into_inner();
+        let shard_id = request.shard_id.unwrap();
+        let graph = request.graph.unwrap();
+        let mut writer = self.0.write().await;
+        match writer.join_relations_graph(&shard_id, &graph) {
+            Some(Ok(count)) => {
+                info!("Remove resource ends correctly");
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(tonic::Response::new(status))
+            }
+            Some(Err(e)) => {
+                let error_msg = format!("Error joining graph {:?}: {}", shard_id, e);
+                error!("{}", error_msg);
+                Err(tonic::Status::internal(error_msg))
+            }
+            None => {
+                let message = format!("Shard not found {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
     #[tracing::instrument(name = "NodeWriterGRPCDriver::remove_resource", skip(self, request))]
     async fn remove_resource(
         &self,

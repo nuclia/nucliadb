@@ -12,4 +12,3 @@ nucliadb_paragraphs_tantivy= { path = "../nucliadb_paragraphs_tantivy" }
 nucliadb_paragraphs_tantivy2= { path = "../nucliadb_paragraphs_tantivy2" }
 nucliadb_vectors= { path = "../nucliadb_vectors" }
 nucliadb_vectors2= { path = "../nucliadb_vectors2" }
-nucliadb_relations= { path = "../nucliadb_relations" }

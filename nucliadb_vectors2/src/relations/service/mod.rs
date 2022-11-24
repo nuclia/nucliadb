@@ -18,7 +18,22 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod disk;
-pub mod relations;
-pub mod utils;
-pub mod vectors;
+mod bfs;
+pub mod reader;
+#[cfg(test)]
+mod tests;
+mod utils;
+pub mod writer;
+
+use nucliadb_service_interface::prelude::InternalError;
+pub use reader::*;
+pub use writer::*;
+
+use super::errors::RelationsErr;
+
+impl InternalError for RelationsErr {}
+impl From<RelationsErr> for Box<dyn InternalError> {
+    fn from(err: RelationsErr) -> Self {
+        Box::new(err)
+    }
+}
