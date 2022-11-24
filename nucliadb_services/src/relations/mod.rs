@@ -19,6 +19,7 @@
 //
 use nucliadb_service_interface::relations_interface::*;
 use nucliadb_vectors2::relations;
+
 use crate::*;
 pub const MAX_VERSION: u32 = 0;
 

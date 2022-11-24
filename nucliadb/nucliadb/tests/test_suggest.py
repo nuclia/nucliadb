@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -60,7 +61,6 @@ async def test_suggest_fuzzy_search(
     )
     assert resp.status_code == 201
     rid2 = resp.json()["uuid"]
-
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
@@ -155,7 +155,7 @@ async def test_suggest_related_entities(
     assert resp.status_code == 201
 
     # Test simple suggestions
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
     assert resp.status_code == 200
     body = resp.json()
