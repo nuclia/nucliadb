@@ -56,7 +56,7 @@ jobs:
       - uses: aig787/cargo-udeps-action@v1
         with:
           version: latest
-          args: -p nucliadb_cluster --all-targets --all-features
+          args: --all-targets --all-features
 
   format-rust:
     name: Code Format
