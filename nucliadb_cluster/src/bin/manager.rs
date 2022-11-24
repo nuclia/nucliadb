@@ -14,7 +14,7 @@ use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 #[derive(Debug, StructOpt)]
-struct ClusterMgrArgs {
+struct Opt {
     #[structopt(short, long, env = "LISTEN_PORT")]
     listen_port: String,
     #[structopt(short, long, env = "NODE_TYPE")]
@@ -124,19 +124,19 @@ pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = ClusterMgrArgs::from_args();
+    let opt = Opt::from_args();
 
     let mut termination = signal(SignalKind::terminate())?;
 
-    let host = format!("{}:{}", &args.pub_ip, &args.listen_port);
+    let host = format!("{}:{}", &opt.pub_ip, &opt.listen_port);
     let addr = reliable_lookup_host(&host).await?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(node_id.to_string(), addr, args.node_type, args.seeds)
+    let cluster = Cluster::new(node_id.to_string(), addr, opt.node_type, opt.seeds)
         .await
         .with_context(|| "Can't create cluster instance ")?;
 
     let mut watcher = cluster.members_change_watcher();
-    let mut writer = get_stream(args.monitor_addr.clone())
+    let mut writer = get_stream(opt.monitor_addr.clone())
         .await
         .with_context(|| "Can't create update writer")?;
     loop {
@@ -173,7 +173,7 @@ async fn main() -> anyhow::Result<()> {
                         } else {
                             error!("Check peer failed before update sending. Sleep 200ms and reconnect");
                             writer.shutdown().await?;
-                            writer = get_stream(args.monitor_addr.clone()).await?
+                            writer = get_stream(opt.monitor_addr.clone()).await?
                         }
                     }
                 };
