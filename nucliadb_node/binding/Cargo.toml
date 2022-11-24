@@ -10,7 +10,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.17.1", features = ["extension-module"] }
-pyo3-log = "0.7.0"
 nucliadb_node = { path = "../../nucliadb_node" }
 nucliadb_protos = { path = "../../nucliadb_protos/rust" }
 serde = { version = "1.0", features = ["derive"] }
