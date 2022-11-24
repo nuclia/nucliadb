@@ -92,20 +92,21 @@ async fn send_update(update: String, stream: &mut TcpStream) -> anyhow::Result<(
     if let Err(e) = stream.flush().await {
         error!("Error during flushing writer: {e}")
     };
-    info!("Try read the answer");
+
     let mut buf = vec![];
-    if let Ok(readed) = stream.read_buf(&mut buf).await {
-        info!("answer from server: {:#?}", buf);
-        if readed != 0 {
-            info!("valid answer receieved: {:#?}", buf);
+
+    info!("Try read the answer");
+    match stream.read_buf(&mut buf).await {
+        Ok(n) if n > 0 => {
+            info!("valid answer received: {:#?}", buf);
+
             Ok(())
-        } else {
+        }
+        _ => {
             info!("invalid ack: {:#?}", buf);
+
             Err(anyhow!("invalid ack"))
         }
-    } else {
-        info!("invalid ack: {:#?}", buf);
-        Err(anyhow!("invalid ack"))
     }
 }
 pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
