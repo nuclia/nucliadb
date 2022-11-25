@@ -156,7 +156,6 @@ async def test_suggest_related_entities(
     assert resp.status_code == 201
 
     # Test simple suggestions
-    await asyncio.sleep(10)
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=An")
     assert resp.status_code == 200
     body = resp.json()
