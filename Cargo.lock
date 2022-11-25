@@ -1924,7 +1924,6 @@ dependencies = [
  "data-encoding",
  "derive_builder",
  "deunicode",
- "env_logger 0.9.3",
  "fs2",
  "heed",
  "itertools",
