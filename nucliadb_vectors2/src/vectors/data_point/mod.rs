@@ -57,22 +57,6 @@ pub enum DPError {
 }
 type DPResult<T> = Result<T, DPError>;
 
-impl<Dl: DeleteLog> key_value::Slot for (Dl, Node) {
-    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
-        self.1.get_key(x)
-    }
-    fn cmp_keys(&self, x: &[u8], key: &[u8]) -> std::cmp::Ordering {
-        self.1.cmp_keys(x, key)
-    }
-    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
-        self.1.read_exact(x)
-    }
-    fn keep_in_merge(&self, x: &[u8]) -> bool {
-        let key = std::str::from_utf8(self.get_key(x)).unwrap();
-        !self.0.is_deleted(key)
-    }
-}
-
 pub struct NoDLog;
 impl DeleteLog for NoDLog {
     fn is_deleted(&self, _: &str) -> bool {

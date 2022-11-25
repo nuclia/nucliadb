@@ -139,6 +139,30 @@ impl NodeWriterService {
         })
     }
 
+    pub fn join_relations_graph(
+        &mut self,
+        shard_id: &ShardId,
+        graph: &JoinGraph,
+    ) -> Option<ServiceResult<usize>> {
+        self.get_mut_shard(shard_id).map(|shard| {
+            POOL.install(|| shard.join_relations_graph(graph))
+                .map(|_| shard.count())
+                .map_err(|e| e.into())
+        })
+    }
+
+    pub fn delete_relation_nodes(
+        &mut self,
+        request: &DeleteGraphNodes,
+    ) -> Option<ServiceResult<usize>> {
+        let id = request.shard_id.as_ref().unwrap();
+        self.get_mut_shard(id).map(|shard| {
+            POOL.install(|| shard.delete_relation_nodes(request))
+                .map(|_| shard.count())
+                .map_err(|e| e.into())
+        })
+    }
+
     pub fn remove_resource(
         &mut self,
         shard_id: &ShardId,

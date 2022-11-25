@@ -34,11 +34,14 @@ pub struct RelationError {
 pub trait RelationReader:
     ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse>
 {
-    fn get_edges(&self) -> EdgeList;
-    fn get_node_types(&self) -> TypeList;
+    fn get_edges(&self) -> InternalResult<EdgeList>;
+    fn get_node_types(&self) -> InternalResult<TypeList>;
 }
 
-pub trait RelationWriter: WriterChild {}
+pub trait RelationWriter: WriterChild {
+    fn join_graph(&mut self, graph: &JoinGraph) -> InternalResult<()>;
+    fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> InternalResult<()>;
+}
 
 impl std::fmt::Display for RelationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

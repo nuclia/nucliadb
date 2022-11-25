@@ -102,6 +102,19 @@ jobs:
         run: |
           MYPYPATH=./mypy_stubs mypy nucliadb/
 
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            workflows:
+              - 'nucliadb_node/**'
+
+      - name: Install rust binding for testing
+        if: steps.filter.outputs.workflows == 'true'
+        run: |
+          maturin build -m nucliadb_node/binding/Cargo.toml
+          pip install target/wheels/*cp39-cp39-manylinux_2_31_x86_64.whl
+
       - name: Run tests
         run: |
           pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/tests

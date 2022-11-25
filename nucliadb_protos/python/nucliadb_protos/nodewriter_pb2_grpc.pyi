@@ -26,91 +26,110 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSentence as VectorSentence,
 )
 
-
 class NodeWriterStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardId]
-
+        nucliadb_protos.noderesources_pb2.ShardId,
+    ]
     NewShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.EmptyQuery,
-        nucliadb_protos.noderesources_pb2.ShardCreated]
-
+        nucliadb_protos.noderesources_pb2.ShardCreated,
+    ]
     CleanAndUpgradeShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardCleaned]
-
+        nucliadb_protos.noderesources_pb2.ShardCleaned,
+    ]
     DeleteShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.ShardId]
-
+        nucliadb_protos.noderesources_pb2.ShardId,
+    ]
     ListShards: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.EmptyQuery,
-        nucliadb_protos.noderesources_pb2.ShardIds]
-
+        nucliadb_protos.noderesources_pb2.ShardIds,
+    ]
     GC: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.noderesources_pb2.EmptyResponse]
-
+        nucliadb_protos.noderesources_pb2.EmptyResponse,
+    ]
     SetResource: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.Resource,
-        nucliadb_protos.nodewriter_pb2.OpStatus]
-
+        nucliadb_protos.nodewriter_pb2.OpStatus,
+    ]
+    DeleteRelationNodes: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodewriter_pb2.DeleteGraphNodes,
+        nucliadb_protos.nodewriter_pb2.OpStatus,
+    ]
+    JoinGraph: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodewriter_pb2.SetGraph,
+        nucliadb_protos.nodewriter_pb2.OpStatus,
+    ]
     RemoveResource: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ResourceID,
-        nucliadb_protos.nodewriter_pb2.OpStatus]
-
+        nucliadb_protos.nodewriter_pb2.OpStatus,
+    ]
 
 class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def GetShard(self,
+    def GetShard(
+        self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-
     @abc.abstractmethod
-    def NewShard(self,
+    def NewShard(
+        self,
         request: nucliadb_protos.noderesources_pb2.EmptyQuery,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
-
     @abc.abstractmethod
-    def CleanAndUpgradeShard(self,
+    def CleanAndUpgradeShard(
+        self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardCleaned: ...
-
     @abc.abstractmethod
-    def DeleteShard(self,
+    def DeleteShard(
+        self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-
     @abc.abstractmethod
-    def ListShards(self,
+    def ListShards(
+        self,
         request: nucliadb_protos.noderesources_pb2.EmptyQuery,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardIds: ...
-
     @abc.abstractmethod
-    def GC(self,
+    def GC(
+        self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
-
     @abc.abstractmethod
-    def SetResource(self,
+    def SetResource(
+        self,
         request: nucliadb_protos.noderesources_pb2.Resource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
-
     @abc.abstractmethod
-    def RemoveResource(self,
+    def DeleteRelationNodes(
+        self,
+        request: nucliadb_protos.nodewriter_pb2.DeleteGraphNodes,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
+    @abc.abstractmethod
+    def JoinGraph(
+        self,
+        request: nucliadb_protos.nodewriter_pb2.SetGraph,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
+    @abc.abstractmethod
+    def RemoveResource(
+        self,
         request: nucliadb_protos.noderesources_pb2.ResourceID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
-
 
 def add_NodeWriterServicer_to_server(servicer: NodeWriterServicer, server: grpc.Server) -> None: ...
 
@@ -118,15 +137,15 @@ class NodeSidecarStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetCount: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
-        nucliadb_protos.nodewriter_pb2.Counter]
-
+        nucliadb_protos.nodewriter_pb2.Counter,
+    ]
 
 class NodeSidecarServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def GetCount(self,
+    def GetCount(
+        self,
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.Counter: ...
-
 
 def add_NodeSidecarServicer_to_server(servicer: NodeSidecarServicer, server: grpc.Server) -> None: ...

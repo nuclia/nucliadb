@@ -299,26 +299,25 @@ impl ShardWriterService {
             result
         };
 
-        // let relation_writer_service = self.relation_writer.clone();
-        // let relation_resource = resource.clone();
-        // let relation_task = move || {
-        //     info!("Relation service starts set_resource");
-        //     let mut writer = relation_writer_service.write().unwrap();
-        //     let result = writer.set_resource(&relation_resource);
-        //     info!("Relation service ends set_resource");
-        //     result
-        //     Ok(())
-        // };
+        let relation_writer_service = self.relation_writer.clone();
+        let relation_resource = resource.clone();
+        let relation_task = move || {
+            info!("Relation service starts set_resource");
+            let mut writer = relation_writer_service.write().unwrap();
+            let result = writer.set_resource(&relation_resource);
+            info!("Relation service ends set_resource");
+            result
+        };
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
-        // let mut relation_result = Ok(());
+        let mut relation_result = Ok(());
         rayon::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
-            // s.spawn(|_| relation_result = relation_task());
+            s.spawn(|_| relation_result = relation_task());
         });
 
         text_result?;
@@ -369,6 +368,18 @@ impl ShardWriterService {
         relation_result?;
         Ok(())
     }
+
+    pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> InternalResult<()> {
+        let mut writer = self.relation_writer.write().unwrap();
+        writer.delete_nodes(nodes)?;
+        Ok(())
+    }
+    pub fn join_relations_graph(&self, graph: &JoinGraph) -> InternalResult<()> {
+        let mut writer = self.relation_writer.write().unwrap();
+        writer.join_graph(graph)?;
+        Ok(())
+    }
+
     pub fn delete(&self) -> Result<(), std::io::Error> {
         let shard_path = Configuration::shards_path_id(&self.id);
         info!("Deleting {}", shard_path);

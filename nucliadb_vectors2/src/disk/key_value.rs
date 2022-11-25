@@ -94,6 +94,15 @@ pub trait KVElem {
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()>;
 }
 
+impl<T: AsRef<[u8]>> KVElem for T {
+    fn serialized_len(&self) -> usize {
+        self.as_ref().len()
+    }
+    fn serialize_into<W: io::Write>(self, mut w: W) -> io::Result<()> {
+        w.write_all(self.as_ref())
+    }
+}
+
 #[allow(unused)]
 pub fn new_key_value<S>(slots: Vec<S>) -> Vec<u8>
 where S: KVElem {
@@ -261,14 +270,6 @@ pub fn merge<S: Slot + Copy>(at: &mut File, producers: Vec<(S, &[u8])>) -> io::R
 #[cfg(test)]
 mod tests {
     use super::*;
-    impl<T: AsRef<[u8]>> KVElem for T {
-        fn serialized_len(&self) -> usize {
-            self.as_ref().len()
-        }
-        fn serialize_into<W: io::Write>(self, mut w: W) -> io::Result<()> {
-            w.write_all(self.as_ref())
-        }
-    }
     // u32 numbers in big-endian (so cmp is faster)
     #[derive(Clone, Copy)]
     pub struct TElem;

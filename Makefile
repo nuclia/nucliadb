@@ -130,11 +130,11 @@ debug-run-nucliadb-redis:
 
 build-node-binding:
 	maturin build -m nucliadb_node/binding/Cargo.toml --release
-	pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-*.whl --force
+	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-node-binding-debug:
 	maturin build -m nucliadb_node/binding/Cargo.toml
-	pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-*.whl --force
+	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest .
