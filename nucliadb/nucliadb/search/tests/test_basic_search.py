@@ -323,12 +323,11 @@ async def test_resource_search_query_param_is_optional(search_api, knowledgebox)
         assert resp.status_code == 200
 
         # Less than 3 characters should fail
-        for query in ("", "f", "fo"):
+        for query in ("f", "fo"):
             resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
             assert resp.status_code == 422
             content = resp.json()
-            assert content["detail"][0]["loc"][0] == "query"
-            assert "has at least 3 characters" in content["detail"][0]["msg"]
+            assert "Query needs to be bigger than 2 or 0" in content["detail"]
 
 
 @pytest.mark.asyncio()

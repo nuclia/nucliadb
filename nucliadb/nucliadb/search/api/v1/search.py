@@ -68,7 +68,7 @@ async def search_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default="", min_length=3),
+    query: str = Query(default=""),
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
@@ -168,6 +168,12 @@ async def search(
     nodemanager = get_nodes()
     audit = get_audit()
     timeit = time()
+
+    if len(item.query) > 0 and len(item.query) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail="Query needs to be bigger than 2 or 0",
+        )
 
     if item.query == "":
         # If query is not defined we force to not return vector results
