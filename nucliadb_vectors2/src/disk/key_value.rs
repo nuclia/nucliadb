@@ -163,6 +163,16 @@ pub fn get_value<S: Slot>(interface: S, src: &[u8], id: usize) -> &[u8] {
     interface.read_exact(&src[pointer..]).0
 }
 
+// O(1)
+pub fn get_keys<'a, S: Slot + Copy + 'a>(
+    interface: S,
+    x: &'a [u8],
+) -> impl Iterator<Item = &'a [u8]> {
+    (0..get_no_elems(x))
+        .map(move |i| get_value(interface, x, i))
+        .map(move |v| interface.get_key(v))
+}
+
 fn transfer_elem<S: Slot>(
     interface: S,
     at: &mut File,
@@ -297,16 +307,21 @@ mod tests {
 
     fn retrieval_checks(expected: &[impl AsRef<[u8]>], buf: &[u8]) {
         let interface = TElem;
+        let mut expected_keys = vec![];
         for i in 0..expected.len() {
             let id =
                 search_by_key(interface, buf, interface.get_key(expected[i].as_ref())).unwrap();
             let value = get_value(interface, buf, id);
+            let key = interface.get_key(value);
             let (head, tail) = interface.read_exact(value);
+            expected_keys.push(key);
             assert_eq!(id, i);
             assert_eq!(value, head);
             assert_eq!(tail, &[] as &[u8]);
             assert_eq!(value, expected[id].as_ref());
         }
+        let got_keys = get_keys(interface, buf).collect::<Vec<_>>();
+        assert_eq!(expected_keys, got_keys);
     }
     #[test]
     fn store_test() {
