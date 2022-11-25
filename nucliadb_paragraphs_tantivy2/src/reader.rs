@@ -99,6 +99,8 @@ impl ReaderChild for ParagraphReaderService {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
+
+        // No query and no filter -> Only facet search
         let only_facets = results == 0 || (request.body.is_empty() && request.filter.is_none());
         let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
