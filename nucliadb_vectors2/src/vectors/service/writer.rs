@@ -56,41 +56,41 @@ impl WriterChild for VectorWriterService {
     }
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         use data_point::{DataPoint, Elem, LabelDictionary};
-        info!("Set resource in vector starts");
-        let resource_id = resource.resource.as_ref().unwrap().uuid.clone();
-
-        info!("Indexing resource contents");
-        let mut elems = vec![];
+        let _resource_id = resource.resource.as_ref().unwrap().uuid.clone();
+        info!("creating datapoints");
+        let mut data_points = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
-                for index in paragraph.paragraphs.values() {
+                for (key, index) in paragraph.paragraphs.iter() {
+                    let index_key = key.clone();
                     let mut labels = resource.labels.clone();
                     labels.append(&mut index.labels.clone());
                     let labels = LabelDictionary::new(labels);
-                    index
+                    let elems = index
                         .sentences
                         .iter()
                         .map(|(key, sentence)| (key.clone(), sentence.vector.clone()))
                         .map(|(key, sentence)| Elem::new(key, sentence, labels.clone()))
-                        .for_each(|elem| elems.push(elem));
+                        .collect::<Vec<_>>();
+                    if !elems.is_empty() {
+                        let new_dp = DataPoint::new(self.index.get_location(), elems)?;
+                        data_points.push((index_key, new_dp));
+                    }
                 }
             }
         }
-        info!("Resource contents indexed");
-
-        info!("Adding entry for new index");
+        info!("{} datapoints where created", data_points.len());
         let lock = self.index.get_elock()?;
+        info!("Processing sentences to delete");
         for to_delete in &resource.sentences_to_delete {
             self.index.delete(to_delete, &lock)
         }
-        if !elems.is_empty() {
-            let new_dp = DataPoint::new(self.index.get_location(), elems)?;
-            self.index.add(resource_id, new_dp, &lock);
+        info!("Indexing datapoints");
+        for (key, data_point) in data_points {
+            self.index.add(key, data_point, &lock);
         }
         self.index.commit(lock)?;
-        info!("Entry for new index added");
-
-        info!("Set resource in vector ends");
+        info!("New version commited");
         Ok(())
     }
     fn garbage_collection(&mut self) {}

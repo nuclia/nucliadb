@@ -98,10 +98,6 @@ impl Index {
         std::mem::drop(lock);
         Ok(index)
     }
-    pub fn has_resource(&self, resource: impl AsRef<str>, _: &ELock) -> bool {
-        let state = self.state.read().unwrap();
-        state.has_id(resource.as_ref())
-    }
     pub fn delete(&mut self, prefix: impl AsRef<str>, _: &ELock) {
         let mut state = self.state.write().unwrap();
         state.remove(prefix.as_ref());
@@ -110,13 +106,8 @@ impl Index {
         let mut state = self.state.write().unwrap();
         state.add(resource, dp);
     }
-    pub fn get_keys(&self, _: &Lock) -> Vec<String> {
-        self.state
-            .read()
-            .unwrap()
-            .get_keys()
-            .map(|k| k.to_string())
-            .collect()
+    pub fn get_keys(&self, _: &Lock) -> VectorR<Vec<String>> {
+        self.state.read().unwrap().get_keys()
     }
     pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<(String, f32)>> {
         let state = self.state.read().unwrap();

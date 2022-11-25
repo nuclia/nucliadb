@@ -209,6 +209,13 @@ impl DataPoint {
     pub fn meta(&self) -> Journal {
         self.journal
     }
+    pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
+        key_value::get_keys(Node, &self.nodes)
+            .map(String::from_utf8_lossy)
+            .map(|s| s.to_string())
+            .filter(|k| !delete_log.is_deleted(k.as_str()))
+            .collect()
+    }
     pub fn search<Dlog: DeleteLog>(
         &self,
         delete_log: &Dlog,
