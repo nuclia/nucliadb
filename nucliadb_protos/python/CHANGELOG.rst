@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.38
+------
+
+- Add cancelled_by_user to Classification proto
+
 0.0.37
 ------
 
