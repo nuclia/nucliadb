@@ -175,3 +175,54 @@ async def test_labels_global(
 
     resp = await nucliadb_writer.post(f"/kb/{knowledgebox}/resource/{rid}/reindex")
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_classification_labels_cancelled_by_the_user(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    expected_label = {
+        "label": "label",
+        "labelset": "labelset",
+        "cancelled_by_user": True,
+    }
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        headers={"X-SYNCHRONOUS": "TRUE"},
+        json={
+            "title": "My Resource",
+            "summary": "My summary",
+            "usermetadata": {"classifications": [expected_label]},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Check cancelled labels come in resource get
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}",
+    )
+    assert resp.status_code == 200
+    content = resp.json()
+    assert content["usermetadata"]["classifications"][0] == expected_label
+
+    # Check cancelled labels come in resource list
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resources",
+    )
+    assert resp.status_code == 200
+    content = resp.json()
+    assert (
+        content["resources"][0]["usermetadata"]["classifications"][0] == expected_label
+    )
+
+    # Check cancelled labels come in search results
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
+    assert resp.status_code == 200
+    content = resp.json()
+    assert (
+        content["resources"][rid]["usermetadata"]["classifications"][0]
+        == expected_label
+    )

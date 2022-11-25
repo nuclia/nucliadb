@@ -162,6 +162,10 @@ class Classification(BaseModel):
     label: str
 
 
+class UserClassification(Classification):
+    cancelled_by_user: bool = False
+
+
 class Sentence(BaseModel):
     start: Optional[int]
     end: Optional[int]
