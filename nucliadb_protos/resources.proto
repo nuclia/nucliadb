@@ -305,6 +305,7 @@ message FieldLayout {
 message Classification {
     string labelset = 1;
     string label = 2;
+    bool cancelled_by_user = 3;
 }
 
 message UserMetadata {

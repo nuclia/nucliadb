@@ -1225,15 +1225,18 @@ class Classification(google.protobuf.message.Message):
 
     LABELSET_FIELD_NUMBER: builtins.int
     LABEL_FIELD_NUMBER: builtins.int
+    CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
     labelset: builtins.str
     label: builtins.str
+    cancelled_by_user: builtins.bool
     def __init__(
         self,
         *,
         labelset: builtins.str = ...,
         label: builtins.str = ...,
+        cancelled_by_user: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["label", b"label", "labelset", b"labelset"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["cancelled_by_user", b"cancelled_by_user", "label", b"label", "labelset", b"labelset"]) -> None: ...
 
 global___Classification = Classification
 
