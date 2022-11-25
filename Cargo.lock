@@ -1732,6 +1732,7 @@ dependencies = [
  "dockertest",
  "env_logger 0.9.3",
  "log",
+ "parse_duration",
  "rand 0.8.5",
  "serde",
  "serde_json",

@@ -3,13 +3,14 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
 use log::{debug, error, info};
-use nucliadb_cluster::cluster::{Cluster, NodeType};
+use nucliadb_cluster::cluster::{Cluster, Member, NodeType};
 use rand::Rng;
 use structopt::StructOpt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net;
 use tokio::net::TcpStream;
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::sync::watch::Receiver;
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
@@ -25,6 +26,14 @@ struct Opt {
     monitor_addr: String,
     #[structopt(short, long, env = "HOSTNAME")]
     pub_ip: String,
+    #[structopt(
+        short,
+        long,
+        env = "UPDATE_INTERVAL",
+        default_value = "30s",
+        parse(try_from_str = parse_duration::parse)
+    )]
+    update_interval: Duration,
 }
 
 async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
@@ -83,32 +92,38 @@ async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
     }
 }
 
-async fn send_update(update: String, stream: &mut TcpStream) -> anyhow::Result<()> {
-    debug!("write_buf");
-    if let Err(e) = stream.write_buf(&mut update.as_bytes()).await {
-        error!("Error during writing cluster members vector: {e}")
-    };
-    debug!("Try flush");
-    if let Err(e) = stream.flush().await {
-        error!("Error during flushing writer: {e}")
-    };
+async fn send_update(
+    watcher: &Receiver<Vec<Member>>,
+    stream: &mut TcpStream,
+    opt: &Opt,
+) -> anyhow::Result<()> {
+    if !check_peer(stream).await? {
+        error!("Check peer failed before members sending. Try to reconnect");
 
-    let mut buf = vec![];
-
-    info!("Try read the answer");
-    match stream.read_buf(&mut buf).await {
-        Ok(n) if n > 0 => {
-            info!("valid answer received: {:#?}", buf);
-
-            Ok(())
-        }
-        _ => {
-            info!("invalid ack: {:#?}", buf);
-
-            Err(anyhow!("invalid ack"))
-        }
+        stream.shutdown().await?;
+        *stream = get_stream(opt.monitor_addr.clone()).await?;
     }
+
+    let members = &*watcher.borrow();
+
+    if !members.is_empty() {
+        let serial = serde_json::to_string(&members)
+            .map_err(|e| anyhow!("Cannot serialize cluster members: {e}"))?;
+
+        stream
+            .write_buf(&mut serial.as_bytes())
+            .await
+            .map_err(|e| anyhow!("Error during sending cluster members: {e}"))?;
+
+        stream
+            .flush()
+            .await
+            .map_err(|e| anyhow!("Error during flushing stream: {e}"))?;
+    }
+
+    Ok(())
 }
+
 pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
     let mut tries = 5;
     while tries != 0 {
@@ -125,6 +140,8 @@ pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
     let opt = Opt::from_args();
 
     let mut termination = signal(SignalKind::terminate())?;
@@ -132,9 +149,9 @@ async fn main() -> anyhow::Result<()> {
     let host = format!("{}:{}", &opt.pub_ip, &opt.listen_port);
     let addr = reliable_lookup_host(&host).await?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(node_id.to_string(), addr, opt.node_type, opt.seeds)
+    let cluster = Cluster::new(node_id.to_string(), addr, opt.node_type, opt.seeds.clone())
         .await
-        .with_context(|| "Can't create cluster instance ")?;
+        .with_context(|| "Can't create cluster instance")?;
 
     let mut watcher = cluster.members_change_watcher();
     let mut writer = get_stream(opt.monitor_addr.clone())
@@ -147,37 +164,28 @@ async fn main() -> anyhow::Result<()> {
                 writer.shutdown().await?;
                 break
             },
+            _ = sleep(opt.update_interval) => {
+                debug!("Fixed update");
+
+                if let Err(e) = send_update(&watcher, &mut writer, &opt).await {
+                    error!("Send cluster members failed: {e}");
+                } else {
+                    info!("Update sended")
+                }
+            },
             res = watcher.changed() => {
                 debug!("Something changed");
+
                 if let Err(e) = res {
-                    error!("update received with error: {e}");
+                    error!("members received with error: {e}");
                     continue
                 }
-                let update = &*watcher.borrow();
-                if !update.is_empty() {
-                    let ser = match serde_json::to_string(&update) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            error!("Error during vector of members serialization: {e}");
-                            continue
-                        }
-                    };
-                    debug!("Serialized update {ser}");
-                    while let Ok(false) = watcher.has_changed() {
-                        if check_peer(&mut writer).await? {
-                            debug!("Correct peer response");
-                            if let Ok(()) = send_update(ser.clone(), &mut writer).await {
-                                debug!("Update sended");
-                                break
-                            }
-                            debug!("send update failed")
-                        } else {
-                            error!("Check peer failed before update sending. Sleep 200ms and reconnect");
-                            writer.shutdown().await?;
-                            writer = get_stream(opt.monitor_addr.clone()).await?
-                        }
-                    }
-                };
+
+                if let Err(e) = send_update(&watcher, &mut writer, &opt).await {
+                    error!("Send cluster members failed: {e}");
+                } else {
+                    info!("Update sended")
+                }
             }
         };
     }
