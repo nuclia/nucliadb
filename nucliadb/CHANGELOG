@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.0.14
+
+- Revert returning classification labels on resource list.
+
 ## 2.0.13
 
 - Include processing queue type info on resource

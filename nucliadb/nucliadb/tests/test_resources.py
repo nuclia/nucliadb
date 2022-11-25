@@ -19,10 +19,7 @@
 #
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.tests.test_search import broker_resource_with_classifications
-from nucliadb.tests.utils import inject_message
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
@@ -142,25 +139,3 @@ async def test_list_resources(
         got_rids.add(r["id"])
 
     assert got_rids == rids
-
-
-@pytest.mark.asyncio
-async def test_list_resources_serializes_labels(
-    nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox: str,
-):
-    bm = broker_resource_with_classifications(knowledgebox)
-    await inject_message(nucliadb_grpc, bm)
-
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{knowledgebox}/resources")
-    assert resp.status_code == 200
-
-    content = resp.json()
-    resource = content["resources"][0]
-    extracted_metadata = resource["data"]["files"]["file"]["extracted"]["metadata"][
-        "metadata"
-    ]
-    assert extracted_metadata["classifications"] == [
-        {"label": "label1", "labelset": "labelset1"}
-    ]
