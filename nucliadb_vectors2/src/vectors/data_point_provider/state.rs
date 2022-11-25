@@ -200,9 +200,6 @@ impl State {
         if let Some(no_nodes) = self.resources.remove(id) {
             self.no_nodes -= no_nodes;
             self.delete_log.insert(id.as_bytes(), SystemTime::now());
-            if self.current.size() > 0 {
-                self.close_work_unit();
-            }
         }
     }
     pub fn add(&mut self, id: String, dp: DataPoint) {
