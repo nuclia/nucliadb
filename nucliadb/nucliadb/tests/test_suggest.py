@@ -136,6 +136,7 @@ async def test_suggest_related_entities(
     ]
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
+        headers={"X-SYNCHRONOUS": "True"},
         json={
             "title": "My resource",
             "slug": "myresource",
