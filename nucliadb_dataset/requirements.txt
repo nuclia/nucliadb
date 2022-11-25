@@ -1,4 +1,4 @@
 protobuf>=3.19.3
-types-protobuf>=3.19.5
+types-protobuf>=3.19.5,<4.0
 grpcio
 nucliadb-protos

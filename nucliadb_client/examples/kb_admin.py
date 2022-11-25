@@ -21,8 +21,10 @@ from typing import Dict, Iterator, List, Optional
 
 try:
     import torch
+
+    LOADED_TORCH = True
 except ImportError:
-    torch = None  # type: ignore
+    LOADED_TORCH = False
 
 import time
 
@@ -36,8 +38,10 @@ from nucliadb_protos.writer_pb2 import SetVectorsRequest
 
 try:
     import transformers  # type: ignore
+
+    LOADED_TRANSFORMERS = True
 except ImportError:
-    transformers = None
+    LOADED_TRANSFORMERS = False
 
 from datetime import datetime
 
@@ -56,10 +60,10 @@ ALL_FIELD_TYPES = [field_name.value for field_name in FieldTypeName]
 
 class VectorsRecomputer:
     def __init__(self, modelid=None):
-        if torch is None:
+        if LOADED_TORCH is False:
             raise ImportError("torch lib is required")
 
-        if transformers is None:
+        if LOADED_TRANSFORMERS is False:
             raise ImportError("transformers lib is required")
 
         self.modelid = modelid
