@@ -323,7 +323,7 @@ async def test_resource_search_query_param_is_optional(search_api, knowledgebox)
         assert resp.status_code == 200
 
         # Less than 3 characters should fail
-        for query in ("", "f", "fo"):
+        for query in ("f", "fo"):
             resp = await client.get(f"/{KB_PREFIX}/{kb}/search?query={query}")
             assert resp.status_code == 422
             content = resp.json()
