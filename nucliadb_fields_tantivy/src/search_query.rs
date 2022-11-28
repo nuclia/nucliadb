@@ -42,7 +42,6 @@ pub fn create_query(
             .parse_query(text)
             .unwrap_or_else(|_| Box::new(AllQuery))
     };
-
     queries.push((Occur::Must, main_q));
     // Fields
     search
@@ -67,5 +66,9 @@ pub fn create_query(
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
             queries.push((Occur::Must, Box::new(facet_term_query)));
         });
-    Box::new(BooleanQuery::new(queries))
+    if queries.len() == 1 && queries[0].1.is::<AllQuery>() {
+        queries.pop().unwrap().1
+    } else {
+        Box::new(BooleanQuery::new(queries))
+    }
 }
