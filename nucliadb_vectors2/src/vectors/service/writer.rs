@@ -63,9 +63,8 @@ impl WriterChild for VectorWriterService {
             for paragraph in resource.paragraphs.values() {
                 for (key, index) in paragraph.paragraphs.iter() {
                     let index_key = key.clone();
-                    let mut labels = resource.labels.clone();
-                    labels.append(&mut index.labels.clone());
-                    let labels = LabelDictionary::new(labels);
+                    let labels = resource.labels.iter().chain(index.labels.iter()).cloned();
+                    let labels = LabelDictionary::new(labels.collect());
                     let elems = index
                         .sentences
                         .iter()
