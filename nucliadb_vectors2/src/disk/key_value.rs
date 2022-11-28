@@ -163,6 +163,7 @@ pub fn get_value<S: Slot>(interface: S, src: &[u8], id: usize) -> &[u8] {
     interface.read_exact(&src[pointer..]).0
 }
 
+// Returns all the keys stored at the serialized key-value 'x'
 // O(1)
 pub fn get_keys<'a, S: Slot + Copy + 'a>(
     interface: S,
