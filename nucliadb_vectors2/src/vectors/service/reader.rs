@@ -99,7 +99,10 @@ impl ReaderChild for VectorReaderService {
     }
     fn stored_ids(&self) -> Vec<String> {
         let lock = self.index.get_slock().unwrap();
-        self.index.get_keys(&lock)
+        self.index.get_keys(&lock).unwrap_or_else(|err| {
+            error!("Error while getting keys {err}");
+            vec![]
+        })
     }
     fn reload(&self) {}
 }
@@ -220,6 +223,8 @@ mod tests {
             with_duplicates: false,
         };
         let result = reader.search(&request).unwrap();
+        let no_nodes = reader.count();
+        assert_eq!(no_nodes, 4);
         assert_eq!(result.documents.len(), 3);
     }
 }

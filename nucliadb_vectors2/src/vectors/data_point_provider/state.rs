@@ -119,6 +119,10 @@ pub struct State {
     delete_log: DTrie<SystemTime>,
     work_stack: LinkedList<WorkUnit>,
     data_points: HashMap<DpId, SystemTime>,
+    // Deprecated field, not all vector clusters are
+    // identified by a resource.
+    #[serde(skip)]
+    #[allow(unused)]
     resources: HashMap<String, usize>,
 }
 impl State {
@@ -133,6 +137,7 @@ impl State {
     fn add_dp(&mut self, dp: DataPoint, time: SystemTime) {
         let mut meta = dp.meta();
         meta.update_time(time);
+        self.no_nodes += meta.no_nodes();
         self.data_points.insert(meta.id(), meta.time());
         self.current.add_unit(meta);
         if self.current.size() == BUFFER_CAP {
@@ -161,8 +166,19 @@ impl State {
     pub fn get_no_nodes(&self) -> usize {
         self.no_nodes
     }
-    pub fn get_keys(&self) -> impl Iterator<Item = &str> {
-        self.resources.keys().map(|k| k.as_str())
+    pub fn get_keys(&self) -> VectorR<Vec<String>> {
+        let mut keys = vec![];
+        let mut delete_log = TimeSensitiveDLog {
+            dlog: &self.delete_log,
+            time: SystemTime::now(),
+        };
+        for (dp_id, time) in self.data_points.iter() {
+            delete_log.time = *time;
+            let data_point = DataPoint::open(&self.location, *dp_id)?;
+            let mut results = data_point.get_keys(&delete_log);
+            keys.append(&mut results);
+        }
+        Ok(keys)
     }
     pub fn create_dlog(&self, journal: Journal) -> impl DeleteLog + '_ {
         TimeSensitiveDLog {
@@ -193,22 +209,11 @@ impl State {
         }
         Ok(ffsv.into())
     }
-    pub fn has_id(&self, id: &str) -> bool {
-        self.resources.contains_key(id)
-    }
     pub fn remove(&mut self, id: &str) {
-        if let Some(no_nodes) = self.resources.remove(id) {
-            self.no_nodes -= no_nodes;
-            self.delete_log.insert(id.as_bytes(), SystemTime::now());
-            if self.current.size() > 0 {
-                self.close_work_unit();
-            }
-        }
+        self.delete_log.insert(id.as_bytes(), SystemTime::now());
     }
     pub fn add(&mut self, id: String, dp: DataPoint) {
         self.remove(&id);
-        self.resources.insert(id, dp.meta().no_nodes());
-        self.no_nodes += dp.meta().no_nodes();
         self.add_dp(dp, SystemTime::now());
     }
     pub fn replace_work_unit(&mut self, new: DataPoint, ctime: SystemTime) {
@@ -225,6 +230,7 @@ impl State {
                 .collect::<Vec<_>>();
             older.iter().for_each(|v| self.delete_log.delete(v));
             unit.load.iter().cloned().for_each(|dp| {
+                self.no_nodes -= dp.no_nodes();
                 self.data_points.remove(&dp.id());
             });
             self.add_dp(new, ctime);

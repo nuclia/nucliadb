@@ -43,12 +43,14 @@ fn simple_flow() {
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
     }
+    let mut expected_keys = vec![];
     let label_dictionary = LabelDictionary::new(labels.clone());
     for i in 0..50 {
         let key = format!("KEY_{}", i);
         let vector = vec![rand::random::<f32>(); 8];
         let labels = label_dictionary.clone();
-        elems.push(Elem::new(key, vector, labels));
+        elems.push(Elem::new(key.clone(), vector, labels));
+        expected_keys.push(key);
     }
     let reader = DataPoint::new(temp_dir.path(), elems).unwrap();
     let id = reader.get_id();
@@ -56,6 +58,9 @@ fn simple_flow() {
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
     let result = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
+    let got_keys = reader.get_keys(&HashSet::new());
+    assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
+    assert_eq!(got_keys.len(), expected_keys.len());
     assert_eq!(result.len(), no_results);
 }
 
