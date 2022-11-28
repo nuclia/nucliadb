@@ -269,6 +269,11 @@ async def test_search_with_filters(
 
     await inject_message(nucliadb_grpc, bm)
 
+    # Check that empty search should return the resource
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?features=document")
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
+
     # Check that filtering by pdf icon returns it
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/pdf"
