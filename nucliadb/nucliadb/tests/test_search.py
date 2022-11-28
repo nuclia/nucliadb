@@ -255,3 +255,34 @@ async def test_search_returns_labels(
     assert extracted_metadata["classifications"] == [
         {"label": "label1", "labelset": "labelset1"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_search_with_filters(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    bm = broker_resource(knowledgebox)
+    bm.basic.icon = "/n/i/application/pdf"
+
+    await inject_message(nucliadb_grpc, bm)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["resources"]) == 1
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/pdf"
+    )
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["resources"]) == 1
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?show=basic&filters=unexisting/filter"
+    )
+    assert resp.status_code == 200
+    content = resp.json()
+    assert len(content["resources"]) == 0
