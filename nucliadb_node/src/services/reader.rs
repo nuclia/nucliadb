@@ -439,19 +439,19 @@ impl ShardReaderService {
             })
         };
 
-        let filters = search_request
-            .filter
-            .iter()
-            .flat_map(|f| f.tags.iter().cloned());
-        let fields = search_request.fields.iter().cloned();
         let vector_request = VectorSearchRequest {
             id: "".to_string(),
             vector: search_request.vector.clone(),
-            tags: fields.chain(filters).collect(),
             reload: search_request.reload,
             page_number: search_request.page_number,
             result_per_page: search_request.result_per_page,
             with_duplicates: true,
+            tags: search_request
+                .filter
+                .iter()
+                .flat_map(|f| f.tags.iter().cloned())
+                .chain(search_request.fields.iter().cloned())
+                .collect(),
         };
         let vector_reader_service = self.vector_reader.clone();
         let span = tracing::Span::current();
