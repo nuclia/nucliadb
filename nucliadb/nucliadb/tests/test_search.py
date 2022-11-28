@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from datetime import datetime
 
 import pytest
@@ -268,21 +269,24 @@ async def test_search_with_filters(
 
     await inject_message(nucliadb_grpc, bm)
 
+    # Wait a little bit
+    await asyncio.sleep(1)
+
+    # Empty search should return the resource
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search")
     assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["resources"]) == 1
+    assert len(resp.json()["resources"]) == 1
 
+    # Check that filtering by pdb icon returns it
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/pdf"
     )
     assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["resources"]) == 1
+    assert len(resp.json()["resources"]) == 1
 
+    # With a different icon should return no results
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/docx"
     )
     assert resp.status_code == 200
-    content = resp.json()
-    assert len(content["resources"]) == 0
+    assert len(resp.json()["resources"]) == 0
