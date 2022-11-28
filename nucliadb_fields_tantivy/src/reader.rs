@@ -90,10 +90,7 @@ impl ReaderChild for FieldReaderService {
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         info!("Document search at {}:{}", line!(), file!());
-        let body = &request.body;
-        let results = request.result_per_page;
-        let only_facets = results == 0 || (body.is_empty() && request.filter.is_none());
-        Ok(self.do_search(request, only_facets))
+        Ok(self.do_search(request))
     }
 
     fn reload(&self) {
@@ -386,11 +383,7 @@ impl FieldReaderService {
         }
     }
 
-    fn do_search(
-        &self,
-        request: &DocumentSearchRequest,
-        only_facets: bool,
-    ) -> DocumentSearchResponse {
+    fn do_search(&self, request: &DocumentSearchRequest) -> DocumentSearchResponse {
         use crate::search_query::create_query;
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
@@ -425,7 +418,7 @@ impl FieldReaderService {
         }
         let searcher = self.reader.searcher();
         match order_field {
-            _ if only_facets => {
+            _ if results == 0 || query.is::<AllQuery>() => {
                 // Just a facet search
                 let facets_count = searcher.search(&query, &facet_collector).unwrap();
                 self.convert_bm25_order(
@@ -691,6 +684,7 @@ mod tests {
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
         assert_eq!(result.total, 0);
+
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
             body: "".to_string(),
@@ -705,8 +699,8 @@ mod tests {
         };
 
         let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 1);
 
-        assert_eq!(result.total, 0);
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
             body: "".to_string(),

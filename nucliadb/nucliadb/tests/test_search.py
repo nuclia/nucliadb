@@ -255,3 +255,30 @@ async def test_search_returns_labels(
     assert extracted_metadata["classifications"] == [
         {"label": "label1", "labelset": "labelset1"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_search_with_filters(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    # Inject a resource with a pdf icon
+    bm = broker_resource(knowledgebox)
+    bm.basic.icon = "application/pdf"
+
+    await inject_message(nucliadb_grpc, bm)
+
+    # Check that filtering by pdf icon returns it
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/pdf"
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
+
+    # With a different icon should return no results
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/docx"
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 0
