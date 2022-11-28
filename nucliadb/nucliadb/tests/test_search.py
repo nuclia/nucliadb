@@ -264,7 +264,7 @@ async def test_search_with_filters(
     knowledgebox,
 ):
     bm = broker_resource(knowledgebox)
-    bm.basic.icon = "/n/i/application/pdf"
+    bm.basic.icon = "application/pdf"
 
     await inject_message(nucliadb_grpc, bm)
 
@@ -281,7 +281,7 @@ async def test_search_with_filters(
     assert len(content["resources"]) == 1
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?show=basic&filters=unexisting/filter"
+        f"/kb/{knowledgebox}/search?show=basic&filters=/n/i/application/docx"
     )
     assert resp.status_code == 200
     content = resp.json()
