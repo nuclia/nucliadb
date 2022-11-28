@@ -113,7 +113,7 @@ class ResourceDeleted(BaseModel):
     seqid: Optional[int] = None
 
 
-ComminResourcePayload = Union[CreateResourcePayload, UpdateResourcePayload]
+ComingResourcePayload = Union[CreateResourcePayload, UpdateResourcePayload]
 
 
 class ResourceFileUploaded(BaseModel):

@@ -40,14 +40,14 @@ from nucliadb.models import RelationType
 from nucliadb.models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb.models.text import PushTextFormat, Text
 from nucliadb.models.writer import (
-    ComminResourcePayload,
+    ComingResourcePayload,
     CreateResourcePayload,
     UpdateResourcePayload,
 )
 
 
 def parse_basic_modify(
-    bm: BrokerMessage, item: ComminResourcePayload, toprocess: PushPayload
+    bm: BrokerMessage, item: ComingResourcePayload, toprocess: PushPayload
 ):
     bm.basic.modified.FromDatetime(datetime.now())
     if item.title:
@@ -112,10 +112,13 @@ def parse_basic_modify(
     if item.usermetadata is not None:
         # protobuferrs repeated fields don't support assignment
         # will allways be a clean basic
-
         bm.basic.usermetadata.classifications.extend(
             [
-                Classification(labelset=x.labelset, label=x.label)
+                Classification(
+                    labelset=x.labelset,
+                    label=x.label,
+                    cancelled_by_user=x.cancelled_by_user,
+                )
                 for x in item.usermetadata.classifications
             ]
         )

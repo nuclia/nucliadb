@@ -481,6 +481,8 @@ pub struct Classification {
     pub labelset: ::prost::alloc::string::String,
     #[prost(string, tag="2")]
     pub label: ::prost::alloc::string::String,
+    #[prost(bool, tag="3")]
+    pub cancelled_by_user: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserMetadata {

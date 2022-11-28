@@ -28,7 +28,7 @@ from pydantic.class_validators import root_validator
 from nucliadb.models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
 
-from .common import Classification, FieldID
+from .common import Classification, FieldID, UserClassification
 
 _T = TypeVar("_T")
 
@@ -183,7 +183,7 @@ def convert_pb_relation_to_api(relation: utils_pb2.Relation):
 
 
 class UserMetadata(BaseModel):
-    classifications: List[Classification] = []
+    classifications: List[UserClassification] = []
     relations: List[Relation] = []
 
     @classmethod
