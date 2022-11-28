@@ -29,7 +29,7 @@ use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
     Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
-use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy, Searcher,
@@ -398,11 +398,7 @@ impl FieldReaderService {
             query_parser
         };
         let text = FieldReaderService::adapt_text(&query_parser, &request.body);
-        let query = if !request.body.is_empty() {
-            create_query(&query_parser, request, &self.schema, &text)
-        } else {
-            Box::new(AllQuery) as Box<dyn Query>
-        };
+        let query = create_query(&query_parser, request, &self.schema, &text);
 
         // Offset to search from
         let results = request.result_per_page as usize;
@@ -725,7 +721,7 @@ mod tests {
         };
 
         let result = field_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 2);
+        assert_eq!(result.total, 1);
         Ok(())
     }
 }

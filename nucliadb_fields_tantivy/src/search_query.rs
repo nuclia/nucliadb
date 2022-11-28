@@ -38,7 +38,9 @@ pub fn create_query(
     let main_q = if text.is_empty() {
         Box::new(AllQuery)
     } else {
-        parser.parse_query(text).unwrap()
+        parser
+            .parse_query(text)
+            .unwrap_or_else(|_| Box::new(AllQuery))
     };
 
     queries.push((Occur::Must, main_q));
