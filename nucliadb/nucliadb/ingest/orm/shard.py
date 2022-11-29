@@ -29,7 +29,7 @@ from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
-from nucliadb.ingest import SERVICE_NAME  # type: ignore
+from nucliadb.ingest import SERVICE_NAME, logger  # type: ignore
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.abc import AbstractShard
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -71,14 +71,19 @@ class Shard(AbstractShard):
                 resource.resource.shard_id
             ) = shard = shardreplica.shard.id
             if reindex_id is not None:
+                logger.info(f"Starting storage.reindexing at shard {shard}")
                 indexpb = await storage.reindexing(
                     resource, shardreplica.node, shard, reindex_id
                 )
+                logger.info(f"Finished storage.reindexing at shard {shard}")
             else:
                 indexpb = await storage.indexing(
                     resource, shardreplica.node, shard, txid
                 )
+
+            logger.info(f"Starting indexing.indexing at shard {shard}")
             await indexing.index(indexpb, shardreplica.node)
+            logger.info(f"Finished indexing.indexing at shard {shard}")
 
             try:
                 res: Counter = await NODES[shardreplica.node].sidecar.GetCount(shardreplica.shard)  # type: ignore

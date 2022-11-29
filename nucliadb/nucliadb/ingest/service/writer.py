@@ -569,6 +569,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             logger.info("Generating index message")
             brain = await resobj.generate_index_message()
+            vector_lengths = [
+                len(vec.vector)
+                for par in brain.brain.paragraphs.values()
+                for pp in par.paragraphs.values()
+                for vec in pp.sentences.values()
+            ]
+            vectors_size = sum(vector_lengths)
+            n_vectors = len(vector_lengths)
+            logger.info(
+                f"About to index {n_vectors} vectors with size {vectors_size} floats"
+            )
 
             logger.info("Calling kbobj.get_resource_shard_id")
             shard_id = await kbobj.get_resource_shard_id(request.rid)
@@ -593,6 +604,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if shard is not None:
                 logger.info("Calling shard.add_resource")
                 count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
+                logger.info("Finished shard.add_resource")
+
                 if count > settings.max_node_fields:
                     logger.info("Calling node_klass.create_shard_by_kbid")
                     shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
