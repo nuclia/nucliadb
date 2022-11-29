@@ -134,7 +134,11 @@ class Storage:
         if self.indexing_bucket is None:
             raise AttributeError()
         key = INDEXING.format(node=node, shard=shard, txid=reindex_id)
-        await self.uploadbytes(self.indexing_bucket, key, message.SerializeToString())
+        logger.info("Starting to serialize message")
+        message_serialized = message.SerializeToString()
+        logger.info("Starting to upload bytes")
+        await self.uploadbytes(self.indexing_bucket, key, message_serialized)
+        logger.info("Finished to upload bytes")
         response = IndexMessage()
         response.node = node
         response.shard = shard

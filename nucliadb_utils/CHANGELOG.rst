@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.14
+------
+
+- Add temporary logging
+
 1.0.13
 ------
 
