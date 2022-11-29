@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.1.3
+
+- Make timeout on resource.reindex configurable via method args
+
 ## 1.1.2
 
 - Be able to reindex vectors too
