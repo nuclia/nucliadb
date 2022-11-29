@@ -169,9 +169,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         evw = ExtractedVectorsWrapper()
         evw.field.CopyFrom(request.field)
         evw.vectors.CopyFrom(request.vectors)
+        logger.debug(f"Setting {len(request.vectors.vectors.vectors)} vectors")
 
-        await field.set_vectors(evw)
-        await txn.commit(resource=False)
+        try:
+            await field.set_vectors(evw)
+            await txn.commit(resource=False)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            await txn.abort()
+
         return response
 
     async def NewKnowledgeBox(  # type: ignore
@@ -250,14 +258,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             try:
                 await kbobj.set_labelset(request.id, request.labelset)
+                await txn.commit(resource=False)
+                response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
                 traceback.print_exc()
                 response.status = OpStatusWriter.Status.ERROR
-
-            await txn.commit(resource=False)
-            response.status = OpStatusWriter.Status.OK
+                await txn.abort()
         else:
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
@@ -270,14 +278,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             try:
                 await kbobj.del_labelset(request.id)
+                await txn.commit(resource=False)
+                response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
                 traceback.print_exc()
                 response.status = OpStatusWriter.Status.ERROR
-
-            await txn.commit(resource=False)
-            response.status = OpStatusWriter.Status.OK
+                await txn.abort()
         else:
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
@@ -350,12 +358,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
-        if kbobj is not None:
-            await kbobj.set_entities(request.group, request.entities)
-            response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
         if kbobj is None:
+            await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
+            return response
+        await kbobj.set_entities(request.group, request.entities)
+        response.status = OpStatusWriter.Status.OK
+        await txn.commit(resource=False)
         return response
 
     async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
@@ -365,14 +374,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             try:
                 await kbobj.del_entities(request.group)
+                await txn.commit(resource=False)
+                response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
                 traceback.print_exc()
                 response.status = OpStatusWriter.Status.ERROR
-
-            await txn.commit(resource=False)
-            response.status = OpStatusWriter.Status.OK
+                await txn.abort()
         else:
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
@@ -412,12 +421,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = OpStatusWriter()
-        if kbobj is not None:
-            await kbobj.set_widgets(request.widget)
-            response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
         if kbobj is None:
+            await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
+            return response
+        await kbobj.set_widgets(request.widget)
+        response.status = OpStatusWriter.Status.OK
+        await txn.commit(resource=False)
         return response
 
     async def DelWidgets(self, request: DetWidgetsRequest, context=None) -> OpStatusWriter:  # type: ignore
@@ -427,14 +437,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         if kbobj is not None:
             try:
                 await kbobj.del_widgets(request.widget)
+                await txn.commit(resource=False)
+                response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
                 traceback.print_exc()
                 response.status = OpStatusWriter.Status.ERROR
-
-            await txn.commit(resource=False)
-            response.status = OpStatusWriter.Status.OK
+                await txn.abort()
         else:
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
@@ -551,31 +561,37 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         storage = await get_storage(service_name=SERVICE_NAME)
         cache = await get_cache()
-
-        kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
-        resobj = ResourceORM(txn, storage, kbobj, request.rid)
-        resobj.disable_vectors = not request.reindex_vectors
-        brain = await resobj.generate_index_message()
-        shard_id = await kbobj.get_resource_shard_id(request.rid)
-        shard: Optional[Shard] = None
-        node_klass = get_node_klass()
-        if shard_id is not None:
-            shard = await kbobj.get_resource_shard(shard_id, node_klass)
-        if shard is None:
-            # Its a new resource
-            # Check if we have enough resource to create a new shard
-            shard = await node_klass.actual_shard(txn, request.kbid)
+        try:
+            kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
+            resobj = ResourceORM(txn, storage, kbobj, request.rid)
+            resobj.disable_vectors = not request.reindex_vectors
+            brain = await resobj.generate_index_message()
+            shard_id = await kbobj.get_resource_shard_id(request.rid)
+            shard: Optional[Shard] = None
+            node_klass = get_node_klass()
+            if shard_id is not None:
+                shard = await kbobj.get_resource_shard(shard_id, node_klass)
             if shard is None:
-                shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
-            await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
+                # Its a new resource
+                # Check if we have enough resource to create a new shard
+                shard = await node_klass.actual_shard(txn, request.kbid)
+                if shard is None:
+                    shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
+                await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
-        if shard is not None:
-            count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
-            if count > settings.max_node_fields:
-                shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
-        response = IndexStatus()
-        await txn.abort()
-        return response
+            if shard is not None:
+                count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
+                if count > settings.max_node_fields:
+                    shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
+            response = IndexStatus()
+            await txn.abort()
+            return response
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            await txn.abort()
+            raise
 
     async def Export(self, request: ExportRequest, context=None):
         try:
