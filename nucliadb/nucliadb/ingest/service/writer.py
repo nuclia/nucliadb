@@ -569,15 +569,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             logger.info("Generating index message")
             brain = await resobj.generate_index_message()
-            n_vectors = sum(
-                [
-                    1
-                    for par in brain.brain.paragraphs.values()
-                    for pp in par.paragraphs.values()
-                    for _ in pp.sentences.values()
-                ]
+            vector_lengths = [
+                len(vec.vector)
+                for par in brain.brain.paragraphs.values()
+                for pp in par.paragraphs.values()
+                for vec in pp.sentences.values()
+            ]
+            vectors_size = sum(vector_lengths)
+            n_vectors = len(vector_lengths)
+            logger.info(
+                f"About to index {n_vectors} vectors with size {vectors_size} floats"
             )
-            logger.info(f"Vectors size {n_vectors}")
 
             logger.info("Calling kbobj.get_resource_shard_id")
             shard_id = await kbobj.get_resource_shard_id(request.rid)
