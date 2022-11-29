@@ -558,31 +558,45 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return response
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
-        txn = await self.proc.driver.begin()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
         try:
+            logger.info("Starting reindex")
+            txn = await self.proc.driver.begin()
+            storage = await get_storage(service_name=SERVICE_NAME)
+            cache = await get_cache()
             kbobj = KnowledgeBoxORM(txn, storage, cache, request.kbid)
             resobj = ResourceORM(txn, storage, kbobj, request.rid)
             resobj.disable_vectors = not request.reindex_vectors
+
+            logger.info("Generating index message")
             brain = await resobj.generate_index_message()
+
+            logger.info("Calling kbobj.get_resource_shard_id")
             shard_id = await kbobj.get_resource_shard_id(request.rid)
             shard: Optional[Shard] = None
             node_klass = get_node_klass()
             if shard_id is not None:
+                logger.info("Calling kbojb.get_resource_shard")
                 shard = await kbobj.get_resource_shard(shard_id, node_klass)
+
             if shard is None:
                 # Its a new resource
                 # Check if we have enough resource to create a new shard
+                logger.info("Calling node_klass.actual_shard")
                 shard = await node_klass.actual_shard(txn, request.kbid)
                 if shard is None:
+                    logger.info("Calling node_klass.create_shard_by_kbid")
                     shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
+
+                logger.info("Calling kbobj.set_resource_shard_id")
                 await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
             if shard is not None:
+                logger.info("Calling shard.add_resource")
                 count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
                 if count > settings.max_node_fields:
+                    logger.info("Calling node_klass.create_shard_by_kbid")
                     shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
+
             response = IndexStatus()
             await txn.abort()
             return response
