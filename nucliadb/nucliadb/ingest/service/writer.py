@@ -169,7 +169,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         evw = ExtractedVectorsWrapper()
         evw.field.CopyFrom(request.field)
         evw.vectors.CopyFrom(request.vectors)
-        logger.debug(f"Setting {len(request.vectors)} vectors")
+        logger.debug(f"Setting {len(request.vectors.vectors.vectors)} vectors")
 
         try:
             await field.set_vectors(evw)
