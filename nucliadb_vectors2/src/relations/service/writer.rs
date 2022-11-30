@@ -149,9 +149,7 @@ impl WriterChild for RelationsWriterService {
 
 impl RelationsWriterService {
     pub fn start(config: &RelationConfig) -> InternalResult<Self> {
-        let path = std::path::Path::new(&config.path);
-        let (index, wmode) = Index::new_writer(path)?;
-        Ok(RelationsWriterService { index, wmode })
+        Self::open(config).or_else(|_| Self::new(config))
     }
     pub fn new(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
