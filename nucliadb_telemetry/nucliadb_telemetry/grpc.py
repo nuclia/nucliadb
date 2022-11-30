@@ -21,7 +21,7 @@ import functools
 from collections import OrderedDict
 from concurrent import futures
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, MutableMapping, Optional
+from typing import Any, Awaitable, Callable, List, MutableMapping, Optional
 
 import grpc
 from grpc import ChannelCredentials, ClientCallDetails, aio  # type: ignore
@@ -383,16 +383,23 @@ class OpenTelemetryGRPC:
             )
         return channel
 
-    def init_server(self, concurrency: int = 4, max_receive_message: int = 100):
+    def init_server(
+        self,
+        concurrency: int = 4,
+        max_receive_message: int = 100,
+        interceptors: Optional[List[aio.ServerInterceptor]] = None,
+    ):
         tracer = self.tracer_provider.get_tracer(f"{self.service_name}_grpc_server")
-        interceptors = [OpenTelemetryServerInterceptor(tracer=tracer)]
+        _interceptors = [OpenTelemetryServerInterceptor(tracer=tracer)]
+        if interceptors is not None:
+            _interceptors.extend(interceptors)
         options = [
             ("grpc.max_send_message_length", max_receive_message * 1024 * 1024),
             ("grpc.max_receive_message_length", max_receive_message * 1024 * 1024),
         ]
         server = aio.server(
             futures.ThreadPoolExecutor(max_workers=concurrency),
-            interceptors=interceptors,
+            interceptors=_interceptors,
             options=options,
         )
         return server
