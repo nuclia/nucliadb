@@ -57,7 +57,7 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid, Error> {
     Ok(host_key)
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, EnumString, EnumDisplay)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, EnumString, EnumDisplay)]
 pub enum NodeType {
     Node,
     Search,
@@ -85,7 +85,7 @@ impl From<&Cluster> for Member {
         Member {
             node_id: cluster.id.id.clone(),
             listen_addr: cluster.listen_addr,
-            node_type: cluster.node_type.clone(),
+            node_type: cluster.node_type,
             is_self: true,
         }
     }
@@ -164,7 +164,8 @@ impl Cluster {
         let (self_id, mut cluster_watcher) = chitchat_handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
-                state.set("node_type", node_type.clone());
+
+                state.set("node_type", node_type);
                 (
                     chitchat.self_node_id().clone(),
                     chitchat.live_nodes_watcher(),

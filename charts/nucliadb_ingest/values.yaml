@@ -30,6 +30,7 @@ chitchat:
   cluster_manager:
     port: 31337
     host: "0.0.0.0"
+    update_interval: "30s"
   node:
     node_type: Ingest
     node0_svc_fixed_ip: 10.4.0.255
