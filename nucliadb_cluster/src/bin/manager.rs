@@ -119,6 +119,22 @@ async fn send_update(
             .flush()
             .await
             .map_err(|e| anyhow!("Error during flushing stream: {e}"))?;
+
+        let mut buffer = vec![];
+
+        stream
+            .read_buf(&mut buffer)
+            .await
+            .map_err(Into::into)
+            .and_then(|n| {
+                if n == 0 {
+                    Err(anyhow!("None update answer"))
+                } else if buffer.try_into().map(u32::from_be_bytes) != Ok(members.len() as u32) {
+                    Err(anyhow!("Received invalid update answer"))
+                } else {
+                    Ok(())
+                }
+            })?;
     }
 
     Ok(())
