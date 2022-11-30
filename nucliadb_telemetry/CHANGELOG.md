@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.7
+
+- Enable adding interceptors
+
 ## 1.1.6
 
 - Open GRPCIO ping
