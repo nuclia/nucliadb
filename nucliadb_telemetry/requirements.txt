@@ -16,5 +16,5 @@ opentelemetry-instrumentation-fastapi==0.30b1
 pydantic
 requests
 fastapi
-types-protobuf
+types-protobuf>=3.19.5,<4.0
 types-requests
