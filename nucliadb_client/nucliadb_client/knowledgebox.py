@@ -95,7 +95,7 @@ class KnowledgeBox:
             return None
         return KnowledgeboxCounters.parse_raw(response.content)
 
-    def shards(self) -> Optional[KnowledgeboxCounters]:
+    def shards(self) -> KnowledgeboxShards:
         response = self.http_search_v1.get(
             "shards", headers={"X-NUCLIADB-ROLES": "MANAGER"}
         )
