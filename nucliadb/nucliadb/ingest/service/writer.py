@@ -125,25 +125,32 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def CleanAndUpgradeKnowledgeBoxIndex(  # type: ignore
         self, request: KnowledgeBoxID, context=None
     ) -> CleanedKnowledgeBoxResponse:
-        txn = await self.proc.driver.begin()
-        node_klass = get_node_klass()
-        all_shards = await node_klass.get_all_shards(txn, request.uuid)
+        try:
+            txn = await self.proc.driver.begin()
+            node_klass = get_node_klass()
+            all_shards = await node_klass.get_all_shards(txn, request.uuid)
 
-        updated_shards = PBShards()
-        updated_shards.CopyFrom(all_shards)
+            updated_shards = PBShards()
+            updated_shards.CopyFrom(all_shards)
 
-        for logic_shard in all_shards.shards:
-            shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
-            replicas_cleaned = await shard.clean_and_upgrade()
-            for replica_id, shard_cleaned in replicas_cleaned.items():
-                update_shards_with_updated_replica(
-                    updated_shards, replica_id, shard_cleaned
-                )
+            for logic_shard in all_shards.shards:
+                shard = node_klass.create_shard_klass(logic_shard.shard, logic_shard)
+                replicas_cleaned = await shard.clean_and_upgrade()
+                for replica_id, shard_cleaned in replicas_cleaned.items():
+                    update_shards_with_updated_replica(
+                        updated_shards, replica_id, shard_cleaned
+                    )
 
-        key = KB_SHARDS.format(kbid=request.uuid)
-        await txn.set(key, updated_shards.SerializeToString())
-        await txn.commit(resource=False)
-        return CleanedKnowledgeBoxResponse()
+            key = KB_SHARDS.format(kbid=request.uuid)
+            await txn.set(key, updated_shards.SerializeToString())
+            await txn.commit(resource=False)
+            return CleanedKnowledgeBoxResponse()
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            await txn.abort()
+            raise
 
     async def SetVectors(  # type: ignore
         self, request: SetVectorsRequest, context=None
