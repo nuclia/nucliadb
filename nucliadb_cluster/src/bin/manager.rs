@@ -2,36 +2,36 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
+use clap::Parser;
 use log::{debug, error, info};
 use nucliadb_cluster::cluster::{Cluster, Member, NodeType};
 use rand::Rng;
-use structopt::StructOpt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net;
-use tokio::net::TcpStream;
+use tokio::net::{self, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::watch::Receiver;
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
-#[derive(Debug, StructOpt)]
-struct Opt {
-    #[structopt(short, long, env = "LISTEN_PORT")]
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, env = "LISTEN_PORT")]
     listen_port: String,
-    #[structopt(short, long, env = "NODE_TYPE")]
+    #[arg(short, long, env = "NODE_TYPE")]
     node_type: NodeType,
-    #[structopt(short, long, env = "SEEDS", value_delimiter = ";")]
+    #[arg(short, long, env = "SEEDS", value_delimiter = ';')]
     seeds: Vec<String>,
-    #[structopt(short, long, env = "MONITOR_ADDR")]
+    #[arg(short, long, env = "MONITOR_ADDR")]
     monitor_addr: String,
-    #[structopt(short, long, env = "HOSTNAME")]
+    #[arg(short, long, env = "HOSTNAME")]
     pub_ip: String,
-    #[structopt(
+    #[arg(
         short,
         long,
         env = "UPDATE_INTERVAL",
         default_value = "30s",
-        parse(try_from_str = parse_duration::parse)
+        value_parser(parse_duration::parse)
     )]
     update_interval: Duration,
 }
@@ -95,13 +95,13 @@ async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
 async fn send_update(
     watcher: &Receiver<Vec<Member>>,
     stream: &mut TcpStream,
-    opt: &Opt,
+    args: &Args,
 ) -> anyhow::Result<()> {
     if !check_peer(stream).await? {
         error!("Check peer failed before members sending. Try to reconnect");
 
         stream.shutdown().await?;
-        *stream = get_stream(opt.monitor_addr.clone()).await?;
+        *stream = get_stream(args.monitor_addr.clone()).await?;
     }
 
     let members = &*watcher.borrow();
@@ -142,19 +142,19 @@ pub async fn reliable_lookup_host(host: &str) -> anyhow::Result<SocketAddr> {
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    let opt = Opt::from_args();
+    let arg = Args::parse();
 
     let mut termination = signal(SignalKind::terminate())?;
 
-    let host = format!("{}:{}", &opt.pub_ip, &opt.listen_port);
+    let host = format!("{}:{}", &arg.pub_ip, &arg.listen_port);
     let addr = reliable_lookup_host(&host).await?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(node_id.to_string(), addr, opt.node_type, opt.seeds.clone())
+    let cluster = Cluster::new(node_id.to_string(), addr, arg.node_type, arg.seeds.clone())
         .await
         .with_context(|| "Can't create cluster instance")?;
 
     let mut watcher = cluster.members_change_watcher();
-    let mut writer = get_stream(opt.monitor_addr.clone())
+    let mut writer = get_stream(arg.monitor_addr.clone())
         .await
         .with_context(|| "Can't create update writer")?;
     loop {
@@ -164,10 +164,10 @@ async fn main() -> anyhow::Result<()> {
                 writer.shutdown().await?;
                 break
             },
-            _ = sleep(opt.update_interval) => {
+            _ = sleep(arg.update_interval) => {
                 debug!("Fixed update");
 
-                if let Err(e) = send_update(&watcher, &mut writer, &opt).await {
+                if let Err(e) = send_update(&watcher, &mut writer, &arg).await {
                     error!("Send cluster members failed: {e}");
                 } else {
                     info!("Update sended")
@@ -181,7 +181,7 @@ async fn main() -> anyhow::Result<()> {
                     continue
                 }
 
-                if let Err(e) = send_update(&watcher, &mut writer, &opt).await {
+                if let Err(e) = send_update(&watcher, &mut writer, &arg).await {
                     error!("Send cluster members failed: {e}");
                 } else {
                     info!("Update sended")
