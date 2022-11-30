@@ -45,3 +45,10 @@ def test_knowledgebox_counters(nucliadb_client):
     assert counters.resources == 0
     assert counters.paragraphs == 0
     assert counters.sentences == 0
+
+
+def test_knowledgebox_shards(nucliadb_client):
+    kb = nucliadb_client.create_kb(
+        title="My KB", description="Its a new KB", slug="mykb"
+    )
+    assert kb.shards()

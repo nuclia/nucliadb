@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.1.4
+
+- Be able to get shard data from a knowledgebox
+
 ## 1.1.3
 
 - Make timeout on resource.reindex configurable via method args
