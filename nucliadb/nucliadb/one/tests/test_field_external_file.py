@@ -52,7 +52,7 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
             json={
                 "slug": "resource1",
                 "title": "Resource 1",
-                "files": {"field1": TEST_EXTERNAL_FILE_FIELD_PAYLOAD,},
+                "files": {"field1": TEST_EXTERNAL_FILE_FIELD_PAYLOAD},
             },
         )
         assert resp.status_code == 201
