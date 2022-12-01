@@ -16,15 +16,35 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+import pytest
+from pydantic import BaseModel, ValidationError
 
-import re
-
-import pydantic
-
-
-class FieldIdString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[^/]+$")
+from nucliadb.models.utils import SlugString
 
 
-class SlugString(pydantic.ConstrainedStr):
-    regex = re.compile(r"^[a-z0-9:_-]+$")
+class TestSlugModel(BaseModel):
+    slug: SlugString
+
+
+def test_kb_slugs():
+    """Test some examples of valid slugs and exhaustively test invalid
+    fields.
+
+    """
+    valid_field_ids = [
+        "foo",
+        "foo_bar",
+        "foo-bar_123",
+        "my-kbis:my-kb-slug",
+    ]
+    for valid in valid_field_ids:
+        TestSlugModel(slug=valid)
+
+    invalid_field_ids = [
+        "",
+        "foo/bar",
+    ]
+    for invalid in invalid_field_ids:
+        with pytest.raises(ValidationError):
+            TestSlugModel(slug=invalid)
