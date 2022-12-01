@@ -23,7 +23,7 @@ from pydantic import BaseModel, ValidationError
 from nucliadb.models.utils import SlugString
 
 
-class TestSlugModel(BaseModel):
+class DummyModel(BaseModel):
     slug: SlugString
 
 
@@ -32,19 +32,22 @@ def test_kb_slugs():
     fields.
 
     """
-    valid_field_ids = [
+    valid_slugs = [
         "foo",
         "foo_bar",
         "foo-bar_123",
         "my-kbis:my-kb-slug",
     ]
-    for valid in valid_field_ids:
-        TestSlugModel(slug=valid)
+    for valid in valid_slugs:
+        DummyModel(slug=valid)
 
-    invalid_field_ids = [
+    invalid_slugs = [
         "",
         "foo/bar",
+        "SomeUpperCase",
+        "@myslug",
+        "&invalid",
     ]
-    for invalid in invalid_field_ids:
+    for invalid in invalid_slugs:
         with pytest.raises(ValidationError):
-            TestSlugModel(slug=invalid)
+            DummyModel(slug=invalid)
