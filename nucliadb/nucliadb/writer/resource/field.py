@@ -253,6 +253,7 @@ def parse_external_file_field(
     writer.files[key].url = uri  # type: ignore
     writer.files[key].file.uri = uri  # type: ignore
     writer.files[key].file.source = resources_pb2.CloudFile.Source.EXTERNAL
+    writer.files[key].file.content_type = file_field.file.content_type
 
     processing = get_processing()
     toprocess.filefield[key] = processing.convert_external_filefield_to_str(file_field)
