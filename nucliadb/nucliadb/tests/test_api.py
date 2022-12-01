@@ -129,3 +129,18 @@ async def test_creation(
     async for paragraph in nucliadb_train.GetParagraphs(request):  # type: ignore
         assert paragraph.metadata.text == "My text"
         assert paragraph.metadata.labels.paragraph[0].label == "title"
+
+
+@pytest.mark.asyncio
+async def test_can_create_knowledgebox_with_colon_in_slug(
+    nucliadb_manager: AsyncClient,
+):
+    resp = await nucliadb_manager.post(
+        f"/kbs",
+        json={"slug": "something:else"},
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_manager.get(f"/kbs")
+    assert resp.status_code == 200
+    assert resp.json()["kbs"][0]["slug"] == "something:else"
