@@ -28,7 +28,9 @@ EXTERNAL_FILE_URL = "http://mysite.com/files/myfile.pdf"
 TEST_EXTERNAL_FILE_FIELD_PAYLOAD = {
     "file": {
         "uri": EXTERNAL_FILE_URL,
+        "content_type": "video/webm",
         "extra_headers": {"Authorization": "Bearer foo1234"},
+        "language": "es",
     }
 }
 
@@ -50,7 +52,7 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
             json={
                 "slug": "resource1",
                 "title": "Resource 1",
-                "files": {"field1": TEST_EXTERNAL_FILE_FIELD_PAYLOAD},
+                "files": {"field1": TEST_EXTERNAL_FILE_FIELD_PAYLOAD,},
             },
         )
         assert resp.status_code == 201
@@ -72,6 +74,7 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
 
         for field in ("field1", "field2"):
             assert data["files"][field]["value"]["file"]["uri"] == EXTERNAL_FILE_URL
+            assert data["files"][field]["value"]["file"]["content_type"] == "video/webm"
             assert "extra_headers" not in data["files"][field]["value"]["file"]
             assert data["files"][field]["value"]["external"] is True
 
@@ -90,5 +93,6 @@ async def test_external_file_field(nuclia_jwt_key, nucliadb_api, knowledgebox_on
         data = resp.json()["data"]
 
         assert data["files"]["field3"]["value"]["file"]["uri"] == EXTERNAL_FILE_URL
+        assert data["files"]["field3"]["value"]["file"]["content_type"] == "video/webm"
         assert "extra_headers" not in data["files"]["field3"]["value"]["file"]
         assert data["files"]["field3"]["value"]["external"] is True
