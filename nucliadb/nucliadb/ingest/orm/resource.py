@@ -30,6 +30,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldMetadata,
     FieldType,
+    Classification,
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
@@ -583,6 +584,11 @@ class Resource:
                 )
                 basic_modified = True
 
+            classifications = get_unique_field_metadata_classifications(field_metadata)
+            if len(classifications) > 0:
+                self.basic.computed_metadata.classifications.extend(classifications)
+                basic_modified = True
+
         # Upload to binary storage
         # Vector indexing
         if self.disable_vectors is False:
@@ -983,3 +989,20 @@ async def get_file_page_positions(field) -> FilePagePositions:
     for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
         positions[index] = (position.start, position.end)
     return positions
+
+
+def get_unique_field_metadata_classifications(field_metadata: FieldMetadata) -> List[Classification]:
+    classifications = []
+
+    for par_metadata in field_metadata.metadata.metadata.paragraphs:
+        for classification in par_metadata.classifications:
+            if classification not in classifications:
+                classifications.append(classification)
+
+    for split_metadata in field_metadata.metadata.split_metadata.values():
+        for par_metadata in split_metadata.paragraphs:
+            for classification in par_metadata.classifications:
+                if classification not in classifications:
+                    classifications.append(classifications)
+    
+    return classifications

@@ -45,6 +45,7 @@ from nucliadb.models.metadata import (
     Relation,
     UserFieldMetadata,
     UserMetadata,
+    ComputedMetadata,
 )
 from nucliadb.models.text import FieldText
 from nucliadb.models.utils import SlugString
@@ -218,6 +219,7 @@ class Resource(BaseModel):
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
+    computed_metadata: Optional[ComputedMetadata]
     created: Optional[datetime]
     modified: Optional[datetime]
     last_seqid: Optional[int]

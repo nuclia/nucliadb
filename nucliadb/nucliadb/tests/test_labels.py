@@ -21,6 +21,8 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.tests.utils import inject_message
+from nucliadb.models.resource import Resource, ResourceList
+from nucliadb.search.api.models import KnowledgeboxSearchResults
 
 
 def broker_resource(knowledgebox):
@@ -226,3 +228,32 @@ async def test_classification_labels_cancelled_by_the_user(
         content["resources"][rid]["usermetadata"]["classifications"][0]
         == expected_label
     )
+
+
+
+
+@pytest.mark.asyncio
+async def test_classification_labels_are_shown_in_resource_basic(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc,
+    knowledgebox,
+):
+    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+
+    # Check resource get
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    assert resp.status_code == 200
+    resource = Resource.parse_raw(resp.content)
+    assert len(resource.computed_metadata.classifications) == 1
+
+    # Check resources list
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resources?show=basic")
+    assert resp.status_code == 200
+    resources = ResourceList.parse_raw(resp.content)
+    assert len(resources.resources[0].computed_metadata.classifications) == 1
+
+    # Check search results list
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show=basic")
+    assert resp.status_code == 200
+    results = KnowledgeboxSearchResults.parse_raw(resp.content)
+    assert len(results.resources[rid].computed_metadata.classifications) == 1
