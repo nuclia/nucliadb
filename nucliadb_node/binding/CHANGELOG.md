@@ -2,6 +2,9 @@
 
 ## 0.4.5
 
+- `only_faceted` flag
+## 0.4.5
+
 - Fixed filter search
 
 ## 0.4.4
