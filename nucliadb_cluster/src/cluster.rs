@@ -18,6 +18,8 @@ use uuid::Uuid;
 
 use crate::error::Error;
 
+const NODE_TYPE_KEY: &str = "node_type";
+const LOAD_SCORE_KEY: &str = "load_score";
 /// The ID that makes the cluster unique.
 const CLUSTER_ID: &str = "nucliadb-cluster";
 
@@ -65,7 +67,7 @@ pub enum NodeType {
 }
 
 /// A member information.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Member {
     /// An ID that makes a member unique.
     pub node_id: String,
@@ -89,21 +91,33 @@ impl From<&Cluster> for Member {
             is_self: true,
         }
     }
+    /// the load score of the node
+    pub load_score: f32,
 }
 
 impl Member {
     pub fn build(node_id: &NodeId, chitchat: &Chitchat) -> Result<Self, Error> {
         chitchat
             .node_state(node_id)
-            .and_then(|state| state.get("node_type"))
-            .ok_or_else(|| Error::MissingNodeState(node_id.id.clone()))
-            .and_then(|node_type| {
-                node_type
-                    .parse()
-                    .map_err(|_| Error::UnknownNodeType(node_type.to_string()))
+            .and_then(|state| {
+                state
+                    .get(NODE_TYPE_KEY)
+                    .map(|node_type| (node_type, state.get(LOAD_SCORE_KEY).unwrap_or("0")))
             })
-            .map(|node_type| Member {
+            .ok_or_else(|| Error::MissingNodeState(node_id.id.clone()))
+            .and_then(|(node_type, load_score)| {
+                Ok((
+                    node_type
+                        .parse()
+                        .map_err(|_| Error::UnknownNodeType(node_type.to_string()))?,
+                    load_score
+                        .parse()
+                        .map_err(|_| Error::InvalidLoadScore(load_score.to_string()))?,
+                ))
+            })
+            .map(|(node_type, load_score)| Member {
                 node_type,
+                load_score,
                 node_id: node_id.id.clone(),
                 is_self: node_id.eq(chitchat.self_node_id()),
                 listen_addr: node_id.gossip_public_address,
@@ -166,7 +180,8 @@ impl Cluster {
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
 
-                state.set("node_type", node_type);
+                state.set(NODE_TYPE_KEY, node_type);
+                state.set(LOAD_SCORE_KEY, 0f32);
                 (
                     chitchat.self_node_id().clone(),
                     chitchat.live_nodes_watcher(),

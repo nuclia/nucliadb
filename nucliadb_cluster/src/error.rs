@@ -13,6 +13,8 @@ pub enum Error {
     /// Incorrect node type
     #[error("Unknown node type: `{0}`")]
     UnknownNodeType(String),
+    #[error("Invalid load score '{0}")]
+    InvalidLoadScore(String),
     #[error("Cannot get state from node `{0}`")]
     MissingNodeState(String),
     #[error("Cannot start cluster: {0}")]
