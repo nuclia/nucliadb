@@ -185,6 +185,11 @@ pub struct NestedPosition {
     pub page: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NestedListPosition {
+    #[prost(message, repeated, tag="1")]
+    pub positions: ::prost::alloc::vec::Vec<NestedPosition>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileExtractedData {
     #[prost(string, tag="1")]
     pub language: ::prost::alloc::string::String,
@@ -210,6 +215,8 @@ pub struct FileExtractedData {
     pub icon: ::prost::alloc::string::String,
     #[prost(map="string, message", tag="12")]
     pub nested_position: ::std::collections::HashMap<::prost::alloc::string::String, NestedPosition>,
+    #[prost(map="string, message", tag="13")]
+    pub nested_list_position: ::std::collections::HashMap<::prost::alloc::string::String, NestedListPosition>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LinkExtractedData {

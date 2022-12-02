@@ -127,6 +127,10 @@ message NestedPosition {
     int64 page = 3;
 }
 
+message NestedListPosition {
+    repeated NestedPosition positions = 1;
+}
+
 message FileExtractedData {
     string language = 1;
     string md5 = 2;
@@ -141,7 +145,8 @@ message FileExtractedData {
 
     string field = 10;
     string icon = 11;
-    map<string, NestedPosition> nested_position = 12;
+    map<string, NestedPosition> nested_position = 12 [deprecated = true];
+    map<string, NestedListPosition> nested_list_position = 13;
 }
 
 message LinkExtractedData {
