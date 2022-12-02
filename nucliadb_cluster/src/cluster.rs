@@ -20,6 +20,11 @@ use crate::error::Error;
 
 const NODE_TYPE_KEY: &str = "node_type";
 const LOAD_SCORE_KEY: &str = "load_score";
+
+pub trait Score {
+    fn compute_score(&self) -> f32;
+}
+
 /// The ID that makes the cluster unique.
 const CLUSTER_ID: &str = "nucliadb-cluster";
 
@@ -233,6 +238,16 @@ impl Cluster {
         });
 
         Ok(cluster)
+    }
+
+    pub async fn update_load_score<T: Score>(&self, scorer: &T) {
+        self.chitchat_handle
+            .with_chitchat(|chitchat| {
+                let state = chitchat.self_node_state();
+
+                state.set(LOAD_SCORE_KEY, scorer.compute_score());
+            })
+            .await;
     }
 
     /// Return watchstream for monitoring change of `members`
