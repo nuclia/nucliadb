@@ -682,6 +682,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -700,6 +701,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -718,6 +720,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -736,6 +739,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -754,6 +758,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -772,6 +777,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -790,6 +796,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -809,6 +816,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -828,6 +836,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -846,6 +855,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 3);
@@ -862,6 +872,7 @@ mod tests {
             timestamps: Some(timestamps),
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -880,6 +891,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
