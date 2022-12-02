@@ -566,7 +566,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
-            logger.info("Starting reindex")
             txn = await self.proc.driver.begin()
             storage = await get_storage(service_name=SERVICE_NAME)
             cache = await get_cache()
@@ -574,38 +573,30 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             resobj = ResourceORM(txn, storage, kbobj, request.rid)
             resobj.disable_vectors = not request.reindex_vectors
 
-            logger.info("Generating index message")
             brain = await resobj.generate_index_message()
-            vector_lengths = [
-                len(vec.vector)
-                for par in brain.brain.paragraphs.values()
-                for pp in par.paragraphs.values()
-                for vec in pp.sentences.values()
-            ]
-            vectors_size = sum(vector_lengths)
-            n_vectors = len(vector_lengths)
-            logger.info(
-                f"About to index {n_vectors} vectors with size {vectors_size} floats"
+            n_vectors = sum(
+                [
+                    1
+                    for par in brain.brain.paragraphs.values()
+                    for pp in par.paragraphs.values()
+                    for _ in pp.sentences.values()
+                ]
             )
+            logger.info(f"About to index {n_vectors} vectors")
 
-            logger.info("Calling kbobj.get_resource_shard_id")
             shard_id = await kbobj.get_resource_shard_id(request.rid)
             shard: Optional[Shard] = None
             node_klass = get_node_klass()
             if shard_id is not None:
-                logger.info("Calling kbojb.get_resource_shard")
                 shard = await kbobj.get_resource_shard(shard_id, node_klass)
 
             if shard is None:
                 # Its a new resource
                 # Check if we have enough resource to create a new shard
-                logger.info("Calling node_klass.actual_shard")
                 shard = await node_klass.actual_shard(txn, request.kbid)
                 if shard is None:
-                    logger.info("Calling node_klass.create_shard_by_kbid")
                     shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
 
-                logger.info("Calling kbobj.set_resource_shard_id")
                 await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
             if shard is not None:
@@ -614,7 +605,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 logger.info("Finished shard.add_resource")
 
                 if count > settings.max_node_fields:
-                    logger.info("Calling node_klass.create_shard_by_kbid")
                     shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
 
             response = IndexStatus()
