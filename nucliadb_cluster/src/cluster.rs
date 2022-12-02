@@ -80,17 +80,7 @@ pub struct Member {
 
     /// If true, it means self.
     pub is_self: bool,
-}
 
-impl From<&Cluster> for Member {
-    fn from(cluster: &Cluster) -> Self {
-        Member {
-            node_id: cluster.id.id.clone(),
-            listen_addr: cluster.listen_addr,
-            node_type: cluster.node_type,
-            is_self: true,
-        }
-    }
     /// the load score of the node
     pub load_score: f32,
 }
@@ -182,6 +172,7 @@ impl Cluster {
 
                 state.set(NODE_TYPE_KEY, node_type);
                 state.set(LOAD_SCORE_KEY, 0f32);
+
                 (
                     chitchat.self_node_id().clone(),
                     chitchat.live_nodes_watcher(),
@@ -262,17 +253,18 @@ impl Cluster {
 
     /// Return `members` list
     pub async fn members(&self) -> Vec<Member> {
-        let mut nodes: Vec<Member> = self
+        let nodes: Vec<Member> = self
             .chitchat_handle
             .with_chitchat(|chitchat| {
                 chitchat.update_nodes_liveliness();
                 chitchat
                     .live_nodes()
+                    .chain([&self.id]) // NOTE: I think we can remove this line
                     .map(|node_id| Member::build(node_id, chitchat).unwrap())
                     .collect()
             })
             .await;
-        nodes.push(Member::from(self));
+
         nodes
     }
 }
