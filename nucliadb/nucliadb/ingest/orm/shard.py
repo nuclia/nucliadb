@@ -81,9 +81,7 @@ class Shard(AbstractShard):
                     resource, shardreplica.node, shard, txid
                 )
 
-            logger.info(f"Starting indexing.indexing at shard {shard}")
             await indexing.index(indexpb, shardreplica.node)
-            logger.info(f"Finished indexing.indexing at shard {shard}")
 
             try:
                 res: Counter = await NODES[shardreplica.node].sidecar.GetCount(shardreplica.shard)  # type: ignore
