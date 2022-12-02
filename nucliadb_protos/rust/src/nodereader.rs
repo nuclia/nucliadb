@@ -69,6 +69,8 @@ pub struct DocumentSearchRequest {
     pub timestamps: ::core::option::Option<Timestamps>,
     #[prost(bool, tag="10")]
     pub reload: bool,
+    #[prost(bool, tag="15")]
+    pub only_faceted: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchRequest {
@@ -98,6 +100,8 @@ pub struct ParagraphSearchRequest {
     pub reload: bool,
     #[prost(bool, tag="14")]
     pub with_duplicates: bool,
+    #[prost(bool, tag="15")]
+    pub only_faceted: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -313,6 +317,8 @@ pub struct SearchRequest {
     pub document: bool,
     #[prost(bool, tag="14")]
     pub with_duplicates: bool,
+    #[prost(bool, tag="15")]
+    pub only_faceted: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

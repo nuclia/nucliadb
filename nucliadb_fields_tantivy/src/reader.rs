@@ -225,6 +225,31 @@ impl FieldReaderService {
         }
     }
 
+    fn facet_count(&self, facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
+        facets_count
+            .top_k(facet, 50)
+            .into_iter()
+            .map(|(facet, count)| FacetResult {
+                tag: facet.to_string(),
+                total: count as i32,
+            })
+            .collect()
+    }
+
+    fn produce_facets(
+        &self,
+        facets: Vec<String>,
+        facets_count: FacetCounts,
+    ) -> HashMap<String, FacetResults> {
+        facets
+            .into_iter()
+            .map(|facet| (&facets_count, facet))
+            .map(|(facets_count, facet)| (self.facet_count(&facet, facets_count), facet))
+            .filter(|(r, _)| !r.is_empty())
+            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+            .collect()
+    }
+
     fn convert_int_order(
         &self,
         response: SearchResponse<u64>,
@@ -271,7 +296,7 @@ impl FieldReaderService {
             }
         }
 
-        let facets = self.create_facets(response.facets, response.facets_count);
+        let facets = self.produce_facets(response.facets, response.facets_count);
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
@@ -331,7 +356,7 @@ impl FieldReaderService {
             }
         }
 
-        let facets = self.create_facets(response.facets, response.facets_count);
+        let facets = self.produce_facets(response.facets, response.facets_count);
         info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
@@ -343,31 +368,6 @@ impl FieldReaderService {
             next_page,
             bm25: true,
         }
-    }
-
-    fn facet_count(&self, facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
-        facets_count
-            .top_k(facet, 50)
-            .into_iter()
-            .map(|(facet, count)| FacetResult {
-                tag: facet.to_string(),
-                total: count as i32,
-            })
-            .collect()
-    }
-
-    fn create_facets(
-        &self,
-        facets: Vec<String>,
-        facets_count: FacetCounts,
-    ) -> HashMap<String, FacetResults> {
-        facets
-            .into_iter()
-            .map(|facet| (&facets_count, facet))
-            .map(|(facets_count, facet)| (self.facet_count(&facet, facets_count), facet))
-            .filter(|(r, _)| !r.is_empty())
-            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-            .collect()
     }
 
     fn adapt_text(parser: &QueryParser, text: &str) -> String {
@@ -398,41 +398,28 @@ impl FieldReaderService {
         let offset = results * request.page_number as usize;
         let extra_result = results + 1;
         let order_field = self.get_order_field(&request.order);
-        let facets = request
-            .faceted
-            .as_ref()
-            .map(|v| {
-                v.tags
-                    .iter()
-                    .filter(|s| FieldReaderService::is_valid_facet(s))
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
+        let valid_facet_iter = request.faceted.iter().flat_map(|v| {
+            v.tags
+                .iter()
+                .filter(|s| FieldReaderService::is_valid_facet(s))
+        });
+
+        let mut facets = vec![];
         let mut facet_collector = FacetCollector::for_field(self.schema.facets);
-        for facet in &facets {
-            match Facet::from_text(facet) {
-                Ok(facet) => facet_collector.add_facet(facet),
-                Err(_) => error!("Invalid facet: {}", facet),
-            }
+        for facet in valid_facet_iter {
+            facets.push(facet.clone());
+            facet_collector.add_facet(Facet::from(facet));
         }
+
         let searcher = self.reader.searcher();
         match order_field {
-            _ if results == 0 || query.is::<AllQuery>() => {
+            _ if request.only_faceted => {
                 // Just a facet search
                 let facets_count = searcher.search(&query, &facet_collector).unwrap();
-                self.convert_bm25_order(
-                    SearchResponse {
-                        facets,
-                        query: &text,
-                        top_docs: vec![],
-                        facets_count,
-                        order_by: request.order.clone(),
-                        page_number: request.page_number,
-                        results_per_page: results as i32,
-                    },
-                    &searcher,
-                )
+                DocumentSearchResponse {
+                    facets: self.produce_facets(facets, facets_count),
+                    ..Default::default()
+                }
             }
             Some(order_field) => {
                 let mut multicollector = MultiCollector::new();
@@ -634,6 +621,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
             reload: false,
+            only_faceted: false,
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -649,6 +637,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
             reload: false,
+            only_faceted: false,
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -664,6 +653,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
             reload: false,
+            only_faceted: false,
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
@@ -680,6 +670,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
             reload: false,
+            only_faceted: false,
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
@@ -696,6 +687,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps.clone()),
             reload: false,
+            only_faceted: false,
         };
 
         let result = field_reader_service.search(&search).unwrap();
@@ -712,6 +704,7 @@ mod tests {
             result_per_page: 20,
             timestamps: Some(timestamps),
             reload: false,
+            only_faceted: false,
         };
 
         let result = field_reader_service.search(&search).unwrap();

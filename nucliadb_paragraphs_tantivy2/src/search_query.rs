@@ -296,12 +296,18 @@ pub fn suggest_query(
             fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
-    if processed.fuzzy_query.is_empty() {
-        fuzzies.clear();
+    if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
+        let original = originals.pop().unwrap().1;
+        let fuzzy = Box::new(BooleanQuery::new(vec![]));
+        (original, termc, fuzzy)
+    } else {
+        if processed.fuzzy_query.is_empty() {
+            fuzzies.clear();
+        }
+        let original = Box::new(BooleanQuery::new(originals));
+        let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
+        (original, termc, fuzzied)
     }
-    let original = Box::new(BooleanQuery::new(originals));
-    let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
-    (original, termc, fuzzied)
 }
 
 pub fn search_query(
@@ -355,12 +361,18 @@ pub fn search_query(
             fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
-    if processed.fuzzy_query.is_empty() {
-        fuzzies.clear();
+    if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
+        let original = originals.pop().unwrap().1;
+        let fuzzy = Box::new(BooleanQuery::new(vec![]));
+        (original, termc, fuzzy)
+    } else {
+        if processed.fuzzy_query.is_empty() {
+            fuzzies.clear();
+        }
+        let original = Box::new(BooleanQuery::new(originals));
+        let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
+        (original, termc, fuzzied)
     }
-    let original = Box::new(BooleanQuery::new(originals));
-    let fuzzied = Box::new(BoostQuery::new(Box::new(BooleanQuery::new(fuzzies)), 0.5));
-    (original, termc, fuzzied)
 }
 
 #[cfg(test)]
