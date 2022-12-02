@@ -40,12 +40,12 @@ from nucliadb.models.keywordset import FieldKeywordset
 from nucliadb.models.layout import FieldLayout
 from nucliadb.models.link import FieldLink
 from nucliadb.models.metadata import (
+    ComputedMetadata,
     Metadata,
     Origin,
     Relation,
     UserFieldMetadata,
     UserMetadata,
-    ComputedMetadata,
 )
 from nucliadb.models.text import FieldText
 from nucliadb.models.utils import SlugString

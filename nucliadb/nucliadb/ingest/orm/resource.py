@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
-from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_protos.resources_pb2 import Classification, CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -30,7 +30,6 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldMetadata,
     FieldType,
-    Classification,
 )
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
@@ -584,10 +583,18 @@ class Resource:
                 )
                 basic_modified = True
 
-            classifications = get_unique_field_metadata_classifications(field_metadata)
+            # Aggregate field-level classifications into basic
+            classifications = get_field_metadata_classifications(field_metadata)
             if len(classifications) > 0:
-                self.basic.computed_metadata.classifications.extend(classifications)
-                basic_modified = True
+                for classification in classifications:
+                    if (
+                        classification
+                        not in self.basic.computed_metadata.classifications
+                    ):
+                        self.basic.computed_metadata.classifications.append(
+                            classifications
+                        )
+                        basic_modified = True
 
         # Upload to binary storage
         # Vector indexing
@@ -991,18 +998,13 @@ async def get_file_page_positions(field) -> FilePagePositions:
     return positions
 
 
-def get_unique_field_metadata_classifications(field_metadata: FieldMetadata) -> List[Classification]:
+def get_field_metadata_classifications(
+    field_metadata: FieldMetadata,
+) -> List[Classification]:
     classifications = []
-
     for par_metadata in field_metadata.metadata.metadata.paragraphs:
-        for classification in par_metadata.classifications:
-            if classification not in classifications:
-                classifications.append(classification)
-
+        classifications.extend(par_metadata.classifications)
     for split_metadata in field_metadata.metadata.split_metadata.values():
         for par_metadata in split_metadata.paragraphs:
-            for classification in par_metadata.classifications:
-                if classification not in classifications:
-                    classifications.append(classifications)
-    
+            classifications.extend(par_metadata.classifications)
     return classifications

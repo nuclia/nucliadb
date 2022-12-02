@@ -184,7 +184,7 @@ def convert_pb_relation_to_api(relation: utils_pb2.Relation):
 
 class ComputedMetadata(BaseModel):
     classifications: List[Classification] = []
-    
+
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.ComputedMetadata) -> _T:
         value = MessageToDict(

@@ -20,9 +20,9 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.tests.utils import inject_message
 from nucliadb.models.resource import Resource, ResourceList
 from nucliadb.search.api.models import KnowledgeboxSearchResults
+from nucliadb.tests.utils import inject_message
 
 
 def broker_resource(knowledgebox):
@@ -228,8 +228,6 @@ async def test_classification_labels_cancelled_by_the_user(
         content["resources"][rid]["usermetadata"]["classifications"][0]
         == expected_label
     )
-
-
 
 
 @pytest.mark.asyncio
