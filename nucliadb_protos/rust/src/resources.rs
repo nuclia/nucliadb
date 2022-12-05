@@ -68,7 +68,7 @@ pub struct Basic {
     #[prost(message, repeated, tag="11")]
     pub fieldmetadata: ::prost::alloc::vec::Vec<UserFieldMetadata>,
     #[prost(message, optional, tag="15")]
-    pub computed_metadata: ::core::option::Option<ComputedMetadata>,
+    pub computedmetadata: ::core::option::Option<ComputedMetadata>,
     /// Only for read operations
     #[prost(string, tag="12")]
     pub uuid: ::prost::alloc::string::String,
@@ -501,9 +501,15 @@ pub struct UserMetadata {
     pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ComputedMetadata {
+pub struct Classifications {
     #[prost(message, repeated, tag="1")]
     pub classifications: ::prost::alloc::vec::Vec<Classification>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ComputedMetadata {
+    /// Key is the field id: field_type_name/field_id
+    #[prost(map="string, message", tag="1")]
+    pub field_classifications: ::std::collections::HashMap<::prost::alloc::string::String, Classifications>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TokenSplit {

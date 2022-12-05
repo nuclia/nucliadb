@@ -219,7 +219,7 @@ class Resource(BaseModel):
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
-    computed_metadata: Optional[ComputedMetadata]
+    computedmetadata: Optional[ComputedMetadata]
     created: Optional[datetime]
     modified: Optional[datetime]
     last_seqid: Optional[int]

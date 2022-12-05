@@ -183,16 +183,17 @@ def convert_pb_relation_to_api(relation: utils_pb2.Relation):
 
 
 class ComputedMetadata(BaseModel):
-    classifications: List[Classification] = []
+    field_classifications: Dict[str, List[Classification]] = {}
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.ComputedMetadata) -> _T:
-        value = MessageToDict(
-            message,
-            preserving_proto_field_name=True,
-            including_default_value_fields=True,
-        )
-        return cls(**value)
+        fcfs: Dict[str, List[Classification]] = {}
+        for field_key, cfs in message.field_classifications.items():
+            fcfs[field_key] = [
+                Classification(label=cf.label, labelset=cf.labelset)
+                for cf in cfs.classifications
+            ]
+        return cls(field_classifications=fcfs)
 
 
 class UserMetadata(BaseModel):
@@ -252,7 +253,7 @@ class Basic(BaseModel):
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
-    computed_metadata: Optional[ComputedMetadata]
+    computedmetadata: Optional[ComputedMetadata]
     uuid: Optional[str]
     last_seqid: Optional[int]
     last_account_seq: Optional[int]

@@ -159,7 +159,7 @@ class Basic(google.protobuf.message.Message):
     METADATA_FIELD_NUMBER: builtins.int
     USERMETADATA_FIELD_NUMBER: builtins.int
     FIELDMETADATA_FIELD_NUMBER: builtins.int
-    COMPUTED_METADATA_FIELD_NUMBER: builtins.int
+    COMPUTEDMETADATA_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
     LAST_SEQID_FIELD_NUMBER: builtins.int
@@ -184,7 +184,7 @@ class Basic(google.protobuf.message.Message):
     @property
     def fieldmetadata(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UserFieldMetadata]: ...
     @property
-    def computed_metadata(self) -> global___ComputedMetadata: ...
+    def computedmetadata(self) -> global___ComputedMetadata: ...
     uuid: builtins.str
     """Only for read operations"""
     @property
@@ -208,15 +208,15 @@ class Basic(google.protobuf.message.Message):
         metadata: global___Metadata | None = ...,
         usermetadata: global___UserMetadata | None = ...,
         fieldmetadata: collections.abc.Iterable[global___UserFieldMetadata] | None = ...,
-        computed_metadata: global___ComputedMetadata | None = ...,
+        computedmetadata: global___ComputedMetadata | None = ...,
         uuid: builtins.str = ...,
         labels: collections.abc.Iterable[builtins.str] | None = ...,
         last_seqid: builtins.int = ...,
         last_account_seq: builtins.int = ...,
         queue: global___Basic.QueueType.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["computed_metadata", b"computed_metadata", "created", b"created", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["computed_metadata", b"computed_metadata", "created", b"created", "fieldmetadata", b"fieldmetadata", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["computedmetadata", b"computedmetadata", "created", b"created", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["computedmetadata", b"computedmetadata", "created", b"created", "fieldmetadata", b"fieldmetadata", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
 
 global___Basic = Basic
 
@@ -1261,7 +1261,7 @@ class UserMetadata(google.protobuf.message.Message):
 
 global___UserMetadata = UserMetadata
 
-class ComputedMetadata(google.protobuf.message.Message):
+class Classifications(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CLASSIFICATIONS_FIELD_NUMBER: builtins.int
@@ -1273,6 +1273,39 @@ class ComputedMetadata(google.protobuf.message.Message):
         classifications: collections.abc.Iterable[global___Classification] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications"]) -> None: ...
+
+global___Classifications = Classifications
+
+class ComputedMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class FieldClassificationsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___Classifications: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___Classifications | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    FIELD_CLASSIFICATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def field_classifications(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Classifications]:
+        """Key is the field id: field_type_name/field_id"""
+    def __init__(
+        self,
+        *,
+        field_classifications: collections.abc.Mapping[builtins.str, global___Classifications] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field_classifications", b"field_classifications"]) -> None: ...
 
 global___ComputedMetadata = ComputedMetadata
 

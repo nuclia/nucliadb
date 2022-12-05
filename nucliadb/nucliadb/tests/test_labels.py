@@ -17,23 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import uuid
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.ingest.tests.vectors import V1, V2, V3
+from nucliadb.models.metadata import Classification, ComputedMetadata
 from nucliadb.models.resource import Resource, ResourceList
 from nucliadb.search.api.models import KnowledgeboxSearchResults
 from nucliadb.tests.utils import inject_message
+from nucliadb_protos import resources_pb2 as rpb
 
 
 def broker_resource(knowledgebox):
-    import uuid
-    from datetime import datetime
-
-    from nucliadb_protos.writer_pb2 import BrokerMessage
-
-    from nucliadb.ingest.tests.vectors import V1, V2, V3
-    from nucliadb_protos import resources_pb2 as rpb
-
     rid = str(uuid.uuid4())
     slug = f"{rid}slug1"
 
@@ -105,9 +104,17 @@ def broker_resource(knowledgebox):
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+
+    fcm.metadata.split_metadata["subfield"].paragraphs.append(p1)
+    fcm.metadata.split_metadata["subfield"].paragraphs.append(p2)
+    fcm.metadata.split_metadata["subfield"].last_index.FromDatetime(datetime.now())
+    fcm.metadata.split_metadata["subfield"].last_understanding.FromDatetime(
+        datetime.now()
+    )
+    fcm.metadata.split_metadata["subfield"].last_extract.FromDatetime(datetime.now())
+
     fcm.metadata.metadata.ner["Ramon"] = "PERSON"
 
-    fcm.metadata.metadata.classifications.append(c1)
     bm.field_metadata.append(fcm)
 
     ev = rpb.ExtractedVectorsWrapper()
@@ -233,25 +240,49 @@ async def test_classification_labels_cancelled_by_the_user(
 @pytest.mark.asyncio
 async def test_classification_labels_are_shown_in_resource_basic(
     nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     nucliadb_grpc,
     knowledgebox,
 ):
     rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
 
+    classifications = [Classification(labelset="labelset1", label="label1")]
+
+    expected_computedmetadata = ComputedMetadata(
+        field_classifications={
+            "file/file": classifications,
+            "file/file/subfield": classifications,
+        }
+    )
+
     # Check resource get
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     resource = Resource.parse_raw(resp.content)
-    assert len(resource.computed_metadata.classifications) == 1
+    assert resource.computedmetadata == expected_computedmetadata
 
     # Check resources list
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resources?show=basic")
     assert resp.status_code == 200
     resources = ResourceList.parse_raw(resp.content)
-    assert len(resources.resources[0].computed_metadata.classifications) == 1
+    assert resources.resources[0].computedmetadata == expected_computedmetadata
 
     # Check search results list
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show=basic")
     assert resp.status_code == 200
     results = KnowledgeboxSearchResults.parse_raw(resp.content)
-    assert len(results.resources[rid].computed_metadata.classifications) == 1
+    assert results.resources[rid].computedmetadata == expected_computedmetadata
+
+    # Deleting the field should cleanup the corresponding labels
+    resp = await nucliadb_writer.delete(
+        f"/kb/{knowledgebox}/resource/{rid}/file/file",
+        headers={"X-SYNCHRONOUS": "True"},
+    )
+    assert resp.status_code == 204
+
+    # Check resource get
+    expected_computedmetadata.field_classifications.pop("file/file")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    assert resp.status_code == 200
+    resource = Resource.parse_raw(resp.content)
+    assert resource.computedmetadata == expected_computedmetadata

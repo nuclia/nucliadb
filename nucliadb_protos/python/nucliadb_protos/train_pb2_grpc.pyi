@@ -36,6 +36,7 @@ from nucliadb_protos.resources_pb2 import (
     Block as Block,
     CONVERSATION as CONVERSATION,
     Classification as Classification,
+    Classifications as Classifications,
     CloudFile as CloudFile,
     ComputedMetadata as ComputedMetadata,
     Conversation as Conversation,

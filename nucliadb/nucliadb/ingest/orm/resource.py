@@ -58,7 +58,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.utils import get_basic, set_basic
-from nucliadb.models.common import CloudLink
+from nucliadb.models.common import FIELD_TYPES_MAP, CloudLink
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:
@@ -162,7 +162,17 @@ class Resource:
             self.basic = self.parse_basic(payload) if payload is not None else PBBasic()
         return self.basic
 
-    async def set_basic(self, payload: PBBasic, slug: Optional[str] = None):
+    def clean_field_classifications_from_basic(self, fieldids: List[FieldID]):
+        for fieldid in fieldids:
+            field_key = get_field_key(fieldid)
+            self.basic.computedmetadata.field_classifications.pop(field_key, None)
+
+    async def set_basic(
+        self,
+        payload: PBBasic,
+        slug: Optional[str] = None,
+        delete_fields: Optional[List[FieldID]] = None,
+    ):
         await self.get_basic()
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
@@ -193,6 +203,8 @@ class Resource:
         if slug is not None and slug != "":
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
+        if delete_fields is not None and len(delete_fields):
+            self.clean_field_classifications_from_basic(delete_fields)
         await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
         self.modified = True
 
@@ -988,17 +1000,27 @@ async def get_file_page_positions(field) -> FilePagePositions:
     return positions
 
 
+def get_field_key(field: FieldID) -> str:
+    ftype = FIELD_TYPES_MAP[field.field_type].value
+    fid = field.field
+    return f"{ftype}/{fid}"
+
+
 def get_field_classifications(
     fcmw: FieldComputedMetadataWrapper,
 ) -> List[Classification]:
-    classifications: List[Classification] = []
+    classifications: List[Tuple[str, Classification]] = []
 
+    field_key = get_field_key(fcmw.field)
     for par_metadata in fcmw.metadata.metadata.paragraphs:
-        classifications.extend(par_metadata.classifications)
+        for cf in par_metadata.classifications:
+            classifications.append((field_key, cf))
 
-    for split_metadata in fcmw.metadata.split_metadata.values():
+    for split_id, split_metadata in fcmw.metadata.split_metadata.items():
+        split_key = f"{field_key}/{split_id}"
         for par_metadata in split_metadata.paragraphs:
-            classifications.extend(par_metadata.classifications)
+            for cf in par_metadata.classifications:
+                classifications.append((split_key, cf))
 
     return classifications
 
@@ -1007,12 +1029,17 @@ def add_field_classifications_to_basic(
     basic: PBBasic, fcmw: FieldComputedMetadataWrapper
 ) -> bool:
     """
-    Returns whether some new classifications were added
+    Returns whether some new field classifications were added
     """
-    added = False
-    for classification in get_field_classifications(fcmw):
-        if classification in basic.computed_metadata.classifications:
+    cf: Classification
+    for field_key, cf in get_field_classifications(fcmw):
+        if (
+            cf
+            in basic.computedmetadata.field_classifications[field_key].classifications
+        ):
             continue
-        basic.computed_metadata.classifications.append(classification)
+        basic.computedmetadata.field_classifications[field_key].classifications.append(
+            cf
+        )
         added = True
     return added

@@ -191,8 +191,8 @@ async def serialize(
                 for fm in orm_resource.basic.fieldmetadata
             ]
 
-            resource.computed_metadata = models.ComputedMetadata.from_message(
-                orm_resource.basic.computed_metadata
+            resource.computedmetadata = models.ComputedMetadata.from_message(
+                orm_resource.basic.computedmetadata
             )
 
             resource.last_seqid = orm_resource.basic.last_seqid
