@@ -1003,7 +1003,9 @@ def get_field_classifications(
     return classifications
 
 
-def add_field_classifications_to_basic(basic: PBBasic, fcmw: FieldComputedMetadataWrapper) -> bool:
+def add_field_classifications_to_basic(
+    basic: PBBasic, fcmw: FieldComputedMetadataWrapper
+) -> bool:
     """
     Returns whether some new classifications were added
     """
