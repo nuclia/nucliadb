@@ -584,7 +584,7 @@ class Resource:
                 basic_modified = True
 
             # Aggregate field-level classifications into basic
-            classifications = get_field_metadata_classifications(field_metadata)
+            classifications = get_field_classifications(field_metadata)
             if len(classifications) > 0:
                 for classification in classifications:
                     if (
@@ -592,7 +592,7 @@ class Resource:
                         not in self.basic.computed_metadata.classifications
                     ):
                         self.basic.computed_metadata.classifications.append(
-                            classifications
+                            classification
                         )
                         basic_modified = True
 
@@ -998,13 +998,16 @@ async def get_file_page_positions(field) -> FilePagePositions:
     return positions
 
 
-def get_field_metadata_classifications(
-    field_metadata: FieldMetadata,
+def get_field_classifications(
+    fcmw: FieldComputedMetadataWrapper,
 ) -> List[Classification]:
     classifications = []
-    for par_metadata in field_metadata.metadata.metadata.paragraphs:
+
+    for par_metadata in fcmw.metadata.metadata.paragraphs:
         classifications.extend(par_metadata.classifications)
-    for split_metadata in field_metadata.metadata.split_metadata.values():
+
+    for split_metadata in fcmw.metadata.split_metadata.values():
         for par_metadata in split_metadata.paragraphs:
             classifications.extend(par_metadata.classifications)
+
     return classifications
