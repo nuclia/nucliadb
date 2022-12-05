@@ -991,7 +991,7 @@ async def get_file_page_positions(field) -> FilePagePositions:
 def get_field_classifications(
     fcmw: FieldComputedMetadataWrapper,
 ) -> List[Classification]:
-    classifications = []
+    classifications: List[Classification] = []
 
     for par_metadata in fcmw.metadata.metadata.paragraphs:
         classifications.extend(par_metadata.classifications)

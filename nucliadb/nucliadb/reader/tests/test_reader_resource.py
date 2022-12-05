@@ -30,6 +30,7 @@ ID = ("id",)
 BASIC = (
     "title",
     "summary",
+    "computed_metadata",
     "icon",
     "layout",
     "thumbnail",
