@@ -583,18 +583,8 @@ class Resource:
                 )
                 basic_modified = True
 
-            # Aggregate field-level classifications into basic
-            classifications = get_field_classifications(field_metadata)
-            if len(classifications) > 0:
-                for classification in classifications:
-                    if (
-                        classification
-                        not in self.basic.computed_metadata.classifications
-                    ):
-                        self.basic.computed_metadata.classifications.append(
-                            classification
-                        )
-                        basic_modified = True
+            if add_field_classifications_to_basic(self.basic, field_metadata):
+                basic_modified = True
 
         # Upload to binary storage
         # Vector indexing
@@ -1011,3 +1001,16 @@ def get_field_classifications(
             classifications.extend(par_metadata.classifications)
 
     return classifications
+
+
+def add_field_classifications_to_basic(basic: PBBasic, fcmw: FieldComputedMetadataWrapper) -> bool:
+    """
+    Returns whether some new classifications were added
+    """
+    added = False
+    for classification in get_field_classifications(fcmw):
+        if classification in basic.computed_metadata.classifications:
+            continue
+        basic.computed_metadata.classifications.append(classification)
+        added = True
+    return added
