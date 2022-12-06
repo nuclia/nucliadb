@@ -168,7 +168,14 @@ class Storage:
     async def delete_indexing(self, payload: IndexMessage):
         if self.indexing_bucket is None:
             raise AttributeError()
-        key = INDEXING.format(node=payload.node, shard=payload.shard, txid=payload.txid)
+
+        if payload.txid == 0 and payload.reindex_id != "":
+            # Deleting a reindexing payload
+            txid = payload.reindex_id
+        else:
+            txid = payload.txid
+
+        key = INDEXING.format(node=payload.node, shard=payload.shard, txid=txid)
         await self.delete_upload(key, self.indexing_bucket)
 
     def needs_move(self, file: CloudFile, kbid: str) -> bool:

@@ -211,10 +211,18 @@ class Worker:
                     f"An error on subscription_worker. Check sentry for more details."
                 )
                 raise e
-        self.store_seqid(seqid)
-        await msg.ack()
-        self.event.set()
-        await storage.delete_indexing(pb)
+        try:
+            self.store_seqid(seqid)
+            await msg.ack()
+            self.event.set()
+            await storage.delete_indexing(pb)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            logger.error(
+                f"An error on subscription_worker. Check sentry for more details."
+            )
+            raise e
 
     async def subscribe(self):
 

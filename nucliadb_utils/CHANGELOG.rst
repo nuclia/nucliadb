@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.15
+------
+
+- Fix delete reindex payload
+
 1.0.14
 ------
 
