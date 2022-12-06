@@ -173,7 +173,7 @@ class Storage:
             # Deleting a reindexing payload
             txid = payload.reindex_id
         else:
-            txid = payload.txid
+            txid = str(payload.txid)
 
         key = INDEXING.format(node=payload.node, shard=payload.shard, txid=txid)
         await self.delete_upload(key, self.indexing_bucket)
