@@ -19,7 +19,6 @@
 #
 from uuid import uuid4
 
-import pytest
 from nucliadb_protos.resources_pb2 import (
     ExtractedText,
     FieldComputedMetadataWrapper,
