@@ -1996,6 +1996,7 @@ dependencies = [
  "nucliadb_service_interface",
  "rand 0.8.5",
  "rayon",
+ "regex",
  "ring",
  "serde",
  "serde_json",
