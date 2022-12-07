@@ -48,7 +48,11 @@ impl NodeDictionary {
         deunicode::deunicode(text).to_lowercase()
     }
     fn build_query(&self, text: &str) -> String {
-        let query = text.split(' ').filter(|s| !s.is_empty()).join(r"\s+");
+        let query = text
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .map(|s| regex::escape(s.trim()))
+            .join(r"\s+");
         format!("(?im){query}.*")
     }
     fn new(path: &Path) -> RResult<NodeDictionary> {
@@ -137,6 +141,7 @@ mod test {
         let r3 = index.search(&reader, 10, "new").unwrap();
         let r4 = index.search(&reader, 10, "york").unwrap();
         let r5 = index.search(&reader, 10, "bár").unwrap();
+
         assert_eq!(r1.len(), 1);
         assert_eq!(r2.len(), 1);
         assert_eq!(r3.len(), 1);
