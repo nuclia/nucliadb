@@ -59,7 +59,7 @@ impl ParagraphReader for ParagraphReaderService {
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response> {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
-        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        let text = self.adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
             suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
         let searcher = self.reader.searcher();
@@ -101,7 +101,6 @@ impl ReaderChild for ParagraphReaderService {
         let offset = results * request.page_number as usize;
 
         // No query and no filter -> Only facet search
-        let only_facets = results == 0 || (request.body.is_empty() && request.filter.is_none());
         let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
@@ -114,7 +113,7 @@ impl ReaderChild for ParagraphReaderService {
                     .collect()
             })
             .unwrap_or_default();
-        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        let text = self.adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
             search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
         let searcher = Searcher {
@@ -122,9 +121,9 @@ impl ReaderChild for ParagraphReaderService {
             results,
             offset,
             facets: &facets,
-            only_facets,
             order_field,
             text: &text,
+            only_faceted: request.only_faceted,
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
         if response.results.is_empty() {
@@ -270,7 +269,7 @@ impl ParagraphReaderService {
         })
     }
 
-    fn adapt_text(parser: &QueryParser, text: &str) -> String {
+    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
         match text.trim() {
             "" => text.to_string(),
             text => parser
@@ -327,9 +326,9 @@ struct Searcher<'a> {
     results: usize,
     offset: usize,
     facets: &'a [String],
-    only_facets: bool,
     order_field: Option<Field>,
     text: &'a str,
+    only_faceted: bool,
 }
 impl<'a> Searcher<'a> {
     fn do_search(
@@ -346,7 +345,7 @@ impl<'a> Searcher<'a> {
                 collector
             },
         );
-        if self.only_facets {
+        if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
             ParagraphSearchResponse::from(SearchFacetsResponse {
@@ -682,6 +681,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -700,6 +700,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -718,9 +719,10 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search on all paragraphs in resource with typo
         let search = ParagraphSearchRequest {
@@ -736,6 +738,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -754,6 +757,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -772,6 +776,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -790,6 +795,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -809,6 +815,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -827,10 +834,11 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
-            with_duplicates: false,
+            with_duplicates: true,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search filter all paragraphs
         let search = ParagraphSearchRequest {
@@ -846,6 +854,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 3);
@@ -862,6 +871,7 @@ mod tests {
             timestamps: Some(timestamps),
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -880,6 +890,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
