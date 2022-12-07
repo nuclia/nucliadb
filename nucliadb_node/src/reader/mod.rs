@@ -76,21 +76,23 @@ impl NodeReaderService {
 
     #[instrument(name = "NodeReaderService::load_shard", skip(self))]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
-        let shard_id = &shard_id.id;
-        info!("{}: Loading shard", shard_id);
-        let in_memory = self.cache.contains_key(shard_id);
+        info!("{}: Loading shard", shard_id.id);
+        let in_memory = self.cache.contains_key(&shard_id.id);
         if !in_memory {
-            info!("{}: Shard was not in memory", shard_id);
-            let in_disk = Path::new(&Configuration::shards_path_id(shard_id)).exists();
-            if in_disk {
-                info!("{}: Shard was in disk", shard_id);
-                let shard = POOL.install(|| ShardReaderService::open(shard_id)).unwrap();
-                info!("{}: Loaded shard", shard_id);
-                self.cache.insert(shard_id.to_string(), shard);
-                info!("{}: Inserted on memory", shard_id);
+            info!("{}: Shard was not in memory", shard_id.id);
+            let on_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
+            if on_disk {
+                info!("{}: Shard was in disk", shard_id.id);
+                if let Ok(shard) = POOL.install(|| ShardReaderService::open(&shard_id.id)) {
+                    info!("{}: Loaded shard", shard_id.id);
+                    self.cache.insert(shard_id.id.clone(), shard);
+                    info!("{}: Inserted on memory", shard_id.id);
+                } else {
+                    info!("{}: is corrupted", shard_id.id);
+                }
             }
         } else {
-            info!("{}: Shard was in memory", shard_id);
+            info!("{}: Shard was in memory", shard_id.id);
         }
     }
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardReaderService> {
