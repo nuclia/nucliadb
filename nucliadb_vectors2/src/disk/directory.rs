@@ -32,6 +32,7 @@ use super::DiskR;
 mod names {
     pub const LOCK: &str = "lk.lock";
     pub const STATE: &str = "state.bincode";
+    pub const TEMP: &str = "temp_state.bincode";
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -39,12 +40,15 @@ pub struct Version(SystemTime);
 
 fn write_state<S>(path: &Path, state: &S) -> DiskR<()>
 where S: Serialize {
+    let temporal_path = path.join(names::TEMP);
+    let state_path = path.join(names::STATE);
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(path.join(names::STATE))?;
+        .open(&temporal_path)?;
     bincode::serialize_into(&mut file, state)?;
+    std::fs::rename(&temporal_path, &state_path)?;
     Ok(())
 }
 
