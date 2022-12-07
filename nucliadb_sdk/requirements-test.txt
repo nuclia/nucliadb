@@ -5,3 +5,4 @@ types-aiofiles
 numpy
 datasets
 requests
+types-requests
