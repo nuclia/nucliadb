@@ -23,9 +23,9 @@ use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
-    op_status, DocumentSearchRequest, OpStatus, ParagraphSearchRequest, RelationSearchRequest,
-    Resource, ResourceId, SearchRequest, Shard as ShardPB, ShardId, SuggestRequest,
-    VectorSearchRequest,
+    op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, OpStatus,
+    ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest, SetGraph,
+    Shard as ShardPB, ShardId, SuggestRequest, VectorSearchRequest, VectorSetId, VectorSetList,
 };
 use prost::Message;
 use pyo3::exceptions;
@@ -58,25 +58,33 @@ impl NodeReader {
     }
 
     pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
+        let request = GetShardRequest::decode(&mut Cursor::new(shard_id)).unwrap();
+        let shard_id = request.shard_id.as_ref().unwrap();
         self.reader.load_shard(&shard_id);
-        if let Some(shard) = self.reader.get_shard(&shard_id) {
-            let stats = shard.get_info();
-            let shard_pb = ShardPB {
-                shard_id: String::from(&shard.id),
-                resources: stats.resources as u64,
-                paragraphs: stats.paragraphs as u64,
-                sentences: stats.sentences as u64,
-            };
-            Ok(PyList::new(py, shard_pb.encode_to_vec()))
-        } else {
-            Err(exceptions::PyTypeError::new_err("Not found"))
+        let response = self
+            .reader
+            .get_shard(&shard_id)
+            .map(|s| s.get_info(&request));
+        match response {
+            Some(Ok(stats)) => {
+                let shard_pb = ShardPB {
+                    shard_id: shard_id.id.clone(),
+                    resources: stats.resources as u64,
+                    paragraphs: stats.paragraphs as u64,
+                    sentences: stats.sentences as u64,
+                };
+                Ok(PyList::new(py, shard_pb.encode_to_vec()))
+            }
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
         }
     }
 
     pub fn get_shards<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let shards = self.reader.get_shards();
-        Ok(PyList::new(py, shards.encode_to_vec()))
+        match self.reader.get_shards() {
+            Ok(r) => Ok(PyList::new(py, r.encode_to_vec())),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+        }
     }
 
     pub fn search<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
@@ -282,6 +290,155 @@ impl NodeWriter {
         };
         self.writer.load_shard(&shard_id);
         match self.writer.remove_resource(&shard_id, &resource) {
+            Some(Ok(count)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(exceptions::PyTypeError::new_err(message))
+            }
+        }
+    }
+
+    pub fn join_graph<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let request = SetGraph::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = request.shard_id.unwrap();
+        let graph = request.graph.unwrap();
+        self.writer.load_shard(&shard_id);
+        match self.writer.join_relations_graph(&shard_id, &graph) {
+            Some(Ok(count)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(exceptions::PyTypeError::new_err(message))
+            }
+        }
+    }
+
+    pub fn delete_relation_nodes<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let nodes = DeleteGraphNodes::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = nodes.shard_id.as_ref().unwrap();
+        self.writer.load_shard(shard_id);
+        match self.writer.delete_relation_nodes(shard_id, &nodes) {
+            Some(Ok(count)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(exceptions::PyTypeError::new_err(message))
+            }
+        }
+    }
+
+    pub fn get_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
+        self.writer.load_shard(&shard_id);
+        match self.writer.list_vectorsets(&shard_id) {
+            Some(Err(_)) => Err(exceptions::PyTypeError::new_err("Not found")),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard ")),
+            Some(Ok(list)) => {
+                let response = VectorSetList {
+                    shard: Some(shard_id),
+                    vectorset: list,
+                };
+                Ok(PyList::new(py, response.encode_to_vec()))
+            }
+        }
+    }
+
+    pub fn set_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let vectorset = VectorSetId::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = vectorset.shard.as_ref().unwrap();
+        self.writer.load_shard(shard_id);
+        match self.writer.add_vectorset(shard_id, &vectorset) {
+            Some(Ok(count)) => {
+                let status = OpStatus {
+                    status: 0,
+                    detail: "Success!".to_string(),
+                    count: count as u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, status.encode_to_vec()))
+            }
+            Some(Err(e)) => {
+                let status = op_status::Status::Error as i32;
+                let detail = format!("Error: {}", e);
+                let op_status = OpStatus {
+                    status,
+                    detail,
+                    count: 0_u64,
+                    shard_id: shard_id.id.clone(),
+                };
+                Ok(PyList::new(py, op_status.encode_to_vec()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(exceptions::PyTypeError::new_err(message))
+            }
+        }
+    }
+
+    pub fn del_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let vectorset = VectorSetId::decode(&mut Cursor::new(request)).unwrap();
+        let shard_id = vectorset.shard.as_ref().unwrap();
+        self.writer.load_shard(shard_id);
+        match self.writer.remove_vectorset(shard_id, &vectorset) {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,

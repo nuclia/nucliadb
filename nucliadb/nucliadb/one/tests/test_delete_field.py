@@ -22,9 +22,9 @@ from typing import Callable
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.writer.tests.test_fields import TEST_TEXT_PAYLOAD
+from nucliadb_models.resource import NucliaDBRoles
 
 
 @pytest.mark.asyncio

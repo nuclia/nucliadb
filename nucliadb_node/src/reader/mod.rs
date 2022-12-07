@@ -98,16 +98,21 @@ impl NodeReaderService {
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardReaderService> {
         self.cache.get(&shard_id.id)
     }
-    pub fn get_shards(&self) -> ShardList {
-        let shards = self.cache.par_iter().map(|(shard_id, shard)| ShardPB {
-            shard_id: shard_id.to_string(),
-            resources: shard.get_resources() as u64,
-            paragraphs: 0_u64,
-            sentences: 0_u64,
-        });
-        ShardList {
-            shards: POOL.install(|| shards.collect()),
-        }
+    pub fn get_shards(&self) -> ServiceResult<ShardList> {
+        let shards = POOL.install(|| {
+            self.cache
+                .par_iter()
+                .map(|(shard_id, shard)| {
+                    shard.get_resources().map(|count| ShardPB {
+                        shard_id: shard_id.clone(),
+                        resources: count as u64,
+                        paragraphs: 0_u64,
+                        sentences: 0_u64,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })?;
+        Ok(ShardList { shards })
     }
     pub fn suggest(
         &self,

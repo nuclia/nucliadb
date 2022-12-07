@@ -19,6 +19,7 @@
 #
 import asyncio
 import time
+from typing import AsyncIterable
 
 import docker  # type: ignore
 import pytest
@@ -175,11 +176,11 @@ async def sidecar(node_single, gcs_storage, natsd):
 
 
 @pytest.fixture(scope="function")
-async def shard():
+async def shard() -> AsyncIterable[str]:
     stub = NodeWriterStub(aio.insecure_channel(settings.writer_listen_address))
     request = EmptyQuery()
-    shard: ShardCreated = await stub.NewShard(request)
+    shard: ShardCreated = await stub.NewShard(request)  # type: ignore
     yield shard.id
     sid = ShardId()
     sid.id = shard.id
-    await stub.DeleteShard(sid)
+    await stub.DeleteShard(sid)  # type: ignore

@@ -26,8 +26,8 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestRequest,
 )
 
-from nucliadb.search.api.models import SearchOptions, Sort, SuggestOptions
 from nucliadb.search.utilities import get_predict
+from nucliadb_models.search import SearchOptions, Sort, SuggestOptions
 
 
 async def global_query_to_pb(
@@ -47,6 +47,7 @@ async def global_query_to_pb(
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     vector: Optional[List[float]] = None,
+    vectorset: Optional[str] = None,
     with_duplicates: bool = False,
 ) -> SearchRequest:
     fields = fields or []
@@ -90,6 +91,8 @@ async def global_query_to_pb(
             request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
         else:
             request.vector.extend(vector)
+        if vectorset is not None:
+            request.vectorset = vectorset
 
     if SearchOptions.RELATIONS in features:
         pass

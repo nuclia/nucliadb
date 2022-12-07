@@ -39,7 +39,11 @@ impl Debug for VectorReaderService {
     }
 }
 
-impl VectorReader for VectorReaderService {}
+impl VectorReader for VectorReaderService {
+    fn count(&self, _vectorset: &str) -> InternalResult<usize> {
+        Ok(self.index.read().unwrap().no_vectors())
+    }
+}
 impl ReaderChild for VectorReaderService {
     type Request = VectorSearchRequest;
     type Response = VectorSearchResponse;
@@ -47,9 +51,6 @@ impl ReaderChild for VectorReaderService {
     fn stop(&self) -> InternalResult<()> {
         info!("Stopping vector reader Service");
         Ok(())
-    }
-    fn count(&self) -> usize {
-        self.index.read().unwrap().no_vectors()
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         debug!(
@@ -141,9 +142,16 @@ mod tests {
     #[test]
     fn test_new_vector_reader() {
         let dir = TempDir::new("payload_dir").unwrap();
+        let vectorset = TempDir::new("vector_set").unwrap();
         let vsc = VectorConfig {
             no_results: Some(3),
             path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            vectorset: vectorset
+                .path()
+                .as_os_str()
+                .to_os_string()
+                .into_string()
+                .unwrap(),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
@@ -178,6 +186,8 @@ mod tests {
             sentences_to_delete: vec![],
             relations_to_delete: vec![],
             relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
             shard_id: "DOC".to_string(),
         };
         // insert - delete - insert sequence
@@ -188,6 +198,7 @@ mod tests {
         let reader = VectorReaderService::start(&vsc).unwrap();
         let request = VectorSearchRequest {
             id: "".to_string(),
+            vector_set: "".to_string(),
             vector: vec![4.0, 6.0, 7.0],
             tags: vec!["1".to_string()],
             page_number: 0,

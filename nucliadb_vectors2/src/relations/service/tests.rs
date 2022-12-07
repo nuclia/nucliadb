@@ -136,6 +136,8 @@ fn create_empty_resource(shard_id: String) -> Resource {
         sentences_to_delete: vec![],
         relations_to_delete: vec![],
         relations: vec![],
+        vectors: HashMap::default(),
+        vectors_to_delete: HashMap::default(),
         shard_id,
     }
 }
@@ -221,7 +223,7 @@ fn join_graph_test() -> anyhow::Result<()> {
     let graph = empty_graph();
     resource.relations = graph;
     writer.set_resource(&resource).unwrap();
-    let got = reader.count();
+    let got = reader.count().unwrap();
     assert_eq!(got, 0);
 
     let graph = JoinGraph {

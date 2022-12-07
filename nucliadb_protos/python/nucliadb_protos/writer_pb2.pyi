@@ -42,6 +42,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
+    VectorSet as VectorSet,
+    VectorSets as VectorSets,
     Widget as Widget,
 )
 from nucliadb_protos.noderesources_pb2 import (
@@ -62,6 +64,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList as ShardList,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
+    VectorSetID as VectorSetID,
+    VectorSetList as VectorSetList,
 )
 from nucliadb_protos.resources_pb2 import (
     Basic as Basic,
@@ -117,6 +121,7 @@ from nucliadb_protos.resources_pb2 import (
     TokenSplit as TokenSplit,
     UserFieldMetadata as UserFieldMetadata,
     UserMetadata as UserMetadata,
+    UserVectorsWrapper as UserVectorsWrapper,
 )
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
@@ -397,6 +402,7 @@ class BrokerMessage(google.protobuf.message.Message):
     PROCESSING_ID_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
     ACCOUNT_SEQ_FIELD_NUMBER: builtins.int
+    USER_VECTORS_FIELD_NUMBER: builtins.int
     kbid: builtins.str
     uuid: builtins.str
     slug: builtins.str
@@ -461,6 +467,8 @@ class BrokerMessage(google.protobuf.message.Message):
     processing_id: builtins.str
     source: global___BrokerMessage.MessageSource.ValueType
     account_seq: builtins.int
+    @property
+    def user_vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.resources_pb2.UserVectorsWrapper]: ...
     def __init__(
         self,
         *,
@@ -496,9 +504,10 @@ class BrokerMessage(google.protobuf.message.Message):
         processing_id: builtins.str = ...,
         source: global___BrokerMessage.MessageSource.ValueType = ...,
         account_seq: builtins.int = ...,
+        user_vectors: collections.abc.Iterable[nucliadb_protos.resources_pb2.UserVectorsWrapper] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["audit", b"audit", "basic", b"basic", "done_time", b"done_time", "origin", b"origin"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "relations", b"relations", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["account_seq", b"account_seq", "audit", b"audit", "basic", b"basic", "conversations", b"conversations", "datetimes", b"datetimes", "delete_fields", b"delete_fields", "done_time", b"done_time", "errors", b"errors", "extracted_text", b"extracted_text", "field_large_metadata", b"field_large_metadata", "field_metadata", b"field_metadata", "field_vectors", b"field_vectors", "file_extracted_data", b"file_extracted_data", "files", b"files", "kbid", b"kbid", "keywordsets", b"keywordsets", "layouts", b"layouts", "link_extracted_data", b"link_extracted_data", "links", b"links", "multiid", b"multiid", "origin", b"origin", "origin_seq", b"origin_seq", "pre_processing_time", b"pre_processing_time", "processing_id", b"processing_id", "relations", b"relations", "slow_processing_time", b"slow_processing_time", "slug", b"slug", "source", b"source", "texts", b"texts", "txseqid", b"txseqid", "type", b"type", "user_vectors", b"user_vectors", "uuid", b"uuid"]) -> None: ...
 
 global___BrokerMessage = BrokerMessage
 
@@ -971,6 +980,106 @@ class GetWidgetResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["kb", b"kb", "status", b"status", "widget", b"widget"]) -> None: ...
 
 global___GetWidgetResponse = GetWidgetResponse
+
+@typing_extensions.final
+class GetVectorSetsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb", b"kb"]) -> None: ...
+
+global___GetVectorSetsRequest = GetVectorSetsRequest
+
+@typing_extensions.final
+class GetVectorSetsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetVectorSetsResponse._Status.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: GetVectorSetsResponse._Status.ValueType  # 0
+        NOTFOUND: GetVectorSetsResponse._Status.ValueType  # 1
+        ERROR: GetVectorSetsResponse._Status.ValueType  # 2
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: GetVectorSetsResponse.Status.ValueType  # 0
+    NOTFOUND: GetVectorSetsResponse.Status.ValueType  # 1
+    ERROR: GetVectorSetsResponse.Status.ValueType  # 2
+
+    KB_FIELD_NUMBER: builtins.int
+    VECTORSETS_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    @property
+    def vectorsets(self) -> nucliadb_protos.knowledgebox_pb2.VectorSets: ...
+    status: global___GetVectorSetsResponse.Status.ValueType
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+        vectorsets: nucliadb_protos.knowledgebox_pb2.VectorSets | None = ...,
+        status: global___GetVectorSetsResponse.Status.ValueType = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb", b"kb", "vectorsets", b"vectorsets"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb", b"kb", "status", b"status", "vectorsets", b"vectorsets"]) -> None: ...
+
+global___GetVectorSetsResponse = GetVectorSetsResponse
+
+@typing_extensions.final
+class DelVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    vectorset: builtins.str
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+        vectorset: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb", b"kb", "vectorset", b"vectorset"]) -> None: ...
+
+global___DelVectorSetRequest = DelVectorSetRequest
+
+@typing_extensions.final
+class SetVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    id: builtins.str
+    @property
+    def vectorset(self) -> nucliadb_protos.knowledgebox_pb2.VectorSet: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+        id: builtins.str = ...,
+        vectorset: nucliadb_protos.knowledgebox_pb2.VectorSet | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb", b"kb", "vectorset", b"vectorset"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "kb", b"kb", "vectorset", b"vectorset"]) -> None: ...
+
+global___SetVectorSetRequest = SetVectorSetRequest
 
 @typing_extensions.final
 class GetWidgetsRequest(google.protobuf.message.Message):

@@ -25,6 +25,7 @@ from uuid import uuid4
 
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
+from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
@@ -33,6 +34,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated,
     ShardId,
     ShardList,
+    VectorSetID,
+    VectorSetList,
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
@@ -93,6 +96,19 @@ class DummyWriterStub:
         self.calls.setdefault("SetResource", []).append(data)
         result = OpStatus()
         result.count = 1
+        return result
+
+    async def AddVectorSet(self, data):
+        self.calls.setdefault("AddVectorSet", []).append(data)
+        result = OpStatus()
+        result.count = 1
+        return result
+
+    async def ListVectorSet(self, data: ShardId):
+        self.calls.setdefault("ListVectorSet", []).append(data)
+        result = VectorSetList()
+        result.shard.id = data.id
+        result.vectorset.append("base")
         return result
 
 
@@ -337,8 +353,14 @@ class Node(AbstractNode):
         resp = await self.writer.GetShard(req)  # type: ignore
         return resp
 
-    async def get_reader_shard(self, id: str) -> NodeResourcesShard:
-        req = ShardId(id=id)
+    async def get_reader_shard(
+        self, shard_id: str, vectorset: Optional[str] = None
+    ) -> NodeResourcesShard:
+
+        req = GetShardRequest()
+        req.shard_id.id = shard_id
+        if vectorset is not None:
+            req.vectorset = vectorset
         resp = await self.reader.GetShard(req)  # type: ignore
         return resp
 
@@ -361,6 +383,26 @@ class Node(AbstractNode):
         req = EmptyQuery()
         resp = await self.writer.ListShards(req)  # type: ignore
         return resp.shards
+
+    async def del_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
+        req = VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
+        return resp
+
+    async def set_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
+        req = VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await self.writer.AddVectorSet(req)  # type: ignore
+        return resp
+
+    async def get_vectorset(self, shard_id: str) -> VectorSetList:
+        req = ShardId()
+        req.id = shard_id
+        resp = await self.writer.ListVectorSets(req)  # type: ignore
+        return resp
 
 
 async def chitchat_update_node(members: List[ClusterMember]) -> None:

@@ -202,6 +202,16 @@ pub mod widget {
         Form = 2,
     }
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSet {
+    #[prost(int32, tag="1")]
+    pub dimension: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSets {
+    #[prost(map="string, message", tag="1")]
+    pub vectorsets: ::std::collections::HashMap<::prost::alloc::string::String, VectorSet>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum KnowledgeBoxResponseStatus {

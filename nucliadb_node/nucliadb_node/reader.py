@@ -22,6 +22,7 @@ from typing import Optional
 
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
+from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import OpStatus
@@ -51,7 +52,9 @@ class Reader:
 
     async def get_count(self, pb: ShardId) -> Optional[int]:
         if pb.id not in CACHE:
-            shard: Shard = await self.stub.GetShard(pb)  # type: ignore
+            req = GetShardRequest()
+            req.shard_id.id = pb.id
+            shard: Shard = await self.stub.GetShard(req)  # type: ignore
             CACHE[pb.id] = shard.resources
             return CACHE[pb.id]
         else:

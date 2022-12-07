@@ -83,7 +83,7 @@ def has_required_scope(conn: HTTPConnection, scopes: typing.Sequence[str]) -> bo
 def requires(
     scopes: typing.Union[str, typing.Sequence[str]],
     status_code: int = 403,
-    redirect: str = None,
+    redirect: Optional[str] = None,
 ) -> typing.Callable:
 
     # As a fastapi requirement, custom Enum classes have to inherit also from
@@ -168,7 +168,7 @@ def requires(
 def requires_one(
     scopes: typing.Union[str, typing.Sequence[str]],
     status_code: int = 403,
-    redirect: str = None,
+    redirect: Optional[str] = None,
 ) -> typing.Callable:
 
     # As a fastapi requirement, custom Enum classes have to inherit also from

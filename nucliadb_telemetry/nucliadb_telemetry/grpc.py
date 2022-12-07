@@ -21,14 +21,14 @@ import functools
 from collections import OrderedDict
 from concurrent import futures
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, List, MutableMapping, Optional
+from typing import Any, Awaitable, Callable, List, Optional
 
 import grpc
 from grpc import ChannelCredentials, ClientCallDetails, aio  # type: ignore
 from grpc.experimental import wrap_server_method_handler  # type: ignore
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract, inject
-from opentelemetry.propagators.textmap import Setter  # type: ignore
+from opentelemetry.propagators.textmap import CarrierT, Setter  # type: ignore
 from opentelemetry.sdk.trace import Span  # type: ignore
 from opentelemetry.sdk.trace import TracerProvider  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
@@ -45,8 +45,8 @@ class _CarrierSetter(Setter):
     keys as is required by grpc.
     """
 
-    def set(self, carrier: MutableMapping[str, str], key: str, value: str):
-        carrier[key.lower()] = value
+    def set(self, carrier: CarrierT, key: str, value: str):  # type: ignore
+        carrier[key.lower()] = value  # type: ignore
 
 
 _carrier_setter = _CarrierSetter()
@@ -93,7 +93,7 @@ def start_span_client(
     # add some attributes from the metadata
     if client_call_details.metadata is not None:
         mutable_metadata = OrderedDict(client_call_details.metadata)
-        inject(mutable_metadata, setter=_carrier_setter)
+        inject(mutable_metadata, setter=_carrier_setter)  # type: ignore
         for key, value in mutable_metadata.items():
             client_call_details.metadata.add(key=key, value=value)  # type: ignore
 

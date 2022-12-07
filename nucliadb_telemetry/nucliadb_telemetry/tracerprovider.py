@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from typing import Optional, Tuple
+from typing import Optional
 
 from opentelemetry.context import Context  # type: ignore
 from opentelemetry.sdk.trace import TracerProvider  # type: ignore
@@ -37,10 +37,10 @@ class AsyncMultiSpanProcessor(SpanProcessor):
     def __init__(self):
         # use a tuple to avoid race conditions when adding a new span and
         # iterating through it on "on_start" and "on_end".
-        self._span_processors = ()  # type: Tuple[SpanProcessor, ...]
+        self._span_processors = ()
         self._lock = asyncio.Lock()
 
-    async def add_span_processor(self, span_processor: SpanProcessor) -> None:
+    async def async_add_span_processor(self, span_processor: SpanProcessor) -> None:
         """Adds a SpanProcessor to the list handled by this instance."""
         async with self._lock:
             self._span_processors += (span_processor,)
@@ -62,8 +62,8 @@ class AsyncMultiSpanProcessor(SpanProcessor):
         for sp in self._span_processors:
             sp.shutdown()
 
-    async def force_flush(self, timeout_millis: int = 30000) -> bool:
-        """Sequentially calls force_flush on all underlying
+    async def async_force_flush(self, timeout_millis: int = 30000) -> bool:  # type: ignore
+        """Sequentially calls async_force_flush on all underlying
         :class:`SpanProcessor`
 
         Args:
@@ -82,7 +82,9 @@ class AsyncMultiSpanProcessor(SpanProcessor):
             if current_time_ns >= deadline_ns:
                 return False
 
-            if not await sp.force_flush((deadline_ns - current_time_ns) // 1000000):
+            if not await sp.async_force_flush(
+                (deadline_ns - current_time_ns) // 1000000
+            ):
                 return False
 
         return True
@@ -90,9 +92,10 @@ class AsyncMultiSpanProcessor(SpanProcessor):
 
 class AsyncTracerProvider(TracerProvider):
     initialized: bool = False
+    _active_span_processor: AsyncMultiSpanProcessor  # type: ignore
 
-    async def add_span_processor(self, span_processor: SpanProcessor) -> None:
-        await self._active_span_processor.add_span_processor(span_processor)
+    async def async_add_span_processor(self, span_processor: SpanProcessor) -> None:
+        await self._active_span_processor.async_add_span_processor(span_processor)
 
-    async def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return await self._active_span_processor.force_flush(timeout_millis)
+    async def async_force_flush(self, timeout_millis: int = 30000) -> bool:
+        return await self._active_span_processor.async_force_flush(timeout_millis)

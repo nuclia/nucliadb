@@ -65,7 +65,7 @@ fn main() {
 
     println!("Writing starts..");
     let mut possible_tag = vec![];
-    let mut writer = Index::writer(at.path()).unwrap();
+    let mut writer = Index::new(at.path(), IndexCheck::None).unwrap();
     for i in 0..(INDEX_SIZE / BATCH_SIZE) {
         let batch_id = format!("Batch_{i}");
         let labels = label_set(i);
@@ -82,7 +82,7 @@ fn main() {
     }
     possible_tag.truncate(1);
 
-    let reader = Index::writer(at.path()).unwrap();
+    let reader = Index::new(at.path(), IndexCheck::None).unwrap();
     let lock = reader.get_slock().unwrap();
     let labels = possible_tag;
 

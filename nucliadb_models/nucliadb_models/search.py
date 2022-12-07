@@ -26,9 +26,8 @@ from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
-from nucliadb.ingest.serialize import ExtractedDataTypeName, ResourceProperties
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import Resource
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
 if TYPE_CHECKING:
     SortValue = OrderBy.OrderType.V
@@ -38,10 +37,13 @@ else:
 _T = TypeVar("_T")
 
 
-class NucliaDBRoles(str, Enum):
-    MANAGER = "MANAGER"
-    READER = "READER"
-    WRITER = "WRITER"
+class ResourceProperties(str, Enum):
+    BASIC = "basic"
+    ORIGIN = "origin"
+    RELATIONS = "relations"
+    VALUES = "values"
+    EXTRACTED = "extracted"
+    ERRORS = "errors"
 
 
 class SearchOptions(str, Enum):
@@ -85,6 +87,7 @@ class Sentence(BaseModel):
     field_type: str
     field: str
     labels: List[str] = []
+    index: Optional[str] = None
 
 
 class Sentences(BaseModel):
@@ -253,7 +256,7 @@ class KnowledgeboxShards(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = ""
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []
@@ -279,4 +282,5 @@ class SearchRequest(BaseModel):
     extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
     shards: List[str] = []
     vector: Optional[List[float]] = None
+    vectorset: Optional[str] = None
     with_duplicates: bool = False

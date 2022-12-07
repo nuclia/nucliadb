@@ -42,8 +42,6 @@ from starlette.requests import Request as StarletteRequest
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.exceptions import (
@@ -66,6 +64,8 @@ from nucliadb.writer.tus.exceptions import (
 )
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError

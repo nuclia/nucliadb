@@ -295,7 +295,7 @@ class S3Storage(Storage):
         endpoint_url: Optional[str] = None,
         verify_ssl: bool = True,
         use_ssl: bool = True,
-        region_name: str = None,
+        region_name: Optional[str] = None,
         max_pool_connections: int = 30,
         bucket: Optional[str] = None,
     ):

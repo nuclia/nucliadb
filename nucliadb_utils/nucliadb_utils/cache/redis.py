@@ -90,7 +90,7 @@ class RedisPubsub(PubSubDriver):
         self,
         handler: Callback,
         key: str,
-        group: str = None,
+        group: Optional[str] = None,
         subscription_id: Optional[str] = None,
     ):
         if group is not None:

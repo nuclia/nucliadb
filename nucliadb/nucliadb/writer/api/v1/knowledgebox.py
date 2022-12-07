@@ -30,13 +30,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from starlette.requests import Request
 
-from nucliadb.models.resource import (
+from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
+from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
     KnowledgeBoxObjID,
     NucliaDBRoles,
 )
-from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
@@ -67,7 +67,6 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
 
     requestpb.config.enabled_filters.extend(item.enabled_filters)
     requestpb.config.enabled_insights.extend(item.enabled_insights)
-
     kbobj: NewKnowledgeBoxResponse = await ingest.NewKnowledgeBox(requestpb)  # type: ignore
     if item.slug != "":
         slug = item.slug

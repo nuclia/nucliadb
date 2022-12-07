@@ -29,6 +29,8 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelSetResponse,
     GetLabelsRequest,
     GetLabelsResponse,
+    GetVectorSetsRequest,
+    GetVectorSetsResponse,
     GetWidgetRequest,
     GetWidgetResponse,
     GetWidgetsRequest,
@@ -36,11 +38,13 @@ from nucliadb_protos.writer_pb2 import (
 )
 from starlette.requests import Request
 
-from nucliadb.models.entities import EntitiesGroup, KnowledgeBoxEntities
-from nucliadb.models.labels import KnowledgeBoxLabels, LabelSet
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.models.widgets import KnowledgeBoxWidgets, Widget, WidgetMode
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.entities import EntitiesGroup, KnowledgeBoxEntities
+from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.vectors import VectorSet, VectorSets
+from nucliadb_models.widgets import KnowledgeBoxWidgets, Widget, WidgetMode
+from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_ingest
 
@@ -58,6 +62,8 @@ async def get_entities(request: Request, kbid: str) -> KnowledgeBoxEntities:
     ingest = get_ingest()
     e_request: GetEntitiesRequest = GetEntitiesRequest()
     e_request.kb.uuid = kbid
+    set_info_on_span({"nuclia.kbid": kbid})
+
     kbobj: GetEntitiesResponse = await ingest.GetEntities(e_request)  # type: ignore
     if kbobj.status == GetEntitiesResponse.Status.OK:
         response = KnowledgeBoxEntities(uuid=kbid)
@@ -88,6 +94,7 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
     l_request: GetEntitiesGroupRequest = GetEntitiesGroupRequest()
     l_request.kb.uuid = kbid
     l_request.group = group
+    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
@@ -112,6 +119,8 @@ async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
     ingest = get_ingest()
     l_request: GetLabelsRequest = GetLabelsRequest()
     l_request.kb.uuid = kbid
+    set_info_on_span({"nuclia.kbid": kbid})
+
     kbobj: GetLabelsResponse = await ingest.GetLabels(l_request)  # type: ignore
     if kbobj.status == GetLabelsResponse.Status.OK:
         response = KnowledgeBoxLabels(uuid=kbid)
@@ -139,6 +148,7 @@ async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
     l_request: GetLabelSetRequest = GetLabelSetRequest()
     l_request.kb.uuid = kbid
     l_request.labelset = labelset
+    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetLabelSetResponse = await ingest.GetLabelSet(l_request)  # type: ignore
     if kbobj.status == GetLabelSetResponse.Status.OK:
@@ -163,6 +173,8 @@ async def get_widgets(request: Request, kbid: str) -> KnowledgeBoxWidgets:
     ingest = get_ingest()
     l_request: GetWidgetsRequest = GetWidgetsRequest()
     l_request.kb.uuid = kbid
+    set_info_on_span({"nuclia.kbid": kbid})
+
     kbobj: GetWidgetsResponse = await ingest.GetWidgets(l_request)  # type: ignore
     if kbobj.status == GetWidgetsResponse.Status.OK:
         response = KnowledgeBoxWidgets(uuid=kbid)
@@ -206,6 +218,7 @@ async def get_widget(request: Request, kbid: str, widget: str) -> Widget:
     l_request: GetWidgetRequest = GetWidgetRequest()
     l_request.kb.uuid = kbid
     l_request.widget = widget
+    set_info_on_span({"nuclia.kbid": kbid})
 
     kbobj: GetWidgetResponse = await ingest.GetWidget(l_request)  # type: ignore
     if kbobj.status == GetWidgetResponse.Status.OK:
@@ -227,3 +240,34 @@ async def get_widget(request: Request, kbid: str, widget: str) -> Widget:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     else:
         raise HTTPException(status_code=500, detail="Unknown GRPC response")
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/vectorsets",
+    status_code=200,
+    name="Get Knowledge Box VectorSet",
+    tags=["Knowledge Box Services"],
+    response_model=VectorSets,
+    openapi_extra={"x-operation_order": 1},
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_vectorset(request: Request, kbid: str):
+    ingest = get_ingest()
+    pbrequest: GetVectorSetsRequest = GetVectorSetsRequest()
+    pbrequest.kb.uuid = kbid
+
+    set_info_on_span({"nuclia.kbid": kbid})
+
+    vectorsets: GetVectorSetsResponse = await ingest.GetVectorSets(pbrequest)  # type: ignore
+    if vectorsets.status == GetVectorSetsResponse.Status.OK:
+        result = VectorSets(vectorsets={})
+        for key, vector in vectorsets.vectorsets.vectorsets.items():
+            result.vectorsets[key] = VectorSet(dimension=vector.dimension)
+        return result
+    elif vectorsets.status == GetVectorSetsResponse.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="VectorSet does not exist")
+    elif vectorsets.status == GetVectorSetsResponse.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error on getting vectorset on a Knowledge box"
+        )

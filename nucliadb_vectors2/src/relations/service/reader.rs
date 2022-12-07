@@ -106,6 +106,13 @@ impl RelationsReaderService {
     }
 }
 impl RelationReader for RelationsReaderService {
+    fn count(&self) -> InternalResult<usize> {
+        Ok(self
+            .index
+            .start_reading()
+            .and_then(|reader| reader.no_nodes())
+            .map(|v| v as usize)?)
+    }
     fn get_edges(&self) -> InternalResult<EdgeList> {
         let reader = self.index.start_reading()?;
         let iter = reader.iter_edge_ids()?;
@@ -159,18 +166,6 @@ impl ReaderChild for RelationsReaderService {
     fn stop(&self) -> InternalResult<()> {
         info!("Stopping relation reader Service");
         Ok(())
-    }
-    fn count(&self) -> usize {
-        let mut count = 0;
-        match self
-            .index
-            .start_reading()
-            .and_then(|reader| reader.no_nodes())
-        {
-            Err(err) => error!("{err:?}"),
-            Ok(v) => count = v as usize,
-        }
-        count
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         if request.prefix.is_empty() {

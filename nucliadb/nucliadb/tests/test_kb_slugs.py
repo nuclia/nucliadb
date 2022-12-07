@@ -20,7 +20,7 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from nucliadb.models.utils import SlugString
+from nucliadb_models.utils import SlugString
 
 
 class DummyModel(BaseModel):

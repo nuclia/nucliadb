@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
@@ -25,30 +26,44 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb.ingest.maindb.driver import Transaction
 
 
-class AbstractShard:
+class AbstractShard(metaclass=ABCMeta):
+    @abstractmethod
     def __init__(self, sharduuid: str, shard: PBShard, node: Optional[Any] = None):
         pass
 
+    @abstractmethod
     async def delete_resource(self, uuid: str, txid: int):
         pass
 
+    @abstractmethod
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> int:
         pass
 
 
-class AbstractNode:
+class AbstractNode(metaclass=ABCMeta):
     label: str
 
     @classmethod
+    @abstractmethod
     def create_shard_klass(cls, shard_id: str, pbshard: PBShard) -> AbstractShard:
         pass
 
     @classmethod
+    @abstractmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> AbstractShard:
         pass
 
     @classmethod
+    @abstractmethod
     async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[AbstractShard]:
+        pass
+
+    @abstractmethod
+    async def del_vectorset(self, shard: str, id: str):
+        pass
+
+    @abstractmethod
+    async def set_vectorset(self, shard: str, id: str):
         pass

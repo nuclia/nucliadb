@@ -35,6 +35,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList as ShardList,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
+    VectorSetID as VectorSetID,
+    VectorSetList as VectorSetList,
 )
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor

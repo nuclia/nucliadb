@@ -205,6 +205,18 @@ jobs:
         run: |
           MYPYPATH=./mypy_stubs mypy nucliadb_node/
 
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            node_modified:
+              - 'nucliadb_node/src/**'
+
+      - name: Build local Node for testing
+        if: steps.filter.outputs.node_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
       - name: Run tests
         run: |
           pytest -rfE --cov=nucliadb_node -s --tb=native -v --cov-report xml --cov-append nucliadb_node/nucliadb_node

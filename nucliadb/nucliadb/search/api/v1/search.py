@@ -30,17 +30,7 @@ from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from sentry_sdk import capture_exception
 
-from nucliadb.ingest.serialize import ExtractedDataTypeName, ResourceProperties
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.search import logger
-from nucliadb.search.api.models import (
-    KnowledgeboxSearchResults,
-    NucliaDBClientType,
-    SearchOptions,
-    SearchRequest,
-    SortOption,
-)
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_results
@@ -48,6 +38,16 @@ from nucliadb.search.search.query import global_query_to_pb
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
+from nucliadb_models.search import (
+    KnowledgeboxSearchResults,
+    NucliaDBClientType,
+    ResourceProperties,
+    SearchOptions,
+    SearchRequest,
+    SortOption,
+)
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_audit
@@ -175,7 +175,7 @@ async def search(
             detail="Query needs to be bigger than 2 or 0",
         )
 
-    if item.query == "":
+    if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
         if SearchOptions.VECTOR in item.features:
             item.features.remove(SearchOptions.VECTOR)
@@ -205,6 +205,7 @@ async def search(
         fields=item.fields,
         reload=item.reload,
         vector=item.vector,
+        vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
     )
 

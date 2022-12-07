@@ -29,6 +29,8 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     IndexResource,
+    ResourceFieldExistsResponse,
+    ResourceFieldId,
     ResourceIdRequest,
     ResourceIdResponse,
 )
@@ -37,13 +39,6 @@ from starlette.requests import Request
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.processing import PushPayload, Source
 from nucliadb.ingest.utils import get_driver
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.models.writer import (
-    CreateResourcePayload,
-    ResourceCreated,
-    ResourceUpdated,
-    UpdateResourcePayload,
-)
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -63,7 +58,15 @@ from nucliadb.writer.resource.basic import (
 )
 from nucliadb.writer.resource.field import extract_fields, parse_fields
 from nucliadb.writer.resource.origin import parse_origin
+from nucliadb.writer.resource.vectors import get_vectorsets, parse_vectors
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.writer import (
+    CreateResourcePayload,
+    ResourceCreated,
+    ResourceUpdated,
+    UpdateResourcePayload,
+)
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
@@ -141,6 +144,13 @@ async def create_resource(
         uuid=uuid,
         x_skip_store=x_skip_store,
     )
+
+    if item.uservectors:
+        vectorsets = await get_vectorsets(kbid)
+        if vectorsets:
+            parse_vectors(writer, item.uservectors, vectorsets)
+        else:
+            raise HTTPException(status_code=412, detail=str("No vectorsets found"))
 
     set_status(writer.basic, item)
 
@@ -226,6 +236,12 @@ async def modify_resource(
         uuid=rid,
         x_skip_store=x_skip_store,
     )
+    if item.uservectors:
+        vectorsets = await get_vectorsets(kbid)
+        if vectorsets:
+            parse_vectors(writer, item.uservectors, vectorsets)
+        else:
+            raise HTTPException(status_code=412, detail=str("No vectorsets found"))
 
     set_status_modify(writer.basic, item)
     try:
@@ -417,7 +433,23 @@ async def get_rid_from_params_or_raise_error(
     slug: Optional[str] = None,
 ) -> str:
     if rid is not None:
-        return rid
+        ingest = get_ingest()
+        pbrequest = ResourceFieldId()
+        pbrequest.kbid = kbid
+        pbrequest.rid = rid
+
+        try:
+            response: ResourceFieldExistsResponse = await ingest.ResourceFieldExists(pbrequest)  # type: ignore
+        except AioRpcError as exc:
+            if exc.code() is GrpcStatusCode.UNAVAILABLE:
+                raise IngestNotAvailable()
+            else:
+                raise exc
+
+        if response.found:
+            return rid
+        else:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
 
     if slug is None:
         raise ValueError("Either rid or slug must be set")

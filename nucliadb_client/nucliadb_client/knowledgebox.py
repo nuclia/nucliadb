@@ -32,9 +32,9 @@ from nucliadb_protos.writer_pb2 import (
     SetLabelsRequest,
 )
 
-from nucliadb.models.resource import KnowledgeBoxObj, ResourceList
-from nucliadb.models.writer import CreateResourcePayload, ResourceCreated
-from nucliadb.search.api.models import KnowledgeboxCounters, KnowledgeboxShards
+from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
+from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards
+from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
 
 if TYPE_CHECKING:
     from nucliadb_client.client import NucliaDBClient

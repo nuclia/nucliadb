@@ -46,13 +46,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tonic_build::configure()
         .build_server(true)
-        .out_dir("src")  // you can change the generated code's location
+        .out_dir("src") // you can change the generated code's location
         .compile(
             &[
                 "nucliadb_protos/nodewriter.proto",
                 "nucliadb_protos/nodereader.proto",
             ],
-            &["../../"],        ).unwrap();
+            &["../../"],
+        )
+        .unwrap();
 
     Ok(())
 }

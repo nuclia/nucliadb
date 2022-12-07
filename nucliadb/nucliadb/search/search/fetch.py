@@ -29,15 +29,12 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.serialize import (
-    ExtractedDataTypeName,
-    ResourceProperties,
-    serialize,
-)
+from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.utils import get_driver
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import Resource
 from nucliadb.search import SERVICE_NAME, logger
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.search import ResourceProperties
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
@@ -65,7 +62,7 @@ async def get_transaction() -> Transaction:
     return transaction
 
 
-async def abort_transaction():
+async def abort_transaction() -> None:
     transaction: Optional[Transaction] = txn.get()
     if transaction is not None:
         await transaction.abort()
@@ -188,10 +185,11 @@ async def get_labels_sentence(
     field_metadata = await field_obj.get_field_metadata()
     if field_metadata:
         paragraph = None
-        if split not in (None, ""):
+        if split not in (None, "") and index >= 0:
+            # Index can com from user vectors
             metadata = field_metadata.split_metadata[split]
             paragraph = metadata.paragraphs[index]
-        elif len(field_metadata.metadata.paragraphs) > index:
+        elif len(field_metadata.metadata.paragraphs) > index and index >= 0:
             paragraph = field_metadata.metadata.paragraphs[index]
 
         if paragraph is not None:

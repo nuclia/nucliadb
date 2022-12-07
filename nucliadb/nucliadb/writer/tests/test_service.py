@@ -19,10 +19,10 @@
 #
 import pytest
 
-from nucliadb.models.entities import EntitiesGroup, Entity
-from nucliadb.models.labels import Label, LabelSet
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb_models.entities import EntitiesGroup, Entity
+from nucliadb_models.labels import Label, LabelSet
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_utils.utilities import get_ingest
 

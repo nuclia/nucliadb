@@ -28,13 +28,13 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from starlette.requests import Request
 
-from nucliadb.models.resource import (
+from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
+from nucliadb_models.resource import (
     KnowledgeBoxList,
     KnowledgeBoxObj,
     KnowledgeBoxObjSummary,
     NucliaDBRoles,
 )
-from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_ingest
 

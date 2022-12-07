@@ -531,3 +531,52 @@ class Widget(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "features", b"features", "filters", b"filters", "id", b"id", "mode", b"mode", "style", b"style", "topEntities", b"topEntities"]) -> None: ...
 
 global___Widget = Widget
+
+@typing_extensions.final
+class VectorSet(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DIMENSION_FIELD_NUMBER: builtins.int
+    dimension: builtins.int
+    def __init__(
+        self,
+        *,
+        dimension: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension"]) -> None: ...
+
+global___VectorSet = VectorSet
+
+@typing_extensions.final
+class VectorSets(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class VectorsetsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___VectorSet: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___VectorSet | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    VECTORSETS_FIELD_NUMBER: builtins.int
+    @property
+    def vectorsets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___VectorSet]: ...
+    def __init__(
+        self,
+        *,
+        vectorsets: collections.abc.Mapping[builtins.str, global___VectorSet] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectorsets", b"vectorsets"]) -> None: ...
+
+global___VectorSets = VectorSets

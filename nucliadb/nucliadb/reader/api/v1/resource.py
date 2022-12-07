@@ -24,28 +24,17 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from sentry_sdk import capture_exception
 
-import nucliadb.models as models
+import nucliadb_models as models
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.serialize import (
-    ExtractedDataTypeName,
-    ResourceFieldProperties,
-    ResourceProperties,
     get_resource_uuid_by_slug,
     serialize,
     set_resource_field_extracted_data,
 )
 from nucliadb.ingest.utils import get_driver
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import (
-    Error,
-    NucliaDBRoles,
-    Resource,
-    ResourceList,
-    ResourcePagination,
-)
 from nucliadb.reader import SERVICE_NAME  # type: ignore
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.models import (
@@ -54,6 +43,17 @@ from nucliadb.reader.api.models import (
     ResourceField,
 )
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import (
+    Error,
+    ExtractedDataTypeName,
+    NucliaDBRoles,
+    Resource,
+    ResourceFieldProperties,
+    ResourceList,
+    ResourcePagination,
+)
+from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage

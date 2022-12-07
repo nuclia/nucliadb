@@ -29,7 +29,7 @@ class InvalidTUSMetadata(Exception):
 class HTTPException(StarletteHTTPException):
     _status_code: Optional[int] = None
 
-    def __init__(self, detail: str = None):
+    def __init__(self, detail: Optional[str] = None):
         if self._status_code:
             super(HTTPException, self).__init__(
                 status_code=self._status_code, detail=detail

@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Bosutech XXI S.L.
+// Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
 // For commercial licensing, contact us at info@nuclia.com.

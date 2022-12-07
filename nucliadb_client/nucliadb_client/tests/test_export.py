@@ -24,12 +24,12 @@ from typing import Optional
 import pytest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb.models.text import TextField
-from nucliadb.models.utils import FieldIdString
-from nucliadb.models.writer import CreateResourcePayload
 from nucliadb_client.client import NucliaDBClient
 from nucliadb_client.exceptions import ConflictError
 from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString
+from nucliadb_models.writer import CreateResourcePayload
 
 
 @pytest.mark.asyncio

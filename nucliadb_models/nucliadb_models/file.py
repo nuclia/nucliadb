@@ -23,7 +23,7 @@ from typing import Optional, Type, TypeVar
 from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 
-from nucliadb.models import CloudLink, File
+from nucliadb_models import CloudLink, File
 from nucliadb_protos import resources_pb2
 
 _T = TypeVar("_T")

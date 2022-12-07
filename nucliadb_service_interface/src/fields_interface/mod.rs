@@ -41,6 +41,7 @@ pub struct FieldConfig {
 pub trait FieldReader:
     ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
 {
+    fn count(&self) -> InternalResult<usize>;
 }
 
 pub trait FieldWriter: WriterChild {}

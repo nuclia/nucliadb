@@ -71,7 +71,7 @@ def _cancel_all_tasks(loop):
             )
 
 
-def run():
+def run() -> None:
     if running_settings.sentry_url and SENTRY:
         set_sentry(
             running_settings.sentry_url,

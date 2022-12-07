@@ -36,6 +36,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList as ShardList,
     TextInformation as TextInformation,
     VectorSentence as VectorSentence,
+    VectorSetID as VectorSetID,
+    VectorSetList as VectorSetList,
 )
 from nucliadb_protos.utils_pb2 import (
     ExtractedText as ExtractedText,
@@ -43,6 +45,10 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
     RelationNode as RelationNode,
+    UserVector as UserVector,
+    UserVectorSet as UserVectorSet,
+    UserVectors as UserVectors,
+    UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
     Vectors as Vectors,
@@ -509,6 +515,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
+    VECTOR_SET_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
     TAGS_FIELD_NUMBER: builtins.int
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
@@ -517,6 +524,10 @@ class VectorSearchRequest(google.protobuf.message.Message):
     RELOAD_FIELD_NUMBER: builtins.int
     id: builtins.str
     """Shard ID"""
+    vector_set: builtins.str
+    """ID for the vector set.
+    Empty for searching on the original index
+    """
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
         """Embedded vector search."""
@@ -533,6 +544,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
         self,
         *,
         id: builtins.str = ...,
+        vector_set: builtins.str = ...,
         vector: collections.abc.Iterable[builtins.float] | None = ...,
         tags: collections.abc.Iterable[builtins.str] | None = ...,
         page_number: builtins.int = ...,
@@ -540,7 +552,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
         with_duplicates: builtins.bool = ...,
         reload: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "tags", b"tags", "vector", b"vector", "vector_set", b"vector_set", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___VectorSearchRequest = VectorSearchRequest
 
@@ -706,6 +718,7 @@ class SearchRequest(google.protobuf.message.Message):
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     PARAGRAPH_FIELD_NUMBER: builtins.int
     DOCUMENT_FIELD_NUMBER: builtins.int
@@ -730,6 +743,7 @@ class SearchRequest(google.protobuf.message.Message):
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]:
         """Embedded vector search."""
+    vectorset: builtins.str
     reload: builtins.bool
     paragraph: builtins.bool
     document: builtins.bool
@@ -748,6 +762,7 @@ class SearchRequest(google.protobuf.message.Message):
         result_per_page: builtins.int = ...,
         timestamps: global___Timestamps | None = ...,
         vector: collections.abc.Iterable[builtins.float] | None = ...,
+        vectorset: builtins.str = ...,
         reload: builtins.bool = ...,
         paragraph: builtins.bool = ...,
         document: builtins.bool = ...,
@@ -755,7 +770,7 @@ class SearchRequest(google.protobuf.message.Message):
         only_faceted: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___SearchRequest = SearchRequest
 
@@ -946,3 +961,23 @@ class TypeList(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["list", b"list"]) -> None: ...
 
 global___TypeList = TypeList
+
+@typing_extensions.final
+class GetShardRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    VECTORSET_FIELD_NUMBER: builtins.int
+    @property
+    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
+    vectorset: builtins.str
+    def __init__(
+        self,
+        *,
+        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
+        vectorset: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id", "vectorset", b"vectorset"]) -> None: ...
+
+global___GetShardRequest = GetShardRequest

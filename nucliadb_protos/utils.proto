@@ -76,3 +76,23 @@ message VectorObject {
     map<string, Vectors> split_vectors = 2;
     repeated string deleted_splits = 3;
 }
+
+
+message UserVector {
+    repeated float vector = 1;
+    repeated string labels = 2;
+    int32 start = 3;
+    int32 end = 4;
+}
+
+message UserVectors {
+    map<string, UserVector> vectors = 1;  // id del vector
+}
+
+message UserVectorSet {
+    map<string, utils.UserVectors> vectors = 1;  // vectorsets
+}
+
+message UserVectorsList {
+    repeated string vectors = 1;
+}

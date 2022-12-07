@@ -159,9 +159,15 @@ message ParagraphSearchResponse {
 }
 
 message VectorSearchRequest {
-    string id = 1; //Shard ID
-    repeated float vector = 2; // Embedded vector search.
-    repeated string tags = 3; // tags to filter
+     //Shard ID
+    string id = 1;
+    // ID for the vector set.
+    // Empty for searching on the original index
+    string vector_set = 15; 
+    // Embedded vector search.
+    repeated float vector = 2;
+    // tags to filter
+    repeated string tags = 3; 
     // What page is the answer.
     int32 page_number = 4;
 
@@ -245,12 +251,14 @@ message SearchRequest {
 
     repeated float vector = 10; // Embedded vector search.
 
+    string vectorset = 15;
+
     bool reload = 11;
     bool paragraph = 12;
     bool document = 13;
 
     bool with_duplicates = 14;
-    bool only_faceted = 15;
+    bool only_faceted = 16;
 
 }
 
@@ -310,11 +318,16 @@ message TypeList {
     repeated RelationTypeListMember list = 1;
 }
 
+message GetShardRequest {
+    noderesources.ShardId shard_id = 1;
+    string vectorset = 2;
+}
+
 
 // Implemented at nucliadb_object_storage
 
 service NodeReader {
-    rpc GetShard(noderesources.ShardId) returns (noderesources.Shard) {}
+    rpc GetShard(GetShardRequest) returns (noderesources.Shard) {}
     rpc GetShards(noderesources.EmptyQuery) returns (noderesources.ShardList) {}
 
     rpc DocumentSearch(DocumentSearchRequest) returns (DocumentSearchResponse) {}

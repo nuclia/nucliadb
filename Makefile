@@ -63,6 +63,8 @@ python-code-lint:
 	isort --profile black nucliadb_telemetry
 	isort --profile black nucliadb_dataset
 	isort --profile black nucliadb_client
+	isort --profile black nucliadb_sdk
+	isort --profile black nucliadb_models
 	isort --profile black nucliadb
 
 	flake8  --config nucliadb_utils/setup.cfg nucliadb_utils/nucliadb_utils
@@ -70,6 +72,8 @@ python-code-lint:
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
 	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
+	flake8  --config nucliadb_sdk/setup.cfg nucliadb_sdk/nucliadb_sdk
+	flake8  --config nucliadb_models/setup.cfg nucliadb_models/nucliadb_models
 	flake8  --config nucliadb/setup.cfg nucliadb/nucliadb
 
 	black nucliadb_utils
@@ -77,6 +81,8 @@ python-code-lint:
 	black nucliadb_telemetry
 	black nucliadb_dataset
 	black nucliadb_client
+	black nucliadb_sdk
+	black nucliadb_models
 	black nucliadb
 
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
@@ -84,6 +90,8 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_node
 	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
 	MYPYPATH=./mypy_stubs mypy nucliadb_client
+	MYPYPATH=./mypy_stubs mypy nucliadb_models
+	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
 	MYPYPATH=./mypy_stubs mypy nucliadb
 
 venv:  ## Initializes an environment
@@ -129,15 +137,20 @@ debug-run-nucliadb-redis:
 
 
 build-node-binding:
+	rm -rf target/wheels/*
 	maturin build -m nucliadb_node/binding/Cargo.toml --release
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-node-binding-debug:
+	rm -rf target/wheels/*
 	maturin build -m nucliadb_node/binding/Cargo.toml
 	pip install target/wheels/nucliadb_node_binding-*.whl --force
 
 build-nucliadb-local:
 	docker build -t nuclia/nucliadb:latest .
+
+build-nucliadb-local-withbinding:
+	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
 
 build-nucliadb-rustbase_arm64:
 	docker build -t nuclia/nucliadb_rust_base:arm64 . -f Dockerfile.rust

@@ -18,4 +18,5 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 pub mod data_point;
 pub mod data_point_provider;
+pub mod indexset;
 pub mod service;

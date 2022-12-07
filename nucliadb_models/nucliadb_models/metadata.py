@@ -25,7 +25,7 @@ from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 from pydantic.class_validators import root_validator
 
-from nucliadb.models.common import FIELD_TYPES_MAP
+from nucliadb_models.common import FIELD_TYPES_MAP
 from nucliadb_protos import resources_pb2, utils_pb2
 
 from .common import Classification, FieldID, UserClassification
@@ -261,8 +261,9 @@ class Origin(InputOrigin):
         WEB = "WEB"
         DESKTOP = "DESKTOP"
         API = "API"
+        PYSDK = "PYSDK"
 
-    source: Optional[Source]
+    source: Optional[Source] = Source.API
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.Origin) -> _T:

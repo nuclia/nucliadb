@@ -72,7 +72,7 @@ async def test_create_knowledgebox(
     pbid = knowledgebox_pb2.KnowledgeBoxID(slug="test")
     result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
 
-    await tracer_provider.force_flush()
+    await tracer_provider.async_force_flush()
 
     expected_spans = 6
 
@@ -90,13 +90,13 @@ async def test_create_knowledgebox(
 
 
 @pytest.mark.asyncio
-async def test_get_resource_id(grpc_servicer):
+async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
     pb.config.title = "My Title"
-    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)
+    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
 
-    pb = writer_pb2.ResourceIdRequest(kbid="foo", slug="bar")
-    result = await stub.GetResourceId(pb)
+    pbid = writer_pb2.ResourceIdRequest(kbid="foo", slug="bar")
+    result = await stub.GetResourceId(pbid)  # type: ignore
     assert result.uuid == ""

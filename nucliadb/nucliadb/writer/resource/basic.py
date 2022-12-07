@@ -36,10 +36,10 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload
-from nucliadb.models import RelationType
-from nucliadb.models.common import FIELD_TYPES_MAP_REVERSE
-from nucliadb.models.text import PushTextFormat, Text
-from nucliadb.models.writer import (
+from nucliadb_models import RelationType
+from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
+from nucliadb_models.text import PushTextFormat, Text
+from nucliadb_models.writer import (
     ComingResourcePayload,
     CreateResourcePayload,
     UpdateResourcePayload,

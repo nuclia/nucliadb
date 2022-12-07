@@ -113,7 +113,7 @@ class BatchSpanProcessor(SpanProcessor):
                 self._spans_dropped = True
 
         try:
-            self.queue.put_nowait(span)
+            self.queue.put_nowait(span)  # type: ignore
         except:
             logger.error(f"Queue size : {self.queue.qsize()}")
 
@@ -136,7 +136,7 @@ class BatchSpanProcessor(SpanProcessor):
             logger.exception(e)
             raise e
 
-    async def _worker(self):
+    async def _worker(self) -> None:
         timeout = self.schedule_delay_millis / 1e3
         flush_request = None  # type: Optional[_FlushRequest]
         while not self.done:
@@ -258,7 +258,7 @@ class BatchSpanProcessor(SpanProcessor):
         try:
             # Ignore type b/c the Optional[None]+slicing is too "clever"
             # for mypy
-            await self.span_exporter.export(self.spans_list[:idx])  # type: ignore
+            await self.span_exporter.async_export(self.spans_list[:idx])  # type: ignore
         except (asyncio.CancelledError):
             logger.exception("Task was canceled while exporting Span batch")
         except Exception:  # pylint: disable=broad-except
@@ -278,13 +278,13 @@ class BatchSpanProcessor(SpanProcessor):
         while self.queue.qsize():
             await self._export_batch()
 
-    async def force_flush(self, timeout_millis: int = None) -> bool:
+    async def async_force_flush(self, timeout_millis: Optional[int] = None) -> bool:
 
         if timeout_millis is None:
             timeout_millis = self.export_timeout_millis
 
         if self.done:
-            logger.warning("Already shutdown, ignoring call to force_flush().")
+            logger.warning("Already shutdown, ignoring call to async_force_flush().")
             return True
 
         async with self.condition:
@@ -298,7 +298,7 @@ class BatchSpanProcessor(SpanProcessor):
         # wait for token to be processed
         ret = await asyncio.wait_for(flush_request.event.wait(), timeout_millis)
         if not ret:
-            logger.warning("Timeout was exceeded in force_flush().")
+            logger.warning("Timeout was exceeded in async_force_flush().")
             return False
         return ret
 

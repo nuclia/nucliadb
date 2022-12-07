@@ -31,18 +31,14 @@ from nucliadb_protos.writer_pb2 import Shards
 from sentry_sdk import capture_exception
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.search import logger
-from nucliadb.search.api.models import (
-    KnowledgeboxCounters,
-    KnowledgeboxShards,
-    ShardObject,
-)
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_driver, get_nodes
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards, ShardObject
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -88,6 +84,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
 async def knowledgebox_counters(
     request: Request,
     kbid: str,
+    vectorset: str = Query(None),
     debug: bool = Query(False),
 ) -> KnowledgeboxCounters:
 
@@ -127,7 +124,7 @@ async def knowledgebox_counters(
             if shard_id is not None:
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
-                ops.append(get_shard(node, shard_id))
+                ops.append(get_shard(node, shard_id, vectorset=vectorset))
                 queried_shards.append((node.label, shard_id, node_id))
 
     if not ops:

@@ -123,7 +123,7 @@ class Worker:
         await self.subscribe()
         self.gc_task = asyncio.create_task(self.garbage())
 
-    async def garbage(self):
+    async def garbage(self) -> None:
         while True:
             await self.event.wait()
             await asyncio.sleep(10)

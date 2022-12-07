@@ -34,9 +34,9 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.ingest.utils import get_driver
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.search.api.models import NucliaDBClientType
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.keys import KB_SHARDS
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"

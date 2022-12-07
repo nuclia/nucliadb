@@ -30,6 +30,7 @@ use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
+use nucliadb_protos::GetShardRequest;
 use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
@@ -119,17 +120,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             loop {
                 interval.tick().await;
-
-                let (shard_count, paragraph_count) = node_reader.cache.values().fold(
-                    (0, 0),
-                    |(shard_count, paragraph_count), shard| {
-                        (
-                            shard_count + 1,
-                            paragraph_count + shard.get_info().paragraphs,
-                        )
-                    },
-                );
-
+                let mut shard_count = 0;
+                let mut paragraph_count = 0;
+                node_reader.cache.values().for_each(|shard| {
+                    match shard.get_info(&GetShardRequest::default()) {
+                        Err(e) => error!("Cannot get for {} metrics: {e:?}", shard.id),
+                        Ok(count) => {
+                            shard_count += 1;
+                            paragraph_count += count.paragraphs;
+                        }
+                    }
+                });
                 report.shard_count.set(shard_count);
                 report.paragraph_count.set(paragraph_count as i64);
 

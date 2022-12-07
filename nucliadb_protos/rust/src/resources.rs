@@ -278,6 +278,16 @@ pub mod extracted_vectors_wrapper {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UserVectorsWrapper {
+    #[prost(message, optional, tag="1")]
+    pub vectors: ::core::option::Option<super::utils::UserVectorSet>,
+    /// Vectorset prefix vector id
+    #[prost(map="string, message", tag="13")]
+    pub vectors_to_delete: ::std::collections::HashMap<::prost::alloc::string::String, super::utils::UserVectorsList>,
+    #[prost(message, optional, tag="3")]
+    pub field: ::core::option::Option<FieldId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Sentence {
     #[prost(int32, tag="1")]
     pub start: i32,

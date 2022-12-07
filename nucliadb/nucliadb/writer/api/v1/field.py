@@ -26,10 +26,8 @@ from nucliadb_protos.resources_pb2 import FieldID, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from starlette.requests import Request
 
-import nucliadb.models as models
+import nucliadb_models as models
 from nucliadb.ingest.processing import PushPayload, Source
-from nucliadb.models.resource import NucliaDBRoles
-from nucliadb.models.writer import ResourceFieldAdded
 from nucliadb.writer.api.v1.resource import get_rid_from_params_or_raise_error
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
@@ -44,6 +42,8 @@ from nucliadb.writer.resource.field import (
     parse_text_field,
 )
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.writer import ResourceFieldAdded
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError

@@ -22,9 +22,9 @@ from typing import Callable, Optional
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
 from nucliadb.reader.api.v1.router import KB_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
 
 # All this scenarios are meant to match a total of 10 resources
 # coming from test_pagination_resources. Tests uses redis so order

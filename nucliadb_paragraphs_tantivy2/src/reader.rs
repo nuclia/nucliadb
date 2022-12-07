@@ -56,6 +56,10 @@ impl Debug for ParagraphReaderService {
 }
 
 impl ParagraphReader for ParagraphReaderService {
+    fn count(&self) -> InternalResult<usize> {
+        let searcher = self.reader.searcher();
+        Ok(searcher.search(&AllQuery, &Count).unwrap())
+    }
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response> {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
@@ -90,10 +94,6 @@ impl ReaderChild for ParagraphReaderService {
     fn stop(&self) -> InternalResult<()> {
         info!("Stopping Paragraph Reader Service");
         Ok(())
-    }
-    fn count(&self) -> usize {
-        let searcher = self.reader.searcher();
-        searcher.search(&AllQuery, &Count).unwrap()
     }
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
@@ -589,6 +589,8 @@ mod tests {
             sentences_to_delete: vec![],
             relations_to_delete: vec![],
             relations: vec![],
+            vectors: HashMap::default(),
+            vectors_to_delete: HashMap::default(),
             shard_id,
         }
     }

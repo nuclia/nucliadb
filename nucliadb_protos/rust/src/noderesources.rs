@@ -158,6 +158,20 @@ pub struct IndexParagraph {
     pub metadata: ::core::option::Option<ParagraphMetadata>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSetId {
+    #[prost(message, optional, tag="1")]
+    pub shard: ::core::option::Option<ShardId>,
+    #[prost(string, tag="2")]
+    pub vectorset: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSetList {
+    #[prost(message, optional, tag="1")]
+    pub shard: ::core::option::Option<ShardId>,
+    #[prost(string, repeated, tag="2")]
+    pub vectorset: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraphs {
     /// id of the paragraph f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
     #[prost(map="string, message", tag="1")]
@@ -198,6 +212,12 @@ pub struct Resource {
     pub relations_to_delete: ::prost::alloc::vec::Vec<super::utils::Relation>,
     #[prost(string, tag="11")]
     pub shard_id: ::prost::alloc::string::String,
+    /// vectorset is the key 
+    #[prost(map="string, message", tag="12")]
+    pub vectors: ::std::collections::HashMap<::prost::alloc::string::String, super::utils::UserVectors>,
+    /// Vectorset prefix vector id
+    #[prost(map="string, message", tag="13")]
+    pub vectors_to_delete: ::std::collections::HashMap<::prost::alloc::string::String, super::utils::UserVectorsList>,
 }
 /// Nested message and enum types in `Resource`.
 pub mod resource {

@@ -21,33 +21,35 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-from nucliadb.models.conversation import InputConversationField
-from nucliadb.models.datetime import FieldDatetime
-from nucliadb.models.file import FileField
-from nucliadb.models.keywordset import FieldKeywordset
-from nucliadb.models.layout import InputLayoutField
-from nucliadb.models.link import LinkField
-from nucliadb.models.metadata import (
+from nucliadb_models.conversation import InputConversationField
+from nucliadb_models.datetime import FieldDatetime
+from nucliadb_models.file import FileField
+from nucliadb_models.keywordset import FieldKeywordset
+from nucliadb_models.layout import InputLayoutField
+from nucliadb_models.link import LinkField
+from nucliadb_models.metadata import (
     InputMetadata,
     Origin,
     UserFieldMetadata,
     UserMetadata,
 )
-from nucliadb.models.processing import PushProcessingOptions
-from nucliadb.models.text import TextField
-from nucliadb.models.utils import FieldIdString, SlugString
+from nucliadb_models.processing import PushProcessingOptions
+from nucliadb_models.text import TextField
+from nucliadb_models.utils import FieldIdString, SlugString
+from nucliadb_models.vectors import UserVectorsWrapper
 
 
 class CreateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     slug: Optional[SlugString] = None
-    icon: Optional[str] = None
+    icon: Optional[str] = "application/generic"
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None
     usermetadata: Optional[UserMetadata] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    uservectors: Optional[UserVectorsWrapper] = None
     origin: Optional[Origin] = None
 
     files: Dict[FieldIdString, FileField] = {}
@@ -81,6 +83,7 @@ class UpdateResourcePayload(BaseModel):
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     usermetadata: Optional[UserMetadata] = None
+    uservectors: Optional[UserVectorsWrapper] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
 
     files: Dict[FieldIdString, FileField] = {}

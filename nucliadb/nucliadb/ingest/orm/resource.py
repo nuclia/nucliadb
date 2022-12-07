@@ -58,7 +58,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.utils import get_basic, set_basic
-from nucliadb.models.common import CloudLink
+from nucliadb_models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:
@@ -104,7 +104,7 @@ class Resource:
         storage: Storage,
         kb: KnowledgeBox,
         uuid: str,
-        basic: PBBasic = None,
+        basic: Optional[PBBasic] = None,
         disable_vectors: bool = True,
     ):
         self.fields: Dict[Tuple[int, str], Field] = {}
@@ -273,6 +273,11 @@ class Resource:
                 vo = await field.get_vectors()
                 if vo is not None:
                     brain.apply_field_vectors(field_key, vo, False, [])
+
+                vu = await field.get_user_vectors()
+                if vu is not None:
+                    vectors_to_delete = {}  # type: ignore
+                    brain.apply_user_vectors(field_key, vu, vectors_to_delete)  # type: ignore
         return brain
 
     async def generate_field_computed_metadata(
@@ -604,6 +609,31 @@ class Resource:
                     )
                 else:
                     raise AttributeError("VO not found on set")
+            for user_vectors in message.user_vectors:
+                field_obj = await self.get_field(
+                    user_vectors.field.field,
+                    user_vectors.field.field_type,
+                    load=False,
+                )
+                uv, vectors_to_delete = await field_obj.set_user_vectors(user_vectors)
+                field_key = self.generate_field_id(user_vectors.field)
+                if uv is not None:
+                    # We need to make sure that the vectors replaced are not on the new vectors
+                    # So we extend the vectors to delete with the one replaced by the update
+                    for vectorset, vectors in vectors_to_delete.items():
+                        for vector in vectors.vectors:
+                            if (
+                                vector
+                                not in user_vectors.vectors_to_delete[vectorset].vectors
+                            ):
+                                user_vectors.vectors_to_delete[
+                                    vectorset
+                                ].vectors.append(vector)
+                    self.indexer.apply_user_vectors(
+                        field_key, uv, user_vectors.vectors_to_delete
+                    )
+                else:
+                    raise AttributeError("User Vectors not found on set")
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
@@ -975,7 +1005,7 @@ class Resource:
         return pb_resource
 
 
-async def get_file_page_positions(field) -> FilePagePositions:
+async def get_file_page_positions(field: File) -> FilePagePositions:
     positions: FilePagePositions = {}
     file_extracted_data = await field.get_file_extracted_data()
     if file_extracted_data is None:

@@ -28,26 +28,23 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import ParagraphSearchResponse
 from sentry_sdk import capture_exception
 
-from nucliadb.ingest.serialize import (
-    ExtractedDataTypeName,
-    ResourceProperties,
-    get_resource_uuid_by_slug,
-)
-from nucliadb.models.common import FieldTypeName
-from nucliadb.models.resource import NucliaDBRoles
+from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.api.models import (
-    NucliaDBClientType,
-    ResourceSearchResults,
-    SearchOptions,
-    SortOption,
-)
 from nucliadb.search.search.fetch import abort_transaction
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
 from nucliadb.search.search.shards import query_paragraph_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
+from nucliadb_models.search import (
+    NucliaDBClientType,
+    ResourceProperties,
+    ResourceSearchResults,
+    SearchOptions,
+    SortOption,
+)
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import ShardsNotFound
 

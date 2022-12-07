@@ -28,9 +28,9 @@ from redis import asyncio as aioredis
 from starlette.routing import Mount
 
 from nucliadb.ingest.cache import clear_ingest_cache
-from nucliadb.models.resource import NucliaDBRoles
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import KB_PREFIX, KBS_PREFIX
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.utilities import clear_global_cache
 
 

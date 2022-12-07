@@ -25,7 +25,7 @@ import logging
 import os
 import sys
 import time
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple, cast
 
 import aiofiles
 import nats
@@ -335,7 +335,11 @@ class Nats:
             pass
 
 
-async def main(arguments):
+class Arguments:
+    dryrun: bool
+
+
+async def main(arguments: Arguments):
     consumers: List[Consumer] = []
     driver = await get_driver()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -357,11 +361,11 @@ async def main(arguments):
     logger.info("END CURATOR KB")
 
 
-def parse():
+def parse() -> Arguments:
     parser = argparse.ArgumentParser(description="Curator")
     parser.add_argument("--dryrun", help="DryRun", action="store_true")
 
-    return parser.parse_args()
+    return cast(Arguments, parser.parse_args())
 
 
 def run() -> int:

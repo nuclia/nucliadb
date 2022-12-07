@@ -25,9 +25,9 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-from nucliadb.models.conversation import FieldConversation
-from nucliadb.models.datetime import FieldDatetime
-from nucliadb.models.extracted import (
+from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.datetime import FieldDatetime
+from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
     FileExtractedData,
@@ -35,25 +35,40 @@ from nucliadb.models.extracted import (
     LinkExtractedData,
     VectorObject,
 )
-from nucliadb.models.file import FieldFile
-from nucliadb.models.keywordset import FieldKeywordset
-from nucliadb.models.layout import FieldLayout
-from nucliadb.models.link import FieldLink
-from nucliadb.models.metadata import (
+from nucliadb_models.file import FieldFile
+from nucliadb_models.keywordset import FieldKeywordset
+from nucliadb_models.layout import FieldLayout
+from nucliadb_models.link import FieldLink
+from nucliadb_models.metadata import (
     Metadata,
     Origin,
     Relation,
     UserFieldMetadata,
     UserMetadata,
 )
-from nucliadb.models.text import FieldText
-from nucliadb.models.utils import SlugString
+from nucliadb_models.text import FieldText
+from nucliadb_models.utils import SlugString
 
 
 class NucliaDBRoles(str, Enum):
     MANAGER = "MANAGER"
     READER = "READER"
     WRITER = "WRITER"
+
+
+class ResourceFieldProperties(str, Enum):
+    VALUE = "value"
+    EXTRACTED = "extracted"
+    ERROR = "error"
+
+
+class ExtractedDataTypeName(str, Enum):
+    TEXT = "text"
+    METADATA = "metadata"
+    LARGE_METADATA = "large_metadata"
+    VECTOR = "vectors"
+    LINK = "link"
+    FILE = "file"
 
 
 class KnowledgeBoxConfig(BaseModel):
@@ -210,6 +225,7 @@ class Resource(BaseModel):
     id: str
 
     # This first block of attributes correspond to Basic fields
+    slug: Optional[str]
     title: Optional[str]
     summary: Optional[str]
     icon: Optional[str]

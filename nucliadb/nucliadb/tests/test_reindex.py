@@ -22,16 +22,15 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import inject_message
 
 
-def broker_resource(knowledgebox):
+def broker_resource(knowledgebox: str) -> BrokerMessage:
     import uuid
     from datetime import datetime
-
-    from nucliadb_protos.writer_pb2 import BrokerMessage
 
     from nucliadb.ingest.tests.vectors import V1, V2, V3
     from nucliadb_protos import resources_pb2 as rpb

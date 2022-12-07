@@ -19,7 +19,6 @@
 #
 from uuid import uuid4
 
-import pytest
 from nucliadb_protos.resources_pb2 import (
     ExtractedText,
     FieldComputedMetadataWrapper,
@@ -125,9 +124,7 @@ def test_get_paragraph_page_number():
     }
     assert br.get_paragraph_page_number(Paragraph(start=10), page_positions) == 0
     assert br.get_paragraph_page_number(Paragraph(start=100), page_positions) == 1
-
-    with pytest.raises(ValueError):
-        br.get_paragraph_page_number(Paragraph(start=500), page_positions)
+    assert br.get_paragraph_page_number(Paragraph(start=500), page_positions) == 2
 
 
 def test_apply_field_metadata_populates_page_number():

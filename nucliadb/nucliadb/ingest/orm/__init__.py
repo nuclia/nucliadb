@@ -22,10 +22,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from clandestined import Cluster  # type: ignore
-
 from nucliadb.ingest.orm.exceptions import NodeClusterNotFound, NodeClusterSmall
 from nucliadb.ingest.settings import settings
+from nucliadb_utils.clandestined import Cluster  # type: ignore
 from nucliadb_utils.settings import nuclia_settings
 
 if TYPE_CHECKING:

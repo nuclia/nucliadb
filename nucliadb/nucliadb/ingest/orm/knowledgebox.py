@@ -28,6 +28,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     Labels,
     LabelSet,
+    VectorSet,
+    VectorSets,
     Widget,
 )
 from nucliadb_protos.resources_pb2 import Basic
@@ -35,6 +37,7 @@ from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
     GetEntitiesResponse,
     GetLabelSetResponse,
+    GetVectorSetsResponse,
     GetWidgetResponse,
     GetWidgetsResponse,
 )
@@ -43,6 +46,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
+from nucliadb.ingest.orm.abc import AbstractNode
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
@@ -72,6 +76,7 @@ KB_LABELS = "/kbs/{kbid}/labels"
 KB_WIDGETS = "/kbs/{kbid}/widgets"
 KB_WIDGETS_WIDGET = "/kbs/{kbid}/widgets/{id}"
 KB_ENTITIES = "/kbs/{kbid}/entities"
+KB_VECTORSET = "/kbs/{kbid}/vectorsets"
 KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
@@ -182,6 +187,7 @@ class KnowledgeBox:
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
     ) -> Tuple[str, bool]:
+
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
         if exist:
@@ -271,6 +277,62 @@ class KnowledgeBox:
 
         return uuid
 
+    async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractNode, str]]:
+        shards_match = KB_SHARDS.format(kbid=self.kbid)
+        payload = await self.txn.get(shards_match)
+        if payload is None:
+            await self.txn.abort()
+            raise ShardsNotFound(f"No shards on knowlege box {self.kbid}")
+        shards_obj = Shards()
+        shards_obj.ParseFromString(payload)
+
+        if not indexing_settings.index_local:
+            await Node.load_active_nodes()
+
+        for shard in shards_obj.shards:
+            # Delete the shard on nodes
+            for replica in shard.replicas:
+                node_klass = get_node_klass()
+                node: Optional[Union[LocalNode, Node]] = await node_klass.get(
+                    replica.node
+                )
+                if node is not None:
+                    yield node, replica.shard.id
+
+    # Vectorset
+    async def get_vectorsets(self, response: GetVectorSetsResponse):
+        vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
+        payload = await self.txn.get(vectorset_key)
+        if payload is not None:
+            response.vectorsets.ParseFromString(payload)
+
+    async def del_vectorset(self, id: str):
+        vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
+        payload = await self.txn.get(vectorset_key)
+        vts = VectorSets()
+        if payload is not None:
+            vts.ParseFromString(payload)
+        del vts.vectorsets[id]
+        # For each Node on the KB delete the vectorset
+        async for node, shard in self.iterate_kb_nodes():
+            await node.del_vectorset(shard, id)
+        payload = vts.SerializeToString()
+        await self.txn.set(vectorset_key, payload)
+
+    async def set_vectorset(self, id: str, vs: VectorSet):
+        vectorset_key = KB_VECTORSET.format(kbid=self.kbid)
+        payload = await self.txn.get(vectorset_key)
+        vts = VectorSets()
+        if payload is not None:
+            vts.ParseFromString(payload)
+        vts.vectorsets[id].CopyFrom(vs)
+        # For each Node on the KB add the vectorset
+        async for node, shard in self.iterate_kb_nodes():
+            await node.set_vectorset(shard, id)
+        payload = vts.SerializeToString()
+        await self.txn.set(vectorset_key, payload)
+
+    # Labels
     async def set_labelset(self, id: str, labelset: LabelSet):
         labelset_key = KB_LABELSET.format(kbid=self.kbid, id=id)
         await self.txn.set(labelset_key, labelset.SerializeToString())

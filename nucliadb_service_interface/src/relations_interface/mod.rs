@@ -36,6 +36,7 @@ pub trait RelationReader:
 {
     fn get_edges(&self) -> InternalResult<EdgeList>;
     fn get_node_types(&self) -> InternalResult<TypeList>;
+    fn count(&self) -> InternalResult<usize>;
 }
 
 pub trait RelationWriter: WriterChild {

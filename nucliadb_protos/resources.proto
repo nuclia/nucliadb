@@ -91,7 +91,6 @@ message Relations {
     repeated utils.Relation relations = 1;
 }
 
-
 message MessageContent {
     enum Format {
         PLAIN = 0;
@@ -178,6 +177,13 @@ message ExtractedVectorsWrapper {
         utils.VectorObject vectors = 1;
         CloudFile file = 2;
     }
+    FieldID field = 3;
+}
+
+
+message UserVectorsWrapper {
+    utils.UserVectorSet vectors = 1;
+    map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
     FieldID field = 3;
 }
 

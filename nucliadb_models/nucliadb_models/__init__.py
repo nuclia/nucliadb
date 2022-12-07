@@ -32,4 +32,4 @@ from .processing import *  # noqa
 from .text import *  # noqa
 from .writer import *  # noqa
 
-logger = logging.getLogger("nucliadb.models")
+logger = logging.getLogger("nucliadb_models")
