@@ -51,7 +51,7 @@ class JaegerExporterAsync(JaegerExporter):
             split_oversized_batches=self.udp_split_oversized_batches,
         )
 
-    async def export(self, spans: List[Span]) -> SpanExportResult:
+    async def async_export(self, spans: List[Span]) -> SpanExportResult:
         # Populate service_name from first span
         # We restrict any SpanProcessor to be only associated with a single
         # TracerProvider, so it is safe to assume that all Spans in a single

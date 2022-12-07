@@ -4,3 +4,4 @@ docker
 types-aiofiles
 numpy
 datasets
+requests
