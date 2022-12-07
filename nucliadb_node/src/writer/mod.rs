@@ -73,15 +73,16 @@ impl NodeWriterService {
         let in_memory = self.cache.contains_key(&shard_id.id);
         if !in_memory {
             info!("{}: Shard was not in memory", shard_id.id);
-            let in_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
-            if in_disk {
+            let on_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
+            if on_disk {
                 info!("{}: Shard was in disk", shard_id.id);
-                let shard = POOL
-                    .install(|| ShardWriterService::open(&shard_id.id))
-                    .unwrap();
-                info!("{}: Loaded shard", shard_id.id);
-                self.cache.insert(shard_id.id.clone(), shard);
-                info!("{}: Inserted on memory", shard_id.id);
+                if let Ok(shard) = POOL.install(|| ShardWriterService::open(&shard_id.id)) {
+                    info!("{}: Loaded shard", shard_id.id);
+                    self.cache.insert(shard_id.id.clone(), shard);
+                    info!("{}: Inserted on memory", shard_id.id);
+                } else {
+                    info!("{}: is corrupted", shard_id.id);
+                }
             }
         } else {
             info!("{}: Shard was in memory", shard_id.id);
