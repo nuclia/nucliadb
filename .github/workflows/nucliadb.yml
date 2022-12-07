@@ -113,7 +113,7 @@ jobs:
         if: steps.filter.outputs.workflows == 'true'
         run: |
           maturin build -m nucliadb_node/binding/Cargo.toml
-          pip install target/wheels/*cp39-cp39-manylinux_2_31_x86_64.whl
+          pip install target/wheels/*_x86_64.whl
 
       - name: Run tests
         run: |
