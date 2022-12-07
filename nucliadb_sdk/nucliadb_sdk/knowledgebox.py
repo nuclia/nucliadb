@@ -209,6 +209,8 @@ class KnowledgeBox:
     ) -> Dict[str, LabelSet]:
 
         response: Dict[str, LabelSet] = {}
+        if search_result.fulltext is None or search_result.fulltext.facets is None:
+            return response
         for labelset, count in search_result.fulltext.facets.get("/l", {}).items():
             real_labelset = labelset[3:]  # removing /l/
             response[real_labelset] = LabelSet(count=count)
@@ -218,6 +220,8 @@ class KnowledgeBox:
             search_result = self.client.search(
                 SearchRequest(features=["document"], faceted=[base_label], page_size=0)
             )
+            if search_result.fulltext is None or search_result.fulltext.facets is None:
+                raise Exception("Search error")
             for label, count in search_result.fulltext.facets.get(
                 base_label, {}
             ).items():

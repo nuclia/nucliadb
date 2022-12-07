@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from enum import Enum
 from typing import List, Optional
 
 import nucliadb_models as models
@@ -53,16 +52,8 @@ from nucliadb_models.resource import (
     TextFieldData,
     TextFieldExtractedData,
 )
+from nucliadb_models.search import ResourceProperties
 from nucliadb_utils.utilities import get_cache, get_storage
-
-
-class ResourceProperties(str, Enum):
-    BASIC = "basic"
-    ORIGIN = "origin"
-    RELATIONS = "relations"
-    VALUES = "values"
-    EXTRACTED = "extracted"
-    ERRORS = "errors"
 
 
 async def set_resource_field_extracted_data(

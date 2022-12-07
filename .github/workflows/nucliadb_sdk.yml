@@ -62,6 +62,7 @@ jobs:
       - name: Install the package
         run: |
           pip install -r test-requirements.txt
+          pip install -r nucliadb_sdk/requirements-sources.txt
           pip install -r nucliadb_sdk/requirements.txt
           pip install -e nucliadb_sdk
 

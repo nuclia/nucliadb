@@ -30,7 +30,6 @@ from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from sentry_sdk import capture_exception
 
-from nucliadb.ingest.serialize import ResourceProperties
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
@@ -44,6 +43,7 @@ from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     NucliaDBClientType,
+    ResourceProperties,
     SearchOptions,
     SearchRequest,
     SortOption,

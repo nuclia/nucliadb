@@ -29,11 +29,12 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.serialize import ResourceProperties, serialize
+from nucliadb.ingest.serialize import serialize
 from nucliadb.ingest.utils import get_driver
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.search import ResourceProperties
 from nucliadb_utils.utilities import get_cache, get_storage
 
 rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(

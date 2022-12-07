@@ -30,7 +30,6 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.serialize import (
-    ResourceProperties,
     get_resource_uuid_by_slug,
     serialize,
     set_resource_field_extracted_data,
@@ -54,6 +53,7 @@ from nucliadb_models.resource import (
     ResourceList,
     ResourcePagination,
 )
+from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage

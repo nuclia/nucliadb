@@ -26,7 +26,6 @@ from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
-from nucliadb.ingest.serialize import ResourceProperties
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
@@ -36,6 +35,15 @@ else:
     SortValue = int
 
 _T = TypeVar("_T")
+
+
+class ResourceProperties(str, Enum):
+    BASIC = "basic"
+    ORIGIN = "origin"
+    RELATIONS = "relations"
+    VALUES = "values"
+    EXTRACTED = "extracted"
+    ERRORS = "errors"
 
 
 class SearchOptions(str, Enum):

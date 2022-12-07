@@ -31,7 +31,6 @@ from nucliadb_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.ingest.serialize import ResourceProperties
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -51,6 +50,7 @@ from nucliadb_models.search import (
     ParagraphPosition,
     Paragraphs,
     RelatedEntities,
+    ResourceProperties,
     ResourceResult,
     Resources,
     ResourceSearchResults,

@@ -100,6 +100,36 @@ jobs:
         run: |
           MYPYPATH=./mypy_stubs mypy nucliadb/nucliadb/search
 
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            node_modified:
+              - 'nucliadb_node/src/**'
+            sidecar_modified:
+              - 'nucliadb_node/nucliadb_node/**'
+            cluster_modified:
+              - 'nucliadb_cluster/**'
+
+      # we may need eu.gcr.io/stashify-218417/node
+      # or eu.gcr.io/stashify-218417/cluster_manager
+      # or eu.gcr.io/stashify-218417/node_sidecar
+
+      - name: Build local Node for testing
+        if: steps.filter.outputs.node_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
+      - name: Build local Sidecar for testing
+        if: steps.filter.outputs.sidecar_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/cluster_manager:main -f Dockerfile.cluster_monitor .
+
+      - name: Build local ClusterManager for testing
+        if: steps.filter.outputs.cluster_modified == 'true'
+        run: |
+          docker build -t eu.gcr.io/stashify-218417/node_sidecar:main -f Dockerfile.node_sidecar .
+
       - name: Run tests
         run: |
           pytest -rfE --cov=nucliadb.search -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/search
