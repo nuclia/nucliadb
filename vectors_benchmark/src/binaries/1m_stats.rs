@@ -41,7 +41,7 @@ fn label_set(batch_id: usize) -> Vec<String> {
 
 fn add_batch(
     writer: &mut Index,
-    batch_id: String,
+    _batch_id: String,
     elems: Vec<(String, Vec<f32>)>,
     labels: Vec<String>,
 ) {
@@ -52,7 +52,7 @@ fn add_batch(
         .collect();
     let new_dp = DataPoint::new(writer.get_location(), elems).unwrap();
     let lock = writer.get_elock().unwrap();
-    writer.add(batch_id, new_dp, &lock);
+    writer.add(new_dp, &lock);
     writer.commit(lock).unwrap();
 }
 fn main() {
