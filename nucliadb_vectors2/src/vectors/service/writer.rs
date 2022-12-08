@@ -113,15 +113,18 @@ impl WriterChild for VectorWriterService {
                 }
             }
         }
-        info!("New data point with {} elements", elems.len());
+
+        let new_dp = DataPoint::new(self.index.get_location(), elems)?;
+        let no_nodes = new_dp.meta().no_nodes();
+
+        info!("New data point with {} elements", no_nodes);
         let lock = self.index.get_elock()?;
         info!("Processing sentences to delete");
         for to_delete in &resource.sentences_to_delete {
             self.index.delete(to_delete, &lock)
         }
         info!("Indexing datapoints");
-        if !elems.is_empty() {
-            let new_dp = DataPoint::new(self.index.get_location(), elems)?;
+        if no_nodes > 0 {
             self.index.add(new_dp, &lock);
             self.index.commit(lock)?;
         }
