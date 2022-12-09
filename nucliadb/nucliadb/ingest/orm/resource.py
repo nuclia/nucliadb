@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
-from nucliadb_protos.resources_pb2 import Classification, CloudFile
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -60,7 +60,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm.brain import FilePagePositions, ResourceBrain
 from nucliadb.ingest.orm.utils import get_basic, set_basic
-from nucliadb_models.common import FIELD_TYPES_MAP, CloudLink
+from nucliadb_models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
 
 if TYPE_CHECKING:
@@ -164,7 +164,12 @@ class Resource:
             self.basic = self.parse_basic(payload) if payload is not None else PBBasic()
         return self.basic
 
-    async def set_basic(self, payload: PBBasic, slug: Optional[str] = None, deleted_fields: Optional[List[str]] = None):
+    async def set_basic(
+        self,
+        payload: PBBasic,
+        slug: Optional[str] = None,
+        deleted_fields: Optional[List[str]] = None,
+    ):
         await self.get_basic()
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
@@ -1047,7 +1052,11 @@ def remove_field_classifications(basic: PBBasic, deleted_fields: List[FieldID]):
     """
     Clean classifications of fields that have been deleted
     """
-    field_classifications = [fc for fc in basic.computedmetadata.field_classifications if fc.field not in deleted_fields]
+    field_classifications = [
+        fc
+        for fc in basic.computedmetadata.field_classifications
+        if fc.field not in deleted_fields
+    ]
     basic.computedmetadata.ClearField("field_classifications")
     basic.computedmetadata.field_classifications.extend(field_classifications)
 
