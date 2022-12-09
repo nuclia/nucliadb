@@ -78,7 +78,7 @@ struct Fssc {
 }
 impl From<Fssc> for Vec<(String, f32)> {
     fn from(fssv: Fssc) -> Self {
-        let mut result = fssv.buff.into_iter().collect::<Vec<_>>();
+        let mut result: Vec<_> = fssv.buff.into_iter().collect();
         result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         result
     }
@@ -93,7 +93,7 @@ impl Fssc {
             buff: HashMap::new(),
         }
     }
-    fn add(&mut self, (candidate, score): (String, f32)) {
+    fn add(&mut self, candidate: String, score: f32) {
         if self.is_full() {
             let smallest_bigger = self
                 .buff
@@ -205,15 +205,16 @@ impl State {
                 request.with_duplicates(),
                 request.no_results(),
             );
-            results.into_iter().for_each(|r| ffsv.add(r));
+            results
+                .into_iter()
+                .for_each(|(candidate, score)| ffsv.add(candidate, score));
         }
         Ok(ffsv.into())
     }
     pub fn remove(&mut self, id: &str) {
         self.delete_log.insert(id.as_bytes(), SystemTime::now());
     }
-    pub fn add(&mut self, id: String, dp: DataPoint) {
-        self.remove(&id);
+    pub fn add(&mut self, dp: DataPoint) {
         self.add_dp(dp, SystemTime::now());
     }
     pub fn replace_work_unit(&mut self, new: DataPoint, ctime: SystemTime) {
@@ -261,7 +262,7 @@ mod test {
         VALUES
             .iter()
             .map(|(key, value)| (key.to_string(), *value))
-            .for_each(|(k, v)| fssv.add((k, v)));
+            .for_each(|(k, v)| fssv.add(k, v));
         let result: Vec<_> = fssv.into();
         assert_eq!(&result[0].0, VALUES[0].0);
         assert_eq!(result[0].1, VALUES[0].1);
@@ -306,9 +307,8 @@ mod test {
         let no_nodes = DataPointProducer::new(dir.path())
             .take(5)
             .map(|dp| {
-                let id = dp.meta().id().to_string();
                 let no_nodes = dp.meta().no_nodes();
-                state.add(id, dp);
+                state.add(dp);
                 no_nodes
             })
             .sum::<usize>();

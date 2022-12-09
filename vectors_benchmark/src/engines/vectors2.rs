@@ -49,7 +49,8 @@ impl VectorEngine for Index {
         }
         let new_dp = DataPoint::new(self.get_location(), elems).unwrap();
         let lock = self.get_elock().unwrap();
-        self.add(batch_id, new_dp, &lock);
+        self.add(new_dp, &lock);
+        self.delete(&batch_id, &lock);
         self.commit(lock).unwrap();
     }
 

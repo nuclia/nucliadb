@@ -101,9 +101,9 @@ impl Index {
         let mut state = self.state.write().unwrap();
         state.remove(prefix.as_ref());
     }
-    pub fn add(&mut self, resource: String, dp: DataPoint, _lock: &ELock) {
+    pub fn add(&mut self, dp: DataPoint, _lock: &ELock) {
         let mut state = self.state.write().unwrap();
-        state.add(resource, dp);
+        state.add(dp);
     }
     pub fn get_keys(&self, _: &Lock) -> VectorR<Vec<String>> {
         self.state.read().unwrap().get_keys()

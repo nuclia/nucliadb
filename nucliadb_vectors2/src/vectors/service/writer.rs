@@ -98,35 +98,34 @@ impl WriterChild for VectorWriterService {
         use data_point::{DataPoint, Elem, LabelDictionary};
         info!("Updating main index");
         info!("creating datapoints");
-        let mut data_points = Vec::new();
+        let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
-                for (key, index) in paragraph.paragraphs.iter() {
-                    let index_key = key.clone();
+                for index in paragraph.paragraphs.values() {
                     let labels = resource.labels.iter().chain(index.labels.iter()).cloned();
                     let labels = LabelDictionary::new(labels.collect());
-                    let elems = index
+                    index
                         .sentences
                         .iter()
                         .map(|(key, sentence)| (key.clone(), sentence.vector.clone()))
                         .map(|(key, sentence)| Elem::new(key, sentence, labels.clone()))
-                        .collect::<Vec<_>>();
-                    if !elems.is_empty() {
-                        let new_dp = DataPoint::new(self.index.get_location(), elems)?;
-                        data_points.push((index_key, new_dp));
-                    }
+                        .for_each(|e| elems.push(e));
                 }
             }
         }
-        info!("{} datapoints where created", data_points.len());
+
+        let new_dp = DataPoint::new(self.index.get_location(), elems)?;
+        let no_nodes = new_dp.meta().no_nodes();
+
+        info!("New data point with {} elements", no_nodes);
         let lock = self.index.get_elock()?;
         info!("Processing sentences to delete");
         for to_delete in &resource.sentences_to_delete {
             self.index.delete(to_delete, &lock)
         }
         info!("Indexing datapoints");
-        for (key, data_point) in data_points {
-            self.index.add(key, data_point, &lock);
+        if no_nodes > 0 {
+            self.index.add(new_dp, &lock);
         }
         self.index.commit(lock)?;
 
@@ -174,9 +173,8 @@ impl WriterChild for VectorWriterService {
                 elems.push(Elem::new(key, vector, labels));
             }
             let new_dp = DataPoint::new(index.get_location(), elems)?;
-            let key = uuid::Uuid::new_v4().to_string();
             let lock = index.get_elock()?;
-            index.add(key, new_dp, &lock);
+            index.add(new_dp, &lock);
             index.commit(lock)?;
         }
         info!("Create and update operations where applied to the indexes in the set");
