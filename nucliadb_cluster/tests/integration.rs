@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 use std::{env, io};
 
 use bytes::BytesMut;
@@ -12,6 +13,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 const SEED_NODE: &str = "0.0.0.0:40400";
+const LIVELINESS_UPDATE: Duration = Duration::from_secs(2);
 
 pub async fn create_seed_node() -> anyhow::Result<Cluster> {
     // create seed node
@@ -21,6 +23,7 @@ pub async fn create_seed_node() -> anyhow::Result<Cluster> {
         peer_addr,
         NodeType::Node,
         vec![SEED_NODE.to_string()],
+        LIVELINESS_UPDATE,
     )
     .await?)
 }
@@ -39,7 +42,14 @@ pub async fn create_cluster_for_test_with_id(
     let port = find_available_port()?;
     eprintln!("port: {port}");
     let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port);
-    let cluster = Cluster::new(peer_uuid, peer_addr, NodeType::Node, vec![seed_node]).await?;
+    let cluster = Cluster::new(
+        peer_uuid,
+        peer_addr,
+        NodeType::Node,
+        vec![seed_node],
+        LIVELINESS_UPDATE,
+    )
+    .await?;
     Ok(cluster)
 }
 

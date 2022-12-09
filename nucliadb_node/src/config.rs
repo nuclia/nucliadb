@@ -312,4 +312,33 @@ impl Configuration {
             }
         }
     }
+
+    /// Retuns the liveliness interval update used by cluster node.
+    pub fn get_cluster_liveliness_interval_update() -> Duration {
+        const DEFAULT_INTERVAL_UPDATE_PLACEHOLDER: &str = "2s";
+        const DEFAULT_INTERVAL_UPDATE: Duration = Duration::from_secs(2);
+
+        match env::var("CLUSTER_LIVELINESS_UPDATE") {
+            Ok(value) => {
+                if let Ok(duration) = parse_duration::parse(&value) {
+                    duration
+                } else {
+                    error!(
+                        "CLUSTER_LIVELINESS_UPDATE defined incorrectly. Defaulting to \
+                         {DEFAULT_INTERVAL_UPDATE_PLACEHOLDER}"
+                    );
+
+                    DEFAULT_INTERVAL_UPDATE
+                }
+            }
+            Err(_) => {
+                warn!(
+                    "CLUSTER_LIVELINESS_UPDATE not defined. Defaulting to \
+                     {DEFAULT_INTERVAL_UPDATE_PLACEHOLDER}"
+                );
+
+                DEFAULT_INTERVAL_UPDATE
+            }
+        }
+    }
 }
