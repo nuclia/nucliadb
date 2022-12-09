@@ -126,8 +126,8 @@ impl WriterChild for VectorWriterService {
         info!("Indexing datapoints");
         if no_nodes > 0 {
             self.index.add(new_dp, &lock);
-            self.index.commit(lock)?;
         }
+        self.index.commit(lock)?;
 
         info!("Updating vectorset indexes");
         // Updating existing indexes
