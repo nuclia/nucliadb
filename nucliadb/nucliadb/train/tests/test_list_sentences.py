@@ -51,8 +51,17 @@ async def test_list_sentences_shows_ners_with_positions(
     async for sentence in train_client.GetSentences(req):  # type: ignore
         if sentence.metadata.entities:
             assert sentence.metadata.entities == {"Barcelona": "CITY"}
-            assert sentence.metadata.entity_positions["CITY/Barcelona"].entity == "Barcelona"
-            assert sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].start == 0
-            assert sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].end == 10
+            assert (
+                sentence.metadata.entity_positions["CITY/Barcelona"].entity
+                == "Barcelona"
+            )
+            assert (
+                sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].start
+                == 0
+            )
+            assert (
+                sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].end
+                == 10
+            )
             found += 1
     assert found > 0

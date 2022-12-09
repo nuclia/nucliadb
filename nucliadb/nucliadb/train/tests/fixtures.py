@@ -166,7 +166,9 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     # Add a ner with positions
     fcmw.metadata.metadata.ner.update({"Barcelona": "CITY"})
     fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
-    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(Position(start=0, end=10))
+    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(
+        Position(start=0, end=10)
+    )
     message2.field_metadata.append(fcmw)
 
     etw = ExtractedTextWrapper()
