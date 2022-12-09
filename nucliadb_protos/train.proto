@@ -23,9 +23,20 @@ message TrainLabels {
     repeated resources.Classification paragraph = 3;
 }
 
+message Position{
+    int64 start = 1;
+    int64 end = 2;
+}
+
+message EntityPositions {
+    string entity = 1;
+    repeated Position positions = 2;
+}
+
 message TrainMetadata {
     string text = 1;
     map<string, string> entities = 2;
+    map<string, EntityPositions> entity_positions = 5;
     TrainLabels labels = 3;
     repeated float vector = 4;
 }
