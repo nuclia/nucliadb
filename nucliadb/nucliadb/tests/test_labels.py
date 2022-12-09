@@ -17,20 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import uuid
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.ingest.orm.resource import (
+    add_field_classifications,
+    remove_field_classifications,
+)
+from nucliadb.ingest.tests.vectors import V1, V2, V3
 from nucliadb.tests.utils import inject_message
+from nucliadb_models.extracted import Classification
+from nucliadb_models.metadata import ComputedMetadata, FieldClassification, FieldID
+from nucliadb_models.resource import Resource, ResourceList
+from nucliadb_models.search import KnowledgeboxSearchResults
+from nucliadb_protos import resources_pb2 as rpb
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    import uuid
-    from datetime import datetime
-
-    from nucliadb.ingest.tests.vectors import V1, V2, V3
-    from nucliadb_protos import resources_pb2 as rpb
-
     rid = str(uuid.uuid4())
     slug = f"{rid}slug1"
 
@@ -103,8 +110,8 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
     fcm.metadata.metadata.ner["Ramon"] = "PERSON"
-
     fcm.metadata.metadata.classifications.append(c1)
+
     bm.field_metadata.append(fcm)
 
     ev = rpb.ExtractedVectorsWrapper()
@@ -224,4 +231,78 @@ async def test_classification_labels_cancelled_by_the_user(
     assert (
         content["resources"][rid]["usermetadata"]["classifications"][0]
         == expected_label
+    )
+
+
+@pytest.mark.asyncio
+async def test_classification_labels_are_shown_in_resource_basic(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc,
+    knowledgebox,
+):
+    rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+
+    classifications = [Classification(labelset="labelset1", label="label1")]
+
+    expected_computedmetadata = ComputedMetadata(
+        field_classifications=[
+            FieldClassification(
+                field=FieldID(field="file", field_type=FieldID.FieldType.FILE),
+                classifications=classifications,
+            ),
+        ]
+    )
+
+    # Check resource get
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    assert resp.status_code == 200
+    resource = Resource.parse_raw(resp.content)
+    assert resource.computedmetadata == expected_computedmetadata
+
+    # Check resources list
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resources?show=basic")
+    assert resp.status_code == 200
+    resources = ResourceList.parse_raw(resp.content)
+    assert resources.resources[0].computedmetadata == expected_computedmetadata
+
+    # Check search results list
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?show=basic")
+    assert resp.status_code == 200
+    results = KnowledgeboxSearchResults.parse_raw(resp.content)
+    assert results.resources[rid].computedmetadata == expected_computedmetadata
+
+
+def test_remove_field_classifications():
+    field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
+    basic = rpb.Basic()
+    remove_field_classifications(basic, deleted_fields=[field])
+
+    field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
+    basic.computedmetadata.field_classifications.append(
+        rpb.FieldClassifications(field=field)
+    )
+    remove_field_classifications(basic, deleted_fields=[field])
+
+    assert len(basic.computedmetadata.field_classifications) == 0
+
+
+def test_add_field_classifications():
+    field = rpb.FieldID(field_type=rpb.FieldType.FILE, field="foo")
+    basic = rpb.Basic()
+
+    fcmw = rpb.FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field)
+
+    assert add_field_classifications(basic, fcmw) is False
+
+    assert len(basic.computedmetadata.field_classifications) == 0
+
+    c1 = rpb.Classification(label="foo", labelset="bar")
+    fcmw.metadata.metadata.classifications.append(c1)
+
+    assert add_field_classifications(basic, fcmw) is True
+
+    assert basic.computedmetadata.field_classifications[0] == rpb.FieldClassifications(
+        field=field, classifications=[c1]
     )

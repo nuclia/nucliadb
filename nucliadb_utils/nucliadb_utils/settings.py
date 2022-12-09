@@ -86,7 +86,7 @@ class NucliaSettings(BaseSettings):
     disable_send_to_process: bool = False
 
     @root_validator(pre=True)
-    def check_relation_is_valid(cls, values):
+    def check_onprem_does_not_use_jwt_key(cls, values):
         if values.get("onprem") and values.get("jwt_key") is not None:
             raise ValueError("Invalid validation")
         return values

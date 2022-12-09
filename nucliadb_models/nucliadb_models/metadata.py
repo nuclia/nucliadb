@@ -182,6 +182,27 @@ def convert_pb_relation_to_api(relation: utils_pb2.Relation):
     return result
 
 
+class FieldClassification(BaseModel):
+    field: FieldID
+    classifications: List[Classification] = []
+
+
+class ComputedMetadata(BaseModel):
+    field_classifications: List[FieldClassification] = []
+
+    @classmethod
+    def from_message(cls: Type[_T], message: resources_pb2.ComputedMetadata) -> _T:
+        values = {"field_classifications": []}
+        for fc in message.field_classifications:
+            values["field_classifications"].append(
+                FieldClassification(
+                    field=FieldID(field=fc.field.field, field_type=FIELD_TYPES_MAP[fc.field.field_type]),
+                    classifications=[Classification(label=c.label, labelset=c.labelset) for c in fc.classifications]
+                )
+            )
+        return cls(**values)
+
+
 class UserMetadata(BaseModel):
     classifications: List[UserClassification] = []
     relations: List[Relation] = []
@@ -239,6 +260,7 @@ class Basic(BaseModel):
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
+    computedmetadata: Optional[ComputedMetadata]
     uuid: Optional[str]
     last_seqid: Optional[int]
     last_account_seq: Optional[int]
