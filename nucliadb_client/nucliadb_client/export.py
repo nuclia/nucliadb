@@ -33,17 +33,9 @@ def parse_arguments():
         dest="host",
     )
 
-    parser.add_argument(
-        "--grpc",
-        dest="grpc",
-        description="Ingest gRPC api port"
-    )
+    parser.add_argument("--grpc", dest="grpc", description="Ingest gRPC api port")
 
-    parser.add_argument(
-        "--http",
-        dest="http",
-        description="HTTP api port"
-    )
+    parser.add_argument("--http", dest="http", description="HTTP api port")
 
     parser.add_argument(
         "--slug",
@@ -58,19 +50,19 @@ def parse_arguments():
     parser.add_argument(
         "--reader_host",
         dest="reader_host",
-        description="Hostname of nucliadb's reader service"
+        description="Hostname of nucliadb's reader service",
     )
 
     parser.add_argument(
         "--writer_host",
         dest="writer_host",
-        description="Hostname of nucliadb's writer service"
+        description="Hostname of nucliadb's writer service",
     )
 
     parser.add_argument(
         "--grpc_host",
         dest="grpc_host",
-        description="Hostname of nucliadb's ingest gRPC service"
+        description="Hostname of nucliadb's ingest gRPC service",
     )
 
     return parser.parse_args()
