@@ -39,12 +39,7 @@ fn label_set(batch_id: usize) -> Vec<String> {
         .collect()
 }
 
-fn add_batch(
-    writer: &mut Index,
-    _batch_id: String,
-    elems: Vec<(String, Vec<f32>)>,
-    labels: Vec<String>,
-) {
+fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {
     let labels = LabelDictionary::new(labels);
     let elems = elems
         .into_iter()
@@ -67,7 +62,6 @@ fn main() {
     let mut possible_tag = vec![];
     let mut writer = Index::new(at.path(), IndexCheck::None).unwrap();
     for i in 0..(INDEX_SIZE / BATCH_SIZE) {
-        let batch_id = format!("Batch_{i}");
         let labels = label_set(i);
         let elems = RandomVectors::new(VECTOR_DIM)
             .take(BATCH_SIZE)
@@ -76,7 +70,7 @@ fn main() {
             .collect();
         possible_tag.push(labels[0].clone());
         let now = SystemTime::now();
-        add_batch(&mut writer, batch_id, elems, labels);
+        add_batch(&mut writer, elems, labels);
         stats.writing_time += now.elapsed().unwrap().as_millis();
         println!("{} vectors included", BATCH_SIZE * i);
     }
