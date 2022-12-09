@@ -35,8 +35,9 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
+from nucliadb_protos.train_pb2 import EnabledMetadata
+from nucliadb_protos.train_pb2 import Position as TrainPosition
 from nucliadb_protos.train_pb2 import (
-    EnabledMetadata,
     TrainField,
     TrainMetadata,
     TrainParagraph,
@@ -806,6 +807,19 @@ class Resource:
                             for entity_key, entity_value in entities.items():
                                 if entity_key in local_text:
                                     metadata.entities[entity_key] = entity_value
+                                    position_key = f"{entity_value}/{entity_key}"
+                                    metadata.entity_positions[
+                                        position_key
+                                    ].entity = entity_key
+                                    position_metadata = field_metadata.positions.get(
+                                        position_key
+                                    )
+                                    for p in position_metadata.position:
+                                        metadata.entity_positions[
+                                            position_key
+                                        ].positions.append(
+                                            TrainPosition(start=p.start, end=p.end)
+                                        )
 
                         pb_sentence = TrainSentence()
                         pb_sentence.uuid = self.uuid

@@ -30,6 +30,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldType,
     Paragraph,
+    Position,
     Sentence,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -162,6 +163,10 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     p2.sentences.append(s1)
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
+    # Add a ner with positions
+    fcmw.metadata.metadata.ner.update({"Barcelona": "CITY"})
+    fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
+    fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(Position(start=0, end=10))
     message2.field_metadata.append(fcmw)
 
     etw = ExtractedTextWrapper()

@@ -33,7 +33,26 @@ async def test_list_sentences(
     req.metadata.text = True
     req.metadata.vector = True
     count = 0
+
     async for _ in train_client.GetSentences(req):  # type: ignore
         count += 1
 
     assert count == 40
+
+
+@pytest.mark.asyncio
+async def test_list_sentences_shows_ners_with_positions(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetSentencesRequest()
+    req.kb.uuid = knowledgebox
+    req.metadata.entities = True
+    found = 0
+    async for sentence in train_client.GetSentences(req):  # type: ignore
+        if sentence.metadata.entities:
+            assert sentence.metadata.entities == {"Barcelona": "CITY"}
+            assert sentence.metadata.entity_positions["CITY/Barcelona"].entity == "Barcelona"
+            assert sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].start == 0
+            assert sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].end == 10
+            found += 1
+    assert found > 0
