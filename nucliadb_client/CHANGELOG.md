@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 1.1.5
+
+- Improve export CLI argument descriptions
+
 ## 1.1.4
 
 - Be able to get shard data from a knowledgebox
