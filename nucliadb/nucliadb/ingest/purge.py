@@ -60,7 +60,7 @@ async def main():
         try:
             await KnowledgeBox.purge(driver, kbid)
             logger.info(f"  √ Successfully Purged {kbid}")
-        except (ShardsNotFound, ShardNotFound) as exc:
+        except ShardNotFound as exc:
             capture_exception(exc)
             logger.info(
                 f"  X At least one shard was unavailable while purging {kbid}, skipping"
