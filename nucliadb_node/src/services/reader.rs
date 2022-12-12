@@ -294,7 +294,7 @@ impl ShardReaderService {
     }
 
     /// Stop the service
-    
+
     #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
         info!("Stopping shard {}...", { &self.id });
