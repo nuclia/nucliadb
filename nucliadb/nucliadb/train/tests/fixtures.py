@@ -154,20 +154,30 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     s1.start = 53
     s1.end = 82
     p1.sentences.append(s1)
+
     p2 = Paragraph()
     p2.start = 84
-    p2.end = 103
+    p2.end = 112
+
     s1 = Sentence()
     s1.start = 84
-    s1.end = 103
+    s1.end = 112
     p2.sentences.append(s1)
+
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
+
     # Add a ner with positions
-    fcmw.metadata.metadata.ner.update({"Barcelona": "CITY"})
+    fcmw.metadata.metadata.ner.update(
+        {
+            "Barcelona": "CITY",
+            "Manresa": "CITY",  # This one will have no positions
+            "Sofia": "CITY",  # This entity should not appear, as it is not in the text
+        }
+    )
     fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
     fcmw.metadata.metadata.positions["CITY/Barcelona"].position.append(
-        Position(start=0, end=10)
+        Position(start=43, end=52)
     )
     message2.field_metadata.append(fcmw)
 
