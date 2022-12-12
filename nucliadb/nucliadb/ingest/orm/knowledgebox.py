@@ -451,13 +451,12 @@ class KnowledgeBox:
         # Delete KB Shards
         shards_match = KB_SHARDS.format(kbid=kbid)
         payload = await txn.get(shards_match)
-        skip_cleaning_shards = payload is None
 
-        if skip_cleaning_shards:
+        if payload is None:
             logger.warning(f"Shards not found for kbid={kbid}")
         else:
             shards_obj = Shards()
-            shards_obj.ParseFromString(payload)
+            shards_obj.ParseFromString(payload)  # type: ignore
 
             if not indexing_settings.index_local:
                 await Node.load_active_nodes()
