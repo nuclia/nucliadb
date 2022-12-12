@@ -23,5 +23,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 
 @pytest.mark.asyncio
-async def test_knowledgebox_purge_handles_unexisting_shard_payload(gcs_storage, redis_driver):
+async def test_knowledgebox_purge_handles_unexisting_shard_payload(
+    gcs_storage, redis_driver
+):
     await KnowledgeBox.purge(redis_driver, "idonotexist")
