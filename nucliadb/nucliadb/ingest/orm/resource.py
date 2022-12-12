@@ -810,13 +810,17 @@ class Resource:
                                 # Add the entity only if found in text
                                 metadata.entities[entity_key] = entity_value
                                 # Add positions for the entity
-                                position_key = f"{entity_value}/{entity_key}"
-                                metadata.entity_positions[position_key].entity = entity_key
-                                position_metadata = field_metadata.positions.get(position_key, None)
-                                positions = position_metadata.position if position_metadata else []
-                                for pos in positions:
-                                    position = TrainPosition(start=pos.start, end=pos.end)
-                                    metadata.entity_positions[position_key].positions.append(position)
+                                poskey = f"{entity_value}/{entity_key}"
+                                metadata.entity_positions[poskey].entity = entity_key
+                                position_metadata = field_metadata.positions.get(
+                                    poskey, None
+                                )
+                                if position_metadata is None:
+                                    continue
+                                for p in position_metadata.position:
+                                    metadata.entity_positions[poskey].positions.append(
+                                        TrainPosition(start=p.start, end=p.end)
+                                    )
 
                         pb_sentence = TrainSentence()
                         pb_sentence.uuid = self.uuid
