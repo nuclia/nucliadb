@@ -190,8 +190,9 @@ impl GraphLayer {
         self.cnx.len()
     }
     pub fn remove_edge(&mut self, from: Node, to: Node) {
-        let edges = self.cnx.get_mut(&from).unwrap();
-        edges.remove(&to);
+        if let Some(edges) = self.cnx.get_mut(&from) {
+            edges.remove(&to);
+        }
     }
     pub fn some_node(&self) -> Option<Node> {
         self.cnx.keys().next().cloned()
