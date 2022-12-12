@@ -179,7 +179,10 @@ impl GraphLayer {
         self.decrease_policy();
     }
     pub fn get_edges(&self, from: Node) -> HashMap<Node, Edge> {
-        self.cnx[&from].clone().into_iter().collect()
+        self.cnx
+            .get(&from)
+            .map(|list| list.clone().into_iter().collect())
+            .unwrap_or_default()
     }
     #[allow(unused)]
     #[cfg(test)]
