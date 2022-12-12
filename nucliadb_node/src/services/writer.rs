@@ -43,6 +43,7 @@ pub struct ShardWriterService {
 }
 
 impl ShardWriterService {
+    #[tracing::instrument(skip_all)]
     pub fn document_version(&self) -> DocumentService {
         match self.document_service_version {
             0 => DocumentService::DocumentV0,
@@ -50,6 +51,7 @@ impl ShardWriterService {
             i => panic!("Unknown document version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
         match self.paragraph_service_version {
             0 => ParagraphService::ParagraphV0,
@@ -57,6 +59,7 @@ impl ShardWriterService {
             i => panic!("Unknown paragraph version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
         match self.vector_service_version {
             0 => VectorService::VectorV0,
@@ -64,6 +67,7 @@ impl ShardWriterService {
             i => panic!("Unknown vector version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
         match self.relation_service_version {
             0 => RelationService::RelationV0,
@@ -71,7 +75,8 @@ impl ShardWriterService {
             i => panic!("Unknown relation version {i}"),
         }
     }
-    /// Start the service
+
+    #[tracing::instrument(skip_all)]
     pub fn start(id: &str) -> InternalResult<ShardWriterService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
@@ -121,6 +126,7 @@ impl ShardWriterService {
             relation_service_version: config.version_relations as i32,
         })
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(id: &str) -> InternalResult<ShardWriterService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
@@ -170,6 +176,7 @@ impl ShardWriterService {
             relation_service_version: config.version_relations as i32,
         })
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(id: &str) -> InternalResult<ShardWriterService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
@@ -219,7 +226,7 @@ impl ShardWriterService {
             relation_service_version: config.version_relations as i32,
         })
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn stop(&mut self) {
         info!("Stopping shard {}...", { &self.id });
         let fields = self.field_writer.clone();
@@ -252,7 +259,7 @@ impl ShardWriterService {
         info!("Shard stopped {}...", { &self.id });
     }
 
-    #[tracing::instrument(name = "ShardWriterService::set_resource", skip(self, resource))]
+    #[tracing::instrument(skip_all)]
     pub fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let field_writer_service = self.field_writer.clone();
         let field_resource = resource.clone();
@@ -328,7 +335,7 @@ impl ShardWriterService {
         vector_result?;
         Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn remove_resource(&mut self, resource: &ResourceId) -> InternalResult<()> {
         let field_writer_service = self.field_writer.clone();
         let field_resource = resource.clone();
@@ -371,42 +378,47 @@ impl ShardWriterService {
         relation_result?;
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     pub fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
         let reader = self.vector_writer.read().unwrap();
         let keys = reader.list_vectorsets()?;
         Ok(keys)
     }
+    #[tracing::instrument(skip_all)]
     pub fn add_vectorset(&self, setid: &VectorSetId) -> InternalResult<()> {
         let mut writer = self.vector_writer.write().unwrap();
         writer.add_vectorset(setid)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     pub fn remove_vectorset(&self, setid: &VectorSetId) -> InternalResult<()> {
         let mut writer = self.vector_writer.write().unwrap();
         writer.remove_vectorset(setid)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> InternalResult<()> {
         let mut writer = self.relation_writer.write().unwrap();
         writer.delete_nodes(nodes)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     pub fn join_relations_graph(&self, graph: &JoinGraph) -> InternalResult<()> {
         let mut writer = self.relation_writer.write().unwrap();
         writer.join_graph(graph)?;
         Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn delete(&self) -> Result<(), std::io::Error> {
         let shard_path = Configuration::shards_path_id(&self.id);
         info!("Deleting {}", shard_path);
         std::fs::remove_dir_all(shard_path)
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn count(&self) -> usize {
         self.field_writer.read().unwrap().count()
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> InternalResult<()> {
         let vector_writer_service = self.vector_writer.clone();
         let mut writer = vector_writer_service.write().unwrap();

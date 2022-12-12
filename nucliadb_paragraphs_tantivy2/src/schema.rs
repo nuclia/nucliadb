@@ -53,6 +53,9 @@ pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime
 }
 
 impl ParagraphSchema {
+    pub fn new() -> ParagraphSchema {
+        ParagraphSchema::default()
+    }
     /// Returns the paragraph metadata for the given document, if any.
     pub fn metadata(&self, doc: &Document) -> Option<ParagraphMetadata> {
         doc.get_first(self.metadata)
@@ -62,7 +65,6 @@ impl ParagraphSchema {
 
 impl Default for ParagraphSchema {
     fn default() -> Self {
-        tracing::info!("creating paragraph schema");
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default()
             .set_stored()
@@ -101,7 +103,6 @@ impl Default for ParagraphSchema {
         let metadata = sb.add_bytes_field("metadata", STORED);
 
         let schema = sb.build();
-        tracing::info!("paragraph schema created");
         ParagraphSchema {
             schema,
             uuid,

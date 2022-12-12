@@ -19,6 +19,7 @@
 //
 
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
@@ -34,7 +35,9 @@ pub struct RelationsWriterService {
     index: Index,
 }
 impl RelationsWriterService {
+    #[tracing::instrument(skip_all)]
     fn delete_node(&self, writer: &mut GraphWriter, id: Entity) -> InternalResult<()> {
+        let time = SystemTime::now();
         let affects = writer.delete_node(&self.wmode, id)?;
         for affected in affects {
             let affected_value = writer.get_node(affected)?;
@@ -44,11 +47,17 @@ impl RelationsWriterService {
                 writer.delete_node(&self.wmode, affected)?;
             }
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(())
     }
 }
 impl RelationWriter for RelationsWriterService {
+    #[tracing::instrument(skip_all)]
     fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> InternalResult<()> {
+        let id = graph.shard_id.as_ref().map(|s| &s.id);
+        let time = SystemTime::now();
         let mut writer = self.index.start_writing()?;
         for node in graph.nodes.iter() {
             let name = node.value.clone();
@@ -58,10 +67,19 @@ impl RelationWriter for RelationsWriterService {
                 self.delete_node(&mut writer, id)?;
             }
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(writer.commit(&mut self.wmode)?)
     }
+    #[tracing::instrument(skip_all)]
     fn join_graph(&mut self, graph: &JoinGraph) -> InternalResult<()> {
+        let time = SystemTime::now();
         let mut writer = self.index.start_writing()?;
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Creating nodes: starts {v} ms");
+        }
         let nodes: HashMap<_, _> = graph
             .nodes
             .iter()
@@ -71,7 +89,13 @@ impl RelationWriter for RelationsWriterService {
             .map(|(key, value, xtype, subtype)| (key, value, xtype, subtype.map(|s| s.to_string())))
             .map(|(&key, value, xtype, subtype)| (key, IoNode::user_node(value, xtype, subtype)))
             .collect();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Creating nodes: ends {v} ms");
+        }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Populating the graph: starts {v} ms");
+        }
         let ubehaviour = || Err(InnerErr::UBehaviour);
         for edge in graph.edges.iter() {
             let from = nodes.get(&edge.source).map_or_else(ubehaviour, Ok)?;
@@ -79,6 +103,13 @@ impl RelationWriter for RelationsWriterService {
             let edge = rtype_parsing(edge.rtype(), &edge.rsubtype);
             let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
             writer.connect(&self.wmode, from, to, &edge)?;
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Populating the graph: ends {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Ending at {v} ms")
         }
         Ok(writer.commit(&mut self.wmode)?)
     }
@@ -90,37 +121,52 @@ impl std::fmt::Debug for RelationsWriterService {
 }
 
 impl WriterChild for RelationsWriterService {
+    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping relation writer Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
-        let mut count = 0;
-        match self
+        let time = SystemTime::now();
+        let count = self
             .index
             .start_reading()
             .and_then(|reader| reader.no_nodes())
-        {
-            Err(err) => error!("{err:?}"),
-            Ok(v) => count = v as usize,
+            .map_err(|err| error!("{err:?}"))
+            .unwrap_or_default();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Ending at {v} ms")
         }
-        count
+        count as usize
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> InternalResult<()> {
+        let id = Some(&x.shard_id);
+        let time = SystemTime::now();
         let node = IoNode::new(x.uuid.clone(), dictionary::ENTITY.to_string(), None);
         let mut writer = self.index.start_writing()?;
         if let Some(id) = writer.get_node_id(node.hash())? {
             self.delete_node(&mut writer, id)?;
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
+        let id = Some(&resource.shard_id);
+        let time = SystemTime::now();
         if resource.status != ResourceStatus::Delete as i32 {
-            let mut writer = self.index.start_writing()?;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Populating the graph: starts {v} ms");
+            }
             let iter = resource
                 .relations
                 .iter()
                 .filter(|rel| rel.to.is_some() || rel.source.is_some());
+            let mut writer = self.index.start_writing()?;
             for rel in iter {
                 let edge = rtype_parsing(rel.relation(), &rel.relation_label);
                 let from = rel.source.as_ref().unwrap();
@@ -141,6 +187,12 @@ impl WriterChild for RelationsWriterService {
                 writer.connect(&self.wmode, &from, &to, &edge)?;
             }
             writer.commit(&mut self.wmode)?;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Populating the graph: ends {v} ms");
+            }
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
         }
         Ok(())
     }

@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt::Debug;
+use std::time::SystemTime;
 
 use nucliadb_protos::{
     DocumentScored, DocumentVectorIdentifier, VectorSearchRequest, VectorSearchResponse,
@@ -54,15 +55,31 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> InternalResult<usize> {
+        let time = SystemTime::now();
         let indexet_slock = self.indexset.get_slock()?;
         if vectorset.is_empty() {
+            info!("Id for the vectorset is empty");
             let index_slock = self.index.get_slock()?;
-            Ok(self.index.no_nodes(&index_slock))
+            let no_nodes = self.index.no_nodes(&index_slock);
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("Ending at {v} ms")
+            }
+            Ok(no_nodes)
         } else if let Some(index) = self.indexset.get(vectorset, &indexet_slock)? {
+            info!("Counting nodes for {vectorset}");
             let lock = index.get_slock()?;
-            Ok(index.no_nodes(&lock))
+            let no_nodes = index.no_nodes(&lock);
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("Ending at {v} ms")
+            }
+            Ok(no_nodes)
         } else {
+            info!("There was not a set called {vectorset}");
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("Ending at {v} ms")
+            }
             Ok(0)
         }
     }
@@ -74,23 +91,46 @@ impl ReaderChild for VectorReaderService {
         info!("Stopping vector reader Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        let id = Some(&request.id);
+        let time = SystemTime::now();
         let offset = request.result_per_page * request.page_number;
         let total_to_get = offset + request.result_per_page;
         let offset = offset as usize;
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: starts at {v} ms");
+        }
         let result = if request.vector_set.is_empty() {
+            info!("{id:?} - No vectorset specified, searching in the main index");
             self.index.search(&(total_to_get, request), &index_slock)?
         } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
+            info!(
+                "{id:?} - vectorset specified and found, searching on {}",
+                request.vector_set
+            );
             let lock = index.get_slock()?;
             index.search(&(total_to_get, request), &lock)?
         } else {
+            info!(
+                "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
+                request.vector_set
+            );
             vec![]
         };
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: ends at {v} ms");
+        }
+
         std::mem::drop(indexet_slock);
         std::mem::drop(index_slock);
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating results: starts at {v} ms");
+        }
         let documents = result
             .into_iter()
             .enumerate()
@@ -101,24 +141,36 @@ impl ReaderChild for VectorReaderService {
                 score: distance,
             })
             .collect::<Vec<_>>();
-        info!("Result created");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating results: ends at {v} ms");
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(VectorSearchResponse {
             documents,
             page_number: request.page_number,
             result_per_page: request.result_per_page,
         })
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
+        let time = SystemTime::now();
         let lock = self.index.get_slock().unwrap();
-        self.index.get_keys(&lock).unwrap_or_else(|err| {
+        let result = self.index.get_keys(&lock).unwrap_or_else(|err| {
             error!("Error while getting keys {err}");
             vec![]
-        })
+        });
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Ending at {v} ms")
+        }
+        result
     }
     fn reload(&self) {}
 }
 
 impl VectorReaderService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
@@ -127,6 +179,7 @@ impl VectorReaderService {
             VectorReaderService::open(config)
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         let path_indexset = std::path::Path::new(&config.vectorset);
@@ -139,6 +192,7 @@ impl VectorReaderService {
             })
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         let path_indexset = std::path::Path::new(&config.vectorset);

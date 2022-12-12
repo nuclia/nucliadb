@@ -49,7 +49,6 @@ pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime
 
 impl ParagraphSchema {
     pub fn new() -> Self {
-        tracing::info!("creating paragraph schema");
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default()
             .set_stored()
@@ -82,7 +81,6 @@ impl ParagraphSchema {
         let split = sb.add_text_field("split", STRING | STORED);
 
         let schema = sb.build();
-        tracing::info!("paragraph schema created");
         ParagraphSchema {
             schema,
             uuid,

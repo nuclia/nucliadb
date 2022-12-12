@@ -43,6 +43,7 @@ impl NodeWriterGRPCDriver {
     // The GRPC writer will only request the writer to bring a shard
     // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
+    #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
         if Configuration::lazy_loading() {
             let mut writer = self.0.write().await;
@@ -59,7 +60,7 @@ impl NodeWriterGRPCDriver {
 }
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::get_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn get_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         self.instrument(&request);
 
@@ -81,7 +82,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::new_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn new_shard(
         &self,
         request: Request<EmptyQuery>,
@@ -95,7 +96,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         Ok(tonic::Response::new(result))
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::delete_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         self.instrument(&request);
 
@@ -120,10 +121,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(
-        name = "NodeWriterGRPCDriver::clean_and_upgrade_shard",
-        skip(self, request)
-    )]
+    #[tracing::instrument(skip_all)]
     async fn clean_and_upgrade_shard(
         &self,
         request: Request<ShardId>,
@@ -147,6 +145,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn list_shards(
         &self,
         request: Request<EmptyQuery>,
@@ -157,7 +156,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     // Incremental call that can be call multiple times for the same resource
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::set_resource", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let resource = request.into_inner();
@@ -197,10 +196,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(
-        name = "NodeWriterGRPCDriver::delete_relation_nodes",
-        skip(self, request)
-    )]
+    #[tracing::instrument(skip_all)]
     async fn delete_relation_nodes(
         &self,
         request: Request<DeleteGraphNodes>,
@@ -232,7 +228,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::join_graph", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let request = request.into_inner();
@@ -261,7 +257,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::remove_resource", skip(self, request))]
+
+    #[tracing::instrument(skip_all)]
     async fn remove_resource(
         &self,
         request: Request<ResourceId>,
@@ -305,6 +302,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn add_vector_set(
         &self,
         request: Request<VectorSetId>,
@@ -335,6 +333,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn remove_vector_set(
         &self,
         request: Request<VectorSetId>,
@@ -365,6 +364,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn list_vector_sets(
         &self,
         request: Request<ShardId>,
@@ -392,7 +392,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::gc", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
         self.instrument(&request);
         let shard_id = request.into_inner();

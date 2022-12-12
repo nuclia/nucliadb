@@ -21,6 +21,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs;
+use std::time::SystemTime;
 
 use nucliadb_protos::{
     OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId, SuggestRequest,
@@ -56,25 +57,60 @@ impl Debug for ParagraphReaderService {
 }
 
 impl ParagraphReader for ParagraphReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let searcher = self.reader.searcher();
-        Ok(searcher.search(&AllQuery, &Count).unwrap())
+        let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        Ok(count)
     }
+    #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response> {
+        let id = Some(&request.shard);
+        let time = SystemTime::now();
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: starts at: {v} ms");
+        }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
             suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: ends at: {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: starts at: {v} ms");
+        }
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(no_results);
         let mut results = searcher.search(&original, &topdocs).unwrap();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: ends at: {v} ms");
+        }
+
         if results.is_empty() {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Trying fuzzy: starts at: {v} ms");
+            }
             let topdocs = TopDocs::with_limit(no_results - results.len());
             match searcher.search(&fuzzied, &topdocs) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
                 Err(err) => error!("{err:?} during suggest"),
             }
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Trying fuzzy: ends at: {v} ms");
+            }
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
         }
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
             facets_count: None,
@@ -96,7 +132,14 @@ impl ReaderChild for ParagraphReaderService {
         info!("Stopping Paragraph Reader Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        let id = Some(&request.id);
+        let time = SystemTime::now();
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: starts at: {v} ms");
+        }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
@@ -114,6 +157,13 @@ impl ReaderChild for ParagraphReaderService {
             })
             .unwrap_or_default();
         let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: ends at: {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: starts at: {v} ms");
+        }
         let (original, termc, fuzzied) =
             search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
         let mut searcher = Searcher {
@@ -126,7 +176,14 @@ impl ReaderChild for ParagraphReaderService {
             text: &text,
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: ends at: {v} ms");
+        }
+
         if response.results.is_empty() {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Applying fuzzy: starts at: {v} ms");
+            }
             searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
             let filter = response
@@ -141,6 +198,13 @@ impl ReaderChild for ParagraphReaderService {
                 .for_each(|r| response.results.push(r));
             response.total = response.results.len() as i32;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Applying fuzzy: ends at: {v} ms");
+            }
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Producing results: starts at: {v} ms");
         }
         let total = response.results.len() as f32;
         response.results.iter_mut().enumerate().for_each(|(i, r)| {
@@ -148,11 +212,20 @@ impl ReaderChild for ParagraphReaderService {
                 sc.booster = total - (i as f32);
             }
         });
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Producing results: starts at: {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
         Ok(response)
     }
+    #[tracing::instrument(skip_all)]
     fn reload(&self) {
         self.reader.reload().unwrap();
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
         self.keys()
     }
@@ -191,42 +264,34 @@ impl ParagraphReaderService {
 
         Ok(docs)
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        info!("Starting Paragraph Service");
         match ParagraphReaderService::open(config) {
             Ok(service) => Ok(service),
-            Err(_e) => {
-                warn!("Paragraph Service does not exists. Creating a new one.");
-                match ParagraphReaderService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("Error starting Paragraph service: {}", e);
-                        Err(Box::new(ParagraphError { msg: e.to_string() }))
-                    }
-                }
-            }
+            Err(_e) => match ParagraphReaderService::new(config) {
+                Ok(service) => Ok(service),
+                Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
+            },
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
         match ParagraphReaderService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
         match ParagraphReaderService::open_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
-
     pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
 
         fs::create_dir_all(&config.path)?;
-
-        debug!("Creating index builder {}:{}", line!(), file!());
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
@@ -235,25 +300,18 @@ impl ParagraphReaderService {
             }),
             ..Default::default()
         };
-
         index_builder = index_builder.settings(settings);
-
         let index = index_builder.create_in_dir(&config.path).unwrap();
-        debug!("Index builder created  {}:{}", line!(), file!());
-
-        debug!("Creating index  {}:{}", line!(), file!());
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into()?;
-        debug!("Index created  {}:{}", line!(), file!());
         Ok(ParagraphReaderService {
             index,
             reader,
             schema: paragraph_schema,
         })
     }
-
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
         let index = Index::open_in_dir(&config.path)?;
@@ -276,10 +334,7 @@ impl ParagraphReaderService {
             text => parser
                 .parse_query(text)
                 .map(|_| text.to_string())
-                .unwrap_or_else(|e| {
-                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
-                    format!("\"{}\"", text.replace('"', ""))
-                }),
+                .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
         }
     }
 
@@ -302,22 +357,14 @@ impl ParagraphReaderService {
             .collect()
     }
     fn is_valid_facet(maybe_facet: &str) -> bool {
-        Facet::from_text(maybe_facet)
-            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
-            .is_ok()
+        Facet::from_text(maybe_facet).is_ok()
     }
 
     fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
-        match order {
-            Some(order) => match order.field.as_str() {
-                "created" => Some(self.schema.created),
-                "modified" => Some(self.schema.modified),
-                _ => {
-                    error!("Order by {} is not currently supported.", order.field);
-                    None
-                }
-            },
-            None => None,
+        match order.as_ref().map(|o| o.field.as_str()) {
+            Some("created") => Some(self.schema.created),
+            Some("modified") => Some(self.schema.modified),
+            _ => None,
         }
     }
 }
