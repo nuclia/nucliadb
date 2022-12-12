@@ -46,12 +46,14 @@ impl Debug for VectorWriterService {
 }
 
 impl VectorWriter for VectorWriterService {
+    #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
         let mut collector = Vec::new();
         let indexset_slock = self.indexset.get_slock()?;
         self.indexset.index_keys(&mut collector, &indexset_slock);
         Ok(collector)
     }
+    #[tracing::instrument(skip_all)]
     fn add_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()> {
         info!(
             "Adding vector index {} to {:?}",
@@ -64,7 +66,7 @@ impl VectorWriter for VectorWriterService {
         self.indexset.commit(indexset_elock)?;
         Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()> {
         info!(
             "Removing vector index {} from {:?}",
@@ -78,14 +80,17 @@ impl VectorWriter for VectorWriterService {
     }
 }
 impl WriterChild for VectorWriterService {
+    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping vector writer Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
         let lock = self.index.get_slock().unwrap();
         self.index.no_nodes(&lock)
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         info!("Delete resource in vector starts");
         let lock = self.index.get_elock()?;
@@ -94,6 +99,7 @@ impl WriterChild for VectorWriterService {
         info!("Delete resource in vector ends");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         use data_point::{DataPoint, Elem, LabelDictionary};
         info!("Updating main index");
@@ -180,10 +186,12 @@ impl WriterChild for VectorWriterService {
         info!("Create and update operations where applied to the indexes in the set");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) {}
 }
 
 impl VectorWriterService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
@@ -192,6 +200,7 @@ impl VectorWriterService {
             VectorWriterService::open(config)
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         let indexset = std::path::Path::new(&config.vectorset);
@@ -204,6 +213,7 @@ impl VectorWriterService {
             })
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         let indexset = std::path::Path::new(&config.vectorset);

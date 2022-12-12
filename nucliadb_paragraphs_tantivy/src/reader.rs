@@ -56,10 +56,12 @@ impl Debug for ParagraphReaderService {
 }
 
 impl ParagraphReader for ParagraphReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
         let searcher = self.reader.searcher();
         Ok(searcher.search(&AllQuery, &Count).unwrap())
     }
+    #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response> {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
@@ -96,6 +98,7 @@ impl ReaderChild for ParagraphReaderService {
         info!("Stopping Paragraph Reader Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
@@ -150,9 +153,11 @@ impl ReaderChild for ParagraphReaderService {
         });
         Ok(response)
     }
+    #[tracing::instrument(skip_all)]
     fn reload(&self) {
         self.reader.reload().unwrap();
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
         self.keys()
     }
@@ -191,7 +196,7 @@ impl ParagraphReaderService {
 
         Ok(docs)
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
         info!("Starting Paragraph Service");
         match ParagraphReaderService::open(config) {
@@ -208,19 +213,20 @@ impl ParagraphReaderService {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
         match ParagraphReaderService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
         match ParagraphReaderService::open_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
-
     pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
 
@@ -253,7 +259,6 @@ impl ParagraphReaderService {
             schema: paragraph_schema,
         })
     }
-
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::new();
         let index = Index::open_in_dir(&config.path)?;

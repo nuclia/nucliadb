@@ -50,16 +50,19 @@ impl Debug for FieldWriterService {
 impl FieldWriter for FieldWriterService {}
 
 impl WriterChild for FieldWriterService {
+    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Text Service");
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap_or(0)
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let resource_id = resource.resource.as_ref().unwrap();
 
@@ -76,6 +79,7 @@ impl WriterChild for FieldWriterService {
         }
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
@@ -95,6 +99,7 @@ impl WriterChild for FieldWriterService {
 }
 
 impl FieldWriterService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &FieldConfig) -> InternalResult<Self> {
         info!("Starting Text Service");
         match FieldWriterService::open(config) {
@@ -111,13 +116,14 @@ impl FieldWriterService {
             }
         }
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &FieldConfig) -> InternalResult<Self> {
         match FieldWriterService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &FieldConfig) -> InternalResult<Self> {
         match FieldWriterService::open_inner(config) {
             Ok(service) => Ok(service),

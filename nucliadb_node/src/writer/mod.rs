@@ -47,6 +47,7 @@ impl NodeWriterService {
             cache: HashMap::new(),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn shutdown(&mut self) {
         for (shard_id, shard) in self.cache.iter_mut() {
             info!("Stopping shard {}", shard_id);
@@ -54,6 +55,7 @@ impl NodeWriterService {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> ServiceResult<()> {
         info!("Recovering shards from {}...", Configuration::shards_path());
         for entry in std::fs::read_dir(Configuration::shards_path())? {
@@ -67,7 +69,7 @@ impl NodeWriterService {
         Ok(())
     }
 
-    #[instrument(name = "NodeWriterService::load_shard", skip(self))]
+    #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         info!("{}: Loading shard", shard_id.id);
         if !self.cache.contains_key(&shard_id.id) {
@@ -86,14 +88,16 @@ impl NodeWriterService {
         }
         info!("{}: Shard loaded", shard_id.id);
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardWriterService> {
         self.cache.get(&shard_id.id)
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_mut_shard(&mut self, shard_id: &ShardId) -> Option<&mut ShardWriterService> {
         self.cache.get_mut(&shard_id.id)
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn new_shard(&mut self) -> ShardCreated {
         let new_id = Uuid::new_v4().to_string();
         let new_shard = POOL.install(|| ShardWriterService::new(&new_id)).unwrap();
@@ -107,12 +111,13 @@ impl NodeWriterService {
         self.cache.insert(new_id, new_shard);
         data
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn delete_shard(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
         self.cache
             .remove(&shard_id.id)
             .map(|shard| POOL.install(|| shard.delete()).map_err(|e| e.into()))
     }
+    #[tracing::instrument(skip_all)]
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
         self.delete_shard(shard_id).transpose()?;
         let id = &shard_id.id;
@@ -126,6 +131,8 @@ impl NodeWriterService {
         self.cache.insert(id.clone(), new_shard);
         Ok(shard_data)
     }
+
+    #[tracing::instrument(skip_all)]
     pub fn set_resource(
         &mut self,
         shard_id: &ShardId,
@@ -137,6 +144,8 @@ impl NodeWriterService {
                 .map_err(|e| e.into())
         })
     }
+
+    #[tracing::instrument(skip_all)]
     pub fn add_vectorset(
         &mut self,
         shard_id: &ShardId,
@@ -149,6 +158,7 @@ impl NodeWriterService {
         })
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn remove_vectorset(
         &mut self,
         shard_id: &ShardId,
@@ -160,6 +170,8 @@ impl NodeWriterService {
                 .map_err(|e| e.into())
         })
     }
+
+    #[tracing::instrument(skip_all)]
     pub fn join_relations_graph(
         &mut self,
         shard_id: &ShardId,
@@ -172,6 +184,7 @@ impl NodeWriterService {
         })
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn delete_relation_nodes(
         &mut self,
         shard_id: &ShardId,
@@ -184,6 +197,7 @@ impl NodeWriterService {
         })
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn remove_resource(
         &mut self,
         shard_id: &ShardId,
@@ -195,17 +209,19 @@ impl NodeWriterService {
                 .map_err(|e| e.into())
         })
     }
+    #[tracing::instrument(skip_all)]
     pub fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
         self.get_mut_shard(shard_id)
             .map(|shard| POOL.install(|| shard.gc()).map_err(|e| e.into()))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn list_vectorsets(&self, shard_id: &ShardId) -> Option<ServiceResult<Vec<String>>> {
         self.get_shard(shard_id).map(|shard| {
             POOL.install(|| shard.list_vectorsets())
                 .map_err(|e| e.into())
         })
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_shard_ids(&self) -> ShardIds {
         let ids = self
             .cache

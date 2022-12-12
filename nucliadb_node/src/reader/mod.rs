@@ -54,6 +54,7 @@ impl NodeReaderService {
     }
 
     /// Stop all shards on memory
+    #[tracing::instrument(skip_all)]
     pub fn shutdown(&mut self) {
         for (shard_id, shard) in &mut self.cache {
             info!("Stopping shard {}", shard_id);
@@ -62,6 +63,7 @@ impl NodeReaderService {
     }
 
     /// Load all shards on the shards memory structure
+    #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> ServiceResult<()> {
         info!("Recovering shards from {}...", Configuration::shards_path());
         for entry in std::fs::read_dir(Configuration::shards_path())? {
@@ -74,7 +76,7 @@ impl NodeReaderService {
         Ok(())
     }
 
-    #[instrument(name = "NodeReaderService::load_shard", skip(self))]
+    #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         info!("{}: Loading shard", shard_id.id);
         let in_memory = self.cache.contains_key(&shard_id.id);
@@ -95,9 +97,11 @@ impl NodeReaderService {
             info!("{}: Shard was in memory", shard_id.id);
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardReaderService> {
         self.cache.get(&shard_id.id)
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_shards(&self) -> ServiceResult<ShardList> {
         let shards = POOL.install(|| {
             self.cache
@@ -114,6 +118,7 @@ impl NodeReaderService {
         })?;
         Ok(ShardList { shards })
     }
+    #[tracing::instrument(skip_all)]
     pub fn suggest(
         &self,
         shard_id: &ShardId,
@@ -123,6 +128,7 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.suggest(request)))
             .map(|r| r.map_err(|e| e.into()))
     }
+    #[tracing::instrument(skip_all)]
     pub fn search(
         &self,
         shard_id: &ShardId,
@@ -132,7 +138,7 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.search(request)))
             .map(|r| r.map_err(|e| e.into()))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn relation_search(
         &self,
         shard_id: &ShardId,
@@ -142,7 +148,7 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.relation_search(request)))
             .map(|r| r.map_err(|e| e.into()))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn vector_search(
         &self,
         shard_id: &ShardId,
@@ -152,7 +158,7 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.vector_search(request)))
             .map(|r| r.map_err(|e| e.into()))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn paragraph_search(
         &self,
         shard_id: &ShardId,
@@ -162,7 +168,7 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.paragraph_search(request)))
             .map(|r| r.map_err(|e| e.into()))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn document_search(
         &self,
         shard_id: &ShardId,
@@ -172,32 +178,37 @@ impl NodeReaderService {
             .map(|shard| POOL.install(|| shard.document_search(request)))
             .map(|r| r.map_err(|e| e.into()))
     }
+    #[tracing::instrument(skip_all)]
     pub fn document_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_field_keys()))
             .map(|ids| IdCollection { ids })
     }
+    #[tracing::instrument(skip_all)]
     pub fn paragraph_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_paragraphs_keys()))
             .map(|ids| IdCollection { ids })
     }
+    #[tracing::instrument(skip_all)]
     pub fn vector_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_vectors_keys()))
             .map(|ids| IdCollection { ids })
     }
+    #[tracing::instrument(skip_all)]
     pub fn relation_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_relations_keys()))
             .map(|ids| IdCollection { ids })
     }
+    #[tracing::instrument(skip_all)]
     pub fn relation_edges(&self, shard_id: &ShardId) -> Option<ServiceResult<EdgeList>> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_relations_edges()))
             .map(|r| r.map_err(|e| e.into()))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn relation_types(&self, shard_id: &ShardId) -> Option<ServiceResult<TypeList>> {
         self.get_shard(shard_id)
             .map(|shard| POOL.install(|| shard.get_relations_types()))

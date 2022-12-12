@@ -57,6 +57,7 @@ pub struct ShardReaderService {
 }
 
 impl ShardReaderService {
+    #[tracing::instrument(skip_all)]
     pub fn document_version(&self) -> DocumentService {
         match self.document_service_version {
             0 => DocumentService::DocumentV0,
@@ -64,6 +65,7 @@ impl ShardReaderService {
             i => panic!("Unknown document version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn paragraph_version(&self) -> ParagraphService {
         match self.paragraph_service_version {
             0 => ParagraphService::ParagraphV0,
@@ -71,6 +73,7 @@ impl ShardReaderService {
             i => panic!("Unknown paragraph version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn vector_version(&self) -> VectorService {
         match self.vector_service_version {
             0 => VectorService::VectorV0,
@@ -78,6 +81,7 @@ impl ShardReaderService {
             i => panic!("Unknown vector version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn relation_version(&self) -> RelationService {
         match self.relation_service_version {
             0 => RelationService::RelationV0,
@@ -85,6 +89,7 @@ impl ShardReaderService {
             i => panic!("Unknown relation version {i}"),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_info(&self, request: &GetShardRequest) -> InternalResult<StatsData> {
         self.reload_policy(true);
         let resources = self.field_reader.count()?;
@@ -98,36 +103,43 @@ impl ShardReaderService {
             relations,
         })
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn get_field_keys(&self) -> Vec<String> {
         self.reload_policy(true);
         self.field_reader.stored_ids()
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_paragraphs_keys(&self) -> Vec<String> {
         self.reload_policy(true);
         self.paragraph_reader.stored_ids()
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_vectors_keys(&self) -> Vec<String> {
         self.reload_policy(true);
         self.vector_reader.stored_ids()
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_relations_keys(&self) -> Vec<String> {
         self.reload_policy(true);
         self.relation_reader.stored_ids()
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_relations_edges(&self) -> InternalResult<EdgeList> {
         self.reload_policy(true);
         self.relation_reader.get_edges()
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_relations_types(&self) -> InternalResult<TypeList> {
         self.reload_policy(true);
         self.relation_reader.get_node_types()
     }
+    #[tracing::instrument(skip_all)]
     pub fn get_resources(&self) -> InternalResult<usize> {
         self.field_reader.count()
     }
 
     /// Start the service
+    #[tracing::instrument(skip_all)]
     pub fn start(id: &str) -> InternalResult<ShardReaderService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
@@ -179,6 +191,7 @@ impl ShardReaderService {
         })
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn open(id: &str) -> InternalResult<ShardReaderService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
@@ -229,6 +242,7 @@ impl ShardReaderService {
         })
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn create(id: &str) -> InternalResult<ShardReaderService> {
         let shard_path = Configuration::shards_path_id(id);
         match Path::new(&shard_path).exists() {
@@ -280,6 +294,8 @@ impl ShardReaderService {
     }
 
     /// Stop the service
+    
+    #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
         info!("Stopping shard {}...", { &self.id });
         let mut field_r = Ok(());
@@ -311,6 +327,7 @@ impl ShardReaderService {
     /// Return a list of queries to suggest from the original
     /// query. The query with more words will come first. `max_group`
     /// defines the limit of words a query can have.
+    #[tracing::instrument(skip_all)]
     fn split_suggest_query(query: String, max_group: usize) -> Vec<String> {
         let words = query.split(' ');
         let mut i = 0;
@@ -334,6 +351,7 @@ impl ShardReaderService {
         prefixes.into_iter().rev().collect()
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn suggest(&self, request: SuggestRequest) -> InternalResult<SuggestResponse> {
         // Search for entities related to the query.
 
@@ -383,7 +401,7 @@ impl ShardReaderService {
         })
     }
 
-    #[tracing::instrument(name = "ShardReaderService::search", skip(self, search_request))]
+    #[tracing::instrument(skip_all)]
     pub fn search(&self, search_request: SearchRequest) -> InternalResult<SearchResponse> {
         self.reload_policy(search_request.reload);
         let skip_paragraphs = !search_request.paragraph;
@@ -483,10 +501,7 @@ impl ShardReaderService {
         })
     }
 
-    #[tracing::instrument(
-        name = "ShardReaderService::paragraph_search",
-        skip(self, search_request)
-    )]
+    #[tracing::instrument(skip_all)]
     pub fn paragraph_search(
         &self,
         search_request: ParagraphSearchRequest,
@@ -497,11 +512,7 @@ impl ShardReaderService {
             self.paragraph_reader.search(&search_request)
         })
     }
-
-    #[tracing::instrument(
-        name = "ShardReaderService::document_search",
-        skip(self, search_request)
-    )]
+    #[tracing::instrument(skip_all)]
     pub fn document_search(
         &self,
         search_request: DocumentSearchRequest,
@@ -513,7 +524,7 @@ impl ShardReaderService {
         })
     }
 
-    #[tracing::instrument(name = "ShardReaderService::vector_search", skip(self, search_request))]
+    #[tracing::instrument(skip_all)]
     pub fn vector_search(
         &self,
         search_request: VectorSearchRequest,
@@ -524,7 +535,7 @@ impl ShardReaderService {
             self.vector_reader.search(&search_request)
         })
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn relation_search(
         &self,
         search_request: RelationSearchRequest,

@@ -74,6 +74,7 @@ impl Debug for FieldReaderService {
 }
 
 impl FieldReader for FieldReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
         let searcher = self.reader.searcher();
         Ok(searcher.search(&AllQuery, &Count).unwrap())
@@ -83,19 +84,21 @@ impl FieldReader for FieldReaderService {
 impl ReaderChild for FieldReaderService {
     type Request = DocumentSearchRequest;
     type Response = DocumentSearchResponse;
-
+    #[tracing::instrument(skip_all)]
     fn stop(&self) -> InternalResult<()> {
         info!("Stopping Reader Text Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         info!("Document search at {}:{}", line!(), file!());
         Ok(self.do_search(request))
     }
-
+    #[tracing::instrument(skip_all)]
     fn reload(&self) {
         self.reader.reload().unwrap();
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
         self.keys()
     }
@@ -136,7 +139,7 @@ impl FieldReaderService {
 
         Ok(docs)
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &FieldConfig) -> InternalResult<Self> {
         info!("Starting Text Service");
         match FieldReaderService::open(config) {
@@ -153,12 +156,14 @@ impl FieldReaderService {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &FieldConfig) -> InternalResult<Self> {
         match FieldReaderService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(FieldError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &FieldConfig) -> InternalResult<Self> {
         match FieldReaderService::open_inner(config) {
             Ok(service) => Ok(service),

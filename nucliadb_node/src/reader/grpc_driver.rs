@@ -22,7 +22,7 @@ use async_std::sync::RwLock;
 use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::*;
 use opentelemetry::global;
-use tracing::{instrument, Span, *};
+use tracing::{Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use Shard as ShardPB;
 
@@ -40,6 +40,7 @@ impl NodeReaderGRPCDriver {
     // The GRPC reader will only request the reader to bring a shard
     // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
+    #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
         if Configuration::lazy_loading() {
             let mut writer = self.0.write().await;
@@ -56,7 +57,7 @@ impl NodeReaderGRPCDriver {
 }
 #[tonic::async_trait]
 impl NodeReader for NodeReaderGRPCDriver {
-    #[instrument(name = "NodeReaderGRPCDriver::get_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn get_shard(
         &self,
         request: tonic::Request<GetShardRequest>,
@@ -90,6 +91,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_shards(
         &self,
         request: tonic::Request<EmptyQuery>,
@@ -104,7 +106,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             .map_err(|e| tonic::Status::internal(e.to_string()))
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::vector_search", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn vector_search(
         &self,
         request: tonic::Request<VectorSearchRequest>,
@@ -133,7 +135,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::relation_search", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn relation_search(
         &self,
         request: tonic::Request<RelationSearchRequest>,
@@ -162,7 +164,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::search", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn search(
         &self,
         request: tonic::Request<SearchRequest>,
@@ -191,7 +193,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[instrument(name = "NodeReaderGRPCDriver::suggest", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn suggest(
         &self,
         request: tonic::Request<SuggestRequest>,
@@ -220,7 +222,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::document_search", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn document_search(
         &self,
         request: tonic::Request<DocumentSearchRequest>,
@@ -250,7 +252,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::paragraph_search", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn paragraph_search(
         &self,
         request: tonic::Request<ParagraphSearchRequest>,
@@ -279,7 +281,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::document_ids", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn document_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -297,7 +299,8 @@ impl NodeReader for NodeReaderGRPCDriver {
             ))),
         }
     }
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::paragraph_ids", skip(self, request))]
+
+    #[tracing::instrument(skip_all)]
     async fn paragraph_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -316,7 +319,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeReaderGRPCDriver::vector_ids", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn vector_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -334,6 +337,7 @@ impl NodeReader for NodeReaderGRPCDriver {
             ))),
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn relation_ids(
         &self,
         request: tonic::Request<ShardId>,
@@ -352,6 +356,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn relation_edges(
         &self,
         request: tonic::Request<ShardId>,
@@ -371,6 +376,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn relation_types(
         &self,
         request: tonic::Request<ShardId>,

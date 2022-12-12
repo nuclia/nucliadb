@@ -56,16 +56,18 @@ impl Debug for ParagraphWriterService {
 impl ParagraphWriter for ParagraphWriterService {}
 
 impl WriterChild for ParagraphWriterService {
+    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Paragraph Service");
         Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap_or(0)
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let mut modified = false;
 
@@ -91,6 +93,7 @@ impl WriterChild for ParagraphWriterService {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);

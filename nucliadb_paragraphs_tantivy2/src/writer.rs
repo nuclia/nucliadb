@@ -57,16 +57,19 @@ impl Debug for ParagraphWriterService {
 impl ParagraphWriter for ParagraphWriterService {}
 
 impl WriterChild for ParagraphWriterService {
+    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Paragraph Service");
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
         searcher.search(&AllQuery, &Count).unwrap_or(0)
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let mut modified = false;
 
@@ -92,6 +95,7 @@ impl WriterChild for ParagraphWriterService {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
@@ -107,11 +111,12 @@ impl WriterChild for ParagraphWriterService {
             }
         }
     }
-
+    #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) {}
 }
 
 impl ParagraphWriterService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
         info!("Starting Paragraph Service");
         match ParagraphWriterService::open(config) {
@@ -128,13 +133,14 @@ impl ParagraphWriterService {
             }
         }
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
         match ParagraphWriterService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
         match ParagraphWriterService::open_inner(config) {
             Ok(service) => Ok(service),

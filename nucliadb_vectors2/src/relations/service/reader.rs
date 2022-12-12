@@ -42,6 +42,7 @@ impl Debug for RelationsReaderService {
 
 impl RelationsReaderService {
     const NO_RESULTS: usize = 10;
+    #[tracing::instrument(skip_all)]
     fn graph_search(
         &self,
         request: &RelationSearchRequest,
@@ -83,6 +84,7 @@ impl RelationsReaderService {
             neighbours: nodes.collect::<Result<Vec<_>, _>>()?,
         })
     }
+    #[tracing::instrument(skip_all)]
     fn text_search(
         &self,
         request: &RelationSearchRequest,
@@ -106,6 +108,7 @@ impl RelationsReaderService {
     }
 }
 impl RelationReader for RelationsReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
         Ok(self
             .index
@@ -113,6 +116,7 @@ impl RelationReader for RelationsReaderService {
             .and_then(|reader| reader.no_nodes())
             .map(|v| v as usize)?)
     }
+    #[tracing::instrument(skip_all)]
     fn get_edges(&self) -> InternalResult<EdgeList> {
         let reader = self.index.start_reading()?;
         let iter = reader.iter_edge_ids()?;
@@ -135,6 +139,7 @@ impl RelationReader for RelationsReaderService {
         }
         Ok(EdgeList { list: edges })
     }
+    #[tracing::instrument(skip_all)]
     fn get_node_types(&self) -> InternalResult<TypeList> {
         let mut found = HashSet::new();
         let mut types = Vec::new();
@@ -162,11 +167,12 @@ impl RelationReader for RelationsReaderService {
 impl ReaderChild for RelationsReaderService {
     type Request = RelationSearchRequest;
     type Response = RelationSearchResponse;
-
+    #[tracing::instrument(skip_all)]
     fn stop(&self) -> InternalResult<()> {
         info!("Stopping relation reader Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         if request.prefix.is_empty() {
             self.graph_search(request)
@@ -174,6 +180,7 @@ impl ReaderChild for RelationsReaderService {
             self.text_search(request)
         }
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
         let mut list = vec![];
         if let Ok(reader) = self.index.start_reading() {
@@ -185,6 +192,7 @@ impl ReaderChild for RelationsReaderService {
         }
         list
     }
+    #[tracing::instrument(skip_all)]
     fn reload(&self) {
         let _v = self
             .index
@@ -195,6 +203,7 @@ impl ReaderChild for RelationsReaderService {
 }
 
 impl RelationsReaderService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
@@ -203,6 +212,7 @@ impl RelationsReaderService {
             Ok(RelationsReaderService::open(config).unwrap())
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
@@ -214,6 +224,7 @@ impl RelationsReaderService {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &RelationConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {

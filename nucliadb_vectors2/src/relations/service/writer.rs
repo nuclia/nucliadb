@@ -34,6 +34,7 @@ pub struct RelationsWriterService {
     index: Index,
 }
 impl RelationsWriterService {
+    #[tracing::instrument(skip_all)]
     fn delete_node(&self, writer: &mut GraphWriter, id: Entity) -> InternalResult<()> {
         let affects = writer.delete_node(&self.wmode, id)?;
         for affected in affects {
@@ -48,6 +49,7 @@ impl RelationsWriterService {
     }
 }
 impl RelationWriter for RelationsWriterService {
+    #[tracing::instrument(skip_all)]
     fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> InternalResult<()> {
         let mut writer = self.index.start_writing()?;
         for node in graph.nodes.iter() {
@@ -60,6 +62,7 @@ impl RelationWriter for RelationsWriterService {
         }
         Ok(writer.commit(&mut self.wmode)?)
     }
+    #[tracing::instrument(skip_all)]
     fn join_graph(&mut self, graph: &JoinGraph) -> InternalResult<()> {
         let mut writer = self.index.start_writing()?;
         let nodes: HashMap<_, _> = graph
@@ -90,10 +93,12 @@ impl std::fmt::Debug for RelationsWriterService {
 }
 
 impl WriterChild for RelationsWriterService {
+    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping relation writer Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
         let mut count = 0;
         match self
@@ -106,6 +111,7 @@ impl WriterChild for RelationsWriterService {
         }
         count
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> InternalResult<()> {
         let node = IoNode::new(x.uuid.clone(), dictionary::ENTITY.to_string(), None);
         let mut writer = self.index.start_writing()?;
@@ -114,6 +120,7 @@ impl WriterChild for RelationsWriterService {
         }
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         if resource.status != ResourceStatus::Delete as i32 {
             let mut writer = self.index.start_writing()?;

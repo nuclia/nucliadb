@@ -54,6 +54,7 @@ impl Debug for VectorReaderService {
 }
 
 impl VectorReader for VectorReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self, vectorset: &str) -> InternalResult<usize> {
         let indexet_slock = self.indexset.get_slock()?;
         if vectorset.is_empty() {
@@ -74,6 +75,7 @@ impl ReaderChild for VectorReaderService {
         info!("Stopping vector reader Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         let offset = request.result_per_page * request.page_number;
         let total_to_get = offset + request.result_per_page;
@@ -108,6 +110,7 @@ impl ReaderChild for VectorReaderService {
             result_per_page: request.result_per_page,
         })
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
         let lock = self.index.get_slock().unwrap();
         self.index.get_keys(&lock).unwrap_or_else(|err| {
@@ -119,6 +122,7 @@ impl ReaderChild for VectorReaderService {
 }
 
 impl VectorReaderService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
@@ -127,6 +131,7 @@ impl VectorReaderService {
             VectorReaderService::open(config)
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         let path_indexset = std::path::Path::new(&config.vectorset);
@@ -139,6 +144,7 @@ impl VectorReaderService {
             })
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &VectorConfig) -> InternalResult<Self> {
         let path = std::path::Path::new(&config.path);
         let path_indexset = std::path::Path::new(&config.vectorset);
