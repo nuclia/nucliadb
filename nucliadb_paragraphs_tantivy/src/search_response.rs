@@ -202,7 +202,6 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
         for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
-            info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = ResultScore {

@@ -20,6 +20,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
+use std::time::SystemTime;
 
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
@@ -57,59 +58,81 @@ impl Debug for ParagraphWriterService {
 impl ParagraphWriter for ParagraphWriterService {}
 
 impl WriterChild for ParagraphWriterService {
-    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Paragraph Service");
         Ok(())
     }
-
     #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
-        searcher.search(&AllQuery, &Count).unwrap_or(0)
+        let count = searcher.search(&AllQuery, &Count).unwrap_or(0);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        count
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        let mut modified = false;
+        let id = Some(&resource.shard_id);
+        let time = SystemTime::now();
 
         if resource.status != ResourceStatus::Delete as i32 {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Indexing paragraphs: starts at {v} ms");
+            }
             let _ = self.index_paragraph(resource);
-            modified = true;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Indexing paragraphs: ends at {v} ms");
+            }
         }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
+        }
         for paragraph_id in &resource.paragraphs_to_delete {
             let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
             self.writer.delete_term(uuid_term);
-            modified = true;
         }
-        match self.writer.commit() {
-            _ if !modified => Ok(()),
-            Ok(opstamp) => {
-                debug!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Paragraph service: {}", e);
-                Err(Box::new(ParagraphError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+        Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
+        let id = Some(&resource_id.shard_id);
+        let time = SystemTime::now();
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        self.writer.delete_term(uuid_term);
-        match self.writer.commit() {
-            Ok(opstamp) => {
-                debug!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Paragraph service: {}", e);
-                Err(Box::new(ParagraphError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete term: starts at {v} ms");
         }
+        self.writer.delete_term(uuid_term);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete term: ends at {v} ms");
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+        Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) {}
@@ -118,20 +141,7 @@ impl WriterChild for ParagraphWriterService {
 impl ParagraphWriterService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        info!("Starting Paragraph Service");
-        match ParagraphWriterService::open(config) {
-            Ok(service) => Ok(service),
-            Err(e) => {
-                warn!("Paragraph Service Open failed {}. Creating a new one.", e);
-                match ParagraphWriterService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("ParagraphConfigice: {}", e);
-                        Err(Box::new(ParagraphError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
+        ParagraphWriterService::open(config).or_else(|_| ParagraphWriterService::new(config))
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
@@ -251,17 +261,14 @@ impl ParagraphWriterService {
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
-                debug!("Paragraph added {}", text);
                 doc.add_text(self.schema.text, &text);
                 doc.add_u64(self.schema.start_pos, start_pos);
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
-                debug!("Paragraph added");
                 self.writer.delete_term(paragraph_term);
                 self.writer.add_document(doc).unwrap();
                 if paragraph_counter % 500 == 0 {
-                    debug!("Commited");
                     self.writer.commit().unwrap();
                 }
             }

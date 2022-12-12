@@ -20,6 +20,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs;
+use std::time::*;
 
 use nucliadb_protos::{
     DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults,
@@ -76,8 +77,14 @@ impl Debug for FieldReaderService {
 impl FieldReader for FieldReaderService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let searcher = self.reader.searcher();
-        Ok(searcher.search(&AllQuery, &Count).unwrap())
+        let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        Ok(count)
     }
 }
 
@@ -141,20 +148,7 @@ impl FieldReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &FieldConfig) -> InternalResult<Self> {
-        info!("Starting Text Service");
-        match FieldReaderService::open(config) {
-            Ok(service) => Ok(service),
-            Err(_e) => {
-                warn!("Text Service does not exists. Creating a new one.");
-                match FieldReaderService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("Error starting Text service: {}", e);
-                        Err(Box::new(FieldError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
+        FieldReaderService::open(config).or_else(|_| FieldReaderService::new(config))
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &FieldConfig) -> InternalResult<Self> {
@@ -217,16 +211,10 @@ impl FieldReaderService {
     }
 
     fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
-        match order {
-            Some(order) => match order.field.as_str() {
-                "created" => Some(self.schema.created),
-                "modified" => Some(self.schema.modified),
-                _ => {
-                    error!("Order by {} is not currently supported.", order.field);
-                    None
-                }
-            },
-            None => None,
+        match order.as_ref().map(|o| o.field.as_str()) {
+            Some("created") => Some(self.schema.created),
+            Some("modified") => Some(self.schema.modified),
+            _ => None,
         }
     }
 
@@ -260,7 +248,6 @@ impl FieldReaderService {
         response: SearchResponse<u64>,
         searcher: &Searcher,
     ) -> DocumentSearchResponse {
-        info!("Document query at {}:{}", line!(), file!());
         let mut total = response.top_docs.len();
         let next_page: bool;
         if total > response.results_per_page as usize {
@@ -270,7 +257,6 @@ impl FieldReaderService {
             next_page = false;
         }
         let mut results = Vec::with_capacity(total);
-        info!("Document query at {}:{}", line!(), file!());
         for (id, (_, doc_address)) in response.top_docs.into_iter().enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
@@ -278,7 +264,6 @@ impl FieldReaderService {
                         bm25: 0.0,
                         booster: id as f32,
                     });
-                    info!("Document query at {}:{}", line!(), file!());
                     let uuid = doc
                         .get_first(self.schema.uuid)
                         .expect("document doesn't appear to have uuid.")
@@ -294,7 +279,6 @@ impl FieldReaderService {
                         .to_path_string();
 
                     let result = DocumentResult { uuid, field, score };
-                    info!("Document query at {}:{}", line!(), file!());
                     results.push(result);
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),
@@ -302,7 +286,6 @@ impl FieldReaderService {
         }
 
         let facets = self.produce_facets(response.facets, response.facets_count);
-        info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
             results,
@@ -320,7 +303,6 @@ impl FieldReaderService {
         response: SearchResponse<f32>,
         searcher: &Searcher,
     ) -> DocumentSearchResponse {
-        info!("Document query at {}:{}", line!(), file!());
         let mut total = response.top_docs.len();
         let next_page: bool;
         if total > response.results_per_page as usize {
@@ -330,7 +312,6 @@ impl FieldReaderService {
             next_page = false;
         }
         let mut results = Vec::with_capacity(total);
-        info!("Document query at {}:{}", line!(), file!());
         for (id, (score, doc_address)) in response.top_docs.into_iter().take(total).enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
@@ -338,7 +319,6 @@ impl FieldReaderService {
                         bm25: score,
                         booster: id as f32,
                     });
-                    info!("Document query at {}:{}", line!(), file!());
                     let uuid = doc
                         .get_first(self.schema.uuid)
                         .expect("document doesn't appear to have uuid.")
@@ -354,7 +334,6 @@ impl FieldReaderService {
                         .to_path_string();
 
                     let result = DocumentResult { uuid, field, score };
-                    info!("Document query at {}:{}", line!(), file!());
                     results.push(result);
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),
@@ -362,7 +341,6 @@ impl FieldReaderService {
         }
 
         let facets = self.produce_facets(response.facets, response.facets_count);
-        info!("Document query at {}:{}", line!(), file!());
         DocumentSearchResponse {
             total: total as i32,
             results,
@@ -381,15 +359,19 @@ impl FieldReaderService {
             text => parser
                 .parse_query(text)
                 .map(|_| text.to_string())
-                .unwrap_or_else(|e| {
-                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
-                    format!("\"{}\"", text.replace('"', ""))
-                }),
+                .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn do_search(&self, request: &DocumentSearchRequest) -> DocumentSearchResponse {
         use crate::search_query::create_query;
+        let id = Some(&request.id);
+        let time = SystemTime::now();
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: starts at {v} ms");
+        }
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
@@ -415,8 +397,17 @@ impl FieldReaderService {
             facets.push(facet.clone());
             facet_collector.add_facet(Facet::from(facet));
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: ends at {v} ms");
+        }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: starts at {v} ms");
+        }
         let searcher = self.reader.searcher();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: ends at {v} ms");
+        }
         match order_field {
             _ if request.only_faceted => {
                 // Just a facet search
@@ -491,9 +482,7 @@ impl FieldReaderService {
             .collect()
     }
     fn is_valid_facet(maybe_facet: &str) -> bool {
-        Facet::from_text(maybe_facet)
-            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
-            .is_ok()
+        Facet::from_text(maybe_facet).is_ok()
     }
 }
 

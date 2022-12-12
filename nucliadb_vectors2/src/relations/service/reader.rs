@@ -20,6 +20,7 @@
 
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::time::SystemTime;
 
 use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
@@ -47,11 +48,17 @@ impl RelationsReaderService {
         &self,
         request: &RelationSearchRequest,
     ) -> InternalResult<RelationSearchResponse> {
+        let id = Some(&request.id);
+        let time = SystemTime::now();
         let reader = self.index.start_reading()?;
         let depth = request.depth as usize;
         let mut entry_points = Vec::with_capacity(request.entry_points.len());
         let mut type_filters = HashSet::with_capacity(request.type_filters.len());
-        request.entry_points.iter().for_each(|node| {
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} -  Creating entry points: starts {v} ms");
+        }
+        for node in request.entry_points.iter() {
             let name = node.value.clone();
             let type_info = node_type_parsing(node.ntype(), &node.subtype);
             let xtype = type_info.0.to_string();
@@ -62,17 +69,39 @@ impl RelationsReaderService {
                 Ok(Some(id)) => entry_points.push(id),
                 Err(e) => error!("{e:?} during {node:?}"),
             }
-        });
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} -  Creating entry points: ends {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - adding query type filters: starts {v} ms");
+        }
         request.type_filters.iter().for_each(|filter| {
             let type_info = node_type_parsing(filter.ntype(), &filter.subtype);
             type_filters.insert(type_info);
         });
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - adding query type filters: ends {v} ms");
+        }
+
         let guide = GrpcGuide {
             type_filters,
             reader: &reader,
             jump_always: dictionary::SYNONYM,
         };
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - running the search: starts {v} ms");
+        }
         let results = reader.search(guide, depth, entry_points)?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - running the search: ends {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - producing results: starts {v} ms");
+        }
         let nodes = results.into_iter().map(|id| {
             reader.get_node(id).map(|node| RelationNode {
                 value: node.name().to_string(),
@@ -80,6 +109,13 @@ impl RelationsReaderService {
                 ntype: string_to_node_type(node.xtype()) as i32,
             })
         });
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - producing results: ends {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(RelationSearchResponse {
             neighbours: nodes.collect::<Result<Vec<_>, _>>()?,
         })
@@ -89,12 +125,25 @@ impl RelationsReaderService {
         &self,
         request: &RelationSearchRequest,
     ) -> InternalResult<RelationSearchResponse> {
+        let id = Some(&request.id);
+        let time = SystemTime::now();
         let prefix = &request.prefix;
         let reader = self.index.start_reading()?;
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - running prefix search: starts {v} ms");
+        }
         let prefixes = reader
             .prefix_search(&self.rmode, Self::NO_RESULTS, prefix)?
             .into_iter()
             .flat_map(|key| reader.get_node_id(&key).ok().flatten());
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - running prefix search: ends {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - generating results: starts {v} ms");
+        }
         let nodes = prefixes.into_iter().map(|id| {
             reader.get_node(id).map(|node| RelationNode {
                 value: node.name().to_string(),
@@ -102,6 +151,13 @@ impl RelationsReaderService {
                 ntype: string_to_node_type(node.xtype()) as i32,
             })
         });
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - generating results: ends {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(RelationSearchResponse {
             neighbours: nodes.collect::<Result<Vec<_>, _>>()?,
         })
@@ -118,6 +174,8 @@ impl RelationReader for RelationsReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn get_edges(&self) -> InternalResult<EdgeList> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let reader = self.index.start_reading()?;
         let iter = reader.iter_edge_ids()?;
         let mut edges = Vec::new();
@@ -137,10 +195,15 @@ impl RelationReader for RelationsReaderService {
                 });
             }
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(EdgeList { list: edges })
     }
     #[tracing::instrument(skip_all)]
     fn get_node_types(&self) -> InternalResult<TypeList> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let mut found = HashSet::new();
         let mut types = Vec::new();
         let reader = self.index.start_reading()?;
@@ -160,6 +223,9 @@ impl RelationReader for RelationsReaderService {
                 });
             }
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(TypeList { list: types })
     }
 }
@@ -174,9 +240,12 @@ impl ReaderChild for RelationsReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        let id = Some(&request.id);
         if request.prefix.is_empty() {
+            info!("{id:?} - No prefix found, running graph search");
             self.graph_search(request)
         } else {
+            info!("{id:?} - Prefix found, running graph search");
             self.text_search(request)
         }
     }

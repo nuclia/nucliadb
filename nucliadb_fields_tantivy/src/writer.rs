@@ -20,6 +20,7 @@
 
 use std::fmt::Debug;
 use std::fs;
+use std::time::SystemTime;
 
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
@@ -58,42 +59,80 @@ impl WriterChild for FieldWriterService {
 
     #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
-        searcher.search(&AllQuery, &Count).unwrap_or(0)
+        let count = searcher.search(&AllQuery, &Count).unwrap_or(0);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        count
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
+        let id = Some(&resource.shard_id);
+        let time = SystemTime::now();
         let resource_id = resource.resource.as_ref().unwrap();
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete existing uuid: starts at {v} ms");
+        }
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete existing uuid: ends at {v} ms");
+        }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Indexing document: starts at {v} ms");
+        }
         if resource.status != ResourceStatus::Delete as i32 {
             self.index_document(resource);
         }
-        match self.writer.commit() {
-            Ok(opstamp) => trace!("Commit {}!", opstamp),
-            Err(e) => error!("Error doing commit: {}", e),
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Indexing document: starts at {v} ms");
         }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
+        let id = Some(&resource_id.shard_id);
+        let time = SystemTime::now();
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete existing uuid: starts at {v} ms");
+        }
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
         self.writer.delete_term(uuid_term);
-        match self.writer.commit() {
-            Ok(opstamp) => {
-                trace!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Text service: {}", e);
-                Err(Box::new(FieldError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete existing uuid: ends at {v} ms");
         }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+
+        Ok(())
     }
     fn garbage_collection(&mut self) {}
 }
@@ -101,20 +140,7 @@ impl WriterChild for FieldWriterService {
 impl FieldWriterService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &FieldConfig) -> InternalResult<Self> {
-        info!("Starting Text Service");
-        match FieldWriterService::open(config) {
-            Ok(service) => Ok(service),
-            Err(e) => {
-                warn!("Field Service Open failed {}. Creating a new one.", e);
-                match FieldWriterService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("FieldConfigce: {}", e);
-                        Err(Box::new(FieldError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
+        FieldWriterService::open(config).or_else(|_| FieldWriterService::new(config))
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &FieldConfig) -> InternalResult<Self> {

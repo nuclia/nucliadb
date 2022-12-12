@@ -20,6 +20,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
+use std::time::SystemTime;
 
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
@@ -63,51 +64,75 @@ impl WriterChild for ParagraphWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
-        searcher.search(&AllQuery, &Count).unwrap_or(0)
+        let count = searcher.search(&AllQuery, &Count).unwrap_or(0);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        count
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        let mut modified = false;
+        let id = Some(&resource.shard_id);
+        let time = SystemTime::now();
 
         if resource.status != ResourceStatus::Delete as i32 {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Indexing paragraphs: starts at {v} ms");
+            }
             let _ = self.index_paragraph(resource);
-            modified = true;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Indexing paragraphs: ends at {v} ms");
+            }
         }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
+        }
         for paragraph_id in &resource.paragraphs_to_delete {
             let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
             self.writer.delete_term(uuid_term);
-            modified = true;
         }
-        match self.writer.commit() {
-            _ if !modified => Ok(()),
-            Ok(opstamp) => {
-                debug!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Paragraph service: {}", e);
-                Err(Box::new(ParagraphError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+        Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
+        let id = Some(&resource_id.shard_id);
+        let time = SystemTime::now();
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        self.writer.delete_term(uuid_term);
-        match self.writer.commit() {
-            Ok(opstamp) => {
-                debug!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Paragraph service: {}", e);
-                Err(Box::new(ParagraphError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete term: starts at {v} ms");
         }
+        self.writer.delete_term(uuid_term);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete term: ends at {v} ms");
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+        Ok(())
     }
 
     fn garbage_collection(&mut self) {}
@@ -115,19 +140,12 @@ impl WriterChild for ParagraphWriterService {
 
 impl ParagraphWriterService {
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        info!("Starting Paragraph Service");
         match ParagraphWriterService::open(config) {
             Ok(service) => Ok(service),
-            Err(e) => {
-                warn!("Paragraph Service Open failed {}. Creating a new one.", e);
-                match ParagraphWriterService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("ParagraphConfigice: {}", e);
-                        Err(Box::new(ParagraphError { msg: e.to_string() }))
-                    }
-                }
-            }
+            Err(_) => match ParagraphWriterService::new(config) {
+                Ok(service) => Ok(service),
+                Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
+            },
         }
     }
 

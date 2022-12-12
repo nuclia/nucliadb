@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::time::SystemTime;
 
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId, VectorSetId};
@@ -48,34 +49,42 @@ impl Debug for VectorWriterService {
 impl VectorWriter for VectorWriterService {
     #[tracing::instrument(skip_all)]
     fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let mut collector = Vec::new();
         let indexset_slock = self.indexset.get_slock()?;
         self.indexset.index_keys(&mut collector, &indexset_slock);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(collector)
     }
     #[tracing::instrument(skip_all)]
     fn add_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()> {
-        info!(
-            "Adding vector index {} to {:?}",
-            setid.vectorset, setid.shard
-        );
+        let id = setid.shard.as_ref().map(|s| &s.id);
+        let time = SystemTime::now();
+        let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
         let indexset_elock = self.indexset.get_elock()?;
-        self.indexset
-            .get_or_create::<&str>(indexid, &indexset_elock)?;
+        self.indexset.get_or_create(indexid, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?}/{set} - Ending at {v} ms");
+        }
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> InternalResult<()> {
-        info!(
-            "Removing vector index {} from {:?}",
-            setid.vectorset, setid.shard
-        );
+        let id = setid.shard.as_ref().map(|s| &s.id);
+        let time = SystemTime::now();
+        let set = &setid.vectorset;
         let indexid = &setid.vectorset;
         let indexset_elock = self.indexset.get_elock()?;
         self.indexset.remove_index(indexid, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?}/{set} - Ending at {v} ms");
+        }
         Ok(())
     }
 }
@@ -87,23 +96,37 @@ impl WriterChild for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let lock = self.index.get_slock().unwrap();
-        self.index.no_nodes(&lock)
+        let no_nodes = self.index.no_nodes(&lock);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
+        no_nodes
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
-        info!("Delete resource in vector starts");
+        let id = Some(&resource_id.shard_id);
+        let time = SystemTime::now();
         let lock = self.index.get_elock()?;
         self.index.delete(&resource_id.uuid, &lock);
         self.index.commit(lock)?;
-        info!("Delete resource in vector ends");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         use data_point::{DataPoint, Elem, LabelDictionary};
-        info!("Updating main index");
-        info!("creating datapoints");
+        let id = resource.resource.as_ref().map(|i| &i.shard_id);
+        let time = SystemTime::now();
+
+        info!("{id:?} - Updating main index");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating elements for the main index: starts {v} ms");
+        }
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
@@ -119,26 +142,50 @@ impl WriterChild for VectorWriterService {
                 }
             }
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating elements for the main index: ends {v} ms");
+        }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Datapoint creation: starts {v} ms");
+        }
         let new_dp = DataPoint::new(self.index.get_location(), elems)?;
         let no_nodes = new_dp.meta().no_nodes();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Datapoint creation: ends {v} ms");
+        }
 
-        info!("New data point with {} elements", no_nodes);
         let lock = self.index.get_elock()?;
-        info!("Processing sentences to delete");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing Sentences to delete: starts {v} ms");
+        }
         for to_delete in &resource.sentences_to_delete {
             self.index.delete(to_delete, &lock)
         }
-        info!("Indexing datapoints");
-        if no_nodes > 0 {
-            self.index.add(new_dp, &lock);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing Sentences to delete: ends {v} ms");
         }
-        self.index.commit(lock)?;
 
-        info!("Updating vectorset indexes");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Indexing datapoint: starts {v} ms");
+        }
+        if no_nodes == 0 {
+            info!("{id:?} - The datapoint is empty, no need to add it");
+            self.index.commit(lock)?;
+        } else {
+            info!("{id:?} - The datapoint is not empty, adding it");
+            self.index.add(new_dp, &lock);
+            self.index.commit(lock)?;
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Indexing datapoint: ends {v} ms");
+        }
+
         // Updating existing indexes
         // Perform delete operations over the vector set
-        info!("Processing delete requests for indexes in the set");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete requests for indexes in the set: starts {v} ms");
+        }
         let indexset_slock = self.indexset.get_slock()?;
         let index_iter = resource.vectors_to_delete.iter().flat_map(|(k, v)| {
             self.indexset
@@ -155,11 +202,15 @@ impl WriterChild for VectorWriterService {
             index.commit(index_lock)?;
         }
         std::mem::drop(indexset_slock);
-        info!("Delete requests for indexes in the set processed");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete requests for indexes in the set: ends {v} ms");
+        }
 
         // Perform add operations over the vector set
         // New indexes may be created.
-        info!("Creating and geting indexes in the set");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating and geting indexes in the set: starts {v} ms");
+        }
         let indexset_elock = self.indexset.get_elock()?;
         let indexes = resource
             .vectors
@@ -183,7 +234,12 @@ impl WriterChild for VectorWriterService {
             index.add(new_dp, &lock);
             index.commit(lock)?;
         }
-        info!("Create and update operations where applied to the indexes in the set");
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating and geting indexes in the set: ends {v} ms");
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms");
+        }
         Ok(())
     }
     #[tracing::instrument(skip_all)]
