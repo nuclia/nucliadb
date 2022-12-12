@@ -47,9 +47,9 @@ async def test_list_sentences_shows_ners_with_positions(
     req = GetSentencesRequest()
     req.kb.uuid = knowledgebox
     req.metadata.entities = True
-    found = 0
     async for sentence in train_client.GetSentences(req):  # type: ignore
-        if sentence.metadata.entities:
+        if "Barcelona" in sentence.metadata.text:
+            # Entity in text with positions
             assert sentence.metadata.entities == {"Barcelona": "CITY"}
             assert (
                 sentence.metadata.entity_positions["CITY/Barcelona"].entity
@@ -57,11 +57,17 @@ async def test_list_sentences_shows_ners_with_positions(
             )
             assert (
                 sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].start
-                == 0
+                == 43
             )
             assert (
                 sentence.metadata.entity_positions["CITY/Barcelona"].positions[0].end
-                == 10
+                == 52
             )
-            found += 1
-    assert found > 0
+        elif "Manresa" in sentence.metadata.text:
+            # Entity found in text but without positions
+            assert sentence.metadata.entities == {"Manresa": "CITY"}
+            assert "CITY/Manresa" not in sentence.metadata.entity_positions
+        else:
+            # Other sentences should not have entities nor positions
+            assert sentence.metadata.entities == {}
+            assert sentence.metadata.entity_positions == {}

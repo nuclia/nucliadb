@@ -802,6 +802,8 @@ class Resource:
                         if extracted_text is not None and text is not None:
                             metadata.text = text[sentence.start : sentence.end]
 
+                        metadata.ClearField("entities")
+                        metadata.ClearField("entity_positions")
                         if enabled_metadata.entities and text is not None:
                             local_text = text[sentence.start : sentence.end]
                             for entity_key, entity_value in entities.items():
@@ -809,14 +811,16 @@ class Resource:
                                     continue
                                 # Add the entity only if found in text
                                 metadata.entities[entity_key] = entity_value
+
                                 # Add positions for the entity
                                 poskey = f"{entity_value}/{entity_key}"
-                                metadata.entity_positions[poskey].entity = entity_key
                                 position_metadata = field_metadata.positions.get(
                                     poskey, None
                                 )
                                 if position_metadata is None:
                                     continue
+
+                                metadata.entity_positions[poskey].entity = entity_key
                                 for p in position_metadata.position:
                                     metadata.entity_positions[poskey].positions.append(
                                         TrainPosition(start=p.start, end=p.end)
