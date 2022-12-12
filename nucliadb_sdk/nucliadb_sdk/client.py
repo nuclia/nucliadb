@@ -24,6 +24,7 @@ CREATE_VECTORSET = "{kburl}/vectorset/{vectorset}"
 VECTORSETS = "{kburl}/vectorsets"
 COUNTER = "{kburl}/counters"
 SEARCH_URL = "{kburl}/search"
+DOWNLOAD_URL = "{kburl}/{uri}"
 
 
 class HTTPError(Exception):
@@ -65,12 +66,18 @@ class NucliaDBClient:
 
     def get_resource(self, id: str):
         url = RESOURCE_PATH.format(kburl=self.url, rid=id)
-        response = self.reader_session.get(url + "?show=values")
+        response = self.reader_session.get(
+            url
+            + "?show=values&show=relations&show=origin&show=basic&extracted=vectors&extracted=text&extracted=metadata&extracted=link&extracted=file"
+        )
         if response.status_code == 200:
             return Resource.parse_raw(response.content)
         elif response.status_code == 404:
             url = RESOURCE_PATH_BY_SLUG.format(kburl=self.url, slug=id)
-            response = self.reader_session.get(url + "?show=values")
+            response = self.reader_session.get(
+                url
+                + "?show=values&show=relations&show=origin&show=basic&extracted=vectors&extracted=text&extracted=metadata&extracted=link&extracted=file"
+            )
             if response.status_code == 200:
                 return Resource.parse_raw(response.content)
             else:
@@ -80,12 +87,18 @@ class NucliaDBClient:
 
     async def async_get_resource(self, id: str):
         url = RESOURCE_PATH.format(kburl=self.url, rid=id)
-        response = await self.async_reader_session.get(url + "?show=values")
+        response = await self.async_reader_session.get(
+            url
+            + "?show=values&show=relations&show=origin&show=basic&extracted=vectors&extracted=text&extracted=metadata&extracted=link&extracted=file"
+        )
         if response.status_code == 200:
             return Resource.parse_raw(response.content)
         elif response.status_code == 404:
             url = RESOURCE_PATH_BY_SLUG.format(kburl=self.url, slug=id)
-            response = await self.async_reader_session.get(url + "?show=values")
+            response = await self.async_reader_session.get(
+                url
+                + "?show=values&show=relations&show=origin&show=basic&extracted=vectors&extracted=text&extracted=metadata&extracted=link&extracted=file"
+            )
             if response.status_code == 200:
                 return Resource.parse_raw(response.content)
             else:
@@ -264,5 +277,22 @@ class NucliaDBClient:
         )
         if response.status_code == 200:
             return KnowledgeboxSearchResults.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def download(self, uri: str) -> bytes:
+        # uri has format
+        # /kb/2a00d5b4-cfcc-48eb-85ac-d70bfd38b26d/resource/41d02aac4ade48098b23e38141807738/file/file/download/field
+        # we need to remove the kb url
+
+        uri_parts = uri.split("/")
+        if len(uri_parts) < 9:
+            raise AttributeError("Not a valid download uri")
+
+        new_uri = "/".join(uri_parts[3:])
+        url = DOWNLOAD_URL.format(kburl=self.url, uri=new_uri)
+        response: httpx.Response = self.reader_session.get(url)
+        if response.status_code == 200:
+            return response.content
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")

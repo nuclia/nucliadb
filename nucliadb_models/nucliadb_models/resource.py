@@ -49,6 +49,7 @@ from nucliadb_models.metadata import (
 )
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
+from nucliadb_models.vectors import UserVectorSet
 
 
 class NucliaDBRoles(str, Enum):
@@ -70,6 +71,7 @@ class ExtractedDataTypeName(str, Enum):
     VECTOR = "vectors"
     LINK = "link"
     FILE = "file"
+    USERVECTOR = "uservectors"
 
 
 class KnowledgeBoxConfig(BaseModel):
@@ -119,6 +121,7 @@ class ExtractedData(BaseModel):
     metadata: Optional[FieldComputedMetadata]
     large_metadata: Optional[LargeComputedMetadata]
     vectors: Optional[VectorObject]
+    uservectors: Optional[UserVectorSet]
 
 
 class TextFieldExtractedData(ExtractedData):
