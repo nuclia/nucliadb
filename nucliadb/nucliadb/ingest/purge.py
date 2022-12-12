@@ -33,7 +33,6 @@ from nucliadb.ingest.orm.knowledgebox import (
 )
 from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY, set_sentry
-from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import get_storage
 
