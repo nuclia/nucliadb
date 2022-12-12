@@ -33,7 +33,6 @@ from nucliadb.ingest.orm.knowledgebox import (
 )
 from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY, set_sentry
-from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.settings import running_settings
 from nucliadb_utils.utilities import get_storage
 
@@ -60,7 +59,7 @@ async def main():
         try:
             await KnowledgeBox.purge(driver, kbid)
             logger.info(f"  √ Successfully Purged {kbid}")
-        except (ShardsNotFound, ShardNotFound) as exc:
+        except ShardNotFound as exc:
             capture_exception(exc)
             logger.info(
                 f"  X At least one shard was unavailable while purging {kbid}, skipping"
