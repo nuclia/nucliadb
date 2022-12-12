@@ -1061,5 +1061,14 @@ async def create_resource(storage, driver, cache, knowledgebox):
     d2.value.FromDatetime(datetime.now())
     await test_resource.set_field(rpb.FieldType.DATETIME, "datetime1", d2)
 
+    # 3 USER VECTORS
+
+    field_obj = await test_resource.get_field("datetime1", type=rpb.FieldType.DATETIME)
+    user_vectors = rpb.UserVectorsWrapper()
+    user_vectors.vectors.vectors["vectorset1"].vectors["vector1"].vector.extend(
+        (0.1, 0.2, 0.3)
+    )
+    await field_obj.set_user_vectors(user_vectors)
+
     await txn.commit(resource=False)
     return test_resource

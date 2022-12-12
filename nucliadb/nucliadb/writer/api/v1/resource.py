@@ -228,6 +228,8 @@ async def modify_resource(
 
     parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
+    if item.origin is not None:
+        parse_origin(writer.origin, item.origin)
 
     await parse_fields(
         writer=writer,

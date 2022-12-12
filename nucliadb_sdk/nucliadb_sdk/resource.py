@@ -1,10 +1,11 @@
 import base64
-from typing import Optional
+from typing import Callable, Optional, Union
 from uuid import uuid4
 
 from nucliadb_models.common import Classification, FieldID
 from nucliadb_models.common import File as NDBModelsFile
 from nucliadb_models.file import FileField
+from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import Origin, TokenSplit, UserFieldMetadata, UserMetadata
 from nucliadb_models.resource import Resource
 from nucliadb_models.text import TextField
@@ -33,6 +34,8 @@ def create_resource(
         create_payload.slug = SlugString(key)
     if icon is not None:
         create_payload.icon = icon
+    else:
+        create_payload.icon = "application/generic"
     main_field = None
     if text is not None:
         create_payload.texts[FieldIdString("text")] = TextField(body=text)
@@ -206,3 +209,76 @@ def update_resource(
         upload_payload.uservectors = uvsw
 
     return upload_payload
+
+
+def from_resource_to_payload(
+    item: Resource,
+    download: Callable[[str], bytes],
+    update: bool = False,
+):
+    if update:
+        payload: Union[
+            UpdateResourcePayload, CreateResourcePayload
+        ] = UpdateResourcePayload()
+        payload.slug = item.slug
+    else:
+        payload = CreateResourcePayload()
+        payload.slug = item.id
+
+    payload.title = item.title
+    payload.summary = item.summary
+    if item.icon is not None:
+        payload.icon = item.icon
+    payload.thumbnail = item.thumbnail
+    payload.layout = item.layout
+
+    payload.usermetadata = item.usermetadata
+    payload.fieldmetadata = item.fieldmetadata
+
+    payload.origin = item.origin
+
+    if item.data.texts is not None:
+        for field, field_payload in item.data.texts.items():
+            payload.texts[field] = TextField(
+                body=field_payload.value.body, format=field_payload.value.format
+            )
+
+    if item.data.links is not None:
+        for field, field_payload in item.data.links.items():
+            payload.links[field] = LinkField(
+                uri=field_payload.value.uri,
+                headers=field_payload.value.headers,
+                cookies=field_payload.value.cookies,
+                language=field_payload.value.language,
+                localstorage=field_payload.value.localstorage,
+            )
+
+    for field, field_payload in item.data.files.items():
+        data = download(uri=field_payload.value.file.uri)
+        payload.files[field] = FileField(
+            language=field_payload.value.language,
+            password=field_payload.value.password,
+            file=NDBModelsFile(
+                payload=base64.b64encode(data),
+                filename=field_payload.value.file.filename,
+                content_type=field_payload.value.file.content_type,
+            ),
+        )
+
+    if item.data.layouts is not None:
+        for field, field_payload in item.data.layouts.items():
+            raise NotImplementedError()
+
+    if item.data.conversations is not None:
+        for field, field_payload in item.data.conversations.items():
+            raise NotImplementedError()
+
+    if item.data.keywordsets is not None:
+        for field, field_payload in item.data.keywordsets.items():
+            raise NotImplementedError()
+
+    if item.data.datetimes is not None:
+        for field, field_payload in item.data.datetimes.items():
+            raise NotImplementedError()
+
+    return payload

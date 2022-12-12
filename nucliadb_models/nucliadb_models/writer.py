@@ -85,6 +85,7 @@ class UpdateResourcePayload(BaseModel):
     usermetadata: Optional[UserMetadata] = None
     uservectors: Optional[UserVectorsWrapper] = None
     fieldmetadata: Optional[List[UserFieldMetadata]] = None
+    origin: Optional[Origin] = None
 
     files: Dict[FieldIdString, FileField] = {}
     links: Dict[FieldIdString, LinkField] = {}
