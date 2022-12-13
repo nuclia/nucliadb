@@ -484,7 +484,7 @@ class Processor:
                 await resource.set_basic(
                     message.basic,
                     slug=message.slug,
-                    deleted_fields=message.delete_fields,
+                    deleted_fields=[field for field in message.delete_fields],
                 )
         elif resource is None and message.source is message.MessageSource.PROCESSOR:
             # It's a new resource, and somehow we received the message coming from processing before

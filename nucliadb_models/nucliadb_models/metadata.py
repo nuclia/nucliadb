@@ -188,6 +188,11 @@ class FieldClassification(BaseModel):
 
 
 class ComputedMetadata(BaseModel):
+    """
+    The purpose of this field is to show a cherry-picked set of fields from computed metadata
+    without having to load the whole computed metadata field.
+    """
+
     field_classifications: List[FieldClassification] = []
 
     @classmethod
@@ -196,8 +201,14 @@ class ComputedMetadata(BaseModel):
         for fc in message.field_classifications:
             values["field_classifications"].append(
                 FieldClassification(
-                    field=FieldID(field=fc.field.field, field_type=FIELD_TYPES_MAP[fc.field.field_type]),
-                    classifications=[Classification(label=c.label, labelset=c.labelset) for c in fc.classifications]
+                    field=FieldID(
+                        field=fc.field.field,
+                        field_type=FIELD_TYPES_MAP[fc.field.field_type],
+                    ),
+                    classifications=[
+                        Classification(label=c.label, labelset=c.labelset)
+                        for c in fc.classifications
+                    ],
                 )
             )
         return cls(**values)
@@ -233,6 +244,10 @@ class ParagraphAnnotation(BaseModel):
 
 
 class UserFieldMetadata(BaseModel):
+    """
+    Field-level metadata set by the user via the rest api
+    """
+
     token: List[TokenSplit] = []
     paragraphs: List[ParagraphAnnotation] = []
     field: FieldID

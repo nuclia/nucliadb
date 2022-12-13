@@ -168,8 +168,11 @@ class Resource:
         self,
         payload: PBBasic,
         slug: Optional[str] = None,
-        deleted_fields: Optional[List[str]] = None,
+        deleted_fields: Optional[List[FieldID]] = None,
     ):
+        """
+        deleted_fields arg is needed to clean classification labels of removed fields from computedmetadata
+        """
         await self.get_basic()
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
@@ -203,7 +206,7 @@ class Resource:
         if slug is not None and slug != "":
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
-        if deleted_fields is not None:
+        if deleted_fields is not None and len(deleted_fields) > 0:
             remove_field_classifications(self.basic, deleted_fields=deleted_fields)
         await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
         self.modified = True
