@@ -9,7 +9,6 @@ use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{self, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::watch::Receiver;
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
