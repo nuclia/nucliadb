@@ -237,18 +237,20 @@ async def merge_vectors_results(
             index_int = int(index)
         except ValueError:
             index_int = -1
-        text = await get_text_sentence(
-            rid, field_type, field, kbid, index_int, start_int, end_int, subfield
-        )
-        labels = await get_labels_sentence(
-            rid,
-            field_type,
-            field,
-            kbid,
-            index_int,
-            start_int,
-            end_int,
-            subfield,
+        text, labels = await asyncio.gather(
+            get_text_sentence(
+                rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+            ),
+            get_labels_sentence(
+                rid,
+                field_type,
+                field,
+                kbid,
+                index_int,
+                start_int,
+                end_int,
+                subfield,
+            ),
         )
         sentence = Sentence(
             score=result.score,
