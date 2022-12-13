@@ -168,6 +168,9 @@ class Resource:
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
 
+            if payload.HasField("metadata") and payload.metadata.useful:
+                self.basic.metadata.status = payload.metadata.status
+
             # We force the usermetadata classification to be the one defined
             if payload.HasField("usermetadata"):
                 self.basic.usermetadata.CopyFrom(payload.usermetadata)
