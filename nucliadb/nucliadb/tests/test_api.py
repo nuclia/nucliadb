@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.resources_pb2 import (
@@ -29,6 +31,9 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+
+from nucliadb.tests.utils import broker_resource, inject_message
+from nucliadb_protos import resources_pb2 as rpb
 
 
 @pytest.mark.asyncio
@@ -144,3 +149,37 @@ async def test_can_create_knowledgebox_with_colon_in_slug(
     resp = await nucliadb_manager.get(f"/kbs")
     assert resp.status_code == 200
     assert resp.json()["kbs"][0]["slug"] == "something:else"
+
+
+@pytest.mark.asyncio
+async def test_reprocess_should_set_status_to_pending(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    """
+    - Create a resource with a status PROCESSED
+    - Send it to reprocess
+    - Check that the status is set to PENDING
+    """
+    br = broker_resource(knowledgebox)
+    br.basic.metadata.status = rpb.Metadata.Status.PROCESSED
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resource/{br.uuid}/reprocess"
+    )
+    assert resp.status_code == 202
+
+    await asyncio.sleep(1)
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{br.uuid}")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PENDING"
