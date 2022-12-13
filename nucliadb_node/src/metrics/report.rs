@@ -74,7 +74,7 @@ impl Report for NodeReport {
 }
 
 impl Score for NodeReport {
-    fn compute_score(&self) -> f32 {
+    fn score(&self) -> f32 {
         self.shard_count
             .get()
             .saturating_mul(self.paragraph_count.get()) as f32

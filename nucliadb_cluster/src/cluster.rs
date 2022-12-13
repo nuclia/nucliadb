@@ -22,7 +22,7 @@ const NODE_TYPE_KEY: &str = "node_type";
 const LOAD_SCORE_KEY: &str = "load_score";
 
 pub trait Score {
-    fn compute_score(&self) -> f32;
+    fn score(&self) -> f32;
 }
 
 /// The ID that makes the cluster unique.
@@ -245,7 +245,7 @@ impl Cluster {
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
 
-                state.set(LOAD_SCORE_KEY, scorer.compute_score());
+                state.set(LOAD_SCORE_KEY, scorer.score());
             })
             .await;
     }
