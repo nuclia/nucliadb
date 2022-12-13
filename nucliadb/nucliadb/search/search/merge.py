@@ -19,7 +19,7 @@
 #
 import asyncio
 import math
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -216,9 +216,7 @@ async def merge_vectors_results(
     end_element = skip + count
     length = len(raw_vectors_list)
 
-    result_sentence_list: List[Sentence] = []
-    for result in raw_vectors_list[min(skip, length) : min(end_element, length)]:
-
+    async def get_sentence(result: DocumentScored) -> Tuple[str, Sentence]:
         id_count = result.doc_id.id.count("/")
         if id_count == 4:
             rid, field_type, field, index, position = result.doc_id.id.split("/")
@@ -252,19 +250,28 @@ async def merge_vectors_results(
             end_int,
             subfield,
         )
-        result_sentence_list.append(
-            Sentence(
-                score=result.score,
-                rid=rid,
-                field_type=field_type,
-                field=field,
-                text=text,
-                labels=labels,
-                index=index,
-            )
+        sentence = Sentence(
+            score=result.score,
+            rid=rid,
+            field_type=field_type,
+            field=field,
+            text=text,
+            labels=labels,
+            index=index,
         )
-        if rid not in resources:
-            resources.append(rid)
+        return (rid, sentence)
+
+    result_sentence_list: List[Sentence] = []
+    ops = [
+        get_sentence(result)
+        for result in raw_vectors_list[min(skip, length) : min(end_element, length)]
+    ]
+    if ops:
+        result = await asyncio.gather(*ops)
+        for rid, sentence in result:
+            result_sentence_list.append(sentence)
+            if rid not in resources:
+                resources.append(rid)
 
     return Sentences(
         results=result_sentence_list, facets=facets, page_number=page, page_size=count
