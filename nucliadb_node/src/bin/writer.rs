@@ -85,8 +85,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Error starting gRPC writer");
     });
 
+    let mut watcher = WatchStream::new(chitchat_cluster.members_change_watcher());
     let monitor_task = tokio::spawn(async move {
-        let mut watcher = WatchStream::new(chitchat_cluster.members_change_watcher());
         loop {
             debug!("node writer wait updates");
             if let Some(update) = watcher.next().await {
@@ -134,6 +134,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 });
                 report.shard_count.set(shard_count);
                 report.paragraph_count.set(paragraph_count as i64);
+
+                chitchat_cluster.update_load_score(&report).await;
 
                 if let Err(e) = metrics_publisher.publish(&report).await {
                     error!("Cannot publish Node metrics: {}", e);

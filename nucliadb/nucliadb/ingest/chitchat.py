@@ -101,6 +101,7 @@ class ChitchatNucliaDB:
                                 listen_addr=x["listen_addr"],
                                 node_type=x["node_type"],
                                 is_self=x["is_self"],
+                                load_score=x["load_score"],
                                 online=True,
                             ),
                             json.loads(mgr_message.decode("utf8").replace("'", '"')),

@@ -18,6 +18,13 @@ use uuid::Uuid;
 
 use crate::error::Error;
 
+const NODE_TYPE_KEY: &str = "node_type";
+const LOAD_SCORE_KEY: &str = "load_score";
+
+pub trait Score {
+    fn score(&self) -> f32;
+}
+
 /// The ID that makes the cluster unique.
 const CLUSTER_ID: &str = "nucliadb-cluster";
 
@@ -65,7 +72,7 @@ pub enum NodeType {
 }
 
 /// A member information.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Member {
     /// An ID that makes a member unique.
     pub node_id: String,
@@ -78,32 +85,34 @@ pub struct Member {
 
     /// If true, it means self.
     pub is_self: bool,
-}
 
-impl From<&Cluster> for Member {
-    fn from(cluster: &Cluster) -> Self {
-        Member {
-            node_id: cluster.id.id.clone(),
-            listen_addr: cluster.listen_addr,
-            node_type: cluster.node_type,
-            is_self: true,
-        }
-    }
+    /// the load score of the node
+    pub load_score: f32,
 }
 
 impl Member {
     pub fn build(node_id: &NodeId, chitchat: &Chitchat) -> Result<Self, Error> {
         chitchat
             .node_state(node_id)
-            .and_then(|state| state.get("node_type"))
-            .ok_or_else(|| Error::MissingNodeState(node_id.id.clone()))
-            .and_then(|node_type| {
-                node_type
-                    .parse()
-                    .map_err(|_| Error::UnknownNodeType(node_type.to_string()))
+            .and_then(|state| {
+                state
+                    .get(NODE_TYPE_KEY)
+                    .map(|node_type| (node_type, state.get(LOAD_SCORE_KEY).unwrap_or("0")))
             })
-            .map(|node_type| Member {
+            .ok_or_else(|| Error::MissingNodeState(node_id.id.clone()))
+            .and_then(|(node_type, load_score)| {
+                Ok((
+                    node_type
+                        .parse()
+                        .map_err(|_| Error::UnknownNodeType(node_type.to_string()))?,
+                    load_score
+                        .parse()
+                        .map_err(|_| Error::InvalidLoadScore(load_score.to_string()))?,
+                ))
+            })
+            .map(|(node_type, load_score)| Member {
                 node_type,
+                load_score,
                 node_id: node_id.id.clone(),
                 is_self: node_id.eq(chitchat.self_node_id()),
                 listen_addr: node_id.gossip_public_address,
@@ -166,7 +175,9 @@ impl Cluster {
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
 
-                state.set("node_type", node_type);
+                state.set(NODE_TYPE_KEY, node_type);
+                state.set(LOAD_SCORE_KEY, 0f32);
+
                 (
                     chitchat.self_node_id().clone(),
                     chitchat.live_nodes_watcher(),
@@ -229,6 +240,16 @@ impl Cluster {
         Ok(cluster)
     }
 
+    pub async fn update_load_score<T: Score>(&self, scorer: &T) {
+        self.chitchat_handle
+            .with_chitchat(|chitchat| {
+                let state = chitchat.self_node_state();
+
+                state.set(LOAD_SCORE_KEY, scorer.score());
+            })
+            .await;
+    }
+
     /// Return watchstream for monitoring change of `members`
     pub fn members_change_watcher(&self) -> watch::Receiver<Vec<Member>> {
         self.members.clone()
@@ -247,17 +268,18 @@ impl Cluster {
 
     /// Return `members` list
     pub async fn members(&self) -> Vec<Member> {
-        let mut nodes: Vec<Member> = self
+        let nodes: Vec<Member> = self
             .chitchat_handle
             .with_chitchat(|chitchat| {
                 chitchat.update_nodes_liveliness();
                 chitchat
                     .live_nodes()
+                    .chain([&self.id]) // NOTE: I think we can remove this line
                     .map(|node_id| Member::build(node_id, chitchat).unwrap())
                     .collect()
             })
             .await;
-        nodes.push(Member::from(self));
+
         nodes
     }
 }

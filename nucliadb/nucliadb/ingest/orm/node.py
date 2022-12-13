@@ -135,6 +135,7 @@ class ClusterMember:
     node_type: str
     online: bool
     is_self: bool
+    load_score: float
 
 
 class Node(AbstractNode):
