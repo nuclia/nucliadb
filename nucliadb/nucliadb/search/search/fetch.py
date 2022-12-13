@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import re
 import string
 from contextvars import ContextVar
@@ -75,8 +76,7 @@ async def fetch_resources(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
 ) -> Dict[str, Resource]:
-    result = {}
-    for resource in resources:
+    async def serialize_resource(resource: str) -> Optional[Tuple[str, Resource]]:
         serialization = await serialize(
             kbid,
             resource,
@@ -86,7 +86,14 @@ async def fetch_resources(
             service_name=SERVICE_NAME,
         )
         if serialization is not None:
-            result[resource] = serialization
+            return (resource, serialization)
+        return None
+
+    result: Dict[str, Resource] = {}
+    ops = [serialize_resource(resource) for resource in resources]
+    if ops:
+        serializations = await asyncio.gather(*ops)
+        result = dict(serializations)
     return result
 
 
