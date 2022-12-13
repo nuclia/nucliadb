@@ -327,6 +327,7 @@ async def reprocess_resource(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
+    writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
     set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=False)
