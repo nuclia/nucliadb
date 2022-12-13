@@ -319,8 +319,10 @@ async def merge_paragraph_results(
 
     async def get_paragraph(result: ParagraphResult) -> Tuple[str, Paragraph]:
         _, field_type, field = result.field.split("/")
-        text = await get_text_paragraph(result, kbid, highlight, ematches)
-        labels = await get_labels_paragraph(result, kbid)
+        text, labels = await asyncio.gather(
+            get_text_paragraph(result, kbid, highlight, ematches),
+            get_labels_paragraph(result, kbid),
+        )
         new_paragraph = Paragraph(
             score=result.score.bm25,
             rid=result.uuid,
