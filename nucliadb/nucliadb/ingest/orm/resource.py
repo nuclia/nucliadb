@@ -26,6 +26,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
+    FieldClassifications,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldMetadata,
@@ -163,7 +164,15 @@ class Resource:
             self.basic = self.parse_basic(payload) if payload is not None else PBBasic()
         return self.basic
 
-    async def set_basic(self, payload: PBBasic, slug: Optional[str] = None):
+    async def set_basic(
+        self,
+        payload: PBBasic,
+        slug: Optional[str] = None,
+        deleted_fields: Optional[List[FieldID]] = None,
+    ):
+        """
+        deleted_fields arg is needed to clean classification labels of removed fields from computedmetadata
+        """
         await self.get_basic()
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
@@ -197,6 +206,8 @@ class Resource:
         if slug is not None and slug != "":
             slug = await self.kb.get_unique_slug(self.uuid, slug)
             self.basic.slug = slug
+        if deleted_fields is not None and len(deleted_fields) > 0:
+            remove_field_classifications(self.basic, deleted_fields=deleted_fields)
         await set_basic(self.txn, self.kb.kbid, self.uuid, self.basic)
         self.modified = True
 
@@ -590,6 +601,9 @@ class Resource:
                 self.basic.thumbnail = CloudLink.format_reader_download_uri(
                     field_metadata.metadata.metadata.thumbnail.uri
                 )
+                basic_modified = True
+
+            if add_field_classifications(self.basic, field_metadata):
                 basic_modified = True
 
         # Upload to binary storage
@@ -1035,3 +1049,32 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
     for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
         positions[index] = (position.start, position.end)
     return positions
+
+
+def remove_field_classifications(basic: PBBasic, deleted_fields: List[FieldID]):
+    """
+    Clean classifications of fields that have been deleted
+    """
+    field_classifications = [
+        fc
+        for fc in basic.computedmetadata.field_classifications
+        if fc.field not in deleted_fields
+    ]
+    basic.computedmetadata.ClearField("field_classifications")
+    basic.computedmetadata.field_classifications.extend(field_classifications)
+
+
+def add_field_classifications(
+    basic: PBBasic, fcmw: FieldComputedMetadataWrapper
+) -> bool:
+    """
+    Returns whether some new field classifications were added
+    """
+    if len(fcmw.metadata.metadata.classifications) == 0:
+        return False
+    remove_field_classifications(basic, [fcmw.field])
+    fcfs = FieldClassifications()
+    fcfs.field.CopyFrom(fcmw.field)
+    fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
+    basic.computedmetadata.field_classifications.append(fcfs)
+    return True

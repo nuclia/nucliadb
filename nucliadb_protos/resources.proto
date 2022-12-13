@@ -52,6 +52,7 @@ message Basic {
     // Not Basic
     UserMetadata usermetadata = 10;
     repeated UserFieldMetadata fieldmetadata = 11;
+    ComputedMetadata computedmetadata = 15;
 
     // Only for read operations
     string uuid = 12;
@@ -322,6 +323,15 @@ message Classification {
 message UserMetadata {
     repeated Classification classifications = 1;
     repeated utils.Relation relations = 3;
+}
+
+message FieldClassifications {
+    FieldID field = 1;
+    repeated Classification classifications = 2;
+}
+
+message ComputedMetadata {
+    repeated FieldClassifications field_classifications = 1;
 }
 
 message TokenSplit {

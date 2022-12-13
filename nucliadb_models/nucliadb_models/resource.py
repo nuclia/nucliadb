@@ -40,6 +40,7 @@ from nucliadb_models.keywordset import FieldKeywordset
 from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
+    ComputedMetadata,
     Metadata,
     Origin,
     Relation,
@@ -234,6 +235,7 @@ class Resource(BaseModel):
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
+    computedmetadata: Optional[ComputedMetadata]
     created: Optional[datetime]
     modified: Optional[datetime]
     last_seqid: Optional[int]

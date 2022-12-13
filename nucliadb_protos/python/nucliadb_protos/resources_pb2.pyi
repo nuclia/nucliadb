@@ -163,6 +163,7 @@ class Basic(google.protobuf.message.Message):
     METADATA_FIELD_NUMBER: builtins.int
     USERMETADATA_FIELD_NUMBER: builtins.int
     FIELDMETADATA_FIELD_NUMBER: builtins.int
+    COMPUTEDMETADATA_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
     LAST_SEQID_FIELD_NUMBER: builtins.int
@@ -186,6 +187,8 @@ class Basic(google.protobuf.message.Message):
         """Not Basic"""
     @property
     def fieldmetadata(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UserFieldMetadata]: ...
+    @property
+    def computedmetadata(self) -> global___ComputedMetadata: ...
     uuid: builtins.str
     """Only for read operations"""
     @property
@@ -209,14 +212,15 @@ class Basic(google.protobuf.message.Message):
         metadata: global___Metadata | None = ...,
         usermetadata: global___UserMetadata | None = ...,
         fieldmetadata: collections.abc.Iterable[global___UserFieldMetadata] | None = ...,
+        computedmetadata: global___ComputedMetadata | None = ...,
         uuid: builtins.str = ...,
         labels: collections.abc.Iterable[builtins.str] | None = ...,
         last_seqid: builtins.int = ...,
         last_account_seq: builtins.int = ...,
         queue: global___Basic.QueueType.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["created", b"created", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["created", b"created", "fieldmetadata", b"fieldmetadata", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["computedmetadata", b"computedmetadata", "created", b"created", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["computedmetadata", b"computedmetadata", "created", b"created", "fieldmetadata", b"fieldmetadata", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
 
 global___Basic = Basic
 
@@ -1302,6 +1306,41 @@ class UserMetadata(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "relations", b"relations"]) -> None: ...
 
 global___UserMetadata = UserMetadata
+
+class FieldClassifications(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FIELD_FIELD_NUMBER: builtins.int
+    CLASSIFICATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def field(self) -> global___FieldID: ...
+    @property
+    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def __init__(
+        self,
+        *,
+        field: global___FieldID | None = ...,
+        classifications: collections.abc.Iterable[global___Classification] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["field", b"field"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "field", b"field"]) -> None: ...
+
+global___FieldClassifications = FieldClassifications
+
+class ComputedMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FIELD_CLASSIFICATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def field_classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldClassifications]: ...
+    def __init__(
+        self,
+        *,
+        field_classifications: collections.abc.Iterable[global___FieldClassifications] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field_classifications", b"field_classifications"]) -> None: ...
+
+global___ComputedMetadata = ComputedMetadata
 
 class TokenSplit(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

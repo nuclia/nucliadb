@@ -36,6 +36,7 @@ BASIC = (
     "thumbnail",
     "metadata",
     "usermetadata",
+    "computedmetadata",
     "created",
     "modified",
     "fieldmetadata",
