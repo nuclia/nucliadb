@@ -33,7 +33,7 @@ chitchat:
     port: 31337
     host: "0.0.0.0"
     update_interval: "30s"
-    liveliness_update: "2s"
+    liveliness_update: "500ms"
   node:
     node_type: Search
     node0_svc_fixed_ip: 10.4.0.255
