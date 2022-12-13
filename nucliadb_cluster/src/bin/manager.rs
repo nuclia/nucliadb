@@ -38,7 +38,7 @@ struct Args {
         short,
         long,
         env = "LIVELINESS_UPDATE",
-        default_value = "2s",
+        default_value = "500ms",
         value_parser(parse_duration::parse)
     )]
     liveliness_update: Duration,
