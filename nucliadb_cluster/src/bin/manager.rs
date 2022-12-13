@@ -9,7 +9,6 @@ use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{self, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::watch::Receiver;
 use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
@@ -101,7 +100,7 @@ async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
 }
 
 async fn send_update(
-    watcher: &Receiver<Vec<Member>>,
+    members: Vec<Member>,
     stream: &mut TcpStream,
     args: &Args,
 ) -> anyhow::Result<()> {
@@ -111,8 +110,6 @@ async fn send_update(
         stream.shutdown().await?;
         *stream = get_stream(args.monitor_addr.clone()).await?;
     }
-
-    let members = &*watcher.borrow();
 
     if !members.is_empty() {
         let serial = serde_json::to_string(&members)
@@ -197,7 +194,9 @@ async fn main() -> anyhow::Result<()> {
             _ = sleep(arg.update_interval) => {
                 debug!("Fixed update");
 
-                if let Err(e) = send_update(&watcher, &mut writer, &arg).await {
+                let members = watcher.borrow().clone();
+
+                if let Err(e) = send_update(members, &mut writer, &arg).await {
                     error!("Send cluster members failed: {e}");
                 } else {
                     info!("Update sended")
@@ -210,8 +209,9 @@ async fn main() -> anyhow::Result<()> {
                     error!("members received with error: {e}");
                     continue
                 }
+                let members = watcher.borrow().clone();
 
-                if let Err(e) = send_update(&watcher, &mut writer, &arg).await {
+                if let Err(e) = send_update(members, &mut writer, &arg).await {
                     error!("Send cluster members failed: {e}");
                 } else {
                     info!("Update sended")
