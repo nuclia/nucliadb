@@ -1,6 +1,16 @@
 CHANGELOG
 =========
 
+0.0.40
+------
+
+- Update train sentence
+
+0.0.39
+------
+
+- Vectorsets
+
 0.0.38
 ------
 
