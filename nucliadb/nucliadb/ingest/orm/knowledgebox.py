@@ -145,7 +145,7 @@ class KnowledgeBox:
         if slug == "" and kbid != "":
             kbid_bytes = await txn.get(KB_UUID.format(kbid=kbid))
             if kbid_bytes is None:
-                raise KeyError()
+                raise KeyError(kbid)
             pbconfig = KnowledgeBoxConfig()
             pbconfig.ParseFromString(kbid_bytes)
             slug = pbconfig.slug

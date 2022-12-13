@@ -623,7 +623,11 @@ class Processor:
 
     async def delete_kb(self, kbid: str = "", slug: str = "") -> str:
         txn = await self.driver.begin()
-        uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
+        try:
+            uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
+        except (AttributeError, KeyError) as exc:
+            await txn.abort()
+            raise exc
         await txn.commit(resource=False)
         return uuid
 

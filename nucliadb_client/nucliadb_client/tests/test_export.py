@@ -79,4 +79,4 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     assert bm.basic.title == resources[0].get().title
 
     for resource in kb.iter_resources(page_size=1):
-        resource.get().title == bm.basic.title
+        assert resource.get().title == bm.basic.title
