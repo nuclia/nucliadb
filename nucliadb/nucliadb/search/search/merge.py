@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import math
 from typing import Any, Dict, List, Optional, Union
 
@@ -277,7 +278,7 @@ async def merge_paragraph_results(
     count: int,
     page: int,
     highlight: bool,
-):
+) -> Paragraphs:
 
     raw_paragraph_list: List[ParagraphResult] = []
     facets: Dict[str, Any] = {}
@@ -297,8 +298,7 @@ async def merge_paragraph_results(
                     facets[key][facetresult.tag] += facetresult.total
         if paragraph_response.next_page:
             next_page = True
-        for result in paragraph_response.results:
-            raw_paragraph_list.append(result)
+        raw_paragraph_list.extend(paragraph_response.results)
 
     if len(paragraph_responses) > 1:
         sort_results_by_score(raw_paragraph_list)
@@ -310,8 +310,7 @@ async def merge_paragraph_results(
     if length > end:
         next_page = True
 
-    result_paragraph_list: List[Paragraph] = []
-    for result in raw_paragraph_list[min(skip, length) : min(end, length)]:
+    async def get_paragraph(result: ParagraphResult) -> Tuple[str, Paragraph]:
         _, field_type, field = result.field.split("/")
         text = await get_text_paragraph(result, kbid, highlight, ematches)
         labels = await get_labels_paragraph(result, kbid)
@@ -341,9 +340,19 @@ async def merge_paragraph_results(
                 new_paragraph.start_seconds = seconds_positions[0]
                 new_paragraph.end_seconds = seconds_positions[1]
 
-        result_paragraph_list.append(new_paragraph)
-        if new_paragraph.rid not in resources:
-            resources.append(new_paragraph.rid)
+        return (new_paragraph.rid, new_paragraph)
+
+    result_paragraph_list: List[Paragraph] = []
+    ops = [
+        get_paragraph(result)
+        for result in raw_paragraph_list[min(skip, length) : min(end, length)]
+    ]
+    if ops:
+        result = await asyncio.gather(*ops)
+        for rid, new_paragraph in result:
+            result_paragraph_list.append(new_paragraph)
+            if new_paragraph.rid not in resources:
+                resources.append(new_paragraph.rid)
 
     total = len(result_paragraph_list)
 
