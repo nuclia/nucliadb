@@ -34,6 +34,14 @@ struct Args {
         value_parser(parse_duration::parse)
     )]
     update_interval: Duration,
+    #[arg(
+        short,
+        long,
+        env = "LIVELINESS_UPDATE",
+        default_value = "2s",
+        value_parser(parse_duration::parse)
+    )]
+    liveliness_update: Duration,
 }
 
 async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
@@ -165,9 +173,15 @@ async fn main() -> anyhow::Result<()> {
     let host = format!("{}:{}", &arg.pub_ip, &arg.listen_port);
     let addr = reliable_lookup_host(&host).await?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(node_id.to_string(), addr, arg.node_type, arg.seeds.clone())
-        .await
-        .with_context(|| "Can't create cluster instance")?;
+    let cluster = Cluster::new(
+        node_id.to_string(),
+        addr,
+        arg.node_type,
+        arg.seeds.clone(),
+        arg.liveliness_update,
+    )
+    .await
+    .with_context(|| "Can't create cluster instance")?;
 
     let mut watcher = cluster.members_change_watcher();
     let mut writer = get_stream(arg.monitor_addr.clone())

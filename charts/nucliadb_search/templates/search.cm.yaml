@@ -25,3 +25,4 @@ data:
   NODE_TYPE: {{ .Values.chitchat.node.node_type }}
   SEEDS: "{{ .Values.chitchat.node.node0_svc_fixed_ip }}:{{ .Values.chitchat.node.chitchat_port }}"
   UPDATE_INTERVAL: {{ .Values.chitchat.cluster_manager.update_interval }}
+  LIVELINESS_UPDATE: {{ .Values.chitchat.cluster_manager.liveliness_interval }}

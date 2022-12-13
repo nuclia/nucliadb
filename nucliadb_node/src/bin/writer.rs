@@ -65,6 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         chitchat_addr,
         NodeType::Node,
         seed_nodes,
+        Configuration::get_cluster_liveliness_interval_update(),
     )
     .await?;
 

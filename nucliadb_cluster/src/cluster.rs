@@ -144,6 +144,7 @@ impl Cluster {
         listen_addr: SocketAddr,
         node_type: NodeType,
         seed_node: Vec<String>,
+        liveliness_update: Duration,
     ) -> Result<Self, Error> {
         info!( node_id=?node_id, listen_addr=?listen_addr, "Create new cluster.");
         let chitchat_node_id = NodeId::new(node_id, listen_addr);
@@ -217,7 +218,7 @@ impl Cluster {
         let chitchat_clone = Arc::clone(&chitchat);
         let interval_task_stop = cluster.stop.clone();
         tokio::task::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(500));
+            let mut interval = tokio::time::interval(liveliness_update);
             while !interval_task_stop.load(Ordering::Relaxed) {
                 interval.tick().await;
                 let mut chitchat_guard = chitchat_clone.lock().await;
