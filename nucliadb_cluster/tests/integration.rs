@@ -1,7 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 use std::{env, io};
 
 use bytes::BytesMut;
@@ -10,10 +9,10 @@ use log::error;
 use nucliadb_cluster::cluster::{Cluster, Member, NodeType, CLUSTER_GOSSIP_INTERVAL};
 use tokio::net::UnixStream;
 use tokio::sync::mpsc;
+use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 const SEED_NODE: &str = "0.0.0.0:40400";
-const LIVELINESS_UPDATE: Duration = Duration::from_secs(2);
 
 pub async fn create_seed_node() -> anyhow::Result<Cluster> {
     // create seed node
@@ -23,7 +22,6 @@ pub async fn create_seed_node() -> anyhow::Result<Cluster> {
         peer_addr,
         NodeType::Node,
         vec![SEED_NODE.to_string()],
-        LIVELINESS_UPDATE,
     )
     .await?)
 }
@@ -42,14 +40,7 @@ pub async fn create_cluster_for_test_with_id(
     let port = find_available_port()?;
     eprintln!("port: {port}");
     let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port);
-    let cluster = Cluster::new(
-        peer_uuid,
-        peer_addr,
-        NodeType::Node,
-        vec![seed_node],
-        LIVELINESS_UPDATE,
-    )
-    .await?;
+    let cluster = Cluster::new(peer_uuid, peer_addr, NodeType::Node, vec![seed_node]).await?;
     Ok(cluster)
 }
 
@@ -85,7 +76,7 @@ async fn test_cluster_two_nodes() {
     setup_logging_for_tests();
     // create seed node
     let cluster = create_seed_node().await.unwrap();
-    let mut watcher = cluster.members_change_watcher();
+    let mut watcher = cluster.live_nodes_watcher().await;
 
     // add node to cluster
     let cluster1 = create_cluster_for_test(SEED_NODE.to_string())
@@ -95,12 +86,15 @@ async fn test_cluster_two_nodes() {
     // allow nodes start and communicate
     tokio::time::sleep(CLUSTER_GOSSIP_INTERVAL * 2).await;
 
-    match tokio::time::timeout(CLUSTER_GOSSIP_INTERVAL, watcher.changed()).await {
-        Ok(_) => {
-            let update = &*watcher.borrow();
+    match tokio::time::timeout(CLUSTER_GOSSIP_INTERVAL, watcher.next()).await {
+        Ok(Some(res)) => {
+            let update = cluster.build_members(res).await;
             assert_eq!(update.len(), 1);
             assert_eq!(update[0].node_id, cluster1.id.id);
             assert_eq!(cluster1.members().await.len(), 2)
+        }
+        Ok(None) => {
+            panic!("no changes in cluster");
         }
         Err(e) => {
             panic!("timeout while waiting cluster changes: {e}");
