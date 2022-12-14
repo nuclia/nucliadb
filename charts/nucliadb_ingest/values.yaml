@@ -11,6 +11,7 @@ topologySpreadConstraints: []
 replicaCount: 2
 revisionHistoryLimit: 2
 imagePullPolicy: IfNotPresent
+imageOtherPullPolicy: Always
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 image_other: cluster_manager:main
