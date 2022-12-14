@@ -14,6 +14,7 @@ on:
       - "test-requirements.txt"
       - "Dockerfile"
       - "nucliadb_protos/python/**"
+      - "nucliadb_cluster/**"
 
   push:
     branches:
@@ -28,6 +29,7 @@ on:
       - "test-requirements.txt"
       - "Dockerfile"
       - "nucliadb_protos/python/**"
+      - "nucliadb_cluster/**"
 
 env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
