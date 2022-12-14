@@ -124,7 +124,7 @@ pub struct Cluster {
     pub listen_addr: SocketAddr,
 
     /// The actual cluster that implement the Scuttlebutt protocol.
-    chitchat_handle: ChitchatHandle,
+    handle: ChitchatHandle,
 
     /// self node id
     pub id: NodeId,
@@ -144,10 +144,10 @@ impl Cluster {
         seed_node: Vec<String>,
     ) -> Result<Self, Error> {
         info!( node_id=?node_id, listen_addr=?listen_addr, "Create new cluster.");
-        let chitchat_node_id = NodeId::new(node_id, listen_addr);
+        let node_id = NodeId::new(node_id, listen_addr);
 
         let config = ChitchatConfig {
-            node_id: chitchat_node_id,
+            node_id: node_id.clone(),
             gossip_interval: CLUSTER_GOSSIP_INTERVAL,
             cluster_id: CLUSTER_ID.to_string(),
             listen_addr,
@@ -155,26 +155,23 @@ impl Cluster {
             failure_detector_config: FailureDetectorConfig::default(),
         };
 
-        let chitchat_handle = spawn_chitchat(config, Vec::new(), &UdpTransport)
+        let handle = spawn_chitchat(config, Vec::new(), &UdpTransport)
             .await
             .map_err(|e| Error::CannotStartCluster(e.to_string()))?;
 
-        let id = chitchat_handle
+        handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
-
                 state.set(NODE_TYPE_KEY, node_type);
                 state.set(LOAD_SCORE_KEY, 0f32);
-
-                chitchat.self_node_id().clone()
             })
             .await;
 
         // Create cluster.
         let cluster = Cluster {
-            id,
+            id: node_id,
             listen_addr,
-            chitchat_handle,
+            handle,
             node_type,
         };
 
@@ -182,7 +179,7 @@ impl Cluster {
     }
 
     pub async fn update_load_score<T: Score>(&self, scorer: &T) {
-        self.chitchat_handle
+        self.handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
 
@@ -193,33 +190,30 @@ impl Cluster {
 
     /// Return watchstream for monitoring change of `members`
     pub async fn live_nodes_watcher(&self) -> WatchStream<HashSet<NodeId>> {
-        self.chitchat_handle
+        self.handle
             .with_chitchat(|chitchat| chitchat.live_nodes_watcher())
             .await
     }
 
     pub async fn build_members(&self, nodes: HashSet<NodeId>) -> Vec<Member> {
-        let nodes: Vec<Member> = self
-            .chitchat_handle
+        self.handle
             .with_chitchat(|chitchat| {
                 nodes
                     .iter()
                     .map(|node_id| Member::build(node_id, chitchat).unwrap())
                     .collect()
             })
-            .await;
-
-        nodes
+            .await
     }
 
     pub async fn add_peer_node(&self, peer_addr: SocketAddr) -> Result<(), anyhow::Error> {
-        self.chitchat_handle.gossip(peer_addr)
+        self.handle.gossip(peer_addr)
     }
 
     /// Return `members` list
     pub async fn members(&self) -> Vec<Member> {
         let nodes: Vec<Member> = self
-            .chitchat_handle
+            .handle
             .with_chitchat(|chitchat| {
                 chitchat.update_nodes_liveliness();
                 chitchat
