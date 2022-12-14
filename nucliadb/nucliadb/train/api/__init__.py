@@ -16,18 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-from enum import Enum
-from typing import Dict
-
-from nucliadb_dataset.nuclia import NucliaDriver
-
-NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
-
-CLIENT_ID = "CLIENT"
-
-
-class DSTYPE(str, Enum):
-    NER = "NER"
-    LABELER = "LABELER"
-    CLASSIFY = "CLASSIFY"
+#
+from . import s3_bucket  # noqa
+from . import shards  # noqa
+from .router import api  # noqa

@@ -318,7 +318,7 @@ async def cache(redis):
 
 @pytest.fixture(scope="function")
 async def chitchat():
-    start_chitchat("testing")
+    await start_chitchat("testing")
 
 
 class nucliadbNodeReader(BaseImage):

@@ -22,9 +22,6 @@ def test_dict_resource(knowledgebox: KnowledgeBox):
         vectors=[Vector(value=[1.0, 0.2], vectorset="base")],
     )
     resource2 = knowledgebox[resource_id]
-    import pdb
-
-    pdb.set_trace()
 
     knowledgebox["mykey2"] = resource2
 

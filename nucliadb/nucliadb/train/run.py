@@ -17,17 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from enum import Enum
-from typing import Dict
-
-from nucliadb_dataset.nuclia import NucliaDriver
-
-NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
-
-CLIENT_ID = "CLIENT"
+from nucliadb.train.app import application
+from nucliadb_utils.fastapi.run import run_fastapi_with_metrics
 
 
-class DSTYPE(str, Enum):
-    NER = "NER"
-    LABELER = "LABELER"
-    CLASSIFY = "CLASSIFY"
+def run_with_metrics():
+    run_fastapi_with_metrics(application)

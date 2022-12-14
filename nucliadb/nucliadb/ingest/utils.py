@@ -29,7 +29,12 @@ from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.settings import nucliadb_settings
 from nucliadb_utils.store import MAIN
-from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    get_utility,
+    set_utility,
+)
 
 try:
     from nucliadb.ingest.maindb.redis import RedisDriver

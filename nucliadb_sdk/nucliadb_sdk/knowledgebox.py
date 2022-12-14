@@ -27,8 +27,10 @@ class KnowledgeBox:
     environment: Environment
     vectorsets: Optional[VectorSets] = None
     api_key: Optional[str] = None
+    id: str
 
     def __init__(self, url: str, api_key: Optional[str] = None):
+        self.id = url.split("/")[-1]
         url_obj = urlparse(url)
         if url_obj.hostname is not None and url_obj.hostname.endswith(NUCLIA_CLOUD):
             env = Environment.CLOUD

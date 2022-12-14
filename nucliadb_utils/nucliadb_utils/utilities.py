@@ -63,6 +63,8 @@ class Utility(str, Enum):
     INDEXING = "indexing"
     AUDIT = "audit"
     STORAGE = "storage"
+    TRAIN = "train"
+    TRAIN_SERVER = "train_server"
 
 
 def get_utility(ident: Utility):
