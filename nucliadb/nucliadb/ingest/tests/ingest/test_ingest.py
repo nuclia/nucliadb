@@ -79,7 +79,7 @@ async def test_ingest_messages_autocommit(
     )
     message1.basic.icon = "text/plain"
     message1.basic.title = "Title Resource"
-    message1.basic.summary = "Summary of document"
+    message1.basic.summary = "Summary of Document"
     message1.basic.thumbnail = "doc"
     message1.basic.layout = "default"
     message1.basic.metadata.language = "es"
