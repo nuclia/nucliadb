@@ -16,18 +16,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+from fastapi.routing import APIRouter
 
-from enum import Enum
-from typing import Dict
+api = APIRouter()
 
-from nucliadb_dataset.nuclia import NucliaDriver
-
-NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
-
-CLIENT_ID = "CLIENT"
-
-
-class DSTYPE(str, Enum):
-    NER = "NER"
-    LABELER = "LABELER"
-    CLASSIFY = "CLASSIFY"
+KB_PREFIX = "kb"
+KBS_PREFIX = "kbs"
+RESOURCE_PREFIX = "resource"
+RSLUG_PREFIX = "slug"

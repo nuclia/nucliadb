@@ -20,4 +20,19 @@
 import logging
 
 SERVICE_NAME = "nucliadb_train"
+API_PREFIX = "API"
 logger = logging.getLogger(SERVICE_NAME)
+
+
+# Define the filter
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return (
+            record.args is not None
+            and len(record.args) >= 3
+            and record.args[2] not in ("/", "/metrics")  # type: ignore
+        )
+
+
+# Add filter to the logger
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())

@@ -17,101 +17,110 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-import logging
-import sys
-from asyncio import tasks
-from typing import Callable, List
-
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
+    AioHttpClientInstrumentor,
+)
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
+from sentry_sdk import capture_exception
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from starlette.middleware import Middleware
+from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import HTMLResponse
+from starlette.routing import Mount
+from starlette_prometheus import PrometheusMiddleware
 
+from nucliadb.train import API_PREFIX, SERVICE_NAME
+from nucliadb.train.api.v1.router import api
+from nucliadb.train.lifecycle import finalize, initialize
 from nucliadb.sentry import SENTRY, set_sentry
-from nucliadb.train import SERVICE_NAME, logger
-from nucliadb.train.server import start_grpc
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
-from nucliadb_utils.settings import running_settings
+from nucliadb_telemetry.utils import get_telemetry
+from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.instrumentation import instrument_app
+from nucliadb_utils.fastapi.openapi import extend_openapi
+from nucliadb_utils.fastapi.versioning import VersionedFastAPI
+from nucliadb_utils.settings import http_settings, running_settings
+
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=http_settings.cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    ),
+    Middleware(PrometheusMiddleware),
+    Middleware(
+        AuthenticationMiddleware,
+        backend=STFAuthenticationBackend(),
+    ),
+]
 
 
-async def main() -> List[Callable]:
-    tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:
-        set_global_textmap(B3MultiFormat())
-        await init_telemetry(tracer_provider)  # To start asyncio task
-
-    grpc_finalizer = await start_grpc(SERVICE_NAME)
-    logger.info(f"======= Train finished starting ======")
-    finalizers = [
-        grpc_finalizer,
-    ]
-
-    return finalizers
+if running_settings.sentry_url and SENTRY:
+    set_sentry(
+        running_settings.sentry_url,
+        running_settings.running_environment,
+        running_settings.logging_integration,
+    )
+    middleware.append(Middleware(SentryAsgiMiddleware))
 
 
-def _cancel_all_tasks(loop):
-    to_cancel = tasks.all_tasks(loop)
-    if not to_cancel:
-        return
-
-    for task in to_cancel:
-        task.cancel()
-
-    loop.run_until_complete(tasks.gather(*to_cancel, return_exceptions=True))
-
-    for task in to_cancel:
-        if task.cancelled():
-            continue
-        if task.exception() is not None:
-            loop.call_exception_handler(
-                {
-                    "message": "unhandled exception during asyncio.run() shutdown",
-                    "exception": task.exception(),
-                    "task": task,
-                }
-            )
+on_startup = [initialize]
+on_shutdown = [finalize]
 
 
-def run() -> None:
-    if running_settings.sentry_url and SENTRY:
-        set_sentry(
-            running_settings.sentry_url,
-            running_settings.running_environment,
-            running_settings.logging_integration,
-        )
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)-18s | %(levelname)-7s | %(name)-16s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        stream=sys.stderr,
+async def global_exception_handler(request, exc):
+    capture_exception(exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong, please contact your administrator"},
     )
 
-    logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
 
-    logging.getLogger("asyncio").setLevel(logging.ERROR)
+fastapi_settings = dict(
+    debug=running_settings.debug,
+    middleware=middleware,
+    on_startup=on_startup,
+    on_shutdown=on_shutdown,
+    exception_handlers={Exception: global_exception_handler},
+)
 
-    if asyncio._get_running_loop() is not None:
-        raise RuntimeError("cannot be called from a running event loop")
 
-    loop = asyncio.new_event_loop()
-    finalizers: List[Callable] = []
-    try:
-        asyncio.set_event_loop(loop)
-        if running_settings.debug is not None:
-            loop.set_debug(running_settings.debug)
-        finalizers.extend(loop.run_until_complete(main()))
+base_app = FastAPI(title="NucliaDB Train API", **fastapi_settings)  # type: ignore
 
-        loop.run_forever()
-    finally:
-        try:
-            for finalizer in finalizers:
-                if asyncio.iscoroutinefunction(finalizer):
-                    loop.run_until_complete(finalizer())
-                else:
-                    finalizer()
-            _cancel_all_tasks(loop)
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.run_until_complete(loop.shutdown_default_executor())
-        finally:
-            asyncio.set_event_loop(None)
-            loop.close()
+base_app.include_router(api)
+
+application = VersionedFastAPI(
+    base_app,
+    version_format="{major}",
+    prefix_format=f"/{API_PREFIX}/v{{major}}",
+    default_version=(1, 0),
+    enable_latest=False,
+    kwargs=fastapi_settings,
+)
+
+# Fastapi versioning does not propagate exception handlers to inner mounted apps
+# We need to patch it manually for now. Also extend OpenAPI definitions
+for route in application.routes:
+    if isinstance(route, Mount):
+        route.app.middleware_stack.handler = global_exception_handler  # type: ignore
+        extend_openapi(route.app)  # type: ignore
+
+
+async def homepage(request: Request) -> HTMLResponse:
+    return HTMLResponse("NucliaDB Train Service")
+
+
+# Use raw starlette routes to avoid unnecessary overhead
+application.add_route("/", homepage)
+
+# Enable forwarding of B3 headers to responses and external requests
+# to both inner applications
+tracer_provider = get_telemetry(SERVICE_NAME)
+set_global_textmap(B3MultiFormat())
+instrument_app(application, tracer_provider=tracer_provider, excluded_urls=["/"])
+AioHttpClientInstrumentor().instrument(tracer_provider=tracer_provider)

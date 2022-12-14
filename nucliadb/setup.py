@@ -56,7 +56,7 @@ setup(
             "search-metrics = nucliadb.search.run:run_with_metrics",
             "extract-openapi-writer = nucliadb.writer.openapi:command_extract_openapi",
             "writer-metrics = nucliadb.writer.run:run_with_metrics",
-            "ndb_train = nucliadb.train.app:run",
+            "ndb_train = nucliadb.train.run:run_with_metrics",
             "nuclia_dataset_upload = nucliadb.train.upload:run",
         ]
     },

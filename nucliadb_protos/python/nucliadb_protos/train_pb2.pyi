@@ -6,13 +6,15 @@ import builtins
 import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import nucliadb_protos.knowledgebox_pb2
 import nucliadb_protos.resources_pb2
 import sys
+import typing
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
@@ -702,3 +704,128 @@ class LabelsetsCount(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["labelsets", b"labelsets"]) -> None: ...
 
 global___LabelsetsCount = LabelsetsCount
+
+@typing_extensions.final
+class TrainSet(google.protobuf.message.Message):
+    """Train API V2"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Type:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[TrainSet._Type.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        PARAGRAPH_CLASSIFICATION: TrainSet._Type.ValueType  # 0
+        TOKEN_CLASSIFICATION: TrainSet._Type.ValueType  # 1
+
+    class Type(_Type, metaclass=_TypeEnumTypeWrapper): ...
+    PARAGRAPH_CLASSIFICATION: TrainSet.Type.ValueType  # 0
+    TOKEN_CLASSIFICATION: TrainSet.Type.ValueType  # 1
+
+    @typing_extensions.final
+    class Filter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        LABELS_FIELD_NUMBER: builtins.int
+        @property
+        def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+        def __init__(
+            self,
+            *,
+            labels: collections.abc.Iterable[builtins.str] | None = ...,
+        ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels"]) -> None: ...
+
+    TYPE_FIELD_NUMBER: builtins.int
+    FILTER_FIELD_NUMBER: builtins.int
+    BATCH_SIZE_FIELD_NUMBER: builtins.int
+    SEED_FIELD_NUMBER: builtins.int
+    type: global___TrainSet.Type.ValueType
+    @property
+    def filter(self) -> global___TrainSet.Filter: ...
+    batch_size: builtins.int
+    seed: builtins.int
+    def __init__(
+        self,
+        *,
+        type: global___TrainSet.Type.ValueType = ...,
+        filter: global___TrainSet.Filter | None = ...,
+        batch_size: builtins.int = ...,
+        seed: builtins.int = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["filter", b"filter"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["batch_size", b"batch_size", "filter", b"filter", "seed", b"seed", "type", b"type"]) -> None: ...
+
+global___TrainSet = TrainSet
+
+@typing_extensions.final
+class Classification(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PARAGRAPH_FIELD_NUMBER: builtins.int
+    CLASSIFICATION_FIELD_NUMBER: builtins.int
+    paragraph: builtins.str
+    @property
+    def classification(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        paragraph: builtins.str = ...,
+        classification: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classification", b"classification", "paragraph", b"paragraph"]) -> None: ...
+
+global___Classification = Classification
+
+@typing_extensions.final
+class ParagraphClassificationBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___Classification] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
+
+global___ParagraphClassificationBatch = ParagraphClassificationBatch
+
+@typing_extensions.final
+class Token(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PARAGRAPH_FIELD_NUMBER: builtins.int
+    TOKEN_FIELD_NUMBER: builtins.int
+    paragraph: builtins.str
+    @property
+    def token(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        paragraph: builtins.str = ...,
+        token: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["paragraph", b"paragraph", "token", b"token"]) -> None: ...
+
+global___Token = Token
+
+@typing_extensions.final
+class TokenClassificationBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Token]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___Token] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
+
+global___TokenClassificationBatch = TokenClassificationBatch

@@ -34,7 +34,7 @@ if SENTRY:
     from sentry_sdk import capture_exception
 
 
-def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
+async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
 
     if settings.chitchat_enabled is False:
         logger.info(f"Chitchat not enabled - {service_name}")
@@ -43,7 +43,7 @@ def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
     chitchat = ChitchatNucliaDB(
         settings.chitchat_binding_host, settings.chitchat_binding_port
     )
-    asyncio.create_task(chitchat.start())
+    await chitchat.start()
     logger.info("Chitchat started")
     set_utility(Utility.CHITCHAT, chitchat)
 
@@ -57,6 +57,7 @@ class ChitchatNucliaDB:
         self.host = host
         self.port = port
         self.chitchat_update_srv = None
+        self.task = None
 
     async def start(self):
         logger.info(f"enter chitchat.start() at {self.host}:{self.port}")
@@ -66,7 +67,7 @@ class ChitchatNucliaDB:
         logger.info(f"tcp server created")
         async with self.chitchat_update_srv:
             logger.info("awaiting connections from rust part of cluster")
-            await asyncio.create_task(self.chitchat_update_srv.serve_forever())
+            self.task = asyncio.create_task(self.chitchat_update_srv.serve_forever())
 
     async def socket_reader(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -123,3 +124,4 @@ class ChitchatNucliaDB:
 
     async def close(self):
         self.chitchat_update_srv.close()
+        self.task.cancel()

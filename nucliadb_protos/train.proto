@@ -136,6 +136,42 @@ message LabelsetsCount {
 }
 
 
+// Train API V2
+
+message TrainSet {
+    enum Type {
+        PARAGRAPH_CLASSIFICATION = 0;
+        TOKEN_CLASSIFICATION = 1;
+    }
+
+    Type type = 1;
+    message Filter {
+        repeated string labels = 1;
+    }
+    Filter filter = 2;
+    int32 batch_size = 3;
+    int32 seed = 4;
+}
+
+
+message Classification {
+    string paragraph = 1;
+    repeated string classification = 2;
+}
+
+message ParagraphClassificationBatch {
+    repeated Classification data = 1;
+}
+
+message Token {
+    string paragraph = 1;
+    repeated string token = 2;
+}
+
+message TokenClassificationBatch {
+    repeated Token data = 1;
+}
+
 service Train {
     rpc GetInfo(GetInfoRequest) returns (TrainInfo) {}
     rpc GetSentences(GetSentencesRequest) returns (stream TrainSentence) {}

@@ -20,6 +20,7 @@
 import asyncio
 import uuid
 from datetime import datetime
+import uvicorn
 
 import pytest
 from grpc import aio
@@ -72,12 +73,11 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
 
 @pytest.fixture(scope="function")
 async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
-    from nucliadb.train.server import start_grpc
+    from nucliadb.train.utils import stop_train_grpc, start_train_grpc
 
-    finalizer = await start_grpc("testing_train")
+    await start_train_grpc("testing_train")
     yield
-
-    finalizer()
+    await stop_train_grpc()
 
 
 @pytest.fixture(scope="function")
@@ -88,6 +88,29 @@ async def train_client(train_api):  # type: ignore
 
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
     yield TrainStub(channel)
+    clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def train_rest_api(test_settings_train: None, local_files, event_loop):  # type: ignore
+    from nucliadb.train.app import application
+
+    await application.router.startup()
+    http_port = free_port()
+    config = uvicorn.Config(application, port=http_port, log_level="info")
+    server = uvicorn.Server(config)
+
+    if not config.loaded:
+        config.load()
+
+    server.lifespan = config.lifespan_class(config)
+
+    server.install_signal_handlers()
+
+    await server.startup()
+    yield f"localhost:{http_port}"
+    await server.shutdown()
+    await application.router.shutdown()
     clear_global_cache()
 
 

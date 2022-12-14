@@ -434,8 +434,3 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
             if node is not None:
                 logger.info(f"{key}/{node.label} remove {node.address}")
                 await Node.destroy(key)
-
-
-class DefinedNodesNucliaDBSearch:
-    async def start(self):
-        await Node.load_active_nodes()
