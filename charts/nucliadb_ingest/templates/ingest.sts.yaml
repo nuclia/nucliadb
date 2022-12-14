@@ -91,7 +91,7 @@ spec:
 {{- end }}
       - name: cluster-manager
         image: "{{ .Values.containerRegistry }}/{{ .Values.image_other }}"
-        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        imagePullPolicy: {{ .Values.imageOtherPullPolicy }}
         command: ["/entrypoint.sh"]
         args: ["/nucliadb_cluster/cluster_manager"]
         envFrom:
