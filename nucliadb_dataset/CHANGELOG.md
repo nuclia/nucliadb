@@ -19,3 +19,8 @@
 ## 1.0.0a1 (2022-07-19)
 
 - Initial release
+
+
+## 1.0.0a6 (2022-12-13)
+
+- Add `get_entities()` method to `nucliabd_dataset` API

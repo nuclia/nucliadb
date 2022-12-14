@@ -26,7 +26,7 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-from nucliadb_protos.writer_pb2 import GetLabelsResponse
+from nucliadb_protos.writer_pb2 import GetLabelsResponse, GetEntitiesResponse
 
 from nucliadb_dataset import CLIENT_ID, NUCLIA_GLOBAL
 from nucliadb_dataset.nuclia import NucliaDriver
@@ -77,6 +77,10 @@ def get_labels(kbid: str) -> GetLabelsResponse:
     labels = client.get_labels(kbid)
     return labels
 
+def get_entities(kbid: str) -> GetEntitiesResponse:
+    client = get_nuclia_client()
+    entities = client.get_entities(kbid)
+    return entities
 
 def get_info(kbid: str) -> TrainInfo:
     client = get_nuclia_client()
