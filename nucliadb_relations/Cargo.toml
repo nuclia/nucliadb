@@ -1,3 +1,5 @@
+# WARNING! This package is deprecated. Look at nucliadb_vectors2/relations instead!
+
 [package]
 name = "nucliadb_relations"
 version = "0.1.0"
