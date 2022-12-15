@@ -10,6 +10,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{self, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::{sleep, timeout};
+use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 #[derive(Debug, Parser)]
@@ -33,14 +34,6 @@ struct Args {
         value_parser(parse_duration::parse)
     )]
     update_interval: Duration,
-    #[arg(
-        short,
-        long,
-        env = "LIVELINESS_UPDATE",
-        default_value = "500ms",
-        value_parser(parse_duration::parse)
-    )]
-    liveliness_update: Duration,
 }
 
 async fn check_peer(stream: &mut TcpStream) -> anyhow::Result<bool> {
@@ -170,31 +163,24 @@ async fn main() -> anyhow::Result<()> {
     let host = format!("{}:{}", &arg.pub_ip, &arg.listen_port);
     let addr = reliable_lookup_host(&host).await?;
     let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(
-        node_id.to_string(),
-        addr,
-        arg.node_type,
-        arg.seeds.clone(),
-        arg.liveliness_update,
-    )
-    .await
-    .with_context(|| "Can't create cluster instance")?;
+    let cluster = Cluster::new(node_id.to_string(), addr, arg.node_type, arg.seeds.clone())
+        .await
+        .with_context(|| "Can't create cluster instance")?;
 
-    let mut watcher = cluster.members_change_watcher();
+    let mut watcher = cluster.live_nodes_watcher().await;
     let mut writer = get_stream(arg.monitor_addr.clone())
         .await
         .with_context(|| "Can't create update writer")?;
     loop {
         tokio::select! {
             _ = termination.recv() => {
-                cluster.shutdown().await;
                 writer.shutdown().await?;
                 break
             },
             _ = sleep(arg.update_interval) => {
                 debug!("Fixed update");
 
-                let members = watcher.borrow().clone();
+                let members = cluster.members().await;
 
                 if let Err(e) = send_update(members, &mut writer, &arg).await {
                     error!("Send cluster members failed: {e}");
@@ -202,14 +188,10 @@ async fn main() -> anyhow::Result<()> {
                     info!("Update sended")
                 }
             },
-            res = watcher.changed() => {
+            Some(res) = watcher.next() => {
                 debug!("Something changed");
 
-                if let Err(e) = res {
-                    error!("members received with error: {e}");
-                    continue
-                }
-                let members = watcher.borrow().clone();
+                let members = cluster.build_members(res).await;
 
                 if let Err(e) = send_update(members, &mut writer, &arg).await {
                     error!("Send cluster members failed: {e}");

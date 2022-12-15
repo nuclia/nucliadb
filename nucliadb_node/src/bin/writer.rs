@@ -31,7 +31,6 @@ use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
 use nucliadb_protos::GetShardRequest;
-use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use tracing::*;
@@ -65,7 +64,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         chitchat_addr,
         NodeType::Node,
         seed_nodes,
-        Configuration::get_cluster_liveliness_interval_update(),
     )
     .await?;
 
@@ -85,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Error starting gRPC writer");
     });
 
-    let mut watcher = WatchStream::new(chitchat_cluster.members_change_watcher());
+    let mut watcher = chitchat_cluster.live_nodes_watcher().await;
     let monitor_task = tokio::spawn(async move {
         loop {
             debug!("node writer wait updates");

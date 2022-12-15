@@ -1,8 +1,7 @@
+use std::collections::HashSet;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 
 use chitchat::transport::UdpTransport;
@@ -11,9 +10,8 @@ use chitchat::{
 };
 use serde::{Deserialize, Serialize};
 use strum::{Display as EnumDisplay, EnumString};
-use tokio::sync::watch;
-use tokio_stream::StreamExt;
-use tracing::{debug, error, info};
+use tokio_stream::wrappers::WatchStream;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -126,22 +124,13 @@ pub struct Cluster {
     pub listen_addr: SocketAddr,
 
     /// The actual cluster that implement the Scuttlebutt protocol.
-    chitchat_handle: ChitchatHandle,
+    handle: ChitchatHandle,
 
     /// self node id
     pub id: NodeId,
 
     /// seflf node type
     pub node_type: NodeType,
-
-    // watcher for receiving actual list of nodes
-    members: watch::Receiver<Vec<Member>>,
-
-    /// A stop flag of cluster monitoring task.
-    /// Once the cluster is created, a task to monitor cluster events will be started.
-    /// Nodes do not need to be monitored for events once they are detached from the cluster.
-    /// You need to update this value to get out of the task loop.
-    stop: Arc<AtomicBool>,
 }
 
 impl Cluster {
@@ -153,13 +142,12 @@ impl Cluster {
         listen_addr: SocketAddr,
         node_type: NodeType,
         seed_node: Vec<String>,
-        liveliness_update: Duration,
     ) -> Result<Self, Error> {
         info!( node_id=?node_id, listen_addr=?listen_addr, "Create new cluster.");
-        let chitchat_node_id = NodeId::new(node_id, listen_addr);
+        let node_id = NodeId::new(node_id, listen_addr);
 
         let config = ChitchatConfig {
-            node_id: chitchat_node_id,
+            node_id: node_id.clone(),
             gossip_interval: CLUSTER_GOSSIP_INTERVAL,
             cluster_id: CLUSTER_ID.to_string(),
             listen_addr,
@@ -167,81 +155,31 @@ impl Cluster {
             failure_detector_config: FailureDetectorConfig::default(),
         };
 
-        let chitchat_handle = spawn_chitchat(config, Vec::new(), &UdpTransport)
+        let handle = spawn_chitchat(config, Vec::new(), &UdpTransport)
             .await
             .map_err(|e| Error::CannotStartCluster(e.to_string()))?;
 
-        let (self_id, mut cluster_watcher) = chitchat_handle
+        handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
-
                 state.set(NODE_TYPE_KEY, node_type);
                 state.set(LOAD_SCORE_KEY, 0f32);
-
-                (
-                    chitchat.self_node_id().clone(),
-                    chitchat.live_nodes_watcher(),
-                )
             })
             .await;
 
-        let (members_tx, members_rx) = watch::channel(Vec::<Member>::new());
-
-        let chitchat = chitchat_handle.chitchat();
-
         // Create cluster.
         let cluster = Cluster {
+            id: node_id,
             listen_addr,
-            chitchat_handle,
-            id: self_id,
+            handle,
             node_type,
-            members: members_rx,
-            stop: Arc::new(AtomicBool::new(false)),
         };
-        // Prepare to start a task that will monitor cluster events.
-        let monitor_task_stop = cluster.stop.clone();
-
-        let chitchat_clone = Arc::clone(&chitchat);
-        // Start to monitor the node status updates.
-        tokio::task::spawn(async move {
-            while !monitor_task_stop.load(Ordering::Relaxed) {
-                if let Some(live_nodes) = cluster_watcher.next().await {
-                    let guard = chitchat_clone.lock().await;
-                    let update_members: Vec<Member> = live_nodes
-                        .iter()
-                        .map(|node_id| Member::build(node_id, &guard).unwrap())
-                        .collect();
-                    let dead: Vec<Member> = guard
-                        .dead_nodes()
-                        .map(|node_id| Member::build(node_id, &guard).unwrap())
-                        .collect();
-                    debug!(updated_memberlist=?update_members);
-                    debug!(dead_nodes=?dead);
-                    if let Err(e) = members_tx.send(update_members) {
-                        debug!("all member updates receivers closed: {e}");
-                        break;
-                    }
-                }
-            }
-            debug!("receive a stop signal");
-        });
-
-        let chitchat_clone = Arc::clone(&chitchat);
-        let interval_task_stop = cluster.stop.clone();
-        tokio::task::spawn(async move {
-            let mut interval = tokio::time::interval(liveliness_update);
-            while !interval_task_stop.load(Ordering::Relaxed) {
-                interval.tick().await;
-                let mut chitchat_guard = chitchat_clone.lock().await;
-                chitchat_guard.update_nodes_liveliness();
-            }
-        });
 
         Ok(cluster)
     }
 
     pub async fn update_load_score<T: Score>(&self, scorer: &T) {
-        self.chitchat_handle
+        self.handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.self_node_state();
 
@@ -251,25 +189,31 @@ impl Cluster {
     }
 
     /// Return watchstream for monitoring change of `members`
-    pub fn members_change_watcher(&self) -> watch::Receiver<Vec<Member>> {
-        self.members.clone()
+    pub async fn live_nodes_watcher(&self) -> WatchStream<HashSet<NodeId>> {
+        self.handle
+            .with_chitchat(|chitchat| chitchat.live_nodes_watcher())
+            .await
+    }
+
+    pub async fn build_members(&self, nodes: HashSet<NodeId>) -> Vec<Member> {
+        self.handle
+            .with_chitchat(|chitchat| {
+                nodes
+                    .iter()
+                    .map(|node_id| Member::build(node_id, chitchat).unwrap())
+                    .collect()
+            })
+            .await
     }
 
     pub async fn add_peer_node(&self, peer_addr: SocketAddr) -> Result<(), anyhow::Error> {
-        self.chitchat_handle.gossip(peer_addr)
-    }
-
-    pub async fn shutdown(self) {
-        self.stop.store(true, Ordering::Relaxed);
-        if let Err(e) = self.chitchat_handle.shutdown().await {
-            error!("Error during chitchat shutdown: {e}");
-        }
+        self.handle.gossip(peer_addr)
     }
 
     /// Return `members` list
     pub async fn members(&self) -> Vec<Member> {
         let nodes: Vec<Member> = self
-            .chitchat_handle
+            .handle
             .with_chitchat(|chitchat| {
                 chitchat.update_nodes_liveliness();
                 chitchat
