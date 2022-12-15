@@ -137,13 +137,12 @@ message LabelsetsCount {
 
 
 // Train API V2
+enum Type {
+    PARAGRAPH_CLASSIFICATION = 0;
+    TOKEN_CLASSIFICATION = 1;
+}
 
 message TrainSet {
-    enum Type {
-        PARAGRAPH_CLASSIFICATION = 0;
-        TOKEN_CLASSIFICATION = 1;
-    }
-
     Type type = 1;
     message Filter {
         repeated string labels = 1;
@@ -151,6 +150,7 @@ message TrainSet {
     Filter filter = 2;
     int32 batch_size = 3;
     int32 seed = 4;
+    float split = 5;
 }
 
 
@@ -170,6 +170,12 @@ message Token {
 
 message TokenClassificationBatch {
     repeated Token data = 1;
+}
+
+message TrainResponse {
+    int64 train = 1;
+    int64 test = 2;
+    Type type = 3;
 }
 
 service Train {

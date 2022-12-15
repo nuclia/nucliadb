@@ -152,6 +152,22 @@ from nucliadb_protos.writer_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _Type:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Type.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    PARAGRAPH_CLASSIFICATION: _Type.ValueType  # 0
+    TOKEN_CLASSIFICATION: _Type.ValueType  # 1
+
+class Type(_Type, metaclass=_TypeEnumTypeWrapper):
+    """Train API V2"""
+
+PARAGRAPH_CLASSIFICATION: Type.ValueType  # 0
+TOKEN_CLASSIFICATION: Type.ValueType  # 1
+global___Type = Type
+
 @typing_extensions.final
 class EnabledMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -707,22 +723,7 @@ global___LabelsetsCount = LabelsetsCount
 
 @typing_extensions.final
 class TrainSet(google.protobuf.message.Message):
-    """Train API V2"""
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class _Type:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[TrainSet._Type.ValueType], builtins.type):  # noqa: F821
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        PARAGRAPH_CLASSIFICATION: TrainSet._Type.ValueType  # 0
-        TOKEN_CLASSIFICATION: TrainSet._Type.ValueType  # 1
-
-    class Type(_Type, metaclass=_TypeEnumTypeWrapper): ...
-    PARAGRAPH_CLASSIFICATION: TrainSet.Type.ValueType  # 0
-    TOKEN_CLASSIFICATION: TrainSet.Type.ValueType  # 1
 
     @typing_extensions.final
     class Filter(google.protobuf.message.Message):
@@ -742,21 +743,24 @@ class TrainSet(google.protobuf.message.Message):
     FILTER_FIELD_NUMBER: builtins.int
     BATCH_SIZE_FIELD_NUMBER: builtins.int
     SEED_FIELD_NUMBER: builtins.int
-    type: global___TrainSet.Type.ValueType
+    SPLIT_FIELD_NUMBER: builtins.int
+    type: global___Type.ValueType
     @property
     def filter(self) -> global___TrainSet.Filter: ...
     batch_size: builtins.int
     seed: builtins.int
+    split: builtins.float
     def __init__(
         self,
         *,
-        type: global___TrainSet.Type.ValueType = ...,
+        type: global___Type.ValueType = ...,
         filter: global___TrainSet.Filter | None = ...,
         batch_size: builtins.int = ...,
         seed: builtins.int = ...,
+        split: builtins.float = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["filter", b"filter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["batch_size", b"batch_size", "filter", b"filter", "seed", b"seed", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["batch_size", b"batch_size", "filter", b"filter", "seed", b"seed", "split", b"split", "type", b"type"]) -> None: ...
 
 global___TrainSet = TrainSet
 
@@ -829,3 +833,24 @@ class TokenClassificationBatch(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
 
 global___TokenClassificationBatch = TokenClassificationBatch
+
+@typing_extensions.final
+class TrainResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TRAIN_FIELD_NUMBER: builtins.int
+    TEST_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    train: builtins.int
+    test: builtins.int
+    type: global___Type.ValueType
+    def __init__(
+        self,
+        *,
+        train: builtins.int = ...,
+        test: builtins.int = ...,
+        type: global___Type.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["test", b"test", "train", b"train", "type", b"type"]) -> None: ...
+
+global___TrainResponse = TrainResponse

@@ -1,6 +1,5 @@
 from nucliadb_dataset.streamer import Streamer
 from nucliadb_sdk.knowledgebox import KnowledgeBox
-from pyarrow import fs
 
 from datasets import IterableDataset
 
@@ -15,6 +14,7 @@ def test_hf_dataset(knowledgebox: KnowledgeBox):
 
     trainset = TrainSet()
     trainset.type = TrainSet.Type.PARAGRAPH_CLASSIFICATION
+    trainset.filter.labels.append("l/labelset1")
     trainset.batch_size = 2
     trainset.seed = 1234
 

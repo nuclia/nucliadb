@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 from fastapi_versioning import version  # type: ignore
 from fastapi import Request
 from nucliadb.train.api.models import TrainSetPartitions
@@ -30,23 +29,32 @@ from nucliadb.train.api.v1.router import KB_PREFIX, api
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/trainset",
+    f"/{KB_PREFIX}/{{kbid}}/check/labeler/{{labelset}}",
     tags=["Train"],
     status_code=200,
-    name="Return Train call",
-    response_model=TrainSetPartitions,
-)
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/trainset/{{prefix}}",
-    tags=["Train"],
-    status_code=200,
-    name="Return Train call",
+    name="Return check status of labels",
     response_model=TrainSetPartitions,
 )
 @version(1)
 @requires_one([NucliaDBRoles.READER])
-async def get_partitions(
-    request: Request, kbid: str, prefix: str
+async def check_labeler(
+    request: Request, kbid: str, labelset: str
 ) -> TrainSetPartitions:
-    all_keys = await get_kb_partitions(kbid, prefix)
+    all_keys = await get_kb_partitions(kbid)
+    return TrainSetPartitions(partitions=all_keys)
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/check/ner/{{entitygroup}}",
+    tags=["Train"],
+    status_code=200,
+    name="Return check status of entities",
+    response_model=TrainSetPartitions,
+)
+@version(1)
+@requires_one([NucliaDBRoles.READER])
+async def check_ner(
+    request: Request, kbid: str, entitygroup: str
+) -> TrainSetPartitions:
+    all_keys = await get_kb_partitions(kbid)
     return TrainSetPartitions(partitions=all_keys)

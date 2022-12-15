@@ -1,15 +1,17 @@
 from typing import Any, List
 from nucliadb_protos.train_pb2 import (
     TokenClassificationBatch,
+    TrainResponse,
     TrainSet,
     Token,
     ParagraphClassificationBatch,
     Classification,
+    Type
 )
-import pyarrow as pa
 from io import BytesIO
 import asyncio
 import time
+import random
 
 
 def token_classification_batch(batch: List[Any]):
@@ -36,19 +38,37 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     # Get the data structure to generate data
 
     # NER / LABELS
-    if trainset.type == TrainSet.Type.PARAGRAPH_CLASSIFICATION:
+    if trainset.type == Type.PARAGRAPH_CLASSIFICATION:
         # Query how many paragraphs has each label
+        label1 has 10 paragraphs
+        label2 has 30 paragraphs
+        More without paragraphs labels
+
+
 
         # Batch size split on number of labels
+        paragraphs = []  # List of paragraphs
+        paragraphs = random.Random(trainset.seed).shuffle(paragraphs)
+        index = round(len(paragraphs) * trainset.split)
+        train = paragraphs[:index]
+        test = paragraphs[index:]
+        
+        tr = TrainResponse()
+        tr.train = len(train)
+        tr.test = len(test)
+        tr.type = Type.PARAGRAPH_CLASSIFICATION
+        payload = tr.SerializeToString()
+        yield len(payload).to_bytes(4, byteorder="big", signed=False)
+        yield payload
 
         # Get paragraphs for each classification
-        for batch in get_paragraphs_from_classificaation(trainset):
+        for batch in get_paragraphs_from_classification(train):
             tcb = paragraph_classification_batch(batch)
             payload = tcb.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
-    elif trainset.type == TrainSet.Type.TOKEN_CLASSIFICATION:
+    elif trainset.type == Type.TOKEN_CLASSIFICATION:
         # Query how many tokens has each entity group
 
         # Batch size split on number of tokens

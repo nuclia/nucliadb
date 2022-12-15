@@ -1,5 +1,4 @@
 from nucliadb_dataset.streamer import Streamer
-from pyarrow import fs
 
 from datasets import IterableDataset
 
