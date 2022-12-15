@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
+use data_point::{DataPoint, Elem, LabelDictionary};
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId, VectorSetId};
 use nucliadb_service_interface::prelude::*;
@@ -109,8 +110,10 @@ impl WriterChild for VectorWriterService {
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
         let id = Some(&resource_id.shard_id);
         let time = SystemTime::now();
+
+        let temporal_mark = TemporalMark::now();
         let lock = self.index.get_elock()?;
-        self.index.delete(&resource_id.uuid, &lock);
+        self.index.delete(&resource_id.uuid, temporal_mark, &lock);
         self.index.commit(lock)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
@@ -119,14 +122,14 @@ impl WriterChild for VectorWriterService {
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        use data_point::{DataPoint, Elem, LabelDictionary};
         let id = resource.resource.as_ref().map(|i| &i.shard_id);
         let time = SystemTime::now();
-
         info!("{id:?} - Updating main index");
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating elements for the main index: starts {v} ms");
         }
+
+        let temporal_mark = TemporalMark::now();
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
             for paragraph in resource.paragraphs.values() {
@@ -149,7 +152,7 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: starts {v} ms");
         }
-        let new_dp = DataPoint::new(self.index.get_location(), elems)?;
+        let new_dp = DataPoint::new(self.index.get_location(), elems, Some(temporal_mark))?;
         let no_nodes = new_dp.meta().no_nodes();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: ends {v} ms");
@@ -160,7 +163,7 @@ impl WriterChild for VectorWriterService {
             info!("{id:?} - Processing Sentences to delete: starts {v} ms");
         }
         for to_delete in &resource.sentences_to_delete {
-            self.index.delete(to_delete, &lock)
+            self.index.delete(to_delete, temporal_mark, &lock)
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Processing Sentences to delete: ends {v} ms");
@@ -197,7 +200,7 @@ impl WriterChild for VectorWriterService {
             let mut index = index?;
             let index_lock = index.get_elock()?;
             vectorlist.vectors.iter().for_each(|vector| {
-                index.delete(vector, &index_lock);
+                index.delete(vector, temporal_mark, &index_lock);
             });
             index.commit(index_lock)?;
         }
@@ -229,7 +232,7 @@ impl WriterChild for VectorWriterService {
                 let labels = LabelDictionary::new(user_vector.labels.clone());
                 elems.push(Elem::new(key, vector, labels));
             }
-            let new_dp = DataPoint::new(index.get_location(), elems)?;
+            let new_dp = DataPoint::new(index.get_location(), elems, Some(temporal_mark))?;
             let lock = index.get_elock()?;
             index.add(new_dp, &lock);
             index.commit(lock)?;

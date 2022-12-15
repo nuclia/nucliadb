@@ -42,15 +42,16 @@ impl<'a> SearchRequest for Request<'a> {
 }
 impl VectorEngine for Index {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>) {
+        let temporal_mark = TemporalMark::now();
         let mut elems = vec![];
         for (key, vector) in keys.into_iter().zip(embeddings.into_iter()) {
             let elem = Elem::new(key, vector, LabelDictionary::new(vec![]));
             elems.push(elem);
         }
-        let new_dp = DataPoint::new(self.get_location(), elems).unwrap();
+        let new_dp = DataPoint::new(self.get_location(), elems, Some(temporal_mark)).unwrap();
         let lock = self.get_elock().unwrap();
         self.add(new_dp, &lock);
-        self.delete(&batch_id, &lock);
+        self.delete(&batch_id, temporal_mark, &lock);
         self.commit(lock).unwrap();
     }
 

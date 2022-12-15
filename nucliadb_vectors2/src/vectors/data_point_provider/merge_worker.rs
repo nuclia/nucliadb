@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
-use std::time::SystemTime;
 
 use tracing::*;
 
@@ -52,13 +51,12 @@ impl Worker {
         let subscriber = self.0.as_path();
         let lock = directory::shared_lock(subscriber)?;
         let state: State = directory::load_state(&lock)?;
-        let time = SystemTime::now();
         std::mem::drop(lock);
-        if let Some(work) = state.get_work() {
+        if let Some(work) = state.current_work_unit() {
             let work: Vec<_> = work
                 .iter()
                 .rev()
-                .map(|j| (state.create_dlog(*j), j.id()))
+                .map(|j| (state.delete_log(*j), j.id()))
                 .collect();
             let new_dp = DataPoint::merge(subscriber, &work)?;
             let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
@@ -67,7 +65,7 @@ impl Worker {
             let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
             let lock = directory::exclusive_lock(subscriber)?;
             let mut state: State = directory::load_state(&lock)?;
-            state.replace_work_unit(new_dp, time);
+            state.replace_work_unit(new_dp);
             directory::persist_state(&lock, &state)?;
             std::mem::drop(lock);
             info!("Merge on {subscriber:?}:\n{report}");

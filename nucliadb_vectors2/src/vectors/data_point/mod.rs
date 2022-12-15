@@ -64,7 +64,7 @@ impl DeleteLog for NoDLog {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct Journal {
     uid: DpId,
     nodes: usize,
@@ -340,7 +340,11 @@ impl DataPoint {
             index,
         })
     }
-    pub fn new(dir: &path::Path, mut elems: Vec<Elem>) -> DPResult<DataPoint> {
+    pub fn new(
+        dir: &path::Path,
+        mut elems: Vec<Elem>,
+        with_time: Option<SystemTime>,
+    ) -> DPResult<DataPoint> {
         use io::Write;
 
         let uid = DpId::new_v4().to_string();
@@ -378,7 +382,7 @@ impl DataPoint {
         let journal = Journal {
             nodes: key_value::get_no_elems(&nodes),
             uid: DpId::parse_str(&uid).unwrap(),
-            ctime: SystemTime::now(),
+            ctime: with_time.unwrap_or_else(SystemTime::now),
         };
         (0..journal.nodes)
             .into_iter()
