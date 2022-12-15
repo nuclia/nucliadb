@@ -52,7 +52,7 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels));
         expected_keys.push(key);
     }
-    let reader = DataPoint::new(temp_dir.path(), elems).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let id = reader.get_id();
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
@@ -79,7 +79,7 @@ fn accuracy_test() {
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels));
     }
-    let reader = DataPoint::new(temp_dir.path(), elems).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let query = create_query();
     println!("QUERY 0: {:?}", query);
     let no_results = 10;
@@ -113,7 +113,7 @@ fn single_graph() {
         vector.clone(),
         LabelDictionary::default(),
     )];
-    let reader = DataPoint::new(temp_dir.path(), elems.clone()).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems.clone(), None).unwrap();
     let result = reader.search(
         &HashSet::from([key.clone()]),
         &vector,
@@ -123,7 +123,7 @@ fn single_graph() {
     );
     assert_eq!(result.len(), 0);
 
-    let reader = DataPoint::new(temp_dir.path(), elems).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let result = reader.search(&HashSet::new(), &vector, &[] as &[String], true, 5);
     assert_eq!(result.len(), 1);
     assert!(result[0].1 >= 0.9);
@@ -148,8 +148,8 @@ fn data_merge() {
         vector1.clone(),
         LabelDictionary::default(),
     )];
-    let dp_0 = DataPoint::new(temp_dir.path(), elems0).unwrap();
-    let dp_1 = DataPoint::new(temp_dir.path(), elems1).unwrap();
+    let dp_0 = DataPoint::new(temp_dir.path(), elems0, None).unwrap();
+    let dp_1 = DataPoint::new(temp_dir.path(), elems1, None).unwrap();
     let dp = DataPoint::merge(
         temp_dir.path(),
         &[

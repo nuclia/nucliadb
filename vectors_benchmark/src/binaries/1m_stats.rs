@@ -40,12 +40,13 @@ fn label_set(batch_id: usize) -> Vec<String> {
 }
 
 fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {
+    let temporal_mark = TemporalMark::now();
     let labels = LabelDictionary::new(labels);
     let elems = elems
         .into_iter()
         .map(|(key, vector)| Elem::new(key, vector, labels.clone()))
         .collect();
-    let new_dp = DataPoint::new(writer.get_location(), elems).unwrap();
+    let new_dp = DataPoint::new(writer.get_location(), elems, Some(temporal_mark)).unwrap();
     let lock = writer.get_elock().unwrap();
     writer.add(new_dp, &lock);
     writer.commit(lock).unwrap();

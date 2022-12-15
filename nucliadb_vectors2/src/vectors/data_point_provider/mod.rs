@@ -22,6 +22,7 @@ mod merge_worker;
 mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
+use std::time::SystemTime;
 use std::{io, mem};
 
 use state::*;
@@ -31,6 +32,7 @@ use crate::disk::directory::{ELock, Lock, SLock, Version};
 use crate::disk::{directory, DiskErr};
 use crate::vectors::data_point::{DPError, DataPoint};
 
+pub type TemporalMark = SystemTime;
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
     fn get_labels(&self) -> &[String];
@@ -97,16 +99,16 @@ impl Index {
         };
         Ok(index)
     }
-    pub fn delete(&mut self, prefix: impl AsRef<str>, _: &ELock) {
+    pub fn delete(&mut self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &ELock) {
         let mut state = self.state.write().unwrap();
-        state.remove(prefix.as_ref());
+        state.remove(prefix.as_ref(), temporal_mark);
     }
-    pub fn add(&mut self, dp: DataPoint, _lock: &ELock) {
+    pub fn add(&mut self, dp: DataPoint, _: &ELock) {
         let mut state = self.state.write().unwrap();
         state.add(dp);
     }
     pub fn get_keys(&self, _: &Lock) -> VectorR<Vec<String>> {
-        self.state.read().unwrap().get_keys()
+        self.state.read().unwrap().keys()
     }
     pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<(String, f32)>> {
         let state = self.state.read().unwrap();
@@ -114,7 +116,7 @@ impl Index {
     }
     pub fn no_nodes(&self, _: &Lock) -> usize {
         let state = self.state.read().unwrap();
-        state.get_no_nodes()
+        state.no_nodes()
     }
     pub fn get_elock(&self) -> VectorR<ELock> {
         let lock = directory::exclusive_lock(&self.location)?;
