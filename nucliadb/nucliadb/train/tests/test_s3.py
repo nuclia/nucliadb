@@ -21,10 +21,7 @@ import base64
 from functools import partial
 from io import BytesIO
 from nucliadb_protos.train_pb2 import TrainSet
-from pyarrow import fs
-import pyarrow as pa
 from datasets.filesystems.s3filesystem import S3FileSystem
-import pyarrow.dataset as ds
 import pytest
 import asyncio
 import requests

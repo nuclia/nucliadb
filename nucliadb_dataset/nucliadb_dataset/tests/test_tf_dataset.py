@@ -1,9 +1,4 @@
 from nucliadb_dataset.streamer import Streamer
-from pyarrow import fs
-
-from datasets import IterableDataset
-
-from nucliadb_dataset import DSTYPE
 from nucliadb_protos.train_pb2 import TrainSet
 import tensorflow as tf
 
