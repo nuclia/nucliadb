@@ -1883,7 +1883,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nucliadb_paragraphs_tantivy2"
+name = "nucliadb_paragraphs_tantivy"
 version = "0.1.0"
 dependencies = [
  "itertools",
@@ -1930,7 +1930,7 @@ name = "nucliadb_services"
 version = "0.1.0"
 dependencies = [
  "nucliadb_fields_tantivy",
- "nucliadb_paragraphs_tantivy2",
+ "nucliadb_paragraphs_tantivy",
  "nucliadb_service_interface",
  "nucliadb_vectors",
 ]

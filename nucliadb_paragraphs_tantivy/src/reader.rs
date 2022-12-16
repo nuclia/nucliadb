@@ -74,30 +74,30 @@ impl ParagraphReader for ParagraphReaderService {
         let time = SystemTime::now();
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: starts at: {v} ms");
+            info!("{id:?} - Creating query: starts at {v} ms");
         }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
-        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        let text = self.adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
             suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: ends at: {v} ms");
+            info!("{id:?} - Creating query: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: starts at: {v} ms");
+            info!("{id:?} - Searching: starts at {v} ms");
         }
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(no_results);
         let mut results = searcher.search(&original, &topdocs).unwrap();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: ends at: {v} ms");
+            info!("{id:?} - Searching: ends at {v} ms");
         }
 
         if results.is_empty() {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Trying fuzzy: starts at: {v} ms");
+                info!("{id:?} - Trying fuzzy: starts at {v} ms");
             }
             let topdocs = TopDocs::with_limit(no_results - results.len());
             match searcher.search(&fuzzied, &topdocs) {
@@ -105,7 +105,7 @@ impl ParagraphReader for ParagraphReaderService {
                 Err(err) => error!("{err:?} during suggest"),
             }
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Trying fuzzy: ends at: {v} ms");
+                info!("{id:?} - Trying fuzzy: ends at {v} ms");
             }
         }
 
@@ -138,12 +138,11 @@ impl ReaderChild for ParagraphReaderService {
         let time = SystemTime::now();
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: starts at: {v} ms");
+            info!("{id:?} - Creating query: starts at {v} ms");
         }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-        let only_facets = results == 0 || (request.body.is_empty() && request.filter.is_none());
         let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
@@ -156,13 +155,13 @@ impl ReaderChild for ParagraphReaderService {
                     .collect()
             })
             .unwrap_or_default();
-        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        let text = self.adapt_text(&parser, &request.body);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Creating query: ends at: {v} ms");
+            info!("{id:?} - Creating query: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: starts at: {v} ms");
+            info!("{id:?} - Searching: starts at {v} ms");
         }
         let (original, termc, fuzzied) =
             search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
@@ -171,18 +170,18 @@ impl ReaderChild for ParagraphReaderService {
             results,
             offset,
             facets: &facets,
-            only_facets,
             order_field,
             text: &text,
+            only_faceted: request.only_faceted,
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Searching: ends at: {v} ms");
+            info!("{id:?} - Searching: ends at {v} ms");
         }
 
         if response.results.is_empty() {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Applying fuzzy: starts at: {v} ms");
+                info!("{id:?} - Applying fuzzy: starts at {v} ms");
             }
             searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
@@ -199,12 +198,12 @@ impl ReaderChild for ParagraphReaderService {
             response.total = response.results.len() as i32;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-                info!("{id:?} - Applying fuzzy: ends at: {v} ms");
+                info!("{id:?} - Applying fuzzy: ends at {v} ms");
             }
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Producing results: starts at: {v} ms");
+            info!("{id:?} - Producing results: starts at {v} ms");
         }
         let total = response.results.len() as f32;
         response.results.iter_mut().enumerate().for_each(|(i, r)| {
@@ -213,7 +212,7 @@ impl ReaderChild for ParagraphReaderService {
             }
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Producing results: starts at: {v} ms");
+            info!("{id:?} - Producing results: starts at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -266,13 +265,7 @@ impl ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        match ParagraphReaderService::open(config) {
-            Ok(service) => Ok(service),
-            Err(_e) => match ParagraphReaderService::new(config) {
-                Ok(service) => Ok(service),
-                Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
-            },
-        }
+        ParagraphReaderService::open(config).or_else(|_| ParagraphReaderService::new(config))
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
@@ -288,9 +281,9 @@ impl ParagraphReaderService {
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
-    pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
-        let paragraph_schema = ParagraphSchema::new();
 
+    pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
+        let paragraph_schema = ParagraphSchema::default();
         fs::create_dir_all(&config.path)?;
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
         let settings = IndexSettings {
@@ -300,6 +293,7 @@ impl ParagraphReaderService {
             }),
             ..Default::default()
         };
+
         index_builder = index_builder.settings(settings);
         let index = index_builder.create_in_dir(&config.path).unwrap();
         let reader = index
@@ -312,8 +306,9 @@ impl ParagraphReaderService {
             schema: paragraph_schema,
         })
     }
+
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
         let index = Index::open_in_dir(&config.path)?;
 
         let reader = index
@@ -328,7 +323,7 @@ impl ParagraphReaderService {
         })
     }
 
-    fn adapt_text(parser: &QueryParser, text: &str) -> String {
+    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
         match text.trim() {
             "" => text.to_string(),
             text => parser
@@ -374,9 +369,9 @@ struct Searcher<'a> {
     results: usize,
     offset: usize,
     facets: &'a [String],
-    only_facets: bool,
     order_field: Option<Field>,
     text: &'a str,
+    only_faceted: bool,
 }
 impl<'a> Searcher<'a> {
     fn do_search(
@@ -393,7 +388,7 @@ impl<'a> Searcher<'a> {
                 collector
             },
         );
-        if self.only_facets {
+        if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
             ParagraphSearchResponse::from(SearchFacetsResponse {
@@ -731,7 +726,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -750,7 +745,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -769,10 +764,10 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search on all paragraphs in resource with typo
         let search = ParagraphSearchRequest {
@@ -788,7 +783,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -807,7 +802,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -826,7 +821,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -845,7 +840,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -865,7 +860,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"shoupd + enaugh\"");
@@ -884,11 +879,11 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
-            with_duplicates: false,
-            ..Default::default()
+            with_duplicates: true,
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search filter all paragraphs
         let search = ParagraphSearchRequest {
@@ -904,7 +899,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 3);
@@ -921,7 +916,7 @@ mod tests {
             timestamps: Some(timestamps),
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -940,7 +935,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
-            ..Default::default()
+            only_faceted: false,
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
