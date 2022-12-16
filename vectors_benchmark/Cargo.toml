@@ -12,7 +12,7 @@ thiserror = "1.0.31"
 serde_json = "1.0.82"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.1.18", features = ["derive"] }
-nucliadb_vectors2 = {path= "../nucliadb_vectors2"}
+nucliadb_vectors = {path= "../nucliadb_vectors"}
 
 [[bin]]
 name = "vectors_benchmark"

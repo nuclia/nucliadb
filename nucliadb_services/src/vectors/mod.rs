@@ -27,9 +27,7 @@ pub type WVectors = Arc<RwLock<dyn VectorWriter>>;
 
 pub fn open_reader(config: &VectorConfig, version: u32) -> InternalResult<RVectors> {
     match version {
-        0 => nucliadb_vectors::service::VectorReaderService::open(config)
-            .map(|v| Arc::new(v) as RVectors),
-        1 => nucliadb_vectors2::vectors::service::VectorReaderService::open(config)
+        1 => nucliadb_vectors::vectors::service::VectorReaderService::open(config)
             .map(|v| Arc::new(v) as RVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
@@ -37,18 +35,14 @@ pub fn open_reader(config: &VectorConfig, version: u32) -> InternalResult<RVecto
 
 pub fn open_writer(config: &VectorConfig, version: u32) -> InternalResult<WVectors> {
     match version {
-        0 => nucliadb_vectors::service::VectorWriterService::open(config)
-            .map(|v| Arc::new(RwLock::new(v)) as WVectors),
-        1 => nucliadb_vectors2::vectors::service::VectorWriterService::open(config)
+        1 => nucliadb_vectors::vectors::service::VectorWriterService::open(config)
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
 }
 pub fn create_reader(config: &VectorConfig, version: u32) -> InternalResult<RVectors> {
     match version {
-        0 => nucliadb_vectors::service::VectorReaderService::new(config)
-            .map(|v| Arc::new(v) as RVectors),
-        1 => nucliadb_vectors2::vectors::service::VectorReaderService::new(config)
+        1 => nucliadb_vectors::vectors::service::VectorReaderService::new(config)
             .map(|v| Arc::new(v) as RVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
@@ -56,9 +50,7 @@ pub fn create_reader(config: &VectorConfig, version: u32) -> InternalResult<RVec
 
 pub fn create_writer(config: &VectorConfig, version: u32) -> InternalResult<WVectors> {
     match version {
-        0 => nucliadb_vectors::service::VectorWriterService::new(config)
-            .map(|v| Arc::new(RwLock::new(v)) as WVectors),
-        1 => nucliadb_vectors2::vectors::service::VectorWriterService::new(config)
+        1 => nucliadb_vectors::vectors::service::VectorWriterService::new(config)
             .map(|v| Arc::new(RwLock::new(v)) as WVectors),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }

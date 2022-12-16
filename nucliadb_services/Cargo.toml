@@ -8,7 +8,5 @@ edition = "2021"
 [dependencies]
 nucliadb_service_interface = { path = "../nucliadb_service_interface" }
 nucliadb_fields_tantivy= { path = "../nucliadb_fields_tantivy" }
-nucliadb_paragraphs_tantivy= { path = "../nucliadb_paragraphs_tantivy" }
 nucliadb_paragraphs_tantivy2= { path = "../nucliadb_paragraphs_tantivy2" }
 nucliadb_vectors= { path = "../nucliadb_vectors" }
-nucliadb_vectors2= { path = "../nucliadb_vectors2" }

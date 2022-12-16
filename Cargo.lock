@@ -1779,10 +1779,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nucliadb_byte_rpr"
-version = "0.1.0"
-
-[[package]]
 name = "nucliadb_cluster"
 version = "0.1.0"
 dependencies = [
@@ -1835,7 +1831,6 @@ dependencies = [
  "nucliadb_cluster",
  "nucliadb_protos",
  "nucliadb_services",
- "nucliadb_vectors",
  "openssl",
  "opentelemetry",
  "opentelemetry-jaeger",
@@ -1888,23 +1883,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nucliadb_paragraphs_tantivy"
-version = "0.1.0"
-dependencies = [
- "itertools",
- "lazy_static",
- "levenshtein_automata",
- "nucliadb_service_interface",
- "once_cell",
- "prost",
- "regex",
- "serde_json",
- "tantivy 0.17.0",
- "tantivy-common 0.2.0",
- "tantivy-fst",
-]
-
-[[package]]
 name = "nucliadb_paragraphs_tantivy2"
 version = "0.1.0"
 dependencies = [
@@ -1952,35 +1930,13 @@ name = "nucliadb_services"
 version = "0.1.0"
 dependencies = [
  "nucliadb_fields_tantivy",
- "nucliadb_paragraphs_tantivy",
  "nucliadb_paragraphs_tantivy2",
  "nucliadb_service_interface",
  "nucliadb_vectors",
- "nucliadb_vectors2",
 ]
 
 [[package]]
 name = "nucliadb_vectors"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "clap 3.2.23",
- "fs2",
- "heed",
- "log",
- "memmap2",
- "nucliadb_byte_rpr",
- "nucliadb_service_interface",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "nucliadb_vectors2"
 version = "0.1.0"
 dependencies = [
  "bincode",
@@ -3972,7 +3928,7 @@ name = "vectors_benchmark"
 version = "0.1.0"
 dependencies = [
  "clap 3.2.23",
- "nucliadb_vectors2",
+ "nucliadb_vectors",
  "rand 0.8.5",
  "serde",
  "serde_json",

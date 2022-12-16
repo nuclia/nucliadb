@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use nucliadb_service_interface::relations_interface::*;
-use nucliadb_vectors2::relations;
+use nucliadb_vectors::relations;
 
 use crate::*;
 pub const MAX_VERSION: u32 = 0;
