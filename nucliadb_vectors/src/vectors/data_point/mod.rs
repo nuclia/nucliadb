@@ -252,7 +252,7 @@ impl DataPoint {
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> DPResult<DataPoint>
     where Dlog: DeleteLog {
-        use io::Write;
+        use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
@@ -278,9 +278,14 @@ impl DataPoint {
         let node_producers = operants
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
-        key_value::merge(&mut nodes, node_producers.collect())?;
-        nodes.flush()?;
+
+        let mut node_buffer = BufWriter::new(&mut nodes);
+        key_value::merge(&mut node_buffer, node_producers.collect())?;
+        node_buffer.flush()?;
+        std::mem::drop(node_buffer);
         let nodes = unsafe { Mmap::map(&nodes)? };
+        let no_nodes = key_value::get_no_elems(&nodes);
+
         let mut index = RAMHnsw::new();
         let ops = HnswOps {
             tracker: &Retriever {
@@ -289,22 +294,24 @@ impl DataPoint {
                 delete_log: &NoDLog,
             },
         };
+        for id in 0..no_nodes {
+            ops.insert(Address(id), &mut index)
+        }
+        let mut hnswf_buffer = BufWriter::new(&mut hnswf);
+        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
+        hnswf_buffer.flush()?;
+        std::mem::drop(hnswf_buffer);
+        let index = unsafe { Mmap::map(&hnswf)? };
 
         let journal = Journal {
-            nodes: key_value::get_no_elems(&nodes),
+            nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: SystemTime::now(),
         };
-        (0..journal.nodes)
-            .into_iter()
-            .for_each(|id| ops.insert(Address(id), &mut index));
-
-        DiskHnsw::serialize_into(&mut hnswf, journal.nodes, index)?;
-        hnswf.flush()?;
-        let index = unsafe { Mmap::map(&hnswf)? };
-
-        journalf.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf.flush()?;
+        let mut journalf_buffer = BufWriter::new(&mut journalf);
+        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
+        journalf_buffer.flush()?;
+        std::mem::drop(journalf_buffer);
 
         Ok(DataPoint {
             journal,
@@ -345,12 +352,12 @@ impl DataPoint {
         mut elems: Vec<Elem>,
         with_time: Option<SystemTime>,
     ) -> DPResult<DataPoint> {
-        use io::Write;
+        use io::{BufWriter, Write};
 
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
-        let mut nodes = fs::OpenOptions::new()
+        let mut nodesf = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -365,11 +372,19 @@ impl DataPoint {
             .write(true)
             .create(true)
             .open(id.join(file_names::HNSW))?;
+
+        // Serializing nodes on disk
+        // Nodes are stored on disk and mmaped.
         elems.sort_by(|a, b| a.key.cmp(&b.key));
         elems.dedup_by(|a, b| a.key.cmp(&b.key).is_eq());
-        key_value::create_key_value(&mut nodes, elems)?;
-        nodes.flush()?;
-        let nodes = unsafe { Mmap::map(&nodes)? };
+        let mut nodesf_buffer = BufWriter::new(&mut nodesf);
+        key_value::create_key_value(&mut nodesf_buffer, elems)?;
+        nodesf_buffer.flush()?;
+        std::mem::drop(nodesf_buffer);
+        let nodes = unsafe { Mmap::map(&nodesf)? };
+        let no_nodes = key_value::get_no_elems(&nodes);
+
+        // Creating the HNSW using the mmaped nodes
         let mut index = RAMHnsw::new();
         let ops = HnswOps {
             tracker: &Retriever {
@@ -378,22 +393,28 @@ impl DataPoint {
                 delete_log: &NoDLog,
             },
         };
+        for id in 0..no_nodes {
+            ops.insert(Address(id), &mut index)
+        }
 
+        // The HNSW is on RAM
+        // Serializing the HNSW into disk
+        let mut hnswf_buffer = BufWriter::new(&mut hnswf);
+        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
+        hnswf_buffer.flush()?;
+        std::mem::drop(hnswf_buffer);
+        let index = unsafe { Mmap::map(&hnswf)? };
+
+        // Saving the journal
         let journal = Journal {
-            nodes: key_value::get_no_elems(&nodes),
+            nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: with_time.unwrap_or_else(SystemTime::now),
         };
-        (0..journal.nodes)
-            .into_iter()
-            .for_each(|id| ops.insert(Address(id), &mut index));
-
-        DiskHnsw::serialize_into(&mut hnswf, journal.nodes, index)?;
-        hnswf.flush()?;
-        let index = unsafe { Mmap::map(&hnswf)? };
-
-        journalf.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf.flush()?;
+        let mut journalf_buffer = BufWriter::new(&mut journalf);
+        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
+        journalf_buffer.flush()?;
+        std::mem::drop(journalf_buffer);
 
         Ok(DataPoint {
             journal,

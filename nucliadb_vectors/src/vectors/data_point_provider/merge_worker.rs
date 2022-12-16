@@ -72,7 +72,7 @@ impl Worker {
             ids.into_iter()
                 .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
                 .filter(|(.., r)| r.is_err())
-                .for_each(|(s, id, ..)| tracing::info!("Error while deleting {s:?}/{id}"));
+                .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
         }
         Ok(())
     }
