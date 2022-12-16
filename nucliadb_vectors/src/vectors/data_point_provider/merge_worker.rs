@@ -52,28 +52,32 @@ impl Worker {
         let lock = directory::shared_lock(subscriber)?;
         let state: State = directory::load_state(&lock)?;
         std::mem::drop(lock);
-        if let Some(work) = state.current_work_unit() {
-            let work: Vec<_> = work
-                .iter()
-                .rev()
-                .map(|j| (state.delete_log(*j), j.id()))
-                .collect();
-            let new_dp = DataPoint::merge(subscriber, &work)?;
-            let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
-            std::mem::drop(state);
 
-            let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
-            let lock = directory::exclusive_lock(subscriber)?;
-            let mut state: State = directory::load_state(&lock)?;
-            state.replace_work_unit(new_dp);
-            directory::persist_state(&lock, &state)?;
-            std::mem::drop(lock);
-            info!("Merge on {subscriber:?}:\n{report}");
-            ids.into_iter()
-                .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
-                .filter(|(.., r)| r.is_err())
-                .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
-        }
+        let Some(work) = state.current_work_unit().map(|work|
+            work
+            .iter()
+            .rev()
+            .map(|j| (state.delete_log(*j), j.id()))
+            .collect::<Vec<_>>()
+        ) else { return Ok(());};
+        let new_dp = DataPoint::merge(subscriber, &work)?;
+        let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
+        std::mem::drop(state);
+
+        let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
+
+        let lock = directory::exclusive_lock(subscriber)?;
+        let mut state: State = directory::load_state(&lock)?;
+        state.replace_work_unit(new_dp);
+        directory::persist_state(&lock, &state)?;
+        std::mem::drop(lock);
+
+        info!("Merge on {subscriber:?}:\n{report}");
+        ids.into_iter()
+            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
+            .filter(|(.., r)| r.is_err())
+            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
+
         Ok(())
     }
 }
