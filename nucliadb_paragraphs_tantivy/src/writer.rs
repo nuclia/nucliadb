@@ -25,6 +25,7 @@ use std::time::SystemTime;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
+use prost::Message;
 use regex::Regex;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -57,7 +58,6 @@ impl Debug for ParagraphWriterService {
 impl ParagraphWriter for ParagraphWriterService {}
 
 impl WriterChild for ParagraphWriterService {
-    #[tracing::instrument(skip_all)]
     fn stop(&mut self) -> InternalResult<()> {
         info!("Stopping Paragraph Service");
         Ok(())
@@ -134,27 +134,23 @@ impl WriterChild for ParagraphWriterService {
         }
         Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) {}
 }
 
 impl ParagraphWriterService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        match ParagraphWriterService::open(config) {
-            Ok(service) => Ok(service),
-            Err(_) => match ParagraphWriterService::new(config) {
-                Ok(service) => Ok(service),
-                Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
-            },
-        }
+        ParagraphWriterService::open(config).or_else(|_| ParagraphWriterService::new(config))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
         match ParagraphWriterService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
         match ParagraphWriterService::open_inner(config) {
             Ok(service) => Ok(service),
@@ -162,7 +158,7 @@ impl ParagraphWriterService {
         }
     }
     pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
 
         fs::create_dir_all(&config.path)?;
 
@@ -188,7 +184,7 @@ impl ParagraphWriterService {
     }
 
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
 
         let index = Index::open_in_dir(&config.path)?;
 
@@ -212,8 +208,20 @@ impl ParagraphWriterService {
                 .get(field)
                 .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
         };
+        let resource_facets = resource
+            .labels
+            .iter()
+            .map(Facet::from_text)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
         let mut paragraph_counter = 0;
         for (field, text_info) in &resource.texts {
+            let text_labels = text_info
+                .labels
+                .iter()
+                .map(Facet::from_text)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
             for (paragraph_id, p) in inspect_paragraph(field) {
                 paragraph_counter += 1;
                 let paragraph_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
@@ -221,38 +229,46 @@ impl ParagraphWriterService {
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
-                let labels = &p.labels;
                 let split = &p.split;
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
                 let text: String = chars[lower_bound..upper_bound].iter().collect();
                 let facet_field = format!("/{}", field);
+                let paragraph_labels = p
+                    .labels
+                    .iter()
+                    .map(Facet::from_text)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+
                 let mut doc = doc!(
                     self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
                     self.schema.modified => timestamp_to_datetime_utc(modified),
                     self.schema.created => timestamp_to_datetime_utc(created),
                     self.schema.status => resource.status as u64,
+                    self.schema.repeated_in_field => p.repeated_in_field as u64,
                 );
-                resource
-                    .labels
+
+                if let Some(ref metadata) = p.metadata {
+                    doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
+                }
+
+                resource_facets
                     .iter()
-                    .chain(text_info.labels.iter())
-                    .chain(labels.iter())
-                    .map(Facet::from)
+                    .chain(text_labels.iter())
+                    .chain(paragraph_labels.iter())
+                    .cloned()
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
-                debug!("Paragraph added {}", text);
                 doc.add_text(self.schema.text, &text);
                 doc.add_u64(self.schema.start_pos, start_pos);
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
-                debug!("Paragraph added");
                 self.writer.delete_term(paragraph_term);
                 self.writer.add_document(doc).unwrap();
                 if paragraph_counter % 500 == 0 {
-                    debug!("Commited");
                     self.writer.commit().unwrap();
                 }
             }
