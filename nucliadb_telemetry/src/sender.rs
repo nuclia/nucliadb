@@ -289,7 +289,7 @@ fn create_http_client() -> Option<HttpClient> {
     if let Some(client) = client_opt.as_ref() {
         info!("telemetry to {} is enabled.", client.endpoint());
     } else {
-        info!("telemetry to quickwit is disabled.");
+        info!("telemetry to nucliadb is disabled.");
     }
     client_opt
 }
