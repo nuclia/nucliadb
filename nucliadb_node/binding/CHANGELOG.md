@@ -1,4 +1,8 @@
 # Changelog
+## 0.4.9
+- Removing deprecated indexes
+
+## 0.4.8
 ## 0.4.7
 
 - Binding name update
