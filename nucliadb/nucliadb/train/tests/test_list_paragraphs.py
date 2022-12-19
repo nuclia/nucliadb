@@ -55,27 +55,19 @@ async def test_list_paragraphs_shows_ners_with_positions(
         if "Barcelona" in paragraph.metadata.text:
             found_barcelona = True
             assert paragraph.metadata.entities == {"Barcelona": "CITY"}
-            assert (
-                paragraph.metadata.entity_positions["CITY/Barcelona"].entity
-                == "Barcelona"
-            )
-            assert (
-                paragraph.metadata.entity_positions["CITY/Barcelona"].positions[0].start
-                == 43
-            )
-            assert (
-                paragraph.metadata.entity_positions["CITY/Barcelona"].positions[0].end
-                == 52
-            )
+            positions = paragraph.metadata.entity_positions["CITY/Barcelona"]
+            assert positions.entity == "Barcelona"
+            assert len(positions.positions) == 1
+            assert positions.positions[0].start == 43
+            assert positions.positions[0].end == 52
         elif "Manresa" in paragraph.metadata.text:
             found_manresa = True
             assert paragraph.metadata.entities == {"Manresa": "CITY"}
-            assert (
-                paragraph.metadata.entity_positions["CITY/Manresa"].positions[0].start
-                == 22
-            )
-            assert (
-                paragraph.metadata.entity_positions["CITY/Manresa"].positions[0].end
-                == 29
-            )
+            positions = paragraph.metadata.entity_positions["CITY/Manresa"]
+            assert positions.entity == "Manresa"
+            assert len(positions.positions) == 2
+            assert positions.positions[0].start == 22
+            assert positions.positions[0].end == 29
+            assert positions.positions[1].start == 38
+            assert positions.positions[1].end == 45
     assert found_manresa and found_barcelona
