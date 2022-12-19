@@ -21,6 +21,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from google.protobuf.internal.containers import MessageMap
+from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
@@ -34,6 +35,7 @@ from nucliadb_protos.resources_pb2 import (
     Metadata,
     Origin,
     Paragraph,
+    UserFieldMetadata,
 )
 from nucliadb_protos.utils_pb2 import (
     Relation,
@@ -118,15 +120,41 @@ class ResourceBrain:
         replace_splits: Dict[str, List[str]],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
+        basic_user_field_metadata: Optional[UserFieldMetadata] = None,
     ):
         # To check for duplicate paragraphs
         unique_paragraphs: Set[str] = set()
+
+        # Expose also user classes
+
+        if basic_user_field_metadata is not None:
+            paragraphs = {
+                compute_paragraph_key(self.rid, paragraph.key): paragraph
+                for paragraph in basic_user_field_metadata.paragraphs
+            }
+        else:
+            paragraphs = {}
 
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
+
+                user_classifications = []
+                denied_classifications = []
+                if key in paragraphs:
+                    user_classifications = [
+                        classification
+                        for classification in paragraphs[key].classifications
+                        if classification.cancelled_by_user is False
+                    ]
+
+                    denied_classifications = [
+                        f"/l/{classification.labelset}/{classification.label}"
+                        for classification in paragraphs[key].classifications
+                        if classification.cancelled_by_user is True
+                    ]
                 position = ParagraphPosition(
                     index=index,
                     start=paragraph.start,
@@ -153,14 +181,33 @@ class ResourceBrain:
                     metadata=ParagraphMetadata(position=position),
                 )
                 for classification in paragraph.classifications:
+                    label = f"/l/{classification.labelset}/{classification.label}"
+                    if label not in denied_classifications:
+                        p.labels.append(label)
+
+                for classification in user_classifications:
                     p.labels.append(
                         f"/l/{classification.labelset}/{classification.label}"
                     )
-
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
+            user_classifications = []
+            denied_classifications = []
+            if key in paragraphs:
+                user_classifications = [
+                    classification
+                    for classification in paragraphs[key].classifications
+                    if classification.cancelled_by_user is False
+                ]
+
+                denied_classifications = [
+                    f"/l/{classification.labelset}/{classification.label}"
+                    for classification in paragraphs[key].classifications
+                    if classification.cancelled_by_user is True
+                ]
+
             position = ParagraphPosition(
                 index=index,
                 start=paragraph.start,
@@ -183,6 +230,11 @@ class ResourceBrain:
                 metadata=ParagraphMetadata(position=position),
             )
             for classification in paragraph.classifications:
+                label = f"/l/{classification.labelset}/{classification.label}"
+                if label not in denied_classifications:
+                    p.labels.append(label)
+
+            for classification in user_classifications:
                 p.labels.append(f"/l/{classification.labelset}/{classification.label}")
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)

@@ -21,7 +21,7 @@ from typing import Optional
 
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
-from nucliadb.train.nodes import NodesManager  # type: ignore
+from nucliadb.train.nodes import TrainNodesManager  # type: ignore
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb.train.settings import settings
@@ -85,7 +85,10 @@ async def stop_train_grpc():
 async def start_nodes_manager():
     driver = await get_driver()
     cache = await get_cache()
-    set_utility(Utility.NODES, NodesManager(driver=driver, cache=cache))
+    storage = await get_storage()
+    set_utility(
+        Utility.NODES, TrainNodesManager(driver=driver, cache=cache, storage=storage)
+    )
 
 
 async def stop_nodes_manager():
@@ -93,8 +96,8 @@ async def stop_nodes_manager():
         clean_utility(Utility.NODES)
 
 
-def get_processor() -> Processor:
-    util = get_utility(Utility.PROCESSOR)
+def get_nodes_manager() -> TrainNodesManager:
+    util = get_utility(Utility.NODES)
     if util is None:
-        raise AttributeError("No processor defined")
+        raise AttributeError("No Node Manager defined")
     return util

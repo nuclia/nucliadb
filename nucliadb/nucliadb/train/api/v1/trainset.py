@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import Optional
 from fastapi_versioning import version  # type: ignore
 from fastapi import Request
 from nucliadb.train.api.models import TrainSetPartitions
@@ -46,7 +47,7 @@ from nucliadb.train.api.v1.router import KB_PREFIX, api
 @version(1)
 @requires_one([NucliaDBRoles.READER])
 async def get_partitions(
-    request: Request, kbid: str, prefix: str
+    request: Request, kbid: str, prefix: Optional[str] = ""
 ) -> TrainSetPartitions:
     all_keys = await get_kb_partitions(kbid, prefix)
     return TrainSetPartitions(partitions=all_keys)

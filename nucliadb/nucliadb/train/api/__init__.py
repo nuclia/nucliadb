@@ -17,6 +17,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from . import s3_bucket  # noqa
-from . import shards  # noqa
-from .router import api  # noqa

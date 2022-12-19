@@ -275,6 +275,14 @@ class Resource:
                 if type_id == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
 
+                user_field_metadata = next(
+                    (
+                        fm
+                        for fm in basic.fieldmetadata
+                        if fm.field.field == field_id and fm.field.field_type == type_id
+                    ),
+                    None,
+                )
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
@@ -282,6 +290,7 @@ class Resource:
                     replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
+                    basic_user_field_metadata=user_field_metadata,
                 )
 
             if self.disable_vectors is False:
@@ -585,6 +594,16 @@ class Resource:
             ):
                 page_positions = await get_file_page_positions(field_obj)
 
+            user_field_metadata = next(
+                (
+                    fm
+                    for fm in self.basic.fieldmetadata
+                    if fm.field.field == field_metadata.field.field
+                    and fm.field.field_type == field_metadata.field.field_type
+                ),
+                None,
+            )
+
             self.indexer.apply_field_metadata(
                 field_key,
                 metadata,
@@ -592,6 +611,7 @@ class Resource:
                 replace_splits=replace_splits,
                 page_positions=page_positions,
                 extracted_text=await field_obj.get_extracted_text(),
+                basic_user_field_metadata=user_field_metadata,
             )
 
             if (

@@ -18,9 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from enum import Enum
+from typing import List, Optional
 import uuid
 from datetime import datetime
-import uvicorn
+from httpx import AsyncClient
+from nucliadb.train import API_PREFIX
+import aiohttp
 
 import pytest
 from grpc import aio
@@ -44,6 +48,7 @@ from nucliadb_utils.utilities import (
     get_storage,
     set_utility,
 )
+from nucliadb.settings import Settings
 
 
 def free_port() -> int:
@@ -92,26 +97,12 @@ async def train_client(train_api):  # type: ignore
 
 
 @pytest.fixture(scope="function")
-async def train_rest_api(test_settings_train: None, local_files, event_loop):  # type: ignore
-    from nucliadb.train.app import application
-
-    await application.router.startup()
-    http_port = free_port()
-    config = uvicorn.Config(application, port=http_port, log_level="info")
-    server = uvicorn.Server(config)
-
-    if not config.loaded:
-        config.load()
-
-    server.lifespan = config.lifespan_class(config)
-
-    server.install_signal_handlers()
-
-    await server.startup()
-    yield f"localhost:{http_port}"
-    await server.shutdown()
-    await application.router.shutdown()
-    clear_global_cache()
+async def train_rest_api(nucliadb: Settings):  # type: ignore
+    async with aiohttp.ClientSession(
+        headers={"X-NUCLIADB-ROLES": "READER"},
+        base_url=f"http://localhost:{nucliadb.http}",
+    ) as client:
+        yield client
 
 
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:

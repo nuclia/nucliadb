@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
 from fastapi_versioning import version  # type: ignore
 from fastapi import Request
 from nucliadb.train.api.models import TrainSetPartitions

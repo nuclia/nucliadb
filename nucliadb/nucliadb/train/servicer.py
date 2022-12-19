@@ -39,13 +39,13 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.train.settings import settings
-from nucliadb.train.utils import get_processor
+from nucliadb.train.utils import get_nodes_manager
 from nucliadb_protos import train_pb2_grpc
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
     async def initialize(self):
-        self.proc = get_processor()
+        self.proc = get_nodes_manager()
 
     async def finalize(self):
         pass

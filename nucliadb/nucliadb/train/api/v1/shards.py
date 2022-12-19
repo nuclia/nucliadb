@@ -18,15 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from fastapi import HTTPException, Request, Response
+from typing import Union
+from fastapi import Body, HTTPException, Request, File
 from nucliadb.train.api.utils import (
-    create_response_dict,
     get_kb_partitions,
     get_train,
-    stream_data_from_trainset,
 )
 from nucliadb.train.generator import generate_train_data
-from nucliadb.train.utils import get_processor
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxResponseStatus
 from nucliadb_utils.authentication import requires_one
 from nucliadb_models.resource import (
@@ -34,29 +32,31 @@ from nucliadb_models.resource import (
 )
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from fastapi.responses import StreamingResponse
+from fastapi_versioning import version  # type: ignore
 
 
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/trainset/{{shard}}",
     tags=["Object Response"],
     status_code=200,
-    name="Return S3 Object call",
+    name="Return Train Stream",
 )
 @requires_one([NucliaDBRoles.READER])
+@version(1)
 async def object_get_response(
-    request: Request, kbid: str, shard: str, item: str
+    request: Request,
+    kbid: str,
+    shard: str,
 ) -> StreamingResponse:
-    proc = get_processor()
-    train = get_train(item)
-    response = await proc.get_kb(uuid=train.kbid)
-    if response.status == KnowledgeBoxResponseStatus.NOTFOUND:
-        raise HTTPException(status_code=404)
 
+    item: bytes = await request.body()
+    trainset = get_train(item)
     all_keys = await get_kb_partitions(kbid, shard)
 
     if len(all_keys) == 0:
         raise HTTPException(status_code=404)
 
     return StreamingResponse(
-        generate_train_data(train), media_type="application/octet-stream"
+        generate_train_data(kbid, shard, trainset),
+        media_type="application/octet-stream",
     )

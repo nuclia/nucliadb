@@ -17,11 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = [
-    "pytest_docker_fixtures",
-    "nucliadb.tests.fixtures",
-    "nucliadb.train.tests.fixtures",
-    "nucliadb_utils.tests.nats",
-    "nucliadb_utils.tests.gcs",
-    "nucliadb_utils.tests.s3",
-]
+
+from . import trainset  # noqa
+from . import shards  # noqa
+from .router import api  # noqa

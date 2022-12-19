@@ -34,6 +34,7 @@ from nucliadb_utils.utilities import (
     clean_utility,
     finalize_utilities,
     get_cache,
+    get_storage,
     get_utility,
     set_utility,
     start_audit_utility,

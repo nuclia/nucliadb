@@ -40,7 +40,7 @@ async def initialize() -> None:
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)
 
-    await start_chitchat()
+    await start_chitchat(SERVICE_NAME)
     await start_nodes_manager()
     await start_train_grpc(SERVICE_NAME)
     await start_audit_utility()
