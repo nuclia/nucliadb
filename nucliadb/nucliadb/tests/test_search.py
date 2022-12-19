@@ -296,12 +296,14 @@ async def test_search_can_filter_by_processing_status(
     - Checks that if not specified, search returns all resources.
     - Checks that search is able to filter by each value.
     """
-    status_list = ["PROCESSED", "PENDING", "ERROR"]
+    valid_status = ["PROCESSED", "PENDING", "ERROR"]
 
     created = 0
-    for status in status_list:
+    for status_name, status_value in rpb.Metadata.Status.items():
+        if status_name not in valid_status:
+            continue
         bm = broker_resource(knowledgebox)
-        bm.basic.metadata.status = rpb.Metadata.Status[status]
+        bm.basic.metadata.status = status_value
         await inject_message(nucliadb_grpc, bm)
         created += 1
 
@@ -311,12 +313,12 @@ async def test_search_can_filter_by_processing_status(
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == created
 
-    for status in status_list:
+    for status in valid_status:
         resp = await nucliadb_reader.post(
             f"/kb/{knowledgebox}/search",
             json={
                 "fields": ["a/title"],
-                "status": status,
+                "status": [status],
             },
         )
         assert resp.status_code == 200

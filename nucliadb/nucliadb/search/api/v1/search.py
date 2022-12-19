@@ -40,6 +40,7 @@ from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     NucliaDBClientType,
@@ -72,6 +73,7 @@ async def search_knowledgebox(
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
+    status: List[ResourceProcessingStatus] = Query(default=[]),
     sort: Optional[SortOption] = None,
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
@@ -108,6 +110,7 @@ async def search_knowledgebox(
         fields=fields,
         filters=filters,
         faceted=faceted,
+        status=status,
         sort=sort,
         page_number=page_number,
         page_size=page_size,
@@ -195,6 +198,7 @@ async def search(
         query=item.query,
         filters=item.filters,
         faceted=item.faceted,
+        status=item.status,
         sort=item.sort.value if item.sort else None,
         page_number=item.page_number,
         page_size=item.page_size,

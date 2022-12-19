@@ -259,7 +259,8 @@ message SearchRequest {
 
     bool with_duplicates = 14;
     bool only_faceted = 16;
-
+    
+    repeated noderesources.Resource.ResourceStatus status = 17;
 }
 
 message SuggestRequest {

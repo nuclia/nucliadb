@@ -325,6 +325,8 @@ pub struct SearchRequest {
     pub with_duplicates: bool,
     #[prost(bool, tag="16")]
     pub only_faceted: bool,
+    #[prost(enumeration="super::noderesources::resource::ResourceStatus", repeated, tag="17")]
+    pub status: ::prost::alloc::vec::Vec<i32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

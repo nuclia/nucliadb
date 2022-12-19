@@ -701,6 +701,7 @@ class SearchRequest(google.protobuf.message.Message):
     DOCUMENT_FIELD_NUMBER: builtins.int
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
@@ -726,6 +727,8 @@ class SearchRequest(google.protobuf.message.Message):
     document: builtins.bool
     with_duplicates: builtins.bool
     only_faceted: builtins.bool
+    @property
+    def status(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType]: ...
     def __init__(
         self,
         *,
@@ -745,9 +748,10 @@ class SearchRequest(google.protobuf.message.Message):
         document: builtins.bool = ...,
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        status: collections.abc.Iterable[nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "status", b"status", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
 
 global___SearchRequest = SearchRequest
 
