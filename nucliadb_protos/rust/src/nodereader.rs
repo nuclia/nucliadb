@@ -67,6 +67,8 @@ pub struct DocumentSearchRequest {
     pub result_per_page: i32,
     #[prost(message, optional, tag="9")]
     pub timestamps: ::core::option::Option<Timestamps>,
+    #[prost(enumeration="super::noderesources::resource::ResourceStatus", repeated, tag="16")]
+    pub status_filters: ::prost::alloc::vec::Vec<i32>,
     #[prost(bool, tag="10")]
     pub reload: bool,
     #[prost(bool, tag="15")]
@@ -96,6 +98,8 @@ pub struct ParagraphSearchRequest {
     pub result_per_page: i32,
     #[prost(message, optional, tag="12")]
     pub timestamps: ::core::option::Option<Timestamps>,
+    #[prost(enumeration="super::noderesources::resource::ResourceStatus", repeated, tag="16")]
+    pub status_filters: ::prost::alloc::vec::Vec<i32>,
     #[prost(bool, tag="13")]
     pub reload: bool,
     #[prost(bool, tag="14")]

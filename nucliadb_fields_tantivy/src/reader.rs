@@ -618,6 +618,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             only_faceted: false,
+            ..Default::default()
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
@@ -634,6 +635,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             only_faceted: false,
+            ..Default::default()
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
@@ -650,6 +652,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             only_faceted: false,
+            ..Default::default()
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
@@ -667,6 +670,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             only_faceted: false,
+            ..Default::default()
         };
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.query, "\"enough - test\"");
@@ -684,6 +688,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             only_faceted: false,
+            ..Default::default()
         };
 
         let result = field_reader_service.search(&search).unwrap();
@@ -701,6 +706,7 @@ mod tests {
             timestamps: Some(timestamps),
             reload: false,
             only_faceted: false,
+            ..Default::default()
         };
 
         let result = field_reader_service.search(&search).unwrap();

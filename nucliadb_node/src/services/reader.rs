@@ -420,6 +420,7 @@ impl ShardReaderService {
             timestamps: search_request.timestamps.clone(),
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
+            ..Default::default()
         };
 
         let field_reader_service = self.field_reader.clone();
@@ -447,6 +448,7 @@ impl ShardReaderService {
             timestamps: search_request.timestamps.clone(),
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
+            ..Default::default()
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
         let span = tracing::Span::current();

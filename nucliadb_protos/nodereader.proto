@@ -54,6 +54,7 @@ message DocumentSearchRequest {
     int32 result_per_page = 8;
 
     Timestamps timestamps = 9;
+    repeated noderesources.Resource.ResourceStatus status_filters = 16;
 
     bool reload = 10;
     bool only_faceted = 15;
@@ -81,8 +82,9 @@ message ParagraphSearchRequest {
 
     Timestamps timestamps = 12;
 
-    bool reload = 13;
+    repeated noderesources.Resource.ResourceStatus status_filters = 16;
 
+    bool reload = 13;
     bool with_duplicates = 14;
     bool only_faceted = 15;
 }
