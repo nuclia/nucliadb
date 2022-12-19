@@ -29,11 +29,8 @@ use tonic_health::proto::HealthCheckRequest;
 use tonic_health::proto::health_client::HealthClient;
 use tonic_health::proto::health_check_response::ServingStatus;
 
-use super::misc::linear_backoff;
+use super::{READER_HOST, READER_PORT, SERVER_STARTUP_TIMEOUT};
 
-
-const READER_HOST: &str = "127.0.0.1";
-const READER_PORT: u16 = 18031;
 
 pub type TestNodeReader = NodeReaderClient<Channel>;
 
@@ -68,30 +65,32 @@ pub async fn node_reader_server() {
         .build()
         .unwrap();
 
-    let mut wait = 100;
-    const MAX_WAIT: u64 = 5000;
-    while let Err(error) = Channel::builder(server_uri.clone()).connect().await {
-        tokio::time::sleep(tokio::time::Duration::from_millis(wait)).await;
-        wait = linear_backoff(wait, 2);
-        if wait > MAX_WAIT {
-            panic!(
-                "Something went wrong while starting reader gRPC server (too many times): {:?}",
-                error
-            );
+    let mut stub = backoff::future::retry(
+        backoff::ExponentialBackoffBuilder::new()
+            .with_max_elapsed_time(Some(SERVER_STARTUP_TIMEOUT))
+            .build(),
+        || async {
+            match Channel::builder(server_uri.clone()).connect().await {
+                Ok(channel) => {
+                    let stub = HealthClient::new(channel);
+                    Ok(stub)
+                },
+                Err(err) => {
+                    Err(backoff::Error::Transient { err: err, retry_after: None })
+                },
+            }
         }
-    }
+    ).await.unwrap();
 
-    let mut stub: HealthClient<Channel> = HealthClient::new(Channel::builder(server_uri).connect().await.unwrap());
     let result = stub.check(
         HealthCheckRequest { service: "nodereader.NodeReader".to_string() }
     ).await.unwrap();
 
-    if result.get_ref().status() != ServingStatus::Serving {
-        panic!(
-            "reader gRPC server not serving, it's {:?}!",
-            result.get_ref().status()
-        );
-    }
+    let serving_status = result.get_ref().status();
+    assert!(
+        serving_status == ServingStatus::Serving,
+        "Test error: reader gRPC server is not serving, it is {serving_status:?}"
+    );
 }
 
 

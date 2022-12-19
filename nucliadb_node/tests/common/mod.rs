@@ -20,9 +20,10 @@
 
 /// Utilities to test NucliaDB node
 
-mod misc;
+mod constants;
 mod node_reader;
 mod node_writer;
 
+pub use constants::*;
 pub use node_reader::*;
 pub use node_writer::*;
