@@ -57,7 +57,7 @@ impl Worker {
             work
             .iter()
             .rev()
-            .map(|j| (state.delete_log(*j), j.id()))
+            .map(|journal| (state.delete_log(*journal), journal.id()))
             .collect::<Vec<_>>()
         ) else { return Ok(());};
         let new_dp = DataPoint::merge(subscriber, &work)?;

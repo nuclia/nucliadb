@@ -251,7 +251,9 @@ impl DataPoint {
             .collect()
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> DPResult<DataPoint>
-    where Dlog: DeleteLog {
+    where
+        Dlog: DeleteLog,
+    {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
@@ -279,10 +281,12 @@ impl DataPoint {
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
 
-        let mut node_buffer = BufWriter::new(&mut nodes);
-        key_value::merge(&mut node_buffer, node_producers.collect())?;
-        node_buffer.flush()?;
-        std::mem::drop(node_buffer);
+        {
+            let mut node_buffer = BufWriter::new(&mut nodes);
+            key_value::merge(&mut node_buffer, node_producers.collect())?;
+            node_buffer.flush()?;
+        }
+
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = key_value::get_no_elems(&nodes);
 
@@ -297,10 +301,13 @@ impl DataPoint {
         for id in 0..no_nodes {
             ops.insert(Address(id), &mut index)
         }
-        let mut hnswf_buffer = BufWriter::new(&mut hnswf);
-        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
-        hnswf_buffer.flush()?;
-        std::mem::drop(hnswf_buffer);
+
+        {
+            let mut hnswf_buffer = BufWriter::new(&mut hnswf);
+            DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
+            hnswf_buffer.flush()?;
+        }
+
         let index = unsafe { Mmap::map(&hnswf)? };
 
         let journal = Journal {
@@ -308,10 +315,12 @@ impl DataPoint {
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: SystemTime::now(),
         };
-        let mut journalf_buffer = BufWriter::new(&mut journalf);
-        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf_buffer.flush()?;
-        std::mem::drop(journalf_buffer);
+        
+        {
+            let mut journalf_buffer = BufWriter::new(&mut journalf);
+            journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
+            journalf_buffer.flush()?;
+        }
 
         Ok(DataPoint {
             journal,
@@ -373,14 +382,15 @@ impl DataPoint {
             .create(true)
             .open(id.join(file_names::HNSW))?;
 
-        // Serializing nodes on disk
-        // Nodes are stored on disk and mmaped.
         elems.sort_by(|a, b| a.key.cmp(&b.key));
         elems.dedup_by(|a, b| a.key.cmp(&b.key).is_eq());
-        let mut nodesf_buffer = BufWriter::new(&mut nodesf);
-        key_value::create_key_value(&mut nodesf_buffer, elems)?;
-        nodesf_buffer.flush()?;
-        std::mem::drop(nodesf_buffer);
+        {
+            // Serializing nodes on disk
+            // Nodes are stored on disk and mmaped.
+            let mut nodesf_buffer = BufWriter::new(&mut nodesf);
+            key_value::create_key_value(&mut nodesf_buffer, elems)?;
+            nodesf_buffer.flush()?;
+        }
         let nodes = unsafe { Mmap::map(&nodesf)? };
         let no_nodes = key_value::get_no_elems(&nodes);
 
@@ -397,24 +407,26 @@ impl DataPoint {
             ops.insert(Address(id), &mut index)
         }
 
-        // The HNSW is on RAM
-        // Serializing the HNSW into disk
-        let mut hnswf_buffer = BufWriter::new(&mut hnswf);
-        DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
-        hnswf_buffer.flush()?;
-        std::mem::drop(hnswf_buffer);
+        {
+            // The HNSW is on RAM
+            // Serializing the HNSW into disk
+            let mut hnswf_buffer = BufWriter::new(&mut hnswf);
+            DiskHnsw::serialize_into(&mut hnswf_buffer, no_nodes, index)?;
+            hnswf_buffer.flush()?;
+        }
         let index = unsafe { Mmap::map(&hnswf)? };
 
-        // Saving the journal
         let journal = Journal {
             nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: with_time.unwrap_or_else(SystemTime::now),
         };
-        let mut journalf_buffer = BufWriter::new(&mut journalf);
-        journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
-        journalf_buffer.flush()?;
-        std::mem::drop(journalf_buffer);
+        {
+            // Saving the journal
+            let mut journalf_buffer = BufWriter::new(&mut journalf);
+            journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
+            journalf_buffer.flush()?;
+        }
 
         Ok(DataPoint {
             journal,
