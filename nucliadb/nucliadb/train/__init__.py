@@ -19,8 +19,8 @@
 
 import logging
 
-SERVICE_NAME = "nucliadb_train"
-API_PREFIX = "API"
+SERVICE_NAME = "nucliadb.train"
+API_PREFIX = "api"
 logger = logging.getLogger(SERVICE_NAME)
 
 

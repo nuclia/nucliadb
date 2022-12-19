@@ -136,10 +136,23 @@ message LabelsetsCount {
 }
 
 
+service Train {
+    rpc GetInfo(GetInfoRequest) returns (TrainInfo) {}
+    rpc GetSentences(GetSentencesRequest) returns (stream TrainSentence) {}
+    rpc GetParagraphs(GetParagraphsRequest) returns (stream TrainParagraph) {}
+    rpc GetFields(GetFieldsRequest) returns (stream TrainField) {}
+    rpc GetResources(GetResourcesRequest) returns (stream TrainResource) {}
+    rpc GetOntology(fdbwriter.GetLabelsRequest) returns (fdbwriter.GetLabelsResponse) {}
+    rpc GetEntities(fdbwriter.GetEntitiesRequest) returns (fdbwriter.GetEntitiesResponse) {}
+    rpc GetOntologyCount(GetLabelsetsCountRequest) returns (LabelsetsCount) {}
+}
+
+
 // Train API V2
 enum Type {
     PARAGRAPH_CLASSIFICATION = 0;
     TOKEN_CLASSIFICATION = 1;
+    SENTENCE_CLASSIFICATION = 2;
 }
 
 message TrainSet {
@@ -151,21 +164,52 @@ message TrainSet {
     int32 batch_size = 3;
     int32 seed = 4;
     float split = 5;
+
+    int32 minresources = 6;
+    bool nones = 7;  // average freq of the other labels
+    float oversampling = 8; // percentage of max oversampling
+
+}
+
+enum LabelFrom {
+    PARAGRAPH = 0;
+    RESOURCE = 1;
+}
+
+message Label {
+    string labelset = 1;
+    string label = 2;
+    LabelFrom origin = 3;
+    bool annotated = 4;
 }
 
 
-message Classification {
-    string paragraph = 1;
-    repeated string classification = 2;
+message TextLabel {
+    string text = 1;
+    repeated Label labels = 2;
 }
 
 message ParagraphClassificationBatch {
-    repeated Classification data = 1;
+    repeated TextLabel data = 1;
+}
+
+message SentenceClassificationBatch {
+    repeated TextLabel data = 1;
 }
 
 message Token {
-    string paragraph = 1;
-    repeated string token = 2;
+    string group = 1;
+    bool annotated = 2;
+    enum Schema {
+        O = 0;
+        B = 1;
+        I = 2;
+    }
+}
+
+message TokensClassification {
+    repeated string text = 1;
+    repeated Token labels = 2;
 }
 
 message TokenClassificationBatch {
@@ -176,15 +220,4 @@ message TrainResponse {
     int64 train = 1;
     int64 test = 2;
     Type type = 3;
-}
-
-service Train {
-    rpc GetInfo(GetInfoRequest) returns (TrainInfo) {}
-    rpc GetSentences(GetSentencesRequest) returns (stream TrainSentence) {}
-    rpc GetParagraphs(GetParagraphsRequest) returns (stream TrainParagraph) {}
-    rpc GetFields(GetFieldsRequest) returns (stream TrainField) {}
-    rpc GetResources(GetResourcesRequest) returns (stream TrainResource) {}
-    rpc GetOntology(fdbwriter.GetLabelsRequest) returns (fdbwriter.GetLabelsResponse) {}
-    rpc GetEntities(fdbwriter.GetEntitiesRequest) returns (fdbwriter.GetEntitiesResponse) {}
-    rpc GetOntologyCount(GetLabelsetsCountRequest) returns (LabelsetsCount) {}
 }
