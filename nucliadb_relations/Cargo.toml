@@ -1,4 +1,4 @@
-# WARNING! This package is deprecated. Look at nucliadb_vectors2/relations instead!
+# WARNING! This crate is deprecated. Look at nucliadb_vectors2/relations instead!
 
 [package]
 name = "nucliadb_relations"
