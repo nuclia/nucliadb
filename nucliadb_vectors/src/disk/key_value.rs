@@ -19,7 +19,6 @@
 //
 
 use std::cmp::Ordering;
-use std::fs::File;
 use std::io::{self, Seek, SeekFrom, Write};
 
 use super::usize_utils::*;
@@ -174,14 +173,18 @@ pub fn get_keys<'a, S: Slot + Copy + 'a>(
         .map(move |v| interface.get_key(v))
 }
 
-fn transfer_elem<S: Slot>(
+fn transfer_elem<S, R>(
     interface: S,
-    at: &mut File,
+    at: &mut R,
     from: &[u8],
     id: Pointer,
     writen_elems: usize,
     crnt_length: usize,
-) -> io::Result<usize> {
+) -> io::Result<usize>
+where
+    S: Slot,
+    R: Write + Seek,
+{
     let idx_slot = (HEADER_LEN + (writen_elems * POINTER_LEN)) as u64;
     let value = get_value::<S>(interface, from, id);
     at.seek(SeekFrom::Start(idx_slot))?;
@@ -208,7 +211,11 @@ fn get_metrics<S: Slot>(interface: S, source: &[u8]) -> (usize, usize) {
 // Merge algorithm for n key-value stores.
 // WARNING: In case of keys duplicatied keys it favors the contents of the first slot.
 // Returns the number of elements merged into the file.
-pub fn merge<S: Slot + Copy>(at: &mut File, producers: Vec<(S, &[u8])>) -> io::Result<usize> {
+pub fn merge<S, R>(recepient: &mut R, producers: Vec<(S, &[u8])>) -> io::Result<usize>
+where
+    S: Slot + Copy,
+    R: Write + Seek,
+{
     let lens = producers
         .iter()
         .copied()
@@ -226,7 +233,9 @@ pub fn merge<S: Slot + Copy>(at: &mut File, producers: Vec<(S, &[u8])>) -> io::R
 
     // Reserve space
     let total_space = HEADER_LEN + (POINTER_LEN * no_elems) + value_space;
-    at.set_len(total_space as u64)?;
+    for _ in 0..total_space {
+        recepient.write_all(&[0])?;
+    }
 
     // Merge loop
     let mut writen_elems = 0;
@@ -266,15 +275,16 @@ pub fn merge<S: Slot + Copy>(at: &mut File, producers: Vec<(S, &[u8])>) -> io::R
                 }
             });
         if let Some(((interface, min), min_id, _)) = min_data {
-            crnt_length = transfer_elem(interface, at, min, min_id, writen_elems, crnt_length)?;
+            crnt_length =
+                transfer_elem(interface, recepient, min, min_id, writen_elems, crnt_length)?;
             writen_elems += 1;
         }
     }
     // Write the number of elements
-    at.seek(SeekFrom::Start(0))?;
-    at.write_all(&writen_elems.to_le_bytes())?;
-    at.seek(SeekFrom::Start(0)).unwrap();
-    at.flush()?;
+    recepient.seek(SeekFrom::Start(0))?;
+    recepient.write_all(&writen_elems.to_le_bytes())?;
+    recepient.seek(SeekFrom::Start(0)).unwrap();
+    recepient.flush()?;
     Ok(writen_elems)
 }
 
