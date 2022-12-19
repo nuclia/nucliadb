@@ -35,7 +35,12 @@ from nucliadb_protos.train_pb2 import (
     TrainSentence,
 )
 from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import GetLabelsRequest, GetLabelsResponse, GetEntitiesResponse, GetEntitiesRequest
+from nucliadb_protos.writer_pb2 import (
+    GetEntitiesRequest,
+    GetEntitiesResponse,
+    GetLabelsRequest,
+    GetLabelsResponse,
+)
 
 
 class NucliaDriver:

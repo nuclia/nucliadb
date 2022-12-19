@@ -282,3 +282,42 @@ async def test_search_with_filters(
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_search_can_filter_by_processing_status(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    """
+    Test description:
+    - Creates a resource for each processing status value.
+    - Checks that if not specified, search returns all resources.
+    - Checks that search is able to filter by each value.
+    """
+    status_list = ["PROCESSED", "PENDING", "ERROR"]
+
+    created = 0
+    for status in status_list:
+        bm = broker_resource(knowledgebox)
+        bm.basic.metadata.status = rpb.Metadata.Status[status]
+        await inject_message(nucliadb_grpc, bm)
+        created += 1
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search", json={"fields": ["a/title"]}
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == created
+
+    for status in status_list:
+        resp = await nucliadb_reader.post(
+            f"/kb/{knowledgebox}/search",
+            json={
+                "fields": ["a/title"],
+                "status": status,
+            },
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()["resources"]) == 1
