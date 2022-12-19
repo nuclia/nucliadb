@@ -91,13 +91,22 @@ impl Journal {
 pub struct Address(usize);
 
 pub struct Retriever<'a, Dlog> {
+    no_nodes: usize,
     temp: &'a [u8],
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
+    pub fn new(temp: &'a [u8], nodes: &'a Mmap, delete_log: &'a Dlog) -> Retriever<'a, Dlog> {
+        Retriever {
+            temp,
+            nodes,
+            delete_log,
+            no_nodes: key_value::get_no_elems(nodes),
+        }
+    }
     fn find_node(&self, Address(x): Address) -> &[u8] {
-        if x == key_value::get_no_elems(self.nodes) {
+        if x == self.no_nodes {
             self.temp
         } else {
             key_value::get_value(Node, self.nodes, x)
@@ -107,7 +116,7 @@ impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
 
 impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
     fn get_vector(&self, x @ Address(addr): Address) -> &[u8] {
-        if addr == key_value::get_no_elems(self.nodes) {
+        if addr == self.no_nodes {
             self.temp
         } else {
             let x = self.find_node(x);
@@ -115,7 +124,7 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         }
     }
     fn is_deleted(&self, x @ Address(addr): Address) -> bool {
-        if addr == key_value::get_no_elems(self.nodes) {
+        if addr == self.no_nodes {
             false
         } else {
             let x = self.find_node(x);
@@ -124,7 +133,7 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         }
     }
     fn has_label(&self, Address(x): Address, label: &[u8]) -> bool {
-        if x == key_value::get_no_elems(self.nodes) {
+        if x == self.no_nodes {
             false
         } else {
             let x = key_value::get_value(Node, self.nodes, x);
@@ -132,11 +141,11 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         }
     }
     fn consine_similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
-        if a0 == key_value::get_no_elems(self.nodes) {
+        if a0 == self.no_nodes {
             let y = self.find_node(y);
             let y = Node::vector(y);
             vector::consine_similarity(self.temp, y)
-        } else if a1 == key_value::get_no_elems(self.nodes) {
+        } else if a1 == self.no_nodes {
             let x = self.find_node(x);
             let x = Node::vector(x);
             vector::consine_similarity(self.temp, x)
@@ -226,13 +235,9 @@ impl DataPoint {
     ) -> Vec<(String, f32)> {
         use ops_hnsw::params;
         let labels = labels.iter().map(|l| l.as_bytes()).collect::<Vec<_>>();
-        let ops = HnswOps {
-            tracker: &Retriever {
-                delete_log,
-                temp: &vector::encode_vector(query),
-                nodes: &self.nodes,
-            },
-        };
+        let encoded_query = vector::encode_vector(query);
+        let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log);
+        let ops = HnswOps { tracker: &tacker };
         let neighbours = ops.search(
             Address(self.journal.nodes),
             self.index.as_ref(),
@@ -289,15 +294,9 @@ impl DataPoint {
 
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = key_value::get_no_elems(&nodes);
-
+        let tracker = Retriever::new(&[], &nodes, &NoDLog);
+        let ops = HnswOps { tracker: &tracker };
         let mut index = RAMHnsw::new();
-        let ops = HnswOps {
-            tracker: &Retriever {
-                temp: &[],
-                nodes: &nodes,
-                delete_log: &NoDLog,
-            },
-        };
         for id in 0..no_nodes {
             ops.insert(Address(id), &mut index)
         }
@@ -315,7 +314,7 @@ impl DataPoint {
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: SystemTime::now(),
         };
-        
+
         {
             let mut journalf_buffer = BufWriter::new(&mut journalf);
             journalf_buffer.write_all(&serde_json::to_vec(&journal)?)?;
@@ -395,14 +394,9 @@ impl DataPoint {
         let no_nodes = key_value::get_no_elems(&nodes);
 
         // Creating the HNSW using the mmaped nodes
+        let tracker = Retriever::new(&[], &nodes, &NoDLog);
+        let ops = HnswOps { tracker: &tracker };
         let mut index = RAMHnsw::new();
-        let ops = HnswOps {
-            tracker: &Retriever {
-                temp: &[],
-                nodes: &nodes,
-                delete_log: &NoDLog,
-            },
-        };
         for id in 0..no_nodes {
             ops.insert(Address(id), &mut index)
         }
