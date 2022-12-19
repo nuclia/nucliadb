@@ -823,25 +823,7 @@ class Resource:
                         metadata.ClearField("entity_positions")
                         if enabled_metadata.entities and text is not None:
                             local_text = text[sentence.start : sentence.end]
-                            for entity_key, entity_value in entities.items():
-                                if entity_key not in local_text:
-                                    continue
-                                # Add the entity only if found in text
-                                metadata.entities[entity_key] = entity_value
-
-                                # Add positions for the entity
-                                poskey = f"{entity_value}/{entity_key}"
-                                position_metadata = field_metadata.positions.get(
-                                    poskey, None
-                                )
-                                if position_metadata is None:
-                                    continue
-
-                                metadata.entity_positions[poskey].entity = entity_key
-                                for p in position_metadata.position:
-                                    metadata.entity_positions[poskey].positions.append(
-                                        TrainPosition(start=p.start, end=p.end)
-                                    )
+                            add_entities_to_metadata(entities, local_text, metadata)
 
                         pb_sentence = TrainSentence()
                         pb_sentence.uuid = self.uuid
@@ -919,11 +901,11 @@ class Resource:
                         if extracted_text is not None and text is not None:
                             metadata.text = text[paragraph.start : paragraph.end]
 
+                        metadata.ClearField("entities")
+                        metadata.ClearField("entity_positions")
                         if enabled_metadata.entities and text is not None:
                             local_text = text[paragraph.start : paragraph.end]
-                            for entity_key, entity_value in entities.items():
-                                if entity_key in local_text:
-                                    metadata.entities[entity_key] = entity_value
+                            add_entities_to_metadata(entities, local_text, metadata)
 
                         if paragraph_key in userdefinedparagraphclass:
                             metadata.labels.paragraph.extend(
@@ -1078,3 +1060,25 @@ def add_field_classifications(
     fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
     basic.computedmetadata.field_classifications.append(fcfs)
     return True
+
+
+def add_entities_to_metadata(
+    entities: Dict[str, str], local_text: str, metadata: TrainMetadata
+) -> None:
+    for entity_key, entity_value in entities.items():
+        if entity_key not in local_text:
+            # Add the entity only if found in text
+            continue
+        metadata.entities[entity_key] = entity_value
+
+        # Add positions for the entity relative to the local text
+        poskey = f"{entity_value}/{entity_key}"
+        metadata.entity_positions[poskey].entity = entity_key
+        last_occurrence_end = 0
+        for _ in range(local_text.count(entity_key)):
+            start = local_text.index(entity_key, last_occurrence_end)
+            end = start + len(entity_key)
+            metadata.entity_positions[poskey].positions.append(
+                TrainPosition(start=start, end=end)
+            )
+            last_occurrence_end = end

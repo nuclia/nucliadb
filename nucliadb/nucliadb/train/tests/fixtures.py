@@ -138,7 +138,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
     etw = ExtractedTextWrapper()
     etw.field.CopyFrom(field1_if)
-    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa."  # noqa
+    etw.body.text = "My lovely field with some information from Barcelona. This will be the good field. \n\n And then we will go Manresa. I miss Manresa!"  # noqa
     message2.extracted_text.append(etw)
 
     fcmw = FieldComputedMetadataWrapper()
@@ -157,11 +157,11 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
     p2 = Paragraph()
     p2.start = 84
-    p2.end = 112
+    p2.end = 130
 
     s1 = Sentence()
     s1.start = 84
-    s1.end = 112
+    s1.end = 130
     p2.sentences.append(s1)
 
     fcmw.metadata.metadata.paragraphs.append(p1)
@@ -171,8 +171,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     fcmw.metadata.metadata.ner.update(
         {
             "Barcelona": "CITY",
-            "Manresa": "CITY",  # This one will have no positions
-            "Sofia": "CITY",  # This entity should not appear, as it is not in the text
+            "Manresa": "CITY",
         }
     )
     fcmw.metadata.metadata.positions["CITY/Barcelona"].entity = "Barcelona"
