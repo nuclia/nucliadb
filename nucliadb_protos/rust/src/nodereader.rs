@@ -330,7 +330,7 @@ pub struct SearchRequest {
     #[prost(bool, tag="16")]
     pub only_faceted: bool,
     #[prost(enumeration="super::noderesources::resource::ResourceStatus", repeated, tag="17")]
-    pub status: ::prost::alloc::vec::Vec<i32>,
+    pub status_filters: ::prost::alloc::vec::Vec<i32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {
