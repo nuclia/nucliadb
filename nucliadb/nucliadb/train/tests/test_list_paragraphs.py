@@ -23,7 +23,7 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 
 
 @pytest.mark.asyncio
-async def test_list_sentences(
+async def test_list_paragraphs(
     train_client: TrainStub, knowledgebox: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
@@ -37,3 +37,45 @@ async def test_list_sentences(
         count += 1
 
     assert count == 30
+
+
+@pytest.mark.asyncio
+async def test_list_paragraphs_shows_ners_with_positions(
+    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+) -> None:
+    req = GetParagraphsRequest()
+    req.kb.uuid = knowledgebox
+    req.metadata.entities = True
+    req.metadata.labels = True
+    req.metadata.text = True
+    req.metadata.vector = True
+
+    found_barcelona = found_manresa = False
+    async for paragraph in train_client.GetParagraphs(req):  # type: ignore
+        if "Barcelona" in paragraph.metadata.text:
+            found_barcelona = True
+            assert paragraph.metadata.entities == {"Barcelona": "CITY"}
+            assert (
+                paragraph.metadata.entity_positions["CITY/Barcelona"].entity
+                == "Barcelona"
+            )
+            assert (
+                paragraph.metadata.entity_positions["CITY/Barcelona"].positions[0].start
+                == 43
+            )
+            assert (
+                paragraph.metadata.entity_positions["CITY/Barcelona"].positions[0].end
+                == 52
+            )
+        elif "Manresa" in paragraph.metadata.text:
+            found_manresa = True
+            assert paragraph.metadata.entities == {"Manresa": "CITY"}
+            assert (
+                paragraph.metadata.entity_positions["CITY/Manresa"].positions[0].start
+                == 22
+            )
+            assert (
+                paragraph.metadata.entity_positions["CITY/Manresa"].positions[0].end
+                == 29
+            )
+    assert found_manresa and found_barcelona

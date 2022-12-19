@@ -64,9 +64,15 @@ async def test_list_sentences_shows_ners_with_positions(
                 == 52
             )
         elif "Manresa" in sentence.metadata.text:
-            # Entity found in text but without positions
             assert sentence.metadata.entities == {"Manresa": "CITY"}
-            assert "CITY/Manresa" not in sentence.metadata.entity_positions
+            assert (
+                sentence.metadata.entity_positions["CITY/Manresa"].positions[0].start
+                == 22
+            )
+            assert (
+                sentence.metadata.entity_positions["CITY/Manresa"].positions[0].end
+                == 29
+            )
         else:
             # Other sentences should not have entities nor positions
             assert sentence.metadata.entities == {}
