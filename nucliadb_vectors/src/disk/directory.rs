@@ -20,6 +20,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -42,21 +43,26 @@ fn write_state<S>(path: &Path, state: &S) -> DiskR<()>
 where S: Serialize {
     let temporal_path = path.join(names::TEMP);
     let state_path = path.join(names::STATE);
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&temporal_path)?;
+    let mut file = BufWriter::new(
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&temporal_path)?,
+    );
     bincode::serialize_into(&mut file, state)?;
+    file.flush()?;
     std::fs::rename(&temporal_path, &state_path)?;
     Ok(())
 }
 
 fn read_state<S>(path: &Path) -> DiskR<S>
 where S: DeserializeOwned {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(path.join(names::STATE))?;
+    let mut file = BufReader::new(
+        OpenOptions::new()
+            .read(true)
+            .open(path.join(names::STATE))?,
+    );
     Ok(bincode::deserialize_from(&mut file)?)
 }
 
