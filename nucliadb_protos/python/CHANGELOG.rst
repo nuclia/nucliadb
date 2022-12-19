@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.41
+------
+
+- Add new ComputedMetadata on resource basic
+
 0.0.40
 ------
 
