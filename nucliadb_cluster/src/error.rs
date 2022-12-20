@@ -1,22 +1,10 @@
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Cluster error kinds.
-#[derive(Error, Debug, Serialize, Deserialize)]
+/// The error that may occur when manipulating the node.
+#[derive(Debug, Error)]
 pub enum Error {
-    /// Read host key error.
-    #[error("Failed to read host key: `{0}`")]
-    ReadHostKey(String),
-    /// Write host key error.
-    #[error("Failed to write host key: `{0}`")]
-    WriteHostKey(String),
-    /// Incorrect node type
-    #[error("Unknown node type: `{0}`")]
-    UnknownNodeType(String),
-    #[error("Invalid load score '{0}")]
-    InvalidLoadScore(String),
-    #[error("Cannot get state from node `{0}`")]
-    MissingNodeState(String),
-    #[error("Cannot start cluster: {0}")]
-    CannotStartCluster(String),
+    #[error("cannot start the node: {0}")]
+    StartFailure(anyhow::Error),
+    #[error("cannot shutdown the node: {0}")]
+    ShutdownFailure(anyhow::Error),
 }
