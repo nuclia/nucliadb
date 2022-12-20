@@ -4,7 +4,7 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 from datasets import IterableDataset
 
 from nucliadb_dataset import DSTYPE
-from nucliadb_protos.train_pb2 import TrainSet
+from nucliadb_protos.train_pb2 import TrainSet, Type
 
 
 def test_hf_dataset(knowledgebox: KnowledgeBox):
@@ -13,7 +13,7 @@ def test_hf_dataset(knowledgebox: KnowledgeBox):
     # create a URL
 
     trainset = TrainSet()
-    trainset.type = TrainSet.Type.PARAGRAPH_CLASSIFICATION
+    trainset.type = Type.PARAGRAPH_CLASSIFICATION
     trainset.filter.labels.append("l/labelset1")
     trainset.batch_size = 2
     trainset.seed = 1234

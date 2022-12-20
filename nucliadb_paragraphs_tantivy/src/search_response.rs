@@ -19,6 +19,7 @@
 //
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use nucliadb_protos::{
     FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore,
 };
@@ -129,6 +130,8 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
+                    let labels = doc.get_all(schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
+
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
                     let end_pos = doc.get_first(schema.end_pos).unwrap().as_u64().unwrap();
@@ -165,6 +168,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         matches: terms,
                         score: Some(score),
                         metadata: schema.metadata(&doc),
+                        labels: labels
                     };
 
                     results.push(result);
@@ -227,6 +231,8 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
+                    let labels = doc.get_all(schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
+
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
                     let end_pos = doc.get_first(schema.end_pos).unwrap().as_u64().unwrap();
@@ -263,6 +269,7 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         index,
                         matches: terms,
                         metadata: schema.metadata(&doc),
+                        labels: labels,
                     };
 
                     results.push(result);

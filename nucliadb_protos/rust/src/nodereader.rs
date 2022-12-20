@@ -167,6 +167,8 @@ pub struct ParagraphResult {
     /// Metadata that can't be searched with but is returned on search results
     #[prost(message, optional, tag="11")]
     pub metadata: ::core::option::Option<super::noderesources::ParagraphMetadata>,
+    #[prost(string, repeated, tag="12")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
