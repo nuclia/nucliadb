@@ -71,7 +71,7 @@ pub fn create_query(
     if let Some(status) = search.with_status.map(|status| status as u64) {
         let term = Term::from_field_u64(schema.status, status);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-        queries.push((Occur::Must, Box::new(term_query.clone())));
+        queries.push((Occur::Must, Box::new(term_query)));
     };
 
     if queries.len() == 1 && queries[0].1.is::<AllQuery>() {

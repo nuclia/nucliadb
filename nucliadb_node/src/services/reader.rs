@@ -420,7 +420,7 @@ impl ShardReaderService {
             timestamps: search_request.timestamps.clone(),
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
-            with_status: search_request.with_status.clone(),
+            with_status: search_request.with_status,
         };
 
         let field_reader_service = self.field_reader.clone();
