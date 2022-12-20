@@ -21,24 +21,21 @@ from typing import Optional
 
 from grpc import aio  # type: ignore
 from grpc_health.v1 import health, health_pb2_grpc
+
+from nucliadb.ingest.utils import get_driver
 from nucliadb.train.nodes import TrainNodesManager  # type: ignore
+from nucliadb.train.settings import settings
+from nucliadb_protos import train_pb2_grpc
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
-from nucliadb.train.settings import settings
-from nucliadb_utils.store import MAIN
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
-    get_audit,
     get_cache,
     get_storage,
     get_utility,
     set_utility,
 )
-from nucliadb_protos import train_pb2_grpc
-
-from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.utils import get_driver
 
 
 async def start_train_grpc(service_name: Optional[str] = None):

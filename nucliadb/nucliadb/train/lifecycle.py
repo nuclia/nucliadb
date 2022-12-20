@@ -19,15 +19,17 @@
 #
 import logging
 import sys
-from nucliadb.train.chitchat import start_chitchat, stop_chitchat
+
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
+
 from nucliadb.train import SERVICE_NAME, logger
+from nucliadb.train.chitchat import start_chitchat, stop_chitchat
 from nucliadb.train.utils import (
-    start_train_grpc,
-    stop_train_grpc,
     start_nodes_manager,
+    start_train_grpc,
     stop_nodes_manager,
+    stop_train_grpc,
 )
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.settings import running_settings

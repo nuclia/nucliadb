@@ -18,6 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from . import trainset  # noqa
 from . import shards  # noqa
+from . import trainset  # noqa
 from .router import api  # noqa

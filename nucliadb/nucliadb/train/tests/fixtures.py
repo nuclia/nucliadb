@@ -18,14 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from enum import Enum
-from typing import List, Optional
 import uuid
 from datetime import datetime
-from httpx import AsyncClient
-from nucliadb.train import API_PREFIX
-import aiohttp
 
+import aiohttp
 import pytest
 from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
@@ -42,13 +38,13 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
+from nucliadb.settings import Settings
 from nucliadb_utils.utilities import (
     Utility,
     clear_global_cache,
     get_storage,
     set_utility,
 )
-from nucliadb.settings import Settings
 
 
 def free_port() -> int:
@@ -78,7 +74,7 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
 
 @pytest.fixture(scope="function")
 async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
-    from nucliadb.train.utils import stop_train_grpc, start_train_grpc
+    from nucliadb.train.utils import start_train_grpc, stop_train_grpc
 
     await start_train_grpc("testing_train")
     yield

@@ -21,7 +21,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from google.protobuf.internal.containers import MessageMap
-from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
@@ -47,6 +46,7 @@ from nucliadb_protos.utils_pb2 import (
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
+from nucliadb.ingest.orm.utils import compute_paragraph_key
 
 if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]

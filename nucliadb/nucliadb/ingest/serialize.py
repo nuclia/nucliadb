@@ -52,8 +52,8 @@ from nucliadb_models.resource import (
     TextFieldData,
     TextFieldExtractedData,
 )
-from nucliadb_models.vectors import UserVectorSet
 from nucliadb_models.search import ResourceProperties
+from nucliadb_models.vectors import UserVectorSet
 from nucliadb_utils.utilities import get_cache, get_storage
 
 

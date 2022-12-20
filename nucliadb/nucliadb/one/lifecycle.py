@@ -24,8 +24,8 @@ from nucliadb.reader.lifecycle import finalize as finalize_reader
 from nucliadb.reader.lifecycle import initialize as initialize_reader
 from nucliadb.search.lifecycle import finalize as finalize_search
 from nucliadb.search.lifecycle import initialize as initialize_search
-from nucliadb.train.lifecycle import initialize as initialize_train
 from nucliadb.train.lifecycle import finalize as finalize_train
+from nucliadb.train.lifecycle import initialize as initialize_train
 from nucliadb.writer.lifecycle import finalize as finalize_writer
 from nucliadb.writer.lifecycle import initialize as initialize_writer
 from nucliadb_utils.utilities import finalize_utilities

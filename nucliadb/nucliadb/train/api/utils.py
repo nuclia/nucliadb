@@ -19,8 +19,9 @@
 #
 
 
-from nucliadb.train.utils import get_nodes_manager
 from nucliadb_protos.train_pb2 import TrainSet
+
+from nucliadb.train.utils import get_nodes_manager
 
 
 async def get_kb_partitions(kbid: str, prefix: str):

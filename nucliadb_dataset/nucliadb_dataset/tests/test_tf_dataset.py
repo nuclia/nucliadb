@@ -1,6 +1,8 @@
+import tensorflow as tf  # type: ignore
+from nucliadb_protos.train_pb2 import TrainSet, Type
+
 from nucliadb_dataset.streamer import Streamer
-from nucliadb_protos.train_pb2 import TrainSet
-import tensorflow as tf
+from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
 def test_tf_dataset(knowledgebox: KnowledgeBox):
@@ -9,12 +11,11 @@ def test_tf_dataset(knowledgebox: KnowledgeBox):
     # create a URL
 
     trainset = TrainSet()
-    trainset.kbid = "XXX"
-    trainset.type = TrainSet.Type.PARAGRAPH_CLASSIFICATION
+    trainset.type = Type.PARAGRAPH_CLASSIFICATION
 
-    streamer = Streamer()
+    streamer = Streamer(trainset, knowledgebox.client)
 
-    ds = tf.data.Dataset.from_generator(
+    _ = tf.data.Dataset.from_generator(
         streamer.get_data,
         output_signature=(
             tf.TensorSpec(shape=(), dtype=tf.int32),

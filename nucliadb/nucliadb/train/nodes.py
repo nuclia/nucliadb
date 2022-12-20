@@ -19,9 +19,7 @@
 #
 import random
 from typing import AsyncIterator, List, Optional, Tuple
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
+
 from nucliadb_protos.train_pb2 import (
     GetFieldsRequest,
     GetParagraphsRequest,
@@ -32,13 +30,14 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-
-from nucliadb_protos.writer_pb2 import ShardObject, Shards
+from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm import NODE_CLUSTER, NODES
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.keys import KB_SHARDS
@@ -130,20 +129,15 @@ class TrainNodesManager:
 
         return node_obj, shard_id, node_id
 
-    async def get_kb_obj(
-        self, txn: Transaction, kbid: KnowledgeBoxID
-    ) -> Optional[KnowledgeBox]:
-        uuid: Optional[str] = kbid.uuid
-        if uuid == "":
-            uuid = await KnowledgeBox.get_kb_uuid(txn, kbid.slug)
+    async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
 
-        if uuid is None:
+        if kbid is None:
             return None
 
-        if not (await KnowledgeBox.exist_kb(txn, uuid)):
+        if not (await KnowledgeBox.exist_kb(txn, kbid)):
             return None
 
-        kbobj = KnowledgeBox(txn, self.storage, self.cache, uuid)
+        kbobj = KnowledgeBox(txn, self.storage, self.cache, kbid)
         return kbobj
 
     async def kb_sentences(
