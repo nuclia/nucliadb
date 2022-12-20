@@ -318,7 +318,7 @@ async def test_search_can_filter_by_processing_status(
             f"/kb/{knowledgebox}/search",
             json={
                 "fields": ["a/title"],
-                "status": [status],
+                "status_filters": [status],
             },
         )
         assert resp.status_code == 200

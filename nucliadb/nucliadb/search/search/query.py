@@ -28,8 +28,8 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.search import SearchOptions, Sort, SuggestOptions
 from nucliadb_models.metadata import ResourceProcessingStatus
+from nucliadb_models.search import SearchOptions, Sort, SuggestOptions
 
 
 async def global_query_to_pb(
@@ -38,7 +38,7 @@ async def global_query_to_pb(
     query: str,
     filters: List[str],
     faceted: List[str],
-    status: List[ResourceProcessingStatus],
+    status_filters: List[ResourceProcessingStatus],
     page_number: int,
     page_size: int,
     range_creation_start: Optional[datetime] = None,
@@ -61,8 +61,8 @@ async def global_query_to_pb(
     request.reload = reload
     request.with_duplicates = with_duplicates
 
-    for sts in status:
-        request.status.append(PROCESSING_STATUS_TO_PB_MAP[sts])
+    for status in status_filters:
+        request.status_filters.append(PROCESSING_STATUS_TO_PB_MAP[status])
 
     # We need to ask for all and cut later
     request.page_number = 0
@@ -181,5 +181,5 @@ async def paragraph_query_to_pb(
 PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.PENDING: Resource.ResourceStatus.PENDING,
     ResourceProcessingStatus.PROCESSED: Resource.ResourceStatus.PROCESSED,
-    ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR
+    ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR,
 }

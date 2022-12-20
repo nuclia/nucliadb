@@ -27,9 +27,8 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.metadata import ResourceProcessingStatus
-
+from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
 if TYPE_CHECKING:
     SortValue = OrderBy.OrderType.V
@@ -262,7 +261,7 @@ class SearchRequest(BaseModel):
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []
-    status: List[ResourceProcessingStatus] = []
+    status_filters: List[ResourceProcessingStatus] = []
     sort: Optional[SortOption] = None
     page_number: int = 0
     page_size: int = 20
