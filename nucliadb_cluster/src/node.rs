@@ -404,7 +404,9 @@ mod tests {
                 r#type: NodeType::Io,
                 address: node.node_id.gossip_public_address,
                 is_self: true,
-                state: [(LOAD_SCORE_KEY.to_string(), 100.to_string())].into_iter().collect(),
+                state: [(LOAD_SCORE_KEY.to_string(), 100.to_string())]
+                    .into_iter()
+                    .collect(),
             }
         );
 
@@ -440,22 +442,29 @@ mod tests {
         let live_nodes = first_node.live_nodes().await;
         let snapshots = cluster_snapshot(live_nodes).await;
 
-        assert_eq!(snapshots, vec![
-            NodeSnapshot {
-                id: second_node.node_id.id,
-                r#type: NodeType::Ingest,
-                address: second_node.node_id.gossip_public_address,
-                is_self: false,
-                state: [(LOAD_SCORE_KEY.to_string(), 40.to_string())].into_iter().collect(),
-            },
-            NodeSnapshot {
-                id: first_node.node_id.id,
-                r#type: NodeType::Io,
-                address: first_node.node_id.gossip_public_address,
-                is_self: true,
-                state: [(LOAD_SCORE_KEY.to_string(), 100.to_string())].into_iter().collect(),
-            },
-        ]);
+        assert_eq!(
+            snapshots,
+            vec![
+                NodeSnapshot {
+                    id: second_node.node_id.id,
+                    r#type: NodeType::Ingest,
+                    address: second_node.node_id.gossip_public_address,
+                    is_self: false,
+                    state: [(LOAD_SCORE_KEY.to_string(), 40.to_string())]
+                        .into_iter()
+                        .collect(),
+                },
+                NodeSnapshot {
+                    id: first_node.node_id.id,
+                    r#type: NodeType::Io,
+                    address: first_node.node_id.gossip_public_address,
+                    is_self: true,
+                    state: [(LOAD_SCORE_KEY.to_string(), 100.to_string())]
+                        .into_iter()
+                        .collect(),
+                },
+            ]
+        );
 
         Ok(())
     }

@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Context};
 use clap::Parser;
 use log::{debug, error, info};
-use nucliadb_cluster::{node, Node, NodeType, NodeSnapshot};
+use nucliadb_cluster::{node, Node, NodeSnapshot, NodeType};
 use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{self, TcpStream};

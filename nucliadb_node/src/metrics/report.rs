@@ -67,7 +67,6 @@ impl NodeReport {
             .saturating_mul(self.paragraph_count.get()) as f32
             / 100.0
     }
-
 }
 
 impl Report for NodeReport {

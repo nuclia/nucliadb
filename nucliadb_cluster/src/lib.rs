@@ -1,7 +1,7 @@
 pub mod error;
-pub mod node;
 pub mod key;
+pub mod node;
 
 pub use error::Error;
-pub use node::{Node, NodeType, NodeSnapshot, NodeHandle};
 pub use key::Key;
+pub use node::{Node, NodeHandle, NodeSnapshot, NodeType};
