@@ -220,10 +220,10 @@ def from_resource_to_payload(
         payload: Union[
             UpdateResourcePayload, CreateResourcePayload
         ] = UpdateResourcePayload()
-        payload.slug = item.slug
+        payload.slug = item.slug  # type: ignore
     else:
         payload = CreateResourcePayload()
-        payload.slug = item.id
+        payload.slug = item.id  # type: ignore
 
     payload.title = item.title
     payload.summary = item.summary
@@ -237,13 +237,13 @@ def from_resource_to_payload(
 
     payload.origin = item.origin
 
-    if item.data.texts is not None:
+    if item.data is not None and item.data.texts is not None:
         for field, field_payload in item.data.texts.items():
             payload.texts[field] = TextField(
                 body=field_payload.value.body, format=field_payload.value.format
             )
 
-    if item.data.links is not None:
+    if item.data is not None and item.data.links is not None:
         for field, field_payload in item.data.links.items():
             payload.links[field] = LinkField(
                 uri=field_payload.value.uri,
@@ -253,31 +253,33 @@ def from_resource_to_payload(
                 localstorage=field_payload.value.localstorage,
             )
 
-    for field, field_payload in item.data.files.items():
-        data = download(uri=field_payload.value.file.uri)
-        payload.files[field] = FileField(
-            language=field_payload.value.language,
-            password=field_payload.value.password,
-            file=NDBModelsFile(
-                payload=base64.b64encode(data),
-                filename=field_payload.value.file.filename,
-                content_type=field_payload.value.file.content_type,
-            ),
-        )
+    if item.data is not None:
+        for field, field_payload in item.data.files.items():
+            if field_payload.value is not None:
+                data = download(uri=field_payload.value.file.uri)
+                payload.files[field] = FileField(
+                    language=field_payload.value.language,
+                    password=field_payload.value.password,
+                    file=NDBModelsFile(
+                        payload=base64.b64encode(data),
+                        filename=field_payload.value.file.filename,
+                        content_type=field_payload.value.file.content_type,
+                    ),
+                )
 
-    if item.data.layouts is not None:
+    if item.data is not None and item.data.layouts is not None:
         for field, field_payload in item.data.layouts.items():
             raise NotImplementedError()
 
-    if item.data.conversations is not None:
+    if item.data is not None and item.data.conversations is not None:
         for field, field_payload in item.data.conversations.items():
             raise NotImplementedError()
 
-    if item.data.keywordsets is not None:
+    if item.data is not None and item.data.keywordsets is not None:
         for field, field_payload in item.data.keywordsets.items():
             raise NotImplementedError()
 
-    if item.data.datetimes is not None:
+    if item.data is not None and item.data.datetimes is not None:
         for field, field_payload in item.data.datetimes.items():
             raise NotImplementedError()
 
