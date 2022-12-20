@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let mut cluster_watcher = node.cluster_watcher().await;
-    let monitor_task = tokio::spawn(async move {
+    let monitor_task = tokio::task::spawn_local(async move {
         loop {
             debug!("node writer wait updates");
             if let Some(live_nodes) = cluster_watcher.next().await {
