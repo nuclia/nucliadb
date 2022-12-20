@@ -204,7 +204,7 @@ message VectorSearchResponse {
 
 // Relation filters are used to make the 
 // search domain smaller. By providing filters the 
-// search may  be faster.
+// search may be faster.
 message RelationFilter {
     // Will filter the search to nodes of type ntype.
     utils.RelationNode.NodeType ntype = 1;
@@ -214,20 +214,33 @@ message RelationFilter {
     string subtype = 2;
 }
 
-// A request for the relation index.
+// Search request for the relation index.
+//
+// It can be done using two strategies:
+// - text search over vertex (node) names
+// - graph search given some entry points (initial vertices)
+//
+// When a prefix is provided, search will be done by prefix, otherwise
+// it will perform a graph search. Filters can be applied to both searches
 message RelationSearchRequest {
-    string id = 1; //Shard ID
-    // A search will start from each of the entry points.
-    // Zero entry points are provided will trigger an iteration
-    // through all of the nodes.
-    repeated utils.RelationNode entry_points = 2;
-    // If needed, the search can be guided through 
-    repeated RelationFilter type_filters = 3;
-    // The user can impose a limit in the number of jumps
-    // the seach may perfom.
-    int32 depth = 4;
+    // Shard ID
+    string id = 1;
+
+    // Prefix to search node (vertex) names
     // Nodes can be filtered by prefix.
     string prefix = 5;
+
+    // List of vertices where search will trigger.
+    repeated utils.RelationNode entry_points = 2;
+
+    // Limit search depth, i.e., distance between entry points and
+    // results. Vertices connected by an edge are at distance one.
+    int32 depth = 4;
+
+    // Filters to apply while searching. It's an OR filtering: any
+    // node (vertex) staisfying one condition will be returned
+    repeated RelationFilter type_filters = 3;
+
     bool reload = 13;
 }
 
