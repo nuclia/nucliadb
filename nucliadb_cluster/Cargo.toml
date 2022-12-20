@@ -33,6 +33,14 @@ rand = "0.8.5"
 strum = { version = "0.24.1", features = ["derive"] }
 clap = { version = "4.0.29", features = ["derive", "env"] }
 parse_duration = "2.1.1"
+derive_builder = "0.12.0"
+derive_more = { version = "0.99.17", default-features = false, features = ["display"] }
+itertools = "0.10.5"
+futures = "0.3.25"
+
+[dev-dependencies]
+serde_test = "1.0.150"
+serial_test = "0.10.0"
 
 [[test]]
 name = "integration"
