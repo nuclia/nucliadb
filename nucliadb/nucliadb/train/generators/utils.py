@@ -1,8 +1,9 @@
 from contextvars import ContextVar
 from typing import Dict, Optional
+
 from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
+from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.utils import get_driver
 from nucliadb.train import SERVICE_NAME
 from nucliadb_utils.utilities import get_cache, get_storage

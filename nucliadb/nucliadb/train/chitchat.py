@@ -19,13 +19,11 @@
 #
 from __future__ import annotations
 
-import asyncio
-
 from nucliadb.ingest.chitchat import start_chitchat as start_chitchat_ingest
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.utils import get_chitchat
-from nucliadb.train.settings import settings
 from nucliadb.train import logger
+from nucliadb.train.settings import settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility
 
 

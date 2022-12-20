@@ -1,10 +1,10 @@
-from typing import Dict, List, Optional, Tuple, TypeVar, Type
-from google.protobuf.json_format import MessageToDict
-from nucliadb_protos import resources_pb2
+from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
+from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 
 from nucliadb_models import FieldID
+from nucliadb_protos import resources_pb2
 
 UserVectorPosition = Tuple[int, int]
 _T = TypeVar("_T")

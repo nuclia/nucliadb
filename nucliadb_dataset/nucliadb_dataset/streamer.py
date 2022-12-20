@@ -1,41 +1,14 @@
-import aiohttp
-from nucliadb_sdk.client import NucliaDBClient
 import requests
-from nucliadb_protos.train_pb2 import TrainSet
+from nucliadb_protos.train_pb2 import (
+    ParagraphClassificationBatch,
+    TrainResponse,
+    TrainSet,
+    Type,
+)
+
+from nucliadb_sdk.client import NucliaDBClient
 
 SIZE_BYTES = 4
-
-
-class AsyncStreamer:
-    def __init__(self, base_url: str, trainset: TrainSet):
-        self.base_url = base_url
-        self.headers = {"X-NUCLIADB-ROLES": "READER"}
-        self.trainset = trainset
-
-    async def get_partitions(self):
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.get(
-                f"{self.base_url}/{self.trainset.kbid}/trainset"
-            ) as client:
-                data = await client.json()
-        return data
-
-    async def get_data(self):
-        finished = False
-        async with aiohttp.ClientSession(headers=self.headers) as session:
-            async with session.get(
-                f"{self.base_url}/{self.trainset.kbid}/trainset"
-            ) as client:
-                while not finished:
-                    data = await client.content.read(SIZE_BYTES)
-                    if data is None:
-                        finished = True
-                        break
-                    payload_size = int.from_bytes(data, byteorder="big", signed=False)
-
-                    payload = await client.read(payload_size)
-                    pb = TrainPayload()
-                    pb.ParseFromString(payload)
 
 
 class Streamer:
@@ -47,6 +20,17 @@ class Streamer:
         self.client = client
         self.trainset = trainset
         self.session = requests.Session()
+        self.first = False
+        self.train_size = None
+        self.test_size = None
+        self.total_train_batches = None
+        self.total_test_batches = None
+        self.count_train_batches = None
+        self.count_test_batches = None
+        self.test_phase = False
+
+        if self.trainset.type == Type.PARAGRAPH_CLASSIFICATION:
+            self.klass = ParagraphClassificationBatch
 
     def get_partitions(self):
         return self.client.reader_session.get(
@@ -60,6 +44,8 @@ class Streamer:
             headers=self.headers,
             stream=True,
         )
+        self.first = False
+        self.test_phase = False
 
     def finalize(self):
         self.resp.close()
@@ -78,8 +64,43 @@ class Streamer:
         data = self.resp.raw.stream(4, decode_content=True)
         if data is None:
             return
+
         payload_size = int.from_bytes(data, byteorder="big", signed=False)
-        payload = self.resp.raw.stream(payload_size, decode_content=True)
-        pb = TrainPayload()
-        pb.ParseFromString(payload)
-        return pb
+        payload = self.resp.raw.stream(payload_size)
+        if self.first is False:
+            tr = TrainResponse()
+            tr.ParseFromString(payload)
+            self.train_size = tr.train
+            self.test_size = tr.test
+            self.total_train_batches = (tr.train // 2) + 1
+            self.total_test_batches = (tr.test // 2) + 1
+            self.count_train_batches = 0
+            self.count_test_batches = 0
+            self.first = True
+            data = self.resp.raw.stream(4, decode_content=True)
+            if data is None:
+                return
+            payload_size = int.from_bytes(data, byteorder="big", signed=False)
+            payload = self.resp.raw.stream(payload_size)
+
+        pcb = self.klass()
+        pcb.ParseFromString(payload)
+
+        if (
+            self.count_train_batches < self.total_train_batches
+            and self.test_phase is False
+        ):
+            self.count_train_batches += 1
+        elif (
+            self.count_train_batches == self.total_train_batches
+            and self.test_phase is False
+        ):
+            # Switch to test
+            self.test_phase = True
+            return None
+        elif self.count_train_batches == self.total_train_batches and self.test_phase:
+            if self.count_test_batches < self.total_test_batches:
+                self.count_test_batches += 1
+            else:
+                return None
+        return pcb

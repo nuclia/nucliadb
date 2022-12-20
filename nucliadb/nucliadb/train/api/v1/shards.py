@@ -18,21 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Union
-from fastapi import Body, HTTPException, Request, File
-from nucliadb.train.api.utils import (
-    get_kb_partitions,
-    get_train,
-)
-from nucliadb.train.generator import generate_train_data
-from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxResponseStatus
-from nucliadb_utils.authentication import requires_one
-from nucliadb_models.resource import (
-    NucliaDBRoles,
-)
-from nucliadb.train.api.v1.router import KB_PREFIX, api
+
+from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version  # type: ignore
+
+from nucliadb.train.api.utils import get_kb_partitions, get_train
+from nucliadb.train.api.v1.router import KB_PREFIX, api
+from nucliadb.train.generator import generate_train_data
+from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils.authentication import requires_one
 
 
 @api.post(

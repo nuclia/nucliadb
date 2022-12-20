@@ -34,10 +34,10 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
+from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb.train import API_PREFIX, SERVICE_NAME
 from nucliadb.train.api.v1.router import api
 from nucliadb.train.lifecycle import finalize, initialize
-from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.instrumentation import instrument_app

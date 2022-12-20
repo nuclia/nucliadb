@@ -1,10 +1,8 @@
+from datasets import IterableDataset
+from nucliadb_protos.train_pb2 import TrainSet, Type
+
 from nucliadb_dataset.streamer import Streamer
 from nucliadb_sdk.knowledgebox import KnowledgeBox
-
-from datasets import IterableDataset
-
-from nucliadb_dataset import DSTYPE
-from nucliadb_protos.train_pb2 import TrainSet, Type
 
 
 def test_hf_dataset(knowledgebox: KnowledgeBox):
@@ -20,4 +18,4 @@ def test_hf_dataset(knowledgebox: KnowledgeBox):
 
     streamer = Streamer(trainset=trainset, client=knowledgebox.client)
 
-    ds = IterableDataset.from_generator(streamer.get_data)
+    _ = IterableDataset.from_generator(streamer.get_data)

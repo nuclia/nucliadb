@@ -22,7 +22,7 @@ import sys
 from collections import Counter
 
 from nucliadb.ingest.utils import get_driver  # type: ignore
-from nucliadb.ingest.utils import get_chitchat, start_ingest, stop_ingest
+from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME, logger
 from nucliadb.search.chitchat import start_chitchat, stop_chitchat
 from nucliadb.search.nodes import NodesManager
@@ -34,7 +34,6 @@ from nucliadb_utils.utilities import (
     clean_utility,
     finalize_utilities,
     get_cache,
-    get_storage,
     get_utility,
     set_utility,
     start_audit_utility,

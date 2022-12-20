@@ -17,12 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Callable
+import asyncio
+from typing import AsyncIterator
+
 import aiohttp
-from nucliadb.tests.utils import inject_message
-from nucliadb.train import API_PREFIX
-from nucliadb.train.api.v1.router import KB_PREFIX
-from nucliadb_models.resource import NucliaDBRoles
+import pytest
+from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
     ParagraphAnnotation,
@@ -34,44 +34,54 @@ from nucliadb_protos.train_pb2 import (
     TrainSet,
     Type,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-import pytest
-from httpx import AsyncClient, Response, StreamConsumed
-import asyncio
+
+from nucliadb.tests.utils import inject_message
+from nucliadb.train import API_PREFIX
+from nucliadb.train.api.v1.router import KB_PREFIX
 
 
 async def get_paragraph_classification_batch_from_response(
     response: aiohttp.ClientResponse,
-) -> ParagraphClassificationBatch:
-    try:
+) -> AsyncIterator[ParagraphClassificationBatch]:
+    header = await response.content.read(4)
+    payload_size = int.from_bytes(header, byteorder="big", signed=False)
+    payload = await response.content.read(payload_size)
+    tr = TrainResponse()
+    tr.ParseFromString(payload)
+    assert tr.train == 3
+    assert tr.test == 1
+
+    total_train_batches = (tr.train // 2) + 1
+    total_test_batches = (tr.test // 2) + 1
+    count_train_batches = 0
+    count_test_batches = 0
+    while count_train_batches < total_train_batches:
         header = await response.content.read(4)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        tr = TrainResponse()
-        tr.ParseFromString(payload)
-        assert tr.train == 6
-        assert tr.test == 2
-        while True:
+        pcb = ParagraphClassificationBatch()
+        pcb.ParseFromString(payload)
+        assert pcb.data
+        yield pcb
+        count_train_batches += 1
 
-            header = await response.content.read(4)
-            payload_size = int.from_bytes(header, byteorder="big", signed=False)
-            payload = await response.content.read(payload_size)
-            pcb = ParagraphClassificationBatch()
-            pcb.ParseFromString(payload)
-            import pdb
-
-            pdb.set_trace()
-            return pcb
-    except RuntimeError:
-        pass
+    while count_test_batches < total_test_batches:
+        header = await response.content.read(4)
+        payload_size = int.from_bytes(header, byteorder="big", signed=False)
+        payload = await response.content.read(payload_size)
+        pcb = ParagraphClassificationBatch()
+        pcb.ParseFromString(payload)
+        assert pcb.data
+        yield pcb
+        count_test_batches += 1
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
     import uuid
     from datetime import datetime
 
-    from nucliadb.ingest.tests.vectors import V1, V2, V3
     from nucliadb_protos import resources_pb2 as rpb
 
     rid = str(uuid.uuid4())
@@ -103,7 +113,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bm.basic.usermetadata.classifications.append(c4)
 
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"
+    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"  # noqa
     etw.field.field = "file"
     etw.field.field_type = rpb.FieldType.FILE
     bm.extracted_text.append(etw)
@@ -217,6 +227,26 @@ async def test_generator_paragraph_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
 
+    slr = SetLabelsRequest()
+    slr.kb.uuid = knowledgebox
+    slr.id = "labelset_paragraphs"
+    slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
+    l1 = Label(title="label_machine")
+    l2 = Label(title="label_user")
+    slr.labelset.labels.append(l1)
+    slr.labelset.labels.append(l2)
+    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+
+    slr = SetLabelsRequest()
+    slr.kb.uuid = knowledgebox
+    slr.id = "labelset_resources"
+    slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
+    l1 = Label(title="label_machine")
+    l2 = Label(title="label_user")
+    slr.labelset.labels.append(l1)
+    slr.labelset.labels.append(l2)
+    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+
     await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
     await asyncio.sleep(0.1)
     async with train_rest_api.get(
@@ -237,8 +267,7 @@ async def test_generator_paragraph_classification(
     ) as response:
 
         assert response.status == 200
-        pcb = await get_paragraph_classification_batch_from_response(response)
-        assert pcb.data
-        import pdb
-
-        pdb.set_trace()
+        expected_results = [1, 1, 2]
+        async for batch in get_paragraph_classification_batch_from_response(response):
+            expected = expected_results.pop()
+            assert len(batch.data) == expected

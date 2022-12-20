@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import AsyncIterator, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
@@ -28,16 +28,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxResponseStatus,
     Widget,
 )
-from nucliadb_protos.train_pb2 import (
-    GetFieldsRequest,
-    GetParagraphsRequest,
-    GetResourcesRequest,
-    GetSentencesRequest,
-    TrainField,
-    TrainParagraph,
-    TrainResource,
-    TrainSentence,
-)
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from sentry_sdk import capture_exception
 
@@ -45,7 +35,7 @@ from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE, Resource
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb.ingest.settings import settings

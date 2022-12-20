@@ -1,11 +1,7 @@
-from nucliadb_models.text import FieldText
-import pytest
-
 from nucliadb_sdk.entities import Entity
 from nucliadb_sdk.file import File
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.vectors import Vector
-from nucliadb_models.resource import Resource
 
 
 def test_dict_resource(knowledgebox: KnowledgeBox):
