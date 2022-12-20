@@ -27,6 +27,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
 if TYPE_CHECKING:
@@ -284,3 +285,4 @@ class SearchRequest(BaseModel):
     vector: Optional[List[float]] = None
     vectorset: Optional[str] = None
     with_duplicates: bool = False
+    with_status: Optional[ResourceProcessingStatus] = None

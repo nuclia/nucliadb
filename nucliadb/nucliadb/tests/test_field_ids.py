@@ -23,7 +23,7 @@ from pydantic import BaseModel, ValidationError
 from nucliadb_models.utils import FieldIdString
 
 
-class TestFieldIdModel(BaseModel):
+class DummyFieldIdModel(BaseModel):
     field_id: FieldIdString
 
 
@@ -38,7 +38,7 @@ def test_field_ids():
         "foo-bar_123",
     ]
     for valid in valid_field_ids:
-        TestFieldIdModel(field_id=valid)
+        DummyFieldIdModel(field_id=valid)
 
     invalid_field_ids = [
         "",
@@ -46,4 +46,4 @@ def test_field_ids():
     ]
     for invalid in invalid_field_ids:
         with pytest.raises(ValidationError):
-            TestFieldIdModel(field_id=invalid)
+            DummyFieldIdModel(field_id=invalid)

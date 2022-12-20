@@ -1,4 +1,9 @@
 # Changelog
+
+## 0.4.10
+
+- Adding `with_status` filter to document searches
+
 ## 0.4.9
 - Removing deprecated indexes
 

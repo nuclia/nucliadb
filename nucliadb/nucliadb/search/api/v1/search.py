@@ -39,6 +39,7 @@ from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
@@ -98,6 +99,7 @@ async def search_knowledgebox(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     shards: List[str] = Query([]),
     with_duplicates: bool = Query(default=False),
+    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -125,6 +127,7 @@ async def search_knowledgebox(
         extracted=extracted,
         shards=shards,
         with_duplicates=with_duplicates,
+        with_status=with_status,
     )
     return await search(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -207,8 +210,8 @@ async def search(
         vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
+        with_status=item.with_status,
     )
-
     incomplete_results = False
     ops = []
     queried_shards = []
