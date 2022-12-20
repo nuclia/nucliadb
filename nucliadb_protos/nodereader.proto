@@ -54,7 +54,7 @@ message DocumentSearchRequest {
     int32 result_per_page = 8;
 
     Timestamps timestamps = 9;
-    repeated noderesources.Resource.ResourceStatus status_filters = 16;
+    optional noderesources.Resource.ResourceStatus with_status = 16;
 
     bool reload = 10;
     bool only_faceted = 15;
@@ -81,8 +81,6 @@ message ParagraphSearchRequest {
     int32 result_per_page = 11;
 
     Timestamps timestamps = 12;
-
-    repeated noderesources.Resource.ResourceStatus status_filters = 16;
 
     bool reload = 13;
     bool with_duplicates = 14;
@@ -262,7 +260,7 @@ message SearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 16;
     
-    repeated noderesources.Resource.ResourceStatus status_filters = 17;
+    optional noderesources.Resource.ResourceStatus with_status = 17;
 }
 
 message SuggestRequest {

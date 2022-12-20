@@ -68,11 +68,11 @@ pub fn create_query(
         });
 
     // Status filters
-    search.status_filters.iter().copied().for_each(|s| {
-        let term = Term::from_field_u64(schema.status, s as u64);
+    if let Some(status) = search.with_status.map(|status| status as u64) {
+        let term = Term::from_field_u64(schema.status, status);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         queries.push((Occur::Must, Box::new(term_query.clone())));
-    });
+    };
 
     if queries.len() == 1 && queries[0].1.is::<AllQuery>() {
         queries.pop().unwrap().1
