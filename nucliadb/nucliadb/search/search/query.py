@@ -38,7 +38,6 @@ async def global_query_to_pb(
     query: str,
     filters: List[str],
     faceted: List[str],
-    status_filters: List[ResourceProcessingStatus],
     page_number: int,
     page_size: int,
     range_creation_start: Optional[datetime] = None,
@@ -52,6 +51,7 @@ async def global_query_to_pb(
     vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
+    with_status: Optional[ResourceProcessingStatus] = None,
 ) -> SearchRequest:
     fields = fields or []
 
@@ -61,8 +61,8 @@ async def global_query_to_pb(
     request.reload = reload
     request.with_duplicates = with_duplicates
 
-    for status in status_filters:
-        request.status_filters.append(PROCESSING_STATUS_TO_PB_MAP[status])
+    if with_status is not None:
+        request.with_status = PROCESSING_STATUS_TO_PB_MAP[with_status]
 
     # We need to ask for all and cut later
     request.page_number = 0

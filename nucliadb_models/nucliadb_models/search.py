@@ -261,7 +261,6 @@ class SearchRequest(BaseModel):
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []
-    status_filters: List[ResourceProcessingStatus] = []
     sort: Optional[SortOption] = None
     page_number: int = 0
     page_size: int = 20
@@ -286,3 +285,4 @@ class SearchRequest(BaseModel):
     vector: Optional[List[float]] = None
     vectorset: Optional[str] = None
     with_duplicates: bool = False
+    with_status: Optional[ResourceProcessingStatus] = None

@@ -308,7 +308,11 @@ async def test_search_can_filter_by_processing_status(
         created += 1
 
     resp = await nucliadb_reader.post(
-        f"/kb/{knowledgebox}/search", json={"fields": ["a/title"]}
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+        },
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == created
@@ -317,8 +321,9 @@ async def test_search_can_filter_by_processing_status(
         resp = await nucliadb_reader.post(
             f"/kb/{knowledgebox}/search",
             json={
+                "features": ["document"],
                 "fields": ["a/title"],
-                "status_filters": [status],
+                "with_status": status,
             },
         )
         assert resp.status_code == 200

@@ -73,7 +73,6 @@ async def search_knowledgebox(
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
-    status_filters: List[ResourceProcessingStatus] = Query(default=[]),
     sort: Optional[SortOption] = None,
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
@@ -100,6 +99,7 @@ async def search_knowledgebox(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     shards: List[str] = Query([]),
     with_duplicates: bool = Query(default=False),
+    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -110,7 +110,6 @@ async def search_knowledgebox(
         fields=fields,
         filters=filters,
         faceted=faceted,
-        status_filters=status_filters,
         sort=sort,
         page_number=page_number,
         page_size=page_size,
@@ -128,6 +127,7 @@ async def search_knowledgebox(
         extracted=extracted,
         shards=shards,
         with_duplicates=with_duplicates,
+        with_status=with_status,
     )
     return await search(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -198,7 +198,6 @@ async def search(
         query=item.query,
         filters=item.filters,
         faceted=item.faceted,
-        status_filters=item.status_filters,
         sort=item.sort.value if item.sort else None,
         page_number=item.page_number,
         page_size=item.page_size,
@@ -211,8 +210,8 @@ async def search(
         vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
+        with_status=item.with_status,
     )
-
     incomplete_results = False
     ops = []
     queried_shards = []
