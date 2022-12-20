@@ -28,7 +28,12 @@ from nucliadb_protos.resources_pb2 import (
     ParagraphAnnotation,
     UserFieldMetadata,
 )
-from nucliadb_protos.train_pb2 import ParagraphClassificationBatch, TrainSet, Type
+from nucliadb_protos.train_pb2 import (
+    ParagraphClassificationBatch,
+    TrainResponse,
+    TrainSet,
+    Type,
+)
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 import pytest
@@ -40,7 +45,15 @@ async def get_paragraph_classification_batch_from_response(
     response: aiohttp.ClientResponse,
 ) -> ParagraphClassificationBatch:
     try:
+        header = await response.content.read(4)
+        payload_size = int.from_bytes(header, byteorder="big", signed=False)
+        payload = await response.content.read(payload_size)
+        tr = TrainResponse()
+        tr.ParseFromString(payload)
+        assert tr.train == 6
+        assert tr.test == 2
         while True:
+
             header = await response.content.read(4)
             payload_size = int.from_bytes(header, byteorder="big", signed=False)
             payload = await response.content.read(payload_size)
@@ -90,7 +103,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bm.basic.usermetadata.classifications.append(c4)
 
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"
     etw.field.field = "file"
     etw.field.field_type = rpb.FieldType.FILE
     bm.extracted_text.append(etw)
@@ -98,11 +111,28 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     c3 = rpb.Classification()
     c3.label = "label_user"
     c3.labelset = "labelset_paragraphs"
+
     pa = ParagraphAnnotation()
     pa.classifications.append(c3)
     pa.key = "N_RID/f/file/47-64"  # Designed to be the RID at indexing time
     ufm = UserFieldMetadata()
     ufm.paragraphs.append(pa)
+
+    pa = ParagraphAnnotation()
+    pa.classifications.append(c3)
+    pa.key = "N_RID/f/file/0-45"  # Designed to be the RID at indexing time
+    ufm.paragraphs.append(pa)
+
+    pa = ParagraphAnnotation()
+    pa.classifications.append(c3)
+    pa.key = "N_RID/f/file/65-93"  # Designed to be the RID at indexing time
+    ufm.paragraphs.append(pa)
+
+    pa = ParagraphAnnotation()
+    pa.classifications.append(c3)
+    pa.key = "N_RID/f/file/94-109"  # Designed to be the RID at indexing time
+    ufm.paragraphs.append(pa)
+
     ufm.field.field = "file"
     ufm.field.field_type = rpb.FieldType.FILE
     bm.basic.fieldmetadata.append(ufm)
@@ -144,8 +174,22 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     )
     p2.classifications.append(c1)
 
+    p3 = rpb.Paragraph(
+        start=65,
+        end=93,
+    )
+    p3.classifications.append(c1)
+
+    p4 = rpb.Paragraph(
+        start=94,
+        end=109,
+    )
+    p4.classifications.append(c1)
+
     fcm.metadata.metadata.paragraphs.append(p1)
     fcm.metadata.metadata.paragraphs.append(p2)
+    fcm.metadata.metadata.paragraphs.append(p3)
+    fcm.metadata.metadata.paragraphs.append(p4)
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
@@ -186,6 +230,7 @@ async def test_generator_paragraph_classification(
     trainset = TrainSet()
     trainset.type == Type.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
+    trainset.filter.labels.append("/l/labelset_paragraphs")
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),

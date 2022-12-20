@@ -1,8 +1,14 @@
+from collections import Counter
 from typing import Any, AsyncIterator, List, Union
+from fastapi import HTTPException
+from nucliadb.train.generators.paragraph_classifier import (
+    generate_paragraph_classification_payloads,
+)
 from nucliadb.train.utils import get_nodes_manager
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
     ParagraphSearchRequest,
+    ParagraphSearchResponse,
     SearchRequest,
 )
 from nucliadb_protos.train_pb2 import (
@@ -22,6 +28,8 @@ import asyncio
 import time
 import random
 
+from sklearn.model_selection import train_test_split
+
 
 def token_classification_batch(batch: List[Any]):
     tcb = TokenClassificationBatch()
@@ -33,25 +41,22 @@ def token_classification_batch(batch: List[Any]):
     return tcb
 
 
-def paragraph_classification_batch(batch: List[Any]):
-    pcb = ParagraphClassificationBatch()
-    for record in batch:
-        token = TextLabel()
-        token.text = record.text
-        # for label in record.labels:
-        #     token.labels.extend(Label(labelset=label.labelset, label=label.label, la))
-        pcb.data.append(token)
-    return pcb
-
-
 async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     # Get the data structure to generate data
     node_manager = get_nodes_manager()
     node, shard_replica_id = await node_manager.get_reader(kbid, shard)
 
+    if trainset.split == 0.0:
+        trainset.split = 0.25
+
     if trainset.type == Type.PARAGRAPH_CLASSIFICATION:
+        if len(trainset.filter.labels) != 1:
+            raise HTTPException(
+                status_code=422,
+                detail="Paragraph Classification should be of 1 labelset",
+            )
         async for data in generate_paragraph_classification_payloads(
-            trainset, node, shard_replica_id
+            kbid, trainset, node, shard_replica_id
         ):
             payload = data.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
@@ -82,45 +87,6 @@ async def generate_token_classification_payload(train: TrainSet):
 
     # Get paragraphs for each token
     pass
-
-
-async def generate_paragraph_classification_payloads(
-    trainset: TrainSet, node: Node, shard_replica_id: str
-) -> AsyncIterator[Union[TrainResponse, ParagraphClassificationBatch]]:
-
-    # Query how many paragraphs has each label
-    request = ParagraphSearchRequest()
-    request.id = shard_replica_id
-    request.only_faceted = True
-    request.with_duplicates = True
-    # request.filter.tags.extend(trainset.filter.labels)
-    request.reload = True
-    request.result_per_page = 100
-
-    resp = await node.reader.ParagraphSearch(request)
-
-    import pdb
-
-    pdb.set_trace()
-
-    # for each label get the
-
-    # Batch size split on number of labels
-    paragraphs = []  # List of paragraphs
-    paragraphs = random.Random(trainset.seed).shuffle(paragraphs)
-    index = round(len(paragraphs) * trainset.split)
-    train = paragraphs[:index]
-    test = paragraphs[index:]
-
-    tr = TrainResponse()
-    tr.train = len(train)
-    tr.test = len(test)
-    tr.type = Type.PARAGRAPH_CLASSIFICATION
-    yield tr
-
-    # Get paragraphs for each classification
-    for batch in get_paragraphs_from_classification(train):
-        yield paragraph_classification_batch(batch)
 
 
 async def generate_sentence_classification_payloads(
