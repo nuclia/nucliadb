@@ -315,9 +315,9 @@ pub struct NodeSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use serde_test::{assert_tokens, Token};
+
+    use super::*;
 
     #[test]
     fn it_ser_de_node_type() {
