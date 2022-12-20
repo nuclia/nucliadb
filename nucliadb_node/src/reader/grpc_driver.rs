@@ -21,6 +21,7 @@
 use async_std::sync::RwLock;
 use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::*;
+use nucliadb_services::ParagraphIterator;
 use opentelemetry::global;
 use tracing::{Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -55,8 +56,51 @@ impl NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
     }
 }
+
+pub struct GrpcStreaming(ParagraphIterator);
+impl futures_core::Stream for GrpcStreaming {
+    type Item = Result<IdAndFacetsBatch, tonic::Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::task::Poll::Ready(self.0.next().map(Ok))
+    }
+}
+
 #[tonic::async_trait]
 impl NodeReader for NodeReaderGRPCDriver {
+    type ParagraphsStream = GrpcStreaming;
+    async fn paragraphs(
+        &self,
+        request: tonic::Request<StreamRequest>,
+    ) -> Result<tonic::Response<Self::ParagraphsStream>, tonic::Status> {
+        info!("Starting paragraph streaming");
+        self.instrument(&request);
+        let request = request.into_inner();
+        let Some(shard_id) = request.shard_id.clone() else {
+            return Err(tonic::Status::not_found("Shard ID not present"));
+        };
+        let shard_id = ShardId { id: shard_id.id };
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.paragraph_stream(&shard_id, request) {
+            Some(Ok(response)) => {
+                info!("Stream created correctly");
+                Ok(tonic::Response::new(GrpcStreaming(response)))
+            }
+            Some(Err(e)) => {
+                info!("Stream could not be created");
+                Err(tonic::Status::internal(e.to_string()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+
     #[tracing::instrument(skip_all)]
     async fn get_shard(
         &self,

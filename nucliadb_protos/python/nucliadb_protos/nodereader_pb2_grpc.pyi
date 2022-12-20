@@ -3,6 +3,7 @@
 isort:skip_file
 """
 import abc
+import collections.abc
 import grpc
 import nucliadb_protos.nodereader_pb2
 import nucliadb_protos.noderesources_pb2
@@ -69,6 +70,10 @@ class NodeReaderStub:
     RelationSearch: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         nucliadb_protos.nodereader_pb2.RelationSearchResponse,
+    ]
+    Paragraphs: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.IdAndFacetsBatch,
     ]
     DocumentIds: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
@@ -142,6 +147,12 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.RelationSearchResponse: ...
+    @abc.abstractmethod
+    def Paragraphs(
+        self,
+        request: nucliadb_protos.nodereader_pb2.StreamRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.IdAndFacetsBatch]: ...
     @abc.abstractmethod
     def DocumentIds(
         self,

@@ -56,6 +56,7 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing_extensions.final
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -71,6 +72,7 @@ class Filter(google.protobuf.message.Message):
 
 global___Filter = Filter
 
+@typing_extensions.final
 class Faceted(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -86,6 +88,7 @@ class Faceted(google.protobuf.message.Message):
 
 global___Faceted = Faceted
 
+@typing_extensions.final
 class OrderBy(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -116,6 +119,7 @@ class OrderBy(google.protobuf.message.Message):
 
 global___OrderBy = OrderBy
 
+@typing_extensions.final
 class Timestamps(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -144,6 +148,7 @@ class Timestamps(google.protobuf.message.Message):
 
 global___Timestamps = Timestamps
 
+@typing_extensions.final
 class FacetResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -161,6 +166,7 @@ class FacetResult(google.protobuf.message.Message):
 
 global___FacetResult = FacetResult
 
+@typing_extensions.final
 class FacetResults(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -176,6 +182,7 @@ class FacetResults(google.protobuf.message.Message):
 
 global___FacetResults = FacetResults
 
+@typing_extensions.final
 class DocumentSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -226,6 +233,7 @@ class DocumentSearchRequest(google.protobuf.message.Message):
 
 global___DocumentSearchRequest = DocumentSearchRequest
 
+@typing_extensions.final
 class ParagraphSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -284,6 +292,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
 
 global___ParagraphSearchRequest = ParagraphSearchRequest
 
+@typing_extensions.final
 class ResultScore(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -304,6 +313,7 @@ class ResultScore(google.protobuf.message.Message):
 
 global___ResultScore = ResultScore
 
+@typing_extensions.final
 class DocumentResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -326,9 +336,11 @@ class DocumentResult(google.protobuf.message.Message):
 
 global___DocumentResult = DocumentResult
 
+@typing_extensions.final
 class DocumentSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class FacetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -382,6 +394,7 @@ class DocumentSearchResponse(google.protobuf.message.Message):
 
 global___DocumentSearchResponse = DocumentSearchResponse
 
+@typing_extensions.final
 class ParagraphResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -428,9 +441,11 @@ class ParagraphResult(google.protobuf.message.Message):
 
 global___ParagraphResult = ParagraphResult
 
+@typing_extensions.final
 class ParagraphSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class FacetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -495,6 +510,7 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
 
 global___ParagraphSearchResponse = ParagraphSearchResponse
 
+@typing_extensions.final
 class VectorSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -540,6 +556,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
 
 global___VectorSearchRequest = VectorSearchRequest
 
+@typing_extensions.final
 class DocumentVectorIdentifier(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -554,6 +571,7 @@ class DocumentVectorIdentifier(google.protobuf.message.Message):
 
 global___DocumentVectorIdentifier = DocumentVectorIdentifier
 
+@typing_extensions.final
 class DocumentScored(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -573,6 +591,7 @@ class DocumentScored(google.protobuf.message.Message):
 
 global___DocumentScored = DocumentScored
 
+@typing_extensions.final
 class VectorSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -597,6 +616,7 @@ class VectorSearchResponse(google.protobuf.message.Message):
 
 global___VectorSearchResponse = VectorSearchResponse
 
+@typing_extensions.final
 class RelationFilter(google.protobuf.message.Message):
     """Relation filters are used to make the 
     search domain smaller. By providing filters the 
@@ -624,6 +644,7 @@ class RelationFilter(google.protobuf.message.Message):
 
 global___RelationFilter = RelationFilter
 
+@typing_extensions.final
 class RelationSearchRequest(google.protobuf.message.Message):
     """A request for the relation index."""
 
@@ -667,6 +688,7 @@ class RelationSearchRequest(google.protobuf.message.Message):
 
 global___RelationSearchRequest = RelationSearchRequest
 
+@typing_extensions.final
 class RelationSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -682,6 +704,7 @@ class RelationSearchResponse(google.protobuf.message.Message):
 
 global___RelationSearchResponse = RelationSearchResponse
 
+@typing_extensions.final
 class SearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -751,6 +774,7 @@ class SearchRequest(google.protobuf.message.Message):
 
 global___SearchRequest = SearchRequest
 
+@typing_extensions.final
 class SuggestRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -777,6 +801,7 @@ class SuggestRequest(google.protobuf.message.Message):
 
 global___SuggestRequest = SuggestRequest
 
+@typing_extensions.final
 class RelatedEntities(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -795,6 +820,7 @@ class RelatedEntities(google.protobuf.message.Message):
 
 global___RelatedEntities = RelatedEntities
 
+@typing_extensions.final
 class SuggestResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -827,6 +853,7 @@ class SuggestResponse(google.protobuf.message.Message):
 
 global___SuggestResponse = SuggestResponse
 
+@typing_extensions.final
 class SearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -851,6 +878,7 @@ class SearchResponse(google.protobuf.message.Message):
 
 global___SearchResponse = SearchResponse
 
+@typing_extensions.final
 class IdCollection(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -866,6 +894,7 @@ class IdCollection(google.protobuf.message.Message):
 
 global___IdCollection = IdCollection
 
+@typing_extensions.final
 class RelationEdge(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -883,6 +912,7 @@ class RelationEdge(google.protobuf.message.Message):
 
 global___RelationEdge = RelationEdge
 
+@typing_extensions.final
 class EdgeList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -898,6 +928,7 @@ class EdgeList(google.protobuf.message.Message):
 
 global___EdgeList = EdgeList
 
+@typing_extensions.final
 class RelationTypeListMember(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -915,6 +946,7 @@ class RelationTypeListMember(google.protobuf.message.Message):
 
 global___RelationTypeListMember = RelationTypeListMember
 
+@typing_extensions.final
 class TypeList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -930,6 +962,7 @@ class TypeList(google.protobuf.message.Message):
 
 global___TypeList = TypeList
 
+@typing_extensions.final
 class GetShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -948,3 +981,65 @@ class GetShardRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id", "vectorset", b"vectorset"]) -> None: ...
 
 global___GetShardRequest = GetShardRequest
+
+@typing_extensions.final
+class IdAndFacetsBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class FacetsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___FacetResults: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___FacetResults | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    IDS_FIELD_NUMBER: builtins.int
+    FACETS_FIELD_NUMBER: builtins.int
+    @property
+    def ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def facets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___FacetResults]: ...
+    def __init__(
+        self,
+        *,
+        ids: collections.abc.Iterable[builtins.str] | None = ...,
+        facets: collections.abc.Mapping[builtins.str, global___FacetResults] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["facets", b"facets", "ids", b"ids"]) -> None: ...
+
+global___IdAndFacetsBatch = IdAndFacetsBatch
+
+@typing_extensions.final
+class StreamRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    FACETED_FIELD_NUMBER: builtins.int
+    RELOAD_FIELD_NUMBER: builtins.int
+    @property
+    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
+    @property
+    def faceted(self) -> global___Faceted: ...
+    reload: builtins.bool
+    def __init__(
+        self,
+        *,
+        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
+        faceted: global___Faceted | None = ...,
+        reload: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
+
+global___StreamRequest = StreamRequest

@@ -323,6 +323,16 @@ message GetShardRequest {
     string vectorset = 2;
 }
 
+message IdAndFacetsBatch {
+    repeated string ids = 1;
+    map<string, FacetResults> facets = 2;
+}
+
+message StreamRequest {
+    noderesources.ShardId shard_id = 3;
+    Faceted faceted = 1;
+    bool reload = 2;
+}
 
 // Implemented at nucliadb_object_storage
 
@@ -334,7 +344,7 @@ service NodeReader {
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
     rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
-
+    rpc Paragraphs(StreamRequest) returns (stream IdAndFacetsBatch) {}
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
