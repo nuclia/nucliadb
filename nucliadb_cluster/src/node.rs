@@ -20,9 +20,6 @@ use crate::Key;
 const NODE_KIND_KEY: &str = "nucliadb-reserved-node-node_type";
 const REGISTERED_KEYS_KEY: &str = "nucliadb-reserved-registered-keys";
 
-const DEFAULT_CLUSTER_ID: &str = "nucliadb-cluster";
-const DEFAULT_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
-
 /// Retrieve the information about a given list of cluster nodes.
 pub async fn cluster_snapshot(nodes: Vec<NodeHandle>) -> Vec<NodeSnapshot> {
     stream::iter(nodes)
@@ -74,7 +71,7 @@ pub struct Node {
     /// The cluster identifier to join.
     #[builder(
         setter(name = "join_cluster"),
-        default = "DEFAULT_CLUSTER_ID.to_string()"
+        default = "Node::DEFAULT_CLUSTER_ID.to_string()"
     )]
     cluster_id: String,
     /// A list of known nodes to connect with in order to join the cluster.
@@ -90,7 +87,7 @@ pub struct Node {
     public_address: SocketAddr,
     /// The interval between each node update.
     /// An update consists to send/receive the node state to/from other cluster nodes.
-    #[builder(default = "DEFAULT_UPDATE_INTERVAL")]
+    #[builder(default = "Node::DEFAULT_UPDATE_INTERVAL")]
     update_interval: Duration,
     /// The initial node state.
     #[builder(setter(custom), default)]
@@ -131,6 +128,9 @@ impl NodeBuilder {
 }
 
 impl Node {
+    const DEFAULT_CLUSTER_ID: &str = "nucliadb-cluster";
+    const DEFAULT_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
+
     /// Returns a builder to create a custom `Node`.
     pub fn builder() -> NodeBuilder {
         NodeBuilder::default()
@@ -426,7 +426,7 @@ mod tests {
 
         let second_node = second_node.start().await?;
 
-        tokio::time::sleep(DEFAULT_UPDATE_INTERVAL * 2).await;
+        tokio::time::sleep(Node::DEFAULT_UPDATE_INTERVAL * 2).await;
 
         let live_nodes = first_node.live_nodes().await;
         let snapshots = cluster_snapshot(live_nodes).await;
