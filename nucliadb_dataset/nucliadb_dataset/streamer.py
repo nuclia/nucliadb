@@ -7,6 +7,7 @@ from nucliadb_protos.train_pb2 import (
 )
 
 from nucliadb_sdk.client import NucliaDBClient
+from sklearn.preprocessing import MultiLabelBinarizer
 
 SIZE_BYTES = 4
 
@@ -16,7 +17,9 @@ class Streamer:
     resp: requests.Response
     client: NucliaDBClient
 
-    def __init__(self, trainset: TrainSet, client: NucliaDBClient):
+    def __init__(
+        self, trainset: TrainSet, client: NucliaDBClient, generator: bool = False
+    ):
         self.client = client
         self.trainset = trainset
         self.session = requests.Session()
@@ -28,20 +31,33 @@ class Streamer:
         self.count_train_batches = None
         self.count_test_batches = None
         self.test_phase = False
+        self.generator = generator
+        self.base_url = self.client.url
+        self.map = None
 
         if self.trainset.type == Type.PARAGRAPH_CLASSIFICATION:
             self.klass = ParagraphClassificationBatch
+            self.map = self.paragraph_classifier_map
+            self.labels = self.get_labels()
+            import pdb
+
+            pdb.set_trace()
+            self.mlb = MultiLabelBinarizer(classes=self.labels.values())
+
+    def paragraph_classifier_map(self, pcb: ParagraphClassificationBatch):
+        for entry in pcb.data:
+            pass
+
+    def get_labels(self):
+        return self.client.reader_session.get(f"{self.base_url}/labelsets").json()
 
     def get_partitions(self):
-        return self.client.reader_session.get(
-            f"{self.base_url}/{self.trainset.kbid}/trainset"
-        ).json()
+        return self.client.reader_session.get(f"{self.base_url}/trainset").json()
 
     def initialize(self):
         self.resp = self.client.reader_session.stream(
             "GET",
-            f"{self.base_url}/{self.trainset.kbid}/trainset",
-            headers=self.headers,
+            f"{self.base_url}/trainset",
             stream=True,
         )
         self.first = False
@@ -68,6 +84,7 @@ class Streamer:
         payload_size = int.from_bytes(data, byteorder="big", signed=False)
         payload = self.resp.raw.stream(payload_size)
         if self.first is False:
+            # Lets get the train/test size
             tr = TrainResponse()
             tr.ParseFromString(payload)
             self.train_size = tr.train
@@ -103,4 +120,4 @@ class Streamer:
                 self.count_test_batches += 1
             else:
                 return None
-        return pcb
+        return self.map(pcb)
