@@ -208,10 +208,10 @@ impl NodeHandle {
         let state = chitchat.self_node_state();
 
         let registered_keys = state
-            .get(REGISTERED_KEYS_KEY)
+            .get(REGISTERED_KEYS_KEY.as_str())
             .unwrap_or_default()
             .split(',')
-            .chain([key.name()])
+            .chain([key.as_str()])
             .join(",");
 
         state.set(REGISTERED_KEYS_KEY, registered_keys);
@@ -275,12 +275,12 @@ impl NodeHandle {
                 let state = chitchat.node_state(&self.node_id).unwrap();
 
                 let r#type = state
-                    .get(NODE_KIND_KEY)
+                    .get(NODE_KIND_KEY.as_str())
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(NodeType::Unknown);
 
                 let state = state
-                    .get(REGISTERED_KEYS_KEY)
+                    .get(REGISTERED_KEYS_KEY.as_str())
                     .unwrap_or_default()
                     .split(',')
                     .filter_map(|key| {
@@ -363,7 +363,7 @@ mod tests {
                 .lock()
                 .await
                 .self_node_state()
-                .get(REGISTERED_KEYS_KEY)
+                .get(REGISTERED_KEYS_KEY.as_str())
                 .map(str::to_string)
         };
 

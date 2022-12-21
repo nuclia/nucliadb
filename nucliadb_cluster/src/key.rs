@@ -20,7 +20,7 @@ impl<T> Key<T> {
     }
 
     /// Returns the name of the key.
-    pub const fn name(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         self.name
     }
 }
@@ -35,9 +35,9 @@ mod tests {
     }
 
     #[test]
-    fn it_returns_key_name() {
+    fn it_returns_key_as_str() {
         let key: Key<u32> = Key::new("a key");
 
-        assert_eq!(key.name(), "a key");
+        assert_eq!(key.as_str(), "a key");
     }
 }
