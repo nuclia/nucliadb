@@ -39,9 +39,24 @@ impl std::fmt::Display for ParagraphError {
 
 impl InternalError for ParagraphError {}
 
+pub struct ParagraphIterator(Box<dyn Iterator<Item = IdAndFacetsBatch> + Send>);
+impl ParagraphIterator {
+    pub fn new<I>(inner: I) -> ParagraphIterator
+    where I: Iterator<Item = IdAndFacetsBatch> + Send + 'static {
+        ParagraphIterator(Box::new(inner))
+    }
+}
+impl Iterator for ParagraphIterator {
+    type Item = IdAndFacetsBatch;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
 pub trait ParagraphReader:
     ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
 {
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator>;
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response>;
     fn count(&self) -> InternalResult<usize>;
 }

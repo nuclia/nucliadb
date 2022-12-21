@@ -24,20 +24,25 @@ use std::fs;
 use std::time::SystemTime;
 
 use nucliadb_protos::{
-    OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId, SuggestRequest,
+    IdAndFacetsBatch, OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
+    StreamRequest, SuggestRequest,
 };
 use nucliadb_service_interface::prelude::*;
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy};
+use tantivy::{
+    Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order, ReloadPolicy,
+};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::search_query;
 use crate::search_query::SharedTermC;
-use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
+use crate::search_response::{
+    produce_facets, SearchBm25Response, SearchFacetsResponse, SearchIntResponse,
+};
 
 const FUZZY_DISTANCE: usize = 1;
 
@@ -123,6 +128,25 @@ impl ParagraphReader for ParagraphReaderService {
             results_per_page: 10,
         }))
     }
+    #[tracing::instrument(skip_all)]
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator> {
+        let facets: Vec<_> = request
+            .faceted
+            .as_ref()
+            .iter()
+            .flat_map(|v| v.tags.iter())
+            .filter(|s| ParagraphReaderService::is_valid_facet(s))
+            .cloned()
+            .collect();
+        Ok(ParagraphIterator::new(BatchProducer {
+            facets,
+            total: self.count()?,
+            offset: 0,
+            paragraph_field: self.schema.paragraph,
+            facet_field: self.schema.facets,
+            searcher: self.reader.searcher(),
+        }))
+    }
 }
 
 impl ReaderChild for ParagraphReaderService {
@@ -147,14 +171,11 @@ impl ReaderChild for ParagraphReaderService {
         let facets: Vec<_> = request
             .faceted
             .as_ref()
-            .map(|v| {
-                v.tags
-                    .iter()
-                    .filter(|s| ParagraphReaderService::is_valid_facet(s))
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
+            .iter()
+            .flat_map(|v| v.tags.iter())
+            .filter(|s| ParagraphReaderService::is_valid_facet(s))
+            .cloned()
+            .collect();
         let text = self.adapt_text(&parser, &request.body);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating query: ends at {v} ms");
@@ -361,6 +382,60 @@ impl ParagraphReaderService {
             Some("modified") => Some(self.schema.modified),
             _ => None,
         }
+    }
+}
+
+pub struct BatchProducer {
+    total: usize,
+    offset: usize,
+    paragraph_field: Field,
+    facet_field: Field,
+    facets: Vec<String>,
+    searcher: LeasedItem<tantivy::Searcher>,
+}
+impl BatchProducer {
+    const BATCH: usize = 1000;
+}
+impl Iterator for BatchProducer {
+    type Item = IdAndFacetsBatch;
+    fn next(&mut self) -> Option<Self::Item> {
+        let time = SystemTime::now();
+        if self.offset >= self.total {
+            info!("No more batches available");
+            return None;
+        }
+        info!("Producing a new batch with offset: {}", self.offset);
+        let facet_collector = self.facets.iter().fold(
+            FacetCollector::for_field(self.facet_field),
+            |mut collector, facet| {
+                collector.add_facet(Facet::from(facet));
+                collector
+            },
+        );
+        let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let mut multicollector = MultiCollector::new();
+        let facet_handler = multicollector.add_collector(facet_collector);
+        let topdocs_handler = multicollector.add_collector(topdocs);
+        let mut multi_fruit = self.searcher.search(&AllQuery, &multicollector).unwrap();
+        let facets_count = facet_handler.extract(&mut multi_fruit);
+        let top_docs = topdocs_handler.extract(&mut multi_fruit);
+        let facets = produce_facets(self.facets.clone(), facets_count);
+        let ids = top_docs
+            .into_iter()
+            .flat_map(|i| self.searcher.doc(i.1))
+            .flat_map(|i| {
+                i.get_first(self.paragraph_field)
+                    .and_then(|i| i.as_text())
+                    .map(|i| i.to_string())
+            });
+        self.offset += Self::BATCH;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("New batch created, took {v} ms");
+        }
+        Some(IdAndFacetsBatch {
+            facets,
+            ids: ids.collect(),
+        })
     }
 }
 
@@ -951,6 +1026,15 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
+
+        let request = StreamRequest {
+            shard_id: None,
+            faceted: None,
+            reload: false,
+        };
+        let iter = paragraph_reader_service.iterator(&request).unwrap();
+        let count = iter.flat_map(|i| i.ids.into_iter()).count();
+        assert_eq!(count, 4);
         Ok(())
     }
 }

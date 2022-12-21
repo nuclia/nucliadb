@@ -517,6 +517,25 @@ impl ShardReaderService {
             self.paragraph_reader.search(&search_request)
         })
     }
+
+    #[tracing::instrument(skip_all)]
+    pub fn paragraph_iterator(&self, request: StreamRequest) -> InternalResult<ParagraphIterator> {
+        self.reload_policy(request.reload);
+        let span = tracing::Span::current();
+        run_with_telemetry(info_span!(parent: &span, "paragraph iteration"), || {
+            self.paragraph_reader.iterator(&request)
+        })
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn document_iterator(&self, request: StreamRequest) -> InternalResult<DocumentIterator> {
+        self.reload_policy(request.reload);
+        let span = tracing::Span::current();
+        run_with_telemetry(info_span!(parent: &span, "field iteration"), || {
+            self.field_reader.iterator(&request)
+        })
+    }
+
     #[tracing::instrument(skip_all)]
     pub fn document_search(
         &self,

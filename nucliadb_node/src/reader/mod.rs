@@ -24,7 +24,8 @@ use std::collections::HashMap;
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
     ParagraphSearchResponse, SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList,
-    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_services::*;
 use rayon::prelude::*;
@@ -180,6 +181,26 @@ impl NodeReaderService {
         };
         let search_response = shard.paragraph_search(request)?;
         Ok(Some(search_response))
+    }
+    #[tracing::instrument(skip_all)]
+    pub fn paragraph_iterator(
+        &self,
+        shard_id: &ShardId,
+        request: StreamRequest,
+    ) -> Option<ServiceResult<ParagraphIterator>> {
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.paragraph_iterator(request)))
+            .map(|r| r.map_err(|e| e.into()))
+    }
+    #[tracing::instrument(skip_all)]
+    pub fn document_iterator(
+        &self,
+        shard_id: &ShardId,
+        request: StreamRequest,
+    ) -> Option<ServiceResult<DocumentIterator>> {
+        self.get_shard(shard_id)
+            .map(|shard| POOL.install(|| shard.document_iterator(request)))
+            .map(|r| r.map_err(|e| e.into()))
     }
     #[tracing::instrument(skip_all)]
     pub fn document_search(

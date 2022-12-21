@@ -42,7 +42,10 @@ fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
         })
         .collect()
 }
-fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<String, FacetResults> {
+pub fn produce_facets(
+    facets: Vec<String>,
+    facets_count: FacetCounts,
+) -> HashMap<String, FacetResults> {
     facets
         .into_iter()
         .map(|facet| (&facets_count, facet))
