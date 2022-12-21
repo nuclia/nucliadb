@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Generator
+from typing import Generator, Tuple
 import tensorflow as tf  # type: ignore
 from nucliadb_protos.train_pb2 import ParagraphClassificationBatch, TrainSet, Type
 
@@ -9,11 +9,11 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 def tensorflow_paragraph_classifier_transformer(
     tokenizer, mlb, pcb: ParagraphClassificationBatch
-) -> Generator[tf.TensorSpec, tf.RaggedTensorSpec]:
+) -> Tuple[tf.TensorSpec, tf.RaggedTensorSpec]:
     for data in pcb.data:
         X = tokenizer.encode(data.text)
         Y = mlb.fit_transoform(data.labels)
-        yield X, Y
+        return X, Y
 
 
 def test_tf_dataset(knowledgebox: KnowledgeBox):

@@ -1,6 +1,9 @@
+from typing import Any, Callable, List, Tuple, Union
 import requests
 from nucliadb_protos.train_pb2 import (
     ParagraphClassificationBatch,
+    TextLabel,
+    TokensClassification,
     TrainResponse,
     TrainSet,
     Type,
@@ -33,7 +36,9 @@ class Streamer:
         self.test_phase = False
         self.generator = generator
         self.base_url = self.client.url
-        self.map = None
+        self.mappings = []
+        self.actual_pcb = None
+        self.actual_pcb_index = 0
 
         if self.trainset.type == Type.PARAGRAPH_CLASSIFICATION:
             self.klass = ParagraphClassificationBatch
@@ -76,7 +81,32 @@ class Streamer:
     def __iter__(self):
         return self.next()
 
-    def next(self):
+    def set_mappings(self, funcs: List[Callable[...]]):
+        self.mappings = funcs
+
+    def apply_mapping(self, X, Y):
+        for func in self.mappings:
+            X, Y = func(X, Y)
+        return X, Y
+
+    def next(self) -> Tuple[Any, Any]:
+        if self.actual_pcb is None or self.actual_pcb_index == len(
+            self.actual_pcb.data
+        ):
+            self.actual_pcb = self.next_batch()
+            if self.actual_pcb is None:
+                return None
+            self.actual_pcb_index = 0
+
+        row: Union[TextLabel, TokensClassification] = self.actual_pcb.data.index(
+            self.actual_pcb_index
+        )
+        X = row.text
+        Y = row.labels
+        self.actual_pcb_index += 1
+        return self.apply_mapping(X, Y)
+
+    def next_batch(self):
         data = self.resp.raw.stream(4, decode_content=True)
         if data is None:
             return
@@ -120,4 +150,4 @@ class Streamer:
                 self.count_test_batches += 1
             else:
                 return None
-        return self.map(pcb)
+        return pcb

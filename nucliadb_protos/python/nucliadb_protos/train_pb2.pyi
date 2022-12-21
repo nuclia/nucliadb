@@ -158,16 +158,18 @@ class _Type:
 
 class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Type.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    PARAGRAPH_CLASSIFICATION: _Type.ValueType  # 0
-    TOKEN_CLASSIFICATION: _Type.ValueType  # 1
+    RESOURCE_CLASSIFICATION: _Type.ValueType  # 0
+    PARAGRAPH_CLASSIFICATION: _Type.ValueType  # 1
     SENTENCE_CLASSIFICATION: _Type.ValueType  # 2
+    TOKEN_CLASSIFICATION: _Type.ValueType  # 3
 
 class Type(_Type, metaclass=_TypeEnumTypeWrapper):
     """Train API V2"""
 
-PARAGRAPH_CLASSIFICATION: Type.ValueType  # 0
-TOKEN_CLASSIFICATION: Type.ValueType  # 1
+RESOURCE_CLASSIFICATION: Type.ValueType  # 0
+PARAGRAPH_CLASSIFICATION: Type.ValueType  # 1
 SENTENCE_CLASSIFICATION: Type.ValueType  # 2
+TOKEN_CLASSIFICATION: Type.ValueType  # 3
 global___Type = Type
 
 class _LabelFrom:
@@ -836,6 +838,22 @@ class TextLabel(google.protobuf.message.Message):
 global___TextLabel = TextLabel
 
 @typing_extensions.final
+class ResourceClassificationBatch(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TextLabel]: ...
+    def __init__(
+        self,
+        *,
+        data: collections.abc.Iterable[global___TextLabel] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
+
+global___ResourceClassificationBatch = ResourceClassificationBatch
+
+@typing_extensions.final
 class ParagraphClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -926,11 +944,11 @@ class TokenClassificationBatch(google.protobuf.message.Message):
 
     DATA_FIELD_NUMBER: builtins.int
     @property
-    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Token]: ...
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TokensClassification]: ...
     def __init__(
         self,
         *,
-        data: collections.abc.Iterable[global___Token] | None = ...,
+        data: collections.abc.Iterable[global___TokensClassification] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
 

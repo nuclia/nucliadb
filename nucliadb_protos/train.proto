@@ -150,9 +150,10 @@ service Train {
 
 // Train API V2
 enum Type {
-    PARAGRAPH_CLASSIFICATION = 0;
-    TOKEN_CLASSIFICATION = 1;
+    RESOURCE_CLASSIFICATION = 0;
+    PARAGRAPH_CLASSIFICATION = 1;
     SENTENCE_CLASSIFICATION = 2;
+    TOKEN_CLASSIFICATION = 3;
 }
 
 message TrainSet {
@@ -189,6 +190,10 @@ message TextLabel {
     repeated Label labels = 2;
 }
 
+message ResourceClassificationBatch {
+    repeated TextLabel data = 1;
+}
+
 message ParagraphClassificationBatch {
     repeated TextLabel data = 1;
 }
@@ -213,7 +218,7 @@ message TokensClassification {
 }
 
 message TokenClassificationBatch {
-    repeated Token data = 1;
+    repeated TokensClassification data = 1;
 }
 
 message TrainResponse {

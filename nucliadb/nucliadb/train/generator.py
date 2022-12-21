@@ -1,6 +1,9 @@
 from typing import Any, List
 
 from fastapi import HTTPException
+from nucliadb.train.generators.resource_classifier import (
+    generate_resource_classification_payloads,
+)
 from nucliadb_protos.train_pb2 import Token, TokenClassificationBatch, TrainSet, Type
 
 from nucliadb.train.generators.paragraph_classifier import (
@@ -28,19 +31,6 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
 
     if trainset.type == Type.PARAGRAPH_CLASSIFICATION:
 
-        txn = await node_manager.driver.begin()
-
-        kbobj = await node_manager.get_kb_obj(txn, kbid)
-        if kbobj is not None:
-            labels = await kbobj.get_labels()
-        else:
-            await txn.abort()
-            raise HTTPException(
-                status_code=422,
-                detail="Invalid KBID",
-            )
-        await txn.abort()
-
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
                 status_code=422,
@@ -48,19 +38,26 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             )
 
         async for data in generate_paragraph_classification_payloads(
-            kbid, trainset, node, shard_replica_id, labels
+            kbid, trainset, node, shard_replica_id
         ):
             payload = data.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
-    # if trainset.type == Type.SENTENCE_CLASSIFICATION:
-    #     async for data in generate_sentence_classification_payloads(
-    #         trainset, node, shard_replica_id
-    #     ):
-    #         payload = data.SerializeToString()
-    #         yield len(payload).to_bytes(4, byteorder="big", signed=False)
-    #         yield payload
+    if trainset.type == Type.RESOURCE_CLASSIFICATION:
+
+        if len(trainset.filter.labels) != 1:
+            raise HTTPException(
+                status_code=422,
+                detail="Paragraph Classification should be of 1 labelset",
+            )
+
+        async for data in generate_resource_classification_payloads(
+            kbid, trainset, node, shard_replica_id
+        ):
+            payload = data.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload
 
     # elif trainset.type == Type.TOKEN_CLASSIFICATION:
     #     for batch in generate_token_classification_payload(
