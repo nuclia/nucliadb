@@ -151,7 +151,6 @@ class KnowledgeBox:
                 ser_pb.group = group
                 ser_pb.entities.CopyFrom(entities)
                 await self.client.writer_stub_async.SetEntities(ser_pb)  # type:  ignore
-
         elif type_line == CODEX.LAB:
             pb_lr = GetLabelsResponse()
             pb_lr.ParseFromString(payload)
