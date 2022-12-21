@@ -31,7 +31,7 @@ use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
     Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
-use tantivy::query::{AllQuery, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
@@ -40,6 +40,7 @@ use tantivy::{
 use tracing::*;
 
 use super::schema::FieldSchema;
+use super::search_query;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -98,14 +99,15 @@ impl Debug for FieldReaderService {
 
 impl FieldReader for FieldReaderService {
     #[tracing::instrument(skip_all)]
-    fn iterator(&self, _: &StreamRequest) -> InternalResult<DocumentIterator> {
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<DocumentIterator> {
         let producer = BatchProducer {
-            total: self.count()?,
             offset: 0,
+            total: self.count()?,
             field_field: self.schema.field,
             uuid_field: self.schema.uuid,
             facet_field: self.schema.facets,
             searcher: self.reader.searcher(),
+            query: search_query::streaming_query(&self.schema, request),
         };
         Ok(DocumentIterator::new(producer.flatten()))
     }
@@ -524,6 +526,7 @@ impl FieldReaderService {
 pub struct BatchProducer {
     total: usize,
     offset: usize,
+    query: Box<dyn Query>,
     field_field: Field,
     uuid_field: Field,
     facet_field: Field,
@@ -542,7 +545,7 @@ impl Iterator for BatchProducer {
         }
         info!("Producing a new batch with offset: {}", self.offset);
         let top_docs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
-        let top_docs = self.searcher.search(&AllQuery, &top_docs).unwrap();
+        let top_docs = self.searcher.search(&self.query, &top_docs).unwrap();
         let mut items = vec![];
         for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
             let uuid = doc
@@ -808,6 +811,7 @@ mod tests {
 
         let request = StreamRequest {
             shard_id: None,
+            filter: None,
             reload: false,
         };
         let iter = field_reader_service.iterator(&request).unwrap();

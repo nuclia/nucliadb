@@ -20,7 +20,7 @@
 // use std::convert::TryFrom;
 // use std::time::SystemTime;
 
-use nucliadb_protos::DocumentSearchRequest;
+use nucliadb_protos::{DocumentSearchRequest, StreamRequest};
 use nucliadb_service_interface::dependencies::*;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
@@ -28,6 +28,21 @@ use tantivy::Term;
 
 use crate::schema::FieldSchema;
 
+pub fn streaming_query(schema: &FieldSchema, request: &StreamRequest) -> Box<dyn Query> {
+    let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
+    queries.push((Occur::Must, Box::new(AllQuery)));
+    request
+        .filter
+        .iter()
+        .flat_map(|f| f.tags.iter())
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            queries.push((Occur::Must, Box::new(facet_term_query)));
+        });
+    Box::new(BooleanQuery::new(queries))
+}
 pub fn create_query(
     parser: &QueryParser,
     search: &DocumentSearchRequest,

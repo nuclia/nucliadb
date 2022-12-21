@@ -127,13 +127,14 @@ impl ParagraphReader for ParagraphReaderService {
         }))
     }
     #[tracing::instrument(skip_all)]
-    fn iterator(&self, _: &StreamRequest) -> InternalResult<ParagraphIterator> {
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator> {
         let producer = BatchProducer {
-            total: self.count()?,
             offset: 0,
+            total: self.count()?,
             paragraph_field: self.schema.paragraph,
             facet_field: self.schema.facets,
             searcher: self.reader.searcher(),
+            query: search_query::streaming_query(&self.schema, request),
         };
         Ok(ParagraphIterator::new(producer.flatten()))
     }
@@ -380,6 +381,7 @@ pub struct BatchProducer {
     offset: usize,
     paragraph_field: Field,
     facet_field: Field,
+    query: Box<dyn Query>,
     searcher: LeasedItem<tantivy::Searcher>,
 }
 impl BatchProducer {
@@ -396,7 +398,7 @@ impl Iterator for BatchProducer {
         info!("Producing a new batch with offset: {}", self.offset);
 
         let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
-        let top_docs = self.searcher.search(&AllQuery, &topdocs).unwrap();
+        let top_docs = self.searcher.search(&self.query, &topdocs).unwrap();
         let mut items = vec![];
         for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
             let id = doc
@@ -1013,6 +1015,7 @@ mod tests {
 
         let request = StreamRequest {
             shard_id: None,
+            filter: None,
             reload: false,
         };
         let iter = paragraph_reader_service.iterator(&request).unwrap();
