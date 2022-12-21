@@ -1,5 +1,11 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Dict, List, Optional, Union
+
+
+class LabelType(str, Enum):
+    PARAGRAPH = "PARAGRAPH"
+    RESOURCE = "RESOURCE"
 
 
 @dataclass

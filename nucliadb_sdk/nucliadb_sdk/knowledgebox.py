@@ -254,9 +254,12 @@ class KnowledgeBox:
 
         return self.process_uploaded_labels_from_search(search_result)
 
-    def set_labels(self):
-        # TODO
-        pass
+    def set_labels(self, labelset: str, labels: List[str]):
+        resp = self.client.writer_session.post(
+            f"{self.client.url}/labelset/{labelset}",
+            json={"title": labelset, "labels": labels},
+        )
+        assert resp.status_code == 200
 
     def search(
         self,

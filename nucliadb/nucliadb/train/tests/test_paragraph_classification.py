@@ -261,6 +261,8 @@ async def test_generator_paragraph_classification(
     trainset.type == Type.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
     trainset.filter.labels.append("/l/labelset_paragraphs")
+    trainset.seed = 1234
+    trainset.split = 0.25
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
