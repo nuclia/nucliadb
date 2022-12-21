@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -7,10 +8,9 @@ use anyhow::anyhow;
 use chitchat::transport::UdpTransport;
 use chitchat::{ChitchatConfig, ChitchatHandle, FailureDetectorConfig, NodeId};
 use derive_builder::Builder;
-use futures::{stream, Stream};
+use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use strum::{Display as EnumDisplay, EnumString};
-use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -189,6 +189,14 @@ impl Node {
 pub struct NodeHandle {
     node_id: NodeId,
     handle: Arc<ChitchatHandle>,
+}
+
+impl fmt::Debug for NodeHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NodeHandle")
+            .field("node_id", &self.node_id)
+            .finish()
+    }
 }
 
 impl NodeHandle {
