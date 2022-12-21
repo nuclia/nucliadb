@@ -4,7 +4,7 @@ use derive_more::Display;
 
 /// An abstraction over string literal to bind a type to a key.
 #[derive(Debug, Display, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[display(fmt = "{}", name)]
+#[display(fmt = "{}", "self.name")]
 pub struct Key<T> {
     name: &'static str,
     _marker: PhantomData<T>,

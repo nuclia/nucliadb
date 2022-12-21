@@ -8,17 +8,17 @@ use chitchat::transport::UdpTransport;
 use chitchat::{ChitchatConfig, ChitchatHandle, FailureDetectorConfig, NodeId};
 use derive_builder::Builder;
 use futures::{stream, Stream};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use strum::{Display as EnumDisplay, EnumString};
 use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 use crate::error::Error;
-use crate::Key;
+use crate::key::Key;
+use crate::register::Register;
 
-const NODE_KIND_KEY: &str = "nucliadb-reserved-node-node_type";
-const REGISTERED_KEYS_KEY: &str = "nucliadb-reserved-registered-keys";
+const NODE_KIND_KEY: Key<NodeType> = Key::new("## nucliadb reserved ## node_type");
+const REGISTER_KEY: Key<Register> = Key::new("## nucliadb reserved ## register");
 
 /// Retrieve the information about a given list of cluster nodes.
 pub async fn cluster_snapshot(nodes: Vec<NodeHandle>) -> Vec<NodeSnapshot> {
@@ -156,10 +156,16 @@ impl Node {
             is_ready_predicate: None,
         };
 
-        self.initial_state.push((
-            REGISTERED_KEYS_KEY.to_string(),
-            self.initial_state.iter().map(|(key, _)| key).join(","),
-        ));
+        let register = Register::with_keys(
+            self.initial_state
+                .iter()
+                .cloned()
+                .map(|(key, _)| key)
+                .collect(),
+        );
+
+        self.initial_state
+            .push((REGISTER_KEY.to_string(), register.to_string()));
         self.initial_state
             .push((NODE_KIND_KEY.to_string(), self.r#type.to_string()));
 
@@ -199,15 +205,11 @@ impl NodeHandle {
         let mut chitchat = chitchat.lock().await;
 
         let state = chitchat.self_node_state();
+        let mut register: Register = state.get(REGISTER_KEY.as_str()).unwrap_or_default().into();
 
-        let registered_keys = state
-            .get(REGISTERED_KEYS_KEY.as_str())
-            .unwrap_or_default()
-            .split(',')
-            .chain([key.as_str()])
-            .join(",");
+        register.insert(key.to_string());
 
-        state.set(REGISTERED_KEYS_KEY, registered_keys);
+        state.set(REGISTER_KEY, register);
         state.set(key, value);
     }
 
@@ -266,16 +268,16 @@ impl NodeHandle {
         self.handle
             .with_chitchat(|chitchat| {
                 let state = chitchat.node_state(&self.node_id).unwrap();
+                let register: Register =
+                    state.get(REGISTER_KEY.as_str()).unwrap_or_default().into();
 
                 let r#type = state
                     .get(NODE_KIND_KEY.as_str())
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(NodeType::Unknown);
 
-                let state = state
-                    .get(REGISTERED_KEYS_KEY.as_str())
-                    .unwrap_or_default()
-                    .split(',')
+                let state = register
+                    .iter()
                     .filter_map(|key| {
                         state
                             .get(key)
@@ -355,20 +357,32 @@ mod tests {
                 .lock()
                 .await
                 .self_node_state()
-                .get(REGISTERED_KEYS_KEY.as_str())
-                .map(str::to_string)
+                .get(REGISTER_KEY.as_str())
+                .map(Register::from)
         };
 
         assert_eq!(
             retrieve_registered_keys().await,
-            Some("a-key,b-key".to_string())
+            Some(Register::with_keys(
+                ["a-key".to_string(), "b-key".to_string()]
+                    .into_iter()
+                    .collect()
+            ))
         );
 
         node.update_state(C_KEY, 'a').await;
 
         assert_eq!(
             retrieve_registered_keys().await,
-            Some("a-key,b-key,c-key".to_string())
+            Some(Register::with_keys(
+                [
+                    "a-key".to_string(),
+                    "b-key".to_string(),
+                    "c-key".to_string()
+                ]
+                .into_iter()
+                .collect()
+            ))
         );
 
         Ok(())
