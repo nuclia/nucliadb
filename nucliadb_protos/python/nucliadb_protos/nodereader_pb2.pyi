@@ -324,19 +324,23 @@ class DocumentResult(google.protobuf.message.Message):
     UUID_FIELD_NUMBER: builtins.int
     SCORE_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     @property
     def score(self) -> global___ResultScore: ...
     field: builtins.str
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         uuid: builtins.str = ...,
         score: global___ResultScore | None = ...,
         field: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["score", b"score"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "score", b"score", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "labels", b"labels", "score", b"score", "uuid", b"uuid"]) -> None: ...
 
 global___DocumentResult = DocumentResult
 

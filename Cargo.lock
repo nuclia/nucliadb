@@ -1852,6 +1852,7 @@ dependencies = [
 name = "nucliadb_fields_tantivy"
 version = "0.1.0"
 dependencies = [
+ "itertools",
  "nucliadb_service_interface",
  "tantivy 0.17.0",
 ]

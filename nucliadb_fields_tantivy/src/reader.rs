@@ -37,6 +37,7 @@ use tantivy::{
     ReloadPolicy, Searcher, TantivyError,
 };
 use tracing::*;
+use itertools::Itertools;
 
 use super::schema::FieldSchema;
 
@@ -294,7 +295,9 @@ impl FieldReaderService {
                         .unwrap()
                         .to_path_string();
 
-                    let result = DocumentResult { uuid, field, score };
+                    let labels = doc.get_all(self.schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
+
+                    let result = DocumentResult { uuid, field, score, labels };
                     results.push(result);
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),
@@ -348,8 +351,10 @@ impl FieldReaderService {
                         .as_facet()
                         .unwrap()
                         .to_path_string();
+                    
+                    let labels = doc.get_all(self.schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
 
-                    let result = DocumentResult { uuid, field, score };
+                    let result = DocumentResult { uuid, field, score, labels };
                     results.push(result);
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),

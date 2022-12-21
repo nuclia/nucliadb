@@ -3,10 +3,11 @@ from typing import AsyncIterator, List, Union
 
 import numpy as np
 from fastapi import HTTPException
-from nucliadb_protos.knowledgebox_pb2 import Labels
+from nucliadb_protos.knowledgebox_pb2 import LabelSet, Labels
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
     ParagraphSearchResponse,
+    StreamRequest,
 )
 from nucliadb_protos.train_pb2 import (
     Label,
@@ -114,25 +115,29 @@ async def hydrate_paragraph_classification_train_test(
 
 
 async def generate_paragraph_classification_payloads(
-    kbid: str, trainset: TrainSet, node: Node, shard_replica_id: str
+    kbid: str,
+    trainset: TrainSet,
+    node: Node,
+    shard_replica_id: str,
+    labelset_object: LabelSet,
 ) -> AsyncIterator[Union[TrainResponse, ParagraphClassificationBatch]]:
 
     labelset = trainset.filter.labels[0]
+    labels = [f"/l/{labelset}/{label.title}" for label in labelset_object.labels]
+    mlb = MultiLabelBinarizer(classes=labels, sparse_output=True)
 
     # Query how many paragraphs has each label
-    request = ParagraphSearchRequest()
-    request.id = shard_replica_id
-    request.filter.tags.append(labelset)
+    request = StreamRequest()
+    request.shard_id.id = shard_replica_id
     request.faceted.tags.append(labelset)
     request.reload = True
-    request.result_per_page = 10_000_000
-    resp: ParagraphSearchResponse = await node.reader.ParagraphSearch(request)
-
     labelset_counts = Counter()
-    for labelset_result in resp.facets.get(labelset).facetresults:
-        labelset_counts[labelset_result.tag] = labelset_result.total
+    ids = []
+    async for idfacets in node.stream_get_paragraphs(request):
+        for labelset_result in idfacets.facets.get(labelset).facetresults:
+            labelset_counts[labelset_result.tag] += labelset_result.total
 
-    mlb = MultiLabelBinarizer(classes=list(labelset_counts.keys()), sparse_output=True)
+        ids.extend(idfacets.ids)
 
     X = []
     Y = []

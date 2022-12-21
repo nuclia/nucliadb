@@ -21,15 +21,18 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+import threading
+from typing import AsyncIterator, Optional
 from uuid import uuid4
 
 from nucliadb_protos.nodereader_pb2 import (
     GetShardRequest,
+    IdAndFacetsBatch,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
     SearchRequest,
     SearchResponse,
+    StreamRequest,
     SuggestRequest,
     SuggestResponse,
 )
@@ -201,6 +204,72 @@ class LocalNode(AbstractNode):
         if vectorset is not None:
             req.vectorset = vectorset
         return await self.reader.GetShard(req)  # type: ignore
+
+    async def stream_get_fields(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[IdAndFacetsBatch]:
+        loop = asyncio.get_running_loop()
+        q = asyncio.Queue(1)
+        exception = None
+        _END = object()
+
+        async def queue_members(q: asyncio.Queue):
+            while True:
+                next_item = await q.get()
+                if next_item is _END:
+                    break
+                yield next_item
+            if exception is not None:
+                raise exception
+
+        def thread_generator():
+            nonlocal exception
+            try:
+                for element in self.reader.documents(stream_request):
+                    asyncio.run_coroutine_threadsafe(q.put(element), loop).result()
+            except Exception as e:
+                exception = e
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+
+        t1 = threading.Thread(target=thread_generator)
+        t1.start()
+        async for idandfacets in queue_members(q):
+            yield idandfacets
+        assert t1.is_alive() is False
+
+    async def stream_get_paragraphs(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[IdAndFacetsBatch]:
+        loop = asyncio.get_running_loop()
+        q = asyncio.Queue(1)
+        exception = None
+        _END = object()
+
+        async def queue_members(q: asyncio.Queue):
+            while True:
+                next_item = await q.get()
+                if next_item is _END:
+                    break
+                yield next_item
+            if exception is not None:
+                raise exception
+
+        def thread_generator():
+            nonlocal exception
+            try:
+                for element in self.reader.paragraphs(stream_request):
+                    asyncio.run_coroutine_threadsafe(q.put(element), loop).result()
+            except Exception as e:
+                exception = e
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+
+        t1 = threading.Thread(target=thread_generator)
+        t1.start()
+        async for idandfacets in queue_members(q):
+            yield idandfacets
+        assert t1.is_alive() is False
 
     async def new_shard(self) -> ShardCreated:
         loop = asyncio.get_running_loop()

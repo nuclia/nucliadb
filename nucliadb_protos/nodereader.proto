@@ -98,6 +98,7 @@ message DocumentResult {
     string uuid = 1;
     ResultScore score = 3;
     string field = 4;
+    repeated string labels = 5;
 }
 
 message DocumentSearchResponse {

@@ -20,12 +20,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 from uuid import uuid4
 
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
-from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
+from nucliadb_protos.nodereader_pb2 import GetShardRequest, IdAndFacetsBatch, StreamRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
@@ -404,6 +404,18 @@ class Node(AbstractNode):
         req.id = shard_id
         resp = await self.writer.ListVectorSets(req)  # type: ignore
         return resp
+
+    async def stream_get_fields(
+        self, streamrequest: StreamRequest
+    ) -> AsyncIterator[IdAndFacetsBatch]:
+        async for data in self.reader.Documents(streamrequest):
+            yield data
+
+    async def stream_get_paragraphs(
+        self, streamrequest: StreamRequest
+    ) -> AsyncIterator[IdAndFacetsBatch]:
+        async for data in self.reader.Paragraphs(streamrequest):
+            yield data
 
 
 async def chitchat_update_node(members: List[ClusterMember]) -> None:

@@ -4,12 +4,14 @@ from fastapi import HTTPException
 from nucliadb.train.generators.resource_classifier import (
     generate_resource_classification_payloads,
 )
+from nucliadb_protos.knowledgebox_pb2 import LabelSet
 from nucliadb_protos.train_pb2 import Token, TokenClassificationBatch, TrainSet, Type
 
 from nucliadb.train.generators.paragraph_classifier import (
     generate_paragraph_classification_payloads,
 )
 from nucliadb.train.utils import get_nodes_manager
+from nucliadb_protos.writer_pb2 import GetLabelSetResponse
 
 
 def token_classification_batch(batch: List[Any]):
@@ -30,6 +32,46 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
         trainset.split = 0.25
 
     if trainset.type == Type.PARAGRAPH_CLASSIFICATION:
+        txn = await node_manager.driver.begin()
+
+        kbobj = await node_manager.get_kb_obj(txn, kbid)
+        if len(trainset.filter.labels) != 1:
+            raise HTTPException(
+                status_code=422,
+                detail="Paragraph Classification should be of 1 labelset",
+            )
+
+        labelset = trainset.filter.labels[0]
+        if kbobj is not None:
+            labelset_response = GetLabelSetResponse()
+            labels = await kbobj.get_labelset(labelset, labelset_response)
+            labelset_object = labelset_response.labelset
+            if labelset_object.kind != LabelSet.LabelSetKind.PARAGRAPHS:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Labelset is not Paragraph Type",
+                )
+
+        else:
+            await txn.abort()
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid KBID",
+            )
+        await txn.abort()
+
+        async for data in generate_paragraph_classification_payloads(
+            kbid, trainset, node, shard_replica_id, labelset_object
+        ):
+            payload = data.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload
+
+    if trainset.type == Type.RESOURCE_CLASSIFICATION:
+
+        txn = await node_manager.driver.begin()
+
+        kbobj = await node_manager.get_kb_obj(txn, kbid)
 
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
@@ -37,14 +79,23 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
                 detail="Paragraph Classification should be of 1 labelset",
             )
 
-        async for data in generate_paragraph_classification_payloads(
-            kbid, trainset, node, shard_replica_id
-        ):
-            payload = data.SerializeToString()
-            yield len(payload).to_bytes(4, byteorder="big", signed=False)
-            yield payload
-
-    if trainset.type == Type.RESOURCE_CLASSIFICATION:
+        labelset = trainset.filter.labels[0]
+        if kbobj is not None:
+            labelset_response = GetLabelSetResponse()
+            labels = await kbobj.get_labelset(labelset, labelset_response)
+            labelset_object = labelset_response.labelset
+            if labelset_object.kind != LabelSet.LabelSetKind.RESOURCES:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Labelset is not Resource Type",
+                )
+        else:
+            await txn.abort()
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid KBID",
+            )
+        await txn.abort()
 
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
@@ -53,7 +104,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             )
 
         async for data in generate_resource_classification_payloads(
-            kbid, trainset, node, shard_replica_id
+            kbid, trainset, node, shard_replica_id, labelset_object
         ):
             payload = data.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
