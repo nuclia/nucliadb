@@ -165,7 +165,6 @@ async fn main() -> anyhow::Result<()> {
     let addr = reliable_lookup_host(&host).await?;
 
     let node = Node::builder()
-        .generate_id()
         .register_as(arg.node_type)
         .on_local_network(addr)
         .with_seed_nodes(arg.seeds.clone())

@@ -18,7 +18,6 @@ const UPDATE_INTERVAL: Duration = Duration::from_millis(250);
 
 pub async fn create_seed_node() -> anyhow::Result<NodeHandle> {
     let node = Node::builder()
-        .generate_id()
         .register_as(NodeType::Io)
         .on_local_network(SocketAddr::from_str(SEED_NODE).unwrap())
         .with_seed_nodes(vec![SEED_NODE.to_string()])

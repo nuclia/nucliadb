@@ -52,7 +52,6 @@ pub enum NodeType {
 /// use nucliadb_cluster::{Node, NodeType};
 ///
 /// let node = Node::builder()
-///     .generate_id()
 ///     .register_as(NodeType::Ingest)
 ///     .on_local_network("0.0.0.0:4000".parse()?)
 ///     .build()?;
@@ -67,6 +66,7 @@ pub enum NodeType {
 #[builder(pattern = "owned", setter(prefix = "with", strip_option, into))]
 pub struct Node {
     /// The node identifier.
+    #[builder(default = "Uuid::new_v4().to_string()")]
     id: String,
     /// The type of the node.
     #[builder(setter(name = "register_as"))]
@@ -98,13 +98,6 @@ pub struct Node {
 }
 
 impl NodeBuilder {
-    /// Generates a nen unique identifier for the node.
-    pub fn generate_id(mut self) -> Self {
-        self.id = Some(Uuid::new_v4().to_string());
-
-        self
-    }
-
     /// Configures the node to join a local cluster network.
     pub fn on_local_network(mut self, address: SocketAddr) -> Self {
         self.listen_address = Some(address);
@@ -348,7 +341,6 @@ mod tests {
         const C_KEY: Key<char> = Key::new("c-key");
 
         let node = Node::builder()
-            .generate_id()
             .on_local_network("0.0.0.0:8080".parse()?)
             .register_as(NodeType::Io)
             .insert_to_initial_state(A_KEY, 42)
@@ -388,7 +380,6 @@ mod tests {
         const LOAD_SCORE_KEY: Key<f32> = Key::new("load-score");
 
         let node = Node::builder()
-            .generate_id()
             .on_local_network("0.0.0.0:8080".parse()?)
             .register_as(NodeType::Io)
             .insert_to_initial_state(LOAD_SCORE_KEY, 100.0)
@@ -419,7 +410,6 @@ mod tests {
         const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 
         let first_node = Node::builder()
-            .generate_id()
             .on_local_network("0.0.0.0:8080".parse()?)
             .register_as(NodeType::Io)
             .insert_to_initial_state(LOAD_SCORE_KEY, 100.0)
@@ -428,7 +418,6 @@ mod tests {
         let first_node = first_node.start().await?;
 
         let second_node = Node::builder()
-            .generate_id()
             .on_local_network("0.0.0.0:8081".parse()?)
             .register_as(NodeType::Ingest)
             .insert_to_initial_state(LOAD_SCORE_KEY, 40.0)
