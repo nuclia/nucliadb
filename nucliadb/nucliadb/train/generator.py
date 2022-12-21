@@ -1,8 +1,8 @@
 from typing import Any, List
 
 from fastapi import HTTPException
-from nucliadb.train.generators.resource_classifier import (
-    generate_resource_classification_payloads,
+from nucliadb.train.generators.field_classifier import (
+    generate_field_classification_payloads,
 )
 from nucliadb_protos.knowledgebox_pb2 import LabelSet
 from nucliadb_protos.train_pb2 import Token, TokenClassificationBatch, TrainSet, Type
@@ -41,12 +41,12 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
                 detail="Paragraph Classification should be of 1 labelset",
             )
 
-        labelset = trainset.filter.labels[0]
+        _, _, labelset = trainset.filter.labels[0].split("/")  # Its /l/labelset
         if kbobj is not None:
             labelset_response = GetLabelSetResponse()
-            labels = await kbobj.get_labelset(labelset, labelset_response)
+            await kbobj.get_labelset(labelset, labelset_response)
             labelset_object = labelset_response.labelset
-            if labelset_object.kind != LabelSet.LabelSetKind.PARAGRAPHS:
+            if LabelSet.LabelSetKind.PARAGRAPHS not in labelset_object.kind:
                 raise HTTPException(
                     status_code=400,
                     detail="Labelset is not Paragraph Type",
@@ -67,7 +67,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
-    if trainset.type == Type.RESOURCE_CLASSIFICATION:
+    if trainset.type == Type.FIELD_CLASSIFICATION:
 
         txn = await node_manager.driver.begin()
 
@@ -79,12 +79,12 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
                 detail="Paragraph Classification should be of 1 labelset",
             )
 
-        labelset = trainset.filter.labels[0]
+        _, _, labelset = trainset.filter.labels[0].split("/")  # Its /l/labelset
         if kbobj is not None:
             labelset_response = GetLabelSetResponse()
-            labels = await kbobj.get_labelset(labelset, labelset_response)
+            await kbobj.get_labelset(labelset, labelset_response)
             labelset_object = labelset_response.labelset
-            if labelset_object.kind != LabelSet.LabelSetKind.RESOURCES:
+            if LabelSet.LabelSetKind.RESOURCES not in labelset_object.kind:
                 raise HTTPException(
                     status_code=400,
                     detail="Labelset is not Resource Type",
@@ -103,7 +103,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
                 detail="Paragraph Classification should be of 1 labelset",
             )
 
-        async for data in generate_resource_classification_payloads(
+        async for data in generate_field_classification_payloads(
             kbid, trainset, node, shard_replica_id, labelset_object
         ):
             payload = data.SerializeToString()

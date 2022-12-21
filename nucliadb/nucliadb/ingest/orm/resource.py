@@ -704,7 +704,9 @@ class Resource:
             fieldkey = self.generate_field_id(fieldid)
             extracted_metadata = await fieldobj.get_field_metadata()
             if extracted_metadata is not None:
-                brain.apply_field_tags_globally(fieldkey, extracted_metadata, self.uuid)
+                brain.apply_field_tags_globally(
+                    fieldkey, extracted_metadata, self.uuid, basic.usermetadata
+                )
             if type == FieldType.KEYWORDSET:
                 field_data = await fieldobj.db_get_value()
                 brain.process_keywordset_fields(fieldkey, field_data)

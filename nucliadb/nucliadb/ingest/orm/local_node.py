@@ -26,8 +26,9 @@ from typing import AsyncIterator, Optional
 from uuid import uuid4
 
 from nucliadb_protos.nodereader_pb2 import (
+    DocumentItem,
     GetShardRequest,
-    IdAndFacetsBatch,
+    ParagraphItem,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
     SearchRequest,
@@ -114,6 +115,84 @@ class LocalReaderWrapper:
         pb = SuggestResponse()
         pb.ParseFromString(pb_bytes)
         return pb
+
+    async def Documents(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[DocumentItem]:
+        loop = asyncio.get_running_loop()
+        q = asyncio.Queue(1)
+        exception = None
+        _END = object()
+
+        def thread_generator():
+            nonlocal exception
+            generator = self.reader.documents(stream_request.SerializeToString())
+            try:
+                element = generator.next()
+                while element is not None:
+                    pb_bytes = bytes(element)
+                    pb = DocumentItem()
+                    pb.ParseFromString(pb_bytes)
+                    asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
+                    element = generator.next()
+            except TypeError:
+                # this is the end
+                pass
+            except Exception as e:
+                exception = e
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+
+        t1 = threading.Thread(target=thread_generator)
+        t1.start()
+
+        while True:
+            next_item = await q.get()
+            if next_item is _END:
+                break
+            yield next_item
+        if exception is not None:
+            raise exception
+        await loop.run_in_executor(self.executor, t1.join)
+
+    async def Paragraphs(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[ParagraphItem]:
+
+        loop = asyncio.get_running_loop()
+        q = asyncio.Queue(1)
+        exception = None
+        _END = object()
+
+        def thread_generator():
+            nonlocal exception
+            generator = self.reader.paragraphs(stream_request.SerializeToString())
+            try:
+                element = generator.next()
+                while element is not None:
+                    pb_bytes = bytes(element)
+                    pb = ParagraphItem()
+                    pb.ParseFromString(pb_bytes)
+                    asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
+                    element = generator.next()
+            except TypeError:
+                # this is the end
+                pass
+            except Exception as e:
+                exception = e
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+
+        t1 = threading.Thread(target=thread_generator)
+        t1.start()
+        while True:
+            next_item = await q.get()
+            if next_item is _END:
+                break
+            yield next_item
+        if exception is not None:
+            raise exception
+        await loop.run_in_executor(self.executor, t1.join)
 
 
 class LocalNode(AbstractNode):
@@ -204,72 +283,6 @@ class LocalNode(AbstractNode):
         if vectorset is not None:
             req.vectorset = vectorset
         return await self.reader.GetShard(req)  # type: ignore
-
-    async def stream_get_fields(
-        self, stream_request: StreamRequest
-    ) -> AsyncIterator[IdAndFacetsBatch]:
-        loop = asyncio.get_running_loop()
-        q = asyncio.Queue(1)
-        exception = None
-        _END = object()
-
-        async def queue_members(q: asyncio.Queue):
-            while True:
-                next_item = await q.get()
-                if next_item is _END:
-                    break
-                yield next_item
-            if exception is not None:
-                raise exception
-
-        def thread_generator():
-            nonlocal exception
-            try:
-                for element in self.reader.documents(stream_request):
-                    asyncio.run_coroutine_threadsafe(q.put(element), loop).result()
-            except Exception as e:
-                exception = e
-            finally:
-                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
-
-        t1 = threading.Thread(target=thread_generator)
-        t1.start()
-        async for idandfacets in queue_members(q):
-            yield idandfacets
-        assert t1.is_alive() is False
-
-    async def stream_get_paragraphs(
-        self, stream_request: StreamRequest
-    ) -> AsyncIterator[IdAndFacetsBatch]:
-        loop = asyncio.get_running_loop()
-        q = asyncio.Queue(1)
-        exception = None
-        _END = object()
-
-        async def queue_members(q: asyncio.Queue):
-            while True:
-                next_item = await q.get()
-                if next_item is _END:
-                    break
-                yield next_item
-            if exception is not None:
-                raise exception
-
-        def thread_generator():
-            nonlocal exception
-            try:
-                for element in self.reader.paragraphs(stream_request):
-                    asyncio.run_coroutine_threadsafe(q.put(element), loop).result()
-            except Exception as e:
-                exception = e
-            finally:
-                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
-
-        t1 = threading.Thread(target=thread_generator)
-        t1.start()
-        async for idandfacets in queue_members(q):
-            yield idandfacets
-        assert t1.is_alive() is False
 
     async def new_shard(self) -> ShardCreated:
         loop = asyncio.get_running_loop()

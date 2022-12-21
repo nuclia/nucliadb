@@ -158,7 +158,7 @@ class _Type:
 
 class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Type.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    RESOURCE_CLASSIFICATION: _Type.ValueType  # 0
+    FIELD_CLASSIFICATION: _Type.ValueType  # 0
     PARAGRAPH_CLASSIFICATION: _Type.ValueType  # 1
     SENTENCE_CLASSIFICATION: _Type.ValueType  # 2
     TOKEN_CLASSIFICATION: _Type.ValueType  # 3
@@ -166,7 +166,7 @@ class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeW
 class Type(_Type, metaclass=_TypeEnumTypeWrapper):
     """Train API V2"""
 
-RESOURCE_CLASSIFICATION: Type.ValueType  # 0
+FIELD_CLASSIFICATION: Type.ValueType  # 0
 PARAGRAPH_CLASSIFICATION: Type.ValueType  # 1
 SENTENCE_CLASSIFICATION: Type.ValueType  # 2
 TOKEN_CLASSIFICATION: Type.ValueType  # 3
@@ -179,12 +179,14 @@ class _LabelFrom:
 class _LabelFromEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_LabelFrom.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARAGRAPH: _LabelFrom.ValueType  # 0
-    RESOURCE: _LabelFrom.ValueType  # 1
+    FIELD: _LabelFrom.ValueType  # 1
+    RESOURCE: _LabelFrom.ValueType  # 2
 
 class LabelFrom(_LabelFrom, metaclass=_LabelFromEnumTypeWrapper): ...
 
 PARAGRAPH: LabelFrom.ValueType  # 0
-RESOURCE: LabelFrom.ValueType  # 1
+FIELD: LabelFrom.ValueType  # 1
+RESOURCE: LabelFrom.ValueType  # 2
 global___LabelFrom = LabelFrom
 
 @typing_extensions.final
@@ -838,7 +840,7 @@ class TextLabel(google.protobuf.message.Message):
 global___TextLabel = TextLabel
 
 @typing_extensions.final
-class ResourceClassificationBatch(google.protobuf.message.Message):
+class FieldClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DATA_FIELD_NUMBER: builtins.int
@@ -851,7 +853,7 @@ class ResourceClassificationBatch(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
 
-global___ResourceClassificationBatch = ResourceClassificationBatch
+global___FieldClassificationBatch = FieldClassificationBatch
 
 @typing_extensions.final
 class ParagraphClassificationBatch(google.protobuf.message.Message):

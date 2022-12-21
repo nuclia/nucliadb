@@ -1043,18 +1043,22 @@ global___DocumentItem = DocumentItem
 class StreamRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SHARD_ID_FIELD_NUMBER: builtins.int
+    FILTER_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    @property
+    def filter(self) -> global___Filter: ...
+    reload: builtins.bool
     @property
     def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    reload: builtins.bool
     def __init__(
         self,
         *,
-        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
+        filter: global___Filter | None = ...,
         reload: builtins.bool = ...,
+        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["filter", b"filter", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
 
 global___StreamRequest = StreamRequest

@@ -21,6 +21,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from google.protobuf.internal.containers import MessageMap
+from nucliadb_models.metadata import UserMetadata
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
@@ -407,20 +408,23 @@ class ResourceBrain:
         metadata: FieldMetadata,
         tags: Dict[str, List[str]],
         relationnodedocument: RelationNode,
+        user_canceled_labels: List[str],
     ):
         for classification in metadata.classifications:
-            tags["l"].append(f"{classification.labelset}/{classification.label}")
-            relationnodelabel = RelationNode(
-                value=f"{classification.labelset}/{classification.label}",
-                ntype=RelationNode.NodeType.LABEL,
-            )
-            self.brain.relations.append(
-                Relation(
-                    relation=Relation.ABOUT,
-                    source=relationnodedocument,
-                    to=relationnodelabel,
+            label = f"{classification.labelset}/{classification.label}"
+            if label not in user_canceled_labels:
+                tags["l"].append(label)
+                relationnodelabel = RelationNode(
+                    value=label,
+                    ntype=RelationNode.NodeType.LABEL,
                 )
-            )
+                self.brain.relations.append(
+                    Relation(
+                        relation=Relation.ABOUT,
+                        source=relationnodedocument,
+                        to=relationnodelabel,
+                    )
+                )
 
         for entity, klass in metadata.ner.items():
             tags["e"].append(f"{klass}/{entity}")
@@ -442,15 +446,54 @@ class ResourceBrain:
                 self.tags["fg"].append(keyword.value)
 
     def apply_field_tags_globally(
-        self, field_key: str, metadata: FieldComputedMetadata, uuid: str
+        self,
+        field_key: str,
+        metadata: FieldComputedMetadata,
+        uuid: str,
+        basic_user_metadata: Optional[UserMetadata] = None,
     ):
-        relationnodedocument = RelationNode(
+        if basic_user_metadata is not None:
+            user_canceled_labels = [
+                f"/l/{classification.labelset}/{classification.label}"
+                for classification in basic_user_metadata.classifications
+                if classification.cancelled_by_user
+            ]
+        else:
+            user_canceled_labels = []
+
+        relation_node_resource = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
         tags: Dict[str, List[str]] = {"l": [], "e": []}
         for meta in metadata.split_metadata.values():
-            self.process_meta(field_key, meta, tags, relationnodedocument)
-        self.process_meta(field_key, metadata.metadata, tags, relationnodedocument)
+            self.process_meta(
+                field_key, meta, tags, relation_node_resource, user_canceled_labels
+            )
+        self.process_meta(
+            field_key,
+            metadata.metadata,
+            tags,
+            relation_node_resource,
+            user_canceled_labels,
+        )
+
+        for classification in basic_user_metadata.classifications:
+            if classification.cancelled_by_user is False:
+                label = f"{classification.labelset}/{classification.label}"
+                if label not in user_canceled_labels:
+                    tags["l"].append(label)
+                    relationnodelabel = RelationNode(
+                        value=label,
+                        ntype=RelationNode.NodeType.LABEL,
+                    )
+                    self.brain.relations.append(
+                        Relation(
+                            relation=Relation.ABOUT,
+                            source=relation_node_resource,
+                            to=relationnodelabel,
+                        )
+                    )
+
         self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
 
     def compute_tags(self):

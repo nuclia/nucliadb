@@ -339,8 +339,9 @@ message DocumentItem {
 }
 
 message StreamRequest {
-    noderesources.ShardId shard_id = 3;
+    Filter filter = 1;
     bool reload = 2;
+    noderesources.ShardId shard_id = 3;
 }
 
 // Implemented at nucliadb_object_storage

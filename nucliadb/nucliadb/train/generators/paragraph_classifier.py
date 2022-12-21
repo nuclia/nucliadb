@@ -123,48 +123,33 @@ async def generate_paragraph_classification_payloads(
 ) -> AsyncIterator[Union[TrainResponse, ParagraphClassificationBatch]]:
 
     labelset = trainset.filter.labels[0]
-    labels = [f"/l/{labelset}/{label.title}" for label in labelset_object.labels]
+    labels = [f"{labelset}/{label.title}" for label in labelset_object.labels]
     mlb = MultiLabelBinarizer(classes=labels, sparse_output=True)
 
     # Query how many paragraphs has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
-    request.faceted.tags.append(labelset)
+    request.filter.tags.append(labelset)
     request.reload = True
-    labelset_counts = Counter()
-    ids = []
-    async for idfacets in node.stream_get_paragraphs(request):
-        for labelset_result in idfacets.facets.get(labelset).facetresults:
-            labelset_counts[labelset_result.tag] += labelset_result.total
-
-        ids.extend(idfacets.ids)
-
     X = []
     Y = []
-    for result in resp.results:
-        for label in result.labels:
-            local_labels = []
+    async for paragraph_item in node.stream_get_paragraphs(request):
+        local_labels = []
+        for label in paragraph_item.labels:
             if label.startswith(labelset):
                 local_labels.append(label)
 
         labels_binary = mlb.fit_transform([local_labels])
 
-        X.append(result.paragraph)
+        X.append(paragraph_item.id)
         Y.append(labels_binary)
 
     # Check if min
-    total = labelset_counts.total()
-    if total < trainset.minresources:
+    total = len(X)
+    if len(X) < trainset.minresources:
         raise HTTPException(
             status_code=400, detail=f"There is no enough with this labelset {total}"
         )
-
-    if min(labelset_counts.values()) < 2:
-        raise HTTPException(status_code=400, detail=f"Labelset with less than 2")
-
-    # We need batches of batch size, stratified with the available labels
-
-    # First get the test-train set
 
     Y = vstack(Y)
 

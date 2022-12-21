@@ -29,6 +29,7 @@ from nucliadb_protos.resources_pb2 import (
     UserFieldMetadata,
 )
 from nucliadb_protos.train_pb2 import (
+    FieldClassificationBatch,
     ParagraphClassificationBatch,
     TrainResponse,
     TrainSet,
@@ -42,15 +43,15 @@ from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
 
 
-async def get_paragraph_classification_batch_from_response(
+async def get_field_classification_batch_from_response(
     response: aiohttp.ClientResponse,
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncIterator[FieldClassificationBatch]:
     header = await response.content.read(4)
     payload_size = int.from_bytes(header, byteorder="big", signed=False)
     payload = await response.content.read(payload_size)
     tr = TrainResponse()
     tr.ParseFromString(payload)
-    assert tr.train == 3
+    assert tr.train == 2
     assert tr.test == 1
 
     total_train_batches = (tr.train // 2) + 1
@@ -61,7 +62,7 @@ async def get_paragraph_classification_batch_from_response(
         header = await response.content.read(4)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        pcb = ParagraphClassificationBatch()
+        pcb = FieldClassificationBatch()
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
@@ -71,8 +72,12 @@ async def get_paragraph_classification_batch_from_response(
         header = await response.content.read(4)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        pcb = ParagraphClassificationBatch()
+        pcb = FieldClassificationBatch()
         pcb.ParseFromString(payload)
+        import pdb
+
+        pdb.set_trace()
+        header = await response.content.read(100)
         assert pcb.data
         yield pcb
         count_test_batches += 1
@@ -216,14 +221,14 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     return bm
 
 
-async def inject_resource_with_paragraph_labels(knowledgebox, writer):
+async def inject_resource_with_field_labels(knowledgebox, writer):
     bm = broker_resource(knowledgebox)
     await inject_message(writer, bm)
     return bm.uuid
 
 
 @pytest.mark.asyncio
-async def test_generator_paragraph_classification(
+async def test_generator_field_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
 
@@ -247,7 +252,7 @@ async def test_generator_paragraph_classification(
     slr.labelset.labels.append(l2)
     await nucliadb_grpc.SetLabels(slr)  # type: ignore
 
-    await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
+    await inject_resource_with_field_labels(knowledgebox, nucliadb_grpc)
     await asyncio.sleep(0.1)
     async with train_rest_api.get(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
@@ -258,19 +263,18 @@ async def test_generator_paragraph_classification(
         partition_id = data["partitions"][0]
 
     trainset = TrainSet()
-    trainset.type = Type.PARAGRAPH_CLASSIFICATION
+    trainset.type == Type.FIELD_CLASSIFICATION
     trainset.batch_size = 2
-    trainset.filter.labels.append("/l/labelset_paragraphs")
+    trainset.filter.labels.append("/l/labelset_resources")
     trainset.seed = 1234
     trainset.split = 0.25
-
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
     ) as response:
 
         assert response.status == 200
-        expected_results = [1, 1, 2]
-        async for batch in get_paragraph_classification_batch_from_response(response):
+        expected_results = [1, 2]
+        async for batch in get_field_classification_batch_from_response(response):
             expected = expected_results.pop()
             assert len(batch.data) == expected

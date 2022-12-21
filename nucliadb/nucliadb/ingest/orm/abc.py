@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from abc import ABCMeta, abstractmethod
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
+from nucliadb_protos.nodereader_pb2 import DocumentItem, ParagraphItem, StreamRequest
 
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
@@ -44,6 +45,7 @@ class AbstractShard(metaclass=ABCMeta):
 
 class AbstractNode(metaclass=ABCMeta):
     label: str
+    reader: Any
 
     @classmethod
     @abstractmethod
@@ -67,3 +69,15 @@ class AbstractNode(metaclass=ABCMeta):
     @abstractmethod
     async def set_vectorset(self, shard: str, id: str):
         pass
+
+    async def stream_get_fields(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[DocumentItem]:
+        async for idandfacets in self.reader.Documents(stream_request=stream_request):
+            yield idandfacets
+
+    async def stream_get_paragraphs(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[ParagraphItem]:
+        async for idandfacets in self.reader.Paragraphs(stream_request=stream_request):
+            yield idandfacets
