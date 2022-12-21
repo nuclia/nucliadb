@@ -25,8 +25,11 @@ use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
     op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, OpStatus,
     ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest, SetGraph,
-    Shard as ShardPB, ShardId, SuggestRequest, VectorSearchRequest, VectorSetId, VectorSetList,
+    Shard as ShardPB, ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
+    VectorSetList,
 };
+use nucliadb_service_interface::fields_interface::DocumentIterator;
+use nucliadb_service_interface::paragraphs_interface::ParagraphIterator;
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
@@ -36,7 +39,36 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
+
 type RawProtos = Vec<u8>;
+
+#[pyclass]
+pub struct PyParagraphProducer {
+    inner: ParagraphIterator,
+}
+#[pymethods]
+impl PyParagraphProducer {
+    pub fn next<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        match self.inner.next() {
+            None => Err(exceptions::PyTypeError::new_err("Empty iterator")),
+            Some(item) => Ok(PyList::new(py, item.encode_to_vec())),
+        }
+    }
+}
+
+#[pyclass]
+pub struct PyDocumentProducer {
+    inner: DocumentIterator,
+}
+#[pymethods]
+impl PyDocumentProducer {
+    pub fn next<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        match self.inner.next() {
+            None => Err(exceptions::PyTypeError::new_err("Empty iterator")),
+            Some(item) => Ok(PyList::new(py, item.encode_to_vec())),
+        }
+    }
+}
 
 #[pyclass]
 pub struct NodeReader {
@@ -54,6 +86,32 @@ impl NodeReader {
     pub fn new() -> NodeReader {
         NodeReader {
             reader: RustReaderService::new(),
+        }
+    }
+
+    pub fn paragraphs(&mut self, shard_id: RawProtos) -> PyResult<PyParagraphProducer> {
+        let request = StreamRequest::decode(&mut Cursor::new(shard_id)).unwrap();
+        let Some(shard_id) = request.shard_id.clone() else {
+            return Err(exceptions::PyTypeError::new_err("Error loading shard"));
+        };
+        self.reader.load_shard(&shard_id);
+        match self.reader.paragraph_iterator(&shard_id, request) {
+            Some(Ok(inner)) => Ok(PyParagraphProducer { inner }),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
+    }
+
+    pub fn documents(&mut self, shard_id: RawProtos) -> PyResult<PyDocumentProducer> {
+        let request = StreamRequest::decode(&mut Cursor::new(shard_id)).unwrap();
+        let Some(shard_id) = request.shard_id.clone() else {
+            return Err(exceptions::PyTypeError::new_err("Error loading shard"));
+        };
+        self.reader.load_shard(&shard_id);
+        match self.reader.document_iterator(&shard_id, request) {
+            Some(Ok(inner)) => Ok(PyDocumentProducer { inner }),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
         }
     }
 

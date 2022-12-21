@@ -1918,6 +1918,7 @@ dependencies = [
  "log",
  "nucliadb_node",
  "nucliadb_protos",
+ "nucliadb_service_interface",
  "openssl",
  "prost",
  "prost-types",
