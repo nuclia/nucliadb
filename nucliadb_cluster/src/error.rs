@@ -4,7 +4,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("cannot start the node: {0}")]
-    StartFailure(anyhow::Error),
+    Start(anyhow::Error),
     #[error("cannot shutdown the node: {0}")]
-    ShutdownFailure(anyhow::Error),
+    Shutdown(anyhow::Error),
 }

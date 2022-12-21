@@ -172,7 +172,7 @@ impl Node {
 
         let handle = chitchat::spawn_chitchat(configuration, self.initial_state, &UdpTransport)
             .await
-            .map_err(Error::StartFailure)?;
+            .map_err(Error::Start)?;
 
         Ok(NodeHandle {
             node_id,
@@ -220,10 +220,10 @@ impl NodeHandle {
 
     /// Shuts the node down by notifying and quitting the cluster.
     pub async fn shutdown(self) -> Result<(), Error> {
-        let handle = Arc::try_unwrap(self.handle)
-            .map_err(|_| Error::ShutdownFailure(anyhow!("node is in use")))?;
+        let handle =
+            Arc::try_unwrap(self.handle).map_err(|_| Error::Shutdown(anyhow!("node is in use")))?;
 
-        handle.shutdown().await.map_err(Error::ShutdownFailure)
+        handle.shutdown().await.map_err(Error::Shutdown)
     }
 
     /// Returns a stream over any changes in the cluster.
