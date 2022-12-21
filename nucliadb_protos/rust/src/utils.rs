@@ -77,6 +77,23 @@ pub struct JoinGraph {
     #[prost(message, repeated, tag="2")]
     pub edges: ::prost::alloc::vec::Vec<JoinGraphCnx>,
 }
+/// TODO: add
+/// RelationNode node = 1;
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelationNeighbours {
+    /// TODO: change
+    ///
+    /// repeated Relation neighbours = 2;
+    #[prost(message, repeated, tag="2")]
+    pub neighbours: ::prost::alloc::vec::Vec<RelationNode>,
+}
+// message RelationPath {
+//     RelationNode origin = 1;
+//     RelationNode destination = 2;
+//     // empty path mean direct edge between origin and destination
+//     repeated Relation path = 3;
+// }
+
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExtractedText {
     #[prost(string, tag="1")]
