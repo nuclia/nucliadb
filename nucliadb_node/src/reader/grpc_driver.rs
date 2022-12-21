@@ -228,7 +228,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         self.instrument(&request);
         let relation_request = request.into_inner();
         let shard_id = ShardId {
-            id: relation_request.id.clone(),
+            id: relation_request.shard_id.clone(),
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;

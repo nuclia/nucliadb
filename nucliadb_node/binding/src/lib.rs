@@ -238,7 +238,7 @@ impl NodeReader {
     ) -> PyResult<&'p PyAny> {
         let paragraph_request = RelationSearchRequest::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = ShardId {
-            id: paragraph_request.id.clone(),
+            id: paragraph_request.shard_id.clone(),
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.relation_search(&shard_id, paragraph_request);

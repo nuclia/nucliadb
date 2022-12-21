@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
+use nucliadb_protos::relation_neighbours_search_request::EntryPoint;
 use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
@@ -360,10 +361,11 @@ impl ShardReaderService {
                 subtype: "".to_string(),
             };
             let request = RelationSearchRequest {
-                id: String::default(),
-                prefix: prefix.clone(),
-                type_filters: vec![filter],
-                depth: 10,
+                shard_id: String::default(),
+                prefix: Some(RelationPrefixSearchRequest {
+                    prefix: prefix.clone(),
+                    type_filters: vec![filter],
+                }),
                 ..Default::default()
             };
             relations_reader_service.search(&request)
@@ -385,7 +387,9 @@ impl ShardReaderService {
             .flat_map(|relation| {
                 relation
                     .unwrap()
-                    .neighbours
+                    .prefix
+                    .unwrap()
+                    .nodes
                     .iter()
                     .map(|relation_node| relation_node.value.clone())
                     .collect::<Vec<String>>()

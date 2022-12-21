@@ -24,6 +24,7 @@ use std::time::SystemTime;
 
 use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::prelude::nucliadb_protos::relation_neighbours_search_request::EntryPoint;
 use tracing::*;
 
 use super::bfs::GrpcGuide;
@@ -42,48 +43,59 @@ impl Debug for RelationsReaderService {
 }
 
 impl RelationsReaderService {
-    const NO_RESULTS: usize = 10;
-    #[tracing::instrument(skip_all)]
-    fn graph_search(
-        &self,
-        request: &RelationSearchRequest,
-    ) -> InternalResult<RelationSearchResponse> {
-        let id = Some(&request.id);
-        let time = SystemTime::now();
-        let reader = self.index.start_reading()?;
-        let depth = request.depth as usize;
-        let mut entry_points = Vec::with_capacity(request.entry_points.len());
-        let mut type_filters = HashSet::with_capacity(request.type_filters.len());
+    const PREFIX_RESULTS_LIMIT: usize = 10;
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} -  Creating entry points: starts {v} ms");
+    fn tic(start: &SystemTime, log: String) {
+        if let Ok(elapsed) = start.elapsed().map(|elapsed| elapsed.as_millis()) {
+            info!("{}", format!("{log} {elapsed} ms"));
         }
-        for node in request.entry_points.iter() {
-            let name = node.value.clone();
-            let type_info = node_type_parsing(node.ntype(), &node.subtype);
+    }
+
+    fn get_entry_points(reader: &GraphReader, entry_points: &Vec<EntryPoint>) -> Vec<(Entity, usize)> {
+        let mut parsed = Vec::with_capacity(entry_points.len());
+
+        for entry_point in entry_points.iter() {
+            if entry_point.node.is_none() {
+                continue;
+            }
+            let relation_node = entry_point.node.as_ref().unwrap();
+            let depth = entry_point.depth;
+
+            let name = relation_node.value.clone();
+            let type_info = node_type_parsing(relation_node.ntype(), &relation_node.subtype);
             let xtype = type_info.0.to_string();
             let subtype = type_info.1.map(|s| s.to_string());
             let node = IoNode::new(name, xtype, subtype);
+
             match reader.get_node_id(node.hash()) {
+                Ok(Some(entity)) => parsed.push((entity, depth as usize)),
                 Ok(None) => (),
-                Ok(Some(id)) => entry_points.push(id),
                 Err(e) => error!("{e:?} during {node:?}"),
             }
         }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} -  Creating entry points: ends {v} ms");
-        }
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - adding query type filters: starts {v} ms");
-        }
-        request.type_filters.iter().for_each(|filter| {
-            let type_info = node_type_parsing(filter.ntype(), &filter.subtype);
-            type_filters.insert(type_info);
-        });
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - adding query type filters: ends {v} ms");
-        }
+        parsed
+    }
+
+    #[tracing::instrument(skip_all)]
+    fn neighbours_search(
+        &self,
+        shard_id: &String,
+        request: &RelationNeighboursSearchRequest,
+    ) -> InternalResult<Vec<RelationNeighbours>> {
+        let reader = self.index.start_reading()?;
+        let time = SystemTime::now();
+
+        Self::tic(&time, format!("{shard_id:?} - Creating entry points: starts"));
+        let entry_points = Self::get_entry_points(&reader, &request.entry_points);
+        Self::tic(&time, format!("{shard_id:?} - Creating entry points: ends"));
+
+        Self::tic(&time, format!("{shard_id:?} - adding query type filters: starts"));
+        let type_filters = request.type_filters
+            .iter()
+            .map(|filter| node_type_parsing(filter.ntype(), &filter.subtype))
+            .collect::<HashSet<_>>();
+        Self::tic(&time, format!("{shard_id:?} - adding query type filters: ends"));
 
         let guide = GrpcGuide {
             type_filters,
@@ -91,77 +103,75 @@ impl RelationsReaderService {
             jump_always: dictionary::SYNONYM,
         };
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running the search: starts {v} ms");
-        }
-        let results = reader.search(guide, depth, entry_points)?;
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running the search: ends {v} ms");
-        }
+        let mut response = vec![];
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - producing results: starts {v} ms");
-        }
-        let nodes = results.into_iter().map(|id| {
-            reader.get_node(id).map(|node| RelationNode {
-                value: node.name().to_string(),
-                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                ntype: string_to_node_type(node.xtype()) as i32,
+        for (entity, depth) in entry_points {
+            Self::tic(&time, format!("{shard_id:?} - running the search (for {entity:?}): starts"));
+            // TODO: guide should be passed as a ref?
+            let neighbours = reader.search(guide.clone(), depth, vec![entity])?;
+            Self::tic(&time, format!("{shard_id:?} - running the search (for {entity:?}): ends"));
+
+            Self::tic(&time, format!("{shard_id:?} - producing results (for {entity:?}): starts"));
+            let neighbours = neighbours
+                .into_iter()
+                .map(|entity| {
+                    reader.get_node(entity)
+                        .map(|ionode| RelationNode {
+                            value: ionode.name().to_string(),
+                            ntype: string_to_node_type(ionode.xtype()) as i32,
+                            subtype: ionode.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Self::tic(&time, format!("{shard_id:?} - producing results (for {entity:?}): ends"));
+
+            response.push(RelationNeighbours {
+                neighbours
             })
-        });
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - producing results: ends {v} ms");
         }
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms");
-        }
-        Ok(RelationSearchResponse {
-            neighbours: nodes.collect::<Result<Vec<_>, _>>()?,
-        })
+        Self::tic(&time, format!("{shard_id:?} - Ending at"));
+        Ok(response)
     }
+
+    /// Relation search by prefix
     #[tracing::instrument(skip_all)]
-    fn text_search(
+    fn prefix_search(
         &self,
-        request: &RelationSearchRequest,
-    ) -> InternalResult<RelationSearchResponse> {
-        let id = Some(&request.id);
-        let time = SystemTime::now();
+        shard_id: &String,
+        request: &RelationPrefixSearchRequest,
+    ) -> InternalResult<RelationPrefixSearchResponse> {
         let prefix = &request.prefix;
         let reader = self.index.start_reading()?;
+        let time = SystemTime::now();
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running prefix search: starts {v} ms");
-        }
+        Self::tic(&time, format!("{shard_id:?} - running prefix search: starts"));
         let prefixes = reader
-            .prefix_search(&self.rmode, Self::NO_RESULTS, prefix)?
+            .prefix_search(&self.rmode, Self::PREFIX_RESULTS_LIMIT, prefix)?
             .into_iter()
             .flat_map(|key| reader.get_node_id(&key).ok().flatten());
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running prefix search: ends {v} ms");
-        }
+        Self::tic(&time, format!("{shard_id:?} - running prefix search: ends"));
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - generating results: starts {v} ms");
-        }
-        let nodes = prefixes.into_iter().map(|id| {
-            reader.get_node(id).map(|node| RelationNode {
-                value: node.name().to_string(),
-                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                ntype: string_to_node_type(node.xtype()) as i32,
-            })
-        });
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - generating results: ends {v} ms");
-        }
+        Self::tic(&time, format!("{shard_id:?} - generating results: starts"));
+        let nodes = prefixes
+            .into_iter()
+            .map(|id| {
+                reader
+                    .get_node(id)
+                    .map(|node| RelationNode {
+                        value: node.name().to_string(),
+                        subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                        ntype: string_to_node_type(node.xtype()) as i32,
+                    })
+            });
+        Self::tic(&time, format!("{shard_id:?} - generating results: ends"));
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Ending at {v} ms");
-        }
-        Ok(RelationSearchResponse {
-            neighbours: nodes.collect::<Result<Vec<_>, _>>()?,
+        Self::tic(&time, format!("{shard_id:?} - Ending at"));
+        Ok(RelationPrefixSearchResponse {
+            nodes: nodes.collect::<Result<Vec<_>, _>>()?,
         })
     }
+
 }
 impl RelationReader for RelationsReaderService {
     #[tracing::instrument(skip_all)]
@@ -240,14 +250,25 @@ impl ReaderChild for RelationsReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        let id = Some(&request.id);
-        if request.prefix.is_empty() {
-            info!("{id:?} - No prefix found, running graph search");
-            self.graph_search(request)
-        } else {
-            info!("{id:?} - Prefix found, running graph search");
-            self.text_search(request)
+        let mut response = Self::Response {
+            prefix: None,
+            neighbours: vec![],
+        };
+        let shard_id = &request.shard_id;
+
+        if let Some(ref prefix_request) = request.prefix {
+            info!("{shard_id:?} - Prefix search");
+            response.prefix = Some(self.prefix_search(&shard_id, prefix_request)?);
         }
+
+        if let Some(ref neighbours_request) = request.neighbours {
+            info!("{shard_id:?} - Neighbours search");
+            response.neighbours = self.neighbours_search(&shard_id, neighbours_request)?;
+        }
+
+        // TODO: implement relation path request
+
+        Ok(response)
     }
     #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
