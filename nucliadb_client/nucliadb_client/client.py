@@ -161,7 +161,6 @@ class NucliaDBClient:
 
         else:
             async with aiofiles.open(location, "r") as dump_file:
-
                 b64_pb = await dump_file.readline()
                 while b64_pb:
                     await kb.import_export(b64_pb.strip())
