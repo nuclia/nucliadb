@@ -999,63 +999,62 @@ class GetShardRequest(google.protobuf.message.Message):
 global___GetShardRequest = GetShardRequest
 
 @typing_extensions.final
-class IdAndFacetsBatch(google.protobuf.message.Message):
+class ParagraphItem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
-    class FacetsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> global___FacetResults: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: global___FacetResults | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    IDS_FIELD_NUMBER: builtins.int
-    FACETS_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    id: builtins.str
     @property
-    def ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    @property
-    def facets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___FacetResults]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        ids: collections.abc.Iterable[builtins.str] | None = ...,
-        facets: collections.abc.Mapping[builtins.str, global___FacetResults] | None = ...,
+        id: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["facets", b"facets", "ids", b"ids"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "labels", b"labels"]) -> None: ...
 
-global___IdAndFacetsBatch = IdAndFacetsBatch
+global___ParagraphItem = ParagraphItem
+
+@typing_extensions.final
+class DocumentItem(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    field: builtins.str
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        field: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "labels", b"labels", "uuid", b"uuid"]) -> None: ...
+
+global___DocumentItem = DocumentItem
 
 @typing_extensions.final
 class StreamRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SHARD_ID_FIELD_NUMBER: builtins.int
-    FACETED_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     @property
     def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
-    @property
-    def faceted(self) -> global___Faceted: ...
     reload: builtins.bool
     def __init__(
         self,
         *,
         shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
-        faceted: global___Faceted | None = ...,
         reload: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "shard_id", b"shard_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
 
 global___StreamRequest = StreamRequest

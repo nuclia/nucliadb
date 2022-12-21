@@ -40,15 +40,15 @@ pub struct FieldConfig {
     pub path: PathBuf,
 }
 
-pub struct DocumentIterator(Box<dyn Iterator<Item = IdAndFacetsBatch> + Send>);
+pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
 impl DocumentIterator {
     pub fn new<I>(inner: I) -> DocumentIterator
-    where I: Iterator<Item = IdAndFacetsBatch> + Send + 'static {
+    where I: Iterator<Item = DocumentItem> + Send + 'static {
         DocumentIterator(Box::new(inner))
     }
 }
 impl Iterator for DocumentIterator {
-    type Item = IdAndFacetsBatch;
+    type Item = DocumentItem;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }

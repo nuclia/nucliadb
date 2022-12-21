@@ -59,7 +59,7 @@ impl NodeReaderGRPCDriver {
 
 pub struct GrpcStreaming<T>(T);
 impl futures_core::Stream for GrpcStreaming<ParagraphIterator> {
-    type Item = Result<IdAndFacetsBatch, tonic::Status>;
+    type Item = Result<ParagraphItem, tonic::Status>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
@@ -69,7 +69,7 @@ impl futures_core::Stream for GrpcStreaming<ParagraphIterator> {
     }
 }
 impl futures_core::Stream for GrpcStreaming<DocumentIterator> {
-    type Item = Result<IdAndFacetsBatch, tonic::Status>;
+    type Item = Result<DocumentItem, tonic::Status>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,

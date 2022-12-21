@@ -22,9 +22,10 @@ use std::fmt::{Debug, Display};
 use std::fs;
 use std::time::*;
 
+use itertools::Itertools;
 use nucliadb_protos::{
-    DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults,
-    IdAndFacetsBatch, OrderBy, ResourceId, ResultScore, StreamRequest,
+    DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
+    FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
 };
 use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
@@ -37,7 +38,6 @@ use tantivy::{
     ReloadPolicy, Searcher, TantivyError,
 };
 use tracing::*;
-use itertools::Itertools;
 
 use super::schema::FieldSchema;
 
@@ -98,23 +98,16 @@ impl Debug for FieldReaderService {
 
 impl FieldReader for FieldReaderService {
     #[tracing::instrument(skip_all)]
-    fn iterator(&self, request: &StreamRequest) -> InternalResult<DocumentIterator> {
-        let facets: Vec<_> = request
-            .faceted
-            .as_ref()
-            .iter()
-            .flat_map(|v| v.tags.iter())
-            .filter(|s| FieldReaderService::is_valid_facet(s))
-            .cloned()
-            .collect();
-        Ok(DocumentIterator::new(BatchProducer {
-            facets,
+    fn iterator(&self, _: &StreamRequest) -> InternalResult<DocumentIterator> {
+        let producer = BatchProducer {
             total: self.count()?,
             offset: 0,
+            field_field: self.schema.field,
             uuid_field: self.schema.uuid,
             facet_field: self.schema.facets,
             searcher: self.reader.searcher(),
-        }))
+        };
+        Ok(DocumentIterator::new(producer.flatten()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -295,9 +288,19 @@ impl FieldReaderService {
                         .unwrap()
                         .to_path_string();
 
-                    let labels = doc.get_all(self.schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
+                    let labels = doc
+                        .get_all(self.schema.facets)
+                        .into_iter()
+                        .map(|x| x.as_facet().unwrap().to_path_string())
+                        .filter(|x| x.starts_with("/l/"))
+                        .collect_vec();
 
-                    let result = DocumentResult { uuid, field, score, labels };
+                    let result = DocumentResult {
+                        uuid,
+                        field,
+                        score,
+                        labels,
+                    };
                     results.push(result);
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),
@@ -351,10 +354,21 @@ impl FieldReaderService {
                         .as_facet()
                         .unwrap()
                         .to_path_string();
-                    
-                    let labels = doc.get_all(self.schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
 
-                    let result = DocumentResult { uuid, field, score, labels };
+                    let labels = doc
+                        .get_all(self.schema.facets)
+                        .into_iter()
+                        .flat_map(|x| x.as_facet())
+                        .map(|x| x.to_path_string())
+                        .filter(|x| x.starts_with("/l/"))
+                        .collect_vec();
+
+                    let result = DocumentResult {
+                        uuid,
+                        field,
+                        score,
+                        labels,
+                    };
                     results.push(result);
                 }
                 Err(e) => error!("Error retrieving document from index: {}", e),
@@ -510,16 +524,16 @@ impl FieldReaderService {
 pub struct BatchProducer {
     total: usize,
     offset: usize,
+    field_field: Field,
     uuid_field: Field,
     facet_field: Field,
-    facets: Vec<String>,
     searcher: LeasedItem<tantivy::Searcher>,
 }
 impl BatchProducer {
     const BATCH: usize = 1000;
 }
 impl Iterator for BatchProducer {
-    type Item = IdAndFacetsBatch;
+    type Item = Vec<DocumentItem>;
     fn next(&mut self) -> Option<Self::Item> {
         let time = SystemTime::now();
         if self.offset >= self.total {
@@ -527,37 +541,42 @@ impl Iterator for BatchProducer {
             return None;
         }
         info!("Producing a new batch with offset: {}", self.offset);
-        let facet_collector = self.facets.iter().fold(
-            FacetCollector::for_field(self.facet_field),
-            |mut collector, facet| {
-                collector.add_facet(Facet::from(facet));
-                collector
-            },
-        );
-        let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
-        let mut multicollector = MultiCollector::new();
-        let facet_handler = multicollector.add_collector(facet_collector);
-        let topdocs_handler = multicollector.add_collector(topdocs);
-        let mut multi_fruit = self.searcher.search(&AllQuery, &multicollector).unwrap();
-        let facets_count = facet_handler.extract(&mut multi_fruit);
-        let top_docs = topdocs_handler.extract(&mut multi_fruit);
-        let facets = produce_facets(self.facets.clone(), facets_count);
-        let ids = top_docs
-            .into_iter()
-            .flat_map(|i| self.searcher.doc(i.1))
-            .flat_map(|i| {
-                i.get_first(self.uuid_field)
-                    .and_then(|i| i.as_text())
-                    .map(|i| i.to_string())
+        let top_docs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let top_docs = self.searcher.search(&AllQuery, &top_docs).unwrap();
+        let mut items = vec![];
+        for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
+            let uuid = doc
+                .get_first(self.uuid_field)
+                .expect("document doesn't appear to have uuid.")
+                .as_text()
+                .unwrap()
+                .to_string();
+
+            let field = doc
+                .get_first(self.field_field)
+                .expect("document doesn't appear to have field.")
+                .as_facet()
+                .unwrap()
+                .to_path_string();
+
+            let labels = doc
+                .get_all(self.facet_field)
+                .into_iter()
+                .flat_map(|x| x.as_facet())
+                .map(|x| x.to_path_string())
+                .filter(|x| x.starts_with("/l/"))
+                .collect_vec();
+            items.push(DocumentItem {
+                field,
+                uuid,
+                labels,
             });
+        }
         self.offset += Self::BATCH;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("New batch created, took {v} ms");
         }
-        Some(IdAndFacetsBatch {
-            facets,
-            ids: ids.collect(),
-        })
+        Some(items)
     }
 }
 
@@ -789,11 +808,10 @@ mod tests {
 
         let request = StreamRequest {
             shard_id: None,
-            faceted: None,
             reload: false,
         };
         let iter = field_reader_service.iterator(&request).unwrap();
-        let count = iter.flat_map(|i| i.ids.into_iter()).count();
+        let count = iter.count();
         assert_eq!(count, 2);
 
         Ok(())

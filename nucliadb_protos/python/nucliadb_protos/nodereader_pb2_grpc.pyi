@@ -105,12 +105,12 @@ class NodeReaderStub:
     ]
     Paragraphs: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.nodereader_pb2.StreamRequest,
-        nucliadb_protos.nodereader_pb2.IdAndFacetsBatch,
+        nucliadb_protos.nodereader_pb2.ParagraphItem,
     ]
     """Streams"""
     Documents: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.nodereader_pb2.StreamRequest,
-        nucliadb_protos.nodereader_pb2.IdAndFacetsBatch,
+        nucliadb_protos.nodereader_pb2.DocumentItem,
     ]
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
@@ -205,13 +205,13 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         self,
         request: nucliadb_protos.nodereader_pb2.StreamRequest,
         context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.IdAndFacetsBatch]:
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ParagraphItem]:
         """Streams"""
     @abc.abstractmethod
     def Documents(
         self,
         request: nucliadb_protos.nodereader_pb2.StreamRequest,
         context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.IdAndFacetsBatch]: ...
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.DocumentItem]: ...
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

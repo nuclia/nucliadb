@@ -327,14 +327,19 @@ message GetShardRequest {
     string vectorset = 2;
 }
 
-message IdAndFacetsBatch {
-    repeated string ids = 1;
-    map<string, FacetResults> facets = 2;
+message ParagraphItem {
+    string id = 1;
+    repeated string labels = 2;
+} 
+
+message DocumentItem {
+    string uuid = 1;
+    string field = 2;
+    repeated string labels = 3;
 }
 
 message StreamRequest {
     noderesources.ShardId shard_id = 3;
-    Faceted faceted = 1;
     bool reload = 2;
 }
 
@@ -360,6 +365,6 @@ service NodeReader {
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
 
     // Streams
-    rpc Paragraphs(StreamRequest) returns (stream IdAndFacetsBatch) {}
-    rpc Documents(StreamRequest) returns (stream IdAndFacetsBatch) {}
+    rpc Paragraphs(StreamRequest) returns (stream ParagraphItem) {}
+    rpc Documents(StreamRequest) returns (stream DocumentItem) {}
 }

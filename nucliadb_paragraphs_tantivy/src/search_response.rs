@@ -133,7 +133,13 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
-                    let labels = doc.get_all(schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
+                    let labels = doc
+                        .get_all(schema.facets)
+                        .into_iter()
+                        .flat_map(|x| x.as_facet())
+                        .map(|x| x.to_path_string())
+                        .filter(|x| x.starts_with("/l/"))
+                        .collect_vec();
 
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
@@ -163,6 +169,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                     let result = ParagraphResult {
                         uuid,
                         field,
+                        labels,
                         start: start_pos,
                         end: end_pos,
                         paragraph,
@@ -171,7 +178,6 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         matches: terms,
                         score: Some(score),
                         metadata: schema.metadata(&doc),
-                        labels: labels
                     };
 
                     results.push(result);
@@ -234,7 +240,12 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
-                    let labels = doc.get_all(schema.facets).into_iter().map(|x| x.as_facet().unwrap().to_path_string()).filter(|x| x.starts_with("/l/")).collect_vec();
+                    let labels = doc
+                        .get_all(schema.facets)
+                        .into_iter()
+                        .map(|x| x.as_facet().unwrap().to_path_string())
+                        .filter(|x| x.starts_with("/l/"))
+                        .collect_vec();
 
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
@@ -263,16 +274,16 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                     terms.sort();
                     let result = ParagraphResult {
                         uuid,
-                        score: Some(score),
+                        labels,
                         field,
-                        start: start_pos,
-                        end: end_pos,
-                        paragraph,
                         split,
                         index,
+                        paragraph,
+                        score: Some(score),
+                        start: start_pos,
+                        end: end_pos,
                         matches: terms,
                         metadata: schema.metadata(&doc),
-                        labels: labels,
                     };
 
                     results.push(result);

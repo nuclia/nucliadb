@@ -90,12 +90,12 @@ class NodeReaderStub(object):
         self.Paragraphs = channel.unary_stream(
                 '/nodereader.NodeReader/Paragraphs',
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.IdAndFacetsBatch.FromString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.ParagraphItem.FromString,
                 )
         self.Documents = channel.unary_stream(
                 '/nodereader.NodeReader/Documents',
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodereader__pb2.IdAndFacetsBatch.FromString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentItem.FromString,
                 )
 
 
@@ -277,12 +277,12 @@ def add_NodeReaderServicer_to_server(servicer, server):
             'Paragraphs': grpc.unary_stream_rpc_method_handler(
                     servicer.Paragraphs,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.IdAndFacetsBatch.SerializeToString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.ParagraphItem.SerializeToString,
             ),
             'Documents': grpc.unary_stream_rpc_method_handler(
                     servicer.Documents,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.FromString,
-                    response_serializer=nucliadb__protos_dot_nodereader__pb2.IdAndFacetsBatch.SerializeToString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentItem.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -547,7 +547,7 @@ class NodeReader(object):
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/Paragraphs',
             nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.IdAndFacetsBatch.FromString,
+            nucliadb__protos_dot_nodereader__pb2.ParagraphItem.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -564,6 +564,6 @@ class NodeReader(object):
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/Documents',
             nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
-            nucliadb__protos_dot_nodereader__pb2.IdAndFacetsBatch.FromString,
+            nucliadb__protos_dot_nodereader__pb2.DocumentItem.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

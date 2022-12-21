@@ -39,15 +39,15 @@ impl std::fmt::Display for ParagraphError {
 
 impl InternalError for ParagraphError {}
 
-pub struct ParagraphIterator(Box<dyn Iterator<Item = IdAndFacetsBatch> + Send>);
+pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
 impl ParagraphIterator {
     pub fn new<I>(inner: I) -> ParagraphIterator
-    where I: Iterator<Item = IdAndFacetsBatch> + Send + 'static {
+    where I: Iterator<Item = ParagraphItem> + Send + 'static {
         ParagraphIterator(Box::new(inner))
     }
 }
 impl Iterator for ParagraphIterator {
-    type Item = IdAndFacetsBatch;
+    type Item = ParagraphItem;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
