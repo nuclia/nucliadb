@@ -214,39 +214,85 @@ message RelationFilter {
     string subtype = 2;
 }
 
-// Search request for the relation index.
+
+// Relation search by prefix
 //
-// It can be done using two strategies:
-// - text search over vertex (node) names
-// - graph search given some entry points (initial vertices)
-//
-// When a prefix is provided, search will be done by prefix, otherwise
-// it will perform a graph search. Filters can be applied to both searches
-message RelationSearchRequest {
-    // Shard ID
-    string id = 1;
+// Search among all vertices and return the ones that match on prefix
+// and pass the filters.
+message RelationPrefixSearchRequest {
+    string prefix = 1;
 
-    // Prefix to search node (vertex) names
-    // Nodes can be filtered by prefix.
-    string prefix = 5;
-
-    // List of vertices where search will trigger.
-    repeated utils.RelationNode entry_points = 2;
-
-    // Limit search depth, i.e., distance between entry points and
-    // results. Vertices connected by an edge are at distance one.
-    int32 depth = 4;
+    // TODO: implement on the code
 
     // Filters to apply while searching. It's an OR filtering: any
     // node (vertex) staisfying one condition will be returned
-    repeated RelationFilter type_filters = 3;
+    repeated RelationFilter type_filters = 2;
+}
 
-    bool reload = 13;
+message RelationPrefixSearchResponse {
+    repeated utils.RelationNode nodes = 1;
+}
+
+
+// Relation neighbour search
+//
+// Search the knowledge graph using some entry points (nodes to start
+// with) and get their surrounding nodes.
+message RelationNeighboursSearchRequest {
+    message EntryPoint {
+        utils.RelationNode node = 2;
+        // Limit search depth, i.e., distance between entry point and
+        // results. Vertices connected by an edge are at distance one.
+        int32 depth = 3;
+    }
+
+    // List of vertices where search will trigger
+    repeated EntryPoint entry_points = 1;
+
+    // Filters to apply while searching. It's an OR filtering: any
+    // node (vertex) staisfying one condition will be returned
+    repeated RelationFilter type_filters = 2;
+
+    // TODO: relation filters
+}
+
+
+// TODO: uncomment and implement
+// message RelationPathsSearchRequest {
+//     message PathEndpoints {
+//         utils.RelationNode origin = 1;
+//         utils.RelationNode destination = 2;
+//     }
+
+//     repeated PathEndpoints paths = 1;
+// }
+
+
+// Query relation index to obtain different information about the
+// knowledge graph. It can be queried using the following strategies:
+//
+// - prefix search over vertex (node) names
+// - graph search:
+//   - given some entry vertices, get neighbour vertices
+//   - (TODO) given some vertices, get paths between them
+message RelationSearchRequest {
+    string shard_id = 1;
+    bool reload = 5;
+
+    RelationPrefixSearchRequest prefix = 11;
+    RelationNeighboursSearchRequest neighbours = 12;
+    // TODO: uncomment and implement
+    // RelationPathsSearchRequest paths = 13;
+
 }
 
 message RelationSearchResponse {
-    repeated utils.RelationNode neighbours = 1;
+    RelationPrefixSearchResponse prefix = 11;
+    repeated utils.RelationNeighbours neighbours = 12;
+    // TODO: uncomment and implement
+    // repeated utils.RelationPath paths = 13;
 }
+
 
 message SearchRequest {
     string shard = 1;
