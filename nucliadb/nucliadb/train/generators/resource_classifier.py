@@ -5,12 +5,14 @@ import numpy as np
 from fastapi import HTTPException
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.nodereader_pb2 import (
+    DocumentSearchRequest,
+    DocumentSearchResponse,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
 )
 from nucliadb_protos.train_pb2 import (
     Label,
-    ParagraphClassificationBatch,
+    ResourceClassificationBatch,
     TextLabel,
     TrainResponse,
     TrainSet,
@@ -26,7 +28,7 @@ from nucliadb.train.generators.stratification import IterativeStratification
 from nucliadb.train.generators.utils import get_resource_from_cache
 
 
-async def get_paragraph(kbid: str, result: str) -> str:
+async def get_resource_text(kbid: str, result: str) -> str:
 
     if result.count("/") == 5:
         rid, field_type, field, split_str, start_end = result.split("/")
@@ -63,7 +65,7 @@ async def get_paragraph(kbid: str, result: str) -> str:
     return splitted_text
 
 
-async def hydrate_paragraph_classification_train_test(
+async def hydrate_resource_classification_train_test(
     kbid: str,
     X: List[str],
     Y: csr_matrix,
@@ -72,12 +74,12 @@ async def hydrate_paragraph_classification_train_test(
     trainset: TrainSet,
     mlb: MultiLabelBinarizer,
 ):
-    batch = ParagraphClassificationBatch()
+    batch = ResourceClassificationBatch()
     for index in train_indexes:
         tl = TextLabel()
         paragraph_id = X[index]
         text_labels = mlb.inverse_transform(Y[index])
-        paragraph_text = await get_paragraph(kbid, paragraph_id)
+        paragraph_text = await get_resource_text(kbid, paragraph_id)
 
         tl.text = paragraph_text
         for label in text_labels[0]:
@@ -87,17 +89,17 @@ async def hydrate_paragraph_classification_train_test(
 
         if len(batch.data) == trainset.batch_size:
             yield batch
-            batch = ParagraphClassificationBatch()
+            batch = ResourceClassificationBatch()
 
     if len(batch.data):
         yield batch
 
-    batch = ParagraphClassificationBatch()
+    batch = ResourceClassificationBatch()
     for index in test_indexes:
         tl = TextLabel()
         paragraph_id = X[index]
         text_labels = mlb.inverse_transform(Y[index])
-        paragraph_text = await get_paragraph(kbid, paragraph_id)
+        paragraph_text = await get_resource_text(kbid, paragraph_id)
 
         tl.text = paragraph_text
         for label in text_labels[0]:
@@ -107,26 +109,26 @@ async def hydrate_paragraph_classification_train_test(
 
         if len(batch.data) == trainset.batch_size:
             yield batch
-            batch = ParagraphClassificationBatch()
+            batch = ResourceClassificationBatch()
 
     if len(batch.data):
         yield batch
 
 
-async def generate_paragraph_classification_payloads(
+async def generate_resource_classification_payloads(
     kbid: str, trainset: TrainSet, node: Node, shard_replica_id: str
-) -> AsyncIterator[Union[TrainResponse, ParagraphClassificationBatch]]:
+) -> AsyncIterator[Union[TrainResponse, ResourceClassificationBatch]]:
 
     labelset = trainset.filter.labels[0]
 
     # Query how many paragraphs has each label
-    request = ParagraphSearchRequest()
+    request = DocumentSearchRequest()
     request.id = shard_replica_id
     request.filter.tags.append(labelset)
     request.faceted.tags.append(labelset)
     request.reload = True
     request.result_per_page = 10_000_000
-    resp: ParagraphSearchResponse = await node.reader.ParagraphSearch(request)
+    resp: DocumentSearchResponse = await node.reader.DocumentSearch(request)
 
     labelset_counts = Counter()
     for labelset_result in resp.facets.get(labelset).facetresults:
@@ -144,7 +146,7 @@ async def generate_paragraph_classification_payloads(
 
         labels_binary = mlb.fit_transform([local_labels])
 
-        X.append(result.paragraph)
+        X.append(f"{result.uuid}/{result.field}")
         Y.append(labels_binary)
 
     # Check if min
@@ -174,11 +176,11 @@ async def generate_paragraph_classification_payloads(
     tr = TrainResponse()
     tr.train = len(train_indexes)
     tr.test = len(test_indexes)
-    tr.type = Type.PARAGRAPH_CLASSIFICATION
+    tr.type = Type.RESOURCE_CLASSIFICATION
     yield tr
 
     # Get paragraphs for each classification
-    async for batch in hydrate_paragraph_classification_train_test(
+    async for batch in hydrate_resource_classification_train_test(
         kbid, X, Y, train_indexes, test_indexes, trainset, mlb
     ):
         yield batch
