@@ -21,6 +21,7 @@ import asyncio
 import uuid
 from datetime import datetime
 
+import aiohttp
 import pytest
 from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
@@ -37,6 +38,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
+from nucliadb.settings import Settings
 from nucliadb_utils.utilities import (
     Utility,
     clear_global_cache,
@@ -72,12 +74,11 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
 
 @pytest.fixture(scope="function")
 async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
-    from nucliadb.train.server import start_grpc
+    from nucliadb.train.utils import start_train_grpc, stop_train_grpc
 
-    finalizer = await start_grpc("testing_train")
+    await start_train_grpc("testing_train")
     yield
-
-    finalizer()
+    await stop_train_grpc()
 
 
 @pytest.fixture(scope="function")
@@ -89,6 +90,15 @@ async def train_client(train_api):  # type: ignore
     channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
     yield TrainStub(channel)
     clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def train_rest_api(nucliadb: Settings):  # type: ignore
+    async with aiohttp.ClientSession(
+        headers={"X-NUCLIADB-ROLES": "READER"},
+        base_url=f"http://localhost:{nucliadb.http}",
+    ) as client:
+        yield client
 
 
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:

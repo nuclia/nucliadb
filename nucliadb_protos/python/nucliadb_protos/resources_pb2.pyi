@@ -38,7 +38,10 @@ class _FieldType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _FieldTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FieldType.ValueType], builtins.type):
+class _FieldTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FieldType.ValueType],
+    builtins.type,
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     FILE: _FieldType.ValueType  # 0
     LINK: _FieldType.ValueType  # 1
@@ -71,7 +74,12 @@ class CloudFile(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[CloudFile._Source.ValueType], builtins.type):  # noqa: F821
+    class _SourceEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            CloudFile._Source.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         FLAPS: CloudFile._Source.ValueType  # 0
         GCS: CloudFile._Source.ValueType  # 1
@@ -112,7 +120,11 @@ class CloudFile(google.protobuf.message.Message):
     offset: builtins.int
     upload_uri: builtins.str
     @property
-    def parts(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def parts(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     old_uri: builtins.str
     old_bucket: builtins.str
     md5: builtins.str
@@ -133,7 +145,37 @@ class CloudFile(google.protobuf.message.Message):
         old_bucket: builtins.str = ...,
         md5: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["bucket_name", b"bucket_name", "content_type", b"content_type", "filename", b"filename", "md5", b"md5", "offset", b"offset", "old_bucket", b"old_bucket", "old_uri", b"old_uri", "parts", b"parts", "resumable_uri", b"resumable_uri", "size", b"size", "source", b"source", "upload_uri", b"upload_uri", "uri", b"uri"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "bucket_name",
+            b"bucket_name",
+            "content_type",
+            b"content_type",
+            "filename",
+            b"filename",
+            "md5",
+            b"md5",
+            "offset",
+            b"offset",
+            "old_bucket",
+            b"old_bucket",
+            "old_uri",
+            b"old_uri",
+            "parts",
+            b"parts",
+            "resumable_uri",
+            b"resumable_uri",
+            "size",
+            b"size",
+            "source",
+            b"source",
+            "upload_uri",
+            b"upload_uri",
+            "uri",
+            b"uri",
+        ],
+    ) -> None: ...
 
 global___CloudFile = CloudFile
 
@@ -145,7 +187,12 @@ class Basic(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _QueueTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Basic._QueueType.ValueType], builtins.type):  # noqa: F821
+    class _QueueTypeEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            Basic._QueueType.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PRIVATE: Basic._QueueType.ValueType  # 0
         SHARED: Basic._QueueType.ValueType  # 1
@@ -188,13 +235,21 @@ class Basic(google.protobuf.message.Message):
     def usermetadata(self) -> global___UserMetadata:
         """Not Basic"""
     @property
-    def fieldmetadata(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UserFieldMetadata]: ...
+    def fieldmetadata(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___UserFieldMetadata
+    ]: ...
     @property
     def computedmetadata(self) -> global___ComputedMetadata: ...
     uuid: builtins.str
     """Only for read operations"""
     @property
-    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     last_seqid: builtins.int
     """last processing seqid of the resource"""
     last_account_seq: builtins.int
@@ -213,7 +268,8 @@ class Basic(google.protobuf.message.Message):
         modified: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         metadata: global___Metadata | None = ...,
         usermetadata: global___UserMetadata | None = ...,
-        fieldmetadata: collections.abc.Iterable[global___UserFieldMetadata] | None = ...,
+        fieldmetadata: collections.abc.Iterable[global___UserFieldMetadata]
+        | None = ...,
         computedmetadata: global___ComputedMetadata | None = ...,
         uuid: builtins.str = ...,
         labels: collections.abc.Iterable[builtins.str] | None = ...,
@@ -221,8 +277,60 @@ class Basic(google.protobuf.message.Message):
         last_account_seq: builtins.int = ...,
         queue: global___Basic.QueueType.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["computedmetadata", b"computedmetadata", "created", b"created", "metadata", b"metadata", "modified", b"modified", "usermetadata", b"usermetadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["computedmetadata", b"computedmetadata", "created", b"created", "fieldmetadata", b"fieldmetadata", "icon", b"icon", "labels", b"labels", "last_account_seq", b"last_account_seq", "last_seqid", b"last_seqid", "layout", b"layout", "metadata", b"metadata", "modified", b"modified", "queue", b"queue", "slug", b"slug", "summary", b"summary", "thumbnail", b"thumbnail", "title", b"title", "usermetadata", b"usermetadata", "uuid", b"uuid"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "computedmetadata",
+            b"computedmetadata",
+            "created",
+            b"created",
+            "metadata",
+            b"metadata",
+            "modified",
+            b"modified",
+            "usermetadata",
+            b"usermetadata",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "computedmetadata",
+            b"computedmetadata",
+            "created",
+            b"created",
+            "fieldmetadata",
+            b"fieldmetadata",
+            "icon",
+            b"icon",
+            "labels",
+            b"labels",
+            "last_account_seq",
+            b"last_account_seq",
+            "last_seqid",
+            b"last_seqid",
+            "layout",
+            b"layout",
+            "metadata",
+            b"metadata",
+            "modified",
+            b"modified",
+            "queue",
+            b"queue",
+            "slug",
+            b"slug",
+            "summary",
+            b"summary",
+            "thumbnail",
+            b"thumbnail",
+            "title",
+            b"title",
+            "usermetadata",
+            b"usermetadata",
+            "uuid",
+            b"uuid",
+        ],
+    ) -> None: ...
 
 global___Basic = Basic
 
@@ -236,7 +344,12 @@ class Origin(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _SourceEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Origin._Source.ValueType], builtins.type):  # noqa: F821
+    class _SourceEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            Origin._Source.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         WEB: Origin._Source.ValueType  # 0
         DESKTOP: Origin._Source.ValueType  # 1
@@ -261,7 +374,10 @@ class Origin(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     SOURCE_FIELD_NUMBER: builtins.int
     SOURCE_ID_FIELD_NUMBER: builtins.int
@@ -281,14 +397,28 @@ class Origin(google.protobuf.message.Message):
     @property
     def modified(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
-    def metadata(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def metadata(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
-    def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def tags(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     @property
-    def colaborators(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def colaborators(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     filename: builtins.str
     @property
-    def related(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def related(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     def __init__(
         self,
         *,
@@ -303,8 +433,37 @@ class Origin(google.protobuf.message.Message):
         filename: builtins.str = ...,
         related: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["created", b"created", "modified", b"modified"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["colaborators", b"colaborators", "created", b"created", "filename", b"filename", "metadata", b"metadata", "modified", b"modified", "related", b"related", "source", b"source", "source_id", b"source_id", "tags", b"tags", "url", b"url"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "created", b"created", "modified", b"modified"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "colaborators",
+            b"colaborators",
+            "created",
+            b"created",
+            "filename",
+            b"filename",
+            "metadata",
+            b"metadata",
+            "modified",
+            b"modified",
+            "related",
+            b"related",
+            "source",
+            b"source",
+            "source_id",
+            b"source_id",
+            "tags",
+            b"tags",
+            "url",
+            b"url",
+        ],
+    ) -> None: ...
 
 global___Origin = Origin
 
@@ -314,13 +473,20 @@ class Relations(google.protobuf.message.Message):
 
     RELATIONS_FIELD_NUMBER: builtins.int
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def relations(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        nucliadb_protos.utils_pb2.Relation
+    ]: ...
     def __init__(
         self,
         *,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation]
+        | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["relations", b"relations"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["relations", b"relations"]
+    ) -> None: ...
 
 global___Relations = Relations
 
@@ -332,7 +498,12 @@ class MessageContent(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[MessageContent._Format.ValueType], builtins.type):  # noqa: F821
+    class _FormatEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            MessageContent._Format.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PLAIN: MessageContent._Format.ValueType  # 0
         HTML: MessageContent._Format.ValueType  # 1
@@ -351,7 +522,11 @@ class MessageContent(google.protobuf.message.Message):
     text: builtins.str
     format: global___MessageContent.Format.ValueType
     @property
-    def attachments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CloudFile]: ...
+    def attachments(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CloudFile
+    ]: ...
     def __init__(
         self,
         *,
@@ -359,7 +534,12 @@ class MessageContent(google.protobuf.message.Message):
         format: global___MessageContent.Format.ValueType = ...,
         attachments: collections.abc.Iterable[global___CloudFile] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["attachments", b"attachments", "format", b"format", "text", b"text"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attachments", b"attachments", "format", b"format", "text", b"text"
+        ],
+    ) -> None: ...
 
 global___MessageContent = MessageContent
 
@@ -376,7 +556,11 @@ class Message(google.protobuf.message.Message):
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     who: builtins.str
     @property
-    def to(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def to(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     @property
     def content(self) -> global___MessageContent: ...
     ident: builtins.str
@@ -389,8 +573,27 @@ class Message(google.protobuf.message.Message):
         content: global___MessageContent | None = ...,
         ident: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["content", b"content", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["content", b"content", "ident", b"ident", "timestamp", b"timestamp", "to", b"to", "who", b"who"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "content", b"content", "timestamp", b"timestamp"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "content",
+            b"content",
+            "ident",
+            b"ident",
+            "timestamp",
+            b"timestamp",
+            "to",
+            b"to",
+            "who",
+            b"who",
+        ],
+    ) -> None: ...
 
 global___Message = Message
 
@@ -400,13 +603,19 @@ class Conversation(google.protobuf.message.Message):
 
     MESSAGES_FIELD_NUMBER: builtins.int
     @property
-    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Message]: ...
+    def messages(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Message
+    ]: ...
     def __init__(
         self,
         *,
         messages: collections.abc.Iterable[global___Message] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["messages", b"messages"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["messages", b"messages"]
+    ) -> None: ...
 
 global___Conversation = Conversation
 
@@ -424,7 +633,9 @@ class FieldConversation(google.protobuf.message.Message):
         pages: builtins.int = ...,
         size: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "size", b"size"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["pages", b"pages", "size", b"size"]
+    ) -> None: ...
 
 global___FieldConversation = FieldConversation
 
@@ -445,7 +656,12 @@ class NestedPosition(google.protobuf.message.Message):
         end: builtins.int = ...,
         page: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "page", b"page", "start", b"start"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end", b"end", "page", b"page", "start", b"start"
+        ],
+    ) -> None: ...
 
 global___NestedPosition = NestedPosition
 
@@ -455,13 +671,19 @@ class NestedListPosition(google.protobuf.message.Message):
 
     POSITIONS_FIELD_NUMBER: builtins.int
     @property
-    def positions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___NestedPosition]: ...
+    def positions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___NestedPosition
+    ]: ...
     def __init__(
         self,
         *,
         positions: collections.abc.Iterable[global___NestedPosition] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["positions", b"positions"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["positions", b"positions"]
+    ) -> None: ...
 
 global___NestedListPosition = NestedListPosition
 
@@ -483,7 +705,10 @@ class FileExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class NestedEntry(google.protobuf.message.Message):
@@ -499,7 +724,10 @@ class FileExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class FileGeneratedEntry(google.protobuf.message.Message):
@@ -516,8 +744,13 @@ class FileExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___CloudFile | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class FileRowsPreviewsEntry(google.protobuf.message.Message):
@@ -534,8 +767,13 @@ class FileExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___RowsPreview | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class NestedPositionEntry(google.protobuf.message.Message):
@@ -552,8 +790,13 @@ class FileExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___NestedPosition | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class NestedListPositionEntry(google.protobuf.message.Message):
@@ -570,8 +813,13 @@ class FileExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___NestedListPosition | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     LANGUAGE_FIELD_NUMBER: builtins.int
     MD5_FIELD_NUMBER: builtins.int
@@ -589,13 +837,25 @@ class FileExtractedData(google.protobuf.message.Message):
     language: builtins.str
     md5: builtins.str
     @property
-    def metadata(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def metadata(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
-    def nested(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def nested(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
-    def file_generated(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___CloudFile]: ...
+    def file_generated(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___CloudFile
+    ]: ...
     @property
-    def file_rows_previews(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___RowsPreview]: ...
+    def file_rows_previews(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___RowsPreview
+    ]: ...
     @property
     def file_preview(self) -> global___CloudFile: ...
     @property
@@ -605,9 +865,17 @@ class FileExtractedData(google.protobuf.message.Message):
     field: builtins.str
     icon: builtins.str
     @property
-    def nested_position(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___NestedPosition]: ...
+    def nested_position(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___NestedPosition
+    ]: ...
     @property
-    def nested_list_position(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___NestedListPosition]: ...
+    def nested_list_position(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___NestedListPosition
+    ]: ...
     def __init__(
         self,
         *,
@@ -615,18 +883,64 @@ class FileExtractedData(google.protobuf.message.Message):
         md5: builtins.str = ...,
         metadata: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         nested: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
-        file_generated: collections.abc.Mapping[builtins.str, global___CloudFile] | None = ...,
-        file_rows_previews: collections.abc.Mapping[builtins.str, global___RowsPreview] | None = ...,
+        file_generated: collections.abc.Mapping[builtins.str, global___CloudFile]
+        | None = ...,
+        file_rows_previews: collections.abc.Mapping[builtins.str, global___RowsPreview]
+        | None = ...,
         file_preview: global___CloudFile | None = ...,
         file_pages_previews: global___FilePages | None = ...,
         file_thumbnail: global___CloudFile | None = ...,
         field: builtins.str = ...,
         icon: builtins.str = ...,
-        nested_position: collections.abc.Mapping[builtins.str, global___NestedPosition] | None = ...,
-        nested_list_position: collections.abc.Mapping[builtins.str, global___NestedListPosition] | None = ...,
+        nested_position: collections.abc.Mapping[builtins.str, global___NestedPosition]
+        | None = ...,
+        nested_list_position: collections.abc.Mapping[
+            builtins.str, global___NestedListPosition
+        ]
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_thumbnail", b"file_thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "file_generated", b"file_generated", "file_pages_previews", b"file_pages_previews", "file_preview", b"file_preview", "file_rows_previews", b"file_rows_previews", "file_thumbnail", b"file_thumbnail", "icon", b"icon", "language", b"language", "md5", b"md5", "metadata", b"metadata", "nested", b"nested", "nested_list_position", b"nested_list_position", "nested_position", b"nested_position"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "file_pages_previews",
+            b"file_pages_previews",
+            "file_preview",
+            b"file_preview",
+            "file_thumbnail",
+            b"file_thumbnail",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field",
+            b"field",
+            "file_generated",
+            b"file_generated",
+            "file_pages_previews",
+            b"file_pages_previews",
+            "file_preview",
+            b"file_preview",
+            "file_rows_previews",
+            b"file_rows_previews",
+            "file_thumbnail",
+            b"file_thumbnail",
+            "icon",
+            b"icon",
+            "language",
+            b"language",
+            "md5",
+            b"md5",
+            "metadata",
+            b"metadata",
+            "nested",
+            b"nested",
+            "nested_list_position",
+            b"nested_list_position",
+            "nested_position",
+            b"nested_position",
+        ],
+    ) -> None: ...
 
 global___FileExtractedData = FileExtractedData
 
@@ -648,7 +962,10 @@ class LinkExtractedData(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     DATE_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
@@ -666,7 +983,9 @@ class LinkExtractedData(google.protobuf.message.Message):
     language: builtins.str
     title: builtins.str
     @property
-    def metadata(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def metadata(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
     def link_thumbnail(self) -> global___CloudFile: ...
     @property
@@ -692,8 +1011,46 @@ class LinkExtractedData(google.protobuf.message.Message):
         type: builtins.str = ...,
         embed: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["date", b"date", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["date", b"date", "description", b"description", "embed", b"embed", "field", b"field", "language", b"language", "link_image", b"link_image", "link_preview", b"link_preview", "link_thumbnail", b"link_thumbnail", "metadata", b"metadata", "title", b"title", "type", b"type"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "date",
+            b"date",
+            "link_image",
+            b"link_image",
+            "link_preview",
+            b"link_preview",
+            "link_thumbnail",
+            b"link_thumbnail",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "date",
+            b"date",
+            "description",
+            b"description",
+            "embed",
+            b"embed",
+            "field",
+            b"field",
+            "language",
+            b"language",
+            "link_image",
+            b"link_image",
+            "link_preview",
+            b"link_preview",
+            "link_thumbnail",
+            b"link_thumbnail",
+            "metadata",
+            b"metadata",
+            "title",
+            b"title",
+            "type",
+            b"type",
+        ],
+    ) -> None: ...
 
 global___LinkExtractedData = LinkExtractedData
 
@@ -717,9 +1074,35 @@ class ExtractedTextWrapper(google.protobuf.message.Message):
         file: global___CloudFile | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["body", b"body", "field", b"field", "file", b"file", "file_or_data", b"file_or_data"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "field", b"field", "file", b"file", "file_or_data", b"file_or_data"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]) -> typing_extensions.Literal["body", "file"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "body",
+            b"body",
+            "field",
+            b"field",
+            "file",
+            b"file",
+            "file_or_data",
+            b"file_or_data",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "body",
+            b"body",
+            "field",
+            b"field",
+            "file",
+            b"file",
+            "file_or_data",
+            b"file_or_data",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]
+    ) -> typing_extensions.Literal["body", "file"] | None: ...
 
 global___ExtractedTextWrapper = ExtractedTextWrapper
 
@@ -743,9 +1126,35 @@ class ExtractedVectorsWrapper(google.protobuf.message.Message):
         file: global___CloudFile | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "vectors", b"vectors"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "vectors", b"vectors"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]) -> typing_extensions.Literal["vectors", "file"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field",
+            b"field",
+            "file",
+            b"file",
+            "file_or_data",
+            b"file_or_data",
+            "vectors",
+            b"vectors",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field",
+            b"field",
+            "file",
+            b"file",
+            "file_or_data",
+            b"file_or_data",
+            "vectors",
+            b"vectors",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]
+    ) -> typing_extensions.Literal["vectors", "file"] | None: ...
 
 global___ExtractedVectorsWrapper = ExtractedVectorsWrapper
 
@@ -768,8 +1177,13 @@ class UserVectorsWrapper(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: nucliadb_protos.utils_pb2.UserVectorsList | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     VECTORS_FIELD_NUMBER: builtins.int
     VECTORS_TO_DELETE_FIELD_NUMBER: builtins.int
@@ -777,7 +1191,11 @@ class UserVectorsWrapper(google.protobuf.message.Message):
     @property
     def vectors(self) -> nucliadb_protos.utils_pb2.UserVectorSet: ...
     @property
-    def vectors_to_delete(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList]:
+    def vectors_to_delete(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, nucliadb_protos.utils_pb2.UserVectorsList
+    ]:
         """Vectorset prefix vector id"""
     @property
     def field(self) -> global___FieldID: ...
@@ -785,11 +1203,27 @@ class UserVectorsWrapper(google.protobuf.message.Message):
         self,
         *,
         vectors: nucliadb_protos.utils_pb2.UserVectorSet | None = ...,
-        vectors_to_delete: collections.abc.Mapping[builtins.str, nucliadb_protos.utils_pb2.UserVectorsList] | None = ...,
+        vectors_to_delete: collections.abc.Mapping[
+            builtins.str, nucliadb_protos.utils_pb2.UserVectorsList
+        ]
+        | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["field", b"field", "vectors", b"vectors"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["field", b"field", "vectors", b"vectors"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field",
+            b"field",
+            "vectors",
+            b"vectors",
+            "vectors_to_delete",
+            b"vectors_to_delete",
+        ],
+    ) -> None: ...
 
 global___UserVectorsWrapper = UserVectorsWrapper
 
@@ -810,7 +1244,12 @@ class Sentence(google.protobuf.message.Message):
         end: builtins.int = ...,
         key: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "key", b"key", "start", b"start"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end", b"end", "key", b"key", "start", b"start"
+        ],
+    ) -> None: ...
 
 global___Sentence = Sentence
 
@@ -822,7 +1261,12 @@ class Paragraph(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _TypeParagraphEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Paragraph._TypeParagraph.ValueType], builtins.type):  # noqa: F821
+    class _TypeParagraphEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            Paragraph._TypeParagraph.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TEXT: Paragraph._TypeParagraph.ValueType  # 0
         OCR: Paragraph._TypeParagraph.ValueType  # 1
@@ -851,14 +1295,30 @@ class Paragraph(google.protobuf.message.Message):
     start: builtins.int
     end: builtins.int
     @property
-    def start_seconds(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def start_seconds(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.int
+    ]: ...
     @property
-    def end_seconds(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def end_seconds(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.int
+    ]: ...
     kind: global___Paragraph.TypeParagraph.ValueType
     @property
-    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def classifications(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Classification
+    ]: ...
     @property
-    def sentences(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Sentence]: ...
+    def sentences(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Sentence
+    ]: ...
     key: builtins.str
     text: builtins.str
     """Optional, as a computed value"""
@@ -875,7 +1335,29 @@ class Paragraph(google.protobuf.message.Message):
         key: builtins.str = ...,
         text: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "end", b"end", "end_seconds", b"end_seconds", "key", b"key", "kind", b"kind", "sentences", b"sentences", "start", b"start", "start_seconds", b"start_seconds", "text", b"text"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "classifications",
+            b"classifications",
+            "end",
+            b"end",
+            "end_seconds",
+            b"end_seconds",
+            "key",
+            b"key",
+            "kind",
+            b"kind",
+            "sentences",
+            b"sentences",
+            "start",
+            b"start",
+            "start_seconds",
+            b"start_seconds",
+            "text",
+            b"text",
+        ],
+    ) -> None: ...
 
 global___Paragraph = Paragraph
 
@@ -893,7 +1375,9 @@ class Position(google.protobuf.message.Message):
         start: builtins.int = ...,
         end: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "start", b"start"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["end", b"end", "start", b"start"]
+    ) -> None: ...
 
 global___Position = Position
 
@@ -904,7 +1388,11 @@ class Positions(google.protobuf.message.Message):
     POSITION_FIELD_NUMBER: builtins.int
     ENTITY_FIELD_NUMBER: builtins.int
     @property
-    def position(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Position]: ...
+    def position(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Position
+    ]: ...
     entity: builtins.str
     def __init__(
         self,
@@ -912,7 +1400,12 @@ class Positions(google.protobuf.message.Message):
         position: collections.abc.Iterable[global___Position] | None = ...,
         entity: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["entity", b"entity", "position", b"position"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "entity", b"entity", "position", b"position"
+        ],
+    ) -> None: ...
 
 global___Positions = Positions
 
@@ -934,7 +1427,10 @@ class FieldMetadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class PositionsEntry(google.protobuf.message.Message):
@@ -951,8 +1447,13 @@ class FieldMetadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___Positions | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     LINKS_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
@@ -967,14 +1468,28 @@ class FieldMetadata(google.protobuf.message.Message):
     SUMMARY_FIELD_NUMBER: builtins.int
     POSITIONS_FIELD_NUMBER: builtins.int
     @property
-    def links(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     @property
-    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Paragraph]: ...
+    def paragraphs(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Paragraph
+    ]: ...
     @property
-    def ner(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+    def ner(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Document"""
     @property
-    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def classifications(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Classification
+    ]: ...
     @property
     def last_index(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -988,7 +1503,11 @@ class FieldMetadata(google.protobuf.message.Message):
     language: builtins.str
     summary: builtins.str
     @property
-    def positions(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Positions]:
+    def positions(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___Positions
+    ]:
         """Document"""
     def __init__(
         self,
@@ -1004,10 +1523,53 @@ class FieldMetadata(google.protobuf.message.Message):
         thumbnail: global___CloudFile | None = ...,
         language: builtins.str = ...,
         summary: builtins.str = ...,
-        positions: collections.abc.Mapping[builtins.str, global___Positions] | None = ...,
+        positions: collections.abc.Mapping[builtins.str, global___Positions]
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "thumbnail", b"thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "last_extract",
+            b"last_extract",
+            "last_index",
+            b"last_index",
+            "last_summary",
+            b"last_summary",
+            "last_understanding",
+            b"last_understanding",
+            "thumbnail",
+            b"thumbnail",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "classifications",
+            b"classifications",
+            "language",
+            b"language",
+            "last_extract",
+            b"last_extract",
+            "last_index",
+            b"last_index",
+            "last_summary",
+            b"last_summary",
+            "last_understanding",
+            b"last_understanding",
+            "links",
+            b"links",
+            "ner",
+            b"ner",
+            "paragraphs",
+            b"paragraphs",
+            "positions",
+            b"positions",
+            "summary",
+            b"summary",
+            "thumbnail",
+            b"thumbnail",
+        ],
+    ) -> None: ...
 
 global___FieldMetadata = FieldMetadata
 
@@ -1030,8 +1592,13 @@ class FieldComputedMetadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___FieldMetadata | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     METADATA_FIELD_NUMBER: builtins.int
     SPLIT_METADATA_FIELD_NUMBER: builtins.int
@@ -1039,18 +1606,39 @@ class FieldComputedMetadata(google.protobuf.message.Message):
     @property
     def metadata(self) -> global___FieldMetadata: ...
     @property
-    def split_metadata(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___FieldMetadata]: ...
+    def split_metadata(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___FieldMetadata
+    ]: ...
     @property
-    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def deleted_splits(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     def __init__(
         self,
         *,
         metadata: global___FieldMetadata | None = ...,
-        split_metadata: collections.abc.Mapping[builtins.str, global___FieldMetadata] | None = ...,
+        split_metadata: collections.abc.Mapping[builtins.str, global___FieldMetadata]
+        | None = ...,
         deleted_splits: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["deleted_splits", b"deleted_splits", "metadata", b"metadata", "split_metadata", b"split_metadata"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["metadata", b"metadata"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deleted_splits",
+            b"deleted_splits",
+            "metadata",
+            b"metadata",
+            "split_metadata",
+            b"split_metadata",
+        ],
+    ) -> None: ...
 
 global___FieldComputedMetadata = FieldComputedMetadata
 
@@ -1070,8 +1658,18 @@ class FieldComputedMetadataWrapper(google.protobuf.message.Message):
         metadata: global___FieldComputedMetadata | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["field", b"field", "metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "metadata", b"metadata"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field", b"field", "metadata", b"metadata"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field", b"field", "metadata", b"metadata"
+        ],
+    ) -> None: ...
 
 global___FieldComputedMetadataWrapper = FieldComputedMetadataWrapper
 
@@ -1085,7 +1683,12 @@ class Metadata(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Metadata._Status.ValueType], builtins.type):  # noqa: F821
+    class _StatusEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            Metadata._Status.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PENDING: Metadata._Status.ValueType  # 0
         PROCESSED: Metadata._Status.ValueType  # 1
@@ -1114,7 +1717,10 @@ class Metadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     METADATA_FIELD_NUMBER: builtins.int
     LANGUAGE_FIELD_NUMBER: builtins.int
@@ -1122,10 +1728,16 @@ class Metadata(google.protobuf.message.Message):
     USEFUL_FIELD_NUMBER: builtins.int
     STATUS_FIELD_NUMBER: builtins.int
     @property
-    def metadata(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def metadata(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     language: builtins.str
     @property
-    def languages(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def languages(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     useful: builtins.bool
     status: global___Metadata.Status.ValueType
     def __init__(
@@ -1137,7 +1749,21 @@ class Metadata(google.protobuf.message.Message):
         useful: builtins.bool = ...,
         status: global___Metadata.Status.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["language", b"language", "languages", b"languages", "metadata", b"metadata", "status", b"status", "useful", b"useful"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "language",
+            b"language",
+            "languages",
+            b"languages",
+            "metadata",
+            b"metadata",
+            "status",
+            b"status",
+            "useful",
+            b"useful",
+        ],
+    ) -> None: ...
 
 global___Metadata = Metadata
 
@@ -1149,7 +1775,12 @@ class FieldText(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldText._Format.ValueType], builtins.type):  # noqa: F821
+    class _FormatEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            FieldText._Format.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PLAIN: FieldText._Format.ValueType  # 0
         HTML: FieldText._Format.ValueType  # 1
@@ -1175,7 +1806,12 @@ class FieldText(google.protobuf.message.Message):
         format: global___FieldText.Format.ValueType = ...,
         md5: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "format", b"format", "md5", b"md5"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "body", b"body", "format", b"format", "md5", b"md5"
+        ],
+    ) -> None: ...
 
 global___FieldText = FieldText
 
@@ -1187,7 +1823,12 @@ class Block(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _TypeBlockEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Block._TypeBlock.ValueType], builtins.type):  # noqa: F821
+    class _TypeBlockEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            Block._TypeBlock.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         TITLE: Block._TypeBlock.ValueType  # 0
         DESCRIPTION: Block._TypeBlock.ValueType  # 1
@@ -1235,8 +1876,30 @@ class Block(google.protobuf.message.Message):
         payload: builtins.str = ...,
         file: global___CloudFile | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["file", b"file"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["cols", b"cols", "file", b"file", "ident", b"ident", "payload", b"payload", "rows", b"rows", "type", b"type", "x", b"x", "y", b"y"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["file", b"file"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cols",
+            b"cols",
+            "file",
+            b"file",
+            "ident",
+            b"ident",
+            "payload",
+            b"payload",
+            "rows",
+            b"rows",
+            "type",
+            b"type",
+            "x",
+            b"x",
+            "y",
+            b"y",
+        ],
+    ) -> None: ...
 
 global___Block = Block
 
@@ -1259,22 +1922,40 @@ class LayoutContent(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___Block | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     BLOCKS_FIELD_NUMBER: builtins.int
     DELETED_BLOCKS_FIELD_NUMBER: builtins.int
     @property
-    def blocks(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Block]: ...
+    def blocks(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___Block
+    ]: ...
     @property
-    def deleted_blocks(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def deleted_blocks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     def __init__(
         self,
         *,
         blocks: collections.abc.Mapping[builtins.str, global___Block] | None = ...,
         deleted_blocks: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["blocks", b"blocks", "deleted_blocks", b"deleted_blocks"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "blocks", b"blocks", "deleted_blocks", b"deleted_blocks"
+        ],
+    ) -> None: ...
 
 global___LayoutContent = LayoutContent
 
@@ -1286,7 +1967,12 @@ class FieldLayout(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _FormatEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[FieldLayout._Format.ValueType], builtins.type):  # noqa: F821
+    class _FormatEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            FieldLayout._Format.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         NUCLIAv1: FieldLayout._Format.ValueType  # 0
 
@@ -1304,8 +1990,13 @@ class FieldLayout(google.protobuf.message.Message):
         body: global___LayoutContent | None = ...,
         format: global___FieldLayout.Format.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["body", b"body"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "format", b"format"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["body", b"body"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["body", b"body", "format", b"format"],
+    ) -> None: ...
 
 global___FieldLayout = FieldLayout
 
@@ -1326,7 +2017,17 @@ class Classification(google.protobuf.message.Message):
         label: builtins.str = ...,
         cancelled_by_user: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["cancelled_by_user", b"cancelled_by_user", "label", b"label", "labelset", b"labelset"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancelled_by_user",
+            b"cancelled_by_user",
+            "label",
+            b"label",
+            "labelset",
+            b"labelset",
+        ],
+    ) -> None: ...
 
 global___Classification = Classification
 
@@ -1337,16 +2038,30 @@ class UserMetadata(google.protobuf.message.Message):
     CLASSIFICATIONS_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
     @property
-    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def classifications(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Classification
+    ]: ...
     @property
-    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def relations(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        nucliadb_protos.utils_pb2.Relation
+    ]: ...
     def __init__(
         self,
         *,
         classifications: collections.abc.Iterable[global___Classification] | None = ...,
-        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
+        relations: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation]
+        | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "relations", b"relations"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "classifications", b"classifications", "relations", b"relations"
+        ],
+    ) -> None: ...
 
 global___UserMetadata = UserMetadata
 
@@ -1359,15 +2074,26 @@ class FieldClassifications(google.protobuf.message.Message):
     @property
     def field(self) -> global___FieldID: ...
     @property
-    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def classifications(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Classification
+    ]: ...
     def __init__(
         self,
         *,
         field: global___FieldID | None = ...,
         classifications: collections.abc.Iterable[global___Classification] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["field", b"field"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "field", b"field"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["field", b"field"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "classifications", b"classifications", "field", b"field"
+        ],
+    ) -> None: ...
 
 global___FieldClassifications = FieldClassifications
 
@@ -1377,13 +2103,23 @@ class ComputedMetadata(google.protobuf.message.Message):
 
     FIELD_CLASSIFICATIONS_FIELD_NUMBER: builtins.int
     @property
-    def field_classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FieldClassifications]: ...
+    def field_classifications(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___FieldClassifications
+    ]: ...
     def __init__(
         self,
         *,
-        field_classifications: collections.abc.Iterable[global___FieldClassifications] | None = ...,
+        field_classifications: collections.abc.Iterable[global___FieldClassifications]
+        | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field_classifications", b"field_classifications"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field_classifications", b"field_classifications"
+        ],
+    ) -> None: ...
 
 global___ComputedMetadata = ComputedMetadata
 
@@ -1407,7 +2143,12 @@ class TokenSplit(google.protobuf.message.Message):
         start: builtins.int = ...,
         end: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "klass", b"klass", "start", b"start", "token", b"token"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end", b"end", "klass", b"klass", "start", b"start", "token", b"token"
+        ],
+    ) -> None: ...
 
 global___TokenSplit = TokenSplit
 
@@ -1419,14 +2160,23 @@ class ParagraphAnnotation(google.protobuf.message.Message):
     CLASSIFICATIONS_FIELD_NUMBER: builtins.int
     key: builtins.str
     @property
-    def classifications(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Classification]: ...
+    def classifications(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Classification
+    ]: ...
     def __init__(
         self,
         *,
         key: builtins.str = ...,
         classifications: collections.abc.Iterable[global___Classification] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "key", b"key"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "classifications", b"classifications", "key", b"key"
+        ],
+    ) -> None: ...
 
 global___ParagraphAnnotation = ParagraphAnnotation
 
@@ -1438,9 +2188,17 @@ class UserFieldMetadata(google.protobuf.message.Message):
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
     @property
-    def token(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TokenSplit]: ...
+    def token(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___TokenSplit
+    ]: ...
     @property
-    def paragraphs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ParagraphAnnotation]: ...
+    def paragraphs(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___ParagraphAnnotation
+    ]: ...
     @property
     def field(self) -> global___FieldID: ...
     def __init__(
@@ -1450,8 +2208,15 @@ class UserFieldMetadata(google.protobuf.message.Message):
         paragraphs: collections.abc.Iterable[global___ParagraphAnnotation] | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["field", b"field"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "paragraphs", b"paragraphs", "token", b"token"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["field", b"field"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field", b"field", "paragraphs", b"paragraphs", "token", b"token"
+        ],
+    ) -> None: ...
 
 global___UserFieldMetadata = UserFieldMetadata
 
@@ -1473,7 +2238,10 @@ class FieldLink(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class CookiesEntry(google.protobuf.message.Message):
@@ -1489,7 +2257,10 @@ class FieldLink(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class LocalstorageEntry(google.protobuf.message.Message):
@@ -1505,7 +2276,10 @@ class FieldLink(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     ADDED_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
@@ -1516,13 +2290,19 @@ class FieldLink(google.protobuf.message.Message):
     @property
     def added(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
-    def headers(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
-    def cookies(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def cookies(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     uri: builtins.str
     language: builtins.str
     @property
-    def localstorage(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def localstorage(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     def __init__(
         self,
         *,
@@ -1533,8 +2313,26 @@ class FieldLink(google.protobuf.message.Message):
         language: builtins.str = ...,
         localstorage: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["added", b"added"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added", b"added", "cookies", b"cookies", "headers", b"headers", "language", b"language", "localstorage", b"localstorage", "uri", b"uri"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["added", b"added"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "added",
+            b"added",
+            "cookies",
+            b"cookies",
+            "headers",
+            b"headers",
+            "language",
+            b"language",
+            "localstorage",
+            b"localstorage",
+            "uri",
+            b"uri",
+        ],
+    ) -> None: ...
 
 global___FieldLink = FieldLink
 
@@ -1549,7 +2347,9 @@ class Keyword(google.protobuf.message.Message):
         *,
         value: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["value", b"value"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["value", b"value"]
+    ) -> None: ...
 
 global___Keyword = Keyword
 
@@ -1559,13 +2359,19 @@ class FieldKeywordset(google.protobuf.message.Message):
 
     KEYWORDS_FIELD_NUMBER: builtins.int
     @property
-    def keywords(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Keyword]: ...
+    def keywords(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Keyword
+    ]: ...
     def __init__(
         self,
         *,
         keywords: collections.abc.Iterable[global___Keyword] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["keywords", b"keywords"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["keywords", b"keywords"]
+    ) -> None: ...
 
 global___FieldKeywordset = FieldKeywordset
 
@@ -1581,8 +2387,12 @@ class FieldDatetime(google.protobuf.message.Message):
         *,
         value: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["value", b"value"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["value", b"value"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["value", b"value"]
+    ) -> None: ...
 
 global___FieldDatetime = FieldDatetime
 
@@ -1604,7 +2414,10 @@ class FieldFile(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     @typing_extensions.final
     class CookiesEntry(google.protobuf.message.Message):
@@ -1620,7 +2433,10 @@ class FieldFile(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.str = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     ADDED_FIELD_NUMBER: builtins.int
     FILE_FIELD_NUMBER: builtins.int
@@ -1637,9 +2453,13 @@ class FieldFile(google.protobuf.message.Message):
     password: builtins.str
     url: builtins.str
     @property
-    def headers(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     @property
-    def cookies(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def cookies(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     def __init__(
         self,
         *,
@@ -1651,8 +2471,28 @@ class FieldFile(google.protobuf.message.Message):
         headers: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         cookies: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["added", b"added", "file", b"file"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["added", b"added", "cookies", b"cookies", "file", b"file", "headers", b"headers", "language", b"language", "password", b"password", "url", b"url"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["added", b"added", "file", b"file"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "added",
+            b"added",
+            "cookies",
+            b"cookies",
+            "file",
+            b"file",
+            "headers",
+            b"headers",
+            "language",
+            b"language",
+            "password",
+            b"password",
+            "url",
+            b"url",
+        ],
+    ) -> None: ...
 
 global___FieldFile = FieldFile
 
@@ -1673,7 +2513,12 @@ class Entity(google.protobuf.message.Message):
         root: builtins.str = ...,
         type: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["root", b"root", "token", b"token", "type", b"type"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "root", b"root", "token", b"token", "type", b"type"
+        ],
+    ) -> None: ...
 
 global___Entity = Entity
 
@@ -1695,21 +2540,35 @@ class FieldLargeMetadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: builtins.int = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     ENTITIES_FIELD_NUMBER: builtins.int
     TOKENS_FIELD_NUMBER: builtins.int
     @property
-    def entities(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Entity]: ...
+    def entities(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Entity
+    ]: ...
     @property
-    def tokens(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.int]: ...
+    def tokens(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.int]: ...
     def __init__(
         self,
         *,
         entities: collections.abc.Iterable[global___Entity] | None = ...,
         tokens: collections.abc.Mapping[builtins.str, builtins.int] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["entities", b"entities", "tokens", b"tokens"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "entities", b"entities", "tokens", b"tokens"
+        ],
+    ) -> None: ...
 
 global___FieldLargeMetadata = FieldLargeMetadata
 
@@ -1732,8 +2591,13 @@ class LargeComputedMetadata(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___FieldLargeMetadata | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     METADATA_FIELD_NUMBER: builtins.int
     SPLIT_METADATA_FIELD_NUMBER: builtins.int
@@ -1741,18 +2605,41 @@ class LargeComputedMetadata(google.protobuf.message.Message):
     @property
     def metadata(self) -> global___FieldLargeMetadata: ...
     @property
-    def split_metadata(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___FieldLargeMetadata]: ...
+    def split_metadata(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___FieldLargeMetadata
+    ]: ...
     @property
-    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def deleted_splits(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     def __init__(
         self,
         *,
         metadata: global___FieldLargeMetadata | None = ...,
-        split_metadata: collections.abc.Mapping[builtins.str, global___FieldLargeMetadata] | None = ...,
+        split_metadata: collections.abc.Mapping[
+            builtins.str, global___FieldLargeMetadata
+        ]
+        | None = ...,
         deleted_splits: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["deleted_splits", b"deleted_splits", "metadata", b"metadata", "split_metadata", b"split_metadata"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["metadata", b"metadata"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deleted_splits",
+            b"deleted_splits",
+            "metadata",
+            b"metadata",
+            "split_metadata",
+            b"split_metadata",
+        ],
+    ) -> None: ...
 
 global___LargeComputedMetadata = LargeComputedMetadata
 
@@ -1776,9 +2663,35 @@ class LargeComputedMetadataWrapper(google.protobuf.message.Message):
         file: global___CloudFile | None = ...,
         field: global___FieldID | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "real", b"real"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "file", b"file", "file_or_data", b"file_or_data", "real", b"real"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]) -> typing_extensions.Literal["real", "file"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field",
+            b"field",
+            "file",
+            b"file",
+            "file_or_data",
+            b"file_or_data",
+            "real",
+            b"real",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field",
+            b"field",
+            "file",
+            b"file",
+            "file_or_data",
+            b"file_or_data",
+            "real",
+            b"real",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["file_or_data", b"file_or_data"]
+    ) -> typing_extensions.Literal["real", "file"] | None: ...
 
 global___LargeComputedMetadataWrapper = LargeComputedMetadataWrapper
 
@@ -1796,7 +2709,9 @@ class PagePositions(google.protobuf.message.Message):
         start: builtins.int = ...,
         end: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "start", b"start"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["end", b"end", "start", b"start"]
+    ) -> None: ...
 
 global___PagePositions = PagePositions
 
@@ -1807,16 +2722,29 @@ class FilePages(google.protobuf.message.Message):
     PAGES_FIELD_NUMBER: builtins.int
     POSITIONS_FIELD_NUMBER: builtins.int
     @property
-    def pages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CloudFile]: ...
+    def pages(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CloudFile
+    ]: ...
     @property
-    def positions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___PagePositions]: ...
+    def positions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___PagePositions
+    ]: ...
     def __init__(
         self,
         *,
         pages: collections.abc.Iterable[global___CloudFile] | None = ...,
         positions: collections.abc.Iterable[global___PagePositions] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["pages", b"pages", "positions", b"positions"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "pages", b"pages", "positions", b"positions"
+        ],
+    ) -> None: ...
 
 global___FilePages = FilePages
 
@@ -1834,23 +2762,35 @@ class RowsPreview(google.protobuf.message.Message):
 
             CELL_FIELD_NUMBER: builtins.int
             @property
-            def cell(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+            def cell(
+                self,
+            ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+                builtins.str
+            ]: ...
             def __init__(
                 self,
                 *,
                 cell: collections.abc.Iterable[builtins.str] | None = ...,
             ) -> None: ...
-            def ClearField(self, field_name: typing_extensions.Literal["cell", b"cell"]) -> None: ...
+            def ClearField(
+                self, field_name: typing_extensions.Literal["cell", b"cell"]
+            ) -> None: ...
 
         ROWS_FIELD_NUMBER: builtins.int
         @property
-        def rows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RowsPreview.Sheet.Row]: ...
+        def rows(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            global___RowsPreview.Sheet.Row
+        ]: ...
         def __init__(
             self,
             *,
             rows: collections.abc.Iterable[global___RowsPreview.Sheet.Row] | None = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["rows", b"rows"]) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["rows", b"rows"]
+        ) -> None: ...
 
     @typing_extensions.final
     class SheetsEntry(google.protobuf.message.Message):
@@ -1867,18 +2807,30 @@ class RowsPreview(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: global___RowsPreview.Sheet | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     SHEETS_FIELD_NUMBER: builtins.int
     @property
-    def sheets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___RowsPreview.Sheet]: ...
+    def sheets(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___RowsPreview.Sheet
+    ]: ...
     def __init__(
         self,
         *,
-        sheets: collections.abc.Mapping[builtins.str, global___RowsPreview.Sheet] | None = ...,
+        sheets: collections.abc.Mapping[builtins.str, global___RowsPreview.Sheet]
+        | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["sheets", b"sheets"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["sheets", b"sheets"]
+    ) -> None: ...
 
 global___RowsPreview = RowsPreview
 
@@ -1896,6 +2848,11 @@ class FieldID(google.protobuf.message.Message):
         field_type: global___FieldType.ValueType = ...,
         field: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "field_type", b"field_type"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "field", b"field", "field_type", b"field_type"
+        ],
+    ) -> None: ...
 
 global___FieldID = FieldID

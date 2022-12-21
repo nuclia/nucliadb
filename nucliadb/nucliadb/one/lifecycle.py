@@ -24,7 +24,8 @@ from nucliadb.reader.lifecycle import finalize as finalize_reader
 from nucliadb.reader.lifecycle import initialize as initialize_reader
 from nucliadb.search.lifecycle import finalize as finalize_search
 from nucliadb.search.lifecycle import initialize as initialize_search
-from nucliadb.train.app import main as initialize_train
+from nucliadb.train.lifecycle import finalize as finalize_train
+from nucliadb.train.lifecycle import initialize as initialize_train
 from nucliadb.writer.lifecycle import finalize as finalize_writer
 from nucliadb.writer.lifecycle import initialize as initialize_writer
 from nucliadb_utils.utilities import finalize_utilities
@@ -38,8 +39,7 @@ async def initialize():
     await initialize_writer()
     await initialize_reader()
     await initialize_search()
-    train_finalizers = await initialize_train()
-    SYNC_FINALIZERS.extend(train_finalizers)
+    await initialize_train()
 
 
 async def finalize():
@@ -53,4 +53,5 @@ async def finalize():
     await finalize_writer()
     await finalize_reader()
     await finalize_search()
+    await finalize_train()
     await finalize_utilities()

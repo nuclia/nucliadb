@@ -132,6 +132,8 @@ message ParagraphResult {
 
     // Metadata that can't be searched with but is returned on search results
     noderesources.ParagraphMetadata metadata = 11;
+
+    repeated string labels = 12;
 }
 
 message ParagraphSearchResponse {

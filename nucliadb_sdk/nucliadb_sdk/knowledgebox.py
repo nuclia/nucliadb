@@ -13,7 +13,11 @@ from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels, LabelSet
-from nucliadb_sdk.resource import create_resource, update_resource
+from nucliadb_sdk.resource import (
+    create_resource,
+    from_resource_to_payload,
+    update_resource,
+)
 from nucliadb_sdk.vectors import Vector, Vectors
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
@@ -23,8 +27,10 @@ class KnowledgeBox:
     environment: Environment
     vectorsets: Optional[VectorSets] = None
     api_key: Optional[str] = None
+    id: str
 
     def __init__(self, url: str, api_key: Optional[str] = None):
+        self.id = url.split("/")[-1]
         url_obj = urlparse(url)
         if url_obj.hostname is not None and url_obj.hostname.endswith(NUCLIA_CLOUD):
             env = Environment.CLOUD
@@ -52,6 +58,9 @@ class KnowledgeBox:
     def __getitem__(self, key: str) -> Resource:
         return self.client.get_resource(id=key)
 
+    def download(self, uri: str) -> bytes:
+        return self.client.download(uri=uri)
+
     def get(self, key: str, default: Optional[Resource] = None) -> Resource:
         try:
             result = self.client.get_resource(id=key)
@@ -68,14 +77,15 @@ class KnowledgeBox:
 
     def __setitem__(self, key: str, item: Resource):
         resource = self.get(key)
-        if resource is not None:
-            pass
-            # TODO
-            # self.client.create_resource(from_resource_to_payload(item))
+        if resource is None:
+            item.id = key
+            self.client.create_resource(
+                from_resource_to_payload(item, download=self.download)
+            )
         else:
-            # TODO
-            # self.client.update_resource(from_resource_to_payload(item, update=True))
-            pass
+            self.client.update_resource(
+                key, from_resource_to_payload(item, download=self.download, update=True)
+            )
 
     def __delitem__(self, key):
         self.client.del_resource(id=key)
@@ -244,9 +254,12 @@ class KnowledgeBox:
 
         return self.process_uploaded_labels_from_search(search_result)
 
-    def set_labels(self):
-        # TODO
-        pass
+    def set_labels(self, labelset: str, labels: List[str]):
+        resp = self.client.writer_session.post(
+            f"{self.client.url}/labelset/{labelset}",
+            json={"title": labelset, "labels": labels},
+        )
+        assert resp.status_code == 200
 
     def search(
         self,
