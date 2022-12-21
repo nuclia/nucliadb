@@ -54,10 +54,11 @@ async def get_field_classification_batch_from_response(
     assert tr.train == 2
     assert tr.test == 1
 
-    total_train_batches = (tr.train // 2) + 1
-    total_test_batches = (tr.test // 2) + 1
+    total_train_batches = (tr.train // 2) + 1 if tr.train % 2 != 0 else (tr.train // 2)
+    total_test_batches = (tr.test // 2) + 1 if tr.test % 2 != 0 else (tr.test // 2)
     count_train_batches = 0
     count_test_batches = 0
+
     while count_train_batches < total_train_batches:
         header = await response.content.read(4)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
@@ -74,9 +75,6 @@ async def get_field_classification_batch_from_response(
         payload = await response.content.read(payload_size)
         pcb = FieldClassificationBatch()
         pcb.ParseFromString(payload)
-        import pdb
-
-        pdb.set_trace()
         header = await response.content.read(100)
         assert pcb.data
         yield pcb
