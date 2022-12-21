@@ -32,7 +32,9 @@ use search_query::{search_query, suggest_query};
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy};
+use tantivy::{
+    Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order, ReloadPolicy,
+};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
@@ -126,6 +128,7 @@ impl ParagraphReader for ParagraphReaderService {
             results_per_page: 10,
         }))
     }
+    #[tracing::instrument(skip_all)]
     fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator> {
         let facets: Vec<_> = request
             .faceted
@@ -388,7 +391,7 @@ pub struct BatchProducer {
     paragraph_field: Field,
     facet_field: Field,
     facets: Vec<String>,
-    searcher: tantivy::LeasedItem<tantivy::Searcher>,
+    searcher: LeasedItem<tantivy::Searcher>,
 }
 impl BatchProducer {
     const BATCH: usize = 1000;
@@ -1023,6 +1026,15 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
+
+        let request = StreamRequest {
+            shard_id: None,
+            faceted: None,
+            reload: false,
+        };
+        let iter = paragraph_reader_service.iterator(&request).unwrap();
+        let count = iter.flat_map(|i| i.ids.into_iter()).count();
+        assert_eq!(count, 4);
         Ok(())
     }
 }

@@ -71,10 +71,6 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         nucliadb_protos.nodereader_pb2.RelationSearchResponse,
     ]
-    Paragraphs: grpc.UnaryStreamMultiCallable[
-        nucliadb_protos.nodereader_pb2.StreamRequest,
-        nucliadb_protos.nodereader_pb2.IdAndFacetsBatch,
-    ]
     DocumentIds: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.nodereader_pb2.IdCollection,
@@ -106,6 +102,15 @@ class NodeReaderStub:
     Suggest: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodereader_pb2.SuggestRequest,
         nucliadb_protos.nodereader_pb2.SuggestResponse,
+    ]
+    Paragraphs: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.IdAndFacetsBatch,
+    ]
+    """Streams"""
+    Documents: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.IdAndFacetsBatch,
     ]
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
@@ -147,12 +152,6 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.RelationSearchRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.RelationSearchResponse: ...
-    @abc.abstractmethod
-    def Paragraphs(
-        self,
-        request: nucliadb_protos.nodereader_pb2.StreamRequest,
-        context: grpc.ServicerContext,
-    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.IdAndFacetsBatch]: ...
     @abc.abstractmethod
     def DocumentIds(
         self,
@@ -201,5 +200,18 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.SuggestRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.SuggestResponse: ...
+    @abc.abstractmethod
+    def Paragraphs(
+        self,
+        request: nucliadb_protos.nodereader_pb2.StreamRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.IdAndFacetsBatch]:
+        """Streams"""
+    @abc.abstractmethod
+    def Documents(
+        self,
+        request: nucliadb_protos.nodereader_pb2.StreamRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.IdAndFacetsBatch]: ...
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

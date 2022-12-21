@@ -345,15 +345,18 @@ service NodeReader {
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
     rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
-    rpc Paragraphs(StreamRequest) returns (stream IdAndFacetsBatch) {}
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
     rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
-
+    
     rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
     rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
-
+    
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
+
+    // Streams
+    rpc Paragraphs(StreamRequest) returns (stream IdAndFacetsBatch) {}
+    rpc Documents(StreamRequest) returns (stream IdAndFacetsBatch) {}
 }

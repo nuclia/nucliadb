@@ -24,7 +24,7 @@ use std::time::*;
 
 use nucliadb_protos::{
     DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult, FacetResults,
-    OrderBy, ResourceId, ResultScore,
+    IdAndFacetsBatch, OrderBy, ResourceId, ResultScore, StreamRequest,
 };
 use nucliadb_service_interface::prelude::*;
 use tantivy::collector::{
@@ -33,12 +33,33 @@ use tantivy::collector::{
 use tantivy::query::{AllQuery, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
-    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy, Searcher,
-    TantivyError,
+    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
+    ReloadPolicy, Searcher, TantivyError,
 };
 use tracing::*;
 
 use super::schema::FieldSchema;
+
+fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
+    facets_count
+        .top_k(facet, 50)
+        .into_iter()
+        .map(|(facet, count)| FacetResult {
+            tag: facet.to_string(),
+            total: count as i32,
+        })
+        .collect()
+}
+
+fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<String, FacetResults> {
+    facets
+        .into_iter()
+        .map(|facet| (&facets_count, facet))
+        .map(|(facets_count, facet)| (facet_count(&facet, facets_count), facet))
+        .filter(|(r, _)| !r.is_empty())
+        .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
+        .collect()
+}
 
 #[derive(Debug)]
 struct TError(TantivyError);
@@ -75,6 +96,26 @@ impl Debug for FieldReaderService {
 }
 
 impl FieldReader for FieldReaderService {
+    #[tracing::instrument(skip_all)]
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<DocumentIterator> {
+        let facets: Vec<_> = request
+            .faceted
+            .as_ref()
+            .iter()
+            .flat_map(|v| v.tags.iter())
+            .filter(|s| FieldReaderService::is_valid_facet(s))
+            .cloned()
+            .collect();
+        Ok(DocumentIterator::new(BatchProducer {
+            facets,
+            total: self.count()?,
+            offset: 0,
+            uuid_field: self.schema.uuid,
+            facet_field: self.schema.facets,
+            searcher: self.reader.searcher(),
+        }))
+    }
+
     #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
         let id: Option<String> = None;
@@ -218,31 +259,6 @@ impl FieldReaderService {
         }
     }
 
-    fn facet_count(&self, facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
-        facets_count
-            .top_k(facet, 50)
-            .into_iter()
-            .map(|(facet, count)| FacetResult {
-                tag: facet.to_string(),
-                total: count as i32,
-            })
-            .collect()
-    }
-
-    fn produce_facets(
-        &self,
-        facets: Vec<String>,
-        facets_count: FacetCounts,
-    ) -> HashMap<String, FacetResults> {
-        facets
-            .into_iter()
-            .map(|facet| (&facets_count, facet))
-            .map(|(facets_count, facet)| (self.facet_count(&facet, facets_count), facet))
-            .filter(|(r, _)| !r.is_empty())
-            .map(|(facetresults, facet)| (facet, FacetResults { facetresults }))
-            .collect()
-    }
-
     fn convert_int_order(
         &self,
         response: SearchResponse<u64>,
@@ -285,7 +301,7 @@ impl FieldReaderService {
             }
         }
 
-        let facets = self.produce_facets(response.facets, response.facets_count);
+        let facets = produce_facets(response.facets, response.facets_count);
         DocumentSearchResponse {
             total: total as i32,
             results,
@@ -340,7 +356,7 @@ impl FieldReaderService {
             }
         }
 
-        let facets = self.produce_facets(response.facets, response.facets_count);
+        let facets = produce_facets(response.facets, response.facets_count);
         DocumentSearchResponse {
             total: total as i32,
             results,
@@ -413,7 +429,7 @@ impl FieldReaderService {
                 // Just a facet search
                 let facets_count = searcher.search(&query, &facet_collector).unwrap();
                 DocumentSearchResponse {
-                    facets: self.produce_facets(facets, facets_count),
+                    facets: produce_facets(facets, facets_count),
                     ..Default::default()
                 }
             }
@@ -483,6 +499,60 @@ impl FieldReaderService {
     }
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()
+    }
+}
+
+pub struct BatchProducer {
+    total: usize,
+    offset: usize,
+    uuid_field: Field,
+    facet_field: Field,
+    facets: Vec<String>,
+    searcher: LeasedItem<tantivy::Searcher>,
+}
+impl BatchProducer {
+    const BATCH: usize = 1000;
+}
+impl Iterator for BatchProducer {
+    type Item = IdAndFacetsBatch;
+    fn next(&mut self) -> Option<Self::Item> {
+        let time = SystemTime::now();
+        if self.offset >= self.total {
+            info!("No more batches available");
+            return None;
+        }
+        info!("Producing a new batch with offset: {}", self.offset);
+        let facet_collector = self.facets.iter().fold(
+            FacetCollector::for_field(self.facet_field),
+            |mut collector, facet| {
+                collector.add_facet(Facet::from(facet));
+                collector
+            },
+        );
+        let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let mut multicollector = MultiCollector::new();
+        let facet_handler = multicollector.add_collector(facet_collector);
+        let topdocs_handler = multicollector.add_collector(topdocs);
+        let mut multi_fruit = self.searcher.search(&AllQuery, &multicollector).unwrap();
+        let facets_count = facet_handler.extract(&mut multi_fruit);
+        let top_docs = topdocs_handler.extract(&mut multi_fruit);
+        let facets = produce_facets(self.facets.clone(), facets_count);
+        let ids = top_docs
+            .into_iter()
+            .flat_map(|i| self.searcher.doc(i.1))
+            .flat_map(|i| {
+                i.get_first(self.uuid_field)
+                    .and_then(|i| i.as_text())
+                    .map(|i| i.to_string())
+            });
+        self.offset += Self::BATCH;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("New batch created, took {v} ms");
+        }
+        Some(IdAndFacetsBatch {
+            facets,
+            ids: ids.collect(),
+        })
     }
 }
 
@@ -711,6 +781,16 @@ mod tests {
 
         let result = field_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 1);
+
+        let request = StreamRequest {
+            shard_id: None,
+            faceted: None,
+            reload: false,
+        };
+        let iter = field_reader_service.iterator(&request).unwrap();
+        let count = iter.flat_map(|i| i.ids.into_iter()).count();
+        assert_eq!(count, 2);
+
         Ok(())
     }
 }
