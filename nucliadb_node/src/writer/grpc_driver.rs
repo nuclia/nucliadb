@@ -101,7 +101,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
 
         info!("gRPC delete_shard {:?}", request);
-        // Deletion does not requiere for the shard
+        // Deletion does not require for the shard
         // to be loaded.
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
@@ -126,7 +126,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         info!("gRPC delete_shard {:?}", request);
 
-        // Deletion and upgrade do not requiere for the shard
+        // Deletion and upgrade do not require for the shard
         // to be loaded.
         let shard_id = request.into_inner();
         let mut writer = self.0.write().await;
