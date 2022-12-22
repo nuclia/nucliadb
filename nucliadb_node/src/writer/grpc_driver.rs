@@ -101,22 +101,18 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
 
         info!("gRPC delete_shard {:?}", request);
-
+        // Deletion does not requiere for the shard
+        // to be loaded.
         let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
         let result = writer.delete_shard(&shard_id);
         std::mem::drop(writer);
         match result {
-            Some(Ok(_)) => Ok(tonic::Response::new(shard_id)),
-            Some(Err(e)) => {
+            Ok(_) => Ok(tonic::Response::new(shard_id)),
+            Err(e) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
-            }
-            None => {
-                let message = format!("Shard not found {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
             }
         }
     }
@@ -130,8 +126,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         info!("gRPC delete_shard {:?}", request);
 
+        // Deletion and upgrade do not requiere for the shard
+        // to be loaded.
         let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
         let result = writer.clean_and_upgrade_shard(&shard_id);
         std::mem::drop(writer);

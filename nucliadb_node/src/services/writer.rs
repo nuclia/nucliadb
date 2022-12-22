@@ -409,12 +409,6 @@ impl ShardWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn delete(&self) -> Result<(), std::io::Error> {
-        let shard_path = Configuration::shards_path_id(&self.id);
-        info!("Deleting {}", shard_path);
-        std::fs::remove_dir_all(shard_path)
-    }
-    #[tracing::instrument(skip_all)]
     pub fn count(&self) -> usize {
         self.field_writer.read().unwrap().count()
     }
