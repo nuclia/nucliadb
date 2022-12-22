@@ -763,36 +763,28 @@ class TrainSet(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     FILTER_FIELD_NUMBER: builtins.int
     BATCH_SIZE_FIELD_NUMBER: builtins.int
-    SEED_FIELD_NUMBER: builtins.int
-    SPLIT_FIELD_NUMBER: builtins.int
     MINRESOURCES_FIELD_NUMBER: builtins.int
-    NONES_FIELD_NUMBER: builtins.int
-    OVERSAMPLING_FIELD_NUMBER: builtins.int
     type: global___Type.ValueType
     @property
     def filter(self) -> global___TrainSet.Filter: ...
     batch_size: builtins.int
-    seed: builtins.int
-    split: builtins.float
+    """int32 seed = 4;
+    float split = 5;
+    """
     minresources: builtins.int
-    nones: builtins.bool
-    """average freq of the other labels"""
-    oversampling: builtins.float
-    """percentage of max oversampling"""
+    """bool nones = 7;  // average freq of the other labels
+    float oversampling = 8; // percentage of max oversampling
+    """
     def __init__(
         self,
         *,
         type: global___Type.ValueType = ...,
         filter: global___TrainSet.Filter | None = ...,
         batch_size: builtins.int = ...,
-        seed: builtins.int = ...,
-        split: builtins.float = ...,
         minresources: builtins.int = ...,
-        nones: builtins.bool = ...,
-        oversampling: builtins.float = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["filter", b"filter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["batch_size", b"batch_size", "filter", b"filter", "minresources", b"minresources", "nones", b"nones", "oversampling", b"oversampling", "seed", b"seed", "split", b"split", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["batch_size", b"batch_size", "filter", b"filter", "minresources", b"minresources", "type", b"type"]) -> None: ...
 
 global___TrainSet = TrainSet
 
@@ -922,24 +914,3 @@ class TokenClassificationBatch(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data", "split_mark", b"split_mark"]) -> None: ...
 
 global___TokenClassificationBatch = TokenClassificationBatch
-
-@typing_extensions.final
-class TrainResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TRAIN_FIELD_NUMBER: builtins.int
-    TEST_FIELD_NUMBER: builtins.int
-    TYPE_FIELD_NUMBER: builtins.int
-    train: builtins.int
-    test: builtins.int
-    type: global___Type.ValueType
-    def __init__(
-        self,
-        *,
-        train: builtins.int = ...,
-        test: builtins.int = ...,
-        type: global___Type.ValueType = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["test", b"test", "train", b"train", "type", b"type"]) -> None: ...
-
-global___TrainResponse = TrainResponse

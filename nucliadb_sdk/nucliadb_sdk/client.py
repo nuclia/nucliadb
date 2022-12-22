@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Optional
 
 import httpx
+import requests
 
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
@@ -49,20 +50,20 @@ class NucliaDBClient:
         self.environment = environment
         self.url = url
         if environment == Environment.CLOUD and api_key is not None:
-            headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
-            self.reader_session = httpx.Client(headers=headers)
-            self.async_reader_session = httpx.AsyncClient(headers=headers)
-            self.writer_session = httpx.Client(headers=headers)
-            self.async_writer_session = httpx.AsyncClient(headers=headers)
+            reader_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
+            writer_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
         elif environment == Environment.CLOUD and api_key is None:
             raise AttributeError("On Cloud you need to provide API Key")
         else:
             reader_headers = {"X-NUCLIADB-ROLES": f"READER"}
-            self.reader_session = httpx.Client(headers=reader_headers)
-            self.async_reader_session = httpx.AsyncClient(headers=reader_headers)
             writer_headers = {"X-NUCLIADB-ROLES": f"WRITER"}
-            self.writer_session = httpx.Client(headers=writer_headers)
-            self.async_writer_session = httpx.AsyncClient(headers=writer_headers)
+
+        self.reader_session = httpx.Client(headers=reader_headers)
+        self.async_reader_session = httpx.AsyncClient(headers=reader_headers)
+        self.stream_session = requests.Session()
+        self.stream_session.headers.update(reader_headers)
+        self.writer_session = httpx.Client(headers=writer_headers)
+        self.async_writer_session = httpx.AsyncClient(headers=writer_headers)
 
     def get_resource(self, id: str):
         url = RESOURCE_PATH.format(kburl=self.url, rid=id)

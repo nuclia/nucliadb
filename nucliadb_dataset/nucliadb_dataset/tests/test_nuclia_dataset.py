@@ -9,18 +9,17 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 def test_nuclia_dataset(
     knowledgebox: KnowledgeBox, upload_data_resource_classification
 ):
-    # First create a dataset
-    # NER / LABELER
-    # create a URL
+    # We need to test the stream
 
     trainset = TrainSet()
-    trainset.type = Type.RESOURCE_CLASSIFICATION
-    trainset.filter.labels.append("l/labelset1")
+    trainset.type = Type.FIELD_CLASSIFICATION
+    trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
     trainset.seed = 1234
 
     streamer = Streamer(trainset=trainset, client=knowledgebox.client)
     streamer.set_mappings([text_label_to_list()])
+    streamer.initialize()
 
     for X, Y in streamer:
         import pdb
@@ -31,3 +30,5 @@ def test_nuclia_dataset(
         import pdb
 
         pdb.set_trace()
+
+    streamer.finalize()

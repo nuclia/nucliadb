@@ -17,7 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb_dataset import DatasetType, ExportType
+from nucliadb_protos.train_pb2 import Type
+from nucliadb_sdk.client import Environment
 from pydantic import BaseSettings
+from enum import Enum
+from typing import List, Optional
+
+import pydantic
 
 
 class Settings(BaseSettings):
@@ -26,3 +33,14 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class RunningSettings(pydantic.BaseSettings):
+    url: str = pydantic.Field(description="KnowledgeBox URL")
+    type: DatasetType = pydantic.Field(description="Dataset Type")
+    labelset: Optional[str] = pydantic.Field(
+        description="For classification which labelset"
+    )
+    family: Optional[List[str]] = pydantic.Field(description="List of family group")
+
+    export: ExportType = pydantic.Field(description="Destination of export")

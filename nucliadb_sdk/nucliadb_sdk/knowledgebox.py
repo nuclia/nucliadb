@@ -8,11 +8,12 @@ from nucliadb_models.search import (
     SearchOptions,
     SearchRequest,
 )
+from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
-from nucliadb_sdk.labels import Label, Labels, LabelSet
+from nucliadb_sdk.labels import Label, LabelType, Labels, LabelSet
 from nucliadb_sdk.resource import (
     create_resource,
     from_resource_to_payload,
@@ -254,10 +255,14 @@ class KnowledgeBox:
 
         return self.process_uploaded_labels_from_search(search_result)
 
-    def set_labels(self, labelset: str, labels: List[str]):
+    def set_labels(self, labelset: str, labels: List[str], labelset_type: LabelType):
         resp = self.client.writer_session.post(
             f"{self.client.url}/labelset/{labelset}",
-            json={"title": labelset, "labels": labels},
+            json={
+                "title": labelset,
+                "labels": [NDBLabel(title=label).dict() for label in labels],
+                "kind": [labelset_type.value],
+            },
         )
         assert resp.status_code == 200
 

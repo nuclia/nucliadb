@@ -52,6 +52,3 @@ opentelemetry-instrumentation-aiohttp-client>=0.30b1
 opentelemetry-semantic-conventions>=0.30b1
 opentelemetry-instrumentation-fastapi>=0.30b1
 opentelemetry-propagator-b3
-
-scikit-learn
-numpy

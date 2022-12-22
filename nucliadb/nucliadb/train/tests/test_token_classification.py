@@ -19,31 +19,25 @@
 
 import asyncio
 from collections import OrderedDict
-from typing import AsyncIterator, Dict, List
+from typing import AsyncIterator, List
 
 import aiohttp
 from nucliadb.train.generators.token_classifier import process_entities
 import pytest
-from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
-    ParagraphAnnotation,
     Position,
     TokenSplit,
     UserFieldMetadata,
 )
 from nucliadb_protos.train_pb2 import (
-    FieldClassificationBatch,
-    ParagraphClassificationBatch,
     TokenClassificationBatch,
-    TrainResponse,
     TrainSet,
     Type,
 )
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     SetEntitiesRequest,
-    SetLabelsRequest,
 )
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -55,16 +49,6 @@ from nucliadb.train.api.v1.router import KB_PREFIX
 async def get_token_classification_batch_from_response(
     response: aiohttp.ClientResponse,
 ) -> AsyncIterator[TokenClassificationBatch]:
-    header = await response.content.read(4)
-    payload_size = int.from_bytes(header, byteorder="big", signed=False)
-    payload = await response.content.read(payload_size)
-    tr = TrainResponse()
-    tr.ParseFromString(payload)
-    assert tr.train == 0
-    assert tr.test == 0
-    assert tr.type == Type.TOKEN_CLASSIFICATION
-
-    train = True
     while True:
         header = await response.content.read(4)
         if header in [b"", None]:
@@ -73,11 +57,8 @@ async def get_token_classification_batch_from_response(
         payload = await response.content.read(payload_size)
         pcb = TokenClassificationBatch()
         pcb.ParseFromString(payload)
-        if pcb.split_mark:
-            train = False
-        else:
-            assert pcb.data
-            yield train, pcb
+        assert pcb.data
+        yield pcb
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -271,8 +252,6 @@ async def test_generator_token_classification(
     trainset.batch_size = 2
     trainset.filter.labels.append("PERSON")
     trainset.filter.labels.append("ORG")
-    trainset.seed = 1234
-    trainset.split = 0.25
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
@@ -280,7 +259,7 @@ async def test_generator_token_classification(
 
         assert response.status == 200
         batches: List[TokenClassificationBatch] = []
-        async for _, batch in get_token_classification_batch_from_response(response):
+        async for batch in get_token_classification_batch_from_response(response):
             batches.append(batch)
 
     for batch in batches:

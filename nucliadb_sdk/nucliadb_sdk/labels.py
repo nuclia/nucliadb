@@ -4,8 +4,9 @@ from typing import Dict, List, Optional, Union
 
 
 class LabelType(str, Enum):
-    PARAGRAPH = "PARAGRAPH"
-    RESOURCE = "RESOURCE"
+    PARAGRAPHS = "PARAGRAPHS"
+    RESOURCES = "RESOURCES"
+    SENTENCES = "SENTENCES"
 
 
 @dataclass

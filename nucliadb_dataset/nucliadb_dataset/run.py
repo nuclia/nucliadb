@@ -17,4 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-pytest_plugins = ["nucliadb_sdk.tests.fixtures", "nucliadb_dataset.tests.fixtures"]
+import logging
+import os
+from nucliadb_protos.train_pb2 import Type
+
+import pydantic_argparse
+
+from nucliadb_dataset import DatasetType
+
+
+DATASET_TYPE_MAPPING = {
+    DatasetType.FIELD_CLASSIFICATION: Type.FIELD_CLASSIFICATION,
+    DatasetType.PARAGRAPH_CLASSIFICATION: Type.PARAGRAPH_CLASSIFICATION,
+    DatasetType.SENTENCE_CLASSIFICATION: Type.SENTENCE_CLASSIFICATION,
+    DatasetType.TOKEN_CLASSIFICATION: Type.TOKEN_CLASSIFICATION,
+}
+
+
+def run():
+    from nucliadb_dataset.settings import RunningSettings
+
+    parser = pydantic_argparse.ArgumentParser(
+        model=RunningSettings,
+        prog="NucliaDB Datasets",
+        description="Generate Arrow files from NucliaDB KBs",
+    )
+    nucliadb_args = parser.parse_typed_args()

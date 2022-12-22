@@ -30,7 +30,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.train_pb2 import (
     ParagraphClassificationBatch,
-    TrainResponse,
     TrainSet,
     Type,
 )
@@ -45,37 +44,17 @@ from nucliadb.train.api.v1.router import KB_PREFIX
 async def get_paragraph_classification_batch_from_response(
     response: aiohttp.ClientResponse,
 ) -> AsyncIterator[ParagraphClassificationBatch]:
-    header = await response.content.read(4)
-    payload_size = int.from_bytes(header, byteorder="big", signed=False)
-    payload = await response.content.read(payload_size)
-    tr = TrainResponse()
-    tr.ParseFromString(payload)
-    assert tr.train == 3
-    assert tr.test == 1
 
-    total_train_batches = (tr.train // 2) + 1
-    total_test_batches = (tr.test // 2) + 1
-    count_train_batches = 0
-    count_test_batches = 0
-    while count_train_batches < total_train_batches:
+    while True:
         header = await response.content.read(4)
+        if header == b"":
+            break
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
         pcb = ParagraphClassificationBatch()
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
-        count_train_batches += 1
-
-    while count_test_batches < total_test_batches:
-        header = await response.content.read(4)
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        pcb = ParagraphClassificationBatch()
-        pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
-        count_test_batches += 1
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -260,9 +239,7 @@ async def test_generator_paragraph_classification(
     trainset = TrainSet()
     trainset.type = Type.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
-    trainset.filter.labels.append("/l/labelset_paragraphs")
-    trainset.seed = 1234
-    trainset.split = 0.25
+    trainset.filter.labels.append("labelset_paragraphs")
 
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
@@ -270,7 +247,8 @@ async def test_generator_paragraph_classification(
     ) as response:
 
         assert response.status == 200
-        expected_results = [1, 1, 2]
+        batches = []
         async for batch in get_paragraph_classification_batch_from_response(response):
-            expected = expected_results.pop()
-            assert len(batch.data) == expected
+            batches.append(batch)
+            assert len(batch.data) == 2
+        assert len(batches) == 2

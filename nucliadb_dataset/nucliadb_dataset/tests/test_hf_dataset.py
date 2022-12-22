@@ -11,11 +11,19 @@ def test_hf_dataset(knowledgebox: KnowledgeBox):
     # create a URL
 
     trainset = TrainSet()
-    trainset.type = Type.PARAGRAPH_CLASSIFICATION
-    trainset.filter.labels.append("l/labelset1")
+    trainset.type = Type.FIELD_CLASSIFICATION
+    trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
     trainset.seed = 1234
 
     streamer = Streamer(trainset=trainset, client=knowledgebox.client)
+    streamer.initialize()
 
-    _ = IterableDataset.from_generator(streamer.get_data)
+    dataset = IterableDataset.from_generator(streamer)
+    print(next(iter(dataset)))
+
+    streamer.initialize()
+
+    dataset = IterableDataset.from_generator(streamer)
+    dataset = dataset.shuffle(seed=42, buffer_size=4)
+    print(next(iter(dataset)))

@@ -1,150 +1,65 @@
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
+from nucliadb_sdk.client import NucliaDBClient
 import requests
 from nucliadb_protos.train_pb2 import (
+    FieldClassificationBatch,
     ParagraphClassificationBatch,
     TextLabel,
     TokensClassification,
-    TrainResponse,
     TrainSet,
     Type,
 )
 
-from nucliadb_sdk.client import NucliaDBClient
 from sklearn.preprocessing import MultiLabelBinarizer
+from urllib3.exceptions import ProtocolError
+
 
 SIZE_BYTES = 4
 
 
+class StreamerAlreadyRunning(Exception):
+    pass
+
+
 class Streamer:
-    session: requests.Session
     resp: requests.Response
     client: NucliaDBClient
 
-    def __init__(
-        self, trainset: TrainSet, client: NucliaDBClient, generator: bool = False
-    ):
+    def __init__(self, trainset: TrainSet, client: NucliaDBClient):
         self.client = client
-        self.trainset = trainset
-        self.session = requests.Session()
-        self.first = False
-        self.train_size = None
-        self.test_size = None
-        self.total_train_batches = None
-        self.total_test_batches = None
-        self.count_train_batches = None
-        self.count_test_batches = None
-        self.test_phase = False
-        self.generator = generator
         self.base_url = self.client.url
-        self.mappings = []
-        self.actual_pcb = None
-        self.actual_pcb_index = 0
+        self.trainset = trainset
+        self.resp = None
 
-        if self.trainset.type == Type.PARAGRAPH_CLASSIFICATION:
-            self.klass = ParagraphClassificationBatch
-            self.map = self.paragraph_classifier_map
-            self.labels = self.get_labels()
-            self.mlb = MultiLabelBinarizer(classes=self.labels.values())
+    @property
+    def initialized(self):
+        return self.resp == None
 
-    def paragraph_classifier_map(self, pcb: ParagraphClassificationBatch):
-        for entry in pcb.data:
-            pass
-
-    def get_labels(self):
-        return self.client.reader_session.get(f"{self.base_url}/labelsets").json()
-
-    def get_partitions(self):
-        return self.client.reader_session.get(f"{self.base_url}/trainset").json()
-
-    def initialize(self):
-        self.resp = self.client.reader_session.stream(
-            "GET",
-            f"{self.base_url}/trainset",
+    def initialize(self, partition_id: str):
+        self.resp = self.client.stream_session.post(
+            f"{self.base_url}/trainset/{partition_id}",
+            data=self.trainset.SerializeToString(),
             stream=True,
         )
-        self.first = False
-        self.test_phase = False
 
     def finalize(self):
         self.resp.close()
-
-    def get_data(self):
-        self.initialize()
-        for data in self:
-            yield data
-
-        self.finalize()
+        self.resp = None
 
     def __iter__(self):
-        return self.next()
+        return self
 
-    def set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
-        self.mappings = funcs
+    def read(self) -> Optional[bytes]:
+        try:
+            header = self.resp.raw.read(4, decode_content=True)
+            payload_size = int.from_bytes(header, byteorder="big", signed=False)
+            data = self.resp.raw.read(payload_size)
+        except ProtocolError:
+            data = None
+        return data
 
-    def apply_mapping(self, X, Y):
-        for func in self.mappings:
-            X, Y = func(X, Y)
-        return X, Y
-
-    def next(self) -> Tuple[Any, Any]:
-        if self.actual_pcb is None or self.actual_pcb_index == len(
-            self.actual_pcb.data
-        ):
-            self.actual_pcb = self.next_batch()
-            if self.actual_pcb is None:
-                return None
-            self.actual_pcb_index = 0
-
-        row: Union[TextLabel, TokensClassification] = self.actual_pcb.data.index(
-            self.actual_pcb_index
-        )
-        X = row.text
-        Y = row.labels
-        self.actual_pcb_index += 1
-        return self.apply_mapping(X, Y)
-
-    def next_batch(self):
-        data = self.resp.raw.stream(4, decode_content=True)
-        if data is None:
-            return
-
-        payload_size = int.from_bytes(data, byteorder="big", signed=False)
-        payload = self.resp.raw.stream(payload_size)
-        if self.first is False:
-            # Lets get the train/test size
-            tr = TrainResponse()
-            tr.ParseFromString(payload)
-            self.train_size = tr.train
-            self.test_size = tr.test
-            self.total_train_batches = (tr.train // 2) + 1
-            self.total_test_batches = (tr.test // 2) + 1
-            self.count_train_batches = 0
-            self.count_test_batches = 0
-            self.first = True
-            data = self.resp.raw.stream(4, decode_content=True)
-            if data is None:
-                return
-            payload_size = int.from_bytes(data, byteorder="big", signed=False)
-            payload = self.resp.raw.stream(payload_size)
-
-        pcb = self.klass()
-        pcb.ParseFromString(payload)
-
-        if (
-            self.count_train_batches < self.total_train_batches
-            and self.test_phase is False
-        ):
-            self.count_train_batches += 1
-        elif (
-            self.count_train_batches == self.total_train_batches
-            and self.test_phase is False
-        ):
-            # Switch to test
-            self.test_phase = True
-            return None
-        elif self.count_train_batches == self.total_train_batches and self.test_phase:
-            if self.count_test_batches < self.total_test_batches:
-                self.count_test_batches += 1
-            else:
-                return None
-        return pcb
+    def __next__(self) -> Tuple[Any, Any]:
+        payload = self.read()
+        if payload is None:
+            raise StopIteration
+        return payload

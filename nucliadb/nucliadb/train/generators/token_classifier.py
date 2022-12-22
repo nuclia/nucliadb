@@ -1,33 +1,19 @@
-from collections import Counter, OrderedDict
-from typing import AsyncIterator, Dict, Iterator, List, Tuple, Union
-from nucliadb_models.common import Paragraph
+from collections import OrderedDict
+from typing import AsyncIterator, Dict, List, Tuple, Union
 
-import numpy as np
-from fastapi import HTTPException
-from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, LabelSet, Labels
 from nucliadb_protos.nodereader_pb2 import (
-    ParagraphSearchRequest,
-    ParagraphSearchResponse,
     StreamRequest,
 )
 from nucliadb_protos.train_pb2 import (
-    Label,
     ParagraphClassificationBatch,
-    TextLabel,
     TokenClassificationBatch,
     TokensClassification,
-    TrainResponse,
     TrainSet,
-    Type,
 )
-from scipy.sparse import csr_matrix, vstack
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MultiLabelBinarizer
 
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_REVERSE
 from nucliadb.train import logger
-from nucliadb.train.generators.stratification import IterativeStratification
 from nucliadb.train.generators.utils import get_resource_from_cache
 
 NERS_DICT = Dict[str, Dict[str, List[Tuple[int, int]]]]
@@ -202,75 +188,12 @@ def process_entities(text: str, ners: POSITION_DICT, paragraphs: List[Tuple[int,
         yield segments
 
 
-async def hydrate_token_classification_train_test(
-    kbid: str,
-    train_indexes: List[str],
-    test_indexes: List[str],
-    trainset: TrainSet,
-):
-    batch = TokenClassificationBatch()
-    for field_id in train_indexes:
-        rid, field_type, field = field_id.split("/")
-        (
-            split_text,
-            split_ners,
-            split_paragaphs,
-        ) = await get_field_text(kbid, rid, field, field_type, trainset.filter.labels)
-
-        for split, text in split_text.items():
-            ners = split_ners.get(split, {})
-            paragraphs = split_paragaphs.get(split, [])
-
-            for segments in process_entities(text, ners, paragraphs):
-                tc = TokensClassification()
-                for segment in segments:
-                    tc.token.append(segment[0])
-                    tc.label.append(segment[1])
-                batch.data.append(tc)
-                if len(batch.data) == trainset.batch_size:
-                    yield batch
-                    batch = TokenClassificationBatch()
-
-    if len(batch.data):
-        yield batch
-
-    batch = TokenClassificationBatch()
-    batch.split_mark = True
-    yield batch
-
-    batch = TokenClassificationBatch()
-    for field_id in test_indexes:
-        rid, field_type, field = field_id.split("/")
-        (
-            split_text,
-            split_ners,
-            split_paragaphs,
-        ) = await get_field_text(kbid, rid, field, field_type, trainset.filter.labels)
-
-        for split, text in split_text.items():
-            ners = split_ners.get(split, {})
-            paragraphs = split_paragaphs.get(split, [])
-
-            for segments in process_entities(text, ners, paragraphs):
-                tc = TokensClassification()
-                for segment in segments:
-                    tc.token.append(segment[0])
-                    tc.label.append(segment[1])
-                batch.data.append(tc)
-                if len(batch.data) == trainset.batch_size:
-                    yield batch
-                    batch = TokenClassificationBatch()
-
-    if len(batch.data):
-        yield batch
-
-
 async def generate_token_classification_payloads(
     kbid: str,
     trainset: TrainSet,
     node: Node,
     shard_replica_id: str,
-) -> AsyncIterator[Union[TrainResponse, ParagraphClassificationBatch]]:
+) -> AsyncIterator[ParagraphClassificationBatch]:
 
     # Query how many paragraphs has each label
     request = StreamRequest()
@@ -278,28 +201,26 @@ async def generate_token_classification_payloads(
     for entitygroup in trainset.filter.labels:
         request.filter.tags.append(f"/e/{entitygroup}")
     request.reload = True
-    X = []
+    batch = TokenClassificationBatch()
     async for field_item in node.stream_get_fields(request):
-        X.append(f"{field_item.uuid}{field_item.field}")
-
-    # Check if min
-    total = len(X)
-    if len(X) < trainset.minresources:
-        raise HTTPException(
-            status_code=400, detail=f"There is no enough with this labelset {total}"
+        _, field_type, field = field_item.field.split("/")
+        (split_text, split_ners, split_paragaphs,) = await get_field_text(
+            kbid, field_item.uuid, field, field_type, trainset.filter.labels
         )
 
-    train_indexes, test_indexes = train_test_split(
-        X, test_size=trainset.split, shuffle=True, random_state=trainset.seed
-    )
+        for split, text in split_text.items():
+            ners = split_ners.get(split, {})
+            paragraphs = split_paragaphs.get(split, [])
 
-    tr = TrainResponse()
-    tr.train = 0
-    tr.test = 0
-    tr.type = Type.TOKEN_CLASSIFICATION
-    yield tr
-    # Get paragraphs for each classification
-    async for batch in hydrate_token_classification_train_test(
-        kbid, train_indexes, test_indexes, trainset
-    ):
+            for segments in process_entities(text, ners, paragraphs):
+                tc = TokensClassification()
+                for segment in segments:
+                    tc.token.append(segment[0])
+                    tc.label.append(segment[1])
+                batch.data.append(tc)
+                if len(batch.data) == trainset.batch_size:
+                    yield batch
+                    batch = TokenClassificationBatch()
+
+    if len(batch.data):
         yield batch

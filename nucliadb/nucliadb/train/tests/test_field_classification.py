@@ -30,8 +30,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.train_pb2 import (
     FieldClassificationBatch,
-    ParagraphClassificationBatch,
-    TrainResponse,
     TrainSet,
     Type,
 )
@@ -46,38 +44,16 @@ from nucliadb.train.api.v1.router import KB_PREFIX
 async def get_field_classification_batch_from_response(
     response: aiohttp.ClientResponse,
 ) -> AsyncIterator[FieldClassificationBatch]:
-    header = await response.content.read(4)
-    payload_size = int.from_bytes(header, byteorder="big", signed=False)
-    payload = await response.content.read(payload_size)
-    tr = TrainResponse()
-    tr.ParseFromString(payload)
-    assert tr.train == 2
-    assert tr.test == 1
-
-    total_train_batches = (tr.train // 2) + 1 if tr.train % 2 != 0 else (tr.train // 2)
-    total_test_batches = (tr.test // 2) + 1 if tr.test % 2 != 0 else (tr.test // 2)
-    count_train_batches = 0
-    count_test_batches = 0
-
-    while count_train_batches < total_train_batches:
+    while True:
         header = await response.content.read(4)
+        if header == b"":
+            break
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
         pcb = FieldClassificationBatch()
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
-        count_train_batches += 1
-
-    while count_test_batches < total_test_batches:
-        header = await response.content.read(4)
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        pcb = FieldClassificationBatch()
-        pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
-        count_test_batches += 1
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -262,16 +238,17 @@ async def test_generator_field_classification(
     trainset = TrainSet()
     trainset.type = Type.FIELD_CLASSIFICATION
     trainset.batch_size = 2
-    trainset.filter.labels.append("/l/labelset_resources")
-    trainset.seed = 1234
-    trainset.split = 0.25
+    trainset.filter.labels.append("labelset_resources")
     async with train_rest_api.post(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
     ) as response:
 
         assert response.status == 200
-        expected_results = [1, 2]
+        batches = []
+        total = 0
         async for batch in get_field_classification_batch_from_response(response):
-            expected = expected_results.pop()
-            assert len(batch.data) == expected
+            batches.append(batch)
+            total += len(batch.data)
+        assert len(batches) == 2
+        assert total == 3

@@ -1,46 +1,45 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 # Mapping to transform a text/labels onto tokens and multilabelbinarizer
-from typing import Any, Dict, List, Tuple, TYPE_CHECKING
+from typing import Any
 
-from sklearn.preprocessing import MultiLabelBinarizer
-from nucliadb_protos.train_pb2 import Label
-
-# Mapping
-def text_label_to_list():
-    def func(X: str, Y: List[Label]) -> Tuple[str, List[str]]:
-        Y = [f"/l/{label.labelset}/{label.label}" for label in Y]
-        return X, Y
-
-    return func
+from nucliadb_protos.train_pb2 import Label, ParagraphClassificationBatch
+import pyarrow as pa
 
 
-def tokenize(tokenizer: Any):
-    def func(X: str, Y: Any) -> Tuple[Any, Any]:
-        X = tokenizer(X)
-        return X, Y
+def bytes_to_batch(klass: Any):
+    def func(batch: bytes) -> klass:
+        pb = klass()
+        pb.ParseFromString(batch)
+        return pb
 
     return func
 
 
-def encoder(encoder):
-    def func(X: Dict[str, Any], Y: Any) -> Tuple[Any, Any]:
-        # X is tokenized
-        X = encoder(X)
-        return X, Y
+def batch_to_paragraph_classification_arrow(batch: ParagraphClassificationBatch):
+    X = []
+    Y = []
+    for data in batch.data:
 
-    return func
-
-
-def mlb(mlb: MultiLabelBinarizer):
-    def func(X: Any, Y: List[str]) -> Tuple[Any, Any]:
-        Y = mlb.fit_transform(Y)
-        return X, Y
-
-    return func
-
-
-def sumarize_text(sumarizer):
-    def func(X: str, Y: Any) -> Tuple[str, Any]:
-        X = sumarizer(X)
-        return X, Y
-
-    return func
+        X.append(data.text)
+        Y.append([f"{label.labelset}/{label.label}" for label in data.labels])
+    data = [pa.array(X), pa.array(Y)]
+    batch = pa.record_batch(data, names=["text", "labels"])
+    return batch

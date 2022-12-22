@@ -449,7 +449,7 @@ class ResourceBrain:
     def apply_field_tags_globally(
         self,
         field_key: str,
-        metadata: FieldComputedMetadata,
+        metadata: Optional[FieldComputedMetadata],
         uuid: str,
         basic_user_metadata: Optional[UserMetadata] = None,
         basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
@@ -467,17 +467,18 @@ class ResourceBrain:
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
         tags: Dict[str, List[str]] = {"l": [], "e": []}
-        for meta in metadata.split_metadata.values():
+        if metadata is not None:
+            for meta in metadata.split_metadata.values():
+                self.process_meta(
+                    field_key, meta, tags, relation_node_resource, user_canceled_labels
+                )
             self.process_meta(
-                field_key, meta, tags, relation_node_resource, user_canceled_labels
+                field_key,
+                metadata.metadata,
+                tags,
+                relation_node_resource,
+                user_canceled_labels,
             )
-        self.process_meta(
-            field_key,
-            metadata.metadata,
-            tags,
-            relation_node_resource,
-            user_canceled_labels,
-        )
 
         for classification in basic_user_metadata.classifications:
             if classification.cancelled_by_user is False:
