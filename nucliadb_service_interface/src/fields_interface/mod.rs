@@ -17,6 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+
 use nucliadb_protos::*;
 
 use crate::service_interface::*;
@@ -35,7 +37,7 @@ impl std::fmt::Display for FieldError {
 impl InternalError for FieldError {}
 
 pub struct FieldConfig {
-    pub path: String,
+    pub path: PathBuf,
 }
 
 pub trait FieldReader:

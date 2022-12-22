@@ -25,7 +25,6 @@ use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_services::*;
 use tracing::*;
 
-use crate::config::Configuration;
 use crate::services::config::ShardConfig;
 use crate::telemetry::run_with_telemetry;
 
@@ -77,28 +76,22 @@ impl ShardWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn start(id: &str) -> InternalResult<ShardWriterService> {
-        let shard_path = Configuration::shards_path_id(id);
-        match Path::new(&shard_path).exists() {
-            true => info!("Loading shard with id {}", id),
-            false => info!("Creating new shard with id {}", id),
-        }
-
+    pub fn new(id: String, shard_path: &Path) -> InternalResult<ShardWriterService> {
         let fsc = FieldConfig {
-            path: format!("{}/text", shard_path),
+            path: shard_path.join("text"),
         };
 
         let psc = ParagraphConfig {
-            path: format!("{}/paragraph", shard_path),
+            path: shard_path.join("paragraph"),
         };
 
         let vsc = VectorConfig {
             no_results: None,
-            path: format!("{}/vectors", shard_path),
-            vectorset: format!("{}/vectorset", shard_path),
+            path: shard_path.join("vectors"),
+            vectorset: shard_path.join("vectorset"),
         };
         let rsc = RelationConfig {
-            path: format!("{}/relations", shard_path),
+            path: shard_path.join("relations"),
         };
         let config = ShardConfig::new(&shard_path);
         let mut fields = None;
@@ -115,7 +108,7 @@ impl ShardWriterService {
         });
 
         Ok(ShardWriterService {
-            id: id.to_string(),
+            id,
             field_writer: fields.transpose()?.unwrap(),
             paragraph_writer: paragraphs.transpose()?.unwrap(),
             vector_writer: vectors.transpose()?.unwrap(),
@@ -127,78 +120,22 @@ impl ShardWriterService {
         })
     }
     #[tracing::instrument(skip_all)]
-    pub fn new(id: &str) -> InternalResult<ShardWriterService> {
-        let shard_path = Configuration::shards_path_id(id);
-        match Path::new(&shard_path).exists() {
-            true => info!("Loading shard with id {}", id),
-            false => info!("Creating new shard with id {}", id),
-        }
-
+    pub fn open(id: String, shard_path: &Path) -> InternalResult<ShardWriterService> {
         let fsc = FieldConfig {
-            path: format!("{}/text", shard_path),
+            path: shard_path.join("text"),
         };
 
         let psc = ParagraphConfig {
-            path: format!("{}/paragraph", shard_path),
+            path: shard_path.join("paragraph"),
         };
 
         let vsc = VectorConfig {
             no_results: None,
-            path: format!("{}/vectors", shard_path),
-            vectorset: format!("{}/vectorset", shard_path),
+            path: shard_path.join("vectors"),
+            vectorset: shard_path.join("vectorset"),
         };
         let rsc = RelationConfig {
-            path: format!("{}/relations", shard_path),
-        };
-        let config = ShardConfig::new(&shard_path);
-        let mut fields = None;
-        let mut paragraphs = None;
-        let mut vectors = None;
-        let mut relations = None;
-        rayon::scope(|s| {
-            s.spawn(|_| fields = Some(fields::create_writer(&fsc, config.version_fields)));
-            s.spawn(|_| vectors = Some(vectors::create_writer(&vsc, config.version_vectors)));
-            s.spawn(|_| relations = Some(relations::create_writer(&rsc, config.version_relations)));
-            s.spawn(|_| {
-                paragraphs = Some(paragraphs::create_writer(&psc, config.version_paragraphs))
-            });
-        });
-
-        Ok(ShardWriterService {
-            id: id.to_string(),
-            field_writer: fields.transpose()?.unwrap(),
-            paragraph_writer: paragraphs.transpose()?.unwrap(),
-            vector_writer: vectors.transpose()?.unwrap(),
-            relation_writer: relations.transpose()?.unwrap(),
-            document_service_version: config.version_fields as i32,
-            paragraph_service_version: config.version_paragraphs as i32,
-            vector_service_version: config.version_vectors as i32,
-            relation_service_version: config.version_relations as i32,
-        })
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn open(id: &str) -> InternalResult<ShardWriterService> {
-        let shard_path = Configuration::shards_path_id(id);
-        match Path::new(&shard_path).exists() {
-            true => info!("Loading shard with id {}", id),
-            false => info!("Creating new shard with id {}", id),
-        }
-
-        let fsc = FieldConfig {
-            path: format!("{}/text", shard_path),
-        };
-
-        let psc = ParagraphConfig {
-            path: format!("{}/paragraph", shard_path),
-        };
-
-        let vsc = VectorConfig {
-            no_results: None,
-            path: format!("{}/vectors", shard_path),
-            vectorset: format!("{}/vectorset", shard_path),
-        };
-        let rsc = RelationConfig {
-            path: format!("{}/relations", shard_path),
+            path: shard_path.join("relations"),
         };
         let config = ShardConfig::new(&shard_path);
         let mut fields = None;
@@ -215,7 +152,7 @@ impl ShardWriterService {
         });
 
         Ok(ShardWriterService {
-            id: id.to_string(),
+            id,
             field_writer: fields.transpose()?.unwrap(),
             paragraph_writer: paragraphs.transpose()?.unwrap(),
             vector_writer: vectors.transpose()?.unwrap(),

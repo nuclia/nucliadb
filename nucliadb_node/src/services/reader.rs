@@ -33,7 +33,6 @@ use nucliadb_services::*;
 use rayon::prelude::*;
 use tracing::*;
 
-use crate::config::Configuration;
 use crate::services::config::ShardConfig;
 use crate::stats::StatsData;
 use crate::telemetry::run_with_telemetry;
@@ -138,82 +137,23 @@ impl ShardReaderService {
         self.field_reader.count()
     }
 
-    /// Start the service
     #[tracing::instrument(skip_all)]
-    pub fn start(id: &str) -> InternalResult<ShardReaderService> {
-        let shard_path = Configuration::shards_path_id(id);
-        match Path::new(&shard_path).exists() {
-            true => info!("Loading shard with id {}", id),
-            false => info!("Creating new shard with id {}", id),
-        }
-
+    pub fn open(id: String, shard_path: &Path) -> InternalResult<ShardReaderService> {
         let fsc = FieldConfig {
-            path: format!("{}/text", shard_path),
+            path: shard_path.join("text"),
         };
 
         let psc = ParagraphConfig {
-            path: format!("{}/paragraph", shard_path),
+            path: shard_path.join("paragraph"),
         };
 
         let vsc = VectorConfig {
             no_results: Some(FIXED_VECTORS_RESULTS),
-            path: format!("{}/vectors", shard_path),
-            vectorset: format!("{}/vectorset", shard_path),
+            path: shard_path.join("vectors"),
+            vectorset: shard_path.join("vectorset"),
         };
         let rsc = RelationConfig {
-            path: format!("{}/relations", shard_path),
-        };
-
-        let config = ShardConfig::new(&shard_path);
-        let mut fields = None;
-        let mut paragraphs = None;
-        let mut vectors = None;
-        let mut relations = None;
-        rayon::scope(|s| {
-            s.spawn(|_| fields = Some(fields::create_reader(&fsc, config.version_fields)));
-            s.spawn(|_| vectors = Some(vectors::create_reader(&vsc, config.version_vectors)));
-            s.spawn(|_| relations = Some(relations::create_reader(&rsc, config.version_relations)));
-            s.spawn(|_| {
-                paragraphs = Some(paragraphs::create_reader(&psc, config.version_paragraphs))
-            });
-        });
-        Ok(ShardReaderService {
-            id: id.to_string(),
-            creation_time: RwLock::new(SystemTime::now()),
-            field_reader: fields.transpose()?.unwrap(),
-            paragraph_reader: paragraphs.transpose()?.unwrap(),
-            vector_reader: vectors.transpose()?.unwrap(),
-            relation_reader: relations.transpose()?.unwrap(),
-            document_service_version: config.version_fields as i32,
-            paragraph_service_version: config.version_paragraphs as i32,
-            vector_service_version: config.version_vectors as i32,
-            relation_service_version: config.version_relations as i32,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn open(id: &str) -> InternalResult<ShardReaderService> {
-        let shard_path = Configuration::shards_path_id(id);
-        match Path::new(&shard_path).exists() {
-            true => info!("Loading shard with id {}", id),
-            false => info!("Creating new shard with id {}", id),
-        }
-
-        let fsc = FieldConfig {
-            path: format!("{}/text", shard_path),
-        };
-
-        let psc = ParagraphConfig {
-            path: format!("{}/paragraph", shard_path),
-        };
-
-        let vsc = VectorConfig {
-            no_results: Some(FIXED_VECTORS_RESULTS),
-            path: format!("{}/vectors", shard_path),
-            vectorset: format!("{}/vectorset", shard_path),
-        };
-        let rsc = RelationConfig {
-            path: format!("{}/relations", shard_path),
+            path: shard_path.join("relations"),
         };
         let config = ShardConfig::new(&shard_path);
         let mut fields = None;
@@ -229,7 +169,7 @@ impl ShardReaderService {
             });
         });
         Ok(ShardReaderService {
-            id: id.to_string(),
+            id,
             creation_time: RwLock::new(SystemTime::now()),
             field_reader: fields.transpose()?.unwrap(),
             paragraph_reader: paragraphs.transpose()?.unwrap(),
@@ -243,28 +183,22 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn create(id: &str) -> InternalResult<ShardReaderService> {
-        let shard_path = Configuration::shards_path_id(id);
-        match Path::new(&shard_path).exists() {
-            true => info!("Loading shard with id {}", id),
-            false => info!("Creating new shard with id {}", id),
-        }
-
+    pub fn create(id: String, shard_path: &Path) -> InternalResult<ShardReaderService> {
         let fsc = FieldConfig {
-            path: format!("{}/text", shard_path),
+            path: shard_path.join("text"),
         };
 
         let psc = ParagraphConfig {
-            path: format!("{}/paragraph", shard_path),
+            path: shard_path.join("paragraph"),
         };
 
         let vsc = VectorConfig {
             no_results: Some(FIXED_VECTORS_RESULTS),
-            path: format!("{}/vectors", shard_path),
-            vectorset: format!("{}/vectorset", shard_path),
+            path: shard_path.join("vectors"),
+            vectorset: shard_path.join("vectorset"),
         };
         let rsc = RelationConfig {
-            path: format!("{}/relations", shard_path),
+            path: shard_path.join("relations"),
         };
         let config = ShardConfig::new(&shard_path);
         let mut fields = None;
@@ -280,7 +214,7 @@ impl ShardReaderService {
             });
         });
         Ok(ShardReaderService {
-            id: id.to_string(),
+            id,
             creation_time: RwLock::new(SystemTime::now()),
             field_reader: fields.transpose()?.unwrap(),
             paragraph_reader: paragraphs.transpose()?.unwrap(),

@@ -642,7 +642,7 @@ mod tests {
     fn test_new_paragraph() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
         let psc = ParagraphConfig {
-            path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            path: dir.path().to_path_buf(),
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());

@@ -223,13 +223,8 @@ mod tests {
         let vectorset = TempDir::new("indexset").unwrap();
         let vsc = VectorConfig {
             no_results: Some(3),
-            path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
-            vectorset: vectorset
-                .path()
-                .as_os_str()
-                .to_os_string()
-                .into_string()
-                .unwrap(),
+            path: dir.path().to_path_buf(),
+            vectorset: vectorset.path().to_path_buf(),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),

@@ -57,36 +57,38 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> ServiceResult<()> {
-        info!("Recovering shards from {}...", Configuration::shards_path());
-        for entry in std::fs::read_dir(Configuration::shards_path())? {
+        let shards_path = Configuration::shards_path();
+        info!("Recovering shards from {shards_path:?}...");
+        for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
-            let shard_id = String::from(entry.file_name().to_str().unwrap());
-
-            let shard = POOL.install(|| ShardWriterService::open(&shard_id.to_string()))?;
-            self.cache.insert(shard_id.clone(), shard);
-            info!("{}: Shard loaded", shard_id);
+            let file_name = entry.file_name().to_str().unwrap().to_string();
+            let shard_path = entry.path();
+            let shard =
+                POOL.install(|| ShardWriterService::open(file_name.clone(), &shard_path))?;
+            self.cache.insert(file_name, shard);
+            info!("Shard loaded: {shard_path:?}");
         }
         Ok(())
     }
 
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
-        info!("{}: Loading shard", shard_id.id);
-        if !self.cache.contains_key(&shard_id.id) {
-            info!("{}: Shard was not in memory", shard_id.id);
-            let on_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
-            if on_disk {
-                info!("{}: Shard was in disk", shard_id.id);
-                if let Ok(shard) = POOL.install(|| ShardWriterService::open(&shard_id.id)) {
-                    info!("{}: Loaded shard", shard_id.id);
-                    self.cache.insert(shard_id.id.clone(), shard);
-                    info!("{}: Inserted on memory", shard_id.id);
-                } else {
-                    info!("{}: is corrupted", shard_id.id);
-                }
-            }
+        let shard_name = shard_id.id.clone();
+        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        if self.cache.contains_key(&shard_id.id) {
+            info!("Shard {shard_path:?} is already on memory");
+            return;
         }
-        info!("{}: Shard loaded", shard_id.id);
+        if !shard_path.is_dir() {
+            error!("Shard {shard_path:?} is not on disk");
+            return;
+        }
+        let Ok(shard) = POOL.install(|| ShardWriterService::open(shard_name, &shard_path)) else {
+            error!("Shard {shard_path:?} could not be loaded from disk");
+            return;
+        };
+        self.cache.insert(shard_id.id.clone(), shard);
+        info!("{shard_path:?}: Shard loaded");
     }
     #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardWriterService> {
@@ -99,8 +101,11 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn new_shard(&mut self) -> ShardCreated {
-        let new_id = Uuid::new_v4().to_string();
-        let new_shard = POOL.install(|| ShardWriterService::new(&new_id)).unwrap();
+        let shard_id = Uuid::new_v4().to_string();
+        let shard_path = Configuration::shards_path_id(&shard_id);
+        let new_shard = POOL
+            .install(|| ShardWriterService::new(shard_id.clone(), &shard_path))
+            .unwrap();
         let data = ShardCreated {
             id: new_shard.id.clone(),
             document_service: new_shard.document_version() as i32,
@@ -108,7 +113,7 @@ impl NodeWriterService {
             vector_service: new_shard.vector_version() as i32,
             relation_service: new_shard.relation_version() as i32,
         };
-        self.cache.insert(new_id, new_shard);
+        self.cache.insert(shard_id, new_shard);
         data
     }
     #[tracing::instrument(skip_all)]
@@ -125,15 +130,16 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
         self.delete_shard(shard_id)?;
-        let id = &shard_id.id;
-        let new_shard = POOL.install(|| ShardWriterService::new(id))?;
+        let shard_name = shard_id.id.clone();
+        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let new_shard = POOL.install(|| ShardWriterService::new(shard_name, &shard_path))?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,
             paragraph_service: new_shard.paragraph_version() as i32,
             vector_service: new_shard.vector_version() as i32,
             relation_service: new_shard.relation_version() as i32,
         };
-        self.cache.insert(id.clone(), new_shard);
+        self.cache.insert(shard_id.id.clone(), new_shard);
         Ok(shard_data)
     }
 
