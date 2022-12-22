@@ -19,7 +19,7 @@
 
 from typing import Any, Callable, Generator, Iterator, List, Optional, Tuple
 from nucliadb_dataset.mapping import (
-    batch_to_paragraph_classification_arrow,
+    batch_to_text_classification_arrow,
     bytes_to_batch,
 )
 from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
@@ -65,8 +65,20 @@ class NucliaDBDataset:
         if "RESOURCES" not in self.labels["labelsets"][labelset]["kind"]:
             raise Exception("Labelset not defined for Field Classification")
 
-        self.klass = FieldClassificationBatch
-        self.schema = pa.schema([pa.field("text", pa.int32()), pa.list()])
+        self.set_mappings(
+            [
+                bytes_to_batch(FieldClassificationBatch),
+                batch_to_text_classification_arrow,
+            ]
+        )
+        self.set_schema(
+            pa.schema(
+                [
+                    pa.field("text", pa.string()),
+                    pa.field("labels", pa.list_(pa.string())),
+                ]
+            )
+        )
 
     def configure_paragraph_classification(self):
         if len(self.trainset.filter.labels) != 1:
@@ -83,7 +95,7 @@ class NucliaDBDataset:
         self.set_mappings(
             [
                 bytes_to_batch(ParagraphClassificationBatch),
-                batch_to_paragraph_classification_arrow,
+                batch_to_text_classification_arrow,
             ]
         )
         self.set_schema(

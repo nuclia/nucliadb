@@ -65,7 +65,12 @@ def create_resource(
                     )
                 )
             elif isinstance(label, str):
-                classifications.append(Classification(labelset="", label=label))
+                if label.count("/") != 1:
+                    raise AttributeError("Str labels should be labelset/label")
+                labelset, label_str = label.split("/")
+                classifications.append(
+                    Classification(labelset=labelset, label=label_str)
+                )
 
         create_payload.usermetadata = UserMetadata(classifications=classifications)
 
@@ -162,7 +167,13 @@ def update_resource(
                     )
                 )
             elif isinstance(label, str):
-                classifications.append(Classification(labelset="", label=label))
+                if label.count("/") != 1:
+                    raise AttributeError("Str labels should be labelset/label")
+                labelset, label_str = label.split("/")
+
+                classifications.append(
+                    Classification(labelset=labelset, label=label_str)
+                )
 
         upload_payload.usermetadata = UserMetadata(classifications=classifications)
 

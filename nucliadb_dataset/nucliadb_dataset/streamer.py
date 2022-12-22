@@ -27,7 +27,7 @@ class Streamer:
 
     @property
     def initialized(self):
-        return self.resp == None
+        return self.resp is not None
 
     def initialize(self, partition_id: str):
         self.resp = self.client.stream_session.post(

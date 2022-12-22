@@ -9,7 +9,7 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 import tempfile
 
 
-def test_filesystem(knowledgebox: KnowledgeBox):
+def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
     trainset.type = Type.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
@@ -25,7 +25,7 @@ def test_filesystem(knowledgebox: KnowledgeBox):
         fse.export()
 
 
-def test_nucliadb(knowledgebox: KnowledgeBox):
+def test_nucliadb(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
     trainset.type = Type.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
@@ -42,7 +42,7 @@ def test_nucliadb(knowledgebox: KnowledgeBox):
         fse.export()
 
 
-def test_live(knowledgebox: KnowledgeBox):
+def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
     trainset.type = Type.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
@@ -50,7 +50,7 @@ def test_live(knowledgebox: KnowledgeBox):
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         fse = NucliaDBDataset(
-            nucliadb_kb_url=knowledgebox.client,
+            client=knowledgebox.client,
             trainset=trainset,
             base_path=tmpdirname,
         )
