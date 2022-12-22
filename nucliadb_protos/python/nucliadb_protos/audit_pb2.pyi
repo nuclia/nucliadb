@@ -21,7 +21,6 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class AuditField(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -66,7 +65,6 @@ class AuditField(google.protobuf.message.Message):
 
 global___AuditField = AuditField
 
-@typing_extensions.final
 class AuditRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

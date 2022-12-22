@@ -163,13 +163,6 @@ message TrainSet {
     }
     Filter filter = 2;
     int32 batch_size = 3;
-    // int32 seed = 4;
-    // float split = 5;
-
-    int32 minresources = 6;
-    // bool nones = 7;  // average freq of the other labels
-    // float oversampling = 8; // percentage of max oversampling
-
 }
 
 enum LabelFrom {

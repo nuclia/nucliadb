@@ -1,16 +1,10 @@
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Optional, Tuple
 from nucliadb_sdk.client import NucliaDBClient
 import requests
 from nucliadb_protos.train_pb2 import (
-    FieldClassificationBatch,
-    ParagraphClassificationBatch,
-    TextLabel,
-    TokensClassification,
     TrainSet,
-    Type,
 )
 
-from sklearn.preprocessing import MultiLabelBinarizer
 from urllib3.exceptions import ProtocolError
 
 

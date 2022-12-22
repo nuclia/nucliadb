@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import logging
-import os
-from nucliadb_protos.train_pb2 import Type
+from pathlib import Path
+from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
+from nucliadb_protos.train_pb2 import TrainSet, Type
 
 import pydantic_argparse
 
-from nucliadb_dataset import DatasetType
+from nucliadb_dataset import DatasetType, ExportType
 
 
 DATASET_TYPE_MAPPING = {
@@ -43,3 +43,38 @@ def run():
         description="Generate Arrow files from NucliaDB KBs",
     )
     nucliadb_args = parser.parse_typed_args()
+    errors = []
+
+    trainset = TrainSet()
+    trainset.type = DATASET_TYPE_MAPPING[nucliadb_args.type]
+    trainset.batch_size = nucliadb_args.batch_size
+    if nucliadb_args.type in (
+        DatasetType.FIELD_CLASSIFICATION,
+        DatasetType.PARAGRAPH_CLASSIFICATION,
+        DatasetType.SENTENCE_CLASSIFICATION,
+    ):
+
+        if nucliadb_args.labelset is not None:
+            trainset.filter.labels.append(nucliadb_args.labelset)
+    elif nucliadb_args.type in (DatasetType.TOKEN_CLASSIFICATION):
+        if nucliadb_args.families is not None:
+            trainset.filter.labels.extend(nucliadb_args.families)
+
+    Path(nucliadb_args.path).mkdir(parents=True, exist_ok=True)
+    if nucliadb_args.export == ExportType.DATASETS:
+        if nucliadb_args.apikey is None:
+            errors.append("API key required to push to Nuclia Dataset™")
+        fse = NucliaDatasetsExport(
+            apikey=nucliadb_args.apikey,
+            nucliadb_kb_url=nucliadb_args.url,
+            trainset=trainset,
+            cache_path=nucliadb_args.path,
+        )
+        fse.export()
+    elif nucliadb_args.export == ExportType.FILESYSTEM:
+        fse = FileSystemExport(
+            nucliadb_kb_url=nucliadb_args.url,
+            trainset=trainset,
+            store_path=nucliadb_args.path,
+        )
+        fse.export()

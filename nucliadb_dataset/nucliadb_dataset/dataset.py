@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Generator, List, Optional, Tuple
+from typing import Any, Callable, Generator, Iterator, List, Optional, Tuple
 from nucliadb_dataset.mapping import (
     batch_to_paragraph_classification_arrow,
     bytes_to_batch,
@@ -34,6 +34,7 @@ from nucliadb_protos.train_pb2 import (
 )
 from nucliadb_sdk.client import NucliaDBClient
 import pyarrow as pa
+from console_progressbar import ProgressBar
 
 ACTUAL_PARTIITON = "actual_partition"
 
@@ -115,23 +116,35 @@ class NucliaDBDataset:
 
         if filename is None:
             filename = partition_id
-        with open(f"{self.base_path}/{filename}.arrow", "wb") as sink:
+
+        counter = 0
+        filename = f"{self.base_path}/{filename}.arrow"
+        print(f"Generating partition {partition_id} from {self.base_url} at {filename}")
+        with open(filename, "wb") as sink:
             with pa.ipc.new_file(sink, self.schema) as writer:
                 for batch in self.streamer:
+                    print(f"\r {counter}")
                     batch = self.map(batch)
                     writer.write(batch)
+                    counter += 1
+        print("-" * 10)
         self.streamer.finalize()
+        return filename
 
-    def iter_all_partitions(self) -> Generator[str, str]:
+    def iter_all_partitions(self) -> Iterator[Tuple[str, str]]:
         partitions = self.get_partitions()
-        for partition in partitions:
-            self.generate_partition(partition, ACTUAL_PARTIITON)
-            yield partition, f"{self.base_path}/{ACTUAL_PARTIITON}.arrow"
+        for index, partition in enumerate(partitions):
+            print(f"Generating partition {partition} {index}/{len(partitions)}")
+            filename = self.generate_partition(partition, ACTUAL_PARTIITON)
+            print("done")
+            yield partition, filename
 
     def generate_all_partitions(self) -> List[str]:
         partitions = self.get_partitions()
-        for partition in partitions:
+        for index, partition in enumerate(partitions):
+            print(f"Generating partition {partition} {index}/{len(partitions)}")
             self.generate_partition(partition)
+            print("done")
         return [f"{self.base_path}/{partition}" for partition in partitions]
 
     def set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):

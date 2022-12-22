@@ -128,7 +128,6 @@ from nucliadb_protos.resources_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class Audit(google.protobuf.message.Message):
     """We receive this information throw an stream system"""
 
@@ -171,7 +170,6 @@ class Audit(google.protobuf.message.Message):
 
 global___Audit = Audit
 
-@typing_extensions.final
 class Error(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -210,7 +208,6 @@ class Error(google.protobuf.message.Message):
 
 global___Error = Error
 
-@typing_extensions.final
 class BrokerMessage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -246,7 +243,6 @@ class BrokerMessage(google.protobuf.message.Message):
     WRITER: BrokerMessage.MessageSource.ValueType  # 0
     PROCESSOR: BrokerMessage.MessageSource.ValueType  # 1
 
-    @typing_extensions.final
     class ConversationsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -264,7 +260,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class LayoutsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -282,7 +277,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class TextsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -300,7 +294,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class KeywordsetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -318,7 +311,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class DatetimesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -336,7 +328,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class LinksEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -354,7 +345,6 @@ class BrokerMessage(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class FilesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -513,11 +503,9 @@ class BrokerMessage(google.protobuf.message.Message):
 
 global___BrokerMessage = BrokerMessage
 
-@typing_extensions.final
 class WriterStatusResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class MsgidEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -550,7 +538,6 @@ class WriterStatusResponse(google.protobuf.message.Message):
 
 global___WriterStatusResponse = WriterStatusResponse
 
-@typing_extensions.final
 class WriterStatusRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -560,7 +547,6 @@ class WriterStatusRequest(google.protobuf.message.Message):
 
 global___WriterStatusRequest = WriterStatusRequest
 
-@typing_extensions.final
 class SetLabelsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -584,7 +570,6 @@ class SetLabelsRequest(google.protobuf.message.Message):
 
 global___SetLabelsRequest = SetLabelsRequest
 
-@typing_extensions.final
 class DelLabelsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -604,7 +589,6 @@ class DelLabelsRequest(google.protobuf.message.Message):
 
 global___DelLabelsRequest = DelLabelsRequest
 
-@typing_extensions.final
 class GetLabelsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -641,7 +625,6 @@ class GetLabelsResponse(google.protobuf.message.Message):
 
 global___GetLabelsResponse = GetLabelsResponse
 
-@typing_extensions.final
 class GetLabelsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -658,7 +641,6 @@ class GetLabelsRequest(google.protobuf.message.Message):
 
 global___GetLabelsRequest = GetLabelsRequest
 
-@typing_extensions.final
 class SetEntitiesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -682,7 +664,6 @@ class SetEntitiesRequest(google.protobuf.message.Message):
 
 global___SetEntitiesRequest = SetEntitiesRequest
 
-@typing_extensions.final
 class GetEntitiesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -699,7 +680,6 @@ class GetEntitiesRequest(google.protobuf.message.Message):
 
 global___GetEntitiesRequest = GetEntitiesRequest
 
-@typing_extensions.final
 class GetEntitiesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -716,7 +696,6 @@ class GetEntitiesResponse(google.protobuf.message.Message):
     OK: GetEntitiesResponse.Status.ValueType  # 0
     NOTFOUND: GetEntitiesResponse.Status.ValueType  # 1
 
-    @typing_extensions.final
     class GroupsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -754,7 +733,6 @@ class GetEntitiesResponse(google.protobuf.message.Message):
 
 global___GetEntitiesResponse = GetEntitiesResponse
 
-@typing_extensions.final
 class DelEntitiesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -774,11 +752,9 @@ class DelEntitiesRequest(google.protobuf.message.Message):
 
 global___DelEntitiesRequest = DelEntitiesRequest
 
-@typing_extensions.final
 class MergeEntitiesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class EntityID(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -812,7 +788,6 @@ class MergeEntitiesRequest(google.protobuf.message.Message):
 
 global___MergeEntitiesRequest = MergeEntitiesRequest
 
-@typing_extensions.final
 class GetLabelSetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -832,7 +807,6 @@ class GetLabelSetRequest(google.protobuf.message.Message):
 
 global___GetLabelSetRequest = GetLabelSetRequest
 
-@typing_extensions.final
 class GetLabelSetResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -869,7 +843,6 @@ class GetLabelSetResponse(google.protobuf.message.Message):
 
 global___GetLabelSetResponse = GetLabelSetResponse
 
-@typing_extensions.final
 class GetEntitiesGroupRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -889,7 +862,6 @@ class GetEntitiesGroupRequest(google.protobuf.message.Message):
 
 global___GetEntitiesGroupRequest = GetEntitiesGroupRequest
 
-@typing_extensions.final
 class GetEntitiesGroupResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -926,7 +898,6 @@ class GetEntitiesGroupResponse(google.protobuf.message.Message):
 
 global___GetEntitiesGroupResponse = GetEntitiesGroupResponse
 
-@typing_extensions.final
 class GetWidgetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -946,7 +917,6 @@ class GetWidgetRequest(google.protobuf.message.Message):
 
 global___GetWidgetRequest = GetWidgetRequest
 
-@typing_extensions.final
 class GetWidgetResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -983,7 +953,6 @@ class GetWidgetResponse(google.protobuf.message.Message):
 
 global___GetWidgetResponse = GetWidgetResponse
 
-@typing_extensions.final
 class GetVectorSetsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1000,7 +969,6 @@ class GetVectorSetsRequest(google.protobuf.message.Message):
 
 global___GetVectorSetsRequest = GetVectorSetsRequest
 
-@typing_extensions.final
 class GetVectorSetsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1039,7 +1007,6 @@ class GetVectorSetsResponse(google.protobuf.message.Message):
 
 global___GetVectorSetsResponse = GetVectorSetsResponse
 
-@typing_extensions.final
 class DelVectorSetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1059,7 +1026,6 @@ class DelVectorSetRequest(google.protobuf.message.Message):
 
 global___DelVectorSetRequest = DelVectorSetRequest
 
-@typing_extensions.final
 class SetVectorSetRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1083,7 +1049,6 @@ class SetVectorSetRequest(google.protobuf.message.Message):
 
 global___SetVectorSetRequest = SetVectorSetRequest
 
-@typing_extensions.final
 class GetWidgetsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1100,7 +1065,6 @@ class GetWidgetsRequest(google.protobuf.message.Message):
 
 global___GetWidgetsRequest = GetWidgetsRequest
 
-@typing_extensions.final
 class GetWidgetsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1117,7 +1081,6 @@ class GetWidgetsResponse(google.protobuf.message.Message):
     OK: GetWidgetsResponse.Status.ValueType  # 0
     NOTFOUND: GetWidgetsResponse.Status.ValueType  # 1
 
-    @typing_extensions.final
     class WidgetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1155,7 +1118,6 @@ class GetWidgetsResponse(google.protobuf.message.Message):
 
 global___GetWidgetsResponse = GetWidgetsResponse
 
-@typing_extensions.final
 class SetWidgetsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1176,7 +1138,6 @@ class SetWidgetsRequest(google.protobuf.message.Message):
 
 global___SetWidgetsRequest = SetWidgetsRequest
 
-@typing_extensions.final
 class DetWidgetsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1196,7 +1157,6 @@ class DetWidgetsRequest(google.protobuf.message.Message):
 
 global___DetWidgetsRequest = DetWidgetsRequest
 
-@typing_extensions.final
 class OpStatusWriter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1226,7 +1186,6 @@ class OpStatusWriter(google.protobuf.message.Message):
 
 global___OpStatusWriter = OpStatusWriter
 
-@typing_extensions.final
 class Notification(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1269,7 +1228,6 @@ class Notification(google.protobuf.message.Message):
 
 global___Notification = Notification
 
-@typing_extensions.final
 class Member(google.protobuf.message.Message):
     """/ The member information."""
 
@@ -1305,7 +1263,6 @@ class Member(google.protobuf.message.Message):
 
 global___Member = Member
 
-@typing_extensions.final
 class ListMembersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1315,7 +1272,6 @@ class ListMembersRequest(google.protobuf.message.Message):
 
 global___ListMembersRequest = ListMembersRequest
 
-@typing_extensions.final
 class ListMembersResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1331,7 +1287,6 @@ class ListMembersResponse(google.protobuf.message.Message):
 
 global___ListMembersResponse = ListMembersResponse
 
-@typing_extensions.final
 class ShardReplica(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1351,7 +1306,6 @@ class ShardReplica(google.protobuf.message.Message):
 
 global___ShardReplica = ShardReplica
 
-@typing_extensions.final
 class ShardObject(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1375,7 +1329,6 @@ class ShardObject(google.protobuf.message.Message):
 
 global___ShardObject = ShardObject
 
-@typing_extensions.final
 class Shards(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1397,7 +1350,6 @@ class Shards(google.protobuf.message.Message):
 
 global___Shards = Shards
 
-@typing_extensions.final
 class ResourceFieldId(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1421,7 +1373,6 @@ class ResourceFieldId(google.protobuf.message.Message):
 
 global___ResourceFieldId = ResourceFieldId
 
-@typing_extensions.final
 class IndexResource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1442,7 +1393,6 @@ class IndexResource(google.protobuf.message.Message):
 
 global___IndexResource = IndexResource
 
-@typing_extensions.final
 class IndexStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1452,7 +1402,6 @@ class IndexStatus(google.protobuf.message.Message):
 
 global___IndexStatus = IndexStatus
 
-@typing_extensions.final
 class ResourceFieldExistsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1467,7 +1416,6 @@ class ResourceFieldExistsResponse(google.protobuf.message.Message):
 
 global___ResourceFieldExistsResponse = ResourceFieldExistsResponse
 
-@typing_extensions.final
 class ResourceIdRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1485,7 +1433,6 @@ class ResourceIdRequest(google.protobuf.message.Message):
 
 global___ResourceIdRequest = ResourceIdRequest
 
-@typing_extensions.final
 class ResourceIdResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1500,7 +1447,6 @@ class ResourceIdResponse(google.protobuf.message.Message):
 
 global___ResourceIdResponse = ResourceIdResponse
 
-@typing_extensions.final
 class ExportRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1515,7 +1461,6 @@ class ExportRequest(google.protobuf.message.Message):
 
 global___ExportRequest = ExportRequest
 
-@typing_extensions.final
 class SetVectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1542,7 +1487,6 @@ class SetVectorsRequest(google.protobuf.message.Message):
 
 global___SetVectorsRequest = SetVectorsRequest
 
-@typing_extensions.final
 class SetVectorsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

@@ -23,6 +23,7 @@ from nucliadb_sdk.client import Environment
 from pydantic import BaseSettings
 from enum import Enum
 from typing import List, Optional
+from pathlib import Path
 
 import pydantic
 
@@ -36,11 +37,29 @@ settings = Settings()
 
 
 class RunningSettings(pydantic.BaseSettings):
+    export: ExportType = pydantic.Field(
+        ExportType.FILESYSTEM, description="Destination of export"
+    )
+    path: str = pydantic.Field(
+        f"{Path.home()}/.nuclia/download", description="Download path"
+    )
     url: str = pydantic.Field(description="KnowledgeBox URL")
     type: DatasetType = pydantic.Field(description="Dataset Type")
     labelset: Optional[str] = pydantic.Field(
         description="For classification which labelset"
     )
-    family: Optional[List[str]] = pydantic.Field(description="List of family group")
+    families: Optional[List[str]] = pydantic.Field(description="List of family group")
 
-    export: ExportType = pydantic.Field(description="Destination of export")
+    apikey: Optional[str] = pydantic.Field(
+        description="API key to upload to Nuclia Datasets™"
+    )
+
+    environment: Environment = pydantic.Field(
+        Environment.OSS, description="CLOUD or OSS"
+    )
+
+    service_token: Optional[str] = pydantic.Field(
+        description="Service account key to access Nuclia Cloud"
+    )
+
+    batch_size: int = pydantic.Field(20, description="Batch streaming size")

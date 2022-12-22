@@ -47,4 +47,9 @@ setup(
     include_package_data=True,
     packages=find_packages(),
     install_requires=requirements,
+    entry_points={
+        "console_scripts": [
+            "dataset_export = nucliadb_dataset.run:run",
+        ]
+    },
 )

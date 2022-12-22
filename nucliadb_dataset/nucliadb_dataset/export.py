@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Optional
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_protos.train_pb2 import TrainSet
@@ -24,10 +25,18 @@ from nucliadb_protos.train_pb2 import TrainSet
 
 class NucliaDatasetsExport:
     def __init__(
-        self, apikey: str, nucliadb_kb_url: str, trainset: TrainSet, cache_path: str
+        self,
+        apikey: str,
+        nucliadb_kb_url: str,
+        trainset: TrainSet,
+        cache_path: str,
+        environment: Environment,
+        service_token: Optional[str] = None,
     ):
         self.apikey = apikey
-        self.client = NucliaDBClient(environment=Environment.OSS, url=nucliadb_kb_url)
+        self.client = NucliaDBClient(
+            environment=environment, url=nucliadb_kb_url, api_key=service_token
+        )
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=cache_path
         )
@@ -40,12 +49,20 @@ class NucliaDatasetsExport:
 
 
 class FileSystemExport:
-    def __init__(self, nucliadb_kb_url: str, trainset: TrainSet, cache_path: str):
-        self.client = NucliaDBClient(environment=Environment.OSS, url=nucliadb_kb_url)
+    def __init__(
+        self,
+        nucliadb_kb_url: str,
+        trainset: TrainSet,
+        store_path: str,
+        environment: Environment,
+        service_token: Optional[str] = None,
+    ):
+        self.client = NucliaDBClient(
+            environment=environment, url=nucliadb_kb_url, service_token=service_token
+        )
         self.nucliadb_dataset = NucliaDBDataset(
-            trainset=trainset, client=self.client, base_path=cache_path
+            trainset=trainset, client=self.client, base_path=store_path
         )
 
     def export(self):
-        # Show progress
         self.nucliadb_dataset.generate_all_partitions()
