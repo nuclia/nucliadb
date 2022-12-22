@@ -51,7 +51,7 @@ impl RelationsReaderService {
         }
     }
 
-    fn get_entry_points(reader: &GraphReader, entry_points: &Vec<EntryPoint>) -> Vec<(Entity, usize)> {
+    fn get_valid_entry_points(reader: &GraphReader, entry_points: &Vec<EntryPoint>) -> Vec<(Entity, usize)> {
         let mut parsed = Vec::with_capacity(entry_points.len());
 
         for entry_point in entry_points.iter() {
@@ -87,7 +87,7 @@ impl RelationsReaderService {
         let time = SystemTime::now();
 
         Self::tic(&time, format!("{shard_id:?} - Creating entry points: starts"));
-        let entry_points = Self::get_entry_points(&reader, &request.entry_points);
+        let entry_points = Self::get_valid_entry_points(&reader, &request.entry_points);
         Self::tic(&time, format!("{shard_id:?} - Creating entry points: ends"));
 
         Self::tic(&time, format!("{shard_id:?} - adding query type filters: starts"));
