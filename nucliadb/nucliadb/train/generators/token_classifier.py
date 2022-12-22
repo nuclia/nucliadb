@@ -59,6 +59,7 @@ async def get_field_text(
     split_ners: Dict[
         str, NERS_DICT
     ] = {}  # Dict of entity group , with entity and list of positions in field
+    split_ners[MAIN] = {}
 
     basic_data = await orm_resource.get_basic()
     invalid_tokens = []
@@ -76,7 +77,7 @@ async def get_field_text(
                             split = MAIN
                         else:
                             split = token.split
-                        invalid_tokens_split[token.split].append(
+                        invalid_tokens_split[split].append(
                             (token.klass, token.token, token.start, token.end)
                         )
                     else:
@@ -84,18 +85,18 @@ async def get_field_text(
                             split = MAIN
                         else:
                             split = token.split
-                        split_ners[token.split].setdefault(token.klass, {}).setdefault(
+                        split_ners[split].setdefault(token.klass, {}).setdefault(
                             token.token, []
                         )
-                        split_ners[token.split][token.klass][token.token].append(
+                        split_ners[split][token.klass][token.token].append(
                             (token.start, token.end)
                         )
 
     field_metadata = await field_obj.get_field_metadata()
     # Check computed definition of entities
     for entity_key, positions in field_metadata.metadata.positions.items():
+        entity_group, entity = entity_key.split("/")
         if entity_group in valid_entity_groups:
-            entity_group, entity = entity_key.split("/")
             split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
             for position in positions.position:
                 split_ners[MAIN][entity_group][entity].append(
@@ -104,8 +105,8 @@ async def get_field_text(
 
     for split, split_metadata in field_metadata.split_metadata.items():
         for entity_key, positions in split_metadata.positions.items():
+            entity_group, entity = entity_key.split("/")
             if entity_group in valid_entity_groups:
-                entity_group, entity = entity_key.split("/")
                 split_ners.setdefault(split, {}).setdefault(
                     entity_group, {}
                 ).setdefault(entity, [])
@@ -154,7 +155,7 @@ async def get_field_text(
 
     return (
         split_text,
-        split_ners,
+        ordered_positions,
         split_paragraphs,
     )
 
@@ -165,19 +166,23 @@ def compute_segments(field_text: str, ners: POSITION_DICT, start: int, end: int)
     for position, ner in ners.items():
         if position[0] < start or position[1] > end:
             continue
-        first_part = field_text[: position[0]]
-        ner_part = field_text[position[0] : position[1]]
-        second_part = field_text[position[1] :]
+
+        relative_start = position[0] - start
+        relative_end = position[1] - start
+        first_part = field_text[:relative_start]
+        ner_part = field_text[relative_start:relative_end]
+        second_part = field_text[relative_end:]
         for part in first_part.split():
             segments.append((part, "O"))
         ner_parts = ner_part.split()
         first = True
         for part in ner_parts:
             if first:
-                segments.append((f"B-{part}", ner[0]))
+                segments.append((part, f"B-{ner[0]}"))
                 first = False
             else:
-                segments.append((f"I-{part}", ner[0]))
+                segments.append((part, f"I-{ner[0]}"))
+        start = relative_end
         field_text = second_part
 
     for part in field_text.split():
@@ -199,14 +204,12 @@ def process_entities(text: str, ners: POSITION_DICT, paragraphs: List[Tuple[int,
 
 async def hydrate_token_classification_train_test(
     kbid: str,
-    X: List[str],
-    train_indexes: np.ndarray,
-    test_indexes: np.ndarray,
+    train_indexes: List[str],
+    test_indexes: List[str],
     trainset: TrainSet,
 ):
     batch = TokenClassificationBatch()
-    for index in train_indexes:
-        field_id = X[index]
+    for field_id in train_indexes:
         rid, field_type, field = field_id.split("/")
         (
             split_text,
@@ -230,9 +233,13 @@ async def hydrate_token_classification_train_test(
 
     if len(batch.data):
         yield batch
+
     batch = TokenClassificationBatch()
-    for index in test_indexes:
-        field_id = X[index]
+    batch.split_mark = True
+    yield batch
+
+    batch = TokenClassificationBatch()
+    for field_id in test_indexes:
         rid, field_type, field = field_id.split("/")
         (
             split_text,
@@ -287,13 +294,12 @@ async def generate_token_classification_payloads(
     )
 
     tr = TrainResponse()
-    tr.train = len(train_indexes)
-    tr.test = len(test_indexes)
+    tr.train = 0
+    tr.test = 0
     tr.type = Type.TOKEN_CLASSIFICATION
     yield tr
-
     # Get paragraphs for each classification
     async for batch in hydrate_token_classification_train_test(
-        kbid, X, train_indexes, test_indexes, trainset
+        kbid, train_indexes, test_indexes, trainset
     ):
         yield batch

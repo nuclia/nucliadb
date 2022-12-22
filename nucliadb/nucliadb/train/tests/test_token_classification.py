@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-from typing import AsyncIterator
+from collections import OrderedDict
+from typing import AsyncIterator, Dict, List
 
 import aiohttp
+from nucliadb.train.generators.token_classifier import process_entities
 import pytest
 from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
@@ -58,33 +60,24 @@ async def get_token_classification_batch_from_response(
     payload = await response.content.read(payload_size)
     tr = TrainResponse()
     tr.ParseFromString(payload)
-    assert tr.train == 2
-    assert tr.test == 1
+    assert tr.train == 0
+    assert tr.test == 0
+    assert tr.type == Type.TOKEN_CLASSIFICATION
 
-    total_train_batches = (tr.train // 2) + 1 if tr.train % 2 != 0 else (tr.train // 2)
-    total_test_batches = (tr.test // 2) + 1 if tr.test % 2 != 0 else (tr.test // 2)
-    count_train_batches = 0
-    count_test_batches = 0
-
-    while count_train_batches < total_train_batches:
+    train = True
+    while True:
         header = await response.content.read(4)
+        if header in [b"", None]:
+            break
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
         pcb = TokenClassificationBatch()
         pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
-        count_train_batches += 1
-
-    while count_test_batches < total_test_batches:
-        header = await response.content.read(4)
-        payload_size = int.from_bytes(header, byteorder="big", signed=False)
-        payload = await response.content.read(payload_size)
-        pcb = TokenClassificationBatch()
-        pcb.ParseFromString(payload)
-        assert pcb.data
-        yield pcb
-        count_test_batches += 1
+        if pcb.split_mark:
+            train = False
+        else:
+            assert pcb.data
+            yield train, pcb
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
@@ -126,36 +119,36 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     ts = TokenSplit()
     ts.token = "Ramon"
     ts.klass = "PERSON"
-    ts.start = 13
-    ts.end = 18
+    ts.start = 12
+    ts.end = 17
     ufm.token.append(ts)
 
     ts = TokenSplit()
     ts.token = "Nuclia"
     ts.klass = "ORG"
-    ts.start = 43
-    ts.end = 49
+    ts.start = 42
+    ts.end = 48
     ufm.token.append(ts)
 
     ts = TokenSplit()
     ts.token = "Generalitat de Catalunya"
     ts.klass = "ORG"
-    ts.start = 67
-    ts.end = 91
+    ts.start = 65
+    ts.end = 89
     ufm.token.append(ts)
 
     ts = TokenSplit()
     ts.token = "Eudald Camprubi"
     ts.klass = "PERSON"
-    ts.start = 93
-    ts.end = 108
+    ts.start = 91
+    ts.end = 106
     ufm.token.append(ts)
 
     ts = TokenSplit()
     ts.token = "Carmen Iniesta"
     ts.klass = "PERSON"
-    ts.start = 153
-    ts.end = 167
+    ts.start = 151
+    ts.end = 165
     ufm.token.append(ts)
 
     ufm.field.field = "file"
@@ -182,21 +175,21 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.field.field_type = rpb.FieldType.FILE
     p1 = rpb.Paragraph(
         start=0,
-        end=45,
+        end=49,
     )
     p2 = rpb.Paragraph(
-        start=47,
-        end=64,
+        start=50,
+        end=90,
     )
 
     p3 = rpb.Paragraph(
-        start=65,
-        end=93,
+        start=91,
+        end=135,
     )
 
     p4 = rpb.Paragraph(
-        start=94,
-        end=109,
+        start=136,
+        end=166,
     )
 
     fcm.metadata.metadata.paragraphs.append(p1)
@@ -213,7 +206,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.field.field = "title"
     fcm.field.field_type = rpb.FieldType.GENERIC
     fcm.metadata.metadata.positions["PERSON/el Super Fran"].entity = "el Super Fran"
-    pos = Position(start=38, end=51)
+    pos = Position(start=37, end=50)
     fcm.metadata.metadata.positions["PERSON/el Super Fran"].position.append(pos)
     bm.field_metadata.append(fcm)
 
@@ -221,10 +214,10 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.field.field = "summary"
     fcm.field.field_type = rpb.FieldType.GENERIC
     fcm.metadata.metadata.positions["ORG/Nuclia"].entity = "Nuclia"
-    pos = Position(start=12, end=18)
+    pos = Position(start=11, end=17)
     fcm.metadata.metadata.positions["ORG/Nuclia"].position.append(pos)
     fcm.metadata.metadata.positions["ORG/Debian"].entity = "Debian"
-    pos = Position(start=25, end=31)
+    pos = Position(start=24, end=30)
     fcm.metadata.metadata.positions["ORG/Debian"].position.append(pos)
     bm.field_metadata.append(fcm)
 
@@ -286,7 +279,52 @@ async def test_generator_token_classification(
     ) as response:
 
         assert response.status == 200
-        expected_results = [1, 2]
-        async for batch in get_token_classification_batch_from_response(response):
-            expected = expected_results.pop()
-            assert len(batch.data) == expected
+        batches: List[TokenClassificationBatch] = []
+        async for _, batch in get_token_classification_batch_from_response(response):
+            batches.append(batch)
+
+    for batch in batches:
+        if batch.data[0].token == "Eudald":
+            assert batch.data[0].label == "B-PERSON"
+            assert batch.data[1].label == "I-PERSON"
+            assert batch.data[2].label == "O"
+        if batch.data[0].token == "This":
+            assert batch.data[4].label == "B-PERSON"
+            assert batch.data[5].label == "I-PERSON"
+        if batch.data[0].token == "Where":
+            assert batch.data[3].label == "B-ORG"
+            assert batch.data[4].label == "I-ORG"
+            assert batch.data[5].label == "I-ORG"
+        if batch.data[0].token == "Summary":
+            assert batch.data[2].label == "B-ORG"
+            assert batch.data[4].label == "B-ORG"
+        if batch.data[0].token == "My":
+            assert batch.data[3].label == "B-PERSON"
+            assert batch.data[12].label == "B-ORG"
+
+
+def test_process_entities():
+    split_text = {"__main__": "This is a bird, its a plane, no, its el Super Fran"}
+    split_ners = {"__main__": OrderedDict([((37, 50), ("PERSON", "el Super Fran"))])}
+    split_paragaphs = {"__main__": []}
+    entities = list(
+        process_entities(
+            split_text["__main__"], split_ners["__main__"], split_paragaphs["__main__"]
+        )
+    )
+    assert entities == [
+        [
+            ("This", "O"),
+            ("is", "O"),
+            ("a", "O"),
+            ("bird,", "O"),
+            ("its", "O"),
+            ("a", "O"),
+            ("plane,", "O"),
+            ("no,", "O"),
+            ("its", "O"),
+            ("el", "B-PERSON"),
+            ("Super", "I-PERSON"),
+            ("Fran", "I-PERSON"),
+        ]
+    ]

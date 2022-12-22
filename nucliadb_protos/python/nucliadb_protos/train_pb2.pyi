@@ -909,14 +909,17 @@ class TokenClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DATA_FIELD_NUMBER: builtins.int
+    SPLIT_MARK_FIELD_NUMBER: builtins.int
     @property
     def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TokensClassification]: ...
+    split_mark: builtins.bool
     def __init__(
         self,
         *,
         data: collections.abc.Iterable[global___TokensClassification] | None = ...,
+        split_mark: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["data", b"data", "split_mark", b"split_mark"]) -> None: ...
 
 global___TokenClassificationBatch = TokenClassificationBatch
 
