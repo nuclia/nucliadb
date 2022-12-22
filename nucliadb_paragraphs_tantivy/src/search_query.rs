@@ -461,7 +461,7 @@ pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.facets, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            queries.push((Occur::Must, Box::new(facet_term_query)));
+            queries.push((Occur::Should, Box::new(facet_term_query)));
         });
     Box::new(BooleanQuery::new(queries))
 }
