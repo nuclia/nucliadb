@@ -17,13 +17,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+
 use nucliadb_protos::*;
 
 use crate::service_interface::*;
 
 #[derive(Clone)]
 pub struct RelationConfig {
-    pub path: String,
+    pub path: PathBuf,
 }
 
 #[derive(Debug)]
