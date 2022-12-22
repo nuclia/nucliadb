@@ -26,17 +26,10 @@ use super::relations_io::{IoEdge, IoNode};
 
 pub const SIZE: usize = 1048576 * 100000;
 pub struct AllGuide;
-impl BfsGuide for AllGuide {
-    fn matches(&self, _node: Entity) -> bool {
-        true
-    }
-}
+impl BfsGuide for AllGuide {}
 
 pub struct FreeJumps;
 impl BfsGuide for FreeJumps {
-    fn matches(&self, _node: Entity) -> bool {
-        true
-    }
     fn free_jump(&self, _cnx: GCnx) -> bool {
         true
     }

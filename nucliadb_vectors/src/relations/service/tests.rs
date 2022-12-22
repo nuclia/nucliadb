@@ -70,31 +70,33 @@ lazy_static! {
     };
     static ref REQUEST0: RelationBfsRequest = RelationBfsRequest {
         entry_points: vec![E0.clone()],
-        type_filters: vec![
-            RelationFilter {
+        node_filters: vec![
+            RelationNodeFilter {
                 ntype: NodeType::Entity as i32,
                 subtype: "".to_string()
             },
-            RelationFilter {
+            RelationNodeFilter {
                 ntype: NodeType::Entity as i32,
                 subtype: "Nonexisting".to_string()
             }
         ],
         depth: 1,
+        edge_filters: vec![],
     };
     static ref RESPONSE0: RelationBfsResponse = RelationBfsResponse {
         nodes: vec![E0.clone(), E1.clone(), E2.clone()]
     };
     static ref REQUEST1: RelationBfsRequest = RelationBfsRequest {
         entry_points: vec![E0.clone()],
-        type_filters: vec![RelationFilter {
+        node_filters: vec![RelationNodeFilter {
             ntype: NodeType::Entity as i32,
             subtype: "Official".to_string()
         },],
         depth: 1,
+        edge_filters: vec![],
     };
     static ref RESPONSE1: RelationBfsResponse = RelationBfsResponse {
-        nodes: vec![E1.clone()]
+        nodes: vec![E0.clone(), E1.clone()]
     };
     static ref EDGE_LIST: EdgeList = EdgeList {
         list: vec![

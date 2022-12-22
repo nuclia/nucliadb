@@ -57,7 +57,8 @@ impl RelationsReaderService {
         let reader = self.index.start_reading()?;
         let depth = bfs_request.depth as usize;
         let mut entry_points = Vec::with_capacity(bfs_request.entry_points.len());
-        let mut type_filters = HashSet::with_capacity(bfs_request.type_filters.len());
+        let mut node_filters = HashSet::with_capacity(bfs_request.node_filters.len());
+        let mut edge_filters = HashSet::with_capacity(bfs_request.edge_filters.len());
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} -  Creating entry points: starts {v} ms");
@@ -81,16 +82,21 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - adding query type filters: starts {v} ms");
         }
-        bfs_request.type_filters.iter().for_each(|filter| {
+        bfs_request.node_filters.iter().for_each(|filter| {
             let type_info = node_type_parsing(filter.ntype(), &filter.subtype);
-            type_filters.insert(type_info);
+            node_filters.insert(type_info);
+        });
+        bfs_request.edge_filters.iter().for_each(|filter| {
+            let type_info = rtype_parsing(filter.ntype(), &filter.subtype);
+            edge_filters.insert(type_info);
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - adding query type filters: ends {v} ms");
         }
 
         let guide = GrpcGuide {
-            type_filters,
+            node_filters,
+            edge_filters,
             reader: &reader,
             jump_always: dictionary::SYNONYM,
         };
@@ -106,13 +112,28 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - producing results: starts {v} ms");
         }
-        let nodes = results.into_iter().map(|id| {
-            reader.get_node(id).map(|node| RelationNode {
-                value: node.name().to_string(),
-                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                ntype: string_to_node_type(node.xtype()) as i32,
-            })
-        });
+        let mut found = HashSet::new();
+        let mut nodes = vec![];
+        for i in results {
+            if !found.contains(&i.from()) {
+                let from = reader.get_node(i.from()).map(|node| RelationNode {
+                    value: node.name().to_string(),
+                    subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                    ntype: string_to_node_type(node.xtype()) as i32,
+                })?;
+                nodes.push(from);
+                found.insert(i.from());
+            }
+            if !found.contains(&i.to()) {
+                let to = reader.get_node(i.to()).map(|node| RelationNode {
+                    value: node.name().to_string(),
+                    subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                    ntype: string_to_node_type(node.xtype()) as i32,
+                })?;
+                nodes.push(to);
+                found.insert(i.to());
+            }
+        }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - producing results: ends {v} ms");
         }
@@ -121,7 +142,7 @@ impl RelationsReaderService {
             info!("{id:?} - Ending at {v} ms");
         }
         Ok(Some(RelationBfsResponse {
-            nodes: nodes.collect::<Result<Vec<_>, _>>()?,
+            nodes: nodes.into_iter().collect(),
         }))
     }
     #[tracing::instrument(skip_all)]

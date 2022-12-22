@@ -620,8 +620,9 @@ class VectorSearchResponse(google.protobuf.message.Message):
 
 global___VectorSearchResponse = VectorSearchResponse
 
-class RelationFilter(google.protobuf.message.Message):
-    """Relation filters are used to make the 
+@typing_extensions.final
+class RelationNodeFilter(google.protobuf.message.Message):
+    """Relation filters are used to make the
     search domain smaller. By providing filters the 
     search may be faster.
     """
@@ -645,7 +646,30 @@ class RelationFilter(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["ntype", b"ntype", "subtype", b"subtype"]) -> None: ...
 
-global___RelationFilter = RelationFilter
+global___RelationNodeFilter = RelationNodeFilter
+
+@typing_extensions.final
+class RelationEdgeFilter(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NTYPE_FIELD_NUMBER: builtins.int
+    SUBTYPE_FIELD_NUMBER: builtins.int
+    ntype: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
+    """Will filter the search to edges of type ntype."""
+    subtype: builtins.str
+    """Additionally the search can be even more specific by 
+    providing a subtype. The empty string is a wilcard that 
+    indicates to not filter by subtype.
+    """
+    def __init__(
+        self,
+        *,
+        ntype: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
+        subtype: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ntype", b"ntype", "subtype", b"subtype"]) -> None: ...
+
+global___RelationEdgeFilter = RelationEdgeFilter
 
 @typing_extensions.final
 class RelationPrefixRequest(google.protobuf.message.Message):
@@ -695,15 +719,21 @@ class RelationBFSRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ENTRY_POINTS_FIELD_NUMBER: builtins.int
-    TYPE_FILTERS_FIELD_NUMBER: builtins.int
+    NODE_FILTERS_FIELD_NUMBER: builtins.int
+    EDGE_FILTERS_FIELD_NUMBER: builtins.int
     DEPTH_FIELD_NUMBER: builtins.int
     @property
     def entry_points(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]:
         """List of vertices where search will trigger"""
     @property
-    def type_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationFilter]:
+    def node_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationNodeFilter]:
         """Filters to apply while searching. It's an OR filtering: any
-        node (vertex) staisfying one condition will be returned
+        node (vertex) satisfying one condition will be returned
+        """
+    @property
+    def edge_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationEdgeFilter]:
+        """Filters to apply while searching. It's an OR filtering: any
+        edge satisfying one condition will be returned
         """
     depth: builtins.int
     """TODO: relation filters"""
@@ -711,10 +741,11 @@ class RelationBFSRequest(google.protobuf.message.Message):
         self,
         *,
         entry_points: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
-        type_filters: collections.abc.Iterable[global___RelationFilter] | None = ...,
+        node_filters: collections.abc.Iterable[global___RelationNodeFilter] | None = ...,
+        edge_filters: collections.abc.Iterable[global___RelationEdgeFilter] | None = ...,
         depth: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["depth", b"depth", "entry_points", b"entry_points", "type_filters", b"type_filters"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["depth", b"depth", "edge_filters", b"edge_filters", "entry_points", b"entry_points", "node_filters", b"node_filters"]) -> None: ...
 
 global___RelationBFSRequest = RelationBFSRequest
 

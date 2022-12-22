@@ -259,9 +259,20 @@ pub struct VectorSearchResponse {
 /// search domain smaller. By providing filters the 
 /// search may be faster.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationFilter {
+pub struct RelationNodeFilter {
     /// Will filter the search to nodes of type ntype.
     #[prost(enumeration="super::utils::relation_node::NodeType", tag="1")]
+    pub ntype: i32,
+    /// Additionally the search can be even more specific by 
+    /// providing a subtype. The empty string is a wilcard that 
+    /// indicates to not filter by subtype. 
+    #[prost(string, tag="2")]
+    pub subtype: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelationEdgeFilter {
+    /// Will filter the search to edges of type ntype.
+    #[prost(enumeration="super::utils::relation::RelationType", tag="1")]
     pub ntype: i32,
     /// Additionally the search can be even more specific by 
     /// providing a subtype. The empty string is a wilcard that 
@@ -293,9 +304,13 @@ pub struct RelationBfsRequest {
     #[prost(message, repeated, tag="1")]
     pub entry_points: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
     /// Filters to apply while searching. It's an OR filtering: any
-    /// node (vertex) staisfying one condition will be returned
+    /// node (vertex) satisfying one condition will be returned
     #[prost(message, repeated, tag="2")]
-    pub type_filters: ::prost::alloc::vec::Vec<RelationFilter>,
+    pub node_filters: ::prost::alloc::vec::Vec<RelationNodeFilter>,
+    /// Filters to apply while searching. It's an OR filtering: any
+    /// edge satisfying one condition will be returned
+    #[prost(message, repeated, tag="4")]
+    pub edge_filters: ::prost::alloc::vec::Vec<RelationEdgeFilter>,
     /// TODO: relation filters
     #[prost(int32, tag="3")]
     pub depth: i32,

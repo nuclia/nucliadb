@@ -26,7 +26,6 @@ use crate::relations::graph_db::*;
 // BfsGuide allows the user to modify how the search will be performed.
 // By default a BfsGuide does not interfere in the search.
 pub trait BfsGuide {
-    fn matches(&self, node: Entity) -> bool;
     fn free_jump(&self, _cnx: GCnx) -> bool {
         false
     }
@@ -56,9 +55,15 @@ where Guide: BfsGuide
     #[builder(setter(skip))]
     #[builder(default = "LinkedList::new()")]
     work_stack: LinkedList<BfsNode>,
+
     #[builder(setter(skip))]
     #[builder(default = "HashSet::new()")]
     visited: HashSet<Entity>,
+
+    #[builder(setter(skip))]
+    #[builder(default = "HashSet::new()")]
+    subgraph: HashSet<GCnx>,
+
     entry_points: Vec<Entity>,
     max_depth: usize,
     guide: Guide,
@@ -76,21 +81,17 @@ where Guide: BfsGuide
 impl<'a, Guide> BfsEngine<'a, Guide>
 where Guide: BfsGuide
 {
-    pub fn search(mut self) -> RResult<Vec<Entity>> {
-        std::mem::take(&mut self.entry_points)
+    pub fn search(mut self) -> RResult<impl Iterator<Item = GCnx>> {
+        self.entry_points
             .iter()
             .copied()
             .map(|point| (BfsNode { point, depth: 0 }, self.visited.insert(point)))
             .filter(|(_, v)| *v)
             .for_each(|(e, _)| self.work_stack.push_back(e));
-        let mut results = vec![];
         while let Some(node) = self.work_stack.pop_front() {
             self.expand(node)?;
-            if self.guide.matches(node.point) {
-                results.push(node.point);
-            }
         }
-        Ok(results)
+        Ok(self.subgraph.into_iter())
     }
     fn expand(&mut self, node: BfsNode) -> RResult<()> {
         self.graph
@@ -100,6 +101,7 @@ where Guide: BfsGuide
             .filter(|edge| self.guide.edge_allowed(edge.edge()))
             .filter(|edge| self.guide.node_allowed(edge.to()))
             .for_each(|edge| {
+                self.subgraph.insert(edge);
                 if !self.visited.contains(&edge.to()) {
                     let node = BfsNode {
                         point: edge.to(),
@@ -116,6 +118,7 @@ where Guide: BfsGuide
             .filter(|edge| self.guide.edge_allowed(edge.edge()))
             .filter(|edge| self.guide.node_allowed(edge.from()))
             .for_each(|edge| {
+                self.subgraph.insert(edge);
                 if !self.visited.contains(&edge.from()) {
                     let node = BfsNode {
                         point: edge.from(),
@@ -173,6 +176,7 @@ mod test {
             .unwrap();
         let expected = &nodes;
         let result = bfs.search().unwrap();
+        let result: Vec<_> = result.map(|cnx| cnx.to()).collect();
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }
@@ -192,6 +196,7 @@ mod test {
             .unwrap();
         let expected = &nodes;
         let result = bfs.search().unwrap();
+        let result: Vec<_> = result.map(|cnx| cnx.to()).collect();
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }
@@ -211,6 +216,8 @@ mod test {
             .unwrap();
         let expected = vec![nodes[0], nodes[1], nodes[3]];
         let result = bfs.search().unwrap();
+        let mut result: Vec<_> = result.map(|cnx| cnx.to()).collect();
+        result.push(nodes[0]);
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }
@@ -230,6 +237,7 @@ mod test {
             .unwrap();
         let expected = &nodes;
         let result = bfs.search().unwrap();
+        let result: Vec<_> = result.map(|cnx| cnx.to()).collect();
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }

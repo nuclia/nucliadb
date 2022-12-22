@@ -59,7 +59,7 @@ impl Index {
         guide: G,
         max_depth: usize,
         entry_points: Vec<Entity>,
-    ) -> RResult<Vec<Entity>> {
+    ) -> RResult<impl Iterator<Item = GCnx>> {
         BfsEngineBuilder::new()
             .graph(&self.graphdb)
             .txn(txn)
@@ -219,7 +219,7 @@ impl<'a> GraphReader<'a> {
         guide: G,
         max_depth: usize,
         entry_points: Vec<Entity>,
-    ) -> RResult<Vec<Entity>> {
+    ) -> RResult<impl Iterator<Item = GCnx>> {
         self.index
             .graph_search(&self.graph_txn, guide, max_depth, entry_points)
     }

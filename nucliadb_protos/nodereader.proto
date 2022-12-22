@@ -205,7 +205,7 @@ message VectorSearchResponse {
 // Relation filters are used to make the 
 // search domain smaller. By providing filters the 
 // search may be faster.
-message RelationFilter {
+message RelationNodeFilter {
     // Will filter the search to nodes of type ntype.
     utils.RelationNode.NodeType ntype = 1;
     // Additionally the search can be even more specific by 
@@ -213,6 +213,16 @@ message RelationFilter {
     // indicates to not filter by subtype. 
     string subtype = 2;
 }
+
+message RelationEdgeFilter {
+    // Will filter the search to edges of type ntype.
+    utils.Relation.RelationType ntype = 1;
+    // Additionally the search can be even more specific by 
+    // providing a subtype. The empty string is a wilcard that 
+    // indicates to not filter by subtype. 
+    string subtype = 2;
+}
+
 
 
 // Relation search by prefix
@@ -237,8 +247,12 @@ message RelationBFSRequest {
     repeated utils.RelationNode entry_points = 1;
 
     // Filters to apply while searching. It's an OR filtering: any
-    // node (vertex) staisfying one condition will be returned
-    repeated RelationFilter type_filters = 2;
+    // node (vertex) satisfying one condition will be returned
+    repeated RelationNodeFilter node_filters = 2;
+
+    // Filters to apply while searching. It's an OR filtering: any
+    // edge satisfying one condition will be returned
+    repeated RelationEdgeFilter edge_filters = 4;
 
     int32 depth = 3;
     // TODO: relation filters
