@@ -23,8 +23,8 @@ use std::fmt::Debug;
 use std::time::SystemTime;
 
 use nucliadb_protos::*;
-use nucliadb_service_interface::prelude::*;
 use nucliadb_service_interface::prelude::nucliadb_protos::relation_neighbours_search_request::EntryPoint;
+use nucliadb_service_interface::prelude::*;
 use tracing::*;
 
 use super::bfs::GrpcGuide;
@@ -44,14 +44,10 @@ impl Debug for RelationsReaderService {
 
 impl RelationsReaderService {
     const PREFIX_RESULTS_LIMIT: usize = 10;
-
-    fn tic(start: &SystemTime, log: String) {
-        if let Ok(elapsed) = start.elapsed().map(|elapsed| elapsed.as_millis()) {
-            info!("{}", format!("{log} {elapsed} ms"));
-        }
-    }
-
-    fn get_valid_entry_points(reader: &GraphReader, entry_points: &Vec<EntryPoint>) -> Vec<(Entity, usize)> {
+    fn get_valid_entry_points(
+        reader: &GraphReader,
+        entry_points: &Vec<EntryPoint>,
+    ) -> Vec<(Entity, usize)> {
         let mut parsed = Vec::with_capacity(entry_points.len());
 
         for entry_point in entry_points.iter() {
@@ -86,16 +82,17 @@ impl RelationsReaderService {
         let reader = self.index.start_reading()?;
         let time = SystemTime::now();
 
-        Self::tic(&time, format!("{shard_id:?} - Creating entry points: starts"));
+        report_progress(shard_id, "Creating entry points: starts", time);
         let entry_points = Self::get_valid_entry_points(&reader, &request.entry_points);
-        Self::tic(&time, format!("{shard_id:?} - Creating entry points: ends"));
+        report_progress(shard_id, "Creating entry points: ends", time);
 
-        Self::tic(&time, format!("{shard_id:?} - adding query type filters: starts"));
-        let type_filters = request.type_filters
+        report_progress(shard_id, "adding query type filters: starts", time);
+        let type_filters = request
+            .type_filters
             .iter()
             .map(|filter| node_type_parsing(filter.ntype(), &filter.subtype))
             .collect::<HashSet<_>>();
-        Self::tic(&time, format!("{shard_id:?} - adding query type filters: ends"));
+        report_progress(shard_id, "adding query type filters: ends", time);
 
         let guide = GrpcGuide {
             type_filters,
@@ -106,31 +103,28 @@ impl RelationsReaderService {
         let mut response = vec![];
 
         for (entity, depth) in entry_points {
-            Self::tic(&time, format!("{shard_id:?} - running the search (for {entity:?}): starts"));
+            report_progress(shard_id, "running bfs search: starts", time);
             // TODO: guide should be passed as a ref?
             let neighbours = reader.search(guide.clone(), depth, vec![entity])?;
-            Self::tic(&time, format!("{shard_id:?} - running the search (for {entity:?}): ends"));
+            report_progress(shard_id, "running bfs search: ends", time);
 
-            Self::tic(&time, format!("{shard_id:?} - producing results (for {entity:?}): starts"));
+            report_progress(shard_id, "producing results: starts", time);
             let neighbours = neighbours
                 .into_iter()
                 .map(|entity| {
-                    reader.get_node(entity)
-                        .map(|ionode| RelationNode {
-                            value: ionode.name().to_string(),
-                            ntype: string_to_node_type(ionode.xtype()) as i32,
-                            subtype: ionode.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                        })
+                    reader.get_node(entity).map(|ionode| RelationNode {
+                        value: ionode.name().to_string(),
+                        ntype: string_to_node_type(ionode.xtype()) as i32,
+                        subtype: ionode.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            Self::tic(&time, format!("{shard_id:?} - producing results (for {entity:?}): ends"));
+            report_progress(shard_id, "producing results: ends", time);
 
-            response.push(RelationNeighbours {
-                neighbours
-            })
+            response.push(RelationNeighbours { neighbours })
         }
 
-        Self::tic(&time, format!("{shard_id:?} - Ending at"));
+        report_progress(shard_id, "Ending", time);
         Ok(response)
     }
 
@@ -145,33 +139,28 @@ impl RelationsReaderService {
         let reader = self.index.start_reading()?;
         let time = SystemTime::now();
 
-        Self::tic(&time, format!("{shard_id:?} - running prefix search: starts"));
+        report_progress(shard_id, "prefix search: starts", time);
         let prefixes = reader
             .prefix_search(&self.rmode, Self::PREFIX_RESULTS_LIMIT, prefix)?
             .into_iter()
             .flat_map(|key| reader.get_node_id(&key).ok().flatten());
-        Self::tic(&time, format!("{shard_id:?} - running prefix search: ends"));
+        report_progress(shard_id, "prefix search: ends", time);
 
-        Self::tic(&time, format!("{shard_id:?} - generating results: starts"));
-        let nodes = prefixes
-            .into_iter()
-            .map(|id| {
-                reader
-                    .get_node(id)
-                    .map(|node| RelationNode {
-                        value: node.name().to_string(),
-                        subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                        ntype: string_to_node_type(node.xtype()) as i32,
-                    })
-            });
-        Self::tic(&time, format!("{shard_id:?} - generating results: ends"));
+        report_progress(shard_id, "generating results: starts", time);
+        let nodes = prefixes.into_iter().map(|id| {
+            reader.get_node(id).map(|node| RelationNode {
+                value: node.name().to_string(),
+                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                ntype: string_to_node_type(node.xtype()) as i32,
+            })
+        });
+        report_progress(shard_id, "generating results: ends", time);
 
-        Self::tic(&time, format!("{shard_id:?} - Ending at"));
+        report_progress(shard_id, "Ending", time);
         Ok(RelationPrefixSearchResponse {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
         })
     }
-
 }
 impl RelationReader for RelationsReaderService {
     #[tracing::instrument(skip_all)]
@@ -258,12 +247,12 @@ impl ReaderChild for RelationsReaderService {
 
         if let Some(ref prefix_request) = request.prefix {
             info!("{shard_id:?} - Prefix search");
-            response.prefix = Some(self.prefix_search(&shard_id, prefix_request)?);
+            response.prefix = Some(self.prefix_search(shard_id, prefix_request)?);
         }
 
         if let Some(ref neighbours_request) = request.neighbours {
             info!("{shard_id:?} - Neighbours search");
-            response.neighbours = self.neighbours_search(&shard_id, neighbours_request)?;
+            response.neighbours = self.neighbours_search(shard_id, neighbours_request)?;
         }
 
         // TODO: implement relation path request

@@ -21,8 +21,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use lazy_static::lazy_static;
-use nucliadb_protos::*;
 use nucliadb_protos::relation_neighbours_search_request::EntryPoint;
+use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
 use prost_types::Timestamp;
 use relation::*;
@@ -66,12 +66,10 @@ lazy_static! {
     static ref REQUEST0: RelationSearchRequest = RelationSearchRequest {
         shard_id: SHARD_ID.clone(),
         neighbours: Some(RelationNeighboursSearchRequest {
-            entry_points: vec![
-                EntryPoint {
-                    node: Some(E0.clone()),
-                    depth: 1
-                }
-            ],
+            entry_points: vec![EntryPoint {
+                node: Some(E0.clone()),
+                depth: 1
+            }],
             type_filters: vec![
                 RelationFilter {
                     ntype: NodeType::Entity as i32,
@@ -87,38 +85,30 @@ lazy_static! {
         reload: false,
     };
     static ref RESPONSE0: RelationSearchResponse = RelationSearchResponse {
-        neighbours: vec![
-            RelationNeighbours {
-                neighbours: vec![E0.clone(), E1.clone(), E2.clone()]
-            }
-        ],
+        neighbours: vec![RelationNeighbours {
+            neighbours: vec![E0.clone(), E1.clone(), E2.clone()]
+        }],
         prefix: None,
     };
     static ref REQUEST1: RelationSearchRequest = RelationSearchRequest {
         shard_id: SHARD_ID.clone(),
         neighbours: Some(RelationNeighboursSearchRequest {
-            entry_points: vec![
-                EntryPoint {
-                    node: Some(E0.clone()),
-                    depth: 1,
-                }
-            ],
-            type_filters: vec![
-                RelationFilter {
-                    ntype: NodeType::Entity as i32,
-                    subtype: "Official".to_string()
-                },
-            ],
+            entry_points: vec![EntryPoint {
+                node: Some(E0.clone()),
+                depth: 1,
+            }],
+            type_filters: vec![RelationFilter {
+                ntype: NodeType::Entity as i32,
+                subtype: "Official".to_string()
+            },],
         }),
         prefix: None,
         reload: false,
     };
     static ref RESPONSE1: RelationSearchResponse = RelationSearchResponse {
-        neighbours: vec![
-            RelationNeighbours {
-                neighbours: vec![E1.clone()]
-            }
-        ],
+        neighbours: vec![RelationNeighbours {
+            neighbours: vec![E1.clone()]
+        }],
         prefix: None,
     };
     static ref EDGE_LIST: EdgeList = EdgeList {

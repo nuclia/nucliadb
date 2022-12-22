@@ -269,10 +269,18 @@ pub struct RelationFilter {
     #[prost(string, tag="2")]
     pub subtype: ::prost::alloc::string::String,
 }
+/// Relation search by prefix
+///
+/// Search among all vertices and return the ones that match on prefix
+/// and pass the filters.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationPrefixSearchRequest {
     #[prost(string, tag="1")]
     pub prefix: ::prost::alloc::string::String,
+    // TODO: implement on the code
+
+    /// Filters to apply while searching. It's an OR filtering: any
+    /// node (vertex) staisfying one condition will be returned
     #[prost(message, repeated, tag="2")]
     pub type_filters: ::prost::alloc::vec::Vec<RelationFilter>,
 }
@@ -281,11 +289,17 @@ pub struct RelationPrefixSearchResponse {
     #[prost(message, repeated, tag="1")]
     pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
 }
+/// Relation neighbour search
+///
+/// Search the knowledge graph using some entry points (nodes to start
+/// with) and get their surrounding nodes.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationNeighboursSearchRequest {
+    /// List of vertices where search will trigger
     #[prost(message, repeated, tag="1")]
     pub entry_points: ::prost::alloc::vec::Vec<relation_neighbours_search_request::EntryPoint>,
-    /// TODO: relation filters
+    /// Filters to apply while searching. It's an OR filtering: any
+    /// node (vertex) staisfying one condition will be returned
     #[prost(message, repeated, tag="2")]
     pub type_filters: ::prost::alloc::vec::Vec<RelationFilter>,
 }
@@ -295,10 +309,13 @@ pub mod relation_neighbours_search_request {
     pub struct EntryPoint {
         #[prost(message, optional, tag="2")]
         pub node: ::core::option::Option<super::super::utils::RelationNode>,
+        /// Limit search depth, i.e., distance between entry point and
+        /// results. Vertices connected by an edge are at distance one.
         #[prost(int32, tag="3")]
         pub depth: i32,
     }
 }
+// TODO: uncomment and implement
 // message RelationPathsSearchRequest {
 //     message PathEndpoints {
 //         utils.RelationNode origin = 1;
@@ -308,60 +325,35 @@ pub mod relation_neighbours_search_request {
 //     repeated PathEndpoints paths = 1;
 // }
 
+/// Query relation index to obtain different information about the
+/// knowledge graph. It can be queried using the following strategies:
+///
+/// - prefix search over vertex (node) names
+/// - graph search:
+///   - given some entry vertices, get neighbour vertices
+///   - (TODO) given some vertices, get paths between them
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchRequest {
     #[prost(string, tag="1")]
     pub shard_id: ::prost::alloc::string::String,
-    #[prost(message, optional, tag="2")]
-    pub prefix: ::core::option::Option<RelationPrefixSearchRequest>,
-    /// optional RelationPathsSearchRequest paths = 4;
-    #[prost(message, optional, tag="3")]
-    pub neighbours: ::core::option::Option<RelationNeighboursSearchRequest>,
-    #[prost(bool, tag="10")]
+    #[prost(bool, tag="5")]
     pub reload: bool,
+    #[prost(message, optional, tag="11")]
+    pub prefix: ::core::option::Option<RelationPrefixSearchRequest>,
+    /// TODO: uncomment and implement
+    /// RelationPathsSearchRequest paths = 13;
+    #[prost(message, optional, tag="12")]
+    pub neighbours: ::core::option::Option<RelationNeighboursSearchRequest>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchResponse {
-    #[prost(message, optional, tag="2")]
+    #[prost(message, optional, tag="11")]
     pub prefix: ::core::option::Option<RelationPrefixSearchResponse>,
-    /// repeated utils.RelationPath paths = 4;
-    #[prost(message, repeated, tag="3")]
+    /// TODO: uncomment and implement
+    /// repeated utils.RelationPath paths = 13;
+    #[prost(message, repeated, tag="12")]
     pub neighbours: ::prost::alloc::vec::Vec<super::utils::RelationNeighbours>,
 }
-// // Search request for the relation index.
-// //
-// // It can be done using two strategies:
-// // - text search over vertex (node) names
-// // - graph search given some entry points (initial vertices)
-// //
-// // When a prefix is provided, search will be done by prefix, otherwise
-// // it will perform a graph search. Filters can be applied to both searches
-// message RelationSearchRequest {
-//     // Shard ID
-//     string id = 1;
-
-//     // Prefix to search node (vertex) names
-//     // Nodes can be filtered by prefix.
-//     string prefix = 5;
-
-//     // List of vertices where search will trigger.
-//     repeated utils.RelationNode entry_points = 2;
-
-//     // Limit search depth, i.e., distance between entry points and
-//     // results. Vertices connected by an edge are at distance one.
-//     int32 depth = 4;
-
-//     // Filters to apply while searching. It's an OR filtering: any
-//     // node (vertex) staisfying one condition will be returned
-//     repeated RelationFilter type_filters = 3;
-
-//     bool reload = 13;
-// }
-
-// message RelationSearchResponse {
-//     repeated utils.RelationNode neighbours = 1;
-// }
-
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchRequest {
     #[prost(string, tag="1")]
