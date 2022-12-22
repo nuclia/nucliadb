@@ -44,10 +44,14 @@ impl Debug for RelationsReaderService {
 impl RelationsReaderService {
     const NO_RESULTS: usize = 10;
     #[tracing::instrument(skip_all)]
-    fn graph_search(&self, request: &RelationSearchRequest) -> InternalResult<RelationBfsResponse> {
+    fn graph_search(
+        &self,
+        request: &RelationSearchRequest,
+    ) -> InternalResult<Option<RelationBfsResponse>> {
         let Some(bfs_request) = request.neighbours.as_ref() else {
-            return Ok(RelationBfsResponse::default())
+            return Ok(None);
         };
+
         let id = Some(&request.shard_id);
         let time = SystemTime::now();
         let reader = self.index.start_reading()?;
@@ -116,18 +120,19 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        Ok(RelationBfsResponse {
+        Ok(Some(RelationBfsResponse {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
-        })
+        }))
     }
     #[tracing::instrument(skip_all)]
     fn prefix_search(
         &self,
         request: &RelationSearchRequest,
-    ) -> InternalResult<RelationPrefixResponse> {
+    ) -> InternalResult<Option<RelationPrefixResponse>> {
         let Some(prefix_request) = request.prefix.as_ref() else {
-            return Ok(RelationPrefixResponse::default());
+            return Ok(None);
         };
+
         let id = Some(&request.shard_id);
         let time = SystemTime::now();
         let prefix = &prefix_request.prefix;
@@ -161,9 +166,9 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        Ok(RelationPrefixResponse {
+        Ok(Some(RelationPrefixResponse {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
-        })
+        }))
     }
 }
 impl RelationReader for RelationsReaderService {
@@ -243,12 +248,9 @@ impl ReaderChild for RelationsReaderService {
     }
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
-        let prefix_result = self.prefix_search(request)?;
-        let graph_result = self.graph_search(request)?;
-
         Ok(RelationSearchResponse {
-            neighbours: Some(graph_result),
-            prefix: Some(prefix_result),
+            neighbours: self.graph_search(request)?,
+            prefix: self.prefix_search(request)?,
         })
     }
     #[tracing::instrument(skip_all)]

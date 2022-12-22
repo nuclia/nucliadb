@@ -281,8 +281,8 @@ message RelationPrefixResponse {
     repeated utils.RelationNode nodes = 1;
 }
 message RelationSearchResponse {
-    RelationPrefixResponse prefix = 11;
-    RelationBFSResponse neighbours = 12;
+    optional RelationPrefixResponse prefix = 11;
+    optional RelationBFSResponse neighbours = 12;
     // TODO: uncomment and implement
     // repeated utils.RelationPath paths = 13;
 }
