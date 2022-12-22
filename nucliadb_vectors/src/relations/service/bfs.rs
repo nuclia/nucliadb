@@ -27,7 +27,6 @@ use crate::relations::bfs_engine::*;
 use crate::relations::errors::*;
 use crate::relations::index::*;
 
-#[derive(Clone)]
 pub struct GrpcGuide<'a> {
     pub reader: &'a GraphReader<'a>,
     pub type_filters: HashSet<(&'a str, Option<&'a str>)>,

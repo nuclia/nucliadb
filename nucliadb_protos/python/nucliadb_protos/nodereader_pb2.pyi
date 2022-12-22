@@ -44,6 +44,7 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
+    RelationNeighbours as RelationNeighbours,
     RelationNode as RelationNode,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
@@ -622,7 +623,7 @@ global___VectorSearchResponse = VectorSearchResponse
 class RelationFilter(google.protobuf.message.Message):
     """Relation filters are used to make the 
     search domain smaller. By providing filters the 
-    search may  be faster.
+    search may be faster.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -646,61 +647,176 @@ class RelationFilter(google.protobuf.message.Message):
 
 global___RelationFilter = RelationFilter
 
-class RelationSearchRequest(google.protobuf.message.Message):
-    """A request for the relation index."""
+@typing_extensions.final
+class RelationPrefixRequest(google.protobuf.message.Message):
+    """Relation search by prefix
+
+    Search among all vertices and return the ones that match on prefix
+    and pass the filters.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ID_FIELD_NUMBER: builtins.int
+    PREFIX_FIELD_NUMBER: builtins.int
+    prefix: builtins.str
+    def __init__(
+        self,
+        *,
+        prefix: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["prefix", b"prefix"]) -> None: ...
+
+global___RelationPrefixRequest = RelationPrefixRequest
+
+@typing_extensions.final
+class RelationPrefixSearchResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODES_FIELD_NUMBER: builtins.int
+    @property
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
+    def __init__(
+        self,
+        *,
+        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes"]) -> None: ...
+
+global___RelationPrefixSearchResponse = RelationPrefixSearchResponse
+
+@typing_extensions.final
+class RelationBFSRequest(google.protobuf.message.Message):
+    """Relation neighbour search
+
+    Search the knowledge graph using some entry points (nodes to start
+    with) and get their surrounding nodes.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     ENTRY_POINTS_FIELD_NUMBER: builtins.int
     TYPE_FILTERS_FIELD_NUMBER: builtins.int
     DEPTH_FIELD_NUMBER: builtins.int
-    PREFIX_FIELD_NUMBER: builtins.int
-    RELOAD_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    """Shard ID"""
     @property
     def entry_points(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]:
-        """A search will start from each of the entry points.
-        Zero entry points are provided will trigger an iteration
-        through all of the nodes.
-        """
+        """List of vertices where search will trigger"""
     @property
     def type_filters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationFilter]:
-        """If needed, the search can be guided through"""
+        """Filters to apply while searching. It's an OR filtering: any
+        node (vertex) staisfying one condition will be returned
+        """
     depth: builtins.int
-    """The user can impose a limit in the number of jumps
-    the seach may perfom.
-    """
-    prefix: builtins.str
-    """Nodes can be filtered by prefix."""
-    reload: builtins.bool
+    """TODO: relation filters"""
     def __init__(
         self,
         *,
-        id: builtins.str = ...,
         entry_points: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
         type_filters: collections.abc.Iterable[global___RelationFilter] | None = ...,
         depth: builtins.int = ...,
-        prefix: builtins.str = ...,
-        reload: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["depth", b"depth", "entry_points", b"entry_points", "id", b"id", "prefix", b"prefix", "reload", b"reload", "type_filters", b"type_filters"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["depth", b"depth", "entry_points", b"entry_points", "type_filters", b"type_filters"]) -> None: ...
 
-global___RelationSearchRequest = RelationSearchRequest
+global___RelationBFSRequest = RelationBFSRequest
 
-class RelationSearchResponse(google.protobuf.message.Message):
+@typing_extensions.final
+class RelationSearchRequest(google.protobuf.message.Message):
+    """    repeated PathEndpoints paths = 1;
+    }
+
+    Query relation index to obtain different information about the
+    knowledge graph. It can be queried using the following strategies:
+
+    - prefix search over vertex (node) names
+    - graph search:
+      - given some entry vertices, get neighbour vertices
+      - (TODO) given some vertices, get paths between them
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    RELOAD_FIELD_NUMBER: builtins.int
+    PREFIX_FIELD_NUMBER: builtins.int
     NEIGHBOURS_FIELD_NUMBER: builtins.int
+    shard_id: builtins.str
+    reload: builtins.bool
     @property
-    def neighbours(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
+    def prefix(self) -> global___RelationPrefixRequest: ...
+    @property
+    def neighbours(self) -> global___RelationBFSRequest:
+        """TODO: uncomment and implement
+        RelationPathsSearchRequest paths = 13;
+        """
     def __init__(
         self,
         *,
-        neighbours: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
+        shard_id: builtins.str = ...,
+        reload: builtins.bool = ...,
+        prefix: global___RelationPrefixRequest | None = ...,
+        neighbours: global___RelationBFSRequest | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["neighbours", b"neighbours"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_neighbours", b"_neighbours", "_prefix", b"_prefix", "neighbours", b"neighbours", "prefix", b"prefix"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_neighbours", b"_neighbours", "_prefix", b"_prefix", "neighbours", b"neighbours", "prefix", b"prefix", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_neighbours", b"_neighbours"]) -> typing_extensions.Literal["neighbours"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_prefix", b"_prefix"]) -> typing_extensions.Literal["prefix"] | None: ...
+
+global___RelationSearchRequest = RelationSearchRequest
+
+@typing_extensions.final
+class RelationBFSResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODES_FIELD_NUMBER: builtins.int
+    @property
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
+    def __init__(
+        self,
+        *,
+        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes"]) -> None: ...
+
+global___RelationBFSResponse = RelationBFSResponse
+
+@typing_extensions.final
+class RelationPrefixResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODES_FIELD_NUMBER: builtins.int
+    @property
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
+    def __init__(
+        self,
+        *,
+        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes"]) -> None: ...
+
+global___RelationPrefixResponse = RelationPrefixResponse
+
+@typing_extensions.final
+class RelationSearchResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PREFIX_FIELD_NUMBER: builtins.int
+    NEIGHBOURS_FIELD_NUMBER: builtins.int
+    @property
+    def prefix(self) -> global___RelationPrefixResponse: ...
+    @property
+    def neighbours(self) -> global___RelationBFSResponse:
+        """TODO: uncomment and implement
+        repeated utils.RelationPath paths = 13;
+        """
+    def __init__(
+        self,
+        *,
+        prefix: global___RelationPrefixResponse | None = ...,
+        neighbours: global___RelationBFSResponse | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["neighbours", b"neighbours", "prefix", b"prefix"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["neighbours", b"neighbours", "prefix", b"prefix"]) -> None: ...
 
 global___RelationSearchResponse = RelationSearchResponse
 

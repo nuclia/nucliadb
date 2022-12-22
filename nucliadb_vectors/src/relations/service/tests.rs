@@ -21,7 +21,6 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use lazy_static::lazy_static;
-use nucliadb_protos::relation_neighbours_search_request::EntryPoint;
 use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
 use prost_types::Timestamp;
@@ -63,53 +62,39 @@ lazy_static! {
             },
         ]
     };
-    static ref REQUEST0: RelationSearchRequest = RelationSearchRequest {
+    static ref REQUEST_BONES: RelationSearchRequest = RelationSearchRequest {
         shard_id: SHARD_ID.clone(),
-        neighbours: Some(RelationNeighboursSearchRequest {
-            entry_points: vec![EntryPoint {
-                node: Some(E0.clone()),
-                depth: 1
-            }],
-            type_filters: vec![
-                RelationFilter {
-                    ntype: NodeType::Entity as i32,
-                    subtype: "".to_string()
-                },
-                RelationFilter {
-                    ntype: NodeType::Entity as i32,
-                    subtype: "Nonexisting".to_string()
-                }
-            ],
-        }),
-        prefix: None,
         reload: false,
-    };
-    static ref RESPONSE0: RelationSearchResponse = RelationSearchResponse {
-        neighbours: vec![RelationNeighbours {
-            neighbours: vec![E0.clone(), E1.clone(), E2.clone()]
-        }],
         prefix: None,
+        neighbours: None,
     };
-    static ref REQUEST1: RelationSearchRequest = RelationSearchRequest {
-        shard_id: SHARD_ID.clone(),
-        neighbours: Some(RelationNeighboursSearchRequest {
-            entry_points: vec![EntryPoint {
-                node: Some(E0.clone()),
-                depth: 1,
-            }],
-            type_filters: vec![RelationFilter {
+    static ref REQUEST0: RelationBfsRequest = RelationBfsRequest {
+        entry_points: vec![E0.clone()],
+        type_filters: vec![
+            RelationFilter {
                 ntype: NodeType::Entity as i32,
-                subtype: "Official".to_string()
-            },],
-        }),
-        prefix: None,
-        reload: false,
+                subtype: "".to_string()
+            },
+            RelationFilter {
+                ntype: NodeType::Entity as i32,
+                subtype: "Nonexisting".to_string()
+            }
+        ],
+        depth: 1,
     };
-    static ref RESPONSE1: RelationSearchResponse = RelationSearchResponse {
-        neighbours: vec![RelationNeighbours {
-            neighbours: vec![E1.clone()]
-        }],
-        prefix: None,
+    static ref RESPONSE0: RelationBfsResponse = RelationBfsResponse {
+        nodes: vec![E0.clone(), E1.clone(), E2.clone()]
+    };
+    static ref REQUEST1: RelationBfsRequest = RelationBfsRequest {
+        entry_points: vec![E0.clone()],
+        type_filters: vec![RelationFilter {
+            ntype: NodeType::Entity as i32,
+            subtype: "Official".to_string()
+        },],
+        depth: 1,
+    };
+    static ref RESPONSE1: RelationBfsResponse = RelationBfsResponse {
+        nodes: vec![E1.clone()]
     };
     static ref EDGE_LIST: EdgeList = EdgeList {
         list: vec![
@@ -221,14 +206,15 @@ fn simple_request() -> anyhow::Result<()> {
     writer.set_resource(&resource).unwrap();
 
     reader.reload();
-    let got = reader.search(&REQUEST0).unwrap();
-    assert!(!got.neighbours.is_empty());
-    println!("Got: {got:#?}");
-    assert_eq!(got.neighbours.len(), RESPONSE0.neighbours.len());
-    assert!(got
-        .neighbours
+    let mut request = REQUEST_BONES.clone();
+    request.neighbours = Some(REQUEST0.clone());
+    let got = reader.search(&request).unwrap();
+    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let is_permutation = bfs_response
+        .nodes
         .iter()
-        .all(|member| RESPONSE0.neighbours.contains(member)));
+        .all(|member| RESPONSE0.nodes.contains(member));
+    assert!((bfs_response.nodes.len() == RESPONSE0.nodes.len()) && is_permutation);
     Ok(())
 }
 
@@ -268,12 +254,17 @@ fn join_graph_test() -> anyhow::Result<()> {
     };
     writer.join_graph(&graph).unwrap();
     reader.reload();
-    let got = reader.search(&REQUEST0).unwrap();
-    assert_eq!(got.neighbours.len(), RESPONSE0.neighbours.len());
-    assert!(got
-        .neighbours
+
+    let mut request = REQUEST_BONES.clone();
+    request.neighbours = Some(REQUEST0.clone());
+    let got = reader.search(&request).unwrap();
+    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let is_permutation = bfs_response
+        .nodes
         .iter()
-        .all(|member| RESPONSE0.neighbours.contains(member)));
+        .all(|member| RESPONSE0.nodes.contains(member));
+    assert!((bfs_response.nodes.len() == RESPONSE0.nodes.len()) && is_permutation);
+
     Ok(())
 }
 
@@ -285,17 +276,18 @@ fn simple_request_with_similarity() -> anyhow::Result<()> {
     let graph = similatity_edges(entities(empty_graph()));
     resource.relations = graph;
     writer.set_resource(&resource).unwrap();
-
     reader.reload();
-    let mut request = REQUEST0.clone();
-    request.depth = 0;
-    let got = reader.search(&REQUEST0).unwrap();
-    println!("{:?}", got.neighbours);
-    assert_eq!(got.neighbours.len(), RESPONSE0.neighbours.len());
-    assert!(got
-        .neighbours
+
+    let mut request = REQUEST_BONES.clone();
+    request.neighbours = Some(REQUEST0.clone());
+    let got = reader.search(&request).unwrap();
+    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let is_permutation = bfs_response
+        .nodes
         .iter()
-        .all(|member| RESPONSE0.neighbours.contains(member)));
+        .all(|member| RESPONSE0.nodes.contains(member));
+    assert!((bfs_response.nodes.len() == RESPONSE0.nodes.len()) && is_permutation);
+
     Ok(())
 }
 
@@ -307,14 +299,18 @@ fn typed_request() -> anyhow::Result<()> {
     let graph = entities(empty_graph());
     resource.relations = graph;
     writer.set_resource(&resource).unwrap();
-
     reader.reload();
-    let got = reader.search(&REQUEST1).unwrap();
-    assert_eq!(got.neighbours.len(), RESPONSE1.neighbours.len());
-    assert!(got
-        .neighbours
+
+    let mut request = REQUEST_BONES.clone();
+    request.neighbours = Some(REQUEST1.clone());
+    let got = reader.search(&request).unwrap();
+    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let is_permutation = bfs_response
+        .nodes
         .iter()
-        .all(|member| RESPONSE1.neighbours.contains(member)));
+        .all(|member| RESPONSE1.nodes.contains(member));
+    assert!((bfs_response.nodes.len() == RESPONSE1.nodes.len()) && is_permutation);
+
     Ok(())
 }
 
@@ -328,26 +324,36 @@ fn just_prefix_querying() -> anyhow::Result<()> {
     writer.set_resource(&resource).unwrap();
 
     reader.reload();
-    let mut request = REQUEST0.clone();
-    request.entry_points.clear();
-    request.prefix = "E".to_string();
+    let mut request = REQUEST_BONES.clone();
+    request.prefix = Some(RelationPrefixRequest {
+        prefix: "E".to_string(),
+    });
     let got = reader.search(&request).unwrap();
-    assert_eq!(got.neighbours.len(), RESPONSE0.neighbours.len());
-    assert!(got
-        .neighbours
+    let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
+    let is_permutation = prefix_response
+        .nodes
         .iter()
-        .all(|member| RESPONSE0.neighbours.contains(member)));
+        .all(|member| RESPONSE0.nodes.contains(member));
+    assert!((prefix_response.nodes.len() == RESPONSE0.nodes.len()) && is_permutation);
 
-    request.prefix = "e".to_string();
+    request.prefix = Some(RelationPrefixRequest {
+        prefix: "e".to_string(),
+    });
     let got = reader.search(&request).unwrap();
-    assert_eq!(got.neighbours.len(), RESPONSE0.neighbours.len());
-    assert!(got
-        .neighbours
+    let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
+    let is_permutation = prefix_response
+        .nodes
         .iter()
-        .all(|member| RESPONSE0.neighbours.contains(member)));
-    request.prefix = "not".to_string();
+        .all(|member| RESPONSE0.nodes.contains(member));
+    assert!((prefix_response.nodes.len() == RESPONSE0.nodes.len()) && is_permutation);
+
+    request.prefix = Some(RelationPrefixRequest {
+        prefix: "not".to_string(),
+    });
     let got = reader.search(&request).unwrap();
-    assert!(got.neighbours.is_empty());
+    let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
+    assert!(prefix_response.nodes.is_empty());
+
     Ok(())
 }
 

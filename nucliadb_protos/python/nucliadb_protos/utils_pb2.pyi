@@ -188,7 +188,40 @@ class JoinGraph(google.protobuf.message.Message):
 
 global___JoinGraph = JoinGraph
 
+@typing_extensions.final
+class RelationNeighbours(google.protobuf.message.Message):
+    """TODO: uncomment and implement
+    RelationNode node = 1;
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NEIGHBOURS_FIELD_NUMBER: builtins.int
+    @property
+    def neighbours(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelationNode]:
+        """TODO: change RelationNode to Relation
+        repeated Relation neighbours = 2;
+        """
+    def __init__(
+        self,
+        *,
+        neighbours: collections.abc.Iterable[global___RelationNode] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["neighbours", b"neighbours"]) -> None: ...
+
+global___RelationNeighbours = RelationNeighbours
+
+@typing_extensions.final
 class ExtractedText(google.protobuf.message.Message):
+    """TODO: uncomment and implement
+    message RelationPath {
+        RelationNode origin = 1;
+        RelationNode destination = 2;
+        // empty path mean direct edge between origin and destination
+        repeated Relation path = 3;
+    }
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class SplitTextEntry(google.protobuf.message.Message):

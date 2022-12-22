@@ -219,14 +219,8 @@ message RelationFilter {
 //
 // Search among all vertices and return the ones that match on prefix
 // and pass the filters.
-message RelationPrefixSearchRequest {
+message RelationPrefixRequest {
     string prefix = 1;
-
-    // TODO: implement on the code
-
-    // Filters to apply while searching. It's an OR filtering: any
-    // node (vertex) staisfying one condition will be returned
-    repeated RelationFilter type_filters = 2;
 }
 
 message RelationPrefixSearchResponse {
@@ -238,21 +232,15 @@ message RelationPrefixSearchResponse {
 //
 // Search the knowledge graph using some entry points (nodes to start
 // with) and get their surrounding nodes.
-message RelationNeighboursSearchRequest {
-    message EntryPoint {
-        utils.RelationNode node = 2;
-        // Limit search depth, i.e., distance between entry point and
-        // results. Vertices connected by an edge are at distance one.
-        int32 depth = 3;
-    }
-
+message RelationBFSRequest {
     // List of vertices where search will trigger
-    repeated EntryPoint entry_points = 1;
+    repeated utils.RelationNode entry_points = 1;
 
     // Filters to apply while searching. It's an OR filtering: any
     // node (vertex) staisfying one condition will be returned
     repeated RelationFilter type_filters = 2;
 
+    int32 depth = 3;
     // TODO: relation filters
 }
 
@@ -279,16 +267,22 @@ message RelationSearchRequest {
     string shard_id = 1;
     bool reload = 5;
 
-    RelationPrefixSearchRequest prefix = 11;
-    RelationNeighboursSearchRequest neighbours = 12;
+    optional RelationPrefixRequest prefix = 11;
+    optional RelationBFSRequest neighbours = 12;
     // TODO: uncomment and implement
     // RelationPathsSearchRequest paths = 13;
 
 }
 
+message RelationBFSResponse {
+    repeated utils.RelationNode nodes = 1;
+}
+message RelationPrefixResponse {
+    repeated utils.RelationNode nodes = 1;
+}
 message RelationSearchResponse {
-    RelationPrefixSearchResponse prefix = 11;
-    repeated utils.RelationNeighbours neighbours = 12;
+    RelationPrefixResponse prefix = 11;
+    RelationBFSResponse neighbours = 12;
     // TODO: uncomment and implement
     // repeated utils.RelationPath paths = 13;
 }

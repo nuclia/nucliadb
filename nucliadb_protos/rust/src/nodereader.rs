@@ -274,15 +274,9 @@ pub struct RelationFilter {
 /// Search among all vertices and return the ones that match on prefix
 /// and pass the filters.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationPrefixSearchRequest {
+pub struct RelationPrefixRequest {
     #[prost(string, tag="1")]
     pub prefix: ::prost::alloc::string::String,
-    // TODO: implement on the code
-
-    /// Filters to apply while searching. It's an OR filtering: any
-    /// node (vertex) staisfying one condition will be returned
-    #[prost(message, repeated, tag="2")]
-    pub type_filters: ::prost::alloc::vec::Vec<RelationFilter>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationPrefixSearchResponse {
@@ -294,26 +288,17 @@ pub struct RelationPrefixSearchResponse {
 /// Search the knowledge graph using some entry points (nodes to start
 /// with) and get their surrounding nodes.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationNeighboursSearchRequest {
+pub struct RelationBfsRequest {
     /// List of vertices where search will trigger
     #[prost(message, repeated, tag="1")]
-    pub entry_points: ::prost::alloc::vec::Vec<relation_neighbours_search_request::EntryPoint>,
+    pub entry_points: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
     /// Filters to apply while searching. It's an OR filtering: any
     /// node (vertex) staisfying one condition will be returned
     #[prost(message, repeated, tag="2")]
     pub type_filters: ::prost::alloc::vec::Vec<RelationFilter>,
-}
-/// Nested message and enum types in `RelationNeighboursSearchRequest`.
-pub mod relation_neighbours_search_request {
-    #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct EntryPoint {
-        #[prost(message, optional, tag="2")]
-        pub node: ::core::option::Option<super::super::utils::RelationNode>,
-        /// Limit search depth, i.e., distance between entry point and
-        /// results. Vertices connected by an edge are at distance one.
-        #[prost(int32, tag="3")]
-        pub depth: i32,
-    }
+    /// TODO: relation filters
+    #[prost(int32, tag="3")]
+    pub depth: i32,
 }
 // TODO: uncomment and implement
 // message RelationPathsSearchRequest {
@@ -339,20 +324,30 @@ pub struct RelationSearchRequest {
     #[prost(bool, tag="5")]
     pub reload: bool,
     #[prost(message, optional, tag="11")]
-    pub prefix: ::core::option::Option<RelationPrefixSearchRequest>,
+    pub prefix: ::core::option::Option<RelationPrefixRequest>,
     /// TODO: uncomment and implement
     /// RelationPathsSearchRequest paths = 13;
     #[prost(message, optional, tag="12")]
-    pub neighbours: ::core::option::Option<RelationNeighboursSearchRequest>,
+    pub neighbours: ::core::option::Option<RelationBfsRequest>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelationBfsResponse {
+    #[prost(message, repeated, tag="1")]
+    pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelationPrefixResponse {
+    #[prost(message, repeated, tag="1")]
+    pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchResponse {
     #[prost(message, optional, tag="11")]
-    pub prefix: ::core::option::Option<RelationPrefixSearchResponse>,
+    pub prefix: ::core::option::Option<RelationPrefixResponse>,
     /// TODO: uncomment and implement
     /// repeated utils.RelationPath paths = 13;
-    #[prost(message, repeated, tag="12")]
-    pub neighbours: ::prost::alloc::vec::Vec<super::utils::RelationNeighbours>,
+    #[prost(message, optional, tag="12")]
+    pub neighbours: ::core::option::Option<RelationBfsResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchRequest {

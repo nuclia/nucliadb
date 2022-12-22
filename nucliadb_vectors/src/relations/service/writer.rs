@@ -47,7 +47,9 @@ impl RelationsWriterService {
                 writer.delete_node(&self.wmode, affected)?;
             }
         }
-        report_progress(&id.to_string(), "Ending", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(())
     }
 }
@@ -65,7 +67,9 @@ impl RelationWriter for RelationsWriterService {
                 self.delete_node(&mut writer, id)?;
             }
         }
-        report_progress(id, "Ending", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(writer.commit(&mut self.wmode)?)
     }
     #[tracing::instrument(skip_all)]
@@ -73,7 +77,9 @@ impl RelationWriter for RelationsWriterService {
         let time = SystemTime::now();
         let mut writer = self.index.start_writing()?;
 
-        report_progress("", "Creating nodes: starts", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Creating nodes: starts {v} ms");
+        }
         let nodes: HashMap<_, _> = graph
             .nodes
             .iter()
@@ -83,9 +89,13 @@ impl RelationWriter for RelationsWriterService {
             .map(|(key, value, xtype, subtype)| (key, value, xtype, subtype.map(|s| s.to_string())))
             .map(|(&key, value, xtype, subtype)| (key, IoNode::user_node(value, xtype, subtype)))
             .collect();
-        report_progress("", "Creating nodes: ends", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Creating nodes: ends {v} ms");
+        }
 
-        report_progress("", "Populating the graph: starts", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Populating the graph: starts {v} ms");
+        }
         let ubehaviour = || Err(InnerErr::UBehaviour);
         for edge in graph.edges.iter() {
             let from = nodes.get(&edge.source).map_or_else(ubehaviour, Ok)?;
@@ -94,9 +104,13 @@ impl RelationWriter for RelationsWriterService {
             let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
             writer.connect(&self.wmode, from, to, &edge)?;
         }
-        report_progress("", "Populating the graph: ends", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Populating the graph: ends {v} ms");
+        }
 
-        report_progress("", "Ending", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Ending at {v} ms")
+        }
         Ok(writer.commit(&mut self.wmode)?)
     }
 }
@@ -121,7 +135,9 @@ impl WriterChild for RelationsWriterService {
             .and_then(|reader| reader.no_nodes())
             .map_err(|err| error!("{err:?}"))
             .unwrap_or_default();
-        report_progress("", "Ending at", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Ending at {v} ms")
+        }
         count as usize
     }
     #[tracing::instrument(skip_all)]
@@ -133,7 +149,9 @@ impl WriterChild for RelationsWriterService {
         if let Some(id) = writer.get_node_id(node.hash())? {
             self.delete_node(&mut writer, id)?;
         }
-        report_progress(id, "Ending at", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(())
     }
     #[tracing::instrument(skip_all)]
@@ -141,7 +159,9 @@ impl WriterChild for RelationsWriterService {
         let id = Some(&resource.shard_id);
         let time = SystemTime::now();
         if resource.status != ResourceStatus::Delete as i32 {
-            report_progress(id, "Populating the graph: starts", time);
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Populating the graph: starts {v} ms");
+            }
             let iter = resource
                 .relations
                 .iter()
@@ -167,9 +187,13 @@ impl WriterChild for RelationsWriterService {
                 writer.connect(&self.wmode, &from, &to, &edge)?;
             }
             writer.commit(&mut self.wmode)?;
-            report_progress(id, "Populating the graph: ends", time);
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Populating the graph: ends {v} ms");
+            }
         }
-        report_progress(id, "Ending", time);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at {v} ms")
+        }
         Ok(())
     }
     fn garbage_collection(&mut self) {}

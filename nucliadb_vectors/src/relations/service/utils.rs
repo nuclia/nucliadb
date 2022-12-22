@@ -17,8 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use std::time::SystemTime;
-
 use nucliadb_protos::relation::RelationType;
 use nucliadb_protos::relation_node::NodeType;
 use nucliadb_service_interface::prelude::*;
@@ -34,13 +32,6 @@ pub mod dictionary {
     pub const USER: &str = "User";
     pub const LABEL: &str = "Label";
 }
-
-pub fn report_progress(id: impl std::fmt::Debug, log: &str, start: SystemTime) {
-    if let Ok(elapsed) = start.elapsed().map(|elapsed| elapsed.as_millis()) {
-        tracing::info!("{id:?} - {log} at {elapsed} ms");
-    }
-}
-
 pub fn rtype_parsing(rtype: RelationType, subtype: &str) -> (&str, Option<&str>) {
     let subtype = if subtype.is_empty() {
         None
