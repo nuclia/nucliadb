@@ -44,9 +44,6 @@ class Streamer:
             self.klass = ParagraphClassificationBatch
             self.map = self.paragraph_classifier_map
             self.labels = self.get_labels()
-            import pdb
-
-            pdb.set_trace()
             self.mlb = MultiLabelBinarizer(classes=self.labels.values())
 
     def paragraph_classifier_map(self, pcb: ParagraphClassificationBatch):

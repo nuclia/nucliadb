@@ -803,20 +803,17 @@ class Label(google.protobuf.message.Message):
     LABELSET_FIELD_NUMBER: builtins.int
     LABEL_FIELD_NUMBER: builtins.int
     ORIGIN_FIELD_NUMBER: builtins.int
-    ANNOTATED_FIELD_NUMBER: builtins.int
     labelset: builtins.str
     label: builtins.str
     origin: global___LabelFrom.ValueType
-    annotated: builtins.bool
     def __init__(
         self,
         *,
         labelset: builtins.str = ...,
         label: builtins.str = ...,
         origin: global___LabelFrom.ValueType = ...,
-        annotated: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["annotated", b"annotated", "label", b"label", "labelset", b"labelset", "origin", b"origin"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["label", b"label", "labelset", b"labelset", "origin", b"origin"]) -> None: ...
 
 global___Label = Label
 
@@ -888,55 +885,22 @@ class SentenceClassificationBatch(google.protobuf.message.Message):
 global___SentenceClassificationBatch = SentenceClassificationBatch
 
 @typing_extensions.final
-class Token(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class _Schema:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _SchemaEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Token._Schema.ValueType], builtins.type):  # noqa: F821
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        O: Token._Schema.ValueType  # 0
-        B: Token._Schema.ValueType  # 1
-        I: Token._Schema.ValueType  # 2
-
-    class Schema(_Schema, metaclass=_SchemaEnumTypeWrapper): ...
-    O: Token.Schema.ValueType  # 0
-    B: Token.Schema.ValueType  # 1
-    I: Token.Schema.ValueType  # 2
-
-    GROUP_FIELD_NUMBER: builtins.int
-    ANNOTATED_FIELD_NUMBER: builtins.int
-    group: builtins.str
-    annotated: builtins.bool
-    def __init__(
-        self,
-        *,
-        group: builtins.str = ...,
-        annotated: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["annotated", b"annotated", "group", b"group"]) -> None: ...
-
-global___Token = Token
-
-@typing_extensions.final
 class TokensClassification(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TEXT_FIELD_NUMBER: builtins.int
-    LABELS_FIELD_NUMBER: builtins.int
+    TOKEN_FIELD_NUMBER: builtins.int
+    LABEL_FIELD_NUMBER: builtins.int
     @property
-    def text(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def token(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
-    def labels(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Token]: ...
+    def label(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
-        text: collections.abc.Iterable[builtins.str] | None = ...,
-        labels: collections.abc.Iterable[global___Token] | None = ...,
+        token: collections.abc.Iterable[builtins.str] | None = ...,
+        label: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "text", b"text"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["label", b"label", "token", b"token"]) -> None: ...
 
 global___TokensClassification = TokensClassification
 

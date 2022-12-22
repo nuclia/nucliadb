@@ -1316,17 +1316,20 @@ class Classification(google.protobuf.message.Message):
     LABELSET_FIELD_NUMBER: builtins.int
     LABEL_FIELD_NUMBER: builtins.int
     CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
+    SPLIT_FIELD_NUMBER: builtins.int
     labelset: builtins.str
     label: builtins.str
     cancelled_by_user: builtins.bool
+    split: builtins.str
     def __init__(
         self,
         *,
         labelset: builtins.str = ...,
         label: builtins.str = ...,
         cancelled_by_user: builtins.bool = ...,
+        split: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["cancelled_by_user", b"cancelled_by_user", "label", b"label", "labelset", b"labelset"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["cancelled_by_user", b"cancelled_by_user", "label", b"label", "labelset", b"labelset", "split", b"split"]) -> None: ...
 
 global___Classification = Classification
 
@@ -1395,10 +1398,14 @@ class TokenSplit(google.protobuf.message.Message):
     KLASS_FIELD_NUMBER: builtins.int
     START_FIELD_NUMBER: builtins.int
     END_FIELD_NUMBER: builtins.int
+    CANCELLED_BY_USER_FIELD_NUMBER: builtins.int
+    SPLIT_FIELD_NUMBER: builtins.int
     token: builtins.str
     klass: builtins.str
     start: builtins.int
     end: builtins.int
+    cancelled_by_user: builtins.bool
+    split: builtins.str
     def __init__(
         self,
         *,
@@ -1406,8 +1413,10 @@ class TokenSplit(google.protobuf.message.Message):
         klass: builtins.str = ...,
         start: builtins.int = ...,
         end: builtins.int = ...,
+        cancelled_by_user: builtins.bool = ...,
+        split: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "klass", b"klass", "start", b"start", "token", b"token"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["cancelled_by_user", b"cancelled_by_user", "end", b"end", "klass", b"klass", "split", b"split", "start", b"start", "token", b"token"]) -> None: ...
 
 global___TokenSplit = TokenSplit
 

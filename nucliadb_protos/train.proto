@@ -182,7 +182,6 @@ message Label {
     string labelset = 1;
     string label = 2;
     LabelFrom origin = 3;
-    bool annotated = 4;
 }
 
 
@@ -203,19 +202,10 @@ message SentenceClassificationBatch {
     repeated TextLabel data = 1;
 }
 
-message Token {
-    string group = 1;
-    bool annotated = 2;
-    enum Schema {
-        O = 0;
-        B = 1;
-        I = 2;
-    }
-}
 
 message TokensClassification {
-    repeated string text = 1;
-    repeated Token labels = 2;
+    repeated string token = 1;
+    repeated string label = 2;
 }
 
 message TokenClassificationBatch {

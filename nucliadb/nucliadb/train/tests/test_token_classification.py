@@ -26,16 +26,23 @@ from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
     ParagraphAnnotation,
+    Position,
+    TokenSplit,
     UserFieldMetadata,
 )
 from nucliadb_protos.train_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
+    TokenClassificationBatch,
     TrainResponse,
     TrainSet,
     Type,
 )
-from nucliadb_protos.writer_pb2 import BrokerMessage, SetLabelsRequest
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    SetEntitiesRequest,
+    SetLabelsRequest,
+)
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import inject_message
@@ -43,9 +50,9 @@ from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
 
 
-async def get_field_classification_batch_from_response(
+async def get_token_classification_batch_from_response(
     response: aiohttp.ClientResponse,
-) -> AsyncIterator[FieldClassificationBatch]:
+) -> AsyncIterator[TokenClassificationBatch]:
     header = await response.content.read(4)
     payload_size = int.from_bytes(header, byteorder="big", signed=False)
     payload = await response.content.read(payload_size)
@@ -63,7 +70,7 @@ async def get_field_classification_batch_from_response(
         header = await response.content.read(4)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        pcb = FieldClassificationBatch()
+        pcb = TokenClassificationBatch()
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
@@ -73,7 +80,7 @@ async def get_field_classification_batch_from_response(
         header = await response.content.read(4)
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        pcb = FieldClassificationBatch()
+        pcb = TokenClassificationBatch()
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
@@ -97,8 +104,8 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     )
 
     bm.basic.icon = "text/plain"
-    bm.basic.title = "Title Resource"
-    bm.basic.summary = "Summary of document"
+    bm.basic.title = "This is a bird, its a plane, no, its el Super Fran"
+    bm.basic.summary = "Summary of Nuclia using Debian"
     bm.basic.thumbnail = "doc"
     bm.basic.layout = "default"
     bm.basic.metadata.useful = True
@@ -108,69 +115,67 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     bm.basic.modified.FromDatetime(datetime.now())
     bm.origin.source = rpb.Origin.Source.WEB
 
-    c4 = rpb.Classification()
-    c4.label = "label_user"
-    c4.labelset = "labelset_resources"
-
-    bm.basic.usermetadata.classifications.append(c4)
-
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer? Do you want to go shooping? This is a test!"  # noqa
+    etw.body.text = "My own text Ramon. This is great to be at Nuclia. \n Where is the Generalitat de Catalunya? Eudald Camprubi, do you want to go shooping? This is a test Carmen Iniesta!"  # noqa
     etw.field.field = "file"
     etw.field.field_type = rpb.FieldType.FILE
     bm.extracted_text.append(etw)
 
-    c3 = rpb.Classification()
-    c3.label = "label_user"
-    c3.labelset = "labelset_paragraphs"
-
-    pa = ParagraphAnnotation()
-    pa.classifications.append(c3)
-    pa.key = "N_RID/f/file/47-64"  # Designed to be the RID at indexing time
     ufm = UserFieldMetadata()
-    ufm.paragraphs.append(pa)
 
-    pa = ParagraphAnnotation()
-    pa.classifications.append(c3)
-    pa.key = "N_RID/f/file/0-45"  # Designed to be the RID at indexing time
-    ufm.paragraphs.append(pa)
+    ts = TokenSplit()
+    ts.token = "Ramon"
+    ts.klass = "PERSON"
+    ts.start = 13
+    ts.end = 18
+    ufm.token.append(ts)
 
-    pa = ParagraphAnnotation()
-    pa.classifications.append(c3)
-    pa.key = "N_RID/f/file/65-93"  # Designed to be the RID at indexing time
-    ufm.paragraphs.append(pa)
+    ts = TokenSplit()
+    ts.token = "Nuclia"
+    ts.klass = "ORG"
+    ts.start = 43
+    ts.end = 49
+    ufm.token.append(ts)
 
-    pa = ParagraphAnnotation()
-    pa.classifications.append(c3)
-    pa.key = "N_RID/f/file/94-109"  # Designed to be the RID at indexing time
-    ufm.paragraphs.append(pa)
+    ts = TokenSplit()
+    ts.token = "Generalitat de Catalunya"
+    ts.klass = "ORG"
+    ts.start = 67
+    ts.end = 91
+    ufm.token.append(ts)
+
+    ts = TokenSplit()
+    ts.token = "Eudald Camprubi"
+    ts.klass = "PERSON"
+    ts.start = 93
+    ts.end = 108
+    ufm.token.append(ts)
+
+    ts = TokenSplit()
+    ts.token = "Carmen Iniesta"
+    ts.klass = "PERSON"
+    ts.start = 153
+    ts.end = 167
+    ufm.token.append(ts)
 
     ufm.field.field = "file"
     ufm.field.field_type = rpb.FieldType.FILE
     bm.basic.fieldmetadata.append(ufm)
 
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Summary of document"
+    etw.body.text = "Summary of Nuclia using Debian"
     etw.field.field = "summary"
     etw.field.field_type = rpb.FieldType.GENERIC
     bm.extracted_text.append(etw)
 
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Title Resource"
+    etw.body.text = "This is a bird, its a plane, no, its el Super Fran"
     etw.field.field = "title"
     etw.field.field_type = rpb.FieldType.GENERIC
     bm.extracted_text.append(etw)
 
     bm.files["file"].added.FromDatetime(datetime.now())
     bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
-
-    c1 = rpb.Classification()
-    c1.label = "label_machine"
-    c1.labelset = "labelset_paragraphs"
-
-    c2 = rpb.Classification()
-    c2.label = "label_machine"
-    c2.labelset = "labelset_resources"
 
     fcm = rpb.FieldComputedMetadataWrapper()
     fcm.field.field = "file"
@@ -179,24 +184,20 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
         start=0,
         end=45,
     )
-    p1.classifications.append(c1)
     p2 = rpb.Paragraph(
         start=47,
         end=64,
     )
-    p2.classifications.append(c1)
 
     p3 = rpb.Paragraph(
         start=65,
         end=93,
     )
-    p3.classifications.append(c1)
 
     p4 = rpb.Paragraph(
         start=94,
         end=109,
     )
-    p4.classifications.append(c1)
 
     fcm.metadata.metadata.paragraphs.append(p1)
     fcm.metadata.metadata.paragraphs.append(p2)
@@ -205,51 +206,64 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
-    fcm.metadata.metadata.ner["Ramon"] = "PERSON"
 
-    fcm.metadata.metadata.classifications.append(c2)
     bm.field_metadata.append(fcm)
 
-    ev = rpb.ExtractedVectorsWrapper()
-    ev.field.field = "file"
-    ev.field.field_type = rpb.FieldType.FILE
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "title"
+    fcm.field.field_type = rpb.FieldType.GENERIC
+    fcm.metadata.metadata.positions["PERSON/el Super Fran"].entity = "el Super Fran"
+    pos = Position(start=38, end=51)
+    fcm.metadata.metadata.positions["PERSON/el Super Fran"].position.append(pos)
+    bm.field_metadata.append(fcm)
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "summary"
+    fcm.field.field_type = rpb.FieldType.GENERIC
+    fcm.metadata.metadata.positions["ORG/Nuclia"].entity = "Nuclia"
+    pos = Position(start=12, end=18)
+    fcm.metadata.metadata.positions["ORG/Nuclia"].position.append(pos)
+    fcm.metadata.metadata.positions["ORG/Debian"].entity = "Debian"
+    pos = Position(start=25, end=31)
+    fcm.metadata.metadata.positions["ORG/Debian"].position.append(pos)
+    bm.field_metadata.append(fcm)
 
     bm.source = BrokerMessage.MessageSource.WRITER
     return bm
 
 
-async def inject_resource_with_field_labels(knowledgebox, writer):
+async def inject_resource_with_token_classification(knowledgebox, writer):
     bm = broker_resource(knowledgebox)
     await inject_message(writer, bm)
     return bm.uuid
 
 
 @pytest.mark.asyncio
-async def test_generator_field_classification(
+async def test_generator_token_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
 
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_paragraphs"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.PARAGRAPHS)
-    l1 = Label(title="label_machine")
-    l2 = Label(title="label_user")
-    slr.labelset.labels.append(l1)
-    slr.labelset.labels.append(l2)
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+    # Create Entities
+    ser = SetEntitiesRequest()
+    ser.kb.uuid = knowledgebox
+    ser.group = "PERSON"
+    ser.entities.title = "PERSON"
+    ser.entities.entities["Ramon"].value = "Ramon"
+    ser.entities.entities["Eudald Camprubi"].value = "Eudald Camprubi"
+    ser.entities.entities["Carmen Iniesta"].value = "Carmen Iniesta"
+    ser.entities.entities["el Super Fran"].value = "el Super Fran"
+    await nucliadb_grpc.SetEntities(ser)  # type: ignore
 
-    slr = SetLabelsRequest()
-    slr.kb.uuid = knowledgebox
-    slr.id = "labelset_resources"
-    slr.labelset.kind.append(LabelSet.LabelSetKind.RESOURCES)
-    l1 = Label(title="label_machine")
-    l2 = Label(title="label_user")
-    slr.labelset.labels.append(l1)
-    slr.labelset.labels.append(l2)
-    await nucliadb_grpc.SetLabels(slr)  # type: ignore
+    ser = SetEntitiesRequest()
+    ser.kb.uuid = knowledgebox
+    ser.group = "ORG"
+    ser.entities.title = "ORG"
+    ser.entities.entities["Nuclia"].value = "Nuclia"
+    ser.entities.entities["Debian"].value = "Debian"
+    ser.entities.entities["Generalitat de Catalunya"].value = "Generalitat de Catalunya"
+    await nucliadb_grpc.SetEntities(ser)  # type: ignore
 
-    await inject_resource_with_field_labels(knowledgebox, nucliadb_grpc)
+    await inject_resource_with_token_classification(knowledgebox, nucliadb_grpc)
     await asyncio.sleep(0.1)
     async with train_rest_api.get(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset"
@@ -260,9 +274,10 @@ async def test_generator_field_classification(
         partition_id = data["partitions"][0]
 
     trainset = TrainSet()
-    trainset.type = Type.FIELD_CLASSIFICATION
+    trainset.type = Type.TOKEN_CLASSIFICATION
     trainset.batch_size = 2
-    trainset.filter.labels.append("/l/labelset_resources")
+    trainset.filter.labels.append("PERSON")
+    trainset.filter.labels.append("ORG")
     trainset.seed = 1234
     trainset.split = 0.25
     async with train_rest_api.post(
@@ -272,6 +287,6 @@ async def test_generator_field_classification(
 
         assert response.status == 200
         expected_results = [1, 2]
-        async for batch in get_field_classification_batch_from_response(response):
+        async for batch in get_token_classification_batch_from_response(response):
             expected = expected_results.pop()
             assert len(batch.data) == expected

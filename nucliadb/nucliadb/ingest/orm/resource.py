@@ -698,15 +698,26 @@ class Resource:
         if basic is None:
             raise KeyError("Resource not found")
         brain.set_global_tags(basic=basic, origin=origin, uuid=self.uuid)
-        for type, field in await self.get_fields_ids():
+        for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)
             fieldid = FieldID(field_type=type, field=field)  # type: ignore
             fieldkey = self.generate_field_id(fieldid)
             extracted_metadata = await fieldobj.get_field_metadata()
-            if extracted_metadata is not None:
-                brain.apply_field_tags_globally(
-                    fieldkey, extracted_metadata, self.uuid, basic.usermetadata
-                )
+            valid_user_field_metadata = None
+            for user_field_metadata in basic.fieldmetadata:
+                if (
+                    user_field_metadata.field.field == field
+                    and user_field_metadata.field.field_type == type
+                ):
+                    valid_user_field_metadata = user_field_metadata
+                    break
+            brain.apply_field_tags_globally(
+                fieldkey,
+                extracted_metadata,
+                self.uuid,
+                basic.usermetadata,
+                valid_user_field_metadata,
+            )
             if type == FieldType.KEYWORDSET:
                 field_data = await fieldobj.db_get_value()
                 brain.process_keywordset_fields(fieldkey, field_data)

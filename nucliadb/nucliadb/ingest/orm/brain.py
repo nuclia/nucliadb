@@ -407,7 +407,7 @@ class ResourceBrain:
         field_key: str,
         metadata: FieldMetadata,
         tags: Dict[str, List[str]],
-        relationnodedocument: RelationNode,
+        relation_node_document: RelationNode,
         user_canceled_labels: List[str],
     ):
         for classification in metadata.classifications:
@@ -421,20 +421,21 @@ class ResourceBrain:
                 self.brain.relations.append(
                     Relation(
                         relation=Relation.ABOUT,
-                        source=relationnodedocument,
+                        source=relation_node_document,
                         to=relationnodelabel,
                     )
                 )
 
-        for entity, klass in metadata.ner.items():
-            tags["e"].append(f"{klass}/{entity}")
-            relationnodeentity = RelationNode(
+        for klass_entity, _ in metadata.positions.items():
+            tags["e"].append(klass_entity)
+            klass, entity = klass_entity.split("/")
+            relation_node_entity = RelationNode(
                 value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
             )
             rel = Relation(
                 relation=Relation.ENTITY,
-                source=relationnodedocument,
-                to=relationnodeentity,
+                source=relation_node_document,
+                to=relation_node_entity,
             )
             self.brain.relations.append(rel)
 
@@ -451,6 +452,7 @@ class ResourceBrain:
         metadata: FieldComputedMetadata,
         uuid: str,
         basic_user_metadata: Optional[UserMetadata] = None,
+        basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
         if basic_user_metadata is not None:
             user_canceled_labels = [
@@ -493,6 +495,22 @@ class ResourceBrain:
                             to=relationnodelabel,
                         )
                     )
+
+        if basic_user_fieldmetadata is not None:
+            for token in basic_user_fieldmetadata.token:
+                if token.cancelled_by_user is False:
+                    tags["e"].append(f"{token.klass}/{token.token}")
+                    relation_node_entity = RelationNode(
+                        value=token.token,
+                        ntype=RelationNode.NodeType.ENTITY,
+                        subtype=token.klass,
+                    )
+                    rel = Relation(
+                        relation=Relation.ENTITY,
+                        source=relation_node_resource,
+                        to=relation_node_entity,
+                    )
+                    self.brain.relations.append(rel)
 
         self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
 
