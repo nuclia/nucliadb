@@ -412,7 +412,7 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
         valid_ids.append(member.node_id)
         if (
             member.is_self is False
-            and member.node_type == "Io"
+            and member.node_type == "Node"
             and member.node_id not in NODES
         ):
             print(

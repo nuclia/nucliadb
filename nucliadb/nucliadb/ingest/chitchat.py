@@ -97,11 +97,11 @@ class ChitchatNucliaDB:
                     members: List[ClusterMember] = list(
                         map(
                             lambda x: ClusterMember(
-                                node_id=x["id"],
-                                listen_addr=x["address"],
-                                node_type=x["type"],
+                                node_id=x["node_id"],
+                                listen_addr=x["listen_addr"],
+                                node_type=x["node_type"],
                                 is_self=x["is_self"],
-                                load_score=x.get("load_score", 0.0),
+                                load_score=x["load_score"],
                                 online=True,
                             ),
                             json.loads(mgr_message.decode("utf8").replace("'", '"')),
