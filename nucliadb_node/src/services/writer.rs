@@ -93,7 +93,7 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: shard_path.join("relations"),
         };
-        let config = ShardConfig::new(&shard_path);
+        let config = ShardConfig::new(shard_path);
         let mut fields = None;
         let mut paragraphs = None;
         let mut vectors = None;
@@ -137,7 +137,7 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: shard_path.join("relations"),
         };
-        let config = ShardConfig::new(&shard_path);
+        let config = ShardConfig::new(shard_path);
         let mut fields = None;
         let mut paragraphs = None;
         let mut vectors = None;
