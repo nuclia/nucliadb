@@ -7,15 +7,6 @@ from nucliadb_dataset.streamer import Streamer
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
-def tensorflow_paragraph_classifier_transformer(
-    tokenizer, mlb, pcb: ParagraphClassificationBatch
-) -> Tuple[tf.TensorSpec, tf.RaggedTensorSpec]:
-    for data in pcb.data:
-        X = tokenizer.encode(data.text)
-        Y = mlb.fit_transoform(data.labels)
-        return X, Y
-
-
 def test_tf_dataset(knowledgebox: KnowledgeBox):
     # First create a dataset
     # NER / LABELER
@@ -25,13 +16,6 @@ def test_tf_dataset(knowledgebox: KnowledgeBox):
     trainset.type = Type.PARAGRAPH_CLASSIFICATION
 
     streamer = Streamer(trainset, knowledgebox.client)
-
-    tokenizer = BertTokenizder.....
-    mlb = MultiLabelBinarizer.....
-
-    mapping_function = partial(tensorflow_paragraph_classifier_transformer, tokenizer, mlb)
-
-    streamer.map = mapping_function
 
     _ = tf.data.Dataset.from_generator(
         streamer.get_data,

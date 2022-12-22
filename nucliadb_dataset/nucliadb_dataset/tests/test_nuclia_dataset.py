@@ -6,7 +6,9 @@ from nucliadb_dataset.streamer import Streamer
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
-def test_hf_dataset(knowledgebox: KnowledgeBox, upload_data_resource_classification):
+def test_nuclia_dataset(
+    knowledgebox: KnowledgeBox, upload_data_resource_classification
+):
     # First create a dataset
     # NER / LABELER
     # create a URL

@@ -81,7 +81,7 @@ class Streamer:
     def __iter__(self):
         return self.next()
 
-    def set_mappings(self, funcs: List[Callable[...]]):
+    def set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
         self.mappings = funcs
 
     def apply_mapping(self, X, Y):

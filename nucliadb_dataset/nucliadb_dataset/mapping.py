@@ -1,9 +1,8 @@
 # Mapping to transform a text/labels onto tokens and multilabelbinarizer
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 from sklearn.preprocessing import MultiLabelBinarizer
 from nucliadb_protos.train_pb2 import Label
-from transformers import PreTrainedTokenizer
 
 # Mapping
 def text_label_to_list():
@@ -14,7 +13,7 @@ def text_label_to_list():
     return func
 
 
-def tokenize(tokenizer: PreTrainedTokenizer):
+def tokenize(tokenizer: Any):
     def func(X: str, Y: Any) -> Tuple[Any, Any]:
         X = tokenizer(X)
         return X, Y
