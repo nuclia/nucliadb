@@ -116,6 +116,7 @@ impl RelationsReaderService {
                 subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
                 ntype: string_to_node_type(node.xtype()) as i32,
             })?;
+
             let relation = reader.get_edge(i.edge()).map(|edge| Relation {
                 to: Some(to),
                 source: Some(from),

@@ -405,6 +405,10 @@ pub struct SearchRequest {
     pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="17")]
     pub with_status: ::core::option::Option<i32>,
+    /// if provided, search metadata for this nodes (nodes at distance
+    /// one) and get the shortest path between nodes
+    #[prost(message, optional, tag="18")]
+    pub relations: ::core::option::Option<RelationSearchRequest>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {
@@ -447,6 +451,8 @@ pub struct SearchResponse {
     pub paragraph: ::core::option::Option<ParagraphSearchResponse>,
     #[prost(message, optional, tag="3")]
     pub vector: ::core::option::Option<VectorSearchResponse>,
+    #[prost(message, optional, tag="4")]
+    pub relation: ::core::option::Option<RelationSearchResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdCollection {

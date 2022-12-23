@@ -334,6 +334,10 @@ message SearchRequest {
     
     optional string advanced_query = 18;
     optional noderesources.Resource.ResourceStatus with_status = 17;
+
+    // if provided, search metadata for this nodes (nodes at distance
+    // one) and get the shortest path between nodes
+    RelationSearchRequest relations = 18;
 }
 
 message SuggestRequest {
@@ -367,6 +371,7 @@ message SearchResponse {
     DocumentSearchResponse document = 1;
     ParagraphSearchResponse paragraph = 2;
     VectorSearchResponse vector = 3;
+    RelationSearchResponse relation = 4;
 }
 
 message IdCollection {
