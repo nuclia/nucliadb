@@ -94,43 +94,49 @@ where Guide: BfsGuide
         Ok(self.subgraph.into_iter())
     }
     fn expand(&mut self, node: BfsNode) -> RResult<()> {
-        let mut nodes = HashMap::new();
+        // same_level nodes are reached by a free_edge
+        // which means that they belong to the level being explored now.
+        let mut same_level = HashMap::new();
+        // next_level nodes are reached by a edge that increases the level.
+        let mut next_level = HashMap::new();
         self.graph
             .get_outedges(self.txn, node.point)?
+            .chain(self.graph.get_inedges(self.txn, node.point)?)
             .flat_map(|a| a.ok().into_iter())
             .filter(|edge| node.depth < self.max_depth || self.guide.free_jump(*edge))
             .filter(|edge| self.guide.edge_allowed(edge.edge()))
             .filter(|edge| self.guide.node_allowed(edge.to()))
             .for_each(|edge| {
-                let node = BfsNode {
-                    point: edge.to(),
-                    depth: node.depth + (!self.guide.free_jump(edge) as usize),
-                };
-                let entry = nodes.entry(edge.to()).or_insert(node);
-                entry.depth = std::cmp::min(entry.depth, node.depth);
+                if self.guide.free_jump(edge) {
+                    let node = BfsNode {
+                        point: edge.to(),
+                        depth: node.depth,
+                    };
+                    next_level.remove(&node.point);
+                    same_level.insert(node.point, node);
+                } else if !same_level.contains_key(&node.point) {
+                    let node = BfsNode {
+                        point: edge.to(),
+                        depth: node.depth + 1,
+                    };
+                    next_level.insert(node.point, node);
+                }
                 self.subgraph.insert(edge);
             });
-        self.graph
-            .get_inedges(self.txn, node.point)?
-            .flat_map(|a| a.ok().into_iter())
-            .filter(|edge| node.depth < self.max_depth || self.guide.free_jump(*edge))
-            .filter(|edge| self.guide.edge_allowed(edge.edge()))
-            .filter(|edge| self.guide.node_allowed(edge.from()))
-            .for_each(|edge| {
-                let node = BfsNode {
-                    point: edge.to(),
-                    depth: node.depth + (!self.guide.free_jump(edge) as usize),
-                };
-                let entry = nodes.entry(edge.to()).or_insert(node);
-                entry.depth = std::cmp::min(entry.depth, node.depth);
-                self.subgraph.insert(edge);
-            });
-        nodes.into_values().for_each(|node| {
+        same_level.into_values().for_each(|node| {
             if !self.visited.contains(&node.point) {
-                let node = BfsNode {
-                    point: node.point,
-                    depth: node.depth,
-                };
+                self.visited.insert(node.point);
+                // In order to maintain all the advantages of BFS
+                // even when free edges are present we need to maintain the following invariant:
+                // For every i,j if i < j then the nodes from level i are visited before the nodes
+                // from level j. That invariant only holds if the nodes reached by a
+                // free edge are pushed to the front of the stack. We are avoiding
+                // the aditional complexity of Dijkstra's algorithm.
+                self.work_stack.push_front(node);
+            }
+        });
+        next_level.into_values().for_each(|node| {
+            if !self.visited.contains(&node.point) {
                 self.visited.insert(node.point);
                 self.work_stack.push_back(node);
             }
