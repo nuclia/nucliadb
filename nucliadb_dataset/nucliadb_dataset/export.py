@@ -18,9 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Optional
+
+import requests
+from nucliadb_protos.train_pb2 import TrainSet, Type
+
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_sdk.client import Environment, NucliaDBClient
-from nucliadb_protos.train_pb2 import TrainSet
 
 
 class NucliaDatasetsExport:
@@ -28,26 +31,48 @@ class NucliaDatasetsExport:
         self,
         apikey: str,
         nucliadb_kb_url: str,
+        datasets_url: str,
         trainset: TrainSet,
         cache_path: str,
         environment: Environment,
         service_token: Optional[str] = None,
     ):
         self.apikey = apikey
+        self.datasets_url = datasets_url
+        self.trainset = trainset
         self.client = NucliaDBClient(
             environment=environment, url=nucliadb_kb_url, api_key=service_token
         )
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=cache_path
         )
+        self.datasets_url
 
     def export(self):
-        # Show progress
-        # create dataset in NDS with trainset
+        dataset_def = {
+            "type": Type.Name(self.trainset.type),
+            "batch_size": self.trainset.batch_size,
+            "filter": {
+                "labels": list(self.trainset.filter.labels)
+            }
+        }
+        response = requests.post(
+            f"{self.datasets_url}/datasets",
+            json=dataset_def,
+            headers={"x_stf_nuakey": self.apikey
+        })
 
-        for partition, filename in self.nucliadb_dataset.iter_all_partitions():
+        dataset_id = response.json()["id"]
+
+        # Show progress
+        for partition_id, filename in self.nucliadb_dataset.iter_all_partitions():
             # Upload to NucliaDatasetService
-            pass
+            with open(filename, 'rb') as partition_fileobj:
+                requests.put(
+                    f"{self.datasets_url}/dataset/{dataset_id}/partition/{partition_id}",
+                    data=partition_fileobj,
+                    headers={"x_stf_nuakey": self.apikey}
+                )
 
 
 class FileSystemExport:
@@ -60,7 +85,7 @@ class FileSystemExport:
         service_token: Optional[str] = None,
     ):
         self.client = NucliaDBClient(
-            environment=environment, url=nucliadb_kb_url, api_key=service_token
+            environment=environment, url=nucliadb_kb_url, service_token=service_token
         )
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=store_path

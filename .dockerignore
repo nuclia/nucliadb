@@ -5,9 +5,9 @@ build
 __pycache__
 nucliadb_writer/nats-server
 nucliadb_node/data
-nats-server
-pd-server
-tikv-server
+**/nats-server
+**/pd-server
+**/tikv-server
 target
 __pycache__
 .eggs
@@ -15,12 +15,3 @@ __pycache__
 data
 logs
 **/*.egg-info
-nucliadb_one/nats-server
-nucliadb_ingest/nats-server
-nucliadb_ingest/pd-server
-nucliadb_ingest/tikv-server
-nucliadb_telemetry/nats-server
-nucliadb_utils/nats-server
-nucliadb_train/nats-server
-nucliadb_node/nats-server
-nucliadb/nats-server

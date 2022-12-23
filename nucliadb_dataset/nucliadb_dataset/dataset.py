@@ -65,7 +65,7 @@ class NucliaDBDataset:
 
     def configure_field_classification(self):
         if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to be only on filter labelset to train")
+            raise Exception("Needs to have only one labelset filter to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
@@ -91,7 +91,7 @@ class NucliaDBDataset:
 
     def configure_token_classification(self):
         if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to be only on filter labelset to train")
+            raise Exception("Needs to have only one labelset filter to train")
         self.entities = self.client.get_entities()
         for family_group in self.trainset.filter.labels:
             if family_group not in self.entities.groups:
@@ -114,14 +114,15 @@ class NucliaDBDataset:
 
     def configure_paragraph_classification(self):
         if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to be only on filter labelset to train")
+            raise Exception("Needs to have only one labelset filter to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
 
         if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
 
-        if "PRAGRAPHS" not in self.labels.labelsets[labelset].kind:
+        if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
+            import ipdb; ipdb.set_trace()
             raise Exception("Labelset not defined for Paragraphs Classification")
 
         self.set_mappings(
