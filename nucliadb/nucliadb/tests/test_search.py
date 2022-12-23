@@ -599,7 +599,7 @@ async def test_search_relations(
         "Becquer": {
             "related_to": [
                 {"entity": "Poetry", "relation": "write"},
-                {"entity": "Becquer", "relation": "read"},
+                {"entity": "Joan Antoni", "relation": "read"},
             ]
         },
         "Newton": {
