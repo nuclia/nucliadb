@@ -59,3 +59,12 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             payload = data.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
+
+    if trainset.type == Type.SENTENCE_CLASSIFICATION:
+
+        async for data in generate_sentence_classification_payloads(
+            kbid, trainset, node, shard_replica_id
+        ):
+            payload = data.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload

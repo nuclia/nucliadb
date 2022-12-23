@@ -792,6 +792,25 @@ class TextLabel(google.protobuf.message.Message):
 
 global___TextLabel = TextLabel
 
+class MultipleTextSameLabels(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TEXT_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    @property
+    def text(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Label]: ...
+    def __init__(
+        self,
+        *,
+        text: collections.abc.Iterable[builtins.str] | None = ...,
+        labels: collections.abc.Iterable[global___Label] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "text", b"text"]) -> None: ...
+
+global___MultipleTextSameLabels = MultipleTextSameLabels
+
 class FieldClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -827,11 +846,11 @@ class SentenceClassificationBatch(google.protobuf.message.Message):
 
     DATA_FIELD_NUMBER: builtins.int
     @property
-    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TextLabel]: ...
+    def data(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___MultipleTextSameLabels]: ...
     def __init__(
         self,
         *,
-        data: collections.abc.Iterable[global___TextLabel] | None = ...,
+        data: collections.abc.Iterable[global___MultipleTextSameLabels] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["data", b"data"]) -> None: ...
 

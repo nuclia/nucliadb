@@ -183,6 +183,11 @@ message TextLabel {
     repeated Label labels = 2;
 }
 
+message MultipleTextSameLabels {
+    repeated string text = 1;
+    repeated Label labels = 2;
+}
+
 message FieldClassificationBatch {
     repeated TextLabel data = 1;
 }
@@ -192,7 +197,7 @@ message ParagraphClassificationBatch {
 }
 
 message SentenceClassificationBatch {
-    repeated TextLabel data = 1;
+    repeated MultipleTextSameLabels data = 1;
 }
 
 
