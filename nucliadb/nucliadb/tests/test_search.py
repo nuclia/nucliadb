@@ -586,10 +586,6 @@ async def test_search_relations(
         return_value=[relation_nodes["Becquer"], relation_nodes["Newton"]]
     )
 
-    import asyncio
-
-    await asyncio.sleep(1)
-
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search",
         params={
