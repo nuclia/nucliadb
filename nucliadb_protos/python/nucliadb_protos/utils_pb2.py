@@ -23,6 +23,7 @@ _RELATIONNODE = DESCRIPTOR.message_types_by_name['RelationNode']
 _JOINGRAPHCNX = DESCRIPTOR.message_types_by_name['JoinGraphCnx']
 _JOINGRAPH = DESCRIPTOR.message_types_by_name['JoinGraph']
 _JOINGRAPH_NODESENTRY = _JOINGRAPH.nested_types_by_name['NodesEntry']
+_RELATIONNEIGHBOURS = DESCRIPTOR.message_types_by_name['RelationNeighbours']
 _EXTRACTEDTEXT = DESCRIPTOR.message_types_by_name['ExtractedText']
 _EXTRACTEDTEXT_SPLITTEXTENTRY = _EXTRACTEDTEXT.nested_types_by_name['SplitTextEntry']
 _VECTOR = DESCRIPTOR.message_types_by_name['Vector']
@@ -72,6 +73,13 @@ JoinGraph = _reflection.GeneratedProtocolMessageType('JoinGraph', (_message.Mess
   })
 _sym_db.RegisterMessage(JoinGraph)
 _sym_db.RegisterMessage(JoinGraph.NodesEntry)
+
+RelationNeighbours = _reflection.GeneratedProtocolMessageType('RelationNeighbours', (_message.Message,), {
+  'DESCRIPTOR' : _RELATIONNEIGHBOURS,
+  '__module__' : 'nucliadb_protos.utils_pb2'
+  # @@protoc_insertion_point(class_scope:utils.RelationNeighbours)
+  })
+_sym_db.RegisterMessage(RelationNeighbours)
 
 ExtractedText = _reflection.GeneratedProtocolMessageType('ExtractedText', (_message.Message,), {
 

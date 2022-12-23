@@ -337,7 +337,7 @@ message SearchRequest {
 
     // if provided, search metadata for this nodes (nodes at distance
     // one) and get the shortest path between nodes
-    RelationSearchRequest relations = 18;
+    RelationSearchRequest relations = 19;
 }
 
 message SuggestRequest {
