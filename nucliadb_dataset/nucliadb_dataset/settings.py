@@ -50,6 +50,10 @@ class RunningSettings(pydantic.BaseSettings):
     )
     families: Optional[List[str]] = pydantic.Field(description="List of family group")
 
+    datasets_url: Optional[str] = pydantic.Field(
+        description="Base url for the Nuclia datasets component (including /api/v1)™"
+    )
+
     apikey: Optional[str] = pydantic.Field(
         description="API key to upload to Nuclia Datasets™"
     )

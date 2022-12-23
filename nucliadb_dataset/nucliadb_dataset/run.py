@@ -67,6 +67,7 @@ def run():
         fse = NucliaDatasetsExport(
             apikey=nucliadb_args.apikey,
             nucliadb_kb_url=nucliadb_args.url,
+            datasets_url=nucliadb_args.datasets_url,
             trainset=trainset,
             cache_path=nucliadb_args.path,
         )
