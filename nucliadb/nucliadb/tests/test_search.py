@@ -29,6 +29,7 @@ from nucliadb_utils.utilities import Utility, set_utility
 from nucliadb.ingest.tests.vectors import V1
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_utils.utilities import Utility, set_utility
 
 
 @pytest.mark.asyncio
