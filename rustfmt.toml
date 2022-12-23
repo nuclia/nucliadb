@@ -1,4 +1,5 @@
 ignore = [
+    "nucliadb_protos/*"
 ]
 
 comment_width = 120
