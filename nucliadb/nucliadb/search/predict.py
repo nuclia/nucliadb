@@ -20,6 +20,7 @@
 from typing import List, Optional
 
 import aiohttp
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
@@ -94,3 +95,7 @@ class PredictEngine:
             else:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         return data["data"]
+
+    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+        # TODO: call learning endpoint and get relations from sentence
+        return []

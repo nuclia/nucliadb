@@ -144,14 +144,25 @@ class Resources(BaseModel):
     next_page: bool = False
 
 
-class Relation(BaseModel):
-    title: str
-    uri: str
-    resources: List[ResourceResult]
+class Entity(BaseModel):
+    entity: str  # name of the entity
+    relation: str  # name of the relation
+
+
+class RelationEntity(BaseModel):
+    related_to: List[Entity]
+
+
+class RelationEdge(BaseModel):
+    origin: Entity
+    destination: Entity
+    path: List[Entity]
 
 
 class Relations(BaseModel):
-    results: List[Relation] = []
+    entities: Dict[str, RelationEntity]
+    # TODO: implement in the next iteration of knowledge graph search
+    # graph: List[RelationEdge]
 
 
 class RelatedEntities(BaseModel):

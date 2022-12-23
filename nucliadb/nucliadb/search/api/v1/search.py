@@ -190,7 +190,7 @@ async def search(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-):
+) -> KnowledgeboxSearchResults:
     nodemanager = get_nodes()
     audit = get_audit()
     timeit = time()

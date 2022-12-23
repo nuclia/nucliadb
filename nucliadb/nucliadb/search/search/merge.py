@@ -26,6 +26,7 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchResponse,
     ParagraphResult,
     ParagraphSearchResponse,
+    RelationSearchResponse,
     SearchResponse,
     SuggestResponse,
     VectorSearchResponse,
@@ -43,11 +44,14 @@ from nucliadb.search.search.fetch import (
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
+    Entity,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
     Paragraphs,
     RelatedEntities,
+    RelationEntity,
+    Relations,
     ResourceProperties,
     ResourceResult,
     Resources,
@@ -347,6 +351,42 @@ async def merge_paragraph_results(
     )
 
 
+async def merge_relations_results(
+    relations_responses: List[
+        RelationSearchResponse
+    ],  # TODO: change for appropiate type
+    resources: List[str],
+    kbid: str,
+    count: int,
+    page: int,
+) -> Relations:
+    relations = Relations(entities={}, graph=[])
+
+    print(f"RELATIONS_RESPONSES: {relations_responses}")
+    # __import__("pdb").set_trace()
+
+    for relation_response in relations_responses:
+        for relation in relation_response.neighbours.subgraph:
+            origin = relation.source.value
+            destination = relation.to.value
+            relation_label = relation.relation_label
+
+            relations.entities.setdefault(origin, RelationEntity(related_to=[]))
+            relations.entities[origin].related_to.append(
+                Entity(entity=destination, relation=relation_label)
+            )
+
+            # relations.entities.setdefault(destination, RelationEntity(related_to=[]))
+            # relations.entities[destination].related_to.append(
+            #     Entity(
+            #         entity=origin,
+            #         relation=relation_label
+            #     )
+            # )
+
+    return relations
+
+
 async def merge_results(
     search_responses: List[SearchResponse],
     count: int,
@@ -361,11 +401,13 @@ async def merge_results(
     paragraphs = []
     documents = []
     vectors = []
+    relations = []
 
     for response in search_responses:
         paragraphs.append(response.paragraph)
         documents.append(response.document)
         vectors.append(response.vector)
+        relations.append(response.relation)
 
     api_results = KnowledgeboxSearchResults()
 
@@ -382,6 +424,10 @@ async def merge_results(
 
     api_results.sentences = await merge_vectors_results(
         vectors, resources, kbid, count, page, min_score=min_score
+    )
+
+    api_results.relations = await merge_relations_results(
+        relations, resources, kbid, count, page
     )
 
     api_results.resources = await fetch_resources(
