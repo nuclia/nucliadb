@@ -20,7 +20,7 @@
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Entity(BaseModel):
@@ -34,8 +34,9 @@ class EntitiesGroup(BaseModel):
     title: Optional[str] = None
     color: Optional[str] = None
 
-    # custom = true if they have been created by the user.
-    custom: bool = False
+    custom: bool = Field(
+        default=False, description="Denotes if it has been created by the user"
+    )
 
 
 class KnowledgeBoxEntities(BaseModel):
