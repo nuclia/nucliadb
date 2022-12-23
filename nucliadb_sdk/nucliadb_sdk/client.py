@@ -27,7 +27,7 @@ CREATE_VECTORSET = "{kburl}/vectorset/{vectorset}"
 VECTORSETS = "{kburl}/vectorsets"
 COUNTER = "{kburl}/counters"
 SEARCH_URL = "{kburl}/search"
-LABELS_URL = "{kburl}/labelset"
+LABELS_URL = "{kburl}/labelsets"
 ENTITIES_URL = "{kburl}/entitiesgroups"
 DOWNLOAD_URL = "{kburl}/{uri}"
 
@@ -269,7 +269,7 @@ class NucliaDBClient:
 
     def get_entities(self) -> KnowledgeBoxEntities:
         url = ENTITIES_URL.format(kburl=self.url)
-        response: httpx.Response = self.reader_session.get(url).json()
+        response: httpx.Response = self.reader_session.get(url)
         if response.status_code == 200:
             return KnowledgeBoxEntities.parse_raw(response.content)
         else:
@@ -277,7 +277,7 @@ class NucliaDBClient:
 
     def get_labels(self) -> KnowledgeBoxLabels:
         url = LABELS_URL.format(kburl=self.url)
-        response: httpx.Response = self.reader_session.get(url).json()
+        response: httpx.Response = self.reader_session.get(url)
         if response.status_code == 200:
             return KnowledgeBoxLabels.parse_raw(response.content)
         else:
