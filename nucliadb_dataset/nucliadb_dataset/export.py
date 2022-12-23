@@ -43,6 +43,8 @@ class NucliaDatasetsExport:
 
     def export(self):
         # Show progress
+        # create dataset in NDS with trainset
+
         for partition, filename in self.nucliadb_dataset.iter_all_partitions():
             # Upload to NucliaDatasetService
             pass
@@ -58,7 +60,7 @@ class FileSystemExport:
         service_token: Optional[str] = None,
     ):
         self.client = NucliaDBClient(
-            environment=environment, url=nucliadb_kb_url, service_token=service_token
+            environment=environment, url=nucliadb_kb_url, api_key=service_token
         )
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=store_path

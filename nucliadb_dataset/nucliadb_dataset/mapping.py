@@ -24,6 +24,7 @@ from nucliadb_protos.train_pb2 import (
     FieldClassificationBatch,
     Label,
     ParagraphClassificationBatch,
+    TokenClassificationBatch,
 )
 import pyarrow as pa
 
@@ -42,13 +43,28 @@ def bytes_to_batch(klass: Any):
 def batch_to_text_classification_arrow(batch: T):
     X = []
     Y = []
-    import pdb
-
-    pdb.set_trace()
     for data in batch.data:
         if data.text:
             X.append(data.text)
             Y.append([f"{label.labelset}/{label.label}" for label in data.labels])
-    data = [pa.array(X), pa.array(Y)]
-    batch = pa.record_batch(data, names=["text", "labels"])
-    return batch
+    if len(X):
+        data = [pa.array(X), pa.array(Y)]
+        output_batch = pa.record_batch(data, names=["text", "labels"])
+    else:
+        output_batch = None
+    return output_batch
+
+
+def batch_to_token_classification_arrow(batch: TokenClassificationBatch):
+    X = []
+    Y = []
+    for data in batch.data:
+        if data.text:
+            X.append(data.text)
+            Y.append([f"{label.labelset}/{label.label}" for label in data.labels])
+    if len(X):
+        data = [pa.array(X), pa.array(Y)]
+        output_batch = pa.record_batch(data, names=["text", "labels"])
+    else:
+        output_batch = None
+    return output_batch

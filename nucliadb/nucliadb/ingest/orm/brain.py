@@ -480,23 +480,6 @@ class ResourceBrain:
                 user_canceled_labels,
             )
 
-        for classification in basic_user_metadata.classifications:
-            if classification.cancelled_by_user is False:
-                label = f"{classification.labelset}/{classification.label}"
-                if label not in user_canceled_labels:
-                    tags["l"].append(label)
-                    relationnodelabel = RelationNode(
-                        value=label,
-                        ntype=RelationNode.NodeType.LABEL,
-                    )
-                    self.brain.relations.append(
-                        Relation(
-                            relation=Relation.ABOUT,
-                            source=relation_node_resource,
-                            to=relationnodelabel,
-                        )
-                    )
-
         if basic_user_fieldmetadata is not None:
             for token in basic_user_fieldmetadata.token:
                 if token.cancelled_by_user is False:

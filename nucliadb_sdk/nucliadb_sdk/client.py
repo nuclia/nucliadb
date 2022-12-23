@@ -2,6 +2,8 @@ from enum import Enum
 from typing import Optional
 
 import httpx
+from nucliadb_models.entities import KnowledgeBoxEntities
+from nucliadb_models.labels import KnowledgeBoxLabels
 import requests
 
 from nucliadb_models.resource import Resource
@@ -25,6 +27,8 @@ CREATE_VECTORSET = "{kburl}/vectorset/{vectorset}"
 VECTORSETS = "{kburl}/vectorsets"
 COUNTER = "{kburl}/counters"
 SEARCH_URL = "{kburl}/search"
+LABELS_URL = "{kburl}/labelset"
+ENTITIES_URL = "{kburl}/entitiesgroups"
 DOWNLOAD_URL = "{kburl}/{uri}"
 
 
@@ -260,6 +264,22 @@ class NucliaDBClient:
         response: httpx.Response = await self.async_reader_session.get(url)
         if response.status_code == 200:
             return KnowledgeboxCounters.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def get_entities(self) -> KnowledgeBoxEntities:
+        url = ENTITIES_URL.format(kburl=self.url)
+        response: httpx.Response = self.reader_session.get(url).json()
+        if response.status_code == 200:
+            return KnowledgeBoxEntities.parse_raw(response.content)
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def get_labels(self) -> KnowledgeBoxLabels:
+        url = LABELS_URL.format(kburl=self.url)
+        response: httpx.Response = self.reader_session.get(url).json()
+        if response.status_code == 200:
+            return KnowledgeBoxLabels.parse_raw(response.content)
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 

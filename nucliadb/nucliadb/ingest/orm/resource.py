@@ -415,6 +415,7 @@ class Resource:
 
     async def get_fields_ids(self, force: bool = False) -> List[Tuple[int, str]]:
         # Get all fields
+        basic = await self.get_basic()
         if len(self.all_fields_keys) == 0 or force:
             result = []
             fields = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
@@ -428,7 +429,14 @@ class Resource:
                 result.append((type_id, field))
 
             for generic in VALID_GLOBAL:
-                result.append((FieldType.GENERIC, generic))
+                # We make sure that title and summary are set to be added
+                append = True
+                if generic == "title" and basic.title == "":
+                    append = False
+                elif generic == "summary" and basic.summary == "":
+                    append = False
+                if append:
+                    result.append((FieldType.GENERIC, generic))
 
             self.all_fields_keys = result
         return self.all_fields_keys

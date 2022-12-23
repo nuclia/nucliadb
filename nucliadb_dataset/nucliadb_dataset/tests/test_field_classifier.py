@@ -7,6 +7,8 @@ from nucliadb_dataset.streamer import Streamer
 from nucliadb_sdk.client import Environment
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 import tempfile
+import pyarrow as pa
+import os
 
 
 def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification):
@@ -23,6 +25,11 @@ def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification
             environment=knowledgebox.client.environment,
         )
         fse.export()
+        files = os.listdir(tmpdirname)
+        for filename in files:
+            with open(f"{tmpdirname}/{filename}", "rb") as source:
+                loaded_array = pa.ipc.open_file(source).read_all()
+                assert len(loaded_array) == 2
 
 
 def test_nucliadb(knowledgebox: KnowledgeBox, upload_data_field_classification):
@@ -57,6 +64,7 @@ def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
         partitions = fse.get_partitions()
         assert len(partitions) == 1
         filename = fse.generate_partition(partitions[0])
-        import pdb
 
-        pdb.set_trace()
+        with open(filename, "rb") as source:
+            loaded_array = pa.ipc.open_file(source).read_all()
+            assert len(loaded_array) == 2

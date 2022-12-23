@@ -69,12 +69,11 @@ async def generate_field_classification_payloads(
 
         tl = TextLabel()
         rid, field_type, field = field_id.split("/")
-        paragraph_text = await get_field_text(kbid, rid, field, field_type)
-        tl.text = paragraph_text
+        tl.text = await get_field_text(kbid, rid, field, field_type)
 
         for label in text_labels:
-            _, _, labelset, label_title = label.split("/")
-            tl.labels.append(Label(labelset=labelset, label=label_title))
+            _, _, labelset_title, label_title = label.split("/")
+            tl.labels.append(Label(labelset=labelset_title, label=label_title))
         batch.data.append(tl)
 
         if len(batch.data) == trainset.batch_size:

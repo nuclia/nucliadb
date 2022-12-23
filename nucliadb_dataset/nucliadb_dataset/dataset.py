@@ -20,10 +20,13 @@
 from typing import Any, Callable, Generator, Iterator, List, Optional, Tuple
 from nucliadb_dataset.mapping import (
     batch_to_text_classification_arrow,
+    batch_to_token_classification_arrow,
     bytes_to_batch,
 )
 from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
-from nucliadb_protos.train_pb2 import TrainSet
+from nucliadb_models.entities import KnowledgeBoxEntities
+from nucliadb_models.labels import KnowledgeBoxLabels
+from nucliadb_protos.train_pb2 import TokenClassificationBatch, TrainSet
 from nucliadb_protos.train_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
@@ -40,6 +43,9 @@ ACTUAL_PARTIITON = "actual_partition"
 
 
 class NucliaDBDataset:
+    labels: Optional[KnowledgeBoxLabels] = None
+    entities: Optional[KnowledgeBoxEntities] = None
+
     def __init__(self, trainset: TrainSet, client: NucliaDBClient, base_path: str):
         self.client = client
         self.trainset = trainset
@@ -54,15 +60,18 @@ class NucliaDBDataset:
         if self.trainset.type == Type.FIELD_CLASSIFICATION:
             self.configure_field_classification()
 
+        if self.trainset.type == Type.TOKEN_CLASSIFICATION:
+            self.configure_token_classification()
+
     def configure_field_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to be only on filter labelset to train")
-        self.labels = self.get_labels()
+        self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
-        if labelset not in self.labels["labelsets"]:
+        if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
 
-        if "RESOURCES" not in self.labels["labelsets"][labelset]["kind"]:
+        if "RESOURCES" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Field Classification")
 
         self.set_mappings(
@@ -80,16 +89,39 @@ class NucliaDBDataset:
             )
         )
 
+    def configure_token_classification(self):
+        if len(self.trainset.filter.labels) != 1:
+            raise Exception("Needs to be only on filter labelset to train")
+        self.entities = self.client.get_entities()
+        for family_group in self.trainset.filter.labels:
+            if family_group not in self.entities.groups:
+                raise Exception("Family group is not valid")
+
+        self.set_mappings(
+            [
+                bytes_to_batch(TokenClassificationBatch),
+                batch_to_token_classification_arrow,
+            ]
+        )
+        self.set_schema(
+            pa.schema(
+                [
+                    pa.field("text", pa.list_(pa.string())),
+                    pa.field("labels", pa.list_(pa.string())),
+                ]
+            )
+        )
+
     def configure_paragraph_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to be only on filter labelset to train")
-        self.labels = self.get_labels()
+        self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
 
-        if labelset not in self.labels["labelsets"]:
+        if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
 
-        if "PRAGRAPHS" not in self.labels["labelsets"][labelset]["kind"]:
+        if "PRAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")
 
         self.set_mappings(
@@ -106,9 +138,6 @@ class NucliaDBDataset:
                 ]
             )
         )
-
-    def get_labels(self):
-        return self.client.reader_session.get(f"{self.base_url}/labelsets").json()
 
     def get_partitions(self):
         partitions = self.client.reader_session.get(f"{self.base_url}/trainset").json()
@@ -137,6 +166,8 @@ class NucliaDBDataset:
                 for batch in self.streamer:
                     print(f"\r {counter}")
                     batch = self.map(batch)
+                    if batch is None:
+                        break
                     writer.write(batch)
                     counter += 1
         print("-" * 10)

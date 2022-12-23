@@ -54,6 +54,6 @@ class Streamer:
 
     def __next__(self) -> Tuple[Any, Any]:
         payload = self.read()
-        if payload is None:
+        if payload in [None, b""]:
             raise StopIteration
         return payload
