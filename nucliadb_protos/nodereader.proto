@@ -289,7 +289,7 @@ message RelationSearchRequest {
 }
 
 message RelationBFSResponse {
-    repeated utils.RelationNode nodes = 1;
+    repeated utils.Relation subgraph = 1;
 }
 message RelationPrefixResponse {
     repeated utils.RelationNode nodes = 1;

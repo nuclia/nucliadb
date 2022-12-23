@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::{HashSet, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList};
 
 use super::errors::*;
 use crate::relations::graph_db::*;
@@ -94,6 +94,7 @@ where Guide: BfsGuide
         Ok(self.subgraph.into_iter())
     }
     fn expand(&mut self, node: BfsNode) -> RResult<()> {
+        let mut nodes = HashMap::new();
         self.graph
             .get_outedges(self.txn, node.point)?
             .flat_map(|a| a.ok().into_iter())
@@ -101,15 +102,13 @@ where Guide: BfsGuide
             .filter(|edge| self.guide.edge_allowed(edge.edge()))
             .filter(|edge| self.guide.node_allowed(edge.to()))
             .for_each(|edge| {
+                let node = BfsNode {
+                    point: edge.to(),
+                    depth: node.depth + (!self.guide.free_jump(edge) as usize),
+                };
+                let entry = nodes.entry(edge.to()).or_insert(node);
+                entry.depth = std::cmp::min(entry.depth, node.depth);
                 self.subgraph.insert(edge);
-                if !self.visited.contains(&edge.to()) {
-                    let node = BfsNode {
-                        point: edge.to(),
-                        depth: node.depth + (!self.guide.free_jump(edge) as usize),
-                    };
-                    self.visited.insert(node.point);
-                    self.work_stack.push_back(node);
-                }
             });
         self.graph
             .get_inedges(self.txn, node.point)?
@@ -118,16 +117,24 @@ where Guide: BfsGuide
             .filter(|edge| self.guide.edge_allowed(edge.edge()))
             .filter(|edge| self.guide.node_allowed(edge.from()))
             .for_each(|edge| {
+                let node = BfsNode {
+                    point: edge.to(),
+                    depth: node.depth + (!self.guide.free_jump(edge) as usize),
+                };
+                let entry = nodes.entry(edge.to()).or_insert(node);
+                entry.depth = std::cmp::min(entry.depth, node.depth);
                 self.subgraph.insert(edge);
-                if !self.visited.contains(&edge.from()) {
-                    let node = BfsNode {
-                        point: edge.from(),
-                        depth: node.depth + (!self.guide.free_jump(edge) as usize),
-                    };
-                    self.visited.insert(node.point);
-                    self.work_stack.push_back(node);
-                }
             });
+        nodes.into_values().for_each(|node| {
+            if !self.visited.contains(&node.point) {
+                let node = BfsNode {
+                    point: node.point,
+                    depth: node.depth,
+                };
+                self.visited.insert(node.point);
+                self.work_stack.push_back(node);
+            }
+        });
         Ok(())
     }
 }

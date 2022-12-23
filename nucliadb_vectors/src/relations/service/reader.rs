@@ -94,56 +94,44 @@ impl RelationsReaderService {
             info!("{id:?} - adding query type filters: ends {v} ms");
         }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - running the search: starts {v} ms");
+        }
         let guide = GrpcGuide {
             node_filters,
             edge_filters,
             reader: &reader,
             jump_always: dictionary::SYNONYM,
         };
+        let mut subgraph = vec![];
+        for i in reader.search(guide, depth, entry_points)? {
+            let from = reader.get_node(i.from()).map(|node| RelationNode {
+                value: node.name().to_string(),
+                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                ntype: string_to_node_type(node.xtype()) as i32,
+            })?;
 
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - running the search: starts {v} ms");
+            let to = reader.get_node(i.to()).map(|node| RelationNode {
+                value: node.name().to_string(),
+                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                ntype: string_to_node_type(node.xtype()) as i32,
+            })?;
+            let relation = reader.get_edge(i.edge()).map(|edge| Relation {
+                to: Some(to),
+                source: Some(from),
+                relation: string_to_rtype(edge.xtype()) as i32,
+                relation_label: edge.subtype().map(|s| s.to_string()).unwrap_or_default(),
+            })?;
+            subgraph.push(relation);
         }
-        let results = reader.search(guide, depth, entry_points)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - running the search: ends {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - producing results: starts {v} ms");
-        }
-        let mut found = HashSet::new();
-        let mut nodes = vec![];
-        for i in results {
-            if !found.contains(&i.from()) {
-                let from = reader.get_node(i.from()).map(|node| RelationNode {
-                    value: node.name().to_string(),
-                    subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                    ntype: string_to_node_type(node.xtype()) as i32,
-                })?;
-                nodes.push(from);
-                found.insert(i.from());
-            }
-            if !found.contains(&i.to()) {
-                let to = reader.get_node(i.to()).map(|node| RelationNode {
-                    value: node.name().to_string(),
-                    subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                    ntype: string_to_node_type(node.xtype()) as i32,
-                })?;
-                nodes.push(to);
-                found.insert(i.to());
-            }
-        }
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - producing results: ends {v} ms");
-        }
-
-        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        Ok(Some(RelationBfsResponse {
-            nodes: nodes.into_iter().collect(),
-        }))
+        Ok(Some(RelationBfsResponse { subgraph }))
     }
     #[tracing::instrument(skip_all)]
     fn prefix_search(

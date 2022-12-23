@@ -799,15 +799,15 @@ global___RelationSearchRequest = RelationSearchRequest
 class RelationBFSResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NODES_FIELD_NUMBER: builtins.int
+    SUBGRAPH_FIELD_NUMBER: builtins.int
     @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
+    def subgraph(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
     def __init__(
         self,
         *,
-        nodes: collections.abc.Iterable[nucliadb_protos.utils_pb2.RelationNode] | None = ...,
+        subgraph: collections.abc.Iterable[nucliadb_protos.utils_pb2.Relation] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["nodes", b"nodes"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["subgraph", b"subgraph"]) -> None: ...
 
 global___RelationBFSResponse = RelationBFSResponse
 

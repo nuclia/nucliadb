@@ -348,7 +348,7 @@ pub struct RelationSearchRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationBfsResponse {
     #[prost(message, repeated, tag="1")]
-    pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
+    pub subgraph: ::prost::alloc::vec::Vec<super::utils::Relation>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationPrefixResponse {
