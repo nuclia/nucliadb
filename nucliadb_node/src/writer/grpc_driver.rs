@@ -164,7 +164,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.0.write().await;
         let result = writer.set_resource(&shard_id, &resource);
         std::mem::drop(writer);
-        match result {
+        match result.transpose() {
             Some(Ok(count)) => {
                 info!("Set resource ends correctly");
                 let status = OpStatus {
@@ -202,7 +202,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.delete_relation_nodes(shard_id, &request) {
+        match writer.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -232,7 +232,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
         let mut writer = self.0.write().await;
-        match writer.join_relations_graph(&shard_id, &graph) {
+        match writer.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -271,7 +271,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let result = writer.remove_resource(&shard_id, &resource);
         std::mem::drop(writer);
 
-        match result {
+        match result.transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -308,7 +308,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.add_vectorset(shard_id, &request) {
+        match writer.add_vectorset(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("add_vector_set ends correctly");
                 let status = OpStatus {
@@ -339,7 +339,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.remove_vectorset(shard_id, &request) {
+        match writer.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("remove_vector_set ends correctly");
                 let status = OpStatus {
@@ -369,7 +369,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let shard_id = request.into_inner();
         let reader = self.0.read().await;
-        match reader.list_vectorsets(&shard_id) {
+        match reader.list_vectorsets(&shard_id).transpose() {
             Some(Ok(list)) => {
                 info!("list_vectorset ends correctly");
                 let list = VectorSetList {
@@ -398,7 +398,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.0.write().await;
         let result = writer.gc(&shard_id);
         std::mem::drop(writer);
-        match result {
+        match result.transpose() {
             Some(Ok(_)) => {
                 info!("Garbage collection at {} was successful", shard_id.id);
                 let resp = EmptyResponse {};

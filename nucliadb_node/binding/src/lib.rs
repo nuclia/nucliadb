@@ -94,7 +94,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.search(&shard_id, search_request);
-        match response {
+        match response.transpose()  {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -108,7 +108,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.suggest(&shard_id, suggest_request);
-        match response {
+        match response.transpose()  {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -122,7 +122,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.vector_search(&shard_id, vector_request);
-        match response {
+        match response.transpose()  {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -140,7 +140,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.document_search(&shard_id, document_request);
-        match response {
+        match response.transpose() {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -158,7 +158,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.paragraph_search(&shard_id, paragraph_request);
-        match response {
+        match response.transpose()  {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -176,7 +176,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.relation_search(&shard_id, paragraph_request);
-        match response {
+        match response.transpose()  {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -248,7 +248,7 @@ impl NodeWriter {
             id: resource.shard_id.clone(),
         };
         self.writer.load_shard(&shard_id);
-        match self.writer.set_resource(&shard_id, &resource) {
+        match self.writer.set_resource(&shard_id, &resource).transpose() {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -286,7 +286,11 @@ impl NodeWriter {
             id: resource.shard_id.clone(),
         };
         self.writer.load_shard(&shard_id);
-        match self.writer.remove_resource(&shard_id, &resource) {
+        match self
+            .writer
+            .remove_resource(&shard_id, &resource)
+            .transpose()
+        {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -319,7 +323,11 @@ impl NodeWriter {
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
         self.writer.load_shard(&shard_id);
-        match self.writer.join_relations_graph(&shard_id, &graph) {
+        match self
+            .writer
+            .join_relations_graph(&shard_id, &graph)
+            .transpose()
+        {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -355,7 +363,11 @@ impl NodeWriter {
         let nodes = DeleteGraphNodes::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = nodes.shard_id.as_ref().unwrap();
         self.writer.load_shard(shard_id);
-        match self.writer.delete_relation_nodes(shard_id, &nodes) {
+        match self
+            .writer
+            .delete_relation_nodes(shard_id, &nodes)
+            .transpose()
+        {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -386,7 +398,7 @@ impl NodeWriter {
     pub fn get_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
         self.writer.load_shard(&shard_id);
-        match self.writer.list_vectorsets(&shard_id) {
+        match self.writer.list_vectorsets(&shard_id).transpose() {
             Some(Err(_)) => Err(exceptions::PyTypeError::new_err("Not found")),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard ")),
             Some(Ok(list)) => {
@@ -403,7 +415,7 @@ impl NodeWriter {
         let vectorset = VectorSetId::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = vectorset.shard.as_ref().unwrap();
         self.writer.load_shard(shard_id);
-        match self.writer.add_vectorset(shard_id, &vectorset) {
+        match self.writer.add_vectorset(shard_id, &vectorset).transpose() {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -435,7 +447,11 @@ impl NodeWriter {
         let vectorset = VectorSetId::decode(&mut Cursor::new(request)).unwrap();
         let shard_id = vectorset.shard.as_ref().unwrap();
         self.writer.load_shard(shard_id);
-        match self.writer.remove_vectorset(shard_id, &vectorset) {
+        match self
+            .writer
+            .remove_vectorset(shard_id, &vectorset)
+            .transpose()
+        {
             Some(Ok(count)) => {
                 let status = OpStatus {
                     status: 0,
@@ -466,7 +482,7 @@ impl NodeWriter {
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
         self.writer.load_shard(&shard_id);
-        match self.writer.gc(&shard_id) {
+        match self.writer.gc(&shard_id).transpose() {
             Some(Ok(_)) => {
                 let status = OpStatus {
                     status: 0,

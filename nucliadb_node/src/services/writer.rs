@@ -93,26 +93,46 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: shard_path.join("relations"),
         };
+
         let config = ShardConfig::new(shard_path);
-        let mut fields = None;
-        let mut paragraphs = None;
-        let mut vectors = None;
-        let mut relations = None;
+        let text_task = move || Some(fields::create_writer(&fsc, config.version_fields));
+        let paragraph_task =
+            move || Some(paragraphs::create_writer(&psc, config.version_paragraphs));
+        let vector_task = move || Some(vectors::create_writer(&vsc, config.version_vectors));
+        let relation_task = move || Some(relations::create_writer(&rsc, config.version_relations));
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text create");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph create");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector create");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation create");
+        let relation_task = || run_with_telemetry(info, relation_task);
+
+        let mut text_result = None;
+        let mut paragraph_result = None;
+        let mut vector_result = None;
+        let mut relation_result = None;
         rayon::scope(|s| {
-            s.spawn(|_| fields = Some(fields::create_writer(&fsc, config.version_fields)));
-            s.spawn(|_| vectors = Some(vectors::create_writer(&vsc, config.version_vectors)));
-            s.spawn(|_| relations = Some(relations::create_writer(&rsc, config.version_relations)));
-            s.spawn(|_| {
-                paragraphs = Some(paragraphs::create_writer(&psc, config.version_paragraphs))
-            });
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
         });
+
+        let fields = text_result.transpose()?;
+        let paragraphs = paragraph_result.transpose()?;
+        let vectors = vector_result.transpose()?;
+        let relations = relation_result.transpose()?;
 
         Ok(ShardWriterService {
             id,
-            field_writer: fields.transpose()?.unwrap(),
-            paragraph_writer: paragraphs.transpose()?.unwrap(),
-            vector_writer: vectors.transpose()?.unwrap(),
-            relation_writer: relations.transpose()?.unwrap(),
+            field_writer: fields.unwrap(),
+            paragraph_writer: paragraphs.unwrap(),
+            vector_writer: vectors.unwrap(),
+            relation_writer: relations.unwrap(),
             document_service_version: config.version_fields as i32,
             paragraph_service_version: config.version_paragraphs as i32,
             vector_service_version: config.version_vectors as i32,
@@ -138,25 +158,44 @@ impl ShardWriterService {
             path: shard_path.join("relations"),
         };
         let config = ShardConfig::new(shard_path);
-        let mut fields = None;
-        let mut paragraphs = None;
-        let mut vectors = None;
-        let mut relations = None;
+
+        let text_task = move || Some(fields::open_writer(&fsc, config.version_fields));
+        let paragraph_task = move || Some(paragraphs::open_writer(&psc, config.version_paragraphs));
+        let vector_task = move || Some(vectors::open_writer(&vsc, config.version_vectors));
+        let relation_task = move || Some(relations::open_writer(&rsc, config.version_relations));
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text open");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph open");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector open");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation open");
+        let relation_task = || run_with_telemetry(info, relation_task);
+
+        let mut text_result = None;
+        let mut paragraph_result = None;
+        let mut vector_result = None;
+        let mut relation_result = None;
         rayon::scope(|s| {
-            s.spawn(|_| fields = Some(fields::open_writer(&fsc, config.version_fields)));
-            s.spawn(|_| vectors = Some(vectors::open_writer(&vsc, config.version_vectors)));
-            s.spawn(|_| relations = Some(relations::open_writer(&rsc, config.version_relations)));
-            s.spawn(|_| {
-                paragraphs = Some(paragraphs::open_writer(&psc, config.version_paragraphs))
-            });
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
         });
+
+        let fields = text_result.transpose()?;
+        let paragraphs = paragraph_result.transpose()?;
+        let vectors = vector_result.transpose()?;
+        let relations = relation_result.transpose()?;
 
         Ok(ShardWriterService {
             id,
-            field_writer: fields.transpose()?.unwrap(),
-            paragraph_writer: paragraphs.transpose()?.unwrap(),
-            vector_writer: vectors.transpose()?.unwrap(),
-            relation_writer: relations.transpose()?.unwrap(),
+            field_writer: fields.unwrap(),
+            paragraph_writer: paragraphs.unwrap(),
+            vector_writer: vectors.unwrap(),
+            relation_writer: relations.unwrap(),
             document_service_version: config.version_fields as i32,
             paragraph_service_version: config.version_paragraphs as i32,
             vector_service_version: config.version_vectors as i32,
@@ -170,27 +209,43 @@ impl ShardWriterService {
         let paragraphs = self.paragraph_writer.clone();
         let vectors = self.vector_writer.clone();
         let relations = self.relation_writer.clone();
-        let mut field_r = Ok(());
-        let mut paragraph_r = Ok(());
-        let mut vector_r = Ok(());
-        let mut relation_r = Ok(());
-        rayon::scope(|s| {
-            s.spawn(|_| field_r = fields.write().unwrap().stop());
-            s.spawn(|_| paragraph_r = paragraphs.write().unwrap().stop());
-            s.spawn(|_| vector_r = vectors.write().unwrap().stop());
-            s.spawn(|_| relation_r = relations.write().unwrap().stop());
-        });
-        if let Err(e) = field_r {
-            error!("Error stopping the field writer service: {}", e);
-        }
-        if let Err(e) = paragraph_r {
-            error!("Error stopping the paragraph writer service: {}", e);
-        }
 
-        if let Err(e) = vector_r {
+        let text_task = move || fields.write().unwrap().stop();
+        let paragraph_task = move || paragraphs.write().unwrap().stop();
+        let vector_task = move || vectors.write().unwrap().stop();
+        let relation_task = move || relations.write().unwrap().stop();
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text stop");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph stop");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector stop");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation stop");
+        let relation_task = || run_with_telemetry(info, relation_task);
+
+        let mut text_result = Ok(());
+        let mut paragraph_result = Ok(());
+        let mut vector_result = Ok(());
+        let mut relation_result = Ok(());
+        rayon::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
+        });
+
+        if let Err(e) = text_result {
+            error!("Error stopping the Field writer service: {}", e);
+        }
+        if let Err(e) = paragraph_result {
+            error!("Error stopping the Paragraph writer service: {}", e);
+        }
+        if let Err(e) = vector_result {
             error!("Error stopping the Vector writer service: {}", e);
         }
-        if let Err(e) = relation_r {
+        if let Err(e) = relation_result {
             error!("Error stopping the Relation writer service: {}", e);
         }
         info!("Shard stopped {}...", { &self.id });
@@ -200,48 +255,30 @@ impl ShardWriterService {
     pub fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
         let field_writer_service = self.field_writer.clone();
         let field_resource = resource.clone();
-        let span = tracing::Span::current();
         let text_task = move || {
             info!("Field service starts set_resource");
-            let result = run_with_telemetry(
-                info_span!(parent: &span, "field writer set resource"),
-                || {
-                    let mut writer = field_writer_service.write().unwrap();
-                    writer.set_resource(&field_resource)
-                },
-            );
+            let mut writer = field_writer_service.write().unwrap();
+            let result = writer.set_resource(&field_resource);
             info!("Field service ends set_resource");
             result
         };
 
         let paragraph_resource = resource.clone();
         let paragraph_writer_service = self.paragraph_writer.clone();
-        let span = tracing::Span::current();
         let paragraph_task = move || {
             info!("Paragraph service starts set_resource");
-            let result = run_with_telemetry(
-                info_span!(parent: &span, "paragraph writer set resource"),
-                || {
-                    let mut writer = paragraph_writer_service.write().unwrap();
-                    writer.set_resource(&paragraph_resource)
-                },
-            );
+            let mut writer = paragraph_writer_service.write().unwrap();
+            let result = writer.set_resource(&paragraph_resource);
             info!("Paragraph service ends set_resource");
             result
         };
 
         let vector_writer_service = self.vector_writer.clone();
         let vector_resource = resource.clone();
-        let span = tracing::Span::current();
         let vector_task = move || {
             info!("Vector service starts set_resource");
-            let result = run_with_telemetry(
-                info_span!(parent: &span, "vector writer set resource"),
-                || {
-                    let mut writer = vector_writer_service.write().unwrap();
-                    writer.set_resource(&vector_resource)
-                },
-            );
+            let mut writer = vector_writer_service.write().unwrap();
+            let result = writer.set_resource(&vector_resource);
             info!("Vector service ends set_resource");
             result
         };
@@ -255,6 +292,16 @@ impl ShardWriterService {
             info!("Relation service ends set_resource");
             result
         };
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text set_resource");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph set_resource");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector set_resource");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation set_resource");
+        let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
@@ -270,6 +317,7 @@ impl ShardWriterService {
         text_result?;
         paragraph_result?;
         vector_result?;
+        relation_result?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]
@@ -298,6 +346,16 @@ impl ShardWriterService {
             let mut writer = relation_writer_service.write().unwrap();
             writer.delete_resource(&relation_resource)
         };
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text remove");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph remove");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector remove");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation remove");
+        let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut text_result = Ok(());
         let mut paragraph_result = Ok(());
