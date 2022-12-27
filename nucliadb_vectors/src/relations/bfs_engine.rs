@@ -107,19 +107,21 @@ where Guide: BfsGuide
             .filter(|edge| self.guide.edge_allowed(edge.edge()))
             .filter(|edge| self.guide.node_allowed(edge.to()))
             .for_each(|edge| {
-                if self.guide.free_jump(edge) {
+                let is_free_jump = self.guide.free_jump(edge);
+                let can_use_free_jump = same_level.contains_key(&node.point);
+                if !is_free_jump && !can_use_free_jump {
+                    let node = BfsNode {
+                        point: edge.to(),
+                        depth: node.depth + 1,
+                    };
+                    next_level.insert(node.point, node);
+                } else if is_free_jump {
                     let node = BfsNode {
                         point: edge.to(),
                         depth: node.depth,
                     };
                     next_level.remove(&node.point);
                     same_level.insert(node.point, node);
-                } else if !same_level.contains_key(&node.point) {
-                    let node = BfsNode {
-                        point: edge.to(),
-                        depth: node.depth + 1,
-                    };
-                    next_level.insert(node.point, node);
                 }
                 self.subgraph.insert(edge);
             });
