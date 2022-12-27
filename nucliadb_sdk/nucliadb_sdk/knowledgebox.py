@@ -266,6 +266,16 @@ class KnowledgeBox:
         )
         assert resp.status_code == 200
 
+    def set_entities(self, entity_group: str, entities: List[str]):
+        resp = self.client.writer_session.post(
+            f"{self.client.url}/entitiesgroup/{entity_group}",
+            json={
+                "title": entity_group,
+                "entities": {entity: {"value": entity} for entity in entities},
+            },
+        )
+        assert resp.status_code == 200
+
     def search(
         self,
         text: Optional[str] = None,

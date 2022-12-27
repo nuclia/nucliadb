@@ -35,6 +35,7 @@ from nucliadb_protos.resources_pb2 import (
     Origin,
     Paragraph,
     UserFieldMetadata,
+    UserMetadata,
 )
 from nucliadb_protos.utils_pb2 import (
     Relation,
@@ -47,7 +48,6 @@ from nucliadb_protos.utils_pb2 import (
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
 from nucliadb.ingest.orm.utils import compute_paragraph_key
-from nucliadb_models.metadata import UserMetadata
 
 if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]

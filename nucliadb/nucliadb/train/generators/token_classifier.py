@@ -19,15 +19,14 @@
 #
 
 from collections import OrderedDict
-from typing import AsyncIterator, Dict, List, Tuple, Union
+from typing import AsyncIterator, Dict, List, Tuple, cast
 
-from nucliadb_protos.nodereader_pb2 import StreamRequest
-from nucliadb_protos.train_pb2 import (
-    ParagraphClassificationBatch,
+from nucliadb_protos.dataset_pb2 import (
     TokenClassificationBatch,
     TokensClassification,
     TrainSet,
 )
+from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_REVERSE
@@ -46,7 +45,7 @@ async def get_field_text(
 
     if orm_resource is None:
         logger.error(f"{rid} does not exist on DB")
-        return ""
+        return {}, {}, {}
 
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
@@ -55,7 +54,7 @@ async def get_field_text(
         logger.warn(
             f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
         )
-        return ""
+        return {}, {}, {}
 
     split_text: Dict[str, str] = extracted_text.split_text
     split_text[MAIN] = extracted_text.text
@@ -66,35 +65,35 @@ async def get_field_text(
     split_ners[MAIN] = {}
 
     basic_data = await orm_resource.get_basic()
-    invalid_tokens = []
-    invalid_tokens_split: Dict[str, List[str]] = {}
+    invalid_tokens_split: Dict[str, List[Tuple[str, str, int, int]]] = {}
     # Check user definition of entities
-    for userfieldmetadata in basic_data.fieldmetadata:
-        if (
-            userfieldmetadata.field.field == field
-            and userfieldmetadata.field.field_type == field_type_int
-        ):
-            for token in userfieldmetadata.token:
-                if token.klass in valid_entity_groups:
-                    if token.cancelled_by_user:
-                        if token.split in (None, ""):
-                            split = MAIN
+    if basic_data is not None:
+        for userfieldmetadata in basic_data.fieldmetadata:
+            if (
+                userfieldmetadata.field.field == field
+                and userfieldmetadata.field.field_type == field_type_int
+            ):
+                for token in userfieldmetadata.token:
+                    if token.klass in valid_entity_groups:
+                        if token.cancelled_by_user:
+                            if token.split in (None, ""):
+                                split = MAIN
+                            else:
+                                split = token.split
+                            invalid_tokens_split[split].append(
+                                (token.klass, token.token, token.start, token.end)
+                            )
                         else:
-                            split = token.split
-                        invalid_tokens_split[split].append(
-                            (token.klass, token.token, token.start, token.end)
-                        )
-                    else:
-                        if token.split in (None, ""):
-                            split = MAIN
-                        else:
-                            split = token.split
-                        split_ners[split].setdefault(token.klass, {}).setdefault(
-                            token.token, []
-                        )
-                        split_ners[split][token.klass][token.token].append(
-                            (token.start, token.end)
-                        )
+                            if token.split in (None, ""):
+                                split = MAIN
+                            else:
+                                split = token.split
+                            split_ners[split].setdefault(token.klass, {}).setdefault(
+                                token.token, []
+                            )
+                            split_ners[split][token.klass][token.token].append(
+                                (token.start, token.end)
+                            )
 
     field_metadata = await field_obj.get_field_metadata()
     # Check computed definition of entities
@@ -211,7 +210,7 @@ async def generate_token_classification_payloads(
     trainset: TrainSet,
     node: Node,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncIterator[TokenClassificationBatch]:
 
     # Query how many paragraphs has each label
     request = StreamRequest()
@@ -222,12 +221,16 @@ async def generate_token_classification_payloads(
     batch = TokenClassificationBatch()
     async for field_item in node.stream_get_fields(request):
         _, field_type, field = field_item.field.split("/")
-        (split_text, split_ners, split_paragaphs,) = await get_field_text(
-            kbid, field_item.uuid, field, field_type, trainset.filter.labels
+        (split_text, ordered_positions, split_paragaphs,) = await get_field_text(
+            kbid,
+            field_item.uuid,
+            field,
+            field_type,
+            cast(List[str], trainset.filter.labels),
         )
 
         for split, text in split_text.items():
-            ners = split_ners.get(split, {})
+            ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
             paragraphs = split_paragaphs.get(split, [])
 
             for segments in process_entities(text, ners, paragraphs):

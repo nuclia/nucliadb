@@ -120,7 +120,7 @@ class LocalReaderWrapper:
         self, stream_request: StreamRequest
     ) -> AsyncIterator[DocumentItem]:
         loop = asyncio.get_running_loop()
-        q = asyncio.Queue(1)
+        q: asyncio.Queue[DocumentItem] = asyncio.Queue(1)
         exception = None
         _END = object()
 
@@ -160,7 +160,7 @@ class LocalReaderWrapper:
     ) -> AsyncIterator[ParagraphItem]:
 
         loop = asyncio.get_running_loop()
-        q = asyncio.Queue(1)
+        q: asyncio.Queue[ParagraphItem] = asyncio.Queue(1)
         exception = None
         _END = object()
 

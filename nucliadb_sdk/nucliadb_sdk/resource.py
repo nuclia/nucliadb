@@ -1,5 +1,5 @@
 import base64
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, cast
 from uuid import uuid4
 
 from nucliadb_models.common import Classification, FieldID
@@ -250,48 +250,51 @@ def from_resource_to_payload(
 
     if item.data is not None and item.data.texts is not None:
         for field, field_payload in item.data.texts.items():
-            payload.texts[field] = TextField(
-                body=field_payload.value.body, format=field_payload.value.format
-            )
+            if field_payload is not None and field_payload.value is not None:
+                payload.texts[cast(FieldIdString, field)] = TextField(
+                    body=field_payload.value.body, format=field_payload.value.format
+                )
 
     if item.data is not None and item.data.links is not None:
-        for field, field_payload in item.data.links.items():
-            payload.links[field] = LinkField(
-                uri=field_payload.value.uri,
-                headers=field_payload.value.headers,
-                cookies=field_payload.value.cookies,
-                language=field_payload.value.language,
-                localstorage=field_payload.value.localstorage,
-            )
+        for field, link_payload in item.data.links.items():
+            if link_payload is not None and link_payload.value is not None:
+                payload.links[cast(FieldIdString, field)] = LinkField(
+                    uri=link_payload.value.uri,
+                    headers=link_payload.value.headers,
+                    cookies=link_payload.value.cookies,
+                    language=link_payload.value.language,
+                    localstorage=link_payload.value.localstorage,
+                )
 
-    if item.data is not None:
-        for field, field_payload in item.data.files.items():
-            if field_payload.value is not None:
-                data = download(uri=field_payload.value.file.uri)
-                payload.files[field] = FileField(
-                    language=field_payload.value.language,
-                    password=field_payload.value.password,
+    if item.data is not None and item.data.files is not None:
+        for field, file_payload in item.data.files.items():
+            if (
+                file_payload.value is not None
+                and file_payload.value is not None
+                and file_payload.value.file is not None
+                and file_payload.value.file.uri is not None
+            ):
+                data = download(file_payload.value.file.uri)
+                payload.files[cast(FieldIdString, field)] = FileField(
+                    language=file_payload.value.language,
+                    password=file_payload.value.password,
                     file=NDBModelsFile(
                         payload=base64.b64encode(data),
-                        filename=field_payload.value.file.filename,
-                        content_type=field_payload.value.file.content_type,
+                        filename=file_payload.value.file.filename,
+                        content_type=file_payload.value.file.content_type,
                     ),
                 )
 
     if item.data is not None and item.data.layouts is not None:
-        for field, field_payload in item.data.layouts.items():
-            raise NotImplementedError()
+        raise NotImplementedError()
 
     if item.data is not None and item.data.conversations is not None:
-        for field, field_payload in item.data.conversations.items():
-            raise NotImplementedError()
+        raise NotImplementedError()
 
     if item.data is not None and item.data.keywordsets is not None:
-        for field, field_payload in item.data.keywordsets.items():
-            raise NotImplementedError()
+        raise NotImplementedError()
 
     if item.data is not None and item.data.datetimes is not None:
-        for field, field_payload in item.data.datetimes.items():
-            raise NotImplementedError()
+        raise NotImplementedError()
 
     return payload

@@ -75,7 +75,7 @@ class TrainNodesManager:
                 shard_id = shard_object.replicas[node].shard.id
                 break
 
-        if node_obj is None or node_id is None:
+        if node_obj is None or node_id is None or shard_id is None:
             raise KeyError("Could not find a node to query")
 
         return node_obj, shard_id

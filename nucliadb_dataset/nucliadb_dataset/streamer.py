@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Optional, Tuple
+from typing import Optional
 
 import requests
-from nucliadb_protos.train_pb2 import TrainSet
+from nucliadb_protos.dataset_pb2 import TrainSet
 from urllib3.exceptions import ProtocolError
 
 from nucliadb_sdk.client import NucliaDBClient
@@ -33,7 +33,7 @@ class StreamerAlreadyRunning(Exception):
 
 
 class Streamer:
-    resp: requests.Response
+    resp: Optional[requests.Response]
     client: NucliaDBClient
 
     def __init__(self, trainset: TrainSet, client: NucliaDBClient):
@@ -61,6 +61,8 @@ class Streamer:
         return self
 
     def read(self) -> Optional[bytes]:
+        if self.resp is None:
+            raise Exception("Not initialized")
         try:
             header = self.resp.raw.read(4, decode_content=True)
             payload_size = int.from_bytes(header, byteorder="big", signed=False)
@@ -69,7 +71,7 @@ class Streamer:
             data = None
         return data
 
-    def __next__(self) -> Tuple[Any, Any]:
+    def __next__(self) -> Optional[bytes]:
         payload = self.read()
         if payload in [None, b""]:
             raise StopIteration

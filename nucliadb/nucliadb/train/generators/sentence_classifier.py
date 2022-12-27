@@ -20,15 +20,13 @@
 
 from typing import AsyncIterator, List
 
-from nucliadb_protos.nodereader_pb2 import StreamRequest
-from nucliadb_protos.train_pb2 import (
+from nucliadb_protos.dataset_pb2 import (
     Label,
     MultipleTextSameLabels,
-    ParagraphClassificationBatch,
     SentenceClassificationBatch,
-    TextLabel,
     TrainSet,
 )
+from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_REVERSE
@@ -36,24 +34,20 @@ from nucliadb.train import logger
 from nucliadb.train.generators.utils import get_resource_from_cache
 
 
-async def get_sentences(kbid: str, result: str) -> str:
+async def get_sentences(kbid: str, result: str) -> List[str]:
 
     if result.count("/") == 5:
-        rid, field_type, field, split_str, start_end = result.split("/")
+        rid, field_type, field, split_str, _ = result.split("/")
         split = int(split_str)
-        start_str, end_str = start_end.split("-")
     else:
-        rid, field_type, field, start_end = result.split("/")
+        rid, field_type, field, _ = result.split("/")
         split = None
-        start_str, end_str = start_end.split("-")
-    start = int(start_str)
-    end = int(end_str)
 
     orm_resource = await get_resource_from_cache(kbid, rid)
 
     if orm_resource is None:
         logger.error(f"{rid} does not exist on DB")
-        return ""
+        return []
 
     field_type_int = KB_REVERSE[field_type]
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
@@ -63,7 +57,7 @@ async def get_sentences(kbid: str, result: str) -> str:
         logger.warn(
             f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
         )
-        return ""
+        return []
 
     splitted_texts = []
 
@@ -96,7 +90,7 @@ async def generate_sentence_classification_payloads(
     trainset: TrainSet,
     node: Node,
     shard_replica_id: str,
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncIterator[SentenceClassificationBatch]:
 
     labelsets = []
     # Query how many paragraphs has each label
@@ -120,7 +114,7 @@ async def generate_sentence_classification_payloads(
         sentences_text = await get_sentences(kbid, paragraph_item.id)
 
         for sentence_text in sentences_text:
-            tl.text.append = sentence_text
+            tl.text.append(sentence_text)
         for label in text_labels:
             _, _, labelset, label_title = label.split("/")
             tl.labels.append(Label(labelset=labelset, label=label_title))

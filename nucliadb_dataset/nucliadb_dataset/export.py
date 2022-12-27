@@ -20,7 +20,7 @@
 from typing import Optional
 
 import requests
-from nucliadb_protos.train_pb2 import TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TrainSet, Type
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_sdk.client import Environment, NucliaDBClient
@@ -83,7 +83,7 @@ class FileSystemExport:
         service_token: Optional[str] = None,
     ):
         self.client = NucliaDBClient(
-            environment=environment, url=nucliadb_kb_url, service_token=service_token
+            environment=environment, url=nucliadb_kb_url, api_key=service_token
         )
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=store_path

@@ -20,17 +20,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
-from nucliadb_protos.nodereader_pb2 import (  # type: ignore
-    DocumentItem,
-    GetShardRequest,
-    ParagraphItem,
-    StreamRequest,
-)
+from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard

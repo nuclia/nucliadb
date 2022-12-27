@@ -20,13 +20,13 @@
 
 from typing import AsyncIterator
 
-from nucliadb_protos.nodereader_pb2 import StreamRequest
-from nucliadb_protos.train_pb2 import (
+from nucliadb_protos.dataset_pb2 import (
     Label,
     ParagraphClassificationBatch,
     TextLabel,
     TrainSet,
 )
+from nucliadb_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_REVERSE

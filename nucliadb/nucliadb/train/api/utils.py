@@ -19,22 +19,26 @@
 #
 
 
-from nucliadb_protos.train_pb2 import TrainSet
+from typing import Optional
+
+from nucliadb_protos.dataset_pb2 import TrainSet
 
 from nucliadb.train.utils import get_nodes_manager
 
 
-async def get_kb_partitions(kbid: str, prefix: str):
+async def get_kb_partitions(kbid: str, prefix: Optional[str] = None):
     nodes_manager = get_nodes_manager()
     shards = await nodes_manager.get_shards_by_kbid_inner(kbid=kbid)
     valid_shards = []
+    if prefix is None:
+        prefix = ""
     for shard in shards.shards:
         if shard.shard.startswith(prefix):
             valid_shards.append(shard.shard)
     return valid_shards
 
 
-def get_train(trainset: str) -> TrainSet:
+def get_train(trainset: bytes) -> TrainSet:
     train = TrainSet()
     train.ParseFromString(trainset)
     return train

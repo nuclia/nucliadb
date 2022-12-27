@@ -22,13 +22,13 @@ from typing import AsyncIterator
 
 import aiohttp
 import pytest
+from nucliadb_protos.dataset_pb2 import FieldClassificationBatch, TrainSet, Type
 from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
     ParagraphAnnotation,
     UserFieldMetadata,
 )
-from nucliadb_protos.train_pb2 import FieldClassificationBatch, TrainSet, Type
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 

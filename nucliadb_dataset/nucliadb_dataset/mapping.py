@@ -20,10 +20,11 @@
 # Mapping to transform a text/labels onto tokens and multilabelbinarizer
 from typing import Any, TypeVar
 
-import pyarrow as pa
-from nucliadb_protos.train_pb2 import (
+import pyarrow as pa  # type: ignore
+from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
+    SentenceClassificationBatch,
     TokenClassificationBatch,
 )
 
@@ -31,7 +32,7 @@ BatchType = TypeVar("BatchType", ParagraphClassificationBatch, FieldClassificati
 
 
 def bytes_to_batch(klass: Any):
-    def func(batch: bytes) -> klass:
+    def func(batch: bytes) -> Any:
         pb = klass()
         pb.ParseFromString(batch)
         return pb
@@ -47,8 +48,8 @@ def batch_to_text_classification_arrow(batch: BatchType):
             X.append(data.text)
             Y.append([f"{label.labelset}/{label.label}" for label in data.labels])
     if len(X):
-        data = [pa.array(X), pa.array(Y)]
-        output_batch = pa.record_batch(data, names=["text", "labels"])
+        pa_data = [pa.array(X), pa.array(Y)]
+        output_batch = pa.record_batch(pa_data, names=["text", "labels"])
     else:
         output_batch = None
     return output_batch
@@ -58,12 +59,27 @@ def batch_to_token_classification_arrow(batch: TokenClassificationBatch):
     X = []
     Y = []
     for data in batch.data:
-        if data.text:
-            X.append(data.text)
-            Y.append([f"{label.labelset}/{label.label}" for label in data.labels])
+        X.append(data.token)
+        Y.append(data.label)
     if len(X):
-        data = [pa.array(X), pa.array(Y)]
-        output_batch = pa.record_batch(data, names=["text", "labels"])
+        pa_data = [pa.array(X), pa.array(Y)]
+        output_batch = pa.record_batch(pa_data, names=["text", "labels"])
+    else:
+        output_batch = None
+    return output_batch
+
+
+def batch_to_text_classification_normalized_arrow(batch: SentenceClassificationBatch):
+    X = []
+    Y = []
+    for data in batch.data:
+        batch_labels = [f"{label.labelset}/{label.label}" for label in data.labels]
+        for sentence in data.text:
+            X.append(sentence)
+            Y.append(batch_labels)
+    if len(X):
+        pa_data = [pa.array(X), pa.array(Y)]
+        output_batch = pa.record_batch(pa_data, names=["text", "labels"])
     else:
         output_batch = None
     return output_batch

@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package dataset;
+
+
+
+// Train API V2
+enum Type {
+    FIELD_CLASSIFICATION = 0;
+    PARAGRAPH_CLASSIFICATION = 1;
+    SENTENCE_CLASSIFICATION = 2;
+    TOKEN_CLASSIFICATION = 3;
+}
+
+message TrainSet {
+    Type type = 1;
+    message Filter {
+        repeated string labels = 1;
+    }
+    Filter filter = 2;
+    int32 batch_size = 3;
+}
+
+enum LabelFrom {
+    PARAGRAPH = 0;
+    FIELD = 1;
+    RESOURCE = 2;
+}
+
+message Label {
+    string labelset = 1;
+    string label = 2;
+    LabelFrom origin = 3;
+}
+
+
+message TextLabel {
+    string text = 1;
+    repeated Label labels = 2;
+}
+
+message MultipleTextSameLabels {
+    repeated string text = 1;
+    repeated Label labels = 2;
+}
+
+message FieldClassificationBatch {
+    repeated TextLabel data = 1;
+}
+
+message ParagraphClassificationBatch {
+    repeated TextLabel data = 1;
+}
+
+message SentenceClassificationBatch {
+    repeated MultipleTextSameLabels data = 1;
+}
+
+
+message TokensClassification {
+    repeated string token = 1;
+    repeated string label = 2;
+}
+
+message TokenClassificationBatch {
+    repeated TokensClassification data = 1;
+}

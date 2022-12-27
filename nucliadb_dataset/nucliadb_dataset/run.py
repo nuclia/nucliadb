@@ -20,7 +20,7 @@
 from pathlib import Path
 
 import pydantic_argparse
-from nucliadb_protos.train_pb2 import TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TrainSet, Type
 
 from nucliadb_dataset import DatasetType, ExportType
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport

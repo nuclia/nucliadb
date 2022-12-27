@@ -23,13 +23,13 @@ from typing import AsyncIterator, List
 
 import aiohttp
 import pytest
+from nucliadb_protos.dataset_pb2 import TokenClassificationBatch, TrainSet, Type
 from nucliadb_protos.resources_pb2 import (
     Metadata,
     Position,
     TokenSplit,
     UserFieldMetadata,
 )
-from nucliadb_protos.train_pb2 import TokenClassificationBatch, TrainSet, Type
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 

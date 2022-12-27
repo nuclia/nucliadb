@@ -275,14 +275,17 @@ class Resource:
                 if type_id == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
 
-                user_field_metadata = next(
-                    (
-                        fm
-                        for fm in basic.fieldmetadata
-                        if fm.field.field == field_id and fm.field.field_type == type_id
-                    ),
-                    None,
-                )
+                user_field_metadata = None
+                if basic is not None:
+                    user_field_metadata = next(
+                        (
+                            fm
+                            for fm in basic.fieldmetadata
+                            if fm.field.field == field_id
+                            and fm.field.field_type == type_id
+                        ),
+                        None,
+                    )
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
@@ -431,9 +434,9 @@ class Resource:
             for generic in VALID_GLOBAL:
                 # We make sure that title and summary are set to be added
                 append = True
-                if generic == "title" and basic.title == "":
+                if generic == "title" and (basic is None or basic.title == ""):
                     append = False
-                elif generic == "summary" and basic.summary == "":
+                elif generic == "summary" and (basic is None or basic.summary == ""):
                     append = False
                 if append:
                     result.append((FieldType.GENERIC, generic))

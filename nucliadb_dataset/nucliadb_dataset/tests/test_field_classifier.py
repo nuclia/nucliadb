@@ -22,8 +22,8 @@ import re
 import tempfile
 from uuid import uuid4
 
-import pyarrow as pa
-from nucliadb_protos.train_pb2 import TrainSet, Type
+import pyarrow as pa  # type: ignore
+from nucliadb_protos.dataset_pb2 import TrainSet, Type
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport

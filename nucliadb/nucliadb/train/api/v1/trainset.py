@@ -47,7 +47,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 @requires_one([NucliaDBRoles.READER])
 async def get_partitions(
-    request: Request, kbid: str, prefix: Optional[str] = ""
+    request: Request, kbid: str, prefix: Optional[str] = None
 ) -> TrainSetPartitions:
     all_keys = await get_kb_partitions(kbid, prefix)
     return TrainSetPartitions(partitions=all_keys)

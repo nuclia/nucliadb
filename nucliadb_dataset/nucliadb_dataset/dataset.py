@@ -19,8 +19,8 @@
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple
 
-import pyarrow as pa
-from nucliadb_protos.train_pb2 import (
+import pyarrow as pa  # type: ignore
+from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
     TokenClassificationBatch,
@@ -30,6 +30,7 @@ from nucliadb_protos.train_pb2 import (
 
 from nucliadb_dataset.mapping import (
     batch_to_text_classification_arrow,
+    batch_to_text_classification_normalized_arrow,
     batch_to_token_classification_arrow,
     bytes_to_batch,
 )
@@ -50,7 +51,7 @@ class NucliaDBDataset:
         self.trainset = trainset
         self.base_url = self.client.url
         self.base_path = base_path
-        self.mappings = []
+        self.mappings: List[Callable] = []
         self.streamer = Streamer(self.trainset, self.client)
 
         if self.trainset.type == Type.PARAGRAPH_CLASSIFICATION:
@@ -61,6 +62,31 @@ class NucliaDBDataset:
 
         if self.trainset.type == Type.TOKEN_CLASSIFICATION:
             self.configure_token_classification()
+
+        if self.trainset.type == Type.SENTENCE_CLASSIFICATION:
+            self.configure_sentence_classification()
+
+    def configure_sentence_classification(self):
+        if len(self.trainset.filter.labels) != 1:
+            raise Exception("Needs to be only on filter labelset to train")
+        self.labels = self.client.get_labels()
+        labelset = self.trainset.filter.labels[0]
+        if labelset not in self.labels.labelsets:
+            raise Exception("Labelset is not valid")
+        self.set_mappings(
+            [
+                bytes_to_batch(ParagraphClassificationBatch),
+                batch_to_text_classification_normalized_arrow,
+            ]
+        )
+        self.setschema(
+            pa.schema(
+                [
+                    pa.field("text", pa.string()),
+                    pa.field("labels", pa.list(pa.string())),
+                ]
+            )
+        )
 
     def configure_field_classification(self):
         if len(self.trainset.filter.labels) != 1:

@@ -22,7 +22,7 @@ from typing import AsyncIterator
 
 import aiohttp
 import pytest
-from nucliadb_protos.dataset_pb2 import ParagraphClassificationBatch, TrainSet, Type
+from nucliadb_protos.dataset_pb2 import SentenceClassificationBatch, TrainSet, Type
 from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
@@ -37,9 +37,9 @@ from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
 
 
-async def get_paragraph_classification_batch_from_response(
+async def get_sentence_classification_batch_from_response(
     response: aiohttp.ClientResponse,
-) -> AsyncIterator[ParagraphClassificationBatch]:
+) -> AsyncIterator[SentenceClassificationBatch]:
 
     while True:
         header = await response.content.read(4)
@@ -47,7 +47,7 @@ async def get_paragraph_classification_batch_from_response(
             break
         payload_size = int.from_bytes(header, byteorder="big", signed=False)
         payload = await response.content.read(payload_size)
-        pcb = ParagraphClassificationBatch()
+        pcb = SentenceClassificationBatch()
         pcb.ParseFromString(payload)
         assert pcb.data
         yield pcb
@@ -152,23 +152,30 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
         start=0,
         end=45,
     )
+    p1.sentences.append(rpb.Sentence(start=0, end=45))
     p1.classifications.append(c1)
     p2 = rpb.Paragraph(
         start=47,
         end=64,
     )
+
+    p2.sentences.append(rpb.Sentence(start=47, end=64))
     p2.classifications.append(c1)
 
     p3 = rpb.Paragraph(
         start=65,
         end=93,
     )
+
+    p3.sentences.append(rpb.Sentence(start=65, end=93))
     p3.classifications.append(c1)
 
     p4 = rpb.Paragraph(
         start=94,
         end=109,
     )
+
+    p4.sentences.append(rpb.Sentence(start=94, end=109))
     p4.classifications.append(c1)
 
     fcm.metadata.metadata.paragraphs.append(p1)
@@ -198,7 +205,7 @@ async def inject_resource_with_paragraph_labels(knowledgebox, writer):
 
 
 @pytest.mark.asyncio
-async def test_generator_paragraph_classification(
+async def test_generator_sentence_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
 
@@ -232,8 +239,11 @@ async def test_generator_paragraph_classification(
         assert len(data["partitions"]) == 1
         partition_id = data["partitions"][0]
 
+    import pdb
+
+    pdb.set_trace()
     trainset = TrainSet()
-    trainset.type = Type.PARAGRAPH_CLASSIFICATION
+    trainset.type = Type.SENTENCE_CLASSIFICATION
     trainset.batch_size = 2
     trainset.filter.labels.append("labelset_paragraphs")
 
@@ -244,7 +254,7 @@ async def test_generator_paragraph_classification(
 
         assert response.status == 200
         batches = []
-        async for batch in get_paragraph_classification_batch_from_response(response):
+        async for batch in get_sentence_classification_batch_from_response(response):
             batches.append(batch)
             assert len(batch.data) == 2
         assert len(batches) == 2
