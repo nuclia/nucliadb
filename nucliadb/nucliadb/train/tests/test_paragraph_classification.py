@@ -28,11 +28,7 @@ from nucliadb_protos.resources_pb2 import (
     ParagraphAnnotation,
     UserFieldMetadata,
 )
-from nucliadb_protos.train_pb2 import (
-    ParagraphClassificationBatch,
-    TrainSet,
-    Type,
-)
+from nucliadb_protos.train_pb2 import ParagraphClassificationBatch, TrainSet, Type
 from nucliadb_protos.writer_pb2 import BrokerMessage, SetLabelsRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 

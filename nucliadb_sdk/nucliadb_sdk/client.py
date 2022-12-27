@@ -2,10 +2,10 @@ from enum import Enum
 from typing import Optional
 
 import httpx
-from nucliadb_models.entities import KnowledgeBoxEntities
-from nucliadb_models.labels import KnowledgeBoxLabels
 import requests
 
+from nucliadb_models.entities import KnowledgeBoxEntities
+from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     KnowledgeboxCounters,

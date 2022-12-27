@@ -18,13 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from pathlib import Path
-from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
-from nucliadb_protos.train_pb2 import TrainSet, Type
 
 import pydantic_argparse
+from nucliadb_protos.train_pb2 import TrainSet, Type
 
 from nucliadb_dataset import DatasetType, ExportType
-
+from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 
 DATASET_TYPE_MAPPING = {
     DatasetType.FIELD_CLASSIFICATION: Type.FIELD_CLASSIFICATION,

@@ -17,15 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb_dataset import DatasetType, ExportType
-from nucliadb_protos.train_pb2 import Type
-from nucliadb_sdk.client import Environment
-from pydantic import BaseSettings
-from enum import Enum
-from typing import List, Optional
+
 from pathlib import Path
+from typing import List, Optional
 
 import pydantic
+from pydantic import BaseSettings
+
+from nucliadb_dataset import DatasetType, ExportType
+from nucliadb_sdk.client import Environment
 
 
 class Settings(BaseSettings):

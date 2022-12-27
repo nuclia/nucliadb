@@ -52,26 +52,24 @@ class NucliaDatasetsExport:
         dataset_def = {
             "type": Type.Name(self.trainset.type),
             "batch_size": self.trainset.batch_size,
-            "filter": {
-                "labels": list(self.trainset.filter.labels)
-            }
+            "filter": {"labels": list(self.trainset.filter.labels)},
         }
         response = requests.post(
             f"{self.datasets_url}/datasets",
             json=dataset_def,
-            headers={"x_stf_nuakey": self.apikey
-        })
+            headers={"x_stf_nuakey": self.apikey},
+        )
 
         dataset_id = response.json()["id"]
 
         # Show progress
         for partition_id, filename in self.nucliadb_dataset.iter_all_partitions():
             # Upload to NucliaDatasetService
-            with open(filename, 'rb') as partition_fileobj:
+            with open(filename, "rb") as partition_fileobj:
                 requests.put(
                     f"{self.datasets_url}/dataset/{dataset_id}/partition/{partition_id}",
                     data=partition_fileobj,
-                    headers={"x_stf_nuakey": self.apikey}
+                    headers={"x_stf_nuakey": self.apikey},
                 )
 
 

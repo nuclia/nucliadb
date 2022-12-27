@@ -22,7 +22,6 @@ from collections import OrderedDict
 from typing import AsyncIterator, List
 
 import aiohttp
-from nucliadb.train.generators.token_classifier import process_entities
 import pytest
 from nucliadb_protos.resources_pb2 import (
     Metadata,
@@ -30,20 +29,14 @@ from nucliadb_protos.resources_pb2 import (
     TokenSplit,
     UserFieldMetadata,
 )
-from nucliadb_protos.train_pb2 import (
-    TokenClassificationBatch,
-    TrainSet,
-    Type,
-)
-from nucliadb_protos.writer_pb2 import (
-    BrokerMessage,
-    SetEntitiesRequest,
-)
+from nucliadb_protos.train_pb2 import TokenClassificationBatch, TrainSet, Type
+from nucliadb_protos.writer_pb2 import BrokerMessage, SetEntitiesRequest
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import inject_message
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
+from nucliadb.train.generators.token_classifier import process_entities
 
 
 async def get_token_classification_batch_from_response(

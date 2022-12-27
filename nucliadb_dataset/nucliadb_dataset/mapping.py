@@ -20,15 +20,14 @@
 # Mapping to transform a text/labels onto tokens and multilabelbinarizer
 from typing import Any, TypeVar
 
+import pyarrow as pa
 from nucliadb_protos.train_pb2 import (
     FieldClassificationBatch,
-    Label,
     ParagraphClassificationBatch,
     TokenClassificationBatch,
 )
-import pyarrow as pa
 
-T = TypeVar("BatchType", ParagraphClassificationBatch, FieldClassificationBatch)
+BatchType = TypeVar("BatchType", ParagraphClassificationBatch, FieldClassificationBatch)
 
 
 def bytes_to_batch(klass: Any):
@@ -40,7 +39,7 @@ def bytes_to_batch(klass: Any):
     return func
 
 
-def batch_to_text_classification_arrow(batch: T):
+def batch_to_text_classification_arrow(batch: BatchType):
     X = []
     Y = []
     for data in batch.data:

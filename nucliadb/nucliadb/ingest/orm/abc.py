@@ -19,8 +19,8 @@
 
 from abc import ABCMeta, abstractmethod
 from typing import Any, AsyncIterator, Optional
-from nucliadb_protos.nodereader_pb2 import DocumentItem, ParagraphItem, StreamRequest
 
+from nucliadb_protos.nodereader_pb2 import DocumentItem, ParagraphItem, StreamRequest
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 

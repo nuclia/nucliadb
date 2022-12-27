@@ -1,12 +1,10 @@
 from typing import Any, Optional, Tuple
-from nucliadb_sdk.client import NucliaDBClient
-import requests
-from nucliadb_protos.train_pb2 import (
-    TrainSet,
-)
 
+import requests
+from nucliadb_protos.train_pb2 import TrainSet
 from urllib3.exceptions import ProtocolError
 
+from nucliadb_sdk.client import NucliaDBClient
 
 SIZE_BYTES = 4
 

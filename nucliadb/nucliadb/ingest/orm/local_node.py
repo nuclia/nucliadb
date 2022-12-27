@@ -20,8 +20,8 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncIterator, Optional
 from uuid import uuid4
 

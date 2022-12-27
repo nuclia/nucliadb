@@ -2,18 +2,18 @@ import os
 from typing import Any, AsyncIterable, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
+from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     SearchOptions,
     SearchRequest,
 )
-from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
-from nucliadb_sdk.labels import Label, LabelType, Labels, LabelSet
+from nucliadb_sdk.labels import Label, Labels, LabelSet, LabelType
 from nucliadb_sdk.resource import (
     create_resource,
     from_resource_to_payload,

@@ -1,17 +1,15 @@
-from datasets import IterableDataset
-from nucliadb_dataset.dataset import NucliaDBDataset
-from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
-from nucliadb_protos.train_pb2 import TrainSet, Type
-
-from nucliadb_dataset.streamer import Streamer
-from nucliadb_sdk.client import Environment
-from nucliadb_sdk.knowledgebox import KnowledgeBox
-import tempfile
-import pyarrow as pa
 import os
 import re
-import pytest
+import tempfile
 from uuid import uuid4
+
+import pyarrow as pa
+from nucliadb_protos.train_pb2 import TrainSet, Type
+
+from nucliadb_dataset.dataset import NucliaDBDataset
+from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
+from nucliadb_sdk.knowledgebox import KnowledgeBox
+
 
 def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
@@ -37,8 +35,18 @@ def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification
 def run_dataset_export(requests_mock, knowledgebox, trainset):
     mock_dataset_id = str(uuid4())
     requests_mock.real_http = True
-    requests_mock.register_uri('POST', 'http://datasets.service/datasets', status_code=201, json={"id": mock_dataset_id})
-    requests_mock.register_uri('PUT', re.compile(rf'^http://datasets.service/dataset/{mock_dataset_id}/partition/.*'), status_code=204, content=b"")
+    requests_mock.register_uri(
+        "POST",
+        "http://datasets.service/datasets",
+        status_code=201,
+        json={"id": mock_dataset_id},
+    )
+    requests_mock.register_uri(
+        "PUT",
+        re.compile(rf"^http://datasets.service/dataset/{mock_dataset_id}/partition/.*"),
+        status_code=204,
+        content=b"",
+    )
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         fse = NucliaDatasetsExport(
@@ -47,12 +55,14 @@ def run_dataset_export(requests_mock, knowledgebox, trainset):
             datasets_url="http://datasets.service",
             trainset=trainset,
             cache_path=tmpdirname,
-            environment=knowledgebox.client.environment
+            environment=knowledgebox.client.environment,
         )
         fse.export()
 
 
-def test_nucliadb_export_fields(knowledgebox: KnowledgeBox, upload_data_field_classification, requests_mock):
+def test_nucliadb_export_fields(
+    knowledgebox: KnowledgeBox, upload_data_field_classification, requests_mock
+):
     trainset = TrainSet()
     trainset.type = Type.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")

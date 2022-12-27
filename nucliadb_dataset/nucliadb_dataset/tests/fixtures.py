@@ -1,8 +1,8 @@
-from nucliadb_sdk.entities import Entity, EntityPosition
+import pytest
+
+from nucliadb_sdk.entities import Entity
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.labels import LabelType
-import pytest
-from nucliadb_sdk.labels import Label, Labels
 
 
 @pytest.fixture(scope="function")

@@ -17,7 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Generator, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Iterator, List, Optional, Tuple
+
+import pyarrow as pa
+from nucliadb_protos.train_pb2 import (
+    FieldClassificationBatch,
+    ParagraphClassificationBatch,
+    TokenClassificationBatch,
+    TrainSet,
+    Type,
+)
+
 from nucliadb_dataset.mapping import (
     batch_to_text_classification_arrow,
     batch_to_token_classification_arrow,
@@ -26,18 +36,7 @@ from nucliadb_dataset.mapping import (
 from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
-from nucliadb_protos.train_pb2 import TokenClassificationBatch, TrainSet
-from nucliadb_protos.train_pb2 import (
-    FieldClassificationBatch,
-    ParagraphClassificationBatch,
-    TextLabel,
-    TokensClassification,
-    TrainSet,
-    Type,
-)
 from nucliadb_sdk.client import NucliaDBClient
-import pyarrow as pa
-from console_progressbar import ProgressBar
 
 ACTUAL_PARTIITON = "actual_partition"
 
@@ -122,7 +121,6 @@ class NucliaDBDataset:
             raise Exception("Labelset is not valid")
 
         if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
-            import ipdb; ipdb.set_trace()
             raise Exception("Labelset not defined for Paragraphs Classification")
 
         self.set_mappings(
