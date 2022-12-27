@@ -131,7 +131,8 @@ where Guide: BfsGuide
                 // In order to maintain all the advantages of BFS
                 // even when free edges are present we need to maintain the following invariant:
                 // For every i,j if i < j then the nodes from level i are visited before the nodes
-                // from level j. That invariant only holds if the nodes reached by a
+                // from level j.
+                // The invariant only holds if the nodes reached by a
                 // free edge are pushed to the front of the stack. We are avoiding
                 // the aditional complexity of Dijkstra's algorithm.
                 self.work_stack.push_front(node);
