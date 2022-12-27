@@ -18,10 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import AsyncIterator, List
 import uuid
+import nats
+from os.path import dirname
 from datetime import datetime
 
 import aiohttp
+from nucliadb.ingest.maindb.redis import RedisDriver
+from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
+from nucliadb_utils.cache.redis import RedisPubsub
+from nucliadb_utils.cache.utility import Cache
+from nucliadb_utils.indexing import IndexingUtility
 import pytest
 from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
@@ -37,59 +45,16 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.settings import Settings
 from nucliadb_utils.utilities import (
     Utility,
     clear_global_cache,
     get_storage,
+    get_utility,
     set_utility,
 )
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
-
-
-@pytest.fixture(scope="function")
-def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
-    from nucliadb.train.settings import settings
-    from nucliadb_utils.settings import running_settings, storage_settings
-
-    running_settings.debug = False
-    print(f"Redis ready at {redis_driver.url}")
-
-    storage_settings.gcs_endpoint_url = gcs
-    storage_settings.file_backend = "gcs"
-    storage_settings.gcs_bucket = "test_{kbid}"
-    settings.grpc_port = free_port()
-
-    set_utility(Utility.CACHE, cache)
-    yield
-
-
-@pytest.fixture(scope="function")
-async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
-    from nucliadb.train.utils import start_train_grpc, stop_train_grpc
-
-    await start_train_grpc("testing_train")
-    yield
-    await stop_train_grpc()
-
-
-@pytest.fixture(scope="function")
-async def train_client(train_api):  # type: ignore
-    from nucliadb_protos.train_pb2_grpc import TrainStub
-
-    from nucliadb.train.settings import settings
-
-    channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
-    yield TrainStub(channel)
-    clear_global_cache()
 
 
 @pytest.fixture(scope="function")
@@ -211,6 +176,9 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
     return message2
 
 
+# This fixtures should be deleted once grpc train interface is removed
+
+
 @pytest.fixture(scope="function")
 async def test_pagination_resources(processor, knowledgebox, test_settings_train):
     """
@@ -268,3 +236,50 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     await txn.commit(resource=False)
 
     yield knowledgebox
+
+
+def free_port() -> int:
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("", 0))
+    return sock.getsockname()[1]
+
+
+@pytest.fixture(scope="function")
+def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
+    from nucliadb.train.settings import settings
+    from nucliadb_utils.settings import running_settings, storage_settings
+
+    running_settings.debug = False
+    print(f"Redis ready at {redis_driver.url}")
+
+    storage_settings.gcs_endpoint_url = gcs
+    storage_settings.file_backend = "gcs"
+    storage_settings.gcs_bucket = "test_{kbid}"
+    settings.grpc_port = free_port()
+
+    set_utility(Utility.CACHE, cache)
+    yield
+
+
+@pytest.fixture(scope="function")
+async def train_api(test_settings_train: None, local_files, event_loop):  # type: ignore
+    from nucliadb.train.utils import start_train_grpc, stop_train_grpc
+
+    await start_nodes_manager()
+    await start_train_grpc("testing_train")
+    yield
+    await stop_train_grpc()
+    await stop_nodes_manager()
+
+
+@pytest.fixture(scope="function")
+async def train_client(train_api):  # type: ignore
+    from nucliadb_protos.train_pb2_grpc import TrainStub
+
+    from nucliadb.train.settings import settings
+
+    channel = aio.insecure_channel(f"localhost:{settings.grpc_port}")
+    yield TrainStub(channel)
+    clear_global_cache()

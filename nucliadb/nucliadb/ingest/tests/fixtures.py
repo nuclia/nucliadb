@@ -594,7 +594,7 @@ async def fake_node(indexing_utility_ingest):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox(redis_driver: RedisDriver):
+async def knowledgebox_ingest(redis_driver: RedisDriver):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     txn = await redis_driver.begin()
@@ -752,12 +752,17 @@ def make_extracted_vectors(field_id):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(gcs_storage, redis_driver, cache, knowledgebox, fake_node):
+async def test_resource(
+    gcs_storage, redis_driver, cache, knowledgebox_ingest, fake_node
+):
     """
     Create a resource that has every possible bit of information
     """
     resource = await create_resource(
-        storage=gcs_storage, driver=redis_driver, cache=cache, knowledgebox=knowledgebox
+        storage=gcs_storage,
+        driver=redis_driver,
+        cache=cache,
+        knowledgebox_ingest=knowledgebox_ingest,
     )
     yield resource
     resource.clean()
@@ -879,11 +884,11 @@ def broker_resource(
     return message1
 
 
-async def create_resource(storage, driver, cache, knowledgebox):
+async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: str):
     txn = await driver.begin()
 
     rid = str(uuid.uuid4())
-    kb_obj = KnowledgeBox(txn, storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, storage, cache, kbid=knowledgebox_ingest)
     test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
     await test_resource.set_slug()
 
