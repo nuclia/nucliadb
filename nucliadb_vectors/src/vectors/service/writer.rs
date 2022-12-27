@@ -320,8 +320,8 @@ mod tests {
         let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
             no_results: None,
-            path: dir.path().to_str().unwrap().to_string(),
-            vectorset: dir_vectorset.path().to_str().unwrap().to_string(),
+            path: dir.path().to_path_buf(),
+            vectorset: dir_vectorset.path().to_path_buf(),
         };
         let indexes: HashMap<_, _> = (0..10).map(|i| create_vector_set(i.to_string())).collect();
         let keys: HashSet<_> = indexes.keys().cloned().collect();
@@ -385,8 +385,8 @@ mod tests {
         let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
             no_results: None,
-            path: dir.path().to_str().unwrap().to_string(),
-            vectorset: dir_vectorset.path().to_str().unwrap().to_string(),
+            path: dir.path().to_path_buf(),
+            vectorset: dir_vectorset.path().to_path_buf(),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),

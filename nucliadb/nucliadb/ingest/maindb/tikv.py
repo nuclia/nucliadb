@@ -59,8 +59,12 @@ class TiKVTransaction(Transaction):
         if resource:
             if worker is None or tid is None:
                 raise NoWorkerCommit()
-            key = TXNID.format(worker=worker)
-            await self.txn.put(key.encode(), str(tid).encode())
+            if tid != -1:
+                # If tid == -1 means we are injecting a resource via gRPC. We don't
+                # want to save the tid in this case, as it would break the next
+                # transactionability check.
+                key = TXNID.format(worker=worker)
+                await self.txn.put(key.encode(), str(tid).encode())
         await self.txn.commit()
         self.open = False
 

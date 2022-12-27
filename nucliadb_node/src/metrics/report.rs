@@ -20,7 +20,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use nucliadb_cluster::cluster::Score;
 use prometheus::proto::MetricFamily;
 use prometheus::{labels, opts, IntGauge, Registry};
 
@@ -61,6 +60,13 @@ impl NodeReport {
             paragraph_count,
         })
     }
+
+    pub fn score(&self) -> f32 {
+        self.shard_count
+            .get()
+            .saturating_mul(self.paragraph_count.get()) as f32
+            / 100.0
+    }
 }
 
 impl Report for NodeReport {
@@ -70,14 +76,5 @@ impl Report for NodeReport {
 
     fn labels(&self) -> HashMap<String, String> {
         labels! { "node_id".to_string() => self.id.to_string() }
-    }
-}
-
-impl Score for NodeReport {
-    fn score(&self) -> f32 {
-        self.shard_count
-            .get()
-            .saturating_mul(self.paragraph_count.get()) as f32
-            / 100.0
     }
 }

@@ -37,7 +37,7 @@ serving:
   grpc_writer: 10001
   grpc_sidecar: 10002
   node0_svc_fixed_ip: 10.4.0.255
-  node_type: Node
+  node_type: Io
 
 storage:
   class: ssd

@@ -67,6 +67,8 @@ pub struct DocumentSearchRequest {
     pub result_per_page: i32,
     #[prost(message, optional, tag="9")]
     pub timestamps: ::core::option::Option<Timestamps>,
+    #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="16")]
+    pub with_status: ::core::option::Option<i32>,
     #[prost(bool, tag="10")]
     pub reload: bool,
     #[prost(bool, tag="15")]
@@ -325,6 +327,8 @@ pub struct SearchRequest {
     pub with_duplicates: bool,
     #[prost(bool, tag="16")]
     pub only_faceted: bool,
+    #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="17")]
+    pub with_status: ::core::option::Option<i32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

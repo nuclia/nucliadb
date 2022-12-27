@@ -192,7 +192,7 @@ class PullWorker:
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
-        seqid = int(msg.reply.split(".")[5])
+        seqid = int(reply.split(".")[5])
         logger.debug(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )

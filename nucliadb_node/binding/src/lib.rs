@@ -219,11 +219,9 @@ impl NodeWriter {
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-        self.writer.load_shard(&shard_id);
         match self.writer.delete_shard(&shard_id) {
-            Some(Ok(_)) => Ok(PyList::new(py, shard_id.encode_to_vec())),
-            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
-            None => Err(exceptions::PyTypeError::new_err("Shard not found")),
+            Ok(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }
     }
 
@@ -233,7 +231,6 @@ impl NodeWriter {
         py: Python<'p>,
     ) -> PyResult<&'p PyAny> {
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
-        self.writer.load_shard(&shard_id);
         match self.writer.clean_and_upgrade_shard(&shard_id) {
             Ok(clean_data) => Ok(PyList::new(py, clean_data.encode_to_vec())),
             Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),

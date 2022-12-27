@@ -18,6 +18,7 @@
 use std::{fs, path};
 
 use nucliadb_services::*;
+use path::Path;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -89,9 +90,9 @@ impl From<StoredConfig> for ShardConfig {
     }
 }
 impl ShardConfig {
-    pub fn new(path: &str) -> ShardConfig {
+    pub fn new(path: &Path) -> ShardConfig {
         fs::create_dir_all(path).unwrap();
-        let json_file = path::Path::new(path).join("config.json");
+        let json_file = path.join("config.json");
         if !json_file.exists() {
             let config = ShardConfig::default();
             let serialized = serde_json::to_string(&config).unwrap();
@@ -125,7 +126,7 @@ mod tests {
     #[tokio::test]
     async fn open_and_new() {
         let dir = tempfile::tempdir().unwrap();
-        let config = ShardConfig::new(dir.path().to_str().unwrap());
+        let config = ShardConfig::new(dir.path());
         assert_eq!(config.version_relations, relations::MAX_VERSION);
         assert_eq!(config.version_fields, fields::MAX_VERSION);
         assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);

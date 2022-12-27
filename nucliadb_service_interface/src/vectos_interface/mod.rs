@@ -17,14 +17,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+
 use nucliadb_protos::*;
 
 use crate::service_interface::*;
+
 #[derive(Clone)]
 pub struct VectorConfig {
     pub no_results: Option<usize>,
-    pub path: String,
-    pub vectorset: String,
+    pub path: PathBuf,
+    pub vectorset: PathBuf,
 }
 
 pub trait VectorReader:

@@ -256,9 +256,7 @@ impl DataPoint {
             .collect()
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> DPResult<DataPoint>
-    where
-        Dlog: DeleteLog,
-    {
+    where Dlog: DeleteLog {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);

@@ -19,6 +19,7 @@
 //
 use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -55,20 +56,20 @@ impl Configuration {
     }
 
     /// Where data will be stored
-    pub fn data_path() -> String {
+    pub fn data_path() -> PathBuf {
         match env::var("DATA_PATH") {
-            Ok(var) => var,
-            Err(_) => String::from("data"),
+            Ok(var) => PathBuf::from(var),
+            Err(_) => PathBuf::from("data"),
         }
     }
 
     /// Path for shards information inside data folder
-    pub fn shards_path() -> String {
-        Configuration::data_path() + "/shards"
+    pub fn shards_path() -> PathBuf {
+        Configuration::data_path().join("shards")
     }
 
-    pub fn shards_path_id(id: &str) -> String {
-        format!("{}/{}", Configuration::shards_path(), id)
+    pub fn shards_path_id(id: &str) -> PathBuf {
+        Configuration::shards_path().join(id)
     }
 
     /// Reader GRPC service port

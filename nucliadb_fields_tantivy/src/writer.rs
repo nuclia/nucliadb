@@ -304,7 +304,7 @@ mod tests {
     fn test_new_writer() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
         let fsc = FieldConfig {
-            path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            path: dir.path().to_path_buf(),
         };
 
         let mut field_writer_service = FieldWriterService::start(&fsc).unwrap();

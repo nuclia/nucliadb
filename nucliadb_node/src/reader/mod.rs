@@ -20,7 +20,6 @@
 
 pub mod grpc_driver;
 use std::collections::HashMap;
-use std::path::Path;
 
 use nucliadb_protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
@@ -65,38 +64,40 @@ impl NodeReaderService {
     /// Load all shards on the shards memory structure
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> ServiceResult<()> {
-        info!("Recovering shards from {}...", Configuration::shards_path());
-        for entry in std::fs::read_dir(Configuration::shards_path())? {
+        let shards_path = Configuration::shards_path();
+        info!("Recovering shards from {shards_path:?}...");
+        for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
-            let shard_id = String::from(entry.file_name().to_str().unwrap());
-            let shard = POOL.install(|| ShardReaderService::open(&shard_id.to_string()))?;
-            self.cache.insert(shard_id.clone(), shard);
-            info!("Shard loaded: {:?}", shard_id);
+            let file_name = entry.file_name().to_str().unwrap().to_string();
+            let shard_path = entry.path();
+            let shard =
+                POOL.install(|| ShardReaderService::open(file_name.clone(), &shard_path))?;
+            self.cache.insert(file_name, shard);
+            info!("Shard loaded: {shard_path:?}");
         }
         Ok(())
     }
 
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
-        info!("{}: Loading shard", shard_id.id);
-        let in_memory = self.cache.contains_key(&shard_id.id);
-        if !in_memory {
-            info!("{}: Shard was not in memory", shard_id.id);
-            let on_disk = Path::new(&Configuration::shards_path_id(&shard_id.id)).exists();
-            if on_disk {
-                info!("{}: Shard was in disk", shard_id.id);
-                if let Ok(shard) = POOL.install(|| ShardReaderService::open(&shard_id.id)) {
-                    info!("{}: Loaded shard", shard_id.id);
-                    self.cache.insert(shard_id.id.clone(), shard);
-                    info!("{}: Inserted on memory", shard_id.id);
-                } else {
-                    info!("{}: is corrupted", shard_id.id);
-                }
-            }
-        } else {
-            info!("{}: Shard was in memory", shard_id.id);
+        let shard_name = shard_id.id.clone();
+        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        if self.cache.contains_key(&shard_id.id) {
+            info!("Shard {shard_path:?} is already on memory");
+            return;
         }
+        if !shard_path.is_dir() {
+            error!("Shard {shard_path:?} is not on disk");
+            return;
+        }
+        let Ok(shard) = POOL.install(|| ShardReaderService::open(shard_name, &shard_path)) else {
+            error!("Shard {shard_path:?} could not be loaded from disk");
+            return;
+        };
+        self.cache.insert(shard_id.id.clone(), shard);
+        info!("{shard_path:?}: Shard loaded");
     }
+
     #[tracing::instrument(skip_all)]
     pub fn get_shard(&self, shard_id: &ShardId) -> Option<&ShardReaderService> {
         self.cache.get(&shard_id.id)
