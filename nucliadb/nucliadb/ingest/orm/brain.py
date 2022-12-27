@@ -25,6 +25,7 @@ from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,
@@ -284,6 +285,14 @@ class ResourceBrain:
         elif status == Metadata.Status.PENDING:
             self.brain.status = PBBrainResource.PENDING
 
+    def get_processing_status_tag(self) -> str:
+        return {
+            PBBrainResource.ERROR: ResourceProcessingStatus.ERROR.name,
+            PBBrainResource.EMPTY: ResourceProcessingStatus.EMPTY.name,
+            PBBrainResource.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
+            PBBrainResource.PENDING: ResourceProcessingStatus.PENDING.name,
+        }[self.brain.status]
+
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
 
         self.brain.metadata.created.CopyFrom(basic.created)
@@ -320,6 +329,9 @@ class ResourceBrain:
 
         # icon
         self.tags["n"].append(f"i/{basic.icon}")
+
+        # processing status
+        self.tags["n"].append(f"s/{self.get_processing_status_tag()}")
 
         # main language
         if basic.metadata.language != "":
