@@ -29,7 +29,6 @@ use uuid::Uuid;
 
 use crate::config::Configuration;
 use crate::services::writer::ShardWriterService;
-use crate::utils::POOL;
 
 #[derive(Debug)]
 pub struct NodeWriterService {
@@ -63,8 +62,7 @@ impl NodeWriterService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let shard =
-                POOL.install(|| ShardWriterService::open(file_name.clone(), &shard_path))?;
+            let shard = ShardWriterService::open(file_name.clone(), &shard_path)?;
             self.cache.insert(file_name, shard);
             info!("Shard loaded: {shard_path:?}");
         }
@@ -83,7 +81,7 @@ impl NodeWriterService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = POOL.install(|| ShardWriterService::open(shard_name, &shard_path)) else {
+        let Ok(shard) = ShardWriterService::open(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };
@@ -103,9 +101,7 @@ impl NodeWriterService {
     pub fn new_shard(&mut self) -> ShardCreated {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = Configuration::shards_path_id(&shard_id);
-        let new_shard = POOL
-            .install(|| ShardWriterService::new(shard_id.clone(), &shard_path))
-            .unwrap();
+        let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path).unwrap();
         let data = ShardCreated {
             id: new_shard.id.clone(),
             document_service: new_shard.document_version() as i32,
@@ -132,7 +128,7 @@ impl NodeWriterService {
         self.delete_shard(shard_id)?;
         let shard_name = shard_id.id.clone();
         let shard_path = Configuration::shards_path_id(&shard_id.id);
-        let new_shard = POOL.install(|| ShardWriterService::new(shard_name, &shard_path))?;
+        let new_shard = ShardWriterService::new(shard_name, &shard_path)?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,
             paragraph_service: new_shard.paragraph_version() as i32,
@@ -148,12 +144,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &Resource,
-    ) -> Option<ServiceResult<usize>> {
-        self.get_mut_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.set_resource(resource))
-                .map(|_| shard.count())
-                .map_err(|e| e.into())
-        })
+    ) -> ServiceResult<Option<usize>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.set_resource(resource)?;
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -161,12 +157,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> Option<ServiceResult<usize>> {
-        self.get_mut_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.add_vectorset(setid))
-                .map(|_| shard.count())
-                .map_err(|e| e.into())
-        })
+    ) -> ServiceResult<Option<usize>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.add_vectorset(setid)?;
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -174,12 +170,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> Option<ServiceResult<usize>> {
-        self.get_mut_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.remove_vectorset(setid))
-                .map(|_| shard.count())
-                .map_err(|e| e.into())
-        })
+    ) -> ServiceResult<Option<usize>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.remove_vectorset(setid)?;
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -187,12 +183,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         graph: &JoinGraph,
-    ) -> Option<ServiceResult<usize>> {
-        self.get_mut_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.join_relations_graph(graph))
-                .map(|_| shard.count())
-                .map_err(|e| e.into())
-        })
+    ) -> ServiceResult<Option<usize>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.join_relations_graph(graph)?;
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -200,12 +196,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         request: &DeleteGraphNodes,
-    ) -> Option<ServiceResult<usize>> {
-        self.get_mut_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.delete_relation_nodes(request))
-                .map(|_| shard.count())
-                .map_err(|e| e.into())
-        })
+    ) -> ServiceResult<Option<usize>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.delete_relation_nodes(request)?;
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -213,24 +209,27 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
-    ) -> Option<ServiceResult<usize>> {
-        self.get_mut_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.remove_resource(resource))
-                .map(|_| shard.count())
-                .map_err(|e| e.into())
-        })
+    ) -> ServiceResult<Option<usize>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        shard.remove_resource(resource)?;
+        Ok(Some(shard.count()))
     }
     #[tracing::instrument(skip_all)]
-    pub fn gc(&mut self, shard_id: &ShardId) -> Option<ServiceResult<()>> {
-        self.get_mut_shard(shard_id)
-            .map(|shard| POOL.install(|| shard.gc()).map_err(|e| e.into()))
+    pub fn gc(&mut self, shard_id: &ShardId) -> ServiceResult<Option<()>> {
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
+        };
+        Ok(Some(shard.gc()?))
     }
     #[tracing::instrument(skip_all)]
-    pub fn list_vectorsets(&self, shard_id: &ShardId) -> Option<ServiceResult<Vec<String>>> {
-        self.get_shard(shard_id).map(|shard| {
-            POOL.install(|| shard.list_vectorsets())
-                .map_err(|e| e.into())
-        })
+    pub fn list_vectorsets(&self, shard_id: &ShardId) -> ServiceResult<Option<Vec<String>>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+        let shard_response = shard.list_vectorsets()?;
+        Ok(Some(shard_response))
     }
     #[tracing::instrument(skip_all)]
     pub fn get_shard_ids(&self) -> ShardIds {

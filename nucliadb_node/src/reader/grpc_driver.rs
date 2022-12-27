@@ -119,7 +119,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.vector_search(&shard_id, vector_request) {
+        match reader.vector_search(&shard_id, vector_request).transpose() {
             Some(Ok(response)) => {
                 info!("Vector search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -148,7 +148,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.relation_search(&shard_id, relation_request) {
+        match reader
+            .relation_search(&shard_id, relation_request)
+            .transpose()
+        {
             Some(Ok(response)) => {
                 info!("Relation search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -177,7 +180,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.search(&shard_id, search_request) {
+        match reader.search(&shard_id, search_request).transpose() {
             Some(Ok(response)) => {
                 info!("Document search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -206,7 +209,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.suggest(&shard_id, suggest_request) {
+        match reader.suggest(&shard_id, suggest_request).transpose() {
             Some(Ok(response)) => {
                 info!("Suggest ended correctly");
                 Ok(tonic::Response::new(response))
@@ -236,7 +239,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.document_search(&shard_id, document_request) {
+        match reader
+            .document_search(&shard_id, document_request)
+            .transpose()
+        {
             Some(Ok(response)) => {
                 info!("Document search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -265,7 +271,10 @@ impl NodeReader for NodeReaderGRPCDriver {
         };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.paragraph_search(&shard_id, paragraph_request) {
+        match reader
+            .paragraph_search(&shard_id, paragraph_request)
+            .transpose()
+        {
             Some(Ok(response)) => {
                 info!("Paragraph search ended correctly");
                 Ok(tonic::Response::new(response))
@@ -366,7 +375,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.relation_edges(&shard_id) {
+        match reader.relation_edges(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::not_found(format!("{e:?} in {shard_id:?}",))),
             None => Err(tonic::Status::not_found(format!(
@@ -386,7 +395,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.relation_types(&shard_id) {
+        match reader.relation_types(&shard_id).transpose() {
             Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
             Some(Err(e)) => Err(tonic::Status::not_found(format!("{e:?} in {shard_id:?}",))),
             None => Err(tonic::Status::not_found(format!(
