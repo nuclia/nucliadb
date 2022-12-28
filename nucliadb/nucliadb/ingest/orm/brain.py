@@ -55,6 +55,14 @@ else:
 FilePagePositions = Dict[int, Tuple[int, int]]
 
 
+PROCESSING_STATUS_PB_TYPE_TO_NAME_MAP = {
+    PBBrainResource.ERROR: ResourceProcessingStatus.ERROR.name,
+    PBBrainResource.EMPTY: ResourceProcessingStatus.EMPTY.name,
+    PBBrainResource.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
+    PBBrainResource.PENDING: ResourceProcessingStatus.PENDING.name,
+}
+
+
 def get_paragraph_text(
     extracted_text: ExtractedText, start: int, end: int, split: Optional[str] = None
 ) -> str:
@@ -286,12 +294,7 @@ class ResourceBrain:
             self.brain.status = PBBrainResource.PENDING
 
     def get_processing_status_tag(self) -> str:
-        return {
-            PBBrainResource.ERROR: ResourceProcessingStatus.ERROR.name,
-            PBBrainResource.EMPTY: ResourceProcessingStatus.EMPTY.name,
-            PBBrainResource.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
-            PBBrainResource.PENDING: ResourceProcessingStatus.PENDING.name,
-        }[self.brain.status]
+        return PROCESSING_STATUS_PB_TYPE_TO_NAME_MAP[self.brain.status]
 
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
 
