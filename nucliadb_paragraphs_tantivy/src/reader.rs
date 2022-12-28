@@ -163,8 +163,20 @@ impl ReaderChild for ParagraphReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Searching: starts at {v} ms");
         }
-        let (original, termc, fuzzied) =
-            search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
+        let advanced = request
+            .advance_query
+            .as_ref()
+            .map(|query| parser.parse_query(query))
+            .transpose()
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
+        let (original, termc, fuzzied) = search_query(
+            &parser,
+            &text,
+            request,
+            &self.schema,
+            FUZZY_DISTANCE as u8,
+            advanced,
+        );
         let mut searcher = Searcher {
             request,
             results,

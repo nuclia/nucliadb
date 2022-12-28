@@ -43,7 +43,7 @@ message FacetResults {
 message DocumentSearchRequest {
     string id = 1;
     string body = 2;
-
+    
     repeated string fields = 3;
 
     Filter filter = 4;
@@ -54,10 +54,11 @@ message DocumentSearchRequest {
     int32 result_per_page = 8;
 
     Timestamps timestamps = 9;
-    optional noderesources.Resource.ResourceStatus with_status = 16;
-
+    
     bool reload = 10;
     bool only_faceted = 15;
+    optional noderesources.Resource.ResourceStatus with_status = 16;
+    optional string advance_query = 17;
 
 }
 
@@ -69,22 +70,23 @@ message ParagraphSearchRequest {
     repeated string fields = 3;
     // query this text in all the paragraphs
     string body = 4;
-
+    
     Filter filter = 5;
-
+    
     OrderBy order = 7;
-
+    
     // Faceted{ tags: Vec<String>}
     Faceted faceted = 8;
-
+    
     int32 page_number = 10;
     int32 result_per_page = 11;
-
+    
     Timestamps timestamps = 12;
-
+    
     bool reload = 13;
     bool with_duplicates = 14;
     bool only_faceted = 15;
+    optional string advance_query = 16;
 }
 
 message ResultScore {
@@ -260,6 +262,7 @@ message SearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 16;
     
+    optional string advance_query = 18;
     optional noderesources.Resource.ResourceStatus with_status = 17;
 }
 
@@ -267,7 +270,6 @@ message SuggestRequest {
     string shard = 1;
 
     string body = 2;
-
     Filter filter = 3;
 
     Timestamps timestamps = 4;
