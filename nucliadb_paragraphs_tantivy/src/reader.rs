@@ -39,7 +39,7 @@ use crate::search_query;
 use crate::search_query::SharedTermC;
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
-const FUZZY_DISTANCE: usize = 1;
+const FUZZY_DISTANCE: u8 = 1;
 
 pub struct ParagraphReaderService {
     index: Index,
@@ -80,7 +80,7 @@ impl ParagraphReader for ParagraphReaderService {
         let no_results = 10;
         let text = self.adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
-            suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
+            suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating query: ends at {v} ms");
         }
@@ -174,7 +174,7 @@ impl ReaderChild for ParagraphReaderService {
             &text,
             request,
             &self.schema,
-            FUZZY_DISTANCE as u8,
+            FUZZY_DISTANCE,
             advanced,
         );
         let mut searcher = Searcher {
