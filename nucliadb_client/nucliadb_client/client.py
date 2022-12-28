@@ -26,6 +26,8 @@ from grpc import aio  # type: ignore
 from grpc import insecure_channel
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.b3 import B3MultiFormat
 
 from nucliadb_client import logger
 from nucliadb_client.exceptions import ConflictError
@@ -35,10 +37,15 @@ from nucliadb_models.resource import (
     KnowledgeBoxList,
     KnowledgeBoxObj,
 )
+from nucliadb_telemetry.grpc import OpenTelemetryGRPC
+from nucliadb_telemetry.settings import telemetry_settings
+from nucliadb_telemetry.utils import create_telemetry
 
 API_PREFIX = "api"
 KBS_PREFIX = "/kbs"
 KB_PREFIX = "/kb"
+
+SERVICE_NAME = "nucliadb_client"
 
 
 class NucliaDBClient:
@@ -170,10 +177,19 @@ class NucliaDBClient:
     def init_async_grpc(self):
         if self.writer_stub_async is not None:
             logger.warn("Exists already a writer, replacing on the new loop")
-        options = [
-            ("grpc.max_receive_message_length", 1024 * 1024 * 1024),
-        ]
-        async_channel = aio.insecure_channel(
-            f"{self.grpc_host}:{self.grpc_port}", options
-        )
-        self.writer_stub_async = WriterStub(async_channel)
+
+        max_send_message = 1024
+        grpc_addr = f"{self.grpc_host}:{self.grpc_port}"
+        if telemetry_settings.jaeger_enabled:
+            tracer_provider = create_telemetry(SERVICE_NAME)
+            telemetry_grpc = OpenTelemetryGRPC(SERVICE_NAME, tracer_provider)
+            set_global_textmap(B3MultiFormat())
+            channel = telemetry_grpc.init_client(
+                grpc_addr, max_send_message=max_send_message
+            )
+        else:
+            options = [
+                ("grpc.max_receive_message_length", max_send_message * 1024 * 1024),
+            ]
+            channel = aio.insecure_channel(grpc_addr, options)
+        self.writer_stub_async = WriterStub(channel)
