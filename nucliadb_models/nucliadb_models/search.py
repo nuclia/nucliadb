@@ -307,6 +307,6 @@ class SearchRequest(BaseModel):
                         "faceted": ["/s/p"],
                         "features": [SearchOptions.DOCUMENT],
                     },
-                }
+                },
             }
         }

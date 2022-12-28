@@ -25,7 +25,6 @@ from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
-from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos.resources_pb2 import (
     Basic,
     ExtractedText,
@@ -46,6 +45,7 @@ from nucliadb_protos.utils_pb2 import (
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
+from nucliadb_models.metadata import ResourceProcessingStatus
 
 if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]
