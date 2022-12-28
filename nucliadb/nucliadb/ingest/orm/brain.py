@@ -45,6 +45,7 @@ from nucliadb_protos.utils_pb2 import (
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
+from nucliadb_models.metadata import ResourceProcessingStatus
 
 if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]
@@ -52,6 +53,14 @@ else:
     StatusValue = int
 
 FilePagePositions = Dict[int, Tuple[int, int]]
+
+
+PROCESSING_STATUS_PB_TYPE_TO_NAME_MAP = {
+    PBBrainResource.ERROR: ResourceProcessingStatus.ERROR.name,
+    PBBrainResource.EMPTY: ResourceProcessingStatus.EMPTY.name,
+    PBBrainResource.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
+    PBBrainResource.PENDING: ResourceProcessingStatus.PENDING.name,
+}
 
 
 def get_paragraph_text(
@@ -284,6 +293,9 @@ class ResourceBrain:
         elif status == Metadata.Status.PENDING:
             self.brain.status = PBBrainResource.PENDING
 
+    def get_processing_status_tag(self) -> str:
+        return PROCESSING_STATUS_PB_TYPE_TO_NAME_MAP[self.brain.status]
+
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
 
         self.brain.metadata.created.CopyFrom(basic.created)
@@ -320,6 +332,9 @@ class ResourceBrain:
 
         # icon
         self.tags["n"].append(f"i/{basic.icon}")
+
+        # processing status
+        self.tags["n"].append(f"s/{self.get_processing_status_tag()}")
 
         # main language
         if basic.metadata.language != "":

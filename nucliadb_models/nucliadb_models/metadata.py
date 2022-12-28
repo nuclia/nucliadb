@@ -144,6 +144,7 @@ class ResourceProcessingStatus(Enum):
     PENDING = "PENDING"
     PROCESSED = "PROCESSED"
     ERROR = "ERROR"
+    EMPTY = "EMPTY"
 
 
 class Metadata(InputMetadata):

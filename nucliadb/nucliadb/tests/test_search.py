@@ -295,6 +295,7 @@ async def test_search_can_filter_by_processing_status(
     - Creates a resource for each processing status value.
     - Checks that if not specified, search returns all resources.
     - Checks that search is able to filter by each value.
+    - Checks that we can get counts for each processing status
     """
     valid_status = ["PROCESSED", "PENDING", "ERROR"]
 
@@ -328,3 +329,18 @@ async def test_search_can_filter_by_processing_status(
         )
         assert resp.status_code == 200
         assert len(resp.json()["resources"]) == 1
+
+    # Check facets by processing status
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "faceted": ["/n/s"],
+            "page_size": 0,
+        },
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    facets = resp_json["fulltext"]["facets"]
+    for status in valid_status:
+        assert facets["/n/s"][f"/n/s/{status}"] == 1

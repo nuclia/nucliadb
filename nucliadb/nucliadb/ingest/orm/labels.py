@@ -26,7 +26,7 @@ from nucliadb.ingest.maindb.driver import Transaction
 BASE_TAGS: Dict[str, List[str]] = {
     "t": [],  # doc tags
     "l": [],  # doc labels
-    "n": [],  # type of element i (Icon)
+    "n": [],  # type of element: i (Icon). s (Processing Status)
     "e": [],  # entities e/type/entityid
     "s": [],  # languages p (Principal) s (ALL)
     "u": [],  # contributors s (Source) o (Origin)
