@@ -88,3 +88,47 @@ metadata=title,summary,icon
     facets: [
         ....
     ]
+
+### FILTERS and FACETS
+
+Filters can be used to narrow down the scope of a search query, whereas facets are typically used to get category counts on search results.
+
+NucliaDB implements its own syntax for filters and facets based on "tags". This section aims to describe the complete list of tags available by providing some examples.
+
+The hierarchy of tags is the following:
+
+- `/t`: document tags
+  - Example: `/t/` (TODO)
+
+- `/l`: classification labels as `/l/{labelset}/{label}`
+  - Example: `/l/movie-genre/science-fiction`
+
+- `/n`: miscellanious types for the document
+  - `/n/i`: type of icon or content
+    - Example: `/n/i/application/pdf` or `/n/i/movie/mp4`
+  - `/n/s`: processing status
+    - Example: `/n/s/PROCESSED`, `/n/s/PENDING` or `/n/s/ERROR`
+
+- `/e`: document entities as `/e/{entity-type}/{entity-id}`
+  - Example: `/e/CITY/Barcelona`
+
+- `/s`: languages
+  - `/s/p`: main language of the document
+    - Example: `/s/p/ca` for catalan language
+  - `/s/s`: all other detected languages
+    - Example: `/s/s/tr` for turkish language
+
+- `/u`: contributors
+  - `/u/s`: Origin source
+    - Example: `` (TODO)
+  - `/u/o`: Origin contributors
+    - Example: `` (TODO)
+
+- `/p`: paragraph labels
+  - Note: not being used?
+
+- `/f`: field keyword field (field/keyword)
+  - Example: `` (TODO)
+
+- `/fg`: flat field keywords
+  - Example: `` (TODO)
