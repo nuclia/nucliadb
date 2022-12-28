@@ -95,7 +95,11 @@ impl NodeReader {
             return Err(exceptions::PyTypeError::new_err("Error loading shard"));
         };
         self.reader.load_shard(&shard_id);
-        match self.reader.paragraph_iterator(&shard_id, request) {
+        let result = self
+            .reader
+            .paragraph_iterator(&shard_id, request)
+            .transpose();
+        match result {
             Some(Ok(inner)) => Ok(PyParagraphProducer { inner }),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -108,7 +112,11 @@ impl NodeReader {
             return Err(exceptions::PyTypeError::new_err("Error loading shard"));
         };
         self.reader.load_shard(&shard_id);
-        match self.reader.document_iterator(&shard_id, request) {
+        let result = self
+            .reader
+            .document_iterator(&shard_id, request)
+            .transpose();
+        match result {
             Some(Ok(inner)) => Ok(PyDocumentProducer { inner }),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -118,10 +126,10 @@ impl NodeReader {
     pub fn get_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         let request = GetShardRequest::decode(&mut Cursor::new(shard_id)).unwrap();
         let shard_id = request.shard_id.as_ref().unwrap();
-        self.reader.load_shard(&shard_id);
+        self.reader.load_shard(shard_id);
         let response = self
             .reader
-            .get_shard(&shard_id)
+            .get_shard(shard_id)
             .map(|s| s.get_info(&request));
         match response {
             Some(Ok(stats)) => {
@@ -152,7 +160,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.search(&shard_id, search_request);
-        match response.transpose()  {
+        match response.transpose() {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -166,7 +174,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.suggest(&shard_id, suggest_request);
-        match response.transpose()  {
+        match response.transpose() {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -180,7 +188,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.vector_search(&shard_id, vector_request);
-        match response.transpose()  {
+        match response.transpose() {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -216,7 +224,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.paragraph_search(&shard_id, paragraph_request);
-        match response.transpose()  {
+        match response.transpose() {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
@@ -234,7 +242,7 @@ impl NodeReader {
         };
         self.reader.load_shard(&shard_id);
         let response = self.reader.relation_search(&shard_id, paragraph_request);
-        match response.transpose()  {
+        match response.transpose() {
             Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),

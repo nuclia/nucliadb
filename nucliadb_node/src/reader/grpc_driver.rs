@@ -96,7 +96,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId { id: shard_id.id };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.paragraph_iterator(&shard_id, request) {
+        match reader.paragraph_iterator(&shard_id, request).transpose() {
             Some(Ok(response)) => {
                 info!("Stream created correctly");
                 Ok(tonic::Response::new(GrpcStreaming(response)))
@@ -125,7 +125,7 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = ShardId { id: shard_id.id };
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.document_iterator(&shard_id, request) {
+        match reader.document_iterator(&shard_id, request).transpose() {
             Some(Ok(response)) => {
                 info!("Document stream created correctly");
                 Ok(tonic::Response::new(GrpcStreaming(response)))

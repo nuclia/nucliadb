@@ -187,20 +187,22 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: StreamRequest,
-    ) -> Option<ServiceResult<ParagraphIterator>> {
-        self.get_shard(shard_id)
-            .map(|shard| POOL.install(|| shard.paragraph_iterator(request)))
-            .map(|r| r.map_err(|e| e.into()))
+    ) -> ServiceResult<Option<ParagraphIterator>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+        Ok(Some(shard.paragraph_iterator(request)?))
     }
     #[tracing::instrument(skip_all)]
     pub fn document_iterator(
         &self,
         shard_id: &ShardId,
         request: StreamRequest,
-    ) -> Option<ServiceResult<DocumentIterator>> {
-        self.get_shard(shard_id)
-            .map(|shard| POOL.install(|| shard.document_iterator(request)))
-            .map(|r| r.map_err(|e| e.into()))
+    ) -> ServiceResult<Option<DocumentIterator>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+        Ok(Some(shard.document_iterator(request)?))
     }
     #[tracing::instrument(skip_all)]
     pub fn document_search(
