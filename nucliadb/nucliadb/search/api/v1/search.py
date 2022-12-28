@@ -22,7 +22,7 @@ from datetime import datetime
 from time import time
 from typing import List, Optional
 
-from fastapi import Header, HTTPException, Query, Request, Response
+from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -42,6 +42,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
+    SEARCH_EXAMPLES,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -149,7 +150,7 @@ async def search_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: SearchRequest,
+    item: SearchRequest = Body(examples=SEARCH_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
