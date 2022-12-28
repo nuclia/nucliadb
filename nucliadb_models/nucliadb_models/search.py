@@ -286,25 +286,3 @@ class SearchRequest(BaseModel):
     vectorset: Optional[str] = None
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
-
-
-SEARCH_EXAMPLES = {
-    "filtering_by_icon": {
-        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
-        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",
-        "value": {
-            "query": "Noam Chomsky",
-            "filters": ["/n/i/application/pdf"],
-            "features": [SearchOptions.DOCUMENT],
-        },
-    },
-    "get_language_counts": {
-        "summary": "Get the number of documents for each language",
-        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",
-        "value": {
-            "page_size": 0,
-            "faceted": ["/s/p"],
-            "features": [SearchOptions.DOCUMENT],
-        },
-    },
-}

@@ -42,7 +42,6 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
-    SEARCH_EXAMPLES,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -53,6 +52,27 @@ from nucliadb_models.search import (
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_audit
+
+SEARCH_EXAMPLES = {
+    "filtering_by_icon": {
+        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
+        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "value": {
+            "query": "Noam Chomsky",
+            "filters": ["/n/i/application/pdf"],
+            "features": [SearchOptions.DOCUMENT],
+        },
+    },
+    "get_language_counts": {
+        "summary": "Get the number of documents for each language",
+        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "value": {
+            "page_size": 0,
+            "faceted": ["/s/p"],
+            "features": [SearchOptions.DOCUMENT],
+        },
+    },
+}
 
 
 @api.get(
