@@ -195,9 +195,10 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     PAGE_NUMBER_FIELD_NUMBER: builtins.int
     RESULT_PER_PAGE_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
-    WITH_STATUS_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    WITH_STATUS_FIELD_NUMBER: builtins.int
+    ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     id: builtins.str
     body: builtins.str
     @property
@@ -212,9 +213,10 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     result_per_page: builtins.int
     @property
     def timestamps(self) -> global___Timestamps: ...
-    with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
     reload: builtins.bool
     only_faceted: builtins.bool
+    with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
+    advanced_query: builtins.str
     def __init__(
         self,
         *,
@@ -227,12 +229,16 @@ class DocumentSearchRequest(google.protobuf.message.Message):
         page_number: builtins.int = ...,
         result_per_page: builtins.int = ...,
         timestamps: global___Timestamps | None = ...,
-        with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
         reload: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
+        advanced_query: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_with_status", b"_with_status", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_with_status", b"_with_status", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "with_status", b"with_status"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "with_status", b"with_status"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_with_status", b"_with_status"]) -> typing_extensions.Literal["with_status"] | None: ...
 
 global___DocumentSearchRequest = DocumentSearchRequest
@@ -254,6 +260,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     RELOAD_FIELD_NUMBER: builtins.int
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     id: builtins.str
     uuid: builtins.str
     @property
@@ -274,6 +281,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     reload: builtins.bool
     with_duplicates: builtins.bool
     only_faceted: builtins.bool
+    advanced_query: builtins.str
     def __init__(
         self,
         *,
@@ -290,9 +298,11 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
         reload: builtins.bool = ...,
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        advanced_query: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "uuid", b"uuid", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "uuid", b"uuid", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
 
 global___ParagraphSearchRequest = ParagraphSearchRequest
 
@@ -728,6 +738,7 @@ class SearchRequest(google.protobuf.message.Message):
     DOCUMENT_FIELD_NUMBER: builtins.int
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     WITH_STATUS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
@@ -754,6 +765,7 @@ class SearchRequest(google.protobuf.message.Message):
     document: builtins.bool
     with_duplicates: builtins.bool
     only_faceted: builtins.bool
+    advanced_query: builtins.str
     with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
     def __init__(
         self,
@@ -774,10 +786,14 @@ class SearchRequest(google.protobuf.message.Message):
         document: builtins.bool = ...,
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        advanced_query: builtins.str | None = ...,
         with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_with_status", b"_with_status", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_with_status", b"_with_status", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing_extensions.Literal["_with_status", b"_with_status"]) -> typing_extensions.Literal["with_status"] | None: ...
 
 global___SearchRequest = SearchRequest

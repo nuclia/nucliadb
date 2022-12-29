@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.11
+
+- Adding advanced_query to searches
+
 ## 0.4.10
 
 - Adding `with_status` filter to document searches
