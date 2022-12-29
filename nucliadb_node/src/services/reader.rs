@@ -423,7 +423,7 @@ impl ShardReaderService {
             timestamps: search_request.timestamps.clone(),
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
-            advance_query: search_request.advance_query.clone(),
+            advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
         };
 
@@ -450,7 +450,7 @@ impl ShardReaderService {
             timestamps: search_request.timestamps.clone(),
             reload: search_request.reload,
             only_faceted: search_request.only_faceted,
-            advance_query: search_request.advance_query.clone(),
+            advanced_query: search_request.advanced_query.clone(),
         };
         let paragraph_reader_service = self.paragraph_reader.clone();
         let paragraph_task = move || {

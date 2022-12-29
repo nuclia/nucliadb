@@ -58,7 +58,7 @@ message DocumentSearchRequest {
     bool reload = 10;
     bool only_faceted = 15;
     optional noderesources.Resource.ResourceStatus with_status = 16;
-    optional string advance_query = 17;
+    optional string advanced_query = 17;
 
 }
 
@@ -86,7 +86,7 @@ message ParagraphSearchRequest {
     bool reload = 13;
     bool with_duplicates = 14;
     bool only_faceted = 15;
-    optional string advance_query = 16;
+    optional string advanced_query = 16;
 }
 
 message ResultScore {
@@ -262,7 +262,7 @@ message SearchRequest {
     bool with_duplicates = 14;
     bool only_faceted = 16;
     
-    optional string advance_query = 18;
+    optional string advanced_query = 18;
     optional noderesources.Resource.ResourceStatus with_status = 17;
 }
 

@@ -164,7 +164,7 @@ impl ReaderChild for ParagraphReaderService {
             info!("{id:?} - Searching: starts at {v} ms");
         }
         let advanced = request
-            .advance_query
+            .advanced_query
             .as_ref()
             .map(|query| parser.parse_query(query))
             .transpose()

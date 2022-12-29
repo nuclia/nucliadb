@@ -74,7 +74,7 @@ pub struct DocumentSearchRequest {
     #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="16")]
     pub with_status: ::core::option::Option<i32>,
     #[prost(string, optional, tag="17")]
-    pub advance_query: ::core::option::Option<::prost::alloc::string::String>,
+    pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchRequest {
@@ -107,7 +107,7 @@ pub struct ParagraphSearchRequest {
     #[prost(bool, tag="15")]
     pub only_faceted: bool,
     #[prost(string, optional, tag="16")]
-    pub advance_query: ::core::option::Option<::prost::alloc::string::String>,
+    pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResultScore {
@@ -332,7 +332,7 @@ pub struct SearchRequest {
     #[prost(bool, tag="16")]
     pub only_faceted: bool,
     #[prost(string, optional, tag="18")]
-    pub advance_query: ::core::option::Option<::prost::alloc::string::String>,
+    pub advanced_query: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(enumeration="super::noderesources::resource::ResourceStatus", optional, tag="17")]
     pub with_status: ::core::option::Option<i32>,
 }

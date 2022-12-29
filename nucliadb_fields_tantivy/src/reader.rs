@@ -379,12 +379,12 @@ impl FieldReaderService {
             query_parser
         };
         let text = FieldReaderService::adapt_text(&query_parser, &request.body);
-        let advance_query = request
-            .advance_query
+        let advanced_query = request
+            .advanced_query
             .as_ref()
             .map(|query| query_parser.parse_query(query))
             .transpose()?;
-        let query = create_query(&query_parser, request, &self.schema, &text, advance_query);
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query);
 
         // Offset to search from
         let results = request.result_per_page as usize;
