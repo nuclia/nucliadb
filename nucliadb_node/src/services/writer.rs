@@ -286,11 +286,9 @@ impl ShardWriterService {
         let relation_writer_service = self.relation_writer.clone();
         let relation_resource = resource.clone();
         let relation_task = move || {
-            println!("Relation service starts set_resource");
             info!("Relation service starts set_resource");
             let mut writer = relation_writer_service.write().unwrap();
             let result = writer.set_resource(&relation_resource);
-            println!("Relation service ends set_resource");
             info!("Relation service ends set_resource");
             result
         };
