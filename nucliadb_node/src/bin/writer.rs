@@ -91,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Error starting gRPC writer");
     });
 
+    let telemetry_handle = nucliadb_telemetry::start_telemetry_loop();
     let mut cluster_watcher = node.cluster_watcher().await;
     let monitor_task = tokio::task::spawn(async move {
         loop {
@@ -164,7 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Running");
 
     tokio::try_join!(writer_task, monitor_task)?;
-
+    telemetry_handle.terminate_telemetry().await;
     // node_writer_service.shutdown().await;
 
     Ok(())
