@@ -81,13 +81,8 @@ async def test_get_resource_default_options(
 
         resource = resp.json()
 
-        # DEBUG
-        # import json  # noqa
-        # print(json.dumps(data, indent=4))
-
         expected_root_fields = set(ID + BASIC)
         assert set(resource.keys()) == expected_root_fields
-
         assert "data" not in resource
 
 

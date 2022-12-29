@@ -198,7 +198,7 @@ class ComputedMetadata(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.ComputedMetadata) -> _T:
-        values = {"field_classifications": []}
+        values: Dict[str, List[FieldClassification]] = {"field_classifications": []}
         for fc in message.field_classifications:
             values["field_classifications"].append(
                 FieldClassification(

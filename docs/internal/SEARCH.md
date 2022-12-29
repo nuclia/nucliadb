@@ -105,9 +105,10 @@ The hierarchy of tags is the following:
 
 - `/n`: miscellanious types for the document
   - `/n/i`: type of icon or content
-    - Example: `/n/i/application/pdf` or `/n/i/movie/mp4`
+    - Example filters: `/n/i/application/pdf` or `/n/i/movie/mp4`
+
   - `/n/s`: processing status
-    - Example: `/n/s/PROCESSED`, `/n/s/PENDING` or `/n/s/ERROR`
+    - Example facet results: `/n/s/PROCESSED`, `/n/s/PENDING` or `/n/s/ERROR`
 
 - `/e`: document entities as `/e/{entity-type}/{entity-id}`
   - Example: `/e/CITY/Barcelona`
