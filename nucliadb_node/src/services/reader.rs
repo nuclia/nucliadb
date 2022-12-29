@@ -483,7 +483,7 @@ impl ShardReaderService {
             }
         };
 
-        let relation_request = search_request.relations.clone();
+        let relation_request = search_request.relations;
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || {
             if !skip_relations {
