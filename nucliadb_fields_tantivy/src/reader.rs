@@ -35,7 +35,7 @@ use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
-    ReloadPolicy, Searcher, TantivyError,
+    ReloadPolicy, Result as TantivyResult, Searcher, TantivyError,
 };
 use tracing::*;
 
@@ -136,7 +136,8 @@ impl ReaderChild for FieldReaderService {
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         info!("Document search at {}:{}", line!(), file!());
-        Ok(self.do_search(request))
+        self.do_search(request)
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)
     }
     #[tracing::instrument(skip_all)]
     fn reload(&self) {
@@ -401,7 +402,7 @@ impl FieldReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    fn do_search(&self, request: &DocumentSearchRequest) -> DocumentSearchResponse {
+    fn do_search(&self, request: &DocumentSearchRequest) -> TantivyResult<DocumentSearchResponse> {
         use crate::search_query::create_query;
         let id = Some(&request.id);
         let time = SystemTime::now();
@@ -415,7 +416,12 @@ impl FieldReaderService {
             query_parser
         };
         let text = FieldReaderService::adapt_text(&query_parser, &request.body);
-        let query = create_query(&query_parser, request, &self.schema, &text);
+        let advanced_query = request
+            .advanced_query
+            .as_ref()
+            .map(|query| query_parser.parse_query(query))
+            .transpose()?;
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query);
 
         // Offset to search from
         let results = request.result_per_page as usize;
@@ -449,10 +455,10 @@ impl FieldReaderService {
             _ if request.only_faceted => {
                 // Just a facet search
                 let facets_count = searcher.search(&query, &facet_collector).unwrap();
-                DocumentSearchResponse {
+                Ok(DocumentSearchResponse {
                     facets: produce_facets(facets, facets_count),
                     ..Default::default()
-                }
+                })
             }
             Some(order_field) => {
                 let mut multicollector = MultiCollector::new();
@@ -464,7 +470,7 @@ impl FieldReaderService {
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                self.convert_int_order(
+                let result = self.convert_int_order(
                     SearchResponse {
                         facets_count,
                         facets,
@@ -475,7 +481,8 @@ impl FieldReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
-                )
+                );
+                Ok(result)
             }
             None => {
                 let mut multicollector = MultiCollector::new();
@@ -485,7 +492,7 @@ impl FieldReaderService {
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
                 let top_docs = topdocs_handler.extract(&mut multi_fruit);
-                self.convert_bm25_order(
+                let result = self.convert_bm25_order(
                     SearchResponse {
                         facets_count,
                         facets,
@@ -496,7 +503,8 @@ impl FieldReaderService {
                         results_per_page: results as i32,
                     },
                     &searcher,
-                )
+                );
+                Ok(result)
             }
         }
     }

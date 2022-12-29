@@ -175,7 +175,7 @@ async def knowledgebox_counters(
 
     try:
         resource_count = 0
-        async for key in txn.keys(
+        async for _ in txn.keys(
             match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid), count=-1
         ):
             resource_count += 1

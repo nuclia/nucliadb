@@ -24,6 +24,8 @@ use nucliadb_protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId,
     SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
+use nucliadb_telemetry::payload::TelemetryEvent;
+use nucliadb_telemetry::send_telemetry_event;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing::*;
@@ -90,6 +92,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
 
         info!("Creating new shard");
+        send_telemetry_event(TelemetryEvent::Create).await;
         let mut writer = self.0.write().await;
         let result = writer.new_shard();
         std::mem::drop(writer);
@@ -101,6 +104,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
 
         info!("gRPC delete_shard {:?}", request);
+        send_telemetry_event(TelemetryEvent::Delete).await;
         // Deletion does not require for the shard
         // to be loaded.
         let shard_id = request.into_inner();
@@ -392,6 +396,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
         self.instrument(&request);
+
+        send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         info!("Running garbage collection at {}", shard_id.id);
         self.shard_loading(&shard_id).await;

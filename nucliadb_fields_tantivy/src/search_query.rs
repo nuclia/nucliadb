@@ -48,6 +48,7 @@ pub fn create_query(
     search: &DocumentSearchRequest,
     schema: &FieldSchema,
     text: &str,
+    with_advance: Option<Box<dyn Query>>,
 ) -> Box<dyn Query> {
     let mut queries = vec![];
     let main_q = if text.is_empty() {
@@ -88,6 +89,11 @@ pub fn create_query(
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
         queries.push((Occur::Must, Box::new(term_query)));
     };
+
+    // Advance query
+    if let Some(query) = with_advance {
+        queries.push((Occur::Must, query));
+    }
 
     if queries.len() == 1 && queries[0].1.is::<AllQuery>() {
         queries.pop().unwrap().1

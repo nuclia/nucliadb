@@ -75,12 +75,12 @@ class ChitchatNucliaDB:
         logger.info("new connection accepted")
         while True:
             try:
-                logger.info("wait data in socket")
+                logger.debug("wait data in socket")
                 mgr_message = await reader.read(
                     4096
                 )  # TODO: add message types enum with proper deserialization
                 if len(mgr_message) == 0:
-                    logger.info("empty message received")
+                    logger.debug("empty message received")
                     # TODO: Improve communication
                     await asyncio.sleep(1)
                     continue
