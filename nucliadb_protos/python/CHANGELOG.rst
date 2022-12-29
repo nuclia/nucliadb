@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+0.0.42
+------
+
+- Add advanced_query to search protos
+
 0.0.41
 ------
 
