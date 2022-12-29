@@ -91,6 +91,7 @@ async def search_knowledgebox(
     response: Response,
     kbid: str,
     query: str = Query(default=""),
+    advanced_query: Optional[str] = Query(default=None),
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
@@ -128,6 +129,7 @@ async def search_knowledgebox(
 
     item = SearchRequest(
         query=query,
+        advanced_query=advanced_query,
         fields=fields,
         filters=filters,
         faceted=faceted,
@@ -217,6 +219,7 @@ async def search(
         kbid,
         features=item.features,
         query=item.query,
+        advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
         sort=item.sort.value if item.sort else None,

@@ -344,3 +344,65 @@ async def test_search_can_filter_by_processing_status(
     facets = resp_json["fulltext"]["facets"]
     for status in valid_status:
         assert facets["/n/s"][f"/n/s/{status}"] == 1
+
+
+@pytest.mark.asyncio
+async def test_search_advanced_query(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    """
+    Test description:
+    - Searching with an invalid tantivy syntax should return an error
+    - Searching with a valid tantivy advanced query should return expected results
+    - Searching with advanceed query and a regular query should return expected results
+    """
+    kbid = knowledgebox
+
+    # Inject a couple of messages
+    bm = broker_resource(kbid)
+    bm.uuid = "barack"
+    bm.basic.title = "barack obama"
+    bm.basic.summary = "Barack was the president some time ago"
+    await inject_message(nucliadb_grpc, bm)
+
+    bm = broker_resource(kbid)
+    bm.uuid = "trump"
+    bm.basic.title = "donald trump"
+    bm.basic.summary = "Donald Trump has also been a president in the past"
+    await inject_message(nucliadb_grpc, bm)
+
+    # Invalid advanced query
+    invalid_advanced_query = "IN [unbalanced-parenthesis"
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "advanced_query": invalid_advanced_query,
+        },
+    )
+    assert resp.status_code != 200
+
+    # Valid advanced query
+    advanced_query = 'uuid:"barack" OR uuid:"trump"'
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search?advanced_query={advanced_query}"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["resources"]["barack"]
+    assert resp_json["resources"]["trump"]
+
+    # Advanced query + regular query should AND the results
+    query_all = ""
+    advanced_query = 'uuid:"barack"'
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": query_all,
+            "advanced_query": advanced_query,
+        }
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["resources"]["barack"]

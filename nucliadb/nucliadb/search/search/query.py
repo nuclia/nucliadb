@@ -40,6 +40,7 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
+    advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
@@ -82,6 +83,8 @@ async def global_query_to_pb(
 
     if SearchOptions.DOCUMENT in features or SearchOptions.PARAGRAPH in features:
         request.body = query
+        if advanced_query is not None:
+            request.advanced_query = advanced_query
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
         if sort:
