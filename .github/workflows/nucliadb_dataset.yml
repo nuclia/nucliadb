@@ -64,7 +64,7 @@ jobs:
           pip install -r test-requirements.txt
           pip install -r nucliadb_dataset/requirements-sources.txt
           pip install -r nucliadb_dataset/requirements.txt
-          pip install -r nucliadb_dataset/requirements-test.txt
+          pip install -r nucliadb_dataset/requirements-tests.txt
           pip install -e nucliadb_dataset
 
       - name: Check mypy
