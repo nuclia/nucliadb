@@ -143,7 +143,9 @@ class Node(AbstractNode):
     _reader: Optional[NodeReaderStub] = None
     _sidecar: Optional[NodeSidecarStub] = None
 
-    def __init__(self, address: str, label: str, load_score: float, dummy: bool = False):
+    def __init__(
+        self, address: str, label: str, load_score: float, dummy: bool = False
+    ):
         self.address = address
         self.label = label
         self.load_score = load_score
