@@ -325,6 +325,9 @@ message Member {
 
     /// Dummy Member
     bool dummy = 5;
+
+    /// The load score of the member.
+    float load_score = 6;
 }
 
 message ListMembersRequest {
