@@ -356,7 +356,8 @@ async def test_search_advanced_query(
     Test description:
     - Searching with an invalid tantivy syntax should return an error
     - Searching with a valid tantivy advanced query should return expected results
-    - Searching with advanceed query and a regular query should return expected results
+    - Searching with advanceed query and a regular query should return the intersection 
+      of the results (ie: AND operation)
     """
     kbid = knowledgebox
 
@@ -405,4 +406,5 @@ async def test_search_advanced_query(
     )
     assert resp.status_code == 200
     resp_json = resp.json()
+    assert len(resp_json["resources"]) == 1
     assert resp_json["resources"]["barack"]
