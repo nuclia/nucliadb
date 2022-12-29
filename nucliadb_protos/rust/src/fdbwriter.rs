@@ -454,12 +454,15 @@ pub struct Member {
     //// If true, it means self.
     #[prost(bool, tag="3")]
     pub is_self: bool,
-    //// Writer, Node, Reader
+    //// Io, Ingest, Search, Train.
     #[prost(string, tag="4")]
     pub r#type: ::prost::alloc::string::String,
     //// Dummy Member
     #[prost(bool, tag="5")]
     pub dummy: bool,
+    //// The load score of the member.
+    #[prost(float, tag="6")]
+    pub load_score: f32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListMembersRequest {
