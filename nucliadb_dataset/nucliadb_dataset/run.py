@@ -20,16 +20,16 @@
 from pathlib import Path
 
 import pydantic_argparse
-from nucliadb_protos.dataset_pb2 import TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset import DatasetType, ExportType
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 
 DATASET_TYPE_MAPPING = {
-    DatasetType.FIELD_CLASSIFICATION: Type.FIELD_CLASSIFICATION,
-    DatasetType.PARAGRAPH_CLASSIFICATION: Type.PARAGRAPH_CLASSIFICATION,
-    DatasetType.SENTENCE_CLASSIFICATION: Type.SENTENCE_CLASSIFICATION,
-    DatasetType.TOKEN_CLASSIFICATION: Type.TOKEN_CLASSIFICATION,
+    DatasetType.FIELD_CLASSIFICATION: TaskType.FIELD_CLASSIFICATION,
+    DatasetType.PARAGRAPH_CLASSIFICATION: TaskType.PARAGRAPH_CLASSIFICATION,
+    DatasetType.SENTENCE_CLASSIFICATION: TaskType.SENTENCE_CLASSIFICATION,
+    DatasetType.TOKEN_CLASSIFICATION: TaskType.TOKEN_CLASSIFICATION,
 }
 
 

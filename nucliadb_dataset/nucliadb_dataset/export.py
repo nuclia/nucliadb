@@ -20,7 +20,7 @@
 from typing import Optional
 
 import requests
-from nucliadb_protos.dataset_pb2 import TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_sdk.client import Environment, NucliaDBClient
@@ -50,7 +50,7 @@ class NucliaDatasetsExport:
 
     def export(self):
         dataset_def = {
-            "type": Type.Name(self.trainset.type),
+            "type": TaskType.Name(self.trainset.type),
             "batch_size": self.trainset.batch_size,
             "filter": {"labels": list(self.trainset.filter.labels)},
         }
