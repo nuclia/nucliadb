@@ -63,6 +63,7 @@ from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.utilities import (
     Utility,
+    clean_utility,
     clear_global_cache,
     get_utility,
     set_utility,
@@ -281,6 +282,7 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
 async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     url = f"redis://{redis[0]}:{redis[1]}"
     settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
+    settings.driver = "redis"
     driver = RedisDriver(url=url)
     await driver.initialize()
     if driver.redis is not None:
@@ -592,9 +594,13 @@ async def fake_node(indexing_utility_ingest):
         nats_target=indexing_settings.index_jetstream_target,
         dummy=True,
     )
+
+    old_index_local = indexing_settings.index_local
+    indexing_settings.index_local = False
     set_utility(Utility.INDEXING, indexing_utility)
     yield
-    set_utility(Utility.INDEXING, None)
+    clean_utility(Utility.INDEXING)
+    indexing_settings.index_local = old_index_local
     await Node.destroy(uuid1)
     await Node.destroy(uuid2)
 

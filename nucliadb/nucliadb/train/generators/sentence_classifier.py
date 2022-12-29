@@ -63,25 +63,25 @@ async def get_sentences(kbid: str, result: str) -> List[str]:
 
     if split is not None:
         text = extracted_text.split_text[split]
-        paragraph = next(
-            filter(
-                lambda x: x.key == result,
-                field_metadata.split_metadata[split].paragraphs,
-            )
-        )
-        for sentence in paragraph.sentences:
-            splitted_text = text[sentence.start : sentence.end]
-            splitted_texts.append(splitted_text)
+        valid_paragraph = [
+            x
+            for x in field_metadata.split_metadata[split].paragraphs
+            if x.key == result
+        ]
+        if len(valid_paragraph) > 0:
+            paragraph = valid_paragraph[0]
+            for sentence in paragraph.sentences:
+                splitted_text = text[sentence.start : sentence.end]
+                splitted_texts.append(splitted_text)
     else:
-        paragraph = next(
-            filter(
-                lambda x: x.key == result,
-                field_metadata.metadata.paragraphs,
-            )
-        )
-        for sentence in paragraph.sentences:
-            splitted_text = text[sentence.start : sentence.end]
-            splitted_texts.append(splitted_text)
+        valid_paragraph = [
+            x for x in field_metadata.metadata.paragraphs if x.key == result
+        ]
+        if len(valid_paragraph) > 0:
+            paragraph = valid_paragraph[0]
+            for sentence in paragraph.sentences:
+                splitted_text = text[sentence.start : sentence.end]
+                splitted_texts.append(splitted_text)
     return splitted_texts
 
 

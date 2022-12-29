@@ -76,7 +76,8 @@ def set_utility(ident: Utility, util: Any):
 
 
 def clean_utility(ident: Utility):
-    del MAIN[ident]
+    if ident in MAIN:
+        del MAIN[ident]
 
 
 async def get_storage(

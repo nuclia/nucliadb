@@ -29,6 +29,7 @@ from nucliadb.config import cleanup_config, config_nucliadb
 from nucliadb.run import run_async_nucliadb
 from nucliadb.settings import Settings
 from nucliadb.writer import API_PREFIX
+from nucliadb_utils.utilities import clear_global_cache
 
 
 def free_port() -> int:
@@ -62,6 +63,7 @@ async def nucliadb(dummy_processing):
         server = await run_async_nucliadb(settings)
         yield settings
         cleanup_config()
+        clear_global_cache()
         await server.shutdown()
 
 

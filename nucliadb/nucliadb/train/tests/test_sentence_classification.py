@@ -239,9 +239,6 @@ async def test_generator_sentence_classification(
         assert len(data["partitions"]) == 1
         partition_id = data["partitions"][0]
 
-    import pdb
-
-    pdb.set_trace()
     trainset = TrainSet()
     trainset.type = Type.SENTENCE_CLASSIFICATION
     trainset.batch_size = 2

@@ -37,6 +37,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.settings import Settings
 from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
@@ -172,7 +173,7 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
 @pytest.fixture(scope="function")
 async def test_pagination_resources(
-    processor, knowledgebox_ingest, test_settings_train
+    processor: Processor, knowledgebox_ingest, test_settings_train
 ):
     """
     Create a set of resources with only basic information to test pagination
@@ -203,7 +204,6 @@ async def test_pagination_resources(
             match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
         ):
             count += 1
-
         await txn.abort()
         if count == amount:
             break
@@ -256,7 +256,6 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
     storage_settings.file_backend = "gcs"
     storage_settings.gcs_bucket = "test_{kbid}"
     settings.grpc_port = free_port()
-
     set_utility(Utility.CACHE, cache)
     yield
     storage_settings.file_backend = old_file_backend
