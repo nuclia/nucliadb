@@ -46,6 +46,7 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
     bm = BrokerMessage()
     bm.uuid = "test1"
+    bm.slug = bm.basic.slug = "slugtest"
     bm.kbid = result.uuid
     bm.texts["text1"].body = "My text1"
     bm.files["file1"].file.uri = "http://nofile"
@@ -79,6 +80,7 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert found is False
         found = True
         assert export.basic.title == "My Title"
+        assert export.slug == export.basic.slug == "slugtest"
         assert export.extracted_text[0].body.text == "My text"
     assert found
 

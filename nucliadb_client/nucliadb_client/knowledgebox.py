@@ -108,7 +108,7 @@ class KnowledgeBox:
         response_obj = ResourceList.parse_raw(response.content)
         result = []
         for resource in response_obj.resources:
-            result.append(Resource(rid=resource.id, kb=self))
+            result.append(Resource(rid=resource.id, kb=self, slug=resource.slug))
         return result
 
     def iter_resources(self, page_size: int = 20):
@@ -139,7 +139,7 @@ class KnowledgeBox:
         if type_line == CODEX.RES:
             pb_bm = BrokerMessage()
             pb_bm.ParseFromString(payload)
-            res = Resource(rid=pb_bm.uuid, kb=self)
+            res = Resource(rid=pb_bm.uuid, kb=self, slug=pb_bm.basic.slug)
             res._bm = pb_bm
             await res.commit(processor=False)
         elif type_line == CODEX.ENT:
