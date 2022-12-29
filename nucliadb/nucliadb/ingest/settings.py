@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     driver_tikv_url: Optional[List[str]] = []
     driver_local_url: Optional[str] = None
 
-    partitions: List[str] = ["1"]
+    partitions: List[str] = [
+        "1",
+    ]
 
     pull_time: int = 100
 

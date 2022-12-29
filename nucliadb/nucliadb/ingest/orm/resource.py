@@ -735,7 +735,8 @@ class Resource:
 
     async def compute_global_text(self):
         # For each extracted
-        for fieldid in self._modified_extracted_text:
+        for type, field in await self.get_fields_ids(force=True):
+            fieldid = FieldID(field_type=type, field=field)
             await self.compute_global_text_field(fieldid, self.indexer)
 
     async def compute_global_text_field(self, fieldid: FieldID, brain: ResourceBrain):

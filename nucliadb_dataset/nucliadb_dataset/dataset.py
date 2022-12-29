@@ -187,13 +187,13 @@ class NucliaDBDataset:
         filename = f"{self.base_path}/{filename}.arrow"
         print(f"Generating partition {partition_id} from {self.base_url} at {filename}")
         with open(filename, "wb") as sink:
-            with pa.ipc.new_file(sink, self.schema) as writer:
+            with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in self.streamer:
                     print(f"\r {counter}")
                     batch = self.map(batch)
                     if batch is None:
                         break
-                    writer.write(batch)
+                    writer.write_batch(batch)
                     counter += 1
         print("-" * 10)
         self.streamer.finalize()

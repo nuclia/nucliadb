@@ -428,7 +428,12 @@ class ResourceBrain:
 
         for klass_entity, _ in metadata.positions.items():
             tags["e"].append(klass_entity)
-            klass, entity = klass_entity.split("/")
+            entity_array = klass_entity.split("/")
+            if len(entity_array) == 1:
+                raise AttributeError(f"Entity should be with type {klass_entity}")
+            elif len(entity_array) > 1:
+                klass = entity_array[0]
+                entity = "/".join(entity_array[1:])
             relation_node_entity = RelationNode(
                 value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
             )

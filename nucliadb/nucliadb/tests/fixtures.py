@@ -25,7 +25,7 @@ from httpx import AsyncClient
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.config import config_nucliadb
+from nucliadb.config import cleanup_config, config_nucliadb
 from nucliadb.run import run_async_nucliadb
 from nucliadb.settings import Settings
 from nucliadb.writer import API_PREFIX
@@ -61,6 +61,7 @@ async def nucliadb(dummy_processing):
         config_nucliadb(settings)
         server = await run_async_nucliadb(settings)
         yield settings
+        cleanup_config()
         await server.shutdown()
 
 
@@ -95,7 +96,10 @@ async def nucliadb_manager(nucliadb: Settings):
 async def knowledgebox(nucliadb_manager: AsyncClient):
     resp = await nucliadb_manager.post("/kbs", json={"slug": "knowledgebox"})
     assert resp.status_code == 201
-    return resp.json().get("uuid")
+    uuid = resp.json().get("uuid")
+    yield uuid
+    resp = await nucliadb_manager.delete(f"/kb/{uuid}")
+    assert resp.status_code == 200
 
 
 @pytest.fixture(scope="function")

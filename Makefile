@@ -95,6 +95,7 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
 	MYPYPATH=./mypy_stubs mypy nucliadb
 
+
 venv:  ## Initializes an environment
 	pyenv virtualenv nucliadb
 	pyenv local nucliadb
@@ -117,7 +118,11 @@ base-node-image:
 
 build-search-images: build-local-node build-local-cluster-manager build-local-sidecar
 
-build-local-node:
+build-node:
+	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
+
+# Not use the base image
+build-base-node-image:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_local .
 
 build-local-cluster-manager:

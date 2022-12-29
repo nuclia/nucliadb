@@ -18,18 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import AsyncIterator, List
 import uuid
-import nats
-from os.path import dirname
 from datetime import datetime
 
 import aiohttp
-from nucliadb.ingest.maindb.redis import RedisDriver
-from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
-from nucliadb_utils.cache.redis import RedisPubsub
-from nucliadb_utils.cache.utility import Cache
-from nucliadb_utils.indexing import IndexingUtility
 import pytest
 from grpc import aio
 from nucliadb_protos.knowledgebox_pb2 import EntitiesGroup, Label, LabelSet
@@ -45,14 +37,13 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.settings import Settings
+from nucliadb.train.utils import start_nodes_manager, stop_nodes_manager
 from nucliadb_utils.utilities import (
     Utility,
     clear_global_cache,
     get_storage,
-    get_utility,
     set_utility,
 )
 
@@ -180,7 +171,9 @@ def broker_processed_resource(knowledgebox, number, rid) -> BrokerMessage:
 
 
 @pytest.fixture(scope="function")
-async def test_pagination_resources(processor, knowledgebox, test_settings_train):
+async def test_pagination_resources(
+    processor, knowledgebox_ingest, test_settings_train
+):
     """
     Create a set of resources with only basic information to test pagination
     """
@@ -188,10 +181,10 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
 
     # Create resources
     for i in range(1, amount + 1):
-        message = broker_simple_resource(knowledgebox, i)
+        message = broker_simple_resource(knowledgebox_ingest, i)
         await processor.process(message=message, seqid=-1, transaction_check=False)
 
-        message = broker_processed_resource(knowledgebox, i, message.uuid)
+        message = broker_processed_resource(knowledgebox_ingest, i, message.uuid)
         await processor.process(message=message, seqid=-1, transaction_check=False)
         # Give processed data some time to reach the node
 
@@ -207,7 +200,7 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
         txn = await driver.begin()
         count = 0
         async for key in txn.keys(
-            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox), count=-1
+            match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox_ingest), count=-1
         ):
             count += 1
 
@@ -220,7 +213,7 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     # Add entities
     storage = await get_storage()
     txn = await driver.begin()
-    kb = KnowledgeBox(txn, storage, kbid=knowledgebox, cache=None)
+    kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest, cache=None)
     entities = EntitiesGroup()
     entities.entities["entity1"].value = "PERSON"
     await kb.set_entities_force("group1", entities)
@@ -235,7 +228,7 @@ async def test_pagination_resources(processor, knowledgebox, test_settings_train
     await kb.set_labelset(label_title, labelset)
     await txn.commit(resource=False)
 
-    yield knowledgebox
+    yield knowledgebox_ingest
 
 
 def free_port() -> int:
@@ -254,6 +247,11 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
     running_settings.debug = False
     print(f"Redis ready at {redis_driver.url}")
 
+    old_file_backend = storage_settings.file_backend
+    old_gcs_endpoint_url = storage_settings.gcs_endpoint_url
+    old_gcs_bucket = storage_settings.gcs_bucket
+    old_grpc_port = settings.grpc_port
+
     storage_settings.gcs_endpoint_url = gcs
     storage_settings.file_backend = "gcs"
     storage_settings.gcs_bucket = "test_{kbid}"
@@ -261,6 +259,10 @@ def test_settings_train(cache, gcs, fake_node, redis_driver):  # type: ignore
 
     set_utility(Utility.CACHE, cache)
     yield
+    storage_settings.file_backend = old_file_backend
+    storage_settings.gcs_endpoint_url = old_gcs_endpoint_url
+    storage_settings.gcs_bucket = old_gcs_bucket
+    settings.grpc_port = old_grpc_port
 
 
 @pytest.fixture(scope="function")

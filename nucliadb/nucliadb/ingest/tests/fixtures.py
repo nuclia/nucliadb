@@ -582,8 +582,10 @@ async def local_node():
 
 @pytest.fixture(scope="function")
 async def fake_node(indexing_utility_ingest):
-    await Node.set(str(uuid.uuid4()), address="nohost:9999", label="N", dummy=True)
-    await Node.set(str(uuid.uuid4()), address="nohost:9999", label="N", dummy=True)
+    uuid1 = str(uuid.uuid4())
+    uuid2 = str(uuid.uuid4())
+    await Node.set(uuid1, address="nohost:9999", label="N", dummy=True)
+    await Node.set(uuid2, address="nohost:9999", label="N", dummy=True)
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
@@ -591,6 +593,10 @@ async def fake_node(indexing_utility_ingest):
         dummy=True,
     )
     set_utility(Utility.INDEXING, indexing_utility)
+    yield
+    set_utility(Utility.INDEXING, None)
+    await Node.destroy(uuid1)
+    await Node.destroy(uuid2)
 
 
 @pytest.fixture(scope="function")
@@ -719,14 +725,14 @@ def make_field_metadata(field_id):
     p1.classifications.append(cl1)
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
-    ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
+    # ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
     ex1.metadata.metadata.last_index.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_extract.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_summary.FromDatetime(datetime.now())
     ex1.metadata.metadata.thumbnail.CopyFrom(THUMBNAIL)
-    ex1.metadata.metadata.positions["document"].entity = "Ramon"
-    ex1.metadata.metadata.positions["document"].position.extend(
+    ex1.metadata.metadata.positions["ENTITY/document"].entity = "document"
+    ex1.metadata.metadata.positions["ENTITY/document"].position.extend(
         [rpb.Position(start=0, end=5), rpb.Position(start=23, end=28)]
     )
     return ex1
@@ -995,8 +1001,8 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
 
     # 2.3 TEXT FIELDS
 
-    t2 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
-    textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t2)
+    t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
 
     await textfield.set_extracted_text(make_extracted_text(textfield.id, body="MyText"))
     await textfield.set_field_metadata(make_field_metadata(textfield.id))

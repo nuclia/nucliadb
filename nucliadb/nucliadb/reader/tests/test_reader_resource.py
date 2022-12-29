@@ -53,9 +53,9 @@ EXTRACTED = ("extracted",)
 
 @pytest.mark.asyncio
 async def test_get_resource_inexistent(
-    reader_api: Callable[..., AsyncClient], knowledgebox: str
+    reader_api: Callable[..., AsyncClient], knowledgebox_ingest: str
 ) -> None:
-    kbid = knowledgebox
+    kbid = knowledgebox_ingest
     rid = "000000000000001"
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:

@@ -392,7 +392,7 @@ async def test_resource_endpoints_by_slug(
 )
 async def test_resource_endpoints_by_slug_404(
     writer_api,
-    knowledgebox,
+    knowledgebox_ingest,
     method,
     endpoint,
     payload,
@@ -400,7 +400,7 @@ async def test_resource_endpoints_by_slug_404(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         endpoint = endpoint.format(
             KB_PREFIX=KB_PREFIX,
-            kb=knowledgebox,
+            kb=knowledgebox_ingest,
             RSLUG_PREFIX=RSLUG_PREFIX,
             slug="idonotexist",
         )

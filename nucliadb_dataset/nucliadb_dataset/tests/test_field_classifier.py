@@ -46,8 +46,8 @@ def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification
         fse.export()
         files = os.listdir(tmpdirname)
         for filename in files:
-            with open(f"{tmpdirname}/{filename}", "rb") as source:
-                loaded_array = pa.ipc.open_file(source).read_all()
+            with pa.memory_map(f"{tmpdirname}/{filename}", "rb") as source:
+                loaded_array = pa.ipc.open_stream(source).read_all()
                 assert len(loaded_array) == 2
 
 
@@ -133,6 +133,6 @@ def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
         assert len(partitions) == 1
         filename = fse.generate_partition(partitions[0])
 
-        with open(filename, "rb") as source:
-            loaded_array = pa.ipc.open_file(source).read_all()
+        with pa.memory_map(filename, "rb") as source:
+            loaded_array = pa.ipc.open_stream(source).read_all()
             assert len(loaded_array) == 2

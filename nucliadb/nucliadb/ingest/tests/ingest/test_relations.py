@@ -171,12 +171,8 @@ async def test_ingest_field_metadata_relation_extraction(
             field="title",
         )
     )
-    fcmw.metadata.metadata.ner.update(
-        {
-            "value-1": "subtype-1",
-            "value-2": "subtype-1",
-        }
-    )
+    fcmw.metadata.metadata.positions["subtype-1/value-1"].entity = "value-1"
+    fcmw.metadata.metadata.positions["subtype-1/value-2"].entity = "value-2"
 
     fcmw.metadata.metadata.classifications.extend(
         [

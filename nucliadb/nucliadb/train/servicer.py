@@ -83,7 +83,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbobj = await self.proc.get_kb_obj(txn, request.kb.uuid)
         response = GetEntitiesResponse()
         if kbobj is not None:
             await kbobj.get_entities(response)
@@ -98,7 +98,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         self, request: GetLabelsRequest, context=None
     ) -> GetLabelsResponse:
         txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbobj = await self.proc.get_kb_obj(txn, request.kb.uuid)
         labels: Optional[Labels] = None
         if kbobj is not None:
             labels = await kbobj.get_labels()
