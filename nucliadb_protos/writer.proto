@@ -320,7 +320,7 @@ message Member {
     /// If true, it means self.
     bool is_self = 3;
 
-    /// Writer, Node, Reader
+    /// Io, Ingest, Search, Train.
     string type = 4;
 
     /// Dummy Member
