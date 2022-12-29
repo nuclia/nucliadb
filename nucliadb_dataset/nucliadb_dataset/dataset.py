@@ -23,9 +23,9 @@ import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
+    TaskType,
     TokenClassificationBatch,
     TrainSet,
-    Type,
 )
 
 from nucliadb_dataset.mapping import (
@@ -54,16 +54,16 @@ class NucliaDBDataset:
         self.mappings: List[Callable] = []
         self.streamer = Streamer(self.trainset, self.client)
 
-        if self.trainset.type == Type.PARAGRAPH_CLASSIFICATION:
+        if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
             self.configure_paragraph_classification()
 
-        if self.trainset.type == Type.FIELD_CLASSIFICATION:
+        if self.trainset.type == TaskType.FIELD_CLASSIFICATION:
             self.configure_field_classification()
 
-        if self.trainset.type == Type.TOKEN_CLASSIFICATION:
+        if self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
             self.configure_token_classification()
 
-        if self.trainset.type == Type.SENTENCE_CLASSIFICATION:
+        if self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
             self.configure_sentence_classification()
 
     def configure_sentence_classification(self):

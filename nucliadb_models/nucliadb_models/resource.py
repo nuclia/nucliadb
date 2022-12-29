@@ -71,7 +71,7 @@ class ExtractedDataTypeName(str, Enum):
     VECTOR = "vectors"
     LINK = "link"
     FILE = "file"
-    USERVECTOR = "uservectors"
+    USERVECTORS = "uservectors"
 
 
 class KnowledgeBoxConfig(BaseModel):

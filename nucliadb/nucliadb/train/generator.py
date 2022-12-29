@@ -20,7 +20,7 @@
 
 
 from fastapi import HTTPException
-from nucliadb_protos.dataset_pb2 import TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb.train.generators.field_classifier import (
     generate_field_classification_payloads,
@@ -42,7 +42,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     node_manager = get_nodes_manager()
     node, shard_replica_id = await node_manager.get_reader(kbid, shard)
 
-    if trainset.type == Type.PARAGRAPH_CLASSIFICATION:
+    if trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
                 status_code=422,
@@ -56,7 +56,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
-    if trainset.type == Type.FIELD_CLASSIFICATION:
+    if trainset.type == TaskType.FIELD_CLASSIFICATION:
 
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
@@ -71,7 +71,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
-    if trainset.type == Type.TOKEN_CLASSIFICATION:
+    if trainset.type == TaskType.TOKEN_CLASSIFICATION:
 
         async for token_data in generate_token_classification_payloads(
             kbid, trainset, node, shard_replica_id
@@ -80,7 +80,7 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload
 
-    if trainset.type == Type.SENTENCE_CLASSIFICATION:
+    if trainset.type == TaskType.SENTENCE_CLASSIFICATION:
 
         if len(trainset.filter.labels) == 0:
             raise HTTPException(

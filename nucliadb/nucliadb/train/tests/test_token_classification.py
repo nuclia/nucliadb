@@ -23,7 +23,7 @@ from typing import AsyncIterator, List
 
 import aiohttp
 import pytest
-from nucliadb_protos.dataset_pb2 import TokenClassificationBatch, TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TaskType, TokenClassificationBatch, TrainSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
     Position,
@@ -241,7 +241,7 @@ async def test_generator_token_classification(
         partition_id = data["partitions"][0]
 
     trainset = TrainSet()
-    trainset.type = Type.TOKEN_CLASSIFICATION
+    trainset.type = TaskType.TOKEN_CLASSIFICATION
     trainset.batch_size = 2
     trainset.filter.labels.append("PERSON")
     trainset.filter.labels.append("ORG")

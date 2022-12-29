@@ -5,7 +5,7 @@ package dataset;
 
 
 // Train API V2
-enum Type {
+enum TaskType {
     FIELD_CLASSIFICATION = 0;
     PARAGRAPH_CLASSIFICATION = 1;
     SENTENCE_CLASSIFICATION = 2;
@@ -13,7 +13,7 @@ enum Type {
 }
 
 message TrainSet {
-    Type type = 1;
+    TaskType type = 1;
     message Filter {
         repeated string labels = 1;
     }

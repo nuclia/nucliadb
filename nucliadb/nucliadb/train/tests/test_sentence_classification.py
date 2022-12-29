@@ -22,7 +22,7 @@ from typing import AsyncIterator
 
 import aiohttp
 import pytest
-from nucliadb_protos.dataset_pb2 import SentenceClassificationBatch, TrainSet, Type
+from nucliadb_protos.dataset_pb2 import SentenceClassificationBatch, TaskType, TrainSet
 from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
@@ -240,7 +240,7 @@ async def test_generator_sentence_classification(
         partition_id = data["partitions"][0]
 
     trainset = TrainSet()
-    trainset.type = Type.SENTENCE_CLASSIFICATION
+    trainset.type = TaskType.SENTENCE_CLASSIFICATION
     trainset.batch_size = 2
     trainset.filter.labels.append("labelset_paragraphs")
 

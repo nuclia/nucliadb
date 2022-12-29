@@ -90,7 +90,7 @@ async def set_resource_field_extracted_data(
         if data_vec is not None:
             field_data.vectors = models.VectorObject.from_message(data_vec)
 
-    if ExtractedDataTypeName.USERVECTOR in wanted_extracted_data:
+    if ExtractedDataTypeName.USERVECTORS in wanted_extracted_data:
         user_data_vec = await field.get_user_vectors()
         if user_data_vec is not None:
             field_data.uservectors = UserVectorSet.from_message(user_data_vec)

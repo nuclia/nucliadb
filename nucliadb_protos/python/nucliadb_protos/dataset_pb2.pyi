@@ -18,25 +18,25 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-class _Type:
+class _TaskType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Type.ValueType], builtins.type):  # noqa: F821
+class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_TaskType.ValueType], builtins.type):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    FIELD_CLASSIFICATION: _Type.ValueType  # 0
-    PARAGRAPH_CLASSIFICATION: _Type.ValueType  # 1
-    SENTENCE_CLASSIFICATION: _Type.ValueType  # 2
-    TOKEN_CLASSIFICATION: _Type.ValueType  # 3
+    FIELD_CLASSIFICATION: _TaskType.ValueType  # 0
+    PARAGRAPH_CLASSIFICATION: _TaskType.ValueType  # 1
+    SENTENCE_CLASSIFICATION: _TaskType.ValueType  # 2
+    TOKEN_CLASSIFICATION: _TaskType.ValueType  # 3
 
-class Type(_Type, metaclass=_TypeEnumTypeWrapper):
+class TaskType(_TaskType, metaclass=_TaskTypeEnumTypeWrapper):
     """Train API V2"""
 
-FIELD_CLASSIFICATION: Type.ValueType  # 0
-PARAGRAPH_CLASSIFICATION: Type.ValueType  # 1
-SENTENCE_CLASSIFICATION: Type.ValueType  # 2
-TOKEN_CLASSIFICATION: Type.ValueType  # 3
-global___Type = Type
+FIELD_CLASSIFICATION: TaskType.ValueType  # 0
+PARAGRAPH_CLASSIFICATION: TaskType.ValueType  # 1
+SENTENCE_CLASSIFICATION: TaskType.ValueType  # 2
+TOKEN_CLASSIFICATION: TaskType.ValueType  # 3
+global___TaskType = TaskType
 
 class _LabelFrom:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -74,14 +74,14 @@ class TrainSet(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     FILTER_FIELD_NUMBER: builtins.int
     BATCH_SIZE_FIELD_NUMBER: builtins.int
-    type: global___Type.ValueType
+    type: global___TaskType.ValueType
     @property
     def filter(self) -> global___TrainSet.Filter: ...
     batch_size: builtins.int
     def __init__(
         self,
         *,
-        type: global___Type.ValueType = ...,
+        type: global___TaskType.ValueType = ...,
         filter: global___TrainSet.Filter | None = ...,
         batch_size: builtins.int = ...,
     ) -> None: ...

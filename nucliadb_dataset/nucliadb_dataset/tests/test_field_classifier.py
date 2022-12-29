@@ -23,7 +23,7 @@ import tempfile
 from uuid import uuid4
 
 import pyarrow as pa  # type: ignore
-from nucliadb_protos.dataset_pb2 import TrainSet, Type
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
@@ -32,7 +32,7 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
-    trainset.type = Type.FIELD_CLASSIFICATION
+    trainset.type = TaskType.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
 
@@ -83,7 +83,7 @@ def test_nucliadb_export_fields(
     knowledgebox: KnowledgeBox, upload_data_field_classification, requests_mock
 ):
     trainset = TrainSet()
-    trainset.type = Type.FIELD_CLASSIFICATION
+    trainset.type = TaskType.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
 
@@ -92,7 +92,7 @@ def test_nucliadb_export_fields(
 
 # def test_nucliadb_export_tokens(knowledgebox: KnowledgeBox, upload_data_token_classification, requests_mock):
 #     trainset = TrainSet()
-#     trainset.type = Type.TOKEN_CLASSIFICATION
+#     trainset.type = TaskType.TOKEN_CLASSIFICATION
 #     trainset.filter.labels.append("labelset1")
 #     trainset.batch_size = 2
 
@@ -101,7 +101,7 @@ def test_nucliadb_export_fields(
 
 # def test_nucliadb_export_paragraphs(knowledgebox: KnowledgeBox, upload_data_paragraph_classification, requests_mock):
 #     trainset = TrainSet()
-#     trainset.type = Type.PARAGRAPH_CLASSIFICATION
+#     trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
 #     trainset.filter.labels.append("labelset1")
 #     trainset.batch_size = 2
 
@@ -110,7 +110,7 @@ def test_nucliadb_export_fields(
 
 # def test_nucliadb_export_sentences(knowledgebox: KnowledgeBox, upload_data_sentence_classification, requests_mock):
 #     trainset = TrainSet()
-#     trainset.type = Type.SENTENCE_CLASSIFICATION
+#     trainset.type = TaskType.SENTENCE_CLASSIFICATION
 #     trainset.filter.labels.append("labelset1")
 #     trainset.batch_size = 2
 
@@ -119,7 +119,7 @@ def test_nucliadb_export_fields(
 
 def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
     trainset = TrainSet()
-    trainset.type = Type.FIELD_CLASSIFICATION
+    trainset.type = TaskType.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
     trainset.batch_size = 2
 

@@ -22,7 +22,7 @@ from typing import AsyncIterator
 
 import aiohttp
 import pytest
-from nucliadb_protos.dataset_pb2 import ParagraphClassificationBatch, TrainSet, Type
+from nucliadb_protos.dataset_pb2 import ParagraphClassificationBatch, TaskType, TrainSet
 from nucliadb_protos.knowledgebox_pb2 import Label, LabelSet
 from nucliadb_protos.resources_pb2 import (
     Metadata,
@@ -233,7 +233,7 @@ async def test_generator_paragraph_classification(
         partition_id = data["partitions"][0]
 
     trainset = TrainSet()
-    trainset.type = Type.PARAGRAPH_CLASSIFICATION
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
     trainset.batch_size = 2
     trainset.filter.labels.append("labelset_paragraphs")
 

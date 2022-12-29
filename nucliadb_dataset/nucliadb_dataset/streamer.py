@@ -61,7 +61,7 @@ class Streamer:
         return self
 
     def read(self) -> Optional[bytes]:
-        if self.resp is None:
+        if not self.initialized:
             raise Exception("Not initialized")
         try:
             header = self.resp.raw.read(4, decode_content=True)
