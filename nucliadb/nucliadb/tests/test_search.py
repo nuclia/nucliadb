@@ -402,7 +402,7 @@ async def test_search_advanced_query(
         json={
             "query": query_all,
             "advanced_query": advanced_query,
-        }
+        },
     )
     assert resp.status_code == 200
     resp_json = resp.json()
