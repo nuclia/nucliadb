@@ -400,7 +400,7 @@ class ResourceBrain:
         # labels
         for classification in basic.usermetadata.classifications:
             self.tags["l"].append(f"{classification.labelset}/{classification.label}")
-            relationnodelabel = RelationNode(
+            relation_node_label = RelationNode(
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
             )
@@ -408,7 +408,7 @@ class ResourceBrain:
                 Relation(
                     relation=Relation.ABOUT,
                     source=relationnodedocument,
-                    to=relationnodelabel,
+                    to=relation_node_label,
                 )
             )
 
@@ -429,7 +429,7 @@ class ResourceBrain:
             label = f"{classification.labelset}/{classification.label}"
             if label not in user_canceled_labels:
                 tags["l"].append(label)
-                relationnodelabel = RelationNode(
+                relation_node_label = RelationNode(
                     value=label,
                     ntype=RelationNode.NodeType.LABEL,
                 )
@@ -437,7 +437,7 @@ class ResourceBrain:
                     Relation(
                         relation=Relation.ABOUT,
                         source=relation_node_document,
-                        to=relationnodelabel,
+                        to=relation_node_label,
                     )
                 )
 

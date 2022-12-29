@@ -71,18 +71,19 @@ class NucliaDBClient:
 
     def get_resource(self, id: str):
         url = RESOURCE_PATH.format(kburl=self.url, rid=id)
+        params = {
+            "show": ["values", "relations", "origin", "basic"],
+            "extracted": ["vectors", "text", "metadata", "link", "file"],
+        }
         response = self.reader_session.get(
-            url
-            + "?show=values&show=relations&show=origin&show=basic&extracted=vectors&extracted=text&extracted=metadata&extracted=link&extracted=file"  # noqa
+            url,
+            params=params,
         )
         if response.status_code == 200:
             return Resource.parse_raw(response.content)
         elif response.status_code == 404:
             url = RESOURCE_PATH_BY_SLUG.format(kburl=self.url, slug=id)
-            response = self.reader_session.get(
-                url
-                + "?show=values&show=relations&show=origin&show=basic&extracted=vectors&extracted=text&extracted=metadata&extracted=link&extracted=file"  # noqa
-            )
+            response = self.reader_session.get(url, params=params)
             if response.status_code == 200:
                 return Resource.parse_raw(response.content)
             else:

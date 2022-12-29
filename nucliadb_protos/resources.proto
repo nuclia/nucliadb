@@ -318,7 +318,7 @@ message Classification {
     string labelset = 1;
     string label = 2;
     bool cancelled_by_user = 3;
-    string split = 4;
+    string split = 4;  // On field classification we need to set on which split is the classification
 }
 
 message UserMetadata {

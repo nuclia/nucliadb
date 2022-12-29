@@ -502,6 +502,7 @@ pub struct Classification {
     pub label: ::prost::alloc::string::String,
     #[prost(bool, tag="3")]
     pub cancelled_by_user: bool,
+    /// On field classification we need to set on which split is the classification
     #[prost(string, tag="4")]
     pub split: ::prost::alloc::string::String,
 }

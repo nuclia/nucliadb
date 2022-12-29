@@ -1279,6 +1279,7 @@ class Classification(google.protobuf.message.Message):
     label: builtins.str
     cancelled_by_user: builtins.bool
     split: builtins.str
+    """On field classification we need to set on which split is the classification"""
     def __init__(
         self,
         *,

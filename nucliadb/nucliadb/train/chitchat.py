@@ -37,7 +37,7 @@ async def start_chitchat(service_name: str):
             await start_chitchat_ingest(service_name)
     else:
         logger.info(
-            "Not registering search chitchat as already exist a chitchat utility"
+            "Not registering train chitchat as a chitchat utility already exists"
         )
 
 
