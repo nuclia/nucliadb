@@ -349,7 +349,7 @@ async def test_get_resource_extracted_metadata(
         metadata = resource["data"]["texts"]["text1"]["extracted"]["metadata"][
             "metadata"
         ]
-        assert metadata["positions"]["document"]["entity"] == "Ramon"
+        assert metadata["positions"]["ENTITY/document"]["entity"] == "document"
 
 
 @pytest.mark.asyncio
