@@ -486,17 +486,22 @@ class KnowledgeBox:
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(cls, driver: Driver, kbid: str):
+    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size=1_000):
         # Delete KB Keys
         prefix = KB_KEYS.format(kbid=kbid)
         done = False
         while done is False:
             txn = await driver.begin()
             done = True
-            async for key in txn.keys(match=prefix, count=-1):
+            async for chunk_of_keys in iter_in_chunks(
+                txn.keys(match=prefix, count=-1), chunk_size=chunk_size
+            ):
                 done = False
-                await txn.delete(key)
-            await txn.commit(resource=False)
+                for key in chunk_of_keys:
+                    await txn.delete(key)
+                await txn.commit(resource=False)
+            if done:
+                await txn.abort()
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
 
@@ -613,3 +618,16 @@ class KnowledgeBox:
                     if config is not None
                     else False,
                 )
+
+
+async def iter_in_chunks(gen: AsyncGenerator, chunk_size=100):
+    chunk = []
+
+    async for item in gen:
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+        chunk.append(item)
+
+    if len(chunk):
+        yield chunk
