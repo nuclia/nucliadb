@@ -473,7 +473,7 @@ async def test_file_field_validation(writer_api, knowledgebox_writer):
 @pytest.mark.asyncio()
 async def test_field_endpoints_by_slug(
     writer_api,
-    knowledgebox,
+    knowledgebox_ingest,
     method,
     endpoint,
     payload,
@@ -484,7 +484,7 @@ async def test_field_endpoints_by_slug(
         field_type = "text"
 
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RESOURCES_PREFIX}",
             headers={"X-SYNCHRONOUS": "True"},
             json={"slug": slug},
         )
@@ -502,7 +502,7 @@ async def test_field_endpoints_by_slug(
         )
 
         resp = await op(
-            f"/{KB_PREFIX}/{knowledgebox}/{RSLUG_PREFIX}/idonotexist" + url,
+            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/idonotexist" + url,
             **extra_params,
         )
         assert resp.status_code == 404
@@ -514,6 +514,7 @@ async def test_field_endpoints_by_slug(
             field_type=field_type,
         )
         resp = await op(
-            f"/{KB_PREFIX}/{knowledgebox}/{RSLUG_PREFIX}/{slug}" + url, **extra_params
+            f"/{KB_PREFIX}/{knowledgebox_ingest}/{RSLUG_PREFIX}/{slug}" + url,
+            **extra_params,
         )
         assert str(resp.status_code).startswith("2")

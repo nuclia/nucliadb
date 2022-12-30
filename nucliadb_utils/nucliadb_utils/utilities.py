@@ -63,6 +63,8 @@ class Utility(str, Enum):
     INDEXING = "indexing"
     AUDIT = "audit"
     STORAGE = "storage"
+    TRAIN = "train"
+    TRAIN_SERVER = "train_server"
 
 
 def get_utility(ident: Utility):
@@ -74,7 +76,8 @@ def set_utility(ident: Utility, util: Any):
 
 
 def clean_utility(ident: Utility):
-    del MAIN[ident]
+    if ident in MAIN:
+        del MAIN[ident]
 
 
 async def get_storage(
@@ -165,13 +168,13 @@ async def get_nuclia_storage() -> NucliaStorage:
 
 
 async def get_cache() -> Optional[Cache]:
-    util = get_utility(Utility.CACHE)
+    util: Optional[Cache] = get_utility(Utility.CACHE)
     if util is None and cache_settings.cache_enabled:
         driver = Cache()
         set_utility(Utility.CACHE, driver)
         logger.info("Configuring cache")
 
-    cache = get_utility(Utility.CACHE)
+    cache: Optional[Cache] = get_utility(Utility.CACHE)
     if cache and not cache.initialized:
         await cache.initialize()
     return cache

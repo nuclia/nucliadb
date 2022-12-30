@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
     driver_local_url: Optional[str] = None
+    nodes_load_ingest: bool = False
 
 
 settings = Settings()

@@ -25,14 +25,14 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 
 @pytest.mark.asyncio
 async def test_get_info(
-    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetInfoRequest()
-    req.kb.uuid = knowledgebox
+    req.kb.uuid = knowledgebox_ingest
 
     with aioresponses() as m:
         m.get(
-            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox}/counters",
+            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox_ingest}/counters",
             payload={"resources": 4, "paragraphs": 89, "fields": 4, "sentences": 90},
         )
 

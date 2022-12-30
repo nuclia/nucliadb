@@ -100,6 +100,7 @@ message DocumentResult {
     string uuid = 1;
     ResultScore score = 3;
     string field = 4;
+    repeated string labels = 5;
 }
 
 message DocumentSearchResponse {
@@ -134,6 +135,8 @@ message ParagraphResult {
 
     // Metadata that can't be searched with but is returned on search results
     noderesources.ParagraphMetadata metadata = 11;
+
+    repeated string labels = 12;
 }
 
 message ParagraphSearchResponse {
@@ -326,6 +329,22 @@ message GetShardRequest {
     string vectorset = 2;
 }
 
+message ParagraphItem {
+    string id = 1;
+    repeated string labels = 2;
+} 
+
+message DocumentItem {
+    string uuid = 1;
+    string field = 2;
+    repeated string labels = 3;
+}
+
+message StreamRequest {
+    Filter filter = 1;
+    bool reload = 2;
+    noderesources.ShardId shard_id = 3;
+}
 
 // Implemented at nucliadb_object_storage
 
@@ -337,15 +356,18 @@ service NodeReader {
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
     rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
-
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
     rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
-
+    
     rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
     rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
-
+    
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
+
+    // Streams
+    rpc Paragraphs(StreamRequest) returns (stream ParagraphItem) {}
+    rpc Documents(StreamRequest) returns (stream DocumentItem) {}
 }

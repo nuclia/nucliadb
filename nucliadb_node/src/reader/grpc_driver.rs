@@ -21,6 +21,7 @@
 use async_std::sync::RwLock;
 use nucliadb_protos::node_reader_server::NodeReader;
 use nucliadb_protos::*;
+use nucliadb_services::{DocumentIterator, ParagraphIterator};
 use opentelemetry::global;
 use tracing::{Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -55,8 +56,91 @@ impl NodeReaderGRPCDriver {
         Span::current().set_parent(parent_cx);
     }
 }
+
+pub struct GrpcStreaming<T>(T);
+impl futures_core::Stream for GrpcStreaming<ParagraphIterator> {
+    type Item = Result<ParagraphItem, tonic::Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::task::Poll::Ready(self.0.next().map(Ok))
+    }
+}
+impl futures_core::Stream for GrpcStreaming<DocumentIterator> {
+    type Item = Result<DocumentItem, tonic::Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::task::Poll::Ready(self.0.next().map(Ok))
+    }
+}
+
 #[tonic::async_trait]
 impl NodeReader for NodeReaderGRPCDriver {
+    type ParagraphsStream = GrpcStreaming<ParagraphIterator>;
+    type DocumentsStream = GrpcStreaming<DocumentIterator>;
+    async fn paragraphs(
+        &self,
+        request: tonic::Request<StreamRequest>,
+    ) -> Result<tonic::Response<Self::ParagraphsStream>, tonic::Status> {
+        info!("Starting paragraph streaming");
+        self.instrument(&request);
+        let request = request.into_inner();
+        let Some(shard_id) = request.shard_id.clone() else {
+            return Err(tonic::Status::not_found("Shard ID not present"));
+        };
+        let shard_id = ShardId { id: shard_id.id };
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.paragraph_iterator(&shard_id, request).transpose() {
+            Some(Ok(response)) => {
+                info!("Stream created correctly");
+                Ok(tonic::Response::new(GrpcStreaming(response)))
+            }
+            Some(Err(e)) => {
+                info!("Stream could not be created");
+                Err(tonic::Status::internal(e.to_string()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+
+    async fn documents(
+        &self,
+        request: tonic::Request<StreamRequest>,
+    ) -> Result<tonic::Response<Self::DocumentsStream>, tonic::Status> {
+        info!("Starting document streaming");
+        self.instrument(&request);
+        let request = request.into_inner();
+        let Some(shard_id) = request.shard_id.clone() else {
+            return Err(tonic::Status::not_found("Shard ID not present"));
+        };
+        let shard_id = ShardId { id: shard_id.id };
+        self.shard_loading(&shard_id).await;
+        let reader = self.0.read().await;
+        match reader.document_iterator(&shard_id, request).transpose() {
+            Some(Ok(response)) => {
+                info!("Document stream created correctly");
+                Ok(tonic::Response::new(GrpcStreaming(response)))
+            }
+            Some(Err(e)) => {
+                info!("Document stream could not be created");
+                Err(tonic::Status::internal(e.to_string()))
+            }
+            None => {
+                let message = format!("Error loading shard {:?}", shard_id);
+                Err(tonic::Status::not_found(message))
+            }
+        }
+    }
+
     #[tracing::instrument(skip_all)]
     async fn get_shard(
         &self,

@@ -46,7 +46,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_with_basic(
-    gcs_storage, txn, cache, fake_node, knowledgebox: str
+    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     basic = PBBasic(
         icon="text/plain",
@@ -78,7 +78,7 @@ async def test_create_resource_orm_with_basic(
 
     basic.fieldmetadata.append(ufm1)
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 
@@ -103,7 +103,7 @@ async def test_create_resource_orm_with_basic(
 
 @pytest.mark.asyncio
 async def test_iterate_paragraphs(
-    gcs_storage, txn, cache, fake_node, knowledgebox: str
+    gcs_storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     # Create a resource
     basic = PBBasic(
@@ -119,7 +119,7 @@ async def test_iterate_paragraphs(
     basic.metadata.status = PBMetadata.Status.PROCESSED
 
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
     assert r is not None
 

@@ -17,7 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+from pathlib import Path
+from typing import List, Optional
+
+import pydantic
 from pydantic import BaseSettings
+
+from nucliadb_dataset import DatasetType, ExportType
+from nucliadb_sdk.client import Environment
 
 
 class Settings(BaseSettings):
@@ -26,3 +34,36 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class RunningSettings(pydantic.BaseSettings):
+    export: ExportType = pydantic.Field(
+        ExportType.FILESYSTEM, description="Destination of export"
+    )
+    path: str = pydantic.Field(
+        f"{Path.home()}/.nuclia/download", description="Download path"
+    )
+    url: str = pydantic.Field(description="KnowledgeBox URL")
+    type: DatasetType = pydantic.Field(description="Dataset Type")
+    labelset: Optional[str] = pydantic.Field(
+        description="For classification which labelset"
+    )
+    families: Optional[List[str]] = pydantic.Field(description="List of family group")
+
+    datasets_url: Optional[str] = pydantic.Field(
+        description="Base url for the Nuclia datasets component (including /api/v1)™"
+    )
+
+    apikey: Optional[str] = pydantic.Field(
+        description="API key to upload to Nuclia Datasets™"
+    )
+
+    environment: Environment = pydantic.Field(
+        Environment.OSS, description="CLOUD or OSS"
+    )
+
+    service_token: Optional[str] = pydantic.Field(
+        description="Service account key to access Nuclia Cloud"
+    )
+
+    batch_size: int = pydantic.Field(20, description="Batch streaming size")

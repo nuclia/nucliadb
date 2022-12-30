@@ -1881,6 +1881,7 @@ dependencies = [
 name = "nucliadb_fields_tantivy"
 version = "0.1.0"
 dependencies = [
+ "itertools",
  "nucliadb_service_interface",
  "tantivy 0.17.0",
 ]
@@ -1941,12 +1942,13 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.4.10"
+version = "0.4.12"
 dependencies = [
  "bincode",
  "log",
  "nucliadb_node",
  "nucliadb_protos",
+ "nucliadb_service_interface",
  "openssl",
  "prost",
  "prost-types",

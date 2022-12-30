@@ -20,14 +20,20 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from typing import AsyncIterator, Optional
 from uuid import uuid4
 
 from nucliadb_protos.nodereader_pb2 import (
+    DocumentItem,
     GetShardRequest,
+    ParagraphItem,
+    ParagraphSearchRequest,
+    ParagraphSearchResponse,
     SearchRequest,
     SearchResponse,
+    StreamRequest,
     SuggestRequest,
     SuggestResponse,
 )
@@ -78,6 +84,18 @@ class LocalReaderWrapper:
         pb.ParseFromString(pb_bytes)
         return pb
 
+    async def ParagraphSearch(
+        self, request: ParagraphSearchRequest
+    ) -> ParagraphSearchResponse:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.paragraph_search, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        pb = ParagraphSearchResponse()
+        pb.ParseFromString(pb_bytes)
+        return pb
+
     async def GetShard(self, request: GetShardRequest) -> NodeResourcesShard:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
@@ -97,6 +115,84 @@ class LocalReaderWrapper:
         pb = SuggestResponse()
         pb.ParseFromString(pb_bytes)
         return pb
+
+    async def Documents(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[DocumentItem]:
+        loop = asyncio.get_running_loop()
+        q: asyncio.Queue[DocumentItem] = asyncio.Queue(1)
+        exception = None
+        _END = object()
+
+        def thread_generator():
+            nonlocal exception
+            generator = self.reader.documents(stream_request.SerializeToString())
+            try:
+                element = generator.next()
+                while element is not None:
+                    pb_bytes = bytes(element)
+                    pb = DocumentItem()
+                    pb.ParseFromString(pb_bytes)
+                    asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
+                    element = generator.next()
+            except TypeError:
+                # this is the end
+                pass
+            except Exception as e:
+                exception = e
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+
+        t1 = threading.Thread(target=thread_generator)
+        t1.start()
+
+        while True:
+            next_item = await q.get()
+            if next_item is _END:
+                break
+            yield next_item
+        if exception is not None:
+            raise exception
+        await loop.run_in_executor(self.executor, t1.join)
+
+    async def Paragraphs(
+        self, stream_request: StreamRequest
+    ) -> AsyncIterator[ParagraphItem]:
+
+        loop = asyncio.get_running_loop()
+        q: asyncio.Queue[ParagraphItem] = asyncio.Queue(1)
+        exception = None
+        _END = object()
+
+        def thread_generator():
+            nonlocal exception
+            generator = self.reader.paragraphs(stream_request.SerializeToString())
+            try:
+                element = generator.next()
+                while element is not None:
+                    pb_bytes = bytes(element)
+                    pb = ParagraphItem()
+                    pb.ParseFromString(pb_bytes)
+                    asyncio.run_coroutine_threadsafe(q.put(pb), loop).result()
+                    element = generator.next()
+            except TypeError:
+                # this is the end
+                pass
+            except Exception as e:
+                exception = e
+            finally:
+                asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+
+        t1 = threading.Thread(target=thread_generator)
+        t1.start()
+        while True:
+            next_item = await q.get()
+            if next_item is _END:
+                break
+            yield next_item
+        if exception is not None:
+            raise exception
+        await loop.run_in_executor(self.executor, t1.join)
 
 
 class LocalNode(AbstractNode):

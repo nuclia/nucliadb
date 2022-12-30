@@ -20,17 +20,28 @@
 from typing import Optional
 
 from grpc import aio  # type: ignore
-from grpc_health.v1 import health, health_pb2_grpc  # type: ignore
+from grpc_health.v1 import health, health_pb2_grpc
 
-from nucliadb.train import logger
-from nucliadb.train.servicer import TrainServicer
+from nucliadb.ingest.utils import get_driver
+from nucliadb.train.nodes import TrainNodesManager  # type: ignore
 from nucliadb.train.settings import settings
 from nucliadb_protos import train_pb2_grpc
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    get_cache,
+    get_storage,
+    get_utility,
+    set_utility,
+)
 
 
-async def start_grpc(service_name: Optional[str] = None):
+async def start_train_grpc(service_name: Optional[str] = None):
+    actual_service = get_utility(Utility.TRAIN)
+    if actual_service is not None:
+        return
 
     aio.init_grpc_aio()
 
@@ -43,6 +54,8 @@ async def start_grpc(service_name: Optional[str] = None):
     else:
         server = aio.server()
 
+    from nucliadb.train.servicer import TrainServicer
+
     servicer = TrainServicer()
     await servicer.initialize()
     health_servicer = health.aio.HealthServicer()  # type: ignore
@@ -51,12 +64,37 @@ async def start_grpc(service_name: Optional[str] = None):
     train_pb2_grpc.add_TrainServicer_to_server(servicer, server)
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     await server.start()
-    logger.info(
-        f"======= Train GRPC serving on http://0.0.0.0:{settings.grpc_port}/ ======"
+    set_utility(Utility.TRAIN, servicer)
+    set_utility(Utility.TRAIN_SERVER, server)
+
+
+async def stop_train_grpc():
+    if get_utility(Utility.TRAIN_SERVER):
+        server = get_utility(Utility.TRAIN_SERVER)
+        await server.stop(grace=False)
+        clean_utility(Utility.TRAIN_SERVER)
+    if get_utility(Utility.TRAIN):
+        util = get_utility(Utility.TRAIN)
+        await util.finalize()
+        clean_utility(Utility.TRAIN)
+
+
+async def start_nodes_manager():
+    driver = await get_driver()
+    cache = await get_cache()
+    storage = await get_storage()
+    set_utility(
+        Utility.NODES, TrainNodesManager(driver=driver, cache=cache, storage=storage)
     )
 
-    async def finalizer():
-        await servicer.finalize()
-        await server.stop(grace=False)
 
-    return finalizer
+async def stop_nodes_manager():
+    if get_utility(Utility.NODES):
+        clean_utility(Utility.NODES)
+
+
+def get_nodes_manager() -> TrainNodesManager:
+    util = get_utility(Utility.NODES)
+    if util is None:
+        raise AttributeError("No Node Manager defined")
+    return util

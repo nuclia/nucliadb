@@ -162,9 +162,9 @@ class Node(AbstractNode):
         shard = PBShard(shard=sharduuid)
         try:
             for node in nodes:
-                print(f"Node description: {node}")
+                logger.info(f"Node description: {node}")
                 node_obj = NODES.get(node)
-                print(f"Node obj: {node_obj}")
+                logger.info(f"Node obj: {node_obj}")
                 if node_obj is None:
                     raise NodesUnsync()
                 shard_created = await node_obj.new_shard()
@@ -439,8 +439,3 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
             if node is not None:
                 logger.info(f"{key}/{node.label} remove {node.address}")
                 await Node.destroy(key)
-
-
-class DefinedNodesNucliaDBSearch:
-    async def start(self):
-        await Node.load_active_nodes()

@@ -38,25 +38,17 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
-from nucliadb.ingest.orm.processor import Processor
-from nucliadb.ingest.utils import get_driver
-from nucliadb.train import SERVICE_NAME
 from nucliadb.train.settings import settings
+from nucliadb.train.utils import get_nodes_manager
 from nucliadb_protos import train_pb2_grpc
-from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
     async def initialize(self):
-        storage = await get_storage(service_name=SERVICE_NAME)
-        audit = get_audit()
-        driver = await get_driver()
-        cache = await get_cache()
-        self.proc = Processor(driver=driver, storage=storage, audit=audit, cache=cache)
-        await self.proc.initialize()
+        self.proc = get_nodes_manager()
 
     async def finalize(self):
-        await self.proc.finalize()
+        pass
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
         async for sentence in self.proc.kb_sentences(request):
@@ -91,7 +83,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
         txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbobj = await self.proc.get_kb_obj(txn, request.kb.uuid)
         response = GetEntitiesResponse()
         if kbobj is not None:
             await kbobj.get_entities(response)
@@ -106,7 +98,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         self, request: GetLabelsRequest, context=None
     ) -> GetLabelsResponse:
         txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbobj = await self.proc.get_kb_obj(txn, request.kb.uuid)
         labels: Optional[Labels] = None
         if kbobj is not None:
             labels = await kbobj.get_labels()

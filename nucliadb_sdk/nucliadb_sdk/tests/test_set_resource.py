@@ -15,7 +15,7 @@ def test_create_resource(knowledgebox: KnowledgeBox):
         key="mykey1",
         binary=File(data=b"asd", filename="data"),
         text="I'm Ramon",
-        labels=["positive"],
+        labels=["labelset/positive"],
         entities=[Entity(type="NAME", value="Ramon", positions=[(5, 9)])],
         vectors=[Vector(value=[1.0, 0.2], vectorset="base")],
     )
@@ -51,7 +51,7 @@ async def test_create_resource_async(knowledgebox: KnowledgeBox):
         key="mykey1",
         binary=File(data=b"asd", filename="data"),
         text="asd",
-        labels=["positive"],
+        labels=["labelset/positive"],
         entities=[Entity(type="NAME", value="Ramon", positions=[(5, 9)])],
         vectors=[Vector(value=[1.0, 0.2], vectorset="base")],
     )

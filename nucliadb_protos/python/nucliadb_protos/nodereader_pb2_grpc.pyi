@@ -3,6 +3,7 @@
 isort:skip_file
 """
 import abc
+import collections.abc
 import grpc
 import nucliadb_protos.nodereader_pb2
 import nucliadb_protos.noderesources_pb2
@@ -102,6 +103,15 @@ class NodeReaderStub:
         nucliadb_protos.nodereader_pb2.SuggestRequest,
         nucliadb_protos.nodereader_pb2.SuggestResponse,
     ]
+    Paragraphs: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.ParagraphItem,
+    ]
+    """Streams"""
+    Documents: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.nodereader_pb2.StreamRequest,
+        nucliadb_protos.nodereader_pb2.DocumentItem,
+    ]
 
 class NodeReaderServicer(metaclass=abc.ABCMeta):
     """Implemented at nucliadb_object_storage"""
@@ -190,5 +200,18 @@ class NodeReaderServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodereader_pb2.SuggestRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodereader_pb2.SuggestResponse: ...
+    @abc.abstractmethod
+    def Paragraphs(
+        self,
+        request: nucliadb_protos.nodereader_pb2.StreamRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.ParagraphItem]:
+        """Streams"""
+    @abc.abstractmethod
+    def Documents(
+        self,
+        request: nucliadb_protos.nodereader_pb2.StreamRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.nodereader_pb2.DocumentItem]: ...
 
 def add_NodeReaderServicer_to_server(servicer: NodeReaderServicer, server: grpc.Server) -> None: ...

@@ -1,10 +1,11 @@
 import base64
-from typing import Optional
+from typing import Callable, Optional, Union, cast
 from uuid import uuid4
 
 from nucliadb_models.common import Classification, FieldID
 from nucliadb_models.common import File as NDBModelsFile
 from nucliadb_models.file import FileField
+from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import Origin, TokenSplit, UserFieldMetadata, UserMetadata
 from nucliadb_models.resource import Resource
 from nucliadb_models.text import TextField
@@ -33,6 +34,8 @@ def create_resource(
         create_payload.slug = SlugString(key)
     if icon is not None:
         create_payload.icon = icon
+    else:
+        create_payload.icon = "application/generic"
     main_field = None
     if text is not None:
         create_payload.texts[FieldIdString("text")] = TextField(body=text)
@@ -62,7 +65,12 @@ def create_resource(
                     )
                 )
             elif isinstance(label, str):
-                classifications.append(Classification(labelset="", label=label))
+                if label.count("/") != 1:
+                    raise AttributeError("Str labels should be labelset/label")
+                labelset, label_str = label.split("/")
+                classifications.append(
+                    Classification(labelset=labelset, label=label_str)
+                )
 
         create_payload.usermetadata = UserMetadata(classifications=classifications)
 
@@ -159,7 +167,13 @@ def update_resource(
                     )
                 )
             elif isinstance(label, str):
-                classifications.append(Classification(labelset="", label=label))
+                if label.count("/") != 1:
+                    raise AttributeError("Str labels should be labelset/label")
+                labelset, label_str = label.split("/")
+
+                classifications.append(
+                    Classification(labelset=labelset, label=label_str)
+                )
 
         upload_payload.usermetadata = UserMetadata(classifications=classifications)
 
@@ -206,3 +220,81 @@ def update_resource(
         upload_payload.uservectors = uvsw
 
     return upload_payload
+
+
+def from_resource_to_payload(
+    item: Resource,
+    download: Callable[[str], bytes],
+    update: bool = False,
+):
+    if update:
+        payload: Union[
+            UpdateResourcePayload, CreateResourcePayload
+        ] = UpdateResourcePayload()
+        payload.slug = item.slug  # type: ignore
+    else:
+        payload = CreateResourcePayload()
+        payload.slug = item.id  # type: ignore
+
+    payload.title = item.title
+    payload.summary = item.summary
+    if item.icon is not None:
+        payload.icon = item.icon
+    payload.thumbnail = item.thumbnail
+    payload.layout = item.layout
+
+    payload.usermetadata = item.usermetadata
+    payload.fieldmetadata = item.fieldmetadata
+
+    payload.origin = item.origin
+
+    if item.data is not None and item.data.texts is not None:
+        for field, field_payload in item.data.texts.items():
+            if field_payload is not None and field_payload.value is not None:
+                payload.texts[cast(FieldIdString, field)] = TextField(
+                    body=field_payload.value.body, format=field_payload.value.format
+                )
+
+    if item.data is not None and item.data.links is not None:
+        for field, link_payload in item.data.links.items():
+            if link_payload is not None and link_payload.value is not None:
+                payload.links[cast(FieldIdString, field)] = LinkField(
+                    uri=link_payload.value.uri,
+                    headers=link_payload.value.headers,
+                    cookies=link_payload.value.cookies,
+                    language=link_payload.value.language,
+                    localstorage=link_payload.value.localstorage,
+                )
+
+    if item.data is not None and item.data.files is not None:
+        for field, file_payload in item.data.files.items():
+            if (
+                file_payload.value is not None
+                and file_payload.value is not None
+                and file_payload.value.file is not None
+                and file_payload.value.file.uri is not None
+            ):
+                data = download(file_payload.value.file.uri)
+                payload.files[cast(FieldIdString, field)] = FileField(
+                    language=file_payload.value.language,
+                    password=file_payload.value.password,
+                    file=NDBModelsFile(
+                        payload=base64.b64encode(data),
+                        filename=file_payload.value.file.filename,
+                        content_type=file_payload.value.file.content_type,
+                    ),
+                )
+
+    if item.data is not None and item.data.layouts is not None:
+        raise NotImplementedError()
+
+    if item.data is not None and item.data.conversations is not None:
+        raise NotImplementedError()
+
+    if item.data is not None and item.data.keywordsets is not None:
+        raise NotImplementedError()
+
+    if item.data is not None and item.data.datetimes is not None:
+        raise NotImplementedError()
+
+    return payload

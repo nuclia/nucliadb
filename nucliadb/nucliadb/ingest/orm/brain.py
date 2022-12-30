@@ -34,6 +34,8 @@ from nucliadb_protos.resources_pb2 import (
     Metadata,
     Origin,
     Paragraph,
+    UserFieldMetadata,
+    UserMetadata,
 )
 from nucliadb_protos.utils_pb2 import (
     Relation,
@@ -45,6 +47,7 @@ from nucliadb_protos.utils_pb2 import (
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
+from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.metadata import ResourceProcessingStatus
 
 if TYPE_CHECKING:
@@ -127,15 +130,41 @@ class ResourceBrain:
         replace_splits: Dict[str, List[str]],
         page_positions: Optional[FilePagePositions],
         extracted_text: Optional[ExtractedText],
+        basic_user_field_metadata: Optional[UserFieldMetadata] = None,
     ):
         # To check for duplicate paragraphs
         unique_paragraphs: Set[str] = set()
+
+        # Expose also user classes
+
+        if basic_user_field_metadata is not None:
+            paragraphs = {
+                compute_paragraph_key(self.rid, paragraph.key): paragraph
+                for paragraph in basic_user_field_metadata.paragraphs
+            }
+        else:
+            paragraphs = {}
 
         # We should set paragraphs and labels
         for subfield, metadata_split in metadata.split_metadata.items():
             # For each split of this field
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
+
+                user_classifications = []
+                denied_classifications = []
+                if key in paragraphs:
+                    user_classifications = [
+                        classification
+                        for classification in paragraphs[key].classifications
+                        if classification.cancelled_by_user is False
+                    ]
+
+                    denied_classifications = [
+                        f"/l/{classification.labelset}/{classification.label}"
+                        for classification in paragraphs[key].classifications
+                        if classification.cancelled_by_user is True
+                    ]
                 position = ParagraphPosition(
                     index=index,
                     start=paragraph.start,
@@ -162,14 +191,33 @@ class ResourceBrain:
                     metadata=ParagraphMetadata(position=position),
                 )
                 for classification in paragraph.classifications:
+                    label = f"/l/{classification.labelset}/{classification.label}"
+                    if label not in denied_classifications:
+                        p.labels.append(label)
+
+                for classification in user_classifications:
                     p.labels.append(
                         f"/l/{classification.labelset}/{classification.label}"
                     )
-
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
+            user_classifications = []
+            denied_classifications = []
+            if key in paragraphs:
+                user_classifications = [
+                    classification
+                    for classification in paragraphs[key].classifications
+                    if classification.cancelled_by_user is False
+                ]
+
+                denied_classifications = [
+                    f"/l/{classification.labelset}/{classification.label}"
+                    for classification in paragraphs[key].classifications
+                    if classification.cancelled_by_user is True
+                ]
+
             position = ParagraphPosition(
                 index=index,
                 start=paragraph.start,
@@ -192,6 +240,11 @@ class ResourceBrain:
                 metadata=ParagraphMetadata(position=position),
             )
             for classification in paragraph.classifications:
+                label = f"/l/{classification.labelset}/{classification.label}"
+                if label not in denied_classifications:
+                    p.labels.append(label)
+
+            for classification in user_classifications:
                 p.labels.append(f"/l/{classification.labelset}/{classification.label}")
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
@@ -347,7 +400,7 @@ class ResourceBrain:
         # labels
         for classification in basic.usermetadata.classifications:
             self.tags["l"].append(f"{classification.labelset}/{classification.label}")
-            relationnodelabel = RelationNode(
+            relation_node_label = RelationNode(
                 value=f"{classification.labelset}/{classification.label}",
                 ntype=RelationNode.NodeType.LABEL,
             )
@@ -355,7 +408,7 @@ class ResourceBrain:
                 Relation(
                     relation=Relation.ABOUT,
                     source=relationnodedocument,
-                    to=relationnodelabel,
+                    to=relation_node_label,
                 )
             )
 
@@ -369,31 +422,40 @@ class ResourceBrain:
         field_key: str,
         metadata: FieldMetadata,
         tags: Dict[str, List[str]],
-        relationnodedocument: RelationNode,
+        relation_node_document: RelationNode,
+        user_canceled_labels: List[str],
     ):
         for classification in metadata.classifications:
-            tags["l"].append(f"{classification.labelset}/{classification.label}")
-            relationnodelabel = RelationNode(
-                value=f"{classification.labelset}/{classification.label}",
-                ntype=RelationNode.NodeType.LABEL,
-            )
-            self.brain.relations.append(
-                Relation(
-                    relation=Relation.ABOUT,
-                    source=relationnodedocument,
-                    to=relationnodelabel,
+            label = f"{classification.labelset}/{classification.label}"
+            if label not in user_canceled_labels:
+                tags["l"].append(label)
+                relation_node_label = RelationNode(
+                    value=label,
+                    ntype=RelationNode.NodeType.LABEL,
                 )
-            )
+                self.brain.relations.append(
+                    Relation(
+                        relation=Relation.ABOUT,
+                        source=relation_node_document,
+                        to=relation_node_label,
+                    )
+                )
 
-        for entity, klass in metadata.ner.items():
-            tags["e"].append(f"{klass}/{entity}")
-            relationnodeentity = RelationNode(
+        for klass_entity, _ in metadata.positions.items():
+            tags["e"].append(klass_entity)
+            entity_array = klass_entity.split("/")
+            if len(entity_array) == 1:
+                raise AttributeError(f"Entity should be with type {klass_entity}")
+            elif len(entity_array) > 1:
+                klass = entity_array[0]
+                entity = "/".join(entity_array[1:])
+            relation_node_entity = RelationNode(
                 value=entity, ntype=RelationNode.NodeType.ENTITY, subtype=klass
             )
             rel = Relation(
                 relation=Relation.ENTITY,
-                source=relationnodedocument,
-                to=relationnodeentity,
+                source=relation_node_document,
+                to=relation_node_entity,
             )
             self.brain.relations.append(rel)
 
@@ -405,15 +467,55 @@ class ResourceBrain:
                 self.tags["fg"].append(keyword.value)
 
     def apply_field_tags_globally(
-        self, field_key: str, metadata: FieldComputedMetadata, uuid: str
+        self,
+        field_key: str,
+        metadata: Optional[FieldComputedMetadata],
+        uuid: str,
+        basic_user_metadata: Optional[UserMetadata] = None,
+        basic_user_fieldmetadata: Optional[UserFieldMetadata] = None,
     ):
-        relationnodedocument = RelationNode(
+        if basic_user_metadata is not None:
+            user_canceled_labels = [
+                f"/l/{classification.labelset}/{classification.label}"
+                for classification in basic_user_metadata.classifications
+                if classification.cancelled_by_user
+            ]
+        else:
+            user_canceled_labels = []
+
+        relation_node_resource = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
         )
         tags: Dict[str, List[str]] = {"l": [], "e": []}
-        for meta in metadata.split_metadata.values():
-            self.process_meta(field_key, meta, tags, relationnodedocument)
-        self.process_meta(field_key, metadata.metadata, tags, relationnodedocument)
+        if metadata is not None:
+            for meta in metadata.split_metadata.values():
+                self.process_meta(
+                    field_key, meta, tags, relation_node_resource, user_canceled_labels
+                )
+            self.process_meta(
+                field_key,
+                metadata.metadata,
+                tags,
+                relation_node_resource,
+                user_canceled_labels,
+            )
+
+        if basic_user_fieldmetadata is not None:
+            for token in basic_user_fieldmetadata.token:
+                if token.cancelled_by_user is False:
+                    tags["e"].append(f"{token.klass}/{token.token}")
+                    relation_node_entity = RelationNode(
+                        value=token.token,
+                        ntype=RelationNode.NodeType.ENTITY,
+                        subtype=token.klass,
+                    )
+                    rel = Relation(
+                        relation=Relation.ENTITY,
+                        source=relation_node_resource,
+                        to=relation_node_entity,
+                    )
+                    self.brain.relations.append(rel)
+
         self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
 
     def compute_tags(self):

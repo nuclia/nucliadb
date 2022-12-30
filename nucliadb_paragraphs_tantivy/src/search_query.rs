@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use nucliadb_protos::{ParagraphSearchRequest, SuggestRequest};
+use nucliadb_protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use nucliadb_service_interface::prelude::*;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
@@ -453,4 +453,20 @@ mod tests {
             assert_eq!(fuzzy_query, expected_fuzzy_query);
         }
     }
+}
+
+pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box<dyn Query> {
+    let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
+    queries.push((Occur::Must, Box::new(AllQuery)));
+    request
+        .filter
+        .iter()
+        .flat_map(|f| f.tags.iter())
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            queries.push((Occur::Should, Box::new(facet_term_query)));
+        });
+    Box::new(BooleanQuery::new(queries))
 }

@@ -502,6 +502,9 @@ pub struct Classification {
     pub label: ::prost::alloc::string::String,
     #[prost(bool, tag="3")]
     pub cancelled_by_user: bool,
+    /// On field classification we need to set on which split is the classification
+    #[prost(string, tag="4")]
+    pub split: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserMetadata {
@@ -532,6 +535,10 @@ pub struct TokenSplit {
     pub start: u32,
     #[prost(uint32, tag="4")]
     pub end: u32,
+    #[prost(bool, tag="5")]
+    pub cancelled_by_user: bool,
+    #[prost(string, tag="6")]
+    pub split: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphAnnotation {

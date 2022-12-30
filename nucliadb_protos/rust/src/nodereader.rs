@@ -126,6 +126,8 @@ pub struct DocumentResult {
     pub score: ::core::option::Option<ResultScore>,
     #[prost(string, tag="4")]
     pub field: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="5")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentSearchResponse {
@@ -171,6 +173,8 @@ pub struct ParagraphResult {
     /// Metadata that can't be searched with but is returned on search results
     #[prost(message, optional, tag="11")]
     pub metadata: ::core::option::Option<super::noderesources::ParagraphMetadata>,
+    #[prost(string, repeated, tag="12")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphSearchResponse {
@@ -413,6 +417,31 @@ pub struct GetShardRequest {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
     #[prost(string, tag="2")]
     pub vectorset: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ParagraphItem {
+    #[prost(string, tag="1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="2")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DocumentItem {
+    #[prost(string, tag="1")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(string, tag="2")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="3")]
+    pub labels: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StreamRequest {
+    #[prost(message, optional, tag="1")]
+    pub filter: ::core::option::Option<Filter>,
+    #[prost(bool, tag="2")]
+    pub reload: bool,
+    #[prost(message, optional, tag="3")]
+    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
 }
 /// Generated client implementations.
 pub mod node_reader_client {
@@ -747,6 +776,51 @@ pub mod node_reader_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
+        /// Streams
+        pub async fn paragraphs(
+            &mut self,
+            request: impl tonic::IntoRequest<super::StreamRequest>,
+        ) -> Result<
+            tonic::Response<tonic::codec::Streaming<super::ParagraphItem>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/Paragraphs",
+            );
+            self.inner.server_streaming(request.into_request(), path, codec).await
+        }
+        pub async fn documents(
+            &mut self,
+            request: impl tonic::IntoRequest<super::StreamRequest>,
+        ) -> Result<
+            tonic::Response<tonic::codec::Streaming<super::DocumentItem>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodereader.NodeReader/Documents",
+            );
+            self.inner.server_streaming(request.into_request(), path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -815,6 +889,27 @@ pub mod node_reader_server {
             &self,
             request: tonic::Request<super::SuggestRequest>,
         ) -> Result<tonic::Response<super::SuggestResponse>, tonic::Status>;
+        ///Server streaming response type for the Paragraphs method.
+        type ParagraphsStream: futures_core::Stream<
+                Item = Result<super::ParagraphItem, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        /// Streams
+        async fn paragraphs(
+            &self,
+            request: tonic::Request<super::StreamRequest>,
+        ) -> Result<tonic::Response<Self::ParagraphsStream>, tonic::Status>;
+        ///Server streaming response type for the Documents method.
+        type DocumentsStream: futures_core::Stream<
+                Item = Result<super::DocumentItem, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        async fn documents(
+            &self,
+            request: tonic::Request<super::StreamRequest>,
+        ) -> Result<tonic::Response<Self::DocumentsStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct NodeReaderServer<T: NodeReader> {
@@ -1410,6 +1505,84 @@ pub mod node_reader_server {
                                 send_compression_encodings,
                             );
                         let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/Paragraphs" => {
+                    #[allow(non_camel_case_types)]
+                    struct ParagraphsSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::ServerStreamingService<super::StreamRequest>
+                    for ParagraphsSvc<T> {
+                        type Response = super::ParagraphItem;
+                        type ResponseStream = T::ParagraphsStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::StreamRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).paragraphs(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ParagraphsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodereader.NodeReader/Documents" => {
+                    #[allow(non_camel_case_types)]
+                    struct DocumentsSvc<T: NodeReader>(pub Arc<T>);
+                    impl<
+                        T: NodeReader,
+                    > tonic::server::ServerStreamingService<super::StreamRequest>
+                    for DocumentsSvc<T> {
+                        type Response = super::DocumentItem;
+                        type ResponseStream = T::DocumentsStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::StreamRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).documents(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DocumentsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)

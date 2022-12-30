@@ -19,17 +19,30 @@
 #
 from __future__ import annotations
 
-import asyncio
-
 from nucliadb.ingest.chitchat import start_chitchat as start_chitchat_ingest
-from nucliadb.ingest.orm.node import DefinedNodesNucliaDBSearch
+from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.utils import get_chitchat
+from nucliadb.search import logger
 from nucliadb.search.settings import settings
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility
 
 
-def start_chitchat(service_name: str):
-    if settings.nodes_load_ingest:
-        # used for testing proposes get nodes from a real ingest
-        load_nodes = DefinedNodesNucliaDBSearch()
-        asyncio.create_task(load_nodes.start(), name="NODES_LOAD")
+async def start_chitchat(service_name: str):
+    existing_chitchat_utility = get_utility(Utility.CHITCHAT)
+    if existing_chitchat_utility is None:
+        if settings.nodes_load_ingest:
+            # used for testing proposes get nodes from a real ingest
+            await Node.load_active_nodes()
+        else:
+            await start_chitchat_ingest(service_name)
     else:
-        start_chitchat_ingest(service_name)
+        logger.info(
+            "Not registering search chitchat as already exist a chitchat utility"
+        )
+
+
+async def stop_chitchat():
+    if get_utility(Utility.CHITCHAT):
+        util = get_chitchat()
+        await util.close()
+        clean_utility(Utility.CHITCHAT)

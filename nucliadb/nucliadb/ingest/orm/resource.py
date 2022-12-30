@@ -277,6 +277,17 @@ class Resource:
                 if type_id == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
 
+                user_field_metadata = None
+                if basic is not None:
+                    user_field_metadata = next(
+                        (
+                            fm
+                            for fm in basic.fieldmetadata
+                            if fm.field.field == field_id
+                            and fm.field.field_type == type_id
+                        ),
+                        None,
+                    )
                 brain.apply_field_metadata(
                     field_key,
                     field_metadata,
@@ -284,6 +295,7 @@ class Resource:
                     replace_splits={},
                     page_positions=page_positions,
                     extracted_text=await field.get_extracted_text(),
+                    basic_user_field_metadata=user_field_metadata,
                 )
 
             if self.disable_vectors is False:
@@ -440,6 +452,7 @@ class Resource:
 
     async def get_fields_ids(self, force: bool = False) -> List[Tuple[int, str]]:
         # Get all fields
+        basic = await self.get_basic()
         if len(self.all_fields_keys) == 0 or force:
             result = []
             fields = KB_RESOURCE_FIELDS.format(kbid=self.kb.kbid, uuid=self.uuid)
@@ -453,7 +466,14 @@ class Resource:
                 result.append((type_id, field))
 
             for generic in VALID_GLOBAL:
-                result.append((FieldType.GENERIC, generic))
+                # We make sure that title and summary are set to be added
+                append = True
+                if generic == "title" and (basic is None or basic.title == ""):
+                    append = False
+                elif generic == "summary" and (basic is None or basic.summary == ""):
+                    append = False
+                if append:
+                    result.append((FieldType.GENERIC, generic))
 
             self.all_fields_keys = result
         return self.all_fields_keys
@@ -619,6 +639,16 @@ class Resource:
             ):
                 page_positions = await get_file_page_positions(field_obj)
 
+            user_field_metadata = next(
+                (
+                    fm
+                    for fm in self.basic.fieldmetadata
+                    if fm.field.field == field_metadata.field.field
+                    and fm.field.field_type == field_metadata.field.field_type
+                ),
+                None,
+            )
+
             self.indexer.apply_field_metadata(
                 field_key,
                 metadata,
@@ -626,6 +656,7 @@ class Resource:
                 replace_splits=replace_splits,
                 page_positions=page_positions,
                 extracted_text=await field_obj.get_extracted_text(),
+                basic_user_field_metadata=user_field_metadata,
             )
 
             if (
@@ -712,20 +743,34 @@ class Resource:
         if basic is None:
             raise KeyError("Resource not found")
         brain.set_global_tags(basic=basic, origin=origin, uuid=self.uuid)
-        for type, field in await self.get_fields_ids():
+        for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)
             fieldid = FieldID(field_type=type, field=field)  # type: ignore
             fieldkey = self.generate_field_id(fieldid)
             extracted_metadata = await fieldobj.get_field_metadata()
-            if extracted_metadata is not None:
-                brain.apply_field_tags_globally(fieldkey, extracted_metadata, self.uuid)
+            valid_user_field_metadata = None
+            for user_field_metadata in basic.fieldmetadata:
+                if (
+                    user_field_metadata.field.field == field
+                    and user_field_metadata.field.field_type == type
+                ):
+                    valid_user_field_metadata = user_field_metadata
+                    break
+            brain.apply_field_tags_globally(
+                fieldkey,
+                extracted_metadata,
+                self.uuid,
+                basic.usermetadata,
+                valid_user_field_metadata,
+            )
             if type == FieldType.KEYWORDSET:
                 field_data = await fieldobj.db_get_value()
                 brain.process_keywordset_fields(fieldkey, field_data)
 
     async def compute_global_text(self):
         # For each extracted
-        for fieldid in self._modified_extracted_text:
+        for type, field in await self.get_fields_ids(force=True):
+            fieldid = FieldID(field_type=type, field=field)
             await self.compute_global_text_field(fieldid, self.indexer)
 
     async def compute_global_text_field(self, fieldid: FieldID, brain: ResourceBrain):

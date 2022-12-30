@@ -1,7 +1,6 @@
 syntax = "proto3";
 
 package train;
-
 import "google/protobuf/timestamp.proto";
 
 import public "nucliadb_protos/knowledgebox.proto";

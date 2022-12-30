@@ -26,8 +26,8 @@ from nucliadb.ingest.orm.labels import Labels
 
 
 @pytest.mark.asyncio
-async def test_create_label_orm(txn, gcs_storage, fake_node, knowledgebox):
-    lls = Labels(txn, knowledgebox)
+async def test_create_label_orm(txn, gcs_storage, fake_node, knowledgebox_ingest):
+    lls = Labels(txn, knowledgebox_ingest)
     pbls = PBLabels()
     ppl = PBLabel(title="Label 1", related=None, text=None, uri=None)
     pbls.labelset["labelset1"].title = "Labelset 1"
@@ -37,8 +37,8 @@ async def test_create_label_orm(txn, gcs_storage, fake_node, knowledgebox):
 
 
 @pytest.mark.asyncio
-async def test_get_label_orm(txn, gcs_storage, fake_node, knowledgebox):
-    lls = Labels(txn, knowledgebox)
+async def test_get_label_orm(txn, gcs_storage, fake_node, knowledgebox_ingest):
+    lls = Labels(txn, knowledgebox_ingest)
     pbls = PBLabels()
     ppl = PBLabel(title="Label 1", related=None, text=None, uri=None)
     pbls.labelset["labelset1"].title = "Labelset 1"

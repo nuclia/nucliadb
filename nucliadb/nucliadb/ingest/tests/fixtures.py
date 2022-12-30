@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -27,18 +26,12 @@ from shutil import rmtree
 from tempfile import mkdtemp
 from typing import AsyncIterator, List, Optional
 
-import docker  # type: ignore
 import nats
 import pytest
-from grpc import aio, insecure_channel  # type: ignore
-from grpc_health.v1 import health_pb2_grpc  # type: ignore
-from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
+from grpc import aio  # type: ignore
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 from redis import asyncio as aioredis
 
-from nucliadb.ingest.chitchat import start_chitchat
 from nucliadb.ingest.consumer.service import ConsumerService
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.maindb.local import LocalDriver
@@ -63,116 +56,11 @@ from nucliadb_utils.settings import indexing_settings, transaction_settings
 from nucliadb_utils.storages.settings import settings as storage_settings
 from nucliadb_utils.utilities import (
     Utility,
+    clean_utility,
     clear_global_cache,
     get_utility,
     set_utility,
 )
-
-images.settings["nucliadb_node_reader"] = {
-    "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
-    "command": "bash -c 'node_reader & node_writer'",
-    "env": {
-        "HOST_KEY_PATH": "/data/node.key",
-        "VECTORS_DIMENSION": "768",
-        "DATA_PATH": "/data",
-        "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
-        "LAZY_LOADING": "true",
-        "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=ERROR",  # noqa
-    },
-    "options": {
-        "command": [
-            "/usr/local/bin/node_reader",
-        ],
-        "ports": {"4445": None},
-    },
-}
-
-images.settings["nucliadb_node_writer"] = {
-    "image": "eu.gcr.io/stashify-218417/node",
-    "version": "main",
-    "env": {
-        "HOST_KEY_PATH": "/data/node.key",
-        "VECTORS_DIMENSION": "768",
-        "DATA_PATH": "/data",
-        "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-        "CHITCHAT_PORT": "4444",
-        "SEED_NODES": "",
-        "RUST_BACKTRACE": "full",
-        "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=ERROR,chitchat=ERROR",  # noqa
-    },
-    "options": {
-        "command": [
-            "/usr/local/bin/node_writer",
-        ],
-        "ports": {"4446": None},
-    },
-}
-
-images.settings["nucliadb_node_sidecar"] = {
-    "image": "eu.gcr.io/stashify-218417/node_sidecar",
-    "version": "main",
-    "env": {
-        "INDEX_JETSTREAM_TARGET": "node.{node}",
-        "INDEX_JETSTREAM_GROUP": "node-{node}",
-        "INDEX_JETSTREAM_STREAM": "node",
-        "INDEX_JETSTREAM_SERVERS": "[]",
-        "HOST_KEY_PATH": "/data/node.key",
-        "DATA_PATH": "/data",
-        "SIDECAR_LISTEN_ADDRESS": "0.0.0.0:4447",
-        "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
-        "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
-    },
-    "options": {
-        "command": [
-            "node_sidecar",
-        ],
-        "ports": {"4447": None},
-    },
-}
-
-images.settings["nucliadb_cluster_manager"] = {
-    "image": "eu.gcr.io/stashify-218417/cluster_manager",
-    "version": "main",
-    "network": "host",
-    "env": {
-        "LISTEN_PORT": "4444",
-        "NODE_TYPE": "Ingest",
-        "SEEDS": "0.0.0.0:4444",
-        "MONITOR_ADDR": "TO_REPLACE",
-        "RUST_LOG": "debug",
-        "RUST_BACKTRACE": "full",
-    },
-    "options": {
-        "command": [
-            "/nucliadb_cluster/cluster_manager",
-        ],
-    },
-}
-
-
-def free_port() -> int:
-    import socket
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    return sock.getsockname()[1]
-
-
-def get_chitchat_port(container_obj, port):
-    network = container_obj.attrs["NetworkSettings"]
-    service_port = "{0}/udp".format(port)
-    for netport in network["Ports"].keys():
-        if netport == "6543/tcp":
-            continue
-
-        if netport == service_port:
-            return network["Ports"][service_port][0]["HostPort"]
-
-
-def get_container_host(container_obj):
-    return container_obj.attrs["NetworkSettings"]["IPAddress"]
 
 
 @pytest.fixture(scope="function")
@@ -281,6 +169,7 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
 async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     url = f"redis://{redis[0]}:{redis[1]}"
     settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
+    settings.driver = "redis"
     driver = RedisDriver(url=url)
     await driver.initialize()
     if driver.redis is not None:
@@ -317,288 +206,30 @@ async def cache(redis):
 
 
 @pytest.fixture(scope="function")
-async def chitchat():
-    start_chitchat("testing")
-
-
-class nucliadbNodeReader(BaseImage):
-    name = "nucliadb_node_reader"
-    port = 4445
-
-    def run(self, volume):
-        self._volume = volume
-        self._mount = "/data"
-        return super(nucliadbNodeReader, self).run()
-
-    def get_image_options(self):
-        options = super(nucliadbNodeReader, self).get_image_options()
-        options["volumes"] = {self._volume.name: {"bind": "/data"}}
-        return options
-
-    def check(self):
-        channel = insecure_channel(f"{self.host}:{self.get_port()}")
-        stub = health_pb2_grpc.HealthStub(channel)
-        pb = HealthCheckRequest(service="nodereader.NodeReader")
-        try:
-            result = stub.Check(pb)
-            return result.status == 1
-        except:  # noqa
-            return False
-
-
-class nucliadbNodeWriter(BaseImage):
-    name = "nucliadb_node_writer"
-    port = 4446
-
-    def run(self, volume):
-        self._volume = volume
-        self._mount = "/data"
-        return super(nucliadbNodeWriter, self).run()
-
-    def get_image_options(self):
-        options = super(nucliadbNodeWriter, self).get_image_options()
-        options["volumes"] = {self._volume.name: {"bind": "/data"}}
-        return options
-
-    def check(self):
-        channel = insecure_channel(f"{self.host}:{self.get_port()}")
-        stub = health_pb2_grpc.HealthStub(channel)
-        pb = HealthCheckRequest(service="nodewriter.NodeWriter")
-        try:
-            result = stub.Check(pb)
-            return result.status == 1
-        except:  # noqa
-            return False
-
-
-class nucliadbChitchatNode(BaseImage):
-    name = "nucliadb_cluster_manager"
-    port = 4444
-
-    def run(self):
-        return super(nucliadbChitchatNode, self).run()
-
-    def get_image_options(self):
-        options = super(nucliadbChitchatNode, self).get_image_options()
-        return options
-
-    def check(self):
-        return True
-        # channel = insecure_channel(f"{self.host}:{self.get_port()}")
-        # stub = health_pb2_grpc.HealthStub(channel)
-        # pb = HealthCheckRequest(service="Chitchat")
-        # try:
-        #    result = stub.Check(pb)
-        #    return result.status == 1
-        # except:  # noqa
-        #    return False
-
-
-class nucliadbNodeSidecar(BaseImage):
-    name = "nucliadb_node_sidecar"
-    port = 4447
-
-    def run(self, volume):
-        self._volume = volume
-        self._mount = "/data"
-        return super(nucliadbNodeSidecar, self).run()
-
-    def get_image_options(self):
-        options = super(nucliadbNodeSidecar, self).get_image_options()
-        options["volumes"] = {self._volume.name: {"bind": "/data"}}
-        return options
-
-    def check(self):
-        channel = insecure_channel(f"{self.host}:{self.get_port()}")
-        stub = health_pb2_grpc.HealthStub(channel)
-        pb = HealthCheckRequest(service="")
-        try:
-            result = stub.Check(pb)
-            return result.status == 1
-        except:  # noqa
-            return False
-
-
-nucliadb_node_1_reader = nucliadbNodeReader()
-nucliadb_node_1_writer = nucliadbNodeWriter()
-nucliadb_node_1_sidecar = nucliadbNodeSidecar()
-nucliadb_cluster_mgr = nucliadbChitchatNode()
-
-nucliadb_node_2_reader = nucliadbNodeReader()
-nucliadb_node_2_writer = nucliadbNodeWriter()
-nucliadb_node_2_sidecar = nucliadbNodeSidecar()
-
-
-@pytest.fixture(scope="session", autouse=False)
-def node(natsd: str, gcs: str):
-    docker_client = docker.from_env(version=BaseImage.docker_version)
-    if "DESKTOP" in docker_client.api.version()["Platform"]["Name"].upper():
-        # Valid when using Docker desktop
-        docker_internal_host = "host.docker.internal"
-    else:
-        # Valid when using github actions
-        docker_internal_host = "172.17.0.1"
-
-    volume_node_1 = docker_client.volumes.create(driver="local")
-    volume_node_2 = docker_client.volumes.create(driver="local")
-
-    settings.chitchat_binding_host = "0.0.0.0"
-    settings.chitchat_binding_port = free_port()
-    settings.chitchat_enabled = True
-
-    images.settings["nucliadb_cluster_manager"]["env"][
-        "MONITOR_ADDR"
-    ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
-    cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
-
-    cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
-    cluster_mgr_real_host = get_container_host(nucliadb_cluster_mgr.container_obj)
-
-    images.settings["nucliadb_node_writer"]["env"][
-        "SEED_NODES"
-    ] = f"{cluster_mgr_real_host}:4444"
-    writer1_host, writer1_port = nucliadb_node_1_writer.run(volume_node_1)
-
-    writer2_host, writer2_port = nucliadb_node_2_writer.run(volume_node_2)
-    reader1_host, reader1_port = nucliadb_node_1_reader.run(volume_node_1)
-
-    reader2_host, reader2_port = nucliadb_node_2_reader.run(volume_node_2)
-
-    natsd_server = natsd.replace("localhost", docker_internal_host)
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "INDEX_JETSTREAM_SERVERS"
-    ] = f'["{natsd_server}"]'
-    gcs_server = gcs.replace("localhost", docker_internal_host)
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_ENDPOINT_URL"] = gcs_server
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_BUCKET"] = "test"
-    images.settings["nucliadb_node_sidecar"]["env"]["FILE_BACKEND"] = "gcs"
-    images.settings["nucliadb_node_sidecar"]["env"]["GCS_INDEXING_BUCKET"] = "indexing"
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "GCS_DEADLETTER_BUCKET"
-    ] = "deadletter"
-
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "READER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{reader1_port}"
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "WRITER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{writer1_port}"
-
-    sidecar1_host, sidecar1_port = nucliadb_node_1_sidecar.run(volume_node_1)
-
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "READER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{reader2_port}"
-    images.settings["nucliadb_node_sidecar"]["env"][
-        "WRITER_LISTEN_ADDRESS"
-    ] = f"{docker_internal_host}:{writer2_port}"
-
-    sidecar2_host, sidecar2_port = nucliadb_node_2_sidecar.run(volume_node_2)
-
-    writer1_internal_host = get_container_host(nucliadb_node_1_writer.container_obj)
-    writer2_internal_host = get_container_host(nucliadb_node_2_writer.container_obj)
-
-    settings.writer_port_map = {
-        writer1_internal_host: writer1_port,
-        writer2_internal_host: writer2_port,
-    }
-    settings.reader_port_map = {
-        writer1_internal_host: reader1_port,
-        writer2_internal_host: reader2_port,
-    }
-    settings.sidecar_port_map = {
-        writer1_internal_host: sidecar1_port,
-        writer2_internal_host: sidecar2_port,
-    }
-
-    settings.node_writer_port = None  # type: ignore
-    settings.node_reader_port = None  # type: ignore
-    settings.node_sidecar_port = None  # type: ignore
-
-    yield {
-        "writer1": {
-            "host": writer1_host,
-            "port": writer1_port,
-        },
-        "chitchat": {
-            "host": cluster_mgr_host,
-            "port": cluster_mgr_port,
-        },
-        "writer2": {
-            "host": writer2_host,
-            "port": writer2_port,
-        },
-        "reader1": {
-            "host": reader1_host,
-            "port": reader1_port,
-        },
-        "reader2": {
-            "host": reader2_host,
-            "port": reader2_port,
-        },
-        "sidecar1": {
-            "host": sidecar1_host,
-            "port": sidecar1_port,
-        },
-        "sidecar2": {
-            "host": sidecar2_host,
-            "port": sidecar2_port,
-        },
-    }
-
-    nucliadb_node_1_reader.stop()
-    nucliadb_node_1_writer.stop()
-    nucliadb_node_1_sidecar.stop()
-    nucliadb_node_2_writer.stop()
-    nucliadb_node_2_reader.stop()
-    nucliadb_node_2_sidecar.stop()
-    nucliadb_cluster_mgr.stop()
-
-    for container in (
-        nucliadb_node_1_reader,
-        nucliadb_node_1_writer,
-        nucliadb_node_2_reader,
-        nucliadb_node_2_writer,
-        nucliadb_node_2_sidecar,
-        nucliadb_node_2_sidecar,
-        nucliadb_cluster_mgr,
-    ):
-        for i in range(5):
-            try:
-                docker_client.containers.get(container.container_obj.id)  # type: ignore
-            except docker.errors.NotFound:
-                print("REMOVED")
-                break
-            time.sleep(2)
-
-    volume_node_1.remove()
-    volume_node_2.remove()
-
-
-@pytest.fixture(scope="function")
-async def local_node():
-    yield "localhost", 4444
-
-
-@pytest.fixture(scope="function")
 async def fake_node(indexing_utility_ingest):
-    await Node.set(
-        str(uuid.uuid4()), address="nohost:9999", label="N", load_score=0.0, dummy=True
-    )
-    await Node.set(
-        str(uuid.uuid4()), address="nohost:9999", label="N", load_score=0.0, dummy=True
-    )
+    uuid1 = str(uuid.uuid4())
+    uuid2 = str(uuid.uuid4())
+    await Node.set(uuid1, address="nohost:9999", label="N", load_score=0.0, dummy=True)
+    await Node.set(uuid2, address="nohost:9999", label="N", load_score=0.0, dummy=True)
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
         nats_target=indexing_settings.index_jetstream_target,
         dummy=True,
     )
+
+    old_index_local = indexing_settings.index_local
+    indexing_settings.index_local = False
     set_utility(Utility.INDEXING, indexing_utility)
+    yield
+    clean_utility(Utility.INDEXING)
+    indexing_settings.index_local = old_index_local
+    await Node.destroy(uuid1)
+    await Node.destroy(uuid2)
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox(redis_driver: RedisDriver):
+async def knowledgebox_ingest(redis_driver: RedisDriver):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     txn = await redis_driver.begin()
@@ -723,14 +354,14 @@ def make_field_metadata(field_id):
     p1.classifications.append(cl1)
     ex1.metadata.metadata.paragraphs.append(p1)
     ex1.metadata.metadata.classifications.append(cl1)
-    ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
+    # ex1.metadata.metadata.ner["Ramon"] = "PEOPLE"
     ex1.metadata.metadata.last_index.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_understanding.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_extract.FromDatetime(datetime.now())
     ex1.metadata.metadata.last_summary.FromDatetime(datetime.now())
     ex1.metadata.metadata.thumbnail.CopyFrom(THUMBNAIL)
-    ex1.metadata.metadata.positions["document"].entity = "Ramon"
-    ex1.metadata.metadata.positions["document"].position.extend(
+    ex1.metadata.metadata.positions["ENTITY/document"].entity = "document"
+    ex1.metadata.metadata.positions["ENTITY/document"].position.extend(
         [rpb.Position(start=0, end=5), rpb.Position(start=23, end=28)]
     )
     return ex1
@@ -756,12 +387,17 @@ def make_extracted_vectors(field_id):
 
 
 @pytest.fixture(scope="function")
-async def test_resource(gcs_storage, redis_driver, cache, knowledgebox, fake_node):
+async def test_resource(
+    gcs_storage, redis_driver, cache, knowledgebox_ingest, fake_node
+):
     """
     Create a resource that has every possible bit of information
     """
     resource = await create_resource(
-        storage=gcs_storage, driver=redis_driver, cache=cache, knowledgebox=knowledgebox
+        storage=gcs_storage,
+        driver=redis_driver,
+        cache=cache,
+        knowledgebox_ingest=knowledgebox_ingest,
     )
     yield resource
     resource.clean()
@@ -800,6 +436,10 @@ def broker_resource(
     message1.basic.created.FromDatetime(datetime.now())
     message1.basic.modified.FromDatetime(datetime.now())
     message1.origin.source = rpb.Origin.Source.WEB
+
+    message1.files["file"].file.uri = "http://nofile"
+    message1.files["file"].file.size = 0
+    message1.files["file"].file.source = rpb.CloudFile.Source.LOCAL
 
     etw = rpb.ExtractedTextWrapper()
     etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
@@ -883,11 +523,11 @@ def broker_resource(
     return message1
 
 
-async def create_resource(storage, driver, cache, knowledgebox):
+async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: str):
     txn = await driver.begin()
 
     rid = str(uuid.uuid4())
-    kb_obj = KnowledgeBox(txn, storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, storage, cache, kbid=knowledgebox_ingest)
     test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
     await test_resource.set_slug()
 
@@ -994,8 +634,8 @@ async def create_resource(storage, driver, cache, knowledgebox):
 
     # 2.3 TEXT FIELDS
 
-    t2 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
-    textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t2)
+    t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
 
     await textfield.set_extracted_text(make_extracted_text(textfield.id, body="MyText"))
     await textfield.set_field_metadata(make_field_metadata(textfield.id))
@@ -1064,6 +704,15 @@ async def create_resource(storage, driver, cache, knowledgebox):
     d2 = rpb.FieldDatetime()
     d2.value.FromDatetime(datetime.now())
     await test_resource.set_field(rpb.FieldType.DATETIME, "datetime1", d2)
+
+    # 3 USER VECTORS
+
+    field_obj = await test_resource.get_field("datetime1", type=rpb.FieldType.DATETIME)
+    user_vectors = rpb.UserVectorsWrapper()
+    user_vectors.vectors.vectors["vectorset1"].vectors["vector1"].vector.extend(
+        (0.1, 0.2, 0.3)
+    )
+    await field_obj.set_user_vectors(user_vectors)
 
     await txn.commit(resource=False)
     return test_resource

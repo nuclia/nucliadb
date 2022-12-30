@@ -24,14 +24,17 @@ use std::fs;
 use std::time::SystemTime;
 
 use nucliadb_protos::{
-    OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId, SuggestRequest,
+    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
+    StreamRequest, SuggestRequest,
 };
 use nucliadb_service_interface::prelude::*;
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy};
+use tantivy::{
+    Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order, ReloadPolicy,
+};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
@@ -123,6 +126,18 @@ impl ParagraphReader for ParagraphReaderService {
             results_per_page: 10,
         }))
     }
+    #[tracing::instrument(skip_all)]
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator> {
+        let producer = BatchProducer {
+            offset: 0,
+            total: self.count()?,
+            paragraph_field: self.schema.paragraph,
+            facet_field: self.schema.facets,
+            searcher: self.reader.searcher(),
+            query: search_query::streaming_query(&self.schema, request),
+        };
+        Ok(ParagraphIterator::new(producer.flatten()))
+    }
 }
 
 impl ReaderChild for ParagraphReaderService {
@@ -147,14 +162,11 @@ impl ReaderChild for ParagraphReaderService {
         let facets: Vec<_> = request
             .faceted
             .as_ref()
-            .map(|v| {
-                v.tags
-                    .iter()
-                    .filter(|s| ParagraphReaderService::is_valid_facet(s))
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
+            .iter()
+            .flat_map(|v| v.tags.iter())
+            .filter(|s| ParagraphReaderService::is_valid_facet(s))
+            .cloned()
+            .collect();
         let text = self.adapt_text(&parser, &request.body);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating query: ends at {v} ms");
@@ -373,6 +385,55 @@ impl ParagraphReaderService {
             Some("modified") => Some(self.schema.modified),
             _ => None,
         }
+    }
+}
+
+pub struct BatchProducer {
+    total: usize,
+    offset: usize,
+    paragraph_field: Field,
+    facet_field: Field,
+    query: Box<dyn Query>,
+    searcher: LeasedItem<tantivy::Searcher>,
+}
+impl BatchProducer {
+    const BATCH: usize = 1000;
+}
+impl Iterator for BatchProducer {
+    type Item = Vec<ParagraphItem>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let time = SystemTime::now();
+        if self.offset >= self.total {
+            info!("No more batches available");
+            return None;
+        }
+        info!("Producing a new batch with offset: {}", self.offset);
+
+        let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let top_docs = self.searcher.search(&self.query, &topdocs).unwrap();
+        let mut items = vec![];
+        for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
+            let id = doc
+                .get_first(self.paragraph_field)
+                .expect("document doesn't appear to have uuid.")
+                .as_text()
+                .unwrap()
+                .to_string();
+
+            let labels = doc
+                .get_all(self.facet_field)
+                .into_iter()
+                .flat_map(|x| x.as_facet())
+                .map(|x| x.to_path_string())
+                .filter(|x| x.starts_with("/l/"))
+                .collect::<Vec<_>>();
+            items.push(ParagraphItem { id, labels });
+        }
+        self.offset += Self::BATCH;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("New batch created, took {v} ms");
+        }
+        Some(items)
     }
 }
 
@@ -963,6 +1024,15 @@ mod tests {
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
+
+        let request = StreamRequest {
+            shard_id: None,
+            filter: None,
+            reload: false,
+        };
+        let iter = paragraph_reader_service.iterator(&request).unwrap();
+        let count = iter.count();
+        assert_eq!(count, 4);
         Ok(())
     }
 }
