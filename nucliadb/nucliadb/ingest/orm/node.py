@@ -222,9 +222,10 @@ class Node(AbstractNode):
         ident: str,
         address: str,
         label: str,
+        load_score: float,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, label, dummy)
+        NODES[ident] = Node(address, label, load_score, dummy)
         # Compute cluster
         NODE_CLUSTER.compute()
 

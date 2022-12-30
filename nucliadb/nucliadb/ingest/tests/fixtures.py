@@ -582,8 +582,12 @@ async def local_node():
 
 @pytest.fixture(scope="function")
 async def fake_node(indexing_utility_ingest):
-    await Node.set(str(uuid.uuid4()), address="nohost:9999", label="N", dummy=True)
-    await Node.set(str(uuid.uuid4()), address="nohost:9999", label="N", dummy=True)
+    await Node.set(
+        str(uuid.uuid4()), address="nohost:9999", label="N", load_score=0.0, dummy=True
+    )
+    await Node.set(
+        str(uuid.uuid4()), address="nohost:9999", label="N", load_score=0.0, dummy=True
+    )
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,
