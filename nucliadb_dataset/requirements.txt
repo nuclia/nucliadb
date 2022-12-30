@@ -5,3 +5,4 @@ nucliadb-protos
 requests
 aiohttp
 pydantic_argparse
+pyarrow
