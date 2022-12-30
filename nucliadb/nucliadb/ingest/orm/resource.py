@@ -26,6 +26,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
+    ExtractedVectorsWrapper,
     FieldClassifications,
     FieldComputedMetadataWrapper,
     FieldID,
@@ -295,6 +296,18 @@ class Resource:
                     brain.apply_user_vectors(field_key, vu, vectors_to_delete)  # type: ignore
         return brain
 
+    async def generate_field_vectors(
+        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+    ):
+        vo = await field.get_vectors()
+        if vo is None:
+            return
+        evw = ExtractedVectorsWrapper()
+        evw.field.field = field_id
+        evw.field.field_type = type_id
+        evw.vectors.CopyFrom(vo)
+        bm.field_vectors.append(evw)
+
     async def generate_field_computed_metadata(
         self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
     ):
@@ -394,6 +407,10 @@ class Resource:
                     link_extracted_data.ClearField("link_preview")
                     link_extracted_data.ClearField("link_image")
                     bm.link_extracted_data.append(link_extracted_data)
+
+            # Field vectors
+            await self.generate_field_vectors(bm, type_id, field_id, field)
+
         return bm
 
     # Fields

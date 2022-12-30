@@ -82,6 +82,9 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert export.basic.title == "My Title"
         assert export.slug == export.basic.slug == "slugtest"
         assert export.extracted_text[0].body.text == "My text"
+
+        # Check that vectors are exported
+        assert len(export.field_vectors) > 0
     assert found
 
     req = ExportRequest()
