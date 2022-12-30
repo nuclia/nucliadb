@@ -27,6 +27,8 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldType,
     Keyword,
+    UserVector,
+    UserVectorsWrapper,
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest, IndexResource
@@ -70,6 +72,13 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     bm.extracted_text.append(etw)
     bm.basic.title = "My Title"
 
+    uvw = UserVectorsWrapper()
+    uvw.field.field = "file1"
+    uvw.field.field_type = FieldType.FILE
+    uv = UserVector(vector=[1.0, 0.0], labels=["some", "labels"], start=1, end=2)
+    uvw.vectors.vectors["vectorset1"].vectors["vect1"].CopyFrom(uv)
+    bm.user_vectors.append(uvw)
+
     await stub.ProcessMessage([bm])  # type: ignore
 
     req = ExportRequest()
@@ -85,6 +94,7 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
         # Check that vectors are exported
         assert len(export.field_vectors) > 0
+        assert len(export.user_vectors) > 0
     assert found
 
     req = ExportRequest()

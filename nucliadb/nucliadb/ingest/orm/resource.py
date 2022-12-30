@@ -37,6 +37,7 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
+from nucliadb_protos.resources_pb2 import UserVectorsWrapper
 from nucliadb_protos.train_pb2 import EnabledMetadata
 from nucliadb_protos.train_pb2 import Position as TrainPosition
 from nucliadb_protos.train_pb2 import (
@@ -304,9 +305,22 @@ class Resource:
             return
         evw = ExtractedVectorsWrapper()
         evw.field.field = field_id
-        evw.field.field_type = type_id
+        evw.field.field_type = type_id  # type: ignore
         evw.vectors.CopyFrom(vo)
         bm.field_vectors.append(evw)
+
+    async def generate_user_vectors(
+        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+    ):
+        uv = await field.get_user_vectors()
+        if uv is None:
+            return
+        uvw = UserVectorsWrapper()
+        bm.user_vectors.append(uvw)
+        uvw.field.field = field_id
+        uvw.field.field_type = type_id  # type: ignore
+        uvw.vectors.CopyFrom(uv)
+        bm.user_vectors.append(uvw)
 
     async def generate_field_computed_metadata(
         self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
@@ -410,6 +424,9 @@ class Resource:
 
             # Field vectors
             await self.generate_field_vectors(bm, type_id, field_id, field)
+
+            # User vectors
+            await self.generate_user_vectors(bm, type_id, field_id, field)
 
         return bm
 
