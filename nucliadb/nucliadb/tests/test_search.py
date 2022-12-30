@@ -335,6 +335,7 @@ async def test_search_can_filter_by_processing_status(
         f"/kb/{knowledgebox}/search",
         json={
             "features": ["document"],
+            "fields": ["a/title"],
             "faceted": ["/n/s"],
             "page_size": 0,
         },
