@@ -437,6 +437,10 @@ def broker_resource(
     message1.basic.modified.FromDatetime(datetime.now())
     message1.origin.source = rpb.Origin.Source.WEB
 
+    message1.files["file"].file.uri = "http://nofile"
+    message1.files["file"].file.size = 0
+    message1.files["file"].file.source = rpb.CloudFile.Source.LOCAL
+
     etw = rpb.ExtractedTextWrapper()
     etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
     etw.field.field = "file"

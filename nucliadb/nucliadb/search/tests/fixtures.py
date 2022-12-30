@@ -117,7 +117,7 @@ async def search_api(
     while len(NODES) < 2:
         print("awaiting cluster nodes - search fixtures.py")
         await asyncio.sleep(4)
-        if count == 2:
+        if count == 10:
             raise Exception("No cluster")
         count += 1
 
@@ -228,6 +228,8 @@ async def inject_message(processor, knowledgebox_ingest, message, count: int = 1
                 count_shard: Shard = await node_obj.reader.GetShard(req)  # type: ignore
                 if count_shard.resources >= count:
                     checks[replica.shard.id] = True
+                else:
+                    checks[replica.shard.id] = False
 
         if all(checks.values()):
             break

@@ -162,9 +162,9 @@ class Node(AbstractNode):
         shard = PBShard(shard=sharduuid)
         try:
             for node in nodes:
-                print(f"Node description: {node}")
+                logger.info(f"Node description: {node}")
                 node_obj = NODES.get(node)
-                print(f"Node obj: {node_obj}")
+                logger.info(f"Node obj: {node_obj}")
                 if node_obj is None:
                     raise NodesUnsync()
                 shard_created = await node_obj.new_shard()

@@ -246,7 +246,7 @@ nucliadb_node_2_writer = nucliadbNodeWriter()
 nucliadb_node_2_sidecar = nucliadbNodeSidecar()
 
 
-@pytest.fixture(scope="session", autouse=False)
+@pytest.fixture(scope="function", autouse=False)
 def node(natsd: str, gcs: str):
     running_settings.log_level = "DEBUG"
     docker_client = docker.from_env(version=BaseImage.docker_version)
@@ -267,6 +267,8 @@ def node(natsd: str, gcs: str):
     images.settings["nucliadb_cluster_manager"]["env"][
         "MONITOR_ADDR"
     ] = f"{docker_internal_host}:{settings.chitchat_binding_port}"
+    images.settings["nucliadb_cluster_manager"]["env"]["UPDATE_INTERVAL"] = "1s"
+
     cluster_mgr_host, cluster_mgr_port = nucliadb_cluster_mgr.run()
 
     cluster_mgr_port = get_chitchat_port(nucliadb_cluster_mgr.container_obj, 4444)
