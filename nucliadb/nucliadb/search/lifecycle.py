@@ -21,20 +21,19 @@ import logging
 import sys
 from collections import Counter
 
+from nucliadb.ingest import logger as ingest_logger
 from nucliadb.ingest.utils import get_driver  # type: ignore
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME, logger
-from nucliadb.search.chitchat import start_chitchat, stop_chitchat
+from nucliadb.search.chitchat import start_chitchat
 from nucliadb.search.nodes import NodesManager
 from nucliadb.search.predict import PredictEngine
 from nucliadb_telemetry.utils import clean_telemetry, get_telemetry, init_telemetry
 from nucliadb_utils.settings import nuclia_settings, running_settings
 from nucliadb_utils.utilities import (
     Utility,
-    clean_utility,
     finalize_utilities,
     get_cache,
-    get_utility,
     set_utility,
     start_audit_utility,
     stop_audit_utility,
@@ -42,6 +41,7 @@ from nucliadb_utils.utilities import (
 
 
 async def initialize() -> None:
+    ingest_logger.setLevel(logging.getLevelName(running_settings.log_level.upper()))
     tracer_provider = get_telemetry(SERVICE_NAME)
     if tracer_provider:
         await init_telemetry(tracer_provider)
@@ -76,16 +76,6 @@ async def initialize() -> None:
 
 async def finalize() -> None:
     await stop_ingest()
-    if get_utility(Utility.PARTITION):
-        clean_utility(Utility.PARTITION)
-    if get_utility(Utility.PREDICT):
-        clean_utility(Utility.PREDICT)
-    if get_utility(Utility.NODES):
-        clean_utility(Utility.NODES)
-    if get_utility(Utility.COUNTER):
-        clean_utility(Utility.COUNTER)
-
-    await finalize_utilities()
     await stop_audit_utility()
-    await stop_chitchat()
+    await finalize_utilities()
     await clean_telemetry(SERVICE_NAME)

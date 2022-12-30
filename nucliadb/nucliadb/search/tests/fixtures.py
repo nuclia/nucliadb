@@ -113,9 +113,13 @@ async def search_api(
 
     # Make sure is clean
     await asyncio.sleep(1)
+    count = 0
     while len(NODES) < 2:
         print("awaiting cluster nodes - search fixtures.py")
         await asyncio.sleep(4)
+        if count == 2:
+            raise Exception("No cluster")
+        count += 1
 
     def make_client_fixture(
         roles: Optional[List[Enum]] = None,

@@ -29,6 +29,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb.ingest.settings import settings
+from nucliadb_utils.settings import running_settings
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -247,6 +248,7 @@ nucliadb_node_2_sidecar = nucliadbNodeSidecar()
 
 @pytest.fixture(scope="session", autouse=False)
 def node(natsd: str, gcs: str):
+    running_settings.log_level = "DEBUG"
     docker_client = docker.from_env(version=BaseImage.docker_version)
     if "DESKTOP" in docker_client.api.version()["Platform"]["Name"].upper():
         # Valid when using Docker desktop
