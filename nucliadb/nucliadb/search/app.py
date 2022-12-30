@@ -131,6 +131,7 @@ async def chitchat_members(request: Request) -> JSONResponse:
                 "id": node_id,
                 "listen_address": node.address,
                 "type": node.label,
+                "load_score": node.load_score,
                 "dummy": node.dummy,
             }
             for node_id, node in NODES.items()

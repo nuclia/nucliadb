@@ -143,9 +143,12 @@ class Node(AbstractNode):
     _reader: Optional[NodeReaderStub] = None
     _sidecar: Optional[NodeSidecarStub] = None
 
-    def __init__(self, address: str, label: str, dummy: bool = False):
+    def __init__(
+        self, address: str, label: str, load_score: float, dummy: bool = False
+    ):
         self.address = address
         self.label = label
+        self.load_score = load_score
         self.dummy = dummy
 
     @classmethod
@@ -219,9 +222,10 @@ class Node(AbstractNode):
         ident: str,
         address: str,
         label: str,
+        load_score: float,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, label, dummy)
+        NODES[ident] = Node(address, label, load_score, dummy)
         # Compute cluster
         NODE_CLUSTER.compute()
 
@@ -425,6 +429,7 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
                 member.node_id,
                 address=member.listen_addr,
                 label=member.node_type,
+                load_score=member.load_score,
             )
             print("Node added")
     node_ids = [x for x in NODES.keys()]

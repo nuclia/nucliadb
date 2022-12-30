@@ -531,6 +531,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 id=str(nodeid),
                 listen_address=node.address,
                 type=node.label,
+                load_score=node.load_score,
                 dummy=node.dummy,
             )
             response.members.append(member)
