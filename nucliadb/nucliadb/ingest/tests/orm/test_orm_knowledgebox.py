@@ -29,7 +29,7 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     redis_driver,
     txn,
     cache,
-    knowledgebox: str,
+    knowledgebox_ingest: str,
 ):
     await KnowledgeBox.purge(redis_driver, "idonotexist")
 
@@ -60,21 +60,22 @@ async def test_knowledgebox_delete_all_kb_keys(
     txn,
     cache,
     fake_node,
-    knowledgebox: str,
+    knowledgebox_ingest: str,
 ):
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kbid = knowledgebox_ingest
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
 
     # Create some resources in the KB
     for i in range(10):
         uuid = f"myresource{i}"
-        bm = broker_resource(knowledgebox, uuid)
+        bm = broker_resource(kbid, uuid)
         r = await kb_obj.add_resource(uuid=uuid, slug=uuid, basic=bm.basic)
         assert r is not None
 
     await txn.commit(resource=False)
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(redis_driver, knowledgebox, chunk_size=3)
+    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid, chunk_size=3)
 
     # Check that all of them were deleted
     for i in range(10):
