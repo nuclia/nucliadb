@@ -63,7 +63,7 @@ async def test_iter_in_chunks():
 @pytest.mark.asyncio
 async def test_knowledgebox_delete_all_kb_keys(
     gcs_storage,
-    tikv_driver,
+    redis_driver,
     txn,
     cache,
     fake_node,
@@ -85,7 +85,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     await txn.commit(resource=False)
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(tikv_driver, kbid, chunk_size=chunk_size)
+    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid, chunk_size=chunk_size)
 
     # Check that all of them were deleted
     for uuid in uuids:
