@@ -44,8 +44,8 @@ from nucliadb_utils.authentication import requires_one
     name="Return Train call",
     response_model=TrainSetPartitions,
 )
-@version(1)
 @requires_one([NucliaDBRoles.READER])
+@version(1)
 async def get_partitions(
     request: Request, kbid: str, prefix: Optional[str] = None
 ) -> TrainSetPartitions:
