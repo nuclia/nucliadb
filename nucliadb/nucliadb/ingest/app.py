@@ -109,7 +109,7 @@ async def main() -> List[Callable]:
         set_global_textmap(B3MultiFormat())
         await init_telemetry(tracer_provider)  # To start asyncio task
 
-    chitchat = start_chitchat(SERVICE_NAME)
+    chitchat = await start_chitchat(SERVICE_NAME)
 
     await start_transaction_utility(SERVICE_NAME)
     await start_indexing_utility(SERVICE_NAME)

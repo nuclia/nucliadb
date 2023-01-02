@@ -25,14 +25,14 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 
 @pytest.mark.asyncio
 async def test_get_ontology_count(
-    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetLabelsetsCountRequest()
-    req.kb.uuid = knowledgebox
+    req.kb.uuid = knowledgebox_ingest
 
     with aioresponses() as m:
         m.get(
-            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox}/search?faceted=/l/my-labelset",
+            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox_ingest}/search?faceted=/l/my-labelset",  # noqa
             payload={
                 "resources": {},
                 "sentences": {"results": [], "facets": {}},

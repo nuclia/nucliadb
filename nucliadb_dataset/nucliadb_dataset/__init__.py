@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from enum import Enum
 from typing import Dict
 
 from nucliadb_dataset.nuclia import NucliaDriver
@@ -24,3 +25,15 @@ from nucliadb_dataset.nuclia import NucliaDriver
 NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
 
 CLIENT_ID = "CLIENT"
+
+
+class DatasetType(str, Enum):
+    FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
+    PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
+    SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
+    TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
+
+
+class ExportType(str, Enum):
+    DATASETS = "DATASETS"
+    FILESYSTEM = "FILESYSTEM"

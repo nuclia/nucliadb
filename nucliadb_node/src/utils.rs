@@ -23,15 +23,10 @@ use std::time::Duration;
 
 use http::Uri;
 use opentelemetry::propagation::Extractor;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
 use tracing::Level;
-
-lazy_static::lazy_static! {
-    pub static ref POOL: ThreadPool = ThreadPoolBuilder::new().build().unwrap();
-}
 
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {

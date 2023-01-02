@@ -25,10 +25,10 @@ from nucliadb_protos.writer_pb2 import GetLabelsResponse
 
 @pytest.mark.asyncio
 async def test_get_ontology(
-    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetLabelsRequest()
-    req.kb.uuid = knowledgebox
+    req.kb.uuid = knowledgebox_ingest
 
     labels: GetLabelsResponse = await train_client.GetOntology(req)  # type: ignore
     assert labels.labels.labelset["label1"].labels[0].title == "label1"

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 tantivy = "0.17.0"
 nucliadb_service_interface = { path = "../nucliadb_service_interface" }
+itertools = "0.10.5"

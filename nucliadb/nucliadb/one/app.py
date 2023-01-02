@@ -36,6 +36,7 @@ from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
 from nucliadb.search.utilities import get_counter
 from nucliadb.sentry import SENTRY, set_sentry
+from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
@@ -83,6 +84,7 @@ base_app = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
 base_app.include_router(api_writer_v1)
 base_app.include_router(api_reader_v1)
 base_app.include_router(api_search_v1)
+base_app.include_router(api_train_v1)
 
 application = VersionedFastAPI(
     base_app,

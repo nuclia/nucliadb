@@ -195,6 +195,7 @@ mod tests {
         assert!(dir.path().join(names::STATE).is_file());
         assert!(dir.path().join(names::LOCK).is_file());
         assert_eq!(v0, crnt_version(&lock).unwrap());
+        std::thread::sleep(std::time::Duration::from_millis(100));
         write_state(dir.path(), &State::default()).unwrap();
         let new_version = crnt_version(&lock).unwrap();
         assert!(v0 < new_version);

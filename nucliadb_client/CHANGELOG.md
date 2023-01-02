@@ -1,5 +1,13 @@
 # nucliadb_client
 
+## 2.0.0a2
+
+- Make sure slug is set on resources while importing
+
+## 2.0.0a1
+
+- Add telemetry to client's writer grpc stub
+
 ## 1.1.4
 
 - Be able to get shard data from a knowledgebox

@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import AsyncIterator, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
@@ -28,16 +28,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxResponseStatus,
     Widget,
 )
-from nucliadb_protos.train_pb2 import (
-    GetFieldsRequest,
-    GetParagraphsRequest,
-    GetResourcesRequest,
-    GetSentencesRequest,
-    TrainField,
-    TrainParagraph,
-    TrainResource,
-    TrainSentence,
-)
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from sentry_sdk import capture_exception
 
@@ -45,7 +35,7 @@ from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE, Resource
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb.ingest.settings import settings
@@ -642,68 +632,3 @@ class Processor:
     async def notify(self, channel, payload: bytes):
         if self.cache is not None and self.cache.pubsub is not None:
             await self.cache.pubsub.publish(channel, payload)
-
-    async def kb_sentences(
-        self, request: GetSentencesRequest
-    ) -> AsyncIterator[TrainSentence]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
-        if request.uuid != "":
-            # Filter by uuid
-            resource = await kb.get(request.uuid)
-            if resource:
-                async for sentence in resource.iterate_sentences(request.metadata):
-                    yield sentence
-        else:
-            async for resource in kb.iterate_resources():
-                async for sentence in resource.iterate_sentences(request.metadata):
-                    yield sentence
-        await txn.abort()
-
-    async def kb_paragraphs(
-        self, request: GetParagraphsRequest
-    ) -> AsyncIterator[TrainParagraph]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
-        if request.uuid != "":
-            # Filter by uuid
-            resource = await kb.get(request.uuid)
-            if resource:
-                async for paragraph in resource.iterate_paragraphs(request.metadata):
-                    yield paragraph
-        else:
-            async for resource in kb.iterate_resources():
-                async for paragraph in resource.iterate_paragraphs(request.metadata):
-                    yield paragraph
-        await txn.abort()
-
-    async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
-        if request.uuid != "":
-            # Filter by uuid
-            resource = await kb.get(request.uuid)
-            if resource:
-                async for field in resource.iterate_fields(request.metadata):
-                    yield field
-        else:
-            async for resource in kb.iterate_resources():
-                async for field in resource.iterate_fields(request.metadata):
-                    yield field
-        await txn.abort()
-
-    async def kb_resources(
-        self, request: GetResourcesRequest
-    ) -> AsyncIterator[TrainResource]:
-        txn = await self.driver.begin()
-        kb = KnowledgeBox(txn, self.storage, self.cache, request.kb.uuid)
-        base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
-        async for key in txn.keys(match=base, count=-1):
-            # Fetch and Add wanted item
-            rid = await txn.get(key)
-            if rid is not None:
-                resource = await kb.get(rid.decode())
-                if resource is not None:
-                    yield await resource.get_resource(request.metadata)
-
-        await txn.abort()

@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
         let resource = Resource::decode(&mut Cursor::new(content)).unwrap();
         println!("Adding resource {}", file_path.display());
         let res = writer.set_resource(&shard_id, &resource).unwrap();
-        assert!(res.is_ok());
+        assert!(res.is_some());
         println!("Resource added: {}", res.unwrap());
         let info = reader
             .get_shard(&shard_id)

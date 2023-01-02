@@ -41,6 +41,29 @@ import os
 from nucliadb.settings import Driver, Settings
 
 
+def cleanup_config():
+    from nucliadb.ingest import settings as ingest_settings
+    from nucliadb.ingest.orm import NODE_CLUSTER
+    from nucliadb.train import settings as train_settings
+    from nucliadb.writer import settings as writer_settings
+    from nucliadb_utils import settings as utils_settings
+    from nucliadb_utils.cache import settings as cache_settings
+
+    ingest_settings.settings.parse_obj(ingest_settings.Settings())
+    train_settings.settings.parse_obj(train_settings.Settings())
+    writer_settings.settings.parse_obj(writer_settings.Settings())
+    cache_settings.settings.parse_obj(cache_settings.Settings())
+
+    utils_settings.audit_settings.parse_obj(utils_settings.AuditSettings())
+    utils_settings.indexing_settings.parse_obj(utils_settings.IndexingSettings())
+    utils_settings.transaction_settings.parse_obj(utils_settings.TransactionSettings())
+    utils_settings.nucliadb_settings.parse_obj(utils_settings.NucliaDBSettings())
+    utils_settings.nuclia_settings.parse_obj(utils_settings.NucliaSettings())
+    utils_settings.storage_settings.parse_obj(utils_settings.StorageSettings())
+
+    NODE_CLUSTER.local_node = None
+
+
 def config_nucliadb(nucliadb_args: Settings):
     from nucliadb.ingest.orm import NODE_CLUSTER
     from nucliadb.ingest.orm.local_node import LocalNode

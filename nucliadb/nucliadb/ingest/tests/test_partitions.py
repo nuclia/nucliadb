@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import os
 
 import pytest
@@ -36,4 +37,4 @@ async def test_assign_partitions(partition_settings):
     assign_partitions(partition_settings)
 
     assert partition_settings.partitions == expected_partition_list
-    assert os.environ["PARTITIONS"] == str(expected_partition_list)
+    assert os.environ["PARTITIONS"] == json.dumps(expected_partition_list)

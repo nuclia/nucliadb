@@ -24,10 +24,10 @@ from nucliadb_protos.train_pb2_grpc import TrainStub
 
 @pytest.mark.asyncio
 async def test_list_paragraphs(
-    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
-    req.kb.uuid = knowledgebox
+    req.kb.uuid = knowledgebox_ingest
     req.metadata.entities = True
     req.metadata.labels = True
     req.metadata.text = True
@@ -41,10 +41,10 @@ async def test_list_paragraphs(
 
 @pytest.mark.asyncio
 async def test_list_paragraphs_shows_ners_with_positions(
-    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetParagraphsRequest()
-    req.kb.uuid = knowledgebox
+    req.kb.uuid = knowledgebox_ingest
     req.metadata.entities = True
     req.metadata.labels = True
     req.metadata.text = True

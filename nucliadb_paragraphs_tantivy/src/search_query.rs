@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use nucliadb_protos::{ParagraphSearchRequest, SuggestRequest};
+use nucliadb_protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use nucliadb_service_interface::prelude::*;
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
@@ -316,6 +316,7 @@ pub fn search_query(
     search: &ParagraphSearchRequest,
     schema: &ParagraphSchema,
     distance: u8,
+    with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
     let mut term_collector = TermCollector::default();
     let processed = preprocess_raw_query(text, &mut term_collector);
@@ -324,6 +325,10 @@ pub fn search_query(
     let termc = SharedTermC::from(term_collector);
     let mut fuzzies = fuzzied_queries(fuzzy_query, false, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
+    if let Some(advance) = with_advance {
+        originals.push((Occur::Must, advance.box_clone()));
+        fuzzies.push((Occur::Must, advance));
+    }
     if !search.uuid.is_empty() {
         let term = Term::from_field_text(schema.uuid, &search.uuid);
         let term_query = TermQuery::new(term, IndexRecordOption::Basic);
@@ -448,4 +453,20 @@ mod tests {
             assert_eq!(fuzzy_query, expected_fuzzy_query);
         }
     }
+}
+
+pub fn streaming_query(schema: &ParagraphSchema, request: &StreamRequest) -> Box<dyn Query> {
+    let mut queries: Vec<(Occur, Box<dyn Query>)> = vec![];
+    queries.push((Occur::Must, Box::new(AllQuery)));
+    request
+        .filter
+        .iter()
+        .flat_map(|f| f.tags.iter())
+        .flat_map(|facet_key| Facet::from_text(facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.facets, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            queries.push((Occur::Should, Box::new(facet_term_query)));
+        });
+    Box::new(BooleanQuery::new(queries))
 }

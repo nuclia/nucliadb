@@ -258,6 +258,7 @@ class KnowledgeboxShards(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str = ""
+    advanced_query: Optional[str] = None
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []

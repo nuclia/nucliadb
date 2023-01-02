@@ -108,6 +108,10 @@ jobs:
           filters: |
             workflows:
               - 'nucliadb_node/**'
+              - 'nucliadb_fields_tantivy/**'
+              - 'nucliadb_paragraphs_tantivy/**'
+              - 'nucliadb_vectors/**'
+              - 'nucliadb_relations/**'
 
       - name: Install rust binding for testing
         if: steps.filter.outputs.workflows == 'true'

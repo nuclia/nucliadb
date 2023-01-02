@@ -572,7 +572,7 @@ class KnowledgeBox:
         while key_ok is False:
             found = await self.txn.get(key)
             if found is not None and found.decode() != uuid:
-                slug += ".C"
+                slug += ".c"
                 key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
             else:
                 key_ok = True
