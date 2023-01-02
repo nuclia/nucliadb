@@ -46,7 +46,6 @@ from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
-    ParagraphPosition,
     Paragraphs,
     RelatedEntities,
     ResourceProperties,
@@ -55,6 +54,7 @@ from nucliadb_models.search import (
     ResourceSearchResults,
     Sentence,
     Sentences,
+    TextPosition,
 )
 
 
@@ -165,7 +165,7 @@ async def merge_suggest_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            position=ParagraphPosition(
+            position=TextPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,
@@ -248,6 +248,7 @@ async def merge_vectors_results(
                 field=field,
                 text=text,
                 index=index,
+                position=TextPosition(start=start_int, end=end_int, index=index_int),
             )
         )
         if rid not in resources:
@@ -310,7 +311,7 @@ async def merge_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            position=ParagraphPosition(
+            position=TextPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,

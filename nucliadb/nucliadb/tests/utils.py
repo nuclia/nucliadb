@@ -20,7 +20,7 @@
 import uuid
 from datetime import datetime
 
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb_protos import resources_pb2 as rpb
@@ -59,5 +59,5 @@ def broker_resource(kbid: str, rid=None, slug=None) -> BrokerMessage:
 
 
 async def inject_message(writer: WriterStub, message):
-    await writer.ProcessMessage([message])  # type: ignore
-    return
+    resp = await writer.ProcessMessage([message])  # type: ignore
+    assert resp.status == OpStatusWriter.Status.OK

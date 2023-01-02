@@ -22,7 +22,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from google.protobuf.internal.containers import MessageMap
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
-from nucliadb_protos.noderesources_pb2 import ParagraphMetadata, ParagraphPosition
+from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
+from nucliadb_protos.noderesources_pb2 import ParagraphPosition as TextPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (
@@ -109,19 +110,6 @@ class ResourceBrain:
     def apply_field_text(self, field_key: str, text: str):
         self.brain.texts[field_key].text = text
 
-    def get_paragraph_page_number(
-        self, paragraph: Paragraph, page_positions: FilePagePositions
-    ) -> int:
-        page_number = 0
-        for page_number, (page_start, page_end) in page_positions.items():
-            if page_start <= paragraph.start <= page_end:
-                return int(page_number)
-            if paragraph.start <= page_end:
-                logger.info("There is a wrong page start")
-                return int(page_number)
-        logger.error("Could not found a page")
-        return int(page_number)
-
     def apply_field_metadata(
         self,
         field_key: str,
@@ -165,7 +153,7 @@ class ResourceBrain:
                         for classification in paragraphs[key].classifications
                         if classification.cancelled_by_user is True
                     ]
-                position = ParagraphPosition(
+                position = TextPosition(
                     index=index,
                     start=paragraph.start,
                     end=paragraph.end,
@@ -173,8 +161,8 @@ class ResourceBrain:
                     end_seconds=paragraph.end_seconds,
                 )
                 if page_positions:
-                    position.page_number = self.get_paragraph_page_number(
-                        paragraph, page_positions
+                    position.page_number = get_page_number(
+                        paragraph.start, page_positions
                     )
                 p = BrainParagraph(
                     start=paragraph.start,
@@ -218,7 +206,7 @@ class ResourceBrain:
                     if classification.cancelled_by_user is True
                 ]
 
-            position = ParagraphPosition(
+            position = TextPosition(
                 index=index,
                 start=paragraph.start,
                 end=paragraph.end,
@@ -226,9 +214,7 @@ class ResourceBrain:
                 end_seconds=paragraph.end_seconds,
             )
             if page_positions:
-                position.page_number = self.get_paragraph_page_number(
-                    paragraph, page_positions
-                )
+                position.page_number = get_page_number(paragraph.start, page_positions)
             p = BrainParagraph(
                 start=paragraph.start,
                 end=paragraph.end,
@@ -520,3 +506,15 @@ class ResourceBrain:
 
     def compute_tags(self):
         self.brain.labels.extend(flat_resource_tags(self.tags))
+
+
+def get_page_number(start_index: int, page_positions: FilePagePositions) -> int:
+    page_number = 0
+    for page_number, (page_start, page_end) in page_positions.items():
+        if page_start <= start_index <= page_end:
+            return int(page_number)
+        if start_index <= page_end:
+            logger.info("There is a wrong page start")
+            return int(page_number)
+    logger.error("Could not found a page")
+    return int(page_number)
