@@ -29,7 +29,6 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     redis_driver,
     txn,
     cache,
-    knowledgebox_ingest: str,
 ):
     await KnowledgeBox.purge(redis_driver, "idonotexist")
 
