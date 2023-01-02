@@ -496,8 +496,8 @@ class KnowledgeBox:
             async for chunk_of_keys in iter_in_chunks(
                 txn.keys(match=prefix, count=-1), chunk_size=chunk_size
             ):
-                done = False
                 for key in chunk_of_keys:
+                    done = False
                     await txn.delete(key)
                 await txn.commit(resource=False)
             if done:

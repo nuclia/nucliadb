@@ -35,27 +35,35 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
 
 @pytest.mark.asyncio
 async def test_iter_in_chunks():
-    async def thegenerator(n):
+    async def generate_n(n):
+        if n is None:
+            return
         for i in range(n):
             yield i
 
     total_items = 100
     chunk_size = 10
     iterations = 0
-    async for chunk in iter_in_chunks(thegenerator(total_items), chunk_size=chunk_size):
-        assert len(chunk) == 10
+    async for chunk in iter_in_chunks(generate_n(total_items), chunk_size=chunk_size):
+        assert len(chunk) == chunk_size
         assert chunk == list(
             range(iterations * chunk_size, (iterations * chunk_size) + chunk_size)
         )
         iterations += 1
 
-    assert iterations == 10
+    assert iterations == total_items / chunk_size
+
+    # Check when generator doesn't yield anything
+    iterations = None
+    async for chunk in iter_in_chunks(generate_n(None)):
+        iterations += 1
+    assert iterations is None
 
 
 @pytest.mark.asyncio
 async def test_knowledgebox_delete_all_kb_keys(
     gcs_storage,
-    redis_driver,
+    tikv_driver,
     txn,
     cache,
     fake_node,
@@ -64,19 +72,21 @@ async def test_knowledgebox_delete_all_kb_keys(
     kbid = knowledgebox_ingest
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
 
-    # Create some resources in the KB
-    for i in range(10):
-        uuid = f"myresource{i}"
-        bm = broker_resource(kbid, uuid)
-        r = await kb_obj.add_resource(uuid=uuid, slug=uuid, basic=bm.basic)
-        assert r is not None
+    n_resources = 200
+    chunk_size = 33
 
+    # Create some resources in the KB
+    uuids = set()
+    for _ in range(n_resources):
+        bm = broker_resource(kbid)
+        r = await kb_obj.add_resource(uuid=bm.uuid, slug=bm.uuid, basic=bm.basic)
+        assert r is not None
+        uuids.add(bm.uuid)
     await txn.commit(resource=False)
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid, chunk_size=3)
+    await KnowledgeBox.delete_all_kb_keys(tikv_driver, kbid, chunk_size=chunk_size)
 
     # Check that all of them were deleted
-    for i in range(10):
-        uuid = f"myresource{i}"
+    for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
