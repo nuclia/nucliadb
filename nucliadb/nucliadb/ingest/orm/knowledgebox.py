@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
+from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union, Any, List
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -620,8 +620,10 @@ class KnowledgeBox:
                 )
 
 
-async def iter_in_chunks(gen: AsyncGenerator, chunk_size=100):
-    chunk = []
+async def iter_in_chunks(
+    gen: AsyncGenerator[Any, None], chunk_size: int = 100
+) -> AsyncIterator[List[Any]]:
+    chunk: List[Any] = []
 
     async for item in gen:
         if len(chunk) == chunk_size:
@@ -629,5 +631,5 @@ async def iter_in_chunks(gen: AsyncGenerator, chunk_size=100):
             chunk = []
         chunk.append(item)
 
-    if len(chunk):
+    if len(chunk) > 0:
         yield chunk
