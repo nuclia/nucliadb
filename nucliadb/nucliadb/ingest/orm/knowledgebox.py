@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union, Any, List
+from typing import Any, AsyncGenerator, AsyncIterator, List, Optional, Tuple, Union
 from uuid import uuid4
 
 from grpc import StatusCode
