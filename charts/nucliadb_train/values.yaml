@@ -56,3 +56,7 @@ chitchat:
     node_type: Train
     node0_svc_fixed_ip: 10.4.0.255
     chitchat_port: 4444
+
+vs:
+  gateway:
+  host:
