@@ -19,7 +19,8 @@
 #
 import pytest
 
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, iter_in_chunks
+from nucliadb.ingest.tests.fixtures import broker_resource
 
 
 @pytest.mark.asyncio
@@ -27,3 +28,67 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     gcs_storage, redis_driver
 ):
     await KnowledgeBox.purge(redis_driver, "idonotexist")
+
+
+@pytest.mark.asyncio
+async def test_iter_in_chunks():
+    async def generate_n(n):
+        if n is None:
+            return
+        for i in range(n):
+            yield i
+
+    total_items = 100
+    chunk_size = 10
+    iterations = 0
+    async for chunk in iter_in_chunks(generate_n(total_items), chunk_size=chunk_size):
+        assert len(chunk) == chunk_size
+        assert chunk == list(
+            range(iterations * chunk_size, (iterations * chunk_size) + chunk_size)
+        )
+        iterations += 1
+
+    assert iterations == total_items / chunk_size
+
+    # Check when generator doesn't yield anything
+    iterations = None
+    async for chunk in iter_in_chunks(generate_n(None)):
+        iterations += 1
+    assert iterations is None
+
+
+@pytest.mark.asyncio
+async def test_knowledgebox_delete_all_kb_keys(
+    gcs_storage,
+    redis_driver,
+    txn,
+    cache,
+    fake_node,
+    knowledgebox_ingest: str,
+):
+    kbid = knowledgebox_ingest
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+
+    # Create some resources in the KB
+    n_resources = 200
+    uuids = set()
+    for _ in range(n_resources):
+        bm = broker_resource(kbid)
+        r = await kb_obj.add_resource(uuid=bm.uuid, slug=bm.uuid, basic=bm.basic)
+        assert r is not None
+        await r.set_slug()
+        uuids.add(bm.uuid)
+    await txn.commit(resource=False)
+
+    # Check that all of them are there
+    for uuid in uuids:
+        assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
+
+    # Now delete all kb keys
+    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid)
+    # This is needed to clean the in-memory cache of the transaction of visited_keys
+    txn.clean()
+
+    # Check that all of them were deleted
+    for uuid in uuids:
+        assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
