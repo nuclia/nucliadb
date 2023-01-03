@@ -76,11 +76,18 @@ async def test_knowledgebox_delete_all_kb_keys(
         bm = broker_resource(kbid)
         r = await kb_obj.add_resource(uuid=bm.uuid, slug=bm.uuid, basic=bm.basic)
         assert r is not None
+        await r.set_slug()
         uuids.add(bm.uuid)
     await txn.commit(resource=False)
 
+    # Check that all of them are there
+    for uuid in uuids:
+        assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
+
     # Now delete all kb keys
     await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid)
+    # This is needed to clean the in-memory cache of the transaction of visited_keys
+    txn.clean()
 
     # Check that all of them were deleted
     for uuid in uuids:
