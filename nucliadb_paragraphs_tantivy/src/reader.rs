@@ -21,16 +21,20 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs;
+use std::time::SystemTime;
 
 use nucliadb_protos::{
-    OrderBy, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId, SuggestRequest,
+    OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
+    StreamRequest, SuggestRequest,
 };
 use nucliadb_service_interface::prelude::*;
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{Index, IndexReader, IndexSettings, IndexSortByField, Order, ReloadPolicy};
+use tantivy::{
+    Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order, ReloadPolicy,
+};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
@@ -38,7 +42,7 @@ use crate::search_query;
 use crate::search_query::SharedTermC;
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse};
 
-const FUZZY_DISTANCE: usize = 1;
+const FUZZY_DISTANCE: u8 = 1;
 
 pub struct ParagraphReaderService {
     index: Index,
@@ -56,25 +60,60 @@ impl Debug for ParagraphReaderService {
 }
 
 impl ParagraphReader for ParagraphReaderService {
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> InternalResult<usize> {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let searcher = self.reader.searcher();
-        Ok(searcher.search(&AllQuery, &Count).unwrap())
+        let count = searcher.search(&AllQuery, &Count).unwrap_or_default();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        Ok(count)
     }
+    #[tracing::instrument(skip_all)]
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response> {
+        let id = Some(&request.shard);
+        let time = SystemTime::now();
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: starts at {v} ms");
+        }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let no_results = 10;
-        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
+        let text = self.adapt_text(&parser, &request.body);
         let (original, termc, fuzzied) =
-            suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
+            suggest_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: ends at {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: starts at {v} ms");
+        }
         let searcher = self.reader.searcher();
         let topdocs = TopDocs::with_limit(no_results);
         let mut results = searcher.search(&original, &topdocs).unwrap();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: ends at {v} ms");
+        }
+
         if results.is_empty() {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Trying fuzzy: starts at {v} ms");
+            }
             let topdocs = TopDocs::with_limit(no_results - results.len());
             match searcher.search(&fuzzied, &topdocs) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
                 Err(err) => error!("{err:?} during suggest"),
             }
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Trying fuzzy: ends at {v} ms");
+            }
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
         }
         Ok(ParagraphSearchResponse::from(SearchBm25Response {
             facets_count: None,
@@ -87,6 +126,18 @@ impl ParagraphReader for ParagraphReaderService {
             results_per_page: 10,
         }))
     }
+    #[tracing::instrument(skip_all)]
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator> {
+        let producer = BatchProducer {
+            offset: 0,
+            total: self.count()?,
+            paragraph_field: self.schema.paragraph,
+            facet_field: self.schema.facets,
+            searcher: self.reader.searcher(),
+            query: search_query::streaming_query(&self.schema, request),
+        };
+        Ok(ParagraphIterator::new(producer.flatten()))
+    }
 }
 
 impl ReaderChild for ParagraphReaderService {
@@ -96,37 +147,66 @@ impl ReaderChild for ParagraphReaderService {
         info!("Stopping Paragraph Reader Service");
         Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
+        let id = Some(&request.id);
+        let time = SystemTime::now();
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: starts at {v} ms");
+        }
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-        let only_facets = results == 0 || (request.body.is_empty() && request.filter.is_none());
         let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
             .as_ref()
-            .map(|v| {
-                v.tags
-                    .iter()
-                    .filter(|s| ParagraphReaderService::is_valid_facet(s))
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
-        let text = ParagraphReaderService::adapt_text(&parser, &request.body);
-        let (original, termc, fuzzied) =
-            search_query(&parser, &text, request, &self.schema, FUZZY_DISTANCE as u8);
+            .iter()
+            .flat_map(|v| v.tags.iter())
+            .filter(|s| ParagraphReaderService::is_valid_facet(s))
+            .cloned()
+            .collect();
+        let text = self.adapt_text(&parser, &request.body);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Creating query: ends at {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: starts at {v} ms");
+        }
+        let advanced = request
+            .advanced_query
+            .as_ref()
+            .map(|query| parser.parse_query(query))
+            .transpose()
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
+        let (original, termc, fuzzied) = search_query(
+            &parser,
+            &text,
+            request,
+            &self.schema,
+            FUZZY_DISTANCE,
+            advanced,
+        );
         let mut searcher = Searcher {
             request,
             results,
             offset,
             facets: &facets,
-            only_facets,
             order_field,
             text: &text,
+            only_faceted: request.only_faceted,
         };
         let mut response = searcher.do_search(termc.clone(), original, self);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Searching: ends at {v} ms");
+        }
+
         if response.results.is_empty() {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Applying fuzzy: starts at {v} ms");
+            }
             searcher.results -= response.results.len();
             let fuzzied = searcher.do_search(termc, fuzzied, self);
             let filter = response
@@ -141,6 +221,13 @@ impl ReaderChild for ParagraphReaderService {
                 .for_each(|r| response.results.push(r));
             response.total = response.results.len() as i32;
             response.fuzzy_distance = FUZZY_DISTANCE as i32;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Applying fuzzy: ends at {v} ms");
+            }
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Producing results: starts at {v} ms");
         }
         let total = response.results.len() as f32;
         response.results.iter_mut().enumerate().for_each(|(i, r)| {
@@ -148,11 +235,20 @@ impl ReaderChild for ParagraphReaderService {
                 sc.booster = total - (i as f32);
             }
         });
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Producing results: starts at {v} ms");
+        }
+
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
         Ok(response)
     }
+    #[tracing::instrument(skip_all)]
     fn reload(&self) {
         self.reader.reload().unwrap();
     }
+    #[tracing::instrument(skip_all)]
     fn stored_ids(&self) -> Vec<String> {
         self.keys()
     }
@@ -191,29 +287,18 @@ impl ParagraphReaderService {
 
         Ok(docs)
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        info!("Starting Paragraph Service");
-        match ParagraphReaderService::open(config) {
-            Ok(service) => Ok(service),
-            Err(_e) => {
-                warn!("Paragraph Service does not exists. Creating a new one.");
-                match ParagraphReaderService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("Error starting Paragraph service: {}", e);
-                        Err(Box::new(ParagraphError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
+        ParagraphReaderService::open(config).or_else(|_| ParagraphReaderService::new(config))
     }
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
         match ParagraphReaderService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphReaderService> {
         match ParagraphReaderService::open_inner(config) {
             Ok(service) => Ok(service),
@@ -222,11 +307,8 @@ impl ParagraphReaderService {
     }
 
     pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
-        let paragraph_schema = ParagraphSchema::new();
-
+        let paragraph_schema = ParagraphSchema::default();
         fs::create_dir_all(&config.path)?;
-
-        debug!("Creating index builder {}:{}", line!(), file!());
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
@@ -237,16 +319,11 @@ impl ParagraphReaderService {
         };
 
         index_builder = index_builder.settings(settings);
-
         let index = index_builder.create_in_dir(&config.path).unwrap();
-        debug!("Index builder created  {}:{}", line!(), file!());
-
-        debug!("Creating index  {}:{}", line!(), file!());
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into()?;
-        debug!("Index created  {}:{}", line!(), file!());
         Ok(ParagraphReaderService {
             index,
             reader,
@@ -255,7 +332,7 @@ impl ParagraphReaderService {
     }
 
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
         let index = Index::open_in_dir(&config.path)?;
 
         let reader = index
@@ -270,16 +347,13 @@ impl ParagraphReaderService {
         })
     }
 
-    fn adapt_text(parser: &QueryParser, text: &str) -> String {
+    fn adapt_text(&self, parser: &QueryParser, text: &str) -> String {
         match text.trim() {
             "" => text.to_string(),
             text => parser
                 .parse_query(text)
                 .map(|_| text.to_string())
-                .unwrap_or_else(|e| {
-                    tracing::error!("Error during parsing query: {e}. Input query: {text}");
-                    format!("\"{}\"", text.replace('"', ""))
-                }),
+                .unwrap_or_else(|_| format!("\"{}\"", text.replace('"', ""))),
         }
     }
 
@@ -302,23 +376,64 @@ impl ParagraphReaderService {
             .collect()
     }
     fn is_valid_facet(maybe_facet: &str) -> bool {
-        Facet::from_text(maybe_facet)
-            .map_err(|_| error!("Invalid facet: {maybe_facet}"))
-            .is_ok()
+        Facet::from_text(maybe_facet).is_ok()
     }
 
     fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
-        match order {
-            Some(order) => match order.field.as_str() {
-                "created" => Some(self.schema.created),
-                "modified" => Some(self.schema.modified),
-                _ => {
-                    error!("Order by {} is not currently supported.", order.field);
-                    None
-                }
-            },
-            None => None,
+        match order.as_ref().map(|o| o.field.as_str()) {
+            Some("created") => Some(self.schema.created),
+            Some("modified") => Some(self.schema.modified),
+            _ => None,
         }
+    }
+}
+
+pub struct BatchProducer {
+    total: usize,
+    offset: usize,
+    paragraph_field: Field,
+    facet_field: Field,
+    query: Box<dyn Query>,
+    searcher: LeasedItem<tantivy::Searcher>,
+}
+impl BatchProducer {
+    const BATCH: usize = 1000;
+}
+impl Iterator for BatchProducer {
+    type Item = Vec<ParagraphItem>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let time = SystemTime::now();
+        if self.offset >= self.total {
+            info!("No more batches available");
+            return None;
+        }
+        info!("Producing a new batch with offset: {}", self.offset);
+
+        let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let top_docs = self.searcher.search(&self.query, &topdocs).unwrap();
+        let mut items = vec![];
+        for doc in top_docs.into_iter().flat_map(|i| self.searcher.doc(i.1)) {
+            let id = doc
+                .get_first(self.paragraph_field)
+                .expect("document doesn't appear to have uuid.")
+                .as_text()
+                .unwrap()
+                .to_string();
+
+            let labels = doc
+                .get_all(self.facet_field)
+                .into_iter()
+                .flat_map(|x| x.as_facet())
+                .map(|x| x.to_path_string())
+                .filter(|x| x.starts_with("/l/"))
+                .collect::<Vec<_>>();
+            items.push(ParagraphItem { id, labels });
+        }
+        self.offset += Self::BATCH;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("New batch created, took {v} ms");
+        }
+        Some(items)
     }
 }
 
@@ -327,9 +442,9 @@ struct Searcher<'a> {
     results: usize,
     offset: usize,
     facets: &'a [String],
-    only_facets: bool,
     order_field: Option<Field>,
     text: &'a str,
+    only_faceted: bool,
 }
 impl<'a> Searcher<'a> {
     fn do_search(
@@ -346,7 +461,7 @@ impl<'a> Searcher<'a> {
                 collector
             },
         );
-        if self.only_facets {
+        if self.only_faceted {
             // No query search, just facets
             let facets_count = searcher.search(&query, &facet_collector).unwrap();
             ParagraphSearchResponse::from(SearchFacetsResponse {
@@ -600,7 +715,7 @@ mod tests {
     fn test_new_paragraph() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
         let psc = ParagraphConfig {
-            path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            path: dir.path().to_path_buf(),
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
@@ -684,6 +799,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -703,6 +819,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -722,10 +839,11 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search on all paragraphs in resource with typo
         let search = ParagraphSearchRequest {
@@ -741,6 +859,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -760,6 +879,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -779,6 +899,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -798,6 +919,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -818,6 +940,7 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -837,11 +960,12 @@ mod tests {
             result_per_page: 20,
             timestamps: None,
             reload: false,
-            with_duplicates: false,
+            with_duplicates: true,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search filter all paragraphs
         let search = ParagraphSearchRequest {
@@ -857,6 +981,7 @@ mod tests {
             timestamps: Some(timestamps.clone()),
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -874,6 +999,7 @@ mod tests {
             timestamps: Some(timestamps),
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
@@ -893,10 +1019,20 @@ mod tests {
             timestamps: None,
             reload: false,
             with_duplicates: false,
+            only_faceted: false,
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
         assert_eq!(result.total, 0);
+
+        let request = StreamRequest {
+            shard_id: None,
+            filter: None,
+            reload: false,
+        };
+        let iter = paragraph_reader_service.iterator(&request).unwrap();
+        let count = iter.count();
+        assert_eq!(count, 4);
         Ok(())
     }
 }

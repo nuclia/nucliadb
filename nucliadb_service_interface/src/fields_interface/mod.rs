@@ -17,6 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+
 use nucliadb_protos::*;
 
 use crate::service_interface::*;
@@ -35,12 +37,27 @@ impl std::fmt::Display for FieldError {
 impl InternalError for FieldError {}
 
 pub struct FieldConfig {
-    pub path: String,
+    pub path: PathBuf,
+}
+
+pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
+impl DocumentIterator {
+    pub fn new<I>(inner: I) -> DocumentIterator
+    where I: Iterator<Item = DocumentItem> + Send + 'static {
+        DocumentIterator(Box::new(inner))
+    }
+}
+impl Iterator for DocumentIterator {
+    type Item = DocumentItem;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
 }
 
 pub trait FieldReader:
     ReaderChild<Request = DocumentSearchRequest, Response = DocumentSearchResponse>
 {
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<DocumentIterator>;
     fn count(&self) -> InternalResult<usize>;
 }
 

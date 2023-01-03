@@ -1,53 +1,69 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 use std::{env, io};
 
 use bytes::BytesMut;
 use dockertest::{Composition, DockerTest, StartPolicy};
 use log::error;
-use nucliadb_cluster::cluster::{Cluster, Member, NodeType, CLUSTER_GOSSIP_INTERVAL};
+use nucliadb_cluster::{Node, NodeHandle, NodeSnapshot, NodeType};
 use tokio::net::UnixStream;
 use tokio::sync::mpsc;
+use tokio_stream::StreamExt;
 use uuid::Uuid;
 
-const SEED_NODE: &str = "0.0.0.0:40400";
+const SEED_NODE: &str = "0.0.0.0:4040";
+const UPDATE_INTERVAL: Duration = Duration::from_millis(250);
 
-pub async fn create_seed_node() -> anyhow::Result<Cluster> {
-    // create seed node
-    let peer_addr = SocketAddr::from_str(SEED_NODE).unwrap();
-    Ok(Cluster::new(
-        Uuid::new_v4().to_string(),
-        peer_addr,
-        NodeType::Node,
-        vec![SEED_NODE.to_string()],
-    )
-    .await?)
+pub async fn create_seed_node() -> anyhow::Result<NodeHandle> {
+    let node = Node::builder()
+        .register_as(NodeType::Io)
+        .on_local_network(SocketAddr::from_str(SEED_NODE).unwrap())
+        .with_seed_nodes(vec![SEED_NODE.to_string()])
+        .with_update_interval(UPDATE_INTERVAL)
+        .build()?;
+
+    let node = node.start().await?;
+
+    Ok(node)
 }
 
 pub fn find_available_port() -> anyhow::Result<u16> {
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
     let listener = TcpListener::bind(socket)?;
     let port = listener.local_addr()?.port();
+
     Ok(port)
 }
 
-pub async fn create_cluster_for_test_with_id(
-    peer_uuid: String,
+pub async fn create_node_for_test_with_id(
+    id: String,
     seed_node: String,
-) -> anyhow::Result<Cluster> {
+) -> anyhow::Result<NodeHandle> {
     let port = find_available_port()?;
+
     eprintln!("port: {port}");
-    let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port);
-    let cluster = Cluster::new(peer_uuid, peer_addr, NodeType::Node, vec![seed_node]).await?;
-    Ok(cluster)
+
+    let node = Node::builder()
+        .with_id(id)
+        .register_as(NodeType::Io)
+        .on_local_network(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port))
+        .with_seed_nodes(vec![seed_node])
+        .with_update_interval(UPDATE_INTERVAL)
+        .build()?;
+
+    let node = node.start().await?;
+
+    Ok(node)
 }
 
 /// Creates a local cluster listening on a random port.
-pub async fn create_cluster_for_test(seed_node: String) -> anyhow::Result<Cluster> {
+pub async fn create_node_for_test(seed_node: String) -> anyhow::Result<NodeHandle> {
     let peer_uuid = Uuid::new_v4().to_string();
-    let cluster = create_cluster_for_test_with_id(peer_uuid, seed_node).await?;
-    Ok(cluster)
+    let node = create_node_for_test_with_id(peer_uuid, seed_node).await?;
+
+    Ok(node)
 }
 
 pub fn setup_logging_for_tests() {
@@ -59,38 +75,46 @@ pub fn setup_logging_for_tests() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial_test::serial("cluster")]
 async fn test_cluster_single_node() {
     setup_logging_for_tests();
     // create seed node
-    let cluster = create_seed_node().await.unwrap();
+    let node = create_seed_node().await.unwrap();
 
-    tokio::time::sleep(CLUSTER_GOSSIP_INTERVAL * 2).await;
+    tokio::time::sleep(UPDATE_INTERVAL * 2).await;
 
-    let members: Vec<Member> = cluster.members().await;
-    assert_eq!(members.len(), 1);
+    let live_nodes = node.live_nodes().await;
+
+    assert_eq!(live_nodes.len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[serial_test::serial("cluster")]
 async fn test_cluster_two_nodes() {
     setup_logging_for_tests();
     // create seed node
-    let cluster = create_seed_node().await.unwrap();
-    let mut watcher = cluster.members_change_watcher();
+    let first_node = create_seed_node().await.unwrap();
+    let mut cluster_watcher = first_node.cluster_watcher().await;
 
     // add node to cluster
-    let cluster1 = create_cluster_for_test(SEED_NODE.to_string())
-        .await
-        .unwrap();
+    let second_node = create_node_for_test(SEED_NODE.to_string()).await.unwrap();
 
     // allow nodes start and communicate
-    tokio::time::sleep(CLUSTER_GOSSIP_INTERVAL * 2).await;
+    tokio::time::sleep(UPDATE_INTERVAL * 2).await;
 
-    match tokio::time::timeout(CLUSTER_GOSSIP_INTERVAL, watcher.changed()).await {
-        Ok(_) => {
-            let update = &*watcher.borrow();
-            assert_eq!(update.len(), 1);
-            assert_eq!(update[0].node_id, cluster1.id.id);
-            assert_eq!(cluster1.members().await.len(), 2)
+    match tokio::time::timeout(UPDATE_INTERVAL, cluster_watcher.next()).await {
+        Ok(Some(live_nodes)) => {
+            let live_nodes = live_nodes
+                .into_iter()
+                .map(|node| node.id().to_string())
+                .collect::<Vec<_>>();
+
+            assert_eq!(live_nodes.len(), 2);
+            assert!(live_nodes.contains(&first_node.id().to_string()));
+            assert!(live_nodes.contains(&second_node.id().to_string()));
+        }
+        Ok(None) => {
+            panic!("no changes in cluster");
         }
         Err(e) => {
             panic!("timeout while waiting cluster changes: {e}");
@@ -149,7 +173,7 @@ async fn test_integration_3_nodes_with_monitor() {
                             bytes_read, 0,
                             "0 bytes read from socket. Connection closed by writer"
                         );
-                        let update = serde_json::from_slice::<Vec<Member>>(&buffer).unwrap();
+                        let update = serde_json::from_slice::<Vec<NodeSnapshot>>(&buffer).unwrap();
                         state.change_state(&operation);
                         assert_eq!(update.len(), state.nodes());
                         if state.nodes() == 2 {

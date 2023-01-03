@@ -56,7 +56,6 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -72,7 +71,6 @@ class Filter(google.protobuf.message.Message):
 
 global___Filter = Filter
 
-@typing_extensions.final
 class Faceted(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -88,7 +86,6 @@ class Faceted(google.protobuf.message.Message):
 
 global___Faceted = Faceted
 
-@typing_extensions.final
 class OrderBy(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -119,7 +116,6 @@ class OrderBy(google.protobuf.message.Message):
 
 global___OrderBy = OrderBy
 
-@typing_extensions.final
 class Timestamps(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -148,7 +144,6 @@ class Timestamps(google.protobuf.message.Message):
 
 global___Timestamps = Timestamps
 
-@typing_extensions.final
 class FacetResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -166,7 +161,6 @@ class FacetResult(google.protobuf.message.Message):
 
 global___FacetResult = FacetResult
 
-@typing_extensions.final
 class FacetResults(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -182,7 +176,6 @@ class FacetResults(google.protobuf.message.Message):
 
 global___FacetResults = FacetResults
 
-@typing_extensions.final
 class DocumentSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -197,6 +190,8 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     TIMESTAMPS_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    WITH_STATUS_FIELD_NUMBER: builtins.int
+    ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     id: builtins.str
     body: builtins.str
     @property
@@ -213,6 +208,8 @@ class DocumentSearchRequest(google.protobuf.message.Message):
     def timestamps(self) -> global___Timestamps: ...
     reload: builtins.bool
     only_faceted: builtins.bool
+    with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
+    advanced_query: builtins.str
     def __init__(
         self,
         *,
@@ -227,13 +224,18 @@ class DocumentSearchRequest(google.protobuf.message.Message):
         timestamps: global___Timestamps | None = ...,
         reload: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
+        advanced_query: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "with_status", b"with_status"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_with_status", b"_with_status"]) -> typing_extensions.Literal["with_status"] | None: ...
 
 global___DocumentSearchRequest = DocumentSearchRequest
 
-@typing_extensions.final
 class ParagraphSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -250,6 +252,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     RELOAD_FIELD_NUMBER: builtins.int
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    ADVANCED_QUERY_FIELD_NUMBER: builtins.int
     id: builtins.str
     uuid: builtins.str
     @property
@@ -270,6 +273,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
     reload: builtins.bool
     with_duplicates: builtins.bool
     only_faceted: builtins.bool
+    advanced_query: builtins.str
     def __init__(
         self,
         *,
@@ -286,13 +290,14 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
         reload: builtins.bool = ...,
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        advanced_query: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "uuid", b"uuid", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "advanced_query", b"advanced_query", "body", b"body", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "id", b"id", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "reload", b"reload", "result_per_page", b"result_per_page", "timestamps", b"timestamps", "uuid", b"uuid", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
 
 global___ParagraphSearchRequest = ParagraphSearchRequest
 
-@typing_extensions.final
 class ResultScore(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -313,34 +318,35 @@ class ResultScore(google.protobuf.message.Message):
 
 global___ResultScore = ResultScore
 
-@typing_extensions.final
 class DocumentResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     UUID_FIELD_NUMBER: builtins.int
     SCORE_FIELD_NUMBER: builtins.int
     FIELD_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     @property
     def score(self) -> global___ResultScore: ...
     field: builtins.str
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         uuid: builtins.str = ...,
         score: global___ResultScore | None = ...,
         field: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["score", b"score"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "score", b"score", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "labels", b"labels", "score", b"score", "uuid", b"uuid"]) -> None: ...
 
 global___DocumentResult = DocumentResult
 
-@typing_extensions.final
 class DocumentSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class FacetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -394,7 +400,6 @@ class DocumentSearchResponse(google.protobuf.message.Message):
 
 global___DocumentSearchResponse = DocumentSearchResponse
 
-@typing_extensions.final
 class ParagraphResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -408,6 +413,7 @@ class ParagraphResult(google.protobuf.message.Message):
     SCORE_FIELD_NUMBER: builtins.int
     MATCHES_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
     uuid: builtins.str
     field: builtins.str
     start: builtins.int
@@ -422,6 +428,8 @@ class ParagraphResult(google.protobuf.message.Message):
     @property
     def metadata(self) -> nucliadb_protos.noderesources_pb2.ParagraphMetadata:
         """Metadata that can't be searched with but is returned on search results"""
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -435,17 +443,16 @@ class ParagraphResult(google.protobuf.message.Message):
         score: global___ResultScore | None = ...,
         matches: collections.abc.Iterable[builtins.str] | None = ...,
         metadata: nucliadb_protos.noderesources_pb2.ParagraphMetadata | None = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "score", b"score"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "field", b"field", "index", b"index", "matches", b"matches", "metadata", b"metadata", "paragraph", b"paragraph", "score", b"score", "split", b"split", "start", b"start", "uuid", b"uuid"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "field", b"field", "index", b"index", "labels", b"labels", "matches", b"matches", "metadata", b"metadata", "paragraph", b"paragraph", "score", b"score", "split", b"split", "start", b"start", "uuid", b"uuid"]) -> None: ...
 
 global___ParagraphResult = ParagraphResult
 
-@typing_extensions.final
 class ParagraphSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class FacetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -510,7 +517,6 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
 
 global___ParagraphSearchResponse = ParagraphSearchResponse
 
-@typing_extensions.final
 class VectorSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -556,7 +562,6 @@ class VectorSearchRequest(google.protobuf.message.Message):
 
 global___VectorSearchRequest = VectorSearchRequest
 
-@typing_extensions.final
 class DocumentVectorIdentifier(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -571,7 +576,6 @@ class DocumentVectorIdentifier(google.protobuf.message.Message):
 
 global___DocumentVectorIdentifier = DocumentVectorIdentifier
 
-@typing_extensions.final
 class DocumentScored(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -591,7 +595,6 @@ class DocumentScored(google.protobuf.message.Message):
 
 global___DocumentScored = DocumentScored
 
-@typing_extensions.final
 class VectorSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -616,7 +619,6 @@ class VectorSearchResponse(google.protobuf.message.Message):
 
 global___VectorSearchResponse = VectorSearchResponse
 
-@typing_extensions.final
 class RelationFilter(google.protobuf.message.Message):
     """Relation filters are used to make the 
     search domain smaller. By providing filters the 
@@ -644,7 +646,6 @@ class RelationFilter(google.protobuf.message.Message):
 
 global___RelationFilter = RelationFilter
 
-@typing_extensions.final
 class RelationSearchRequest(google.protobuf.message.Message):
     """A request for the relation index."""
 
@@ -688,7 +689,6 @@ class RelationSearchRequest(google.protobuf.message.Message):
 
 global___RelationSearchRequest = RelationSearchRequest
 
-@typing_extensions.final
 class RelationSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -704,7 +704,6 @@ class RelationSearchResponse(google.protobuf.message.Message):
 
 global___RelationSearchResponse = RelationSearchResponse
 
-@typing_extensions.final
 class SearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -724,6 +723,8 @@ class SearchRequest(google.protobuf.message.Message):
     DOCUMENT_FIELD_NUMBER: builtins.int
     WITH_DUPLICATES_FIELD_NUMBER: builtins.int
     ONLY_FACETED_FIELD_NUMBER: builtins.int
+    ADVANCED_QUERY_FIELD_NUMBER: builtins.int
+    WITH_STATUS_FIELD_NUMBER: builtins.int
     shard: builtins.str
     @property
     def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
@@ -749,6 +750,8 @@ class SearchRequest(google.protobuf.message.Message):
     document: builtins.bool
     with_duplicates: builtins.bool
     only_faceted: builtins.bool
+    advanced_query: builtins.str
+    with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType
     def __init__(
         self,
         *,
@@ -768,13 +771,18 @@ class SearchRequest(google.protobuf.message.Message):
         document: builtins.bool = ...,
         with_duplicates: builtins.bool = ...,
         only_faceted: builtins.bool = ...,
+        advanced_query: builtins.str | None = ...,
+        with_status: nucliadb_protos.noderesources_pb2.Resource.ResourceStatus.ValueType | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "faceted", b"faceted", "filter", b"filter", "order", b"order", "timestamps", b"timestamps", "with_status", b"with_status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_advanced_query", b"_advanced_query", "_with_status", b"_with_status", "advanced_query", b"advanced_query", "body", b"body", "document", b"document", "faceted", b"faceted", "fields", b"fields", "filter", b"filter", "only_faceted", b"only_faceted", "order", b"order", "page_number", b"page_number", "paragraph", b"paragraph", "reload", b"reload", "result_per_page", b"result_per_page", "shard", b"shard", "timestamps", b"timestamps", "vector", b"vector", "vectorset", b"vectorset", "with_duplicates", b"with_duplicates", "with_status", b"with_status"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_advanced_query", b"_advanced_query"]) -> typing_extensions.Literal["advanced_query"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_with_status", b"_with_status"]) -> typing_extensions.Literal["with_status"] | None: ...
 
 global___SearchRequest = SearchRequest
 
-@typing_extensions.final
 class SuggestRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -801,7 +809,6 @@ class SuggestRequest(google.protobuf.message.Message):
 
 global___SuggestRequest = SuggestRequest
 
-@typing_extensions.final
 class RelatedEntities(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -820,7 +827,6 @@ class RelatedEntities(google.protobuf.message.Message):
 
 global___RelatedEntities = RelatedEntities
 
-@typing_extensions.final
 class SuggestResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -853,7 +859,6 @@ class SuggestResponse(google.protobuf.message.Message):
 
 global___SuggestResponse = SuggestResponse
 
-@typing_extensions.final
 class SearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -878,7 +883,6 @@ class SearchResponse(google.protobuf.message.Message):
 
 global___SearchResponse = SearchResponse
 
-@typing_extensions.final
 class IdCollection(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -894,7 +898,6 @@ class IdCollection(google.protobuf.message.Message):
 
 global___IdCollection = IdCollection
 
-@typing_extensions.final
 class RelationEdge(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -912,7 +915,6 @@ class RelationEdge(google.protobuf.message.Message):
 
 global___RelationEdge = RelationEdge
 
-@typing_extensions.final
 class EdgeList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -928,7 +930,6 @@ class EdgeList(google.protobuf.message.Message):
 
 global___EdgeList = EdgeList
 
-@typing_extensions.final
 class RelationTypeListMember(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -946,7 +947,6 @@ class RelationTypeListMember(google.protobuf.message.Message):
 
 global___RelationTypeListMember = RelationTypeListMember
 
-@typing_extensions.final
 class TypeList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -962,7 +962,6 @@ class TypeList(google.protobuf.message.Message):
 
 global___TypeList = TypeList
 
-@typing_extensions.final
 class GetShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -981,3 +980,65 @@ class GetShardRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id", "vectorset", b"vectorset"]) -> None: ...
 
 global___GetShardRequest = GetShardRequest
+
+class ParagraphItem(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "labels", b"labels"]) -> None: ...
+
+global___ParagraphItem = ParagraphItem
+
+class DocumentItem(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: builtins.int
+    FIELD_FIELD_NUMBER: builtins.int
+    LABELS_FIELD_NUMBER: builtins.int
+    uuid: builtins.str
+    field: builtins.str
+    @property
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        uuid: builtins.str = ...,
+        field: builtins.str = ...,
+        labels: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "labels", b"labels", "uuid", b"uuid"]) -> None: ...
+
+global___DocumentItem = DocumentItem
+
+class StreamRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FILTER_FIELD_NUMBER: builtins.int
+    RELOAD_FIELD_NUMBER: builtins.int
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    @property
+    def filter(self) -> global___Filter: ...
+    reload: builtins.bool
+    @property
+    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
+    def __init__(
+        self,
+        *,
+        filter: global___Filter | None = ...,
+        reload: builtins.bool = ...,
+        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["filter", b"filter", "shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["filter", b"filter", "reload", b"reload", "shard_id", b"shard_id"]) -> None: ...
+
+global___StreamRequest = StreamRequest

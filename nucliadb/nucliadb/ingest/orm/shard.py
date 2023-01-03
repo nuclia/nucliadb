@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+import uuid
 from typing import Any, Dict, Optional
 
 from lru import LRU  # type: ignore
@@ -29,7 +30,7 @@ from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
-from nucliadb.ingest import SERVICE_NAME, logger  # type: ignore
+from nucliadb.ingest import SERVICE_NAME  # type: ignore
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.abc import AbstractShard
 from nucliadb_utils.utilities import get_indexing, get_storage
@@ -60,6 +61,11 @@ class Shard(AbstractShard):
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> int:
 
+        if txid == -1 and reindex_id is None:
+            # This means we are injecting a complete resource via ingest gRPC
+            # outside of a transaction. We need to treat this as a reindex operation.
+            reindex_id = uuid.uuid4().hex
+
         storage = await get_storage(service_name=SERVICE_NAME)
         indexing = get_indexing()
 
@@ -71,11 +77,9 @@ class Shard(AbstractShard):
                 resource.resource.shard_id
             ) = shard = shardreplica.shard.id
             if reindex_id is not None:
-                logger.info(f"Starting storage.reindexing at shard {shard}")
                 indexpb = await storage.reindexing(
                     resource, shardreplica.node, shard, reindex_id
                 )
-                logger.info(f"Finished storage.reindexing at shard {shard}")
             else:
                 indexpb = await storage.indexing(
                     resource, shardreplica.node, shard, txid

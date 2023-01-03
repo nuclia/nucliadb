@@ -26,6 +26,7 @@ from fastapi.params import Header
 from fastapi_versioning import version  # type: ignore
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
+from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     IndexResource,
@@ -227,6 +228,8 @@ async def modify_resource(
 
     parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
+    if item.origin is not None:
+        parse_origin(writer.origin, item.origin)
 
     await parse_fields(
         writer=writer,
@@ -326,6 +329,8 @@ async def reprocess_resource(
     writer.kbid = kbid
     writer.uuid = rid
     writer.source = BrokerMessage.MessageSource.WRITER
+    writer.basic.metadata.useful = True
+    writer.basic.metadata.status = Metadata.Status.PENDING
     set_processing_info(writer, processing_info)
     await transaction.commit(writer, partition, wait=False)
 

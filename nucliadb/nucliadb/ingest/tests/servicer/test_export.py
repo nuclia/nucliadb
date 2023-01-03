@@ -27,6 +27,8 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldType,
     Keyword,
+    UserVector,
+    UserVectorsWrapper,
 )
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest, IndexResource
@@ -46,6 +48,7 @@ async def test_export_resources(grpc_servicer: IngestFixture):
 
     bm = BrokerMessage()
     bm.uuid = "test1"
+    bm.slug = bm.basic.slug = "slugtest"
     bm.kbid = result.uuid
     bm.texts["text1"].body = "My text1"
     bm.files["file1"].file.uri = "http://nofile"
@@ -69,6 +72,13 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     bm.extracted_text.append(etw)
     bm.basic.title = "My Title"
 
+    uvw = UserVectorsWrapper()
+    uvw.field.field = "file1"
+    uvw.field.field_type = FieldType.FILE
+    uv = UserVector(vector=[1.0, 0.0], labels=["some", "labels"], start=1, end=2)
+    uvw.vectors.vectors["vectorset1"].vectors["vect1"].CopyFrom(uv)
+    bm.user_vectors.append(uvw)
+
     await stub.ProcessMessage([bm])  # type: ignore
 
     req = ExportRequest()
@@ -79,7 +89,12 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert found is False
         found = True
         assert export.basic.title == "My Title"
+        assert export.slug == export.basic.slug == "slugtest"
         assert export.extracted_text[0].body.text == "My text"
+
+        # Check that vectors are exported
+        assert len(export.field_vectors) > 0
+        assert len(export.user_vectors) > 0
     assert found
 
     req = ExportRequest()

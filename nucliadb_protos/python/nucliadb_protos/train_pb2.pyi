@@ -48,12 +48,14 @@ from nucliadb_protos.resources_pb2 import (
     CONVERSATION as CONVERSATION,
     Classification as Classification,
     CloudFile as CloudFile,
+    ComputedMetadata as ComputedMetadata,
     Conversation as Conversation,
     DATETIME as DATETIME,
     Entity as Entity,
     ExtractedTextWrapper as ExtractedTextWrapper,
     ExtractedVectorsWrapper as ExtractedVectorsWrapper,
     FILE as FILE,
+    FieldClassifications as FieldClassifications,
     FieldComputedMetadata as FieldComputedMetadata,
     FieldComputedMetadataWrapper as FieldComputedMetadataWrapper,
     FieldConversation as FieldConversation,
@@ -148,7 +150,6 @@ from nucliadb_protos.writer_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class EnabledMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -172,7 +173,6 @@ class EnabledMetadata(google.protobuf.message.Message):
 
 global___EnabledMetadata = EnabledMetadata
 
-@typing_extensions.final
 class TrainLabels(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -196,11 +196,44 @@ class TrainLabels(google.protobuf.message.Message):
 
 global___TrainLabels = TrainLabels
 
-@typing_extensions.final
+class Position(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    START_FIELD_NUMBER: builtins.int
+    END_FIELD_NUMBER: builtins.int
+    start: builtins.int
+    end: builtins.int
+    def __init__(
+        self,
+        *,
+        start: builtins.int = ...,
+        end: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "start", b"start"]) -> None: ...
+
+global___Position = Position
+
+class EntityPositions(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTITY_FIELD_NUMBER: builtins.int
+    POSITIONS_FIELD_NUMBER: builtins.int
+    entity: builtins.str
+    @property
+    def positions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Position]: ...
+    def __init__(
+        self,
+        *,
+        entity: builtins.str = ...,
+        positions: collections.abc.Iterable[global___Position] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entity", b"entity", "positions", b"positions"]) -> None: ...
+
+global___EntityPositions = EntityPositions
+
 class TrainMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class EntitiesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -216,13 +249,33 @@ class TrainMetadata(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    class EntityPositionsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___EntityPositions: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___EntityPositions | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
     TEXT_FIELD_NUMBER: builtins.int
     ENTITIES_FIELD_NUMBER: builtins.int
+    ENTITY_POSITIONS_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
     VECTOR_FIELD_NUMBER: builtins.int
     text: builtins.str
     @property
     def entities(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    @property
+    def entity_positions(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___EntityPositions]: ...
     @property
     def labels(self) -> global___TrainLabels: ...
     @property
@@ -232,15 +285,15 @@ class TrainMetadata(google.protobuf.message.Message):
         *,
         text: builtins.str = ...,
         entities: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        entity_positions: collections.abc.Mapping[builtins.str, global___EntityPositions] | None = ...,
         labels: global___TrainLabels | None = ...,
         vector: collections.abc.Iterable[builtins.float] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["labels", b"labels"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["entities", b"entities", "labels", b"labels", "text", b"text", "vector", b"vector"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entities", b"entities", "entity_positions", b"entity_positions", "labels", b"labels", "text", b"text", "vector", b"vector"]) -> None: ...
 
 global___TrainMetadata = TrainMetadata
 
-@typing_extensions.final
 class GetInfoRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -257,7 +310,6 @@ class GetInfoRequest(google.protobuf.message.Message):
 
 global___GetInfoRequest = GetInfoRequest
 
-@typing_extensions.final
 class GetLabelsetsCountRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -282,7 +334,6 @@ class GetLabelsetsCountRequest(google.protobuf.message.Message):
 
 global___GetLabelsetsCountRequest = GetLabelsetsCountRequest
 
-@typing_extensions.final
 class GetResourcesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -309,7 +360,6 @@ class GetResourcesRequest(google.protobuf.message.Message):
 
 global___GetResourcesRequest = GetResourcesRequest
 
-@typing_extensions.final
 class GetParagraphsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -343,7 +393,6 @@ class GetParagraphsRequest(google.protobuf.message.Message):
 
 global___GetParagraphsRequest = GetParagraphsRequest
 
-@typing_extensions.final
 class GetSentencesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -377,7 +426,6 @@ class GetSentencesRequest(google.protobuf.message.Message):
 
 global___GetSentencesRequest = GetSentencesRequest
 
-@typing_extensions.final
 class GetFieldsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -411,7 +459,6 @@ class GetFieldsRequest(google.protobuf.message.Message):
 
 global___GetFieldsRequest = GetFieldsRequest
 
-@typing_extensions.final
 class TrainInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -435,7 +482,6 @@ class TrainInfo(google.protobuf.message.Message):
 
 global___TrainInfo = TrainInfo
 
-@typing_extensions.final
 class TrainSentence(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -465,7 +511,6 @@ class TrainSentence(google.protobuf.message.Message):
 
 global___TrainSentence = TrainSentence
 
-@typing_extensions.final
 class TrainParagraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -492,7 +537,6 @@ class TrainParagraph(google.protobuf.message.Message):
 
 global___TrainParagraph = TrainParagraph
 
-@typing_extensions.final
 class TrainField(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -519,7 +563,6 @@ class TrainField(google.protobuf.message.Message):
 
 global___TrainField = TrainField
 
-@typing_extensions.final
 class TrainResource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -556,11 +599,9 @@ class TrainResource(google.protobuf.message.Message):
 
 global___TrainResource = TrainResource
 
-@typing_extensions.final
 class LabelsetCount(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class ParagraphsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -576,7 +617,6 @@ class LabelsetCount(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class ResourcesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -608,11 +648,9 @@ class LabelsetCount(google.protobuf.message.Message):
 
 global___LabelsetCount = LabelsetCount
 
-@typing_extensions.final
 class LabelsetsCount(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class LabelsetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

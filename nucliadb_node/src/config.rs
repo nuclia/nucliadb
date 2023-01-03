@@ -19,6 +19,7 @@
 //
 use std::env;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -55,20 +56,20 @@ impl Configuration {
     }
 
     /// Where data will be stored
-    pub fn data_path() -> String {
+    pub fn data_path() -> PathBuf {
         match env::var("DATA_PATH") {
-            Ok(var) => var,
-            Err(_) => String::from("data"),
+            Ok(var) => PathBuf::from(var),
+            Err(_) => PathBuf::from("data"),
         }
     }
 
     /// Path for shards information inside data folder
-    pub fn shards_path() -> String {
-        Configuration::data_path() + "/shards"
+    pub fn shards_path() -> PathBuf {
+        Configuration::data_path().join("shards")
     }
 
-    pub fn shards_path_id(id: &str) -> String {
-        format!("{}/{}", Configuration::shards_path(), id)
+    pub fn shards_path_id(id: &str) -> PathBuf {
+        Configuration::shards_path().join(id)
     }
 
     /// Reader GRPC service port
@@ -309,6 +310,35 @@ impl Configuration {
                 );
 
                 DEFAULT_TIMING
+            }
+        }
+    }
+
+    /// Retuns the liveliness interval update used by cluster node.
+    pub fn get_cluster_liveliness_interval_update() -> Duration {
+        const DEFAULT_INTERVAL_UPDATE_PLACEHOLDER: &str = "500ms";
+        const DEFAULT_INTERVAL_UPDATE: Duration = Duration::from_millis(500);
+
+        match env::var("LIVELINESS_UPDATE") {
+            Ok(value) => {
+                if let Ok(duration) = parse_duration::parse(&value) {
+                    duration
+                } else {
+                    error!(
+                        "LIVELINESS_UPDATE defined incorrectly. Defaulting to \
+                         {DEFAULT_INTERVAL_UPDATE_PLACEHOLDER}"
+                    );
+
+                    DEFAULT_INTERVAL_UPDATE
+                }
+            }
+            Err(_) => {
+                warn!(
+                    "LIVELINESS_UPDATE not defined. Defaulting to \
+                     {DEFAULT_INTERVAL_UPDATE_PLACEHOLDER}"
+                );
+
+                DEFAULT_INTERVAL_UPDATE
             }
         }
     }

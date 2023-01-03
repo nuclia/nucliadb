@@ -4,14 +4,13 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Context};
 use clap::Parser;
 use log::{debug, error, info};
-use nucliadb_cluster::cluster::{Cluster, Member, NodeType};
+use nucliadb_cluster::{node, Node, NodeSnapshot, NodeType};
 use rand::Rng;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{self, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::watch::Receiver;
 use tokio::time::{sleep, timeout};
-use uuid::Uuid;
+use tokio_stream::StreamExt;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -93,27 +92,25 @@ async fn get_stream(monitor_addr: String) -> anyhow::Result<TcpStream> {
 }
 
 async fn send_update(
-    watcher: &Receiver<Vec<Member>>,
+    cluster_snapshot: Vec<NodeSnapshot>,
     stream: &mut TcpStream,
     args: &Args,
 ) -> anyhow::Result<()> {
     if !check_peer(stream).await? {
-        error!("Check peer failed before members sending. Try to reconnect");
+        error!("Check peer failed before cluster snapshot sending. Try to reconnect");
 
         stream.shutdown().await?;
         *stream = get_stream(args.monitor_addr.clone()).await?;
     }
 
-    let members = &*watcher.borrow();
-
-    if !members.is_empty() {
-        let serial = serde_json::to_string(&members)
-            .map_err(|e| anyhow!("Cannot serialize cluster members: {e}"))?;
+    if !cluster_snapshot.is_empty() {
+        let serial = serde_json::to_string(&cluster_snapshot)
+            .map_err(|e| anyhow!("Cannot serialize cluster cluster snapshot: {e}"))?;
 
         stream
             .write_buf(&mut serial.as_bytes())
             .await
-            .map_err(|e| anyhow!("Error during sending cluster members: {e}"))?;
+            .map_err(|e| anyhow!("Error during sending cluster cluster snapshot: {e}"))?;
 
         stream
             .flush()
@@ -129,7 +126,9 @@ async fn send_update(
             .and_then(|n| {
                 if n == 0 {
                     Err(anyhow!("None update answer"))
-                } else if buffer.try_into().map(u32::from_be_bytes) != Ok(members.len() as u32) {
+                } else if buffer.try_into().map(u32::from_be_bytes)
+                    != Ok(cluster_snapshot.len() as u32)
+                {
                     Err(anyhow!("Received invalid update answer"))
                 } else {
                     Ok(())
@@ -164,41 +163,47 @@ async fn main() -> anyhow::Result<()> {
 
     let host = format!("{}:{}", &arg.pub_ip, &arg.listen_port);
     let addr = reliable_lookup_host(&host).await?;
-    let node_id = Uuid::new_v4();
-    let cluster = Cluster::new(node_id.to_string(), addr, arg.node_type, arg.seeds.clone())
-        .await
-        .with_context(|| "Can't create cluster instance")?;
 
-    let mut watcher = cluster.members_change_watcher();
+    let node = Node::builder()
+        .register_as(arg.node_type)
+        .on_local_network(addr)
+        .with_seed_nodes(arg.seeds.clone())
+        .build()
+        .with_context(|| "Can't create node instance")?;
+
+    let node = node.start().await?;
+
+    let mut cluster_watcher = node.cluster_watcher().await;
     let mut writer = get_stream(arg.monitor_addr.clone())
         .await
         .with_context(|| "Can't create update writer")?;
+
     loop {
         tokio::select! {
             _ = termination.recv() => {
-                cluster.shutdown().await;
+                node.shutdown().await?;
                 writer.shutdown().await?;
                 break
             },
             _ = sleep(arg.update_interval) => {
-                debug!("Fixed update");
+                debug!("Fixed cluster update");
 
-                if let Err(e) = send_update(&watcher, &mut writer, &arg).await {
-                    error!("Send cluster members failed: {e}");
+                let live_nodes = node.live_nodes().await;
+                let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
+
+                if let Err(e) = send_update(cluster_snapshot, &mut writer, &arg).await {
+                    error!("Send cluster cluster_snapshot failed: {e}");
                 } else {
                     info!("Update sended")
                 }
             },
-            res = watcher.changed() => {
-                debug!("Something changed");
+            Some(live_nodes) = cluster_watcher.next() => {
+                debug!("Something changed in cluster");
 
-                if let Err(e) = res {
-                    error!("members received with error: {e}");
-                    continue
-                }
+                let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
-                if let Err(e) = send_update(&watcher, &mut writer, &arg).await {
-                    error!("Send cluster members failed: {e}");
+                if let Err(e) = send_update(cluster_snapshot, &mut writer, &arg).await {
+                    error!("Send cluster cluster_snapshot failed: {e}");
                 } else {
                     info!("Update sended")
                 }

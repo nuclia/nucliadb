@@ -1,4 +1,8 @@
-protobuf>=3.19.3
-types-protobuf>=3.19.5,<4.0
+protobuf
+types-protobuf
 grpcio
 nucliadb-protos
+requests
+aiohttp
+pydantic_argparse
+pyarrow

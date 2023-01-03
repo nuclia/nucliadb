@@ -78,5 +78,12 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     bm.ParseFromString(base64.b64decode(export[0][4:]))
     assert bm.basic.title == resources[0].get().title
 
+    counters = kb.counters()
+    assert counters
+    assert counters.resources == 1
+
     for resource in kb.iter_resources(page_size=1):
-        resource.get().title == bm.basic.title
+        res = resource.get()
+        assert res.id == bm.uuid
+        assert res.title == bm.basic.title
+        assert res.slug == resource.slug == bm.basic.slug == payload.slug

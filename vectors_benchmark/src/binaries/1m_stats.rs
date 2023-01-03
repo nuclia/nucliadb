@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
-use nucliadb_vectors2::vectors::data_point::{DataPoint, Elem, LabelDictionary};
-use nucliadb_vectors2::vectors::data_point_provider::*;
+use nucliadb_vectors::vectors::data_point::{DataPoint, Elem, LabelDictionary};
+use nucliadb_vectors::vectors::data_point_provider::*;
 use vectors_benchmark::random_vectors::RandomVectors;
 use vectors_benchmark::stats::Stats;
 
@@ -39,20 +39,16 @@ fn label_set(batch_id: usize) -> Vec<String> {
         .collect()
 }
 
-fn add_batch(
-    writer: &mut Index,
-    batch_id: String,
-    elems: Vec<(String, Vec<f32>)>,
-    labels: Vec<String>,
-) {
+fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {
+    let temporal_mark = TemporalMark::now();
     let labels = LabelDictionary::new(labels);
     let elems = elems
         .into_iter()
         .map(|(key, vector)| Elem::new(key, vector, labels.clone()))
         .collect();
-    let new_dp = DataPoint::new(writer.get_location(), elems).unwrap();
+    let new_dp = DataPoint::new(writer.get_location(), elems, Some(temporal_mark)).unwrap();
     let lock = writer.get_elock().unwrap();
-    writer.add(batch_id, new_dp, &lock);
+    writer.add(new_dp, &lock);
     writer.commit(lock).unwrap();
 }
 fn main() {
@@ -67,7 +63,6 @@ fn main() {
     let mut possible_tag = vec![];
     let mut writer = Index::new(at.path(), IndexCheck::None).unwrap();
     for i in 0..(INDEX_SIZE / BATCH_SIZE) {
-        let batch_id = format!("Batch_{i}");
         let labels = label_set(i);
         let elems = RandomVectors::new(VECTOR_DIM)
             .take(BATCH_SIZE)
@@ -76,7 +71,7 @@ fn main() {
             .collect();
         possible_tag.push(labels[0].clone());
         let now = SystemTime::now();
-        add_batch(&mut writer, batch_id, elems, labels);
+        add_batch(&mut writer, elems, labels);
         stats.writing_time += now.elapsed().unwrap().as_millis();
         println!("{} vectors included", BATCH_SIZE * i);
     }

@@ -86,7 +86,7 @@ message UserVector {
 }
 
 message UserVectors {
-    map<string, UserVector> vectors = 1;  // id del vector
+    map<string, UserVector> vectors = 1;  // vector's id
 }
 
 message UserVectorSet {

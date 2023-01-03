@@ -17,8 +17,9 @@ resources: {}
 #    cpu: "300m"
 
 serving:
-  port: 8080
+  port: 8000
   metricsPort: 3030
+  grpc_port: 8080
 
 services:
   # This must match the redis or tikv driver on nucliadb_shared
@@ -45,3 +46,20 @@ tracing:
   jaegerAgentTag: 1.34.1
   jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
   jaegerCollectorGrpcPort: 14250
+
+chitchat:
+  cluster_manager:
+    port: 31337
+    host: "0.0.0.0"
+    update_interval: "30s"
+    liveliness_update: "500ms"
+  node:
+    node_type: Train
+    node0_svc_fixed_ip: 10.4.0.255
+    chitchat_port: 4444
+
+vs:
+  gateway:
+  host:
+
+zone:

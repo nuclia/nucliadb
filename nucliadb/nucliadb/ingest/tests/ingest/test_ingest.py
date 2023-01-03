@@ -59,11 +59,17 @@ EXAMPLE_VECTOR = base64.b64decode(
 
 @pytest.mark.asyncio
 async def test_ingest_messages_autocommit(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, processor, knowledgebox
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    processor,
+    knowledgebox_ingest,
 ):
     rid = str(uuid.uuid4())
     message1: BrokerMessage = BrokerMessage(
-        kbid=knowledgebox,
+        kbid=knowledgebox_ingest,
         uuid=rid,
         slug="slug1",
         type=BrokerMessage.AUTOCOMMIT,
@@ -79,7 +85,7 @@ async def test_ingest_messages_autocommit(
     )
     message1.basic.icon = "text/plain"
     message1.basic.title = "Title Resource"
-    message1.basic.summary = "Summary of document"
+    message1.basic.summary = "Summary of Document"
     message1.basic.thumbnail = "doc"
     message1.basic.layout = "default"
     message1.basic.metadata.language = "es"
@@ -160,14 +166,20 @@ async def test_ingest_messages_autocommit(
 
 @pytest.mark.asyncio
 async def test_ingest_error_message(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, processor, knowledgebox
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    processor,
+    knowledgebox_ingest,
 ):
     filename = f"{dirname(__file__)}/assets/resource.pb"
     with open(filename, "r") as f:
         data = base64.b64decode(f.read())
     message0: BrokerMessage = BrokerMessage()
     message0.ParseFromString(data)
-    message0.kbid = knowledgebox
+    message0.kbid = knowledgebox_ingest
     message0.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message0, seqid=1)
 
@@ -176,12 +188,12 @@ async def test_ingest_error_message(
         data = base64.b64decode(f.read())
     message1: BrokerMessage = BrokerMessage()
     message1.ParseFromString(data)
-    message1.kbid = knowledgebox
+    message1.kbid = knowledgebox_ingest
     message1.ClearField("field_vectors")
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=2)
 
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.get(message1.uuid)
     assert r is not None
     field_obj = await r.get_field("wikipedia_ml", TEXT)
@@ -257,7 +269,7 @@ async def test_ingest_audit_stream_files_only(
     txn,
     cache,
     fake_node,
-    knowledgebox,
+    knowledgebox_ingest,
     stream_processor,
     stream_audit: StreamAuditStorage,
     redis_driver,
@@ -265,7 +277,7 @@ async def test_ingest_audit_stream_files_only(
     from nucliadb_utils.settings import audit_settings
 
     # Prepare a test audit stream to receive our messages
-    partition = stream_audit.get_partition(knowledgebox)
+    partition = stream_audit.get_partition(knowledgebox_ingest)
     client: Client = await nats.connect(stream_audit.nats_servers)
     jetstream: JetStreamContext = client.jetstream()
     if audit_settings.audit_jetstream_target is None:
@@ -290,7 +302,7 @@ async def test_ingest_audit_stream_files_only(
     #
     # Test 1: add a resource with some files
     #
-    message = make_message(knowledgebox, rid)
+    message = make_message(knowledgebox_ingest, rid)
     add_filefields(
         message,
         [("file_1", "file.png"), ("file_2", "text.pb"), ("file_3", "vectors.pb")],
@@ -298,7 +310,7 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
-    assert auditreq.kbid == knowledgebox
+    assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
 
@@ -324,7 +336,7 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
 
-    assert auditreq.kbid == knowledgebox
+    assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
     assert auditreq.fields_audit[0].action == AuditField.FieldAction.DELETED
@@ -335,7 +347,7 @@ async def test_ingest_audit_stream_files_only(
     # Test 3: modify a file while adding and deleting other files
     #
 
-    message = make_message(knowledgebox, rid)
+    message = make_message(knowledgebox_ingest, rid)
     add_filefields(message, [("file_2", "file.png"), ("file_4", "text.pb")])
     fieldid = FieldID(field="file_3", field_type=FieldType.FILE)
     message.delete_fields.append(fieldid)
@@ -343,7 +355,7 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=3)
     auditreq = await get_audit_messages(psub)
 
-    assert auditreq.kbid == knowledgebox
+    assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
 
@@ -363,7 +375,7 @@ async def test_ingest_audit_stream_files_only(
     #
 
     message = make_message(
-        knowledgebox, rid, message_type=BrokerMessage.MessageType.DELETE
+        knowledgebox_ingest, rid, message_type=BrokerMessage.MessageType.DELETE
     )
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
@@ -379,13 +391,13 @@ async def test_ingest_audit_stream_files_only(
     # Test 5: Delete knowledgebox
 
     txn = await redis_driver.begin()
-    kb = await KnowledgeBox.get_kb(txn, knowledgebox)
+    kb = await KnowledgeBox.get_kb(txn, knowledgebox_ingest)
 
     set_utility(Utility.AUDIT, stream_audit)
-    await KnowledgeBox.delete_kb(txn, kb.slug, knowledgebox)  # type: ignore
+    await KnowledgeBox.delete_kb(txn, kb.slug, knowledgebox_ingest)  # type: ignore
 
     auditreq = await get_audit_messages(psub)
-    assert auditreq.kbid == knowledgebox
+    assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.type == AuditRequest.AuditType.KB_DELETED
 
     await txn.abort()

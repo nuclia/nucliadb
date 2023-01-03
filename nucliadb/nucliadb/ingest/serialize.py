@@ -53,6 +53,7 @@ from nucliadb_models.resource import (
     TextFieldExtractedData,
 )
 from nucliadb_models.search import ResourceProperties
+from nucliadb_models.vectors import UserVectorSet
 from nucliadb_utils.utilities import get_cache, get_storage
 
 
@@ -88,6 +89,11 @@ async def set_resource_field_extracted_data(
         data_vec = await field.get_vectors()
         if data_vec is not None:
             field_data.vectors = models.VectorObject.from_message(data_vec)
+
+    if ExtractedDataTypeName.USERVECTORS in wanted_extracted_data:
+        user_data_vec = await field.get_user_vectors()
+        if user_data_vec is not None:
+            field_data.uservectors = UserVectorSet.from_message(user_data_vec)
 
     if (
         isinstance(field, File)
@@ -168,6 +174,9 @@ async def serialize(
                 models.UserFieldMetadata.from_message(fm)
                 for fm in orm_resource.basic.fieldmetadata
             ]
+            resource.computedmetadata = models.ComputedMetadata.from_message(
+                orm_resource.basic.computedmetadata
+            )
 
             resource.last_seqid = orm_resource.basic.last_seqid
 

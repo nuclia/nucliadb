@@ -6,6 +6,7 @@ replicaCount: 2
 revisionHistoryLimit: 2
 debug: False
 imagePullPolicy: IfNotPresent
+imageOtherPullPolicy: Always
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 image_other: cluster_manager:main
@@ -33,6 +34,7 @@ chitchat:
     port: 31337
     host: "0.0.0.0"
     update_interval: "30s"
+    liveliness_update: "500ms"
   node:
     node_type: Search
     node0_svc_fixed_ip: 10.4.0.255

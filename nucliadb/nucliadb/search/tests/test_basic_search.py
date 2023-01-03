@@ -51,8 +51,8 @@ async def test_search_kb_not_found(search_api: Callable[..., AsyncClient]) -> No
         assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 @pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
+@pytest.mark.asyncio
 async def test_multiple_fuzzy_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -78,8 +78,8 @@ async def test_multiple_fuzzy_search_resource_all(
         )
 
 
-@pytest.mark.asyncio
 @pytest.mark.xfail(RUNNING_IN_GH_ACTIONS, reason="Somethimes this fails in GH actions")
+@pytest.mark.asyncio
 async def test_multiple_search_resource_all(
     search_api: Callable[..., AsyncClient], multiple_search_resource: str
 ) -> None:
@@ -315,9 +315,9 @@ async def test_resource_search_by_slug(search_api, test_resource_deterministic_i
 
 
 @pytest.mark.asyncio()
-async def test_resource_search_query_param_is_optional(search_api, knowledgebox):
+async def test_resource_search_query_param_is_optional(search_api, knowledgebox_ingest):
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox
+        kb = knowledgebox_ingest
         # If query is not present, should not fail
         resp = await client.get(f"/{KB_PREFIX}/{kb}/search")
         assert resp.status_code == 200
@@ -331,9 +331,9 @@ async def test_resource_search_query_param_is_optional(search_api, knowledgebox)
 
 
 @pytest.mark.asyncio()
-async def test_search_with_duplicates(search_api, knowledgebox):
+async def test_search_with_duplicates(search_api, knowledgebox_ingest):
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        kb = knowledgebox
+        kb = knowledgebox_ingest
         resp = await client.get(f"/{KB_PREFIX}/{kb}/search?with_duplicates=True")
         assert resp.status_code == 200
 

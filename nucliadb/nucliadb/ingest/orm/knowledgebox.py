@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
+from typing import Any, AsyncGenerator, AsyncIterator, List, Optional, Tuple, Union
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -145,7 +145,7 @@ class KnowledgeBox:
         if slug == "" and kbid != "":
             kbid_bytes = await txn.get(KB_UUID.format(kbid=kbid))
             if kbid_bytes is None:
-                raise KeyError()
+                raise KeyError(kbid)
             pbconfig = KnowledgeBoxConfig()
             pbconfig.ParseFromString(kbid_bytes)
             slug = pbconfig.slug
@@ -451,36 +451,36 @@ class KnowledgeBox:
         # Delete KB Shards
         shards_match = KB_SHARDS.format(kbid=kbid)
         payload = await txn.get(shards_match)
+
         if payload is None:
-            await txn.abort()
-            raise ShardsNotFound(f"No shards on knowlege box {kbid}")
-        shards_obj = Shards()
-        shards_obj.ParseFromString(payload)
+            logger.warning(f"Shards not found for kbid={kbid}")
+        else:
+            shards_obj = Shards()
+            shards_obj.ParseFromString(payload)  # type: ignore
 
-        if not indexing_settings.index_local:
-            await Node.load_active_nodes()
+            if not indexing_settings.index_local:
+                await Node.load_active_nodes()
 
-        for shard in shards_obj.shards:
-            # Delete the shard on nodes
-            for replica in shard.replicas:
-                node_klass = get_node_klass()
-                node: Optional[Union[LocalNode, Node]] = await node_klass.get(
-                    replica.node
-                )
-                if node is None:
-                    logger.info(f"No node {replica.node} found lets continue")
-                    continue
-
-                try:
-                    await node.delete_shard(replica.shard.id)
-                    logger.debug(
-                        f"Succeded deleting shard from nodeid={replica.node} at {node.address}"
+            for shard in shards_obj.shards:
+                # Delete the shard on nodes
+                for replica in shard.replicas:
+                    node_klass = get_node_klass()
+                    node: Optional[Union[LocalNode, Node]] = await node_klass.get(
+                        replica.node
                     )
-                except AioRpcError as exc:
-                    if exc.code() == StatusCode.NOT_FOUND:
+                    if node is None:
+                        logger.info(f"No node {replica.node} found lets continue")
                         continue
-                    await txn.abort()
-                    raise ShardNotFound(f"{exc.details()} @ {node.address}")
+                    try:
+                        await node.delete_shard(replica.shard.id)
+                        logger.debug(
+                            f"Succeded deleting shard from nodeid={replica.node} at {node.address}"
+                        )
+                    except AioRpcError as exc:
+                        if exc.code() == StatusCode.NOT_FOUND:
+                            continue
+                        await txn.abort()
+                        raise ShardNotFound(f"{exc.details()} @ {node.address}")
 
         await txn.commit(resource=False)
         await cls.delete_all_kb_keys(driver, kbid)
@@ -493,10 +493,15 @@ class KnowledgeBox:
         while done is False:
             txn = await driver.begin()
             done = True
-            async for key in txn.keys(match=prefix, count=-1):
-                done = False
-                await txn.delete(key)
-            await txn.commit(resource=False)
+            async for chunk_of_keys in iter_in_chunks(
+                txn.keys(match=prefix, count=-1), chunk_size=1_000
+            ):
+                for key in chunk_of_keys:
+                    done = False
+                    await txn.delete(key)
+                await txn.commit(resource=False)
+            if done:
+                await txn.abort()
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
 
@@ -572,7 +577,7 @@ class KnowledgeBox:
         while key_ok is False:
             found = await self.txn.get(key)
             if found is not None and found.decode() != uuid:
-                slug += ".C"
+                slug += ".c"
                 key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
             else:
                 key_ok = True
@@ -613,3 +618,18 @@ class KnowledgeBox:
                     if config is not None
                     else False,
                 )
+
+
+async def iter_in_chunks(
+    gen: AsyncGenerator[Any, None], chunk_size: int = 100
+) -> AsyncIterator[List[Any]]:
+    chunk: List[Any] = []
+
+    async for item in gen:
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+        chunk.append(item)
+
+    if len(chunk) > 0:
+        yield chunk

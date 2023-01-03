@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
 from uuid import uuid4
 
 import pytest
@@ -47,11 +48,14 @@ class NucliaDB(BaseImage):
 
 @pytest.fixture(scope="session")
 def nucliadb():
-    container = NucliaDB()
-    host, port = container.run()
-    public_api_url = f"http://{host}:{port}"
-    yield public_api_url
-    container.stop()
+    if os.environ.get("TEST_LOCAL_NUCLIADB"):
+        yield os.environ.get("TEST_LOCAL_NUCLIADB")
+    else:
+        container = NucliaDB()
+        host, port = container.run()
+        public_api_url = f"http://{host}:{port}"
+        yield public_api_url
+        container.stop()
 
 
 @pytest.fixture(scope="function")

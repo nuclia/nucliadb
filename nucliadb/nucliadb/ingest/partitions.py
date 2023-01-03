@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import os
 
 from nucliadb.ingest import logger
@@ -49,7 +50,7 @@ def assign_partitions(settings: Settings):
 
     # update settings AND Environment Varialbe (for this process and its childs) with partition list
     settings.partitions = partitions_list
-    os.environ["PARTITIONS"] = str(partitions_list)
+    os.environ["PARTITIONS"] = json.dumps(partitions_list)
     logger.info(
         f"PARTITIONS: Assigned Partitions (in settings) = {settings.partitions}"
     )

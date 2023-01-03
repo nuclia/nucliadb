@@ -40,6 +40,7 @@ from nucliadb_models.keywordset import FieldKeywordset
 from nucliadb_models.layout import FieldLayout
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
+    ComputedMetadata,
     Metadata,
     Origin,
     Relation,
@@ -48,6 +49,7 @@ from nucliadb_models.metadata import (
 )
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
+from nucliadb_models.vectors import UserVectorSet
 
 
 class NucliaDBRoles(str, Enum):
@@ -69,6 +71,7 @@ class ExtractedDataTypeName(str, Enum):
     VECTOR = "vectors"
     LINK = "link"
     FILE = "file"
+    USERVECTORS = "uservectors"
 
 
 class KnowledgeBoxConfig(BaseModel):
@@ -118,6 +121,7 @@ class ExtractedData(BaseModel):
     metadata: Optional[FieldComputedMetadata]
     large_metadata: Optional[LargeComputedMetadata]
     vectors: Optional[VectorObject]
+    uservectors: Optional[UserVectorSet]
 
 
 class TextFieldExtractedData(ExtractedData):
@@ -234,6 +238,7 @@ class Resource(BaseModel):
     metadata: Optional[Metadata]
     usermetadata: Optional[UserMetadata]
     fieldmetadata: Optional[List[UserFieldMetadata]]
+    computedmetadata: Optional[ComputedMetadata]
     created: Optional[datetime]
     modified: Optional[datetime]
     last_seqid: Optional[int]

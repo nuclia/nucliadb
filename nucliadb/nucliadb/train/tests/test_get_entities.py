@@ -25,9 +25,9 @@ from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
 @pytest.mark.asyncio
 async def test_get_entities(
-    train_client: TrainStub, knowledgebox: str, test_pagination_resources
+    train_client: TrainStub, knowledgebox_ingest: str, test_pagination_resources
 ) -> None:
     req = GetEntitiesRequest()
-    req.kb.uuid = knowledgebox
+    req.kb.uuid = knowledgebox_ingest
     entities: GetEntitiesResponse = await train_client.GetEntities(req)  # type: ignore
     assert entities.groups["group1"].entities["entity1"].value == "PERSON"

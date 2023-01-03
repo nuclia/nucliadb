@@ -87,6 +87,16 @@ class NodeReaderStub(object):
                 request_serializer=nucliadb__protos_dot_nodereader__pb2.SuggestRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodereader__pb2.SuggestResponse.FromString,
                 )
+        self.Paragraphs = channel.unary_stream(
+                '/nodereader.NodeReader/Paragraphs',
+                request_serializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.ParagraphItem.FromString,
+                )
+        self.Documents = channel.unary_stream(
+                '/nodereader.NodeReader/Documents',
+                request_serializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodereader__pb2.DocumentItem.FromString,
+                )
 
 
 class NodeReaderServicer(object):
@@ -178,6 +188,19 @@ class NodeReaderServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Paragraphs(self, request, context):
+        """Streams
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Documents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NodeReaderServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -250,6 +273,16 @@ def add_NodeReaderServicer_to_server(servicer, server):
                     servicer.Suggest,
                     request_deserializer=nucliadb__protos_dot_nodereader__pb2.SuggestRequest.FromString,
                     response_serializer=nucliadb__protos_dot_nodereader__pb2.SuggestResponse.SerializeToString,
+            ),
+            'Paragraphs': grpc.unary_stream_rpc_method_handler(
+                    servicer.Paragraphs,
+                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.ParagraphItem.SerializeToString,
+            ),
+            'Documents': grpc.unary_stream_rpc_method_handler(
+                    servicer.Documents,
+                    request_deserializer=nucliadb__protos_dot_nodereader__pb2.StreamRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_nodereader__pb2.DocumentItem.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -498,5 +531,39 @@ class NodeReader(object):
         return grpc.experimental.unary_unary(request, target, '/nodereader.NodeReader/Suggest',
             nucliadb__protos_dot_nodereader__pb2.SuggestRequest.SerializeToString,
             nucliadb__protos_dot_nodereader__pb2.SuggestResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Paragraphs(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/Paragraphs',
+            nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.ParagraphItem.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Documents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/nodereader.NodeReader/Documents',
+            nucliadb__protos_dot_nodereader__pb2.StreamRequest.SerializeToString,
+            nucliadb__protos_dot_nodereader__pb2.DocumentItem.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

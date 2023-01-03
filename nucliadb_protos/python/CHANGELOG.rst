@@ -1,6 +1,30 @@
 CHANGELOG
 =========
 
+0.0.43
+------
+- Add load score value in cluster member
+
+0.0.42
+------
+
+- Add advanced_query to search protos
+
+0.0.41
+------
+
+- Add new ComputedMetadata on resource basic
+
+0.0.40
+------
+
+- Update train sentence
+
+0.0.39
+------
+
+- Vectorsets
+
 0.0.38
 ------
 

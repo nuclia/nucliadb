@@ -19,6 +19,7 @@
 //
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use nucliadb_protos::{
     FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore,
 };
@@ -41,7 +42,10 @@ fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
         })
         .collect()
 }
-fn produce_facets(facets: Vec<String>, facets_count: FacetCounts) -> HashMap<String, FacetResults> {
+pub fn produce_facets(
+    facets: Vec<String>,
+    facets_count: FacetCounts,
+) -> HashMap<String, FacetResults> {
     facets
         .into_iter()
         .map(|facet| (&facets_count, facet))
@@ -129,6 +133,14 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_path_string();
 
+                    let labels = doc
+                        .get_all(schema.facets)
+                        .into_iter()
+                        .flat_map(|x| x.as_facet())
+                        .map(|x| x.to_path_string())
+                        .filter(|x| x.starts_with("/l/"))
+                        .collect_vec();
+
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
                     let end_pos = doc.get_first(schema.end_pos).unwrap().as_u64().unwrap();
@@ -157,6 +169,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                     let result = ParagraphResult {
                         uuid,
                         field,
+                        labels,
                         start: start_pos,
                         end: end_pos,
                         paragraph,
@@ -164,7 +177,7 @@ impl<'a> From<SearchIntResponse<'a>> for ParagraphSearchResponse {
                         index,
                         matches: terms,
                         score: Some(score),
-                        metadata: None,
+                        metadata: schema.metadata(&doc),
                     };
 
                     results.push(result);
@@ -202,7 +215,6 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
         let searcher = response.text_service.reader.searcher();
         let default_split = Value::Str("".to_string());
         for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
-            info!("Score: {} - DocAddress: {:?}", score, doc_address);
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = ResultScore {
@@ -227,6 +239,13 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                         .as_facet()
                         .unwrap()
                         .to_path_string();
+
+                    let labels = doc
+                        .get_all(schema.facets)
+                        .into_iter()
+                        .map(|x| x.as_facet().unwrap().to_path_string())
+                        .filter(|x| x.starts_with("/l/"))
+                        .collect_vec();
 
                     let start_pos = doc.get_first(schema.start_pos).unwrap().as_u64().unwrap();
 
@@ -255,15 +274,16 @@ impl<'a> From<SearchBm25Response<'a>> for ParagraphSearchResponse {
                     terms.sort();
                     let result = ParagraphResult {
                         uuid,
-                        score: Some(score),
+                        labels,
                         field,
-                        start: start_pos,
-                        end: end_pos,
-                        paragraph,
                         split,
                         index,
+                        paragraph,
+                        score: Some(score),
+                        start: start_pos,
+                        end: end_pos,
                         matches: terms,
-                        metadata: None,
+                        metadata: schema.metadata(&doc),
                     };
 
                     results.push(result);

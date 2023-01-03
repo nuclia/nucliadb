@@ -22,7 +22,7 @@ from datetime import datetime
 from time import time
 from typing import List, Optional
 
-from fastapi import Header, HTTPException, Query, Request, Response
+from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
@@ -39,6 +39,7 @@ from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
@@ -51,6 +52,27 @@ from nucliadb_models.search import (
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_audit
+
+SEARCH_EXAMPLES = {
+    "filtering_by_icon": {
+        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
+        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "value": {
+            "query": "Noam Chomsky",
+            "filters": ["/n/i/application/pdf"],
+            "features": [SearchOptions.DOCUMENT],
+        },
+    },
+    "get_language_counts": {
+        "summary": "Get the number of documents for each language",
+        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "value": {
+            "page_size": 0,
+            "faceted": ["/s/p"],
+            "features": [SearchOptions.DOCUMENT],
+        },
+    },
+}
 
 
 @api.get(
@@ -69,6 +91,7 @@ async def search_knowledgebox(
     response: Response,
     kbid: str,
     query: str = Query(default=""),
+    advanced_query: Optional[str] = Query(default=None),
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
@@ -98,6 +121,7 @@ async def search_knowledgebox(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     shards: List[str] = Query([]),
     with_duplicates: bool = Query(default=False),
+    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -105,6 +129,7 @@ async def search_knowledgebox(
 
     item = SearchRequest(
         query=query,
+        advanced_query=advanced_query,
         fields=fields,
         filters=filters,
         faceted=faceted,
@@ -125,6 +150,7 @@ async def search_knowledgebox(
         extracted=extracted,
         shards=shards,
         with_duplicates=with_duplicates,
+        with_status=with_status,
     )
     return await search(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -146,7 +172,7 @@ async def search_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: SearchRequest,
+    item: SearchRequest = Body(examples=SEARCH_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -193,6 +219,7 @@ async def search(
         kbid,
         features=item.features,
         query=item.query,
+        advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
         sort=item.sort.value if item.sort else None,
@@ -207,8 +234,8 @@ async def search(
         vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
+        with_status=item.with_status,
     )
-
     incomplete_results = False
     ops = []
     queried_shards = []

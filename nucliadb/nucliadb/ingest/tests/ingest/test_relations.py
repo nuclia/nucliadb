@@ -36,11 +36,11 @@ from nucliadb_utils.utilities import get_indexing, get_storage
 
 @pytest.mark.asyncio
 async def test_ingest_relations_indexing(
-    fake_node, local_files, gcs_storage, knowledgebox, processor
+    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
-        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
     )
 
     e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
@@ -82,11 +82,11 @@ async def test_ingest_relations_indexing(
 
 @pytest.mark.asyncio
 async def test_ingest_label_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor
+    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
-        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
     )
 
     labels = [
@@ -119,11 +119,11 @@ async def test_ingest_label_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_colab_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor
+    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
-        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
     )
 
     colaborators = ["Alice", "Bob", "Trudy"]
@@ -149,11 +149,11 @@ async def test_ingest_colab_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_field_metadata_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor
+    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
-        kbid=knowledgebox,
+        kbid=knowledgebox_ingest,
         uuid=rid,
         slug="slug-1",
         type=BrokerMessage.AUTOCOMMIT,
@@ -171,12 +171,8 @@ async def test_ingest_field_metadata_relation_extraction(
             field="title",
         )
     )
-    fcmw.metadata.metadata.ner.update(
-        {
-            "value-1": "subtype-1",
-            "value-2": "subtype-1",
-        }
-    )
+    fcmw.metadata.metadata.positions["subtype-1/value-1"].entity = "value-1"
+    fcmw.metadata.metadata.positions["subtype-1/value-2"].entity = "value-2"
 
     fcmw.metadata.metadata.classifications.extend(
         [
@@ -230,11 +226,11 @@ async def test_ingest_field_metadata_relation_extraction(
 
 @pytest.mark.asyncio
 async def test_ingest_field_relations_relation_extraction(
-    fake_node, local_files, gcs_storage, knowledgebox, processor
+    fake_node, local_files, gcs_storage, knowledgebox_ingest, processor
 ):
     rid = str(uuid.uuid4())
     bm = BrokerMessage(
-        kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
+        kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
     )
 
     relationnode = RelationNode(

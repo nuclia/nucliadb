@@ -26,9 +26,7 @@ pub type WParagraphs = Arc<RwLock<dyn ParagraphWriter>>;
 
 pub fn open_reader(config: &ParagraphConfig, version: u32) -> InternalResult<RParagraphs> {
     match version {
-        0 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::open(config)
-            .map(|v| Arc::new(v) as RParagraphs),
-        1 => nucliadb_paragraphs_tantivy2::reader::ParagraphReaderService::open(config)
+        1 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::open(config)
             .map(|v| Arc::new(v) as RParagraphs),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
@@ -36,9 +34,7 @@ pub fn open_reader(config: &ParagraphConfig, version: u32) -> InternalResult<RPa
 
 pub fn open_writer(config: &ParagraphConfig, version: u32) -> InternalResult<WParagraphs> {
     match version {
-        0 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::open(config)
-            .map(|v| Arc::new(RwLock::new(v)) as WParagraphs),
-        1 => nucliadb_paragraphs_tantivy2::writer::ParagraphWriterService::open(config)
+        1 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::open(config)
             .map(|v| Arc::new(RwLock::new(v)) as WParagraphs),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
@@ -46,9 +42,7 @@ pub fn open_writer(config: &ParagraphConfig, version: u32) -> InternalResult<WPa
 
 pub fn create_reader(config: &ParagraphConfig, version: u32) -> InternalResult<RParagraphs> {
     match version {
-        0 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::new(config)
-            .map(|v| Arc::new(v) as RParagraphs),
-        1 => nucliadb_paragraphs_tantivy2::reader::ParagraphReaderService::new(config)
+        1 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::new(config)
             .map(|v| Arc::new(v) as RParagraphs),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }
@@ -56,9 +50,7 @@ pub fn create_reader(config: &ParagraphConfig, version: u32) -> InternalResult<R
 
 pub fn create_writer(config: &ParagraphConfig, version: u32) -> InternalResult<WParagraphs> {
     match version {
-        0 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::new(config)
-            .map(|v| Arc::new(RwLock::new(v)) as WParagraphs),
-        1 => nucliadb_paragraphs_tantivy2::writer::ParagraphWriterService::new(config)
+        1 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::new(config)
             .map(|v| Arc::new(RwLock::new(v)) as WParagraphs),
         v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
     }

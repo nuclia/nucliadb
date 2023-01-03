@@ -37,10 +37,10 @@ from nucliadb_utils.storages.storage import Storage
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_vector(
-    gcs_storage: Storage, txn, cache, fake_node, knowledgebox: str
+    gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -61,10 +61,10 @@ async def test_create_resource_orm_vector(
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_vector_file(
-    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox: str
+    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
@@ -99,10 +99,10 @@ async def test_create_resource_orm_vector_file(
 
 @pytest.mark.asyncio
 async def test_create_resource_orm_vector_split(
-    gcs_storage: Storage, txn, cache, fake_node, knowledgebox: str
+    gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox)
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 

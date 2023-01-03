@@ -24,6 +24,8 @@ use nucliadb_protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId,
     SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
+use nucliadb_telemetry::payload::TelemetryEvent;
+use nucliadb_telemetry::send_telemetry_event;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing::*;
@@ -43,6 +45,7 @@ impl NodeWriterGRPCDriver {
     // The GRPC writer will only request the writer to bring a shard
     // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
+    #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
         if Configuration::lazy_loading() {
             let mut writer = self.0.write().await;
@@ -59,7 +62,7 @@ impl NodeWriterGRPCDriver {
 }
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::get_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn get_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         self.instrument(&request);
 
@@ -81,7 +84,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::new_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn new_shard(
         &self,
         request: Request<EmptyQuery>,
@@ -89,41 +92,36 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
 
         info!("Creating new shard");
+        send_telemetry_event(TelemetryEvent::Create).await;
         let mut writer = self.0.write().await;
         let result = writer.new_shard();
         std::mem::drop(writer);
         Ok(tonic::Response::new(result))
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::delete_shard", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn delete_shard(&self, request: Request<ShardId>) -> Result<Response<ShardId>, Status> {
         self.instrument(&request);
 
         info!("gRPC delete_shard {:?}", request);
-
+        send_telemetry_event(TelemetryEvent::Delete).await;
+        // Deletion does not require for the shard
+        // to be loaded.
         let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
         let result = writer.delete_shard(&shard_id);
         std::mem::drop(writer);
         match result {
-            Some(Ok(_)) => Ok(tonic::Response::new(shard_id)),
-            Some(Err(e)) => {
+            Ok(_) => Ok(tonic::Response::new(shard_id)),
+            Err(e) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
-            None => {
-                let message = format!("Shard not found {:?}", shard_id);
-                Err(tonic::Status::not_found(message))
-            }
         }
     }
 
-    #[tracing::instrument(
-        name = "NodeWriterGRPCDriver::clean_and_upgrade_shard",
-        skip(self, request)
-    )]
+    #[tracing::instrument(skip_all)]
     async fn clean_and_upgrade_shard(
         &self,
         request: Request<ShardId>,
@@ -132,8 +130,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         info!("gRPC delete_shard {:?}", request);
 
+        // Deletion and upgrade do not require for the shard
+        // to be loaded.
         let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
         let result = writer.clean_and_upgrade_shard(&shard_id);
         std::mem::drop(writer);
@@ -147,6 +146,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn list_shards(
         &self,
         request: Request<EmptyQuery>,
@@ -157,7 +157,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     // Incremental call that can be call multiple times for the same resource
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::set_resource", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn set_resource(&self, request: Request<Resource>) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let resource = request.into_inner();
@@ -168,7 +168,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.0.write().await;
         let result = writer.set_resource(&shard_id, &resource);
         std::mem::drop(writer);
-        match result {
+        match result.transpose() {
             Some(Ok(count)) => {
                 info!("Set resource ends correctly");
                 let status = OpStatus {
@@ -197,10 +197,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(
-        name = "NodeWriterGRPCDriver::delete_relation_nodes",
-        skip(self, request)
-    )]
+    #[tracing::instrument(skip_all)]
     async fn delete_relation_nodes(
         &self,
         request: Request<DeleteGraphNodes>,
@@ -209,7 +206,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.delete_relation_nodes(shard_id, &request) {
+        match writer.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -232,14 +229,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
     }
 
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::join_graph", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn join_graph(&self, request: Request<SetGraph>) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
         let mut writer = self.0.write().await;
-        match writer.join_relations_graph(&shard_id, &graph) {
+        match writer.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -261,7 +258,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::remove_resource", skip(self, request))]
+
+    #[tracing::instrument(skip_all)]
     async fn remove_resource(
         &self,
         request: Request<ResourceId>,
@@ -277,7 +275,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let result = writer.remove_resource(&shard_id, &resource);
         std::mem::drop(writer);
 
-        match result {
+        match result.transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
                 let status = OpStatus {
@@ -305,6 +303,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn add_vector_set(
         &self,
         request: Request<VectorSetId>,
@@ -313,7 +312,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.add_vectorset(shard_id, &request) {
+        match writer.add_vectorset(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("add_vector_set ends correctly");
                 let status = OpStatus {
@@ -335,6 +334,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn remove_vector_set(
         &self,
         request: Request<VectorSetId>,
@@ -343,7 +343,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
         let mut writer = self.0.write().await;
-        match writer.remove_vectorset(shard_id, &request) {
+        match writer.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("remove_vector_set ends correctly");
                 let status = OpStatus {
@@ -365,6 +365,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
+    #[tracing::instrument(skip_all)]
     async fn list_vector_sets(
         &self,
         request: Request<ShardId>,
@@ -372,7 +373,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let shard_id = request.into_inner();
         let reader = self.0.read().await;
-        match reader.list_vectorsets(&shard_id) {
+        match reader.list_vectorsets(&shard_id).transpose() {
             Some(Ok(list)) => {
                 info!("list_vectorset ends correctly");
                 let list = VectorSetList {
@@ -392,16 +393,18 @@ impl NodeWriter for NodeWriterGRPCDriver {
             }
         }
     }
-    #[tracing::instrument(name = "NodeWriterGRPCDriver::gc", skip(self, request))]
+    #[tracing::instrument(skip_all)]
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
         self.instrument(&request);
+
+        send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         info!("Running garbage collection at {}", shard_id.id);
         self.shard_loading(&shard_id).await;
         let mut writer = self.0.write().await;
         let result = writer.gc(&shard_id);
         std::mem::drop(writer);
-        match result {
+        match result.transpose() {
             Some(Ok(_)) => {
                 info!("Garbage collection at {} was successful", shard_id.id);
                 let resp = EmptyResponse {};

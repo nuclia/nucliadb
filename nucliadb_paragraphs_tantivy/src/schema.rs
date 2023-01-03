@@ -17,11 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use nucliadb_service_interface::prelude::nucliadb_protos::ParagraphMetadata;
 use nucliadb_service_interface::prelude::*;
+use prost::Message;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
 use tantivy::schema::{
     Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
 };
+use tantivy::Document;
 
 #[derive(Debug, Clone)]
 pub struct ParagraphSchema {
@@ -39,6 +42,8 @@ pub struct ParagraphSchema {
     pub field: Field,
     pub split: Field,
     pub index: Field,
+    pub repeated_in_field: Field,
+    pub metadata: Field,
 }
 
 pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
@@ -48,8 +53,18 @@ pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime
 }
 
 impl ParagraphSchema {
-    pub fn new() -> Self {
-        tracing::info!("creating paragraph schema");
+    pub fn new() -> ParagraphSchema {
+        ParagraphSchema::default()
+    }
+    /// Returns the paragraph metadata for the given document, if any.
+    pub fn metadata(&self, doc: &Document) -> Option<ParagraphMetadata> {
+        doc.get_first(self.metadata)
+            .and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
+    }
+}
+
+impl Default for ParagraphSchema {
+    fn default() -> Self {
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default()
             .set_stored()
@@ -59,7 +74,10 @@ impl ParagraphSchema {
             .set_indexed()
             .set_stored()
             .set_fast(Cardinality::SingleValue);
-
+        let repeated_options = NumericOptions::default()
+            .set_indexed()
+            .set_stored()
+            .set_fast(Cardinality::SingleValue);
         let facet_options = FacetOptions::default().set_stored();
 
         let uuid = sb.add_text_field("uuid", STRING | STORED);
@@ -81,8 +99,10 @@ impl ParagraphSchema {
         let field = sb.add_facet_field("field", facet_options);
         let split = sb.add_text_field("split", STRING | STORED);
 
+        let repeated_in_field = sb.add_u64_field("repeated_in_field", repeated_options);
+        let metadata = sb.add_bytes_field("metadata", STORED);
+
         let schema = sb.build();
-        tracing::info!("paragraph schema created");
         ParagraphSchema {
             schema,
             uuid,
@@ -97,12 +117,8 @@ impl ParagraphSchema {
             field,
             split,
             index,
+            repeated_in_field,
+            metadata,
         }
-    }
-}
-
-impl Default for ParagraphSchema {
-    fn default() -> Self {
-        Self::new()
     }
 }

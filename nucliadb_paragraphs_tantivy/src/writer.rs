@@ -20,10 +20,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
+use std::time::SystemTime;
 
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
+use prost::Message;
 use regex::Regex;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -60,80 +62,95 @@ impl WriterChild for ParagraphWriterService {
         info!("Stopping Paragraph Service");
         Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     fn count(&self) -> usize {
+        let id: Option<String> = None;
+        let time = SystemTime::now();
         let reader = self.index.reader().unwrap();
         let searcher = reader.searcher();
-        searcher.search(&AllQuery, &Count).unwrap_or(0)
+        let count = searcher.search(&AllQuery, &Count).unwrap_or(0);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Ending at: {v} ms");
+        }
+        count
     }
+    #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        let mut modified = false;
+        let id = Some(&resource.shard_id);
+        let time = SystemTime::now();
 
         if resource.status != ResourceStatus::Delete as i32 {
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Indexing paragraphs: starts at {v} ms");
+            }
             let _ = self.index_paragraph(resource);
-            modified = true;
+            if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+                info!("{id:?} - Indexing paragraphs: ends at {v} ms");
+            }
         }
 
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing paragraphs to delete: starts at {v} ms");
+        }
         for paragraph_id in &resource.paragraphs_to_delete {
             let uuid_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
             self.writer.delete_term(uuid_term);
-            modified = true;
         }
-        match self.writer.commit() {
-            _ if !modified => Ok(()),
-            Ok(opstamp) => {
-                debug!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Paragraph service: {}", e);
-                Err(Box::new(ParagraphError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Processing paragraphs to delete: ends at {v} ms");
         }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+        Ok(())
     }
+    #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> InternalResult<()> {
+        let id = Some(&resource_id.shard_id);
+        let time = SystemTime::now();
         let uuid_field = self.schema.uuid;
         let uuid_term = Term::from_field_text(uuid_field, &resource_id.uuid);
-        self.writer.delete_term(uuid_term);
-        match self.writer.commit() {
-            Ok(opstamp) => {
-                debug!("Commit {}!", opstamp);
-                Ok(())
-            }
-            Err(e) => {
-                error!("Error starting Paragraph service: {}", e);
-                Err(Box::new(ParagraphError { msg: e.to_string() }))
-            }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete term: starts at {v} ms");
         }
+        self.writer.delete_term(uuid_term);
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Delete term: ends at {v} ms");
+        }
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: starts at {v} ms");
+        }
+        self.writer.commit().map_err(|e| {
+            Box::new(ParagraphError { msg: e.to_string() }) as Box<dyn InternalError>
+        })?;
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Commit: ends at {v} ms");
+        }
+        Ok(())
     }
-
+    #[tracing::instrument(skip_all)]
     fn garbage_collection(&mut self) {}
 }
 
 impl ParagraphWriterService {
+    #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> InternalResult<Self> {
-        info!("Starting Paragraph Service");
-        match ParagraphWriterService::open(config) {
-            Ok(service) => Ok(service),
-            Err(e) => {
-                warn!("Paragraph Service Open failed {}. Creating a new one.", e);
-                match ParagraphWriterService::new(config) {
-                    Ok(service) => Ok(service),
-                    Err(e) => {
-                        error!("ParagraphConfigice: {}", e);
-                        Err(Box::new(ParagraphError { msg: e.to_string() }))
-                    }
-                }
-            }
-        }
+        ParagraphWriterService::open(config).or_else(|_| ParagraphWriterService::new(config))
     }
-
+    #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
         match ParagraphWriterService::new_inner(config) {
             Ok(service) => Ok(service),
             Err(e) => Err(Box::new(ParagraphError { msg: e.to_string() })),
         }
     }
+    #[tracing::instrument(skip_all)]
     pub fn open(config: &ParagraphConfig) -> InternalResult<ParagraphWriterService> {
         match ParagraphWriterService::open_inner(config) {
             Ok(service) => Ok(service),
@@ -141,7 +158,7 @@ impl ParagraphWriterService {
         }
     }
     pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
 
         fs::create_dir_all(&config.path)?;
 
@@ -167,7 +184,7 @@ impl ParagraphWriterService {
     }
 
     pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
-        let paragraph_schema = ParagraphSchema::new();
+        let paragraph_schema = ParagraphSchema::default();
 
         let index = Index::open_in_dir(&config.path)?;
 
@@ -191,8 +208,20 @@ impl ParagraphWriterService {
                 .get(field)
                 .map_or_else(|| &empty_paragraph, |i| &i.paragraphs)
         };
+        let resource_facets = resource
+            .labels
+            .iter()
+            .map(Facet::from_text)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
         let mut paragraph_counter = 0;
         for (field, text_info) in &resource.texts {
+            let text_labels = text_info
+                .labels
+                .iter()
+                .map(Facet::from_text)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
             for (paragraph_id, p) in inspect_paragraph(field) {
                 paragraph_counter += 1;
                 let paragraph_term = Term::from_field_text(self.schema.paragraph, paragraph_id);
@@ -200,38 +229,46 @@ impl ParagraphWriterService {
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
                 let index = p.index as u64;
-                let labels = &p.labels;
                 let split = &p.split;
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
                 let text: String = chars[lower_bound..upper_bound].iter().collect();
                 let facet_field = format!("/{}", field);
+                let paragraph_labels = p
+                    .labels
+                    .iter()
+                    .map(Facet::from_text)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
+
                 let mut doc = doc!(
                     self.schema.uuid => resource.resource.as_ref().unwrap().uuid.as_str(),
                     self.schema.modified => timestamp_to_datetime_utc(modified),
                     self.schema.created => timestamp_to_datetime_utc(created),
                     self.schema.status => resource.status as u64,
+                    self.schema.repeated_in_field => p.repeated_in_field as u64,
                 );
-                resource
-                    .labels
+
+                if let Some(ref metadata) = p.metadata {
+                    doc.add_bytes(self.schema.metadata, metadata.encode_to_vec());
+                }
+
+                resource_facets
                     .iter()
-                    .chain(text_info.labels.iter())
-                    .chain(labels.iter())
-                    .map(Facet::from)
+                    .chain(text_labels.iter())
+                    .chain(paragraph_labels.iter())
+                    .cloned()
                     .for_each(|facet| doc.add_facet(self.schema.facets, facet));
                 doc.add_facet(self.schema.field, Facet::from(&facet_field));
                 doc.add_text(self.schema.paragraph, paragraph_id.clone());
-                debug!("Paragraph added {}", text);
                 doc.add_text(self.schema.text, &text);
                 doc.add_u64(self.schema.start_pos, start_pos);
                 doc.add_u64(self.schema.end_pos, end_pos);
                 doc.add_u64(self.schema.index, index);
                 doc.add_text(self.schema.split, split);
-                debug!("Paragraph added");
                 self.writer.delete_term(paragraph_term);
                 self.writer.add_document(doc).unwrap();
                 if paragraph_counter % 500 == 0 {
-                    debug!("Commited");
                     self.writer.commit().unwrap();
                 }
             }
@@ -398,7 +435,7 @@ mod tests {
     fn test_new_writer() -> anyhow::Result<()> {
         let dir = TempDir::new("payload_dir").unwrap();
         let psc = ParagraphConfig {
-            path: dir.path().as_os_str().to_os_string().into_string().unwrap(),
+            path: dir.path().to_path_buf(),
         };
 
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();

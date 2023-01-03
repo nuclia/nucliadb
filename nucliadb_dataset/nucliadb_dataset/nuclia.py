@@ -35,7 +35,12 @@ from nucliadb_protos.train_pb2 import (
     TrainSentence,
 )
 from nucliadb_protos.train_pb2_grpc import TrainStub
-from nucliadb_protos.writer_pb2 import GetLabelsRequest, GetLabelsResponse
+from nucliadb_protos.writer_pb2 import (
+    GetEntitiesRequest,
+    GetEntitiesResponse,
+    GetLabelsRequest,
+    GetLabelsResponse,
+)
 
 
 class NucliaDriver:
@@ -93,6 +98,11 @@ class NucliaDriver:
         request = GetLabelsRequest()
         request.kb.uuid = kbid
         return self.stub.GetOntology(request)
+
+    def get_entities(self, kbid: str) -> GetEntitiesResponse:
+        request = GetEntitiesRequest()
+        request.kb.uuid = kbid
+        return self.stub.GetEntities(request)
 
     def get_info(self, kbid: str) -> TrainInfo:
         request = GetInfoRequest()

@@ -531,6 +531,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 id=str(nodeid),
                 listen_address=node.address,
                 type=node.label,
+                load_score=node.load_score,
                 dummy=node.dummy,
             )
             response.members.append(member)
@@ -621,16 +622,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             resobj.disable_vectors = not request.reindex_vectors
 
             brain = await resobj.generate_index_message()
-            n_vectors = sum(
-                [
-                    1
-                    for par in brain.brain.paragraphs.values()
-                    for pp in par.paragraphs.values()
-                    for _ in pp.sentences.values()
-                ]
-            )
-            logger.info(f"About to index {n_vectors} vectors")
-
             shard_id = await kbobj.get_resource_shard_id(request.rid)
             shard: Optional[Shard] = None
             node_klass = get_node_klass()

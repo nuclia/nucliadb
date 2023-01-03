@@ -43,7 +43,7 @@ message FacetResults {
 message DocumentSearchRequest {
     string id = 1;
     string body = 2;
-
+    
     repeated string fields = 3;
 
     Filter filter = 4;
@@ -54,9 +54,11 @@ message DocumentSearchRequest {
     int32 result_per_page = 8;
 
     Timestamps timestamps = 9;
-
+    
     bool reload = 10;
     bool only_faceted = 15;
+    optional noderesources.Resource.ResourceStatus with_status = 16;
+    optional string advanced_query = 17;
 
 }
 
@@ -68,23 +70,23 @@ message ParagraphSearchRequest {
     repeated string fields = 3;
     // query this text in all the paragraphs
     string body = 4;
-
+    
     Filter filter = 5;
-
+    
     OrderBy order = 7;
-
+    
     // Faceted{ tags: Vec<String>}
     Faceted faceted = 8;
-
+    
     int32 page_number = 10;
     int32 result_per_page = 11;
-
+    
     Timestamps timestamps = 12;
-
+    
     bool reload = 13;
-
     bool with_duplicates = 14;
     bool only_faceted = 15;
+    optional string advanced_query = 16;
 }
 
 message ResultScore {
@@ -98,6 +100,7 @@ message DocumentResult {
     string uuid = 1;
     ResultScore score = 3;
     string field = 4;
+    repeated string labels = 5;
 }
 
 message DocumentSearchResponse {
@@ -132,6 +135,8 @@ message ParagraphResult {
 
     // Metadata that can't be searched with but is returned on search results
     noderesources.ParagraphMetadata metadata = 11;
+
+    repeated string labels = 12;
 }
 
 message ParagraphSearchResponse {
@@ -259,14 +264,15 @@ message SearchRequest {
 
     bool with_duplicates = 14;
     bool only_faceted = 16;
-
+    
+    optional string advanced_query = 18;
+    optional noderesources.Resource.ResourceStatus with_status = 17;
 }
 
 message SuggestRequest {
     string shard = 1;
 
     string body = 2;
-
     Filter filter = 3;
 
     Timestamps timestamps = 4;
@@ -323,6 +329,22 @@ message GetShardRequest {
     string vectorset = 2;
 }
 
+message ParagraphItem {
+    string id = 1;
+    repeated string labels = 2;
+} 
+
+message DocumentItem {
+    string uuid = 1;
+    string field = 2;
+    repeated string labels = 3;
+}
+
+message StreamRequest {
+    Filter filter = 1;
+    bool reload = 2;
+    noderesources.ShardId shard_id = 3;
+}
 
 // Implemented at nucliadb_object_storage
 
@@ -334,15 +356,18 @@ service NodeReader {
     rpc ParagraphSearch(ParagraphSearchRequest) returns (ParagraphSearchResponse) {}
     rpc VectorSearch(VectorSearchRequest) returns (VectorSearchResponse) {}
     rpc RelationSearch(RelationSearchRequest) returns (RelationSearchResponse) {}
-
     rpc DocumentIds(noderesources.ShardId) returns (IdCollection) {}
     rpc ParagraphIds(noderesources.ShardId) returns (IdCollection) {}
     rpc VectorIds(noderesources.ShardId) returns (IdCollection) {}
     rpc RelationIds(noderesources.ShardId) returns (IdCollection) {}
-
+    
     rpc RelationEdges(noderesources.ShardId) returns (EdgeList) {}
     rpc RelationTypes(noderesources.ShardId) returns (TypeList) {}
-
+    
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Suggest(SuggestRequest) returns (SuggestResponse) {}
+
+    // Streams
+    rpc Paragraphs(StreamRequest) returns (stream ParagraphItem) {}
+    rpc Documents(StreamRequest) returns (stream DocumentItem) {}
 }

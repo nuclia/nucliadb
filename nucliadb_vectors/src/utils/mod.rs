@@ -18,25 +18,30 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::cmp::Ordering;
+pub mod dtrie;
+pub mod merger;
+pub mod trie;
 
-use crate::memory_system::elements::Node;
-
-#[derive(Clone, Copy)]
-pub struct StandardElem(pub Node, pub f32);
-impl Eq for StandardElem {}
-impl Ord for StandardElem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+pub trait DeleteLog: std::marker::Sync {
+    fn is_deleted(&self, _: &str) -> bool;
+}
+impl<'a, D: DeleteLog> DeleteLog for &'a D {
+    fn is_deleted(&self, x: &str) -> bool {
+        D::is_deleted(self, x)
     }
 }
-impl PartialEq for StandardElem {
-    fn eq(&self, other: &Self) -> bool {
-        f32::eq(&self.1, &other.1)
+impl<Dl: DeleteLog, S: crate::disk::key_value::Slot> crate::disk::key_value::Slot for (Dl, S) {
+    fn get_key<'a>(&self, x: &'a [u8]) -> &'a [u8] {
+        self.1.get_key(x)
     }
-}
-impl PartialOrd for StandardElem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        f32::partial_cmp(&self.1, &other.1)
+    fn cmp_keys(&self, x: &[u8], key: &[u8]) -> std::cmp::Ordering {
+        self.1.cmp_keys(x, key)
+    }
+    fn read_exact<'a>(&self, x: &'a [u8]) -> (/* head */ &'a [u8], /* tail */ &'a [u8]) {
+        self.1.read_exact(x)
+    }
+    fn keep_in_merge(&self, x: &[u8]) -> bool {
+        let key = std::str::from_utf8(self.get_key(x)).unwrap();
+        !self.0.is_deleted(key)
     }
 }

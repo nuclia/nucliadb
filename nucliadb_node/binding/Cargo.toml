@@ -1,6 +1,6 @@
 [package]
 name = "nucliadb_node_binding"
-version = "0.4.8"
+version = "0.4.12"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.17.1", features = ["extension-module"] }
 nucliadb_node = { path = "../../nucliadb_node" }
+nucliadb_service_interface= { path = "../../nucliadb_service_interface" }
 nucliadb_protos = { path = "../../nucliadb_protos/rust" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }

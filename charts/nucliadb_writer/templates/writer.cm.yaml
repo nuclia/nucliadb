@@ -17,3 +17,5 @@ data:
 {{- end }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
+  PROMETHEUS_URL: {{ .Values.prometheus.url }}
+  PROMETHEUS_PUSH_TIMING: {{ .Values.prometheus.push_timing }}

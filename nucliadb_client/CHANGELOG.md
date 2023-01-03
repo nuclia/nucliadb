@@ -1,8 +1,16 @@
 # nucliadb_client
 
-## 1.1.5
+## 2.0.0a3
 
 - Improve export CLI argument descriptions
+
+## 2.0.0a2
+
+- Make sure slug is set on resources while importing
+
+## 2.0.0a1
+
+- Add telemetry to client's writer grpc stub
 
 ## 1.1.4
 

@@ -113,9 +113,13 @@ async def search_api(
 
     # Make sure is clean
     await asyncio.sleep(1)
+    count = 0
     while len(NODES) < 2:
         print("awaiting cluster nodes - search fixtures.py")
         await asyncio.sleep(4)
+        if count == 10:
+            raise Exception("No cluster")
+        count += 1
 
     def make_client_fixture(
         roles: Optional[List[Enum]] = None,
@@ -161,26 +165,26 @@ async def search_api(
 async def test_search_resource(
     indexing_utility_registered,
     processor,
-    knowledgebox,
+    knowledgebox_ingest,
 ):
     """
     Create a resource that has every possible bit of information
     """
-    message1 = broker_resource(knowledgebox, rid="foobar", slug="foobar-slug")
+    message1 = broker_resource(knowledgebox_ingest, rid="foobar", slug="foobar-slug")
 
-    return await inject_message(processor, knowledgebox, message1)
+    return await inject_message(processor, knowledgebox_ingest, message1)
 
 
 @pytest.fixture(scope="function")
 async def test_resource_deterministic_ids(
     indexing_utility_registered,
     processor,
-    knowledgebox,
+    knowledgebox_ingest,
 ):
     rid = "foobar"
     slug = "foobar-slug"
-    message1 = broker_resource(knowledgebox, rid=rid, slug=slug)
-    kb = await inject_message(processor, knowledgebox, message1)
+    message1 = broker_resource(knowledgebox_ingest, rid=rid, slug=slug)
+    kb = await inject_message(processor, knowledgebox_ingest, message1)
     return kb, rid, slug
 
 
@@ -188,24 +192,24 @@ async def test_resource_deterministic_ids(
 async def multiple_search_resource(
     indexing_utility_registered,
     processor,
-    knowledgebox,
+    knowledgebox_ingest,
 ):
     """
     Create a resource that has every possible bit of information
     """
     for count in range(100):
-        message1 = broker_resource(knowledgebox)
-        await inject_message(processor, knowledgebox, message1, count + 1)
-    return knowledgebox
+        message1 = broker_resource(knowledgebox_ingest)
+        await inject_message(processor, knowledgebox_ingest, message1, count + 1)
+    return knowledgebox_ingest
 
 
-async def inject_message(processor, knowledgebox, message, count: int = 1):
+async def inject_message(processor, knowledgebox_ingest, message, count: int = 1):
     await processor.process(message=message, seqid=count)
 
     # Make sure is indexed
     driver = await get_driver()
     txn = await driver.begin()
-    shard = await Node.actual_shard(txn, knowledgebox)
+    shard = await Node.actual_shard(txn, knowledgebox_ingest)
     if shard is None:
         raise Exception("Could not find shard")
     await txn.abort()
@@ -224,10 +228,12 @@ async def inject_message(processor, knowledgebox, message, count: int = 1):
                 count_shard: Shard = await node_obj.reader.GetShard(req)  # type: ignore
                 if count_shard.resources >= count:
                     checks[replica.shard.id] = True
+                else:
+                    checks[replica.shard.id] = False
 
         if all(checks.values()):
             break
         await asyncio.sleep(1)
 
     assert all(checks.values())
-    return knowledgebox
+    return knowledgebox_ingest

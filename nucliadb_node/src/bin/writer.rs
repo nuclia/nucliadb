@@ -1,3 +1,4 @@
+use std::fs;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -21,20 +22,23 @@ use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
 
-use nucliadb_cluster::cluster::{read_or_create_host_key, Cluster, NodeType};
+use anyhow::{Context, Result};
+use nucliadb_cluster::{node, Key, Node, NodeType};
 use nucliadb_node::config::Configuration;
-use nucliadb_node::metrics;
 use nucliadb_node::metrics::report::NodeReport;
+use nucliadb_node::metrics::Publisher;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
 use nucliadb_protos::GetShardRequest;
-use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use tracing::*;
+use uuid::Uuid;
+
+const LOAD_SCORE_KEY: Key<f32> = Key::new("load-score");
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,13 +64,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Cluster
     let host_key = read_or_create_host_key(Path::new(&host_key_path))?;
-    let chitchat_cluster = Cluster::new(
-        host_key.to_string(),
-        chitchat_addr,
-        NodeType::Node,
-        seed_nodes,
-    )
-    .await?;
+
+    let node = Node::builder()
+        .register_as(NodeType::Io)
+        .on_local_network(chitchat_addr)
+        .with_id(host_key.to_string())
+        .with_seed_nodes(seed_nodes)
+        .insert_to_initial_state(LOAD_SCORE_KEY, 0.0)
+        .build()?;
+
+    let node = node.start().await?;
 
     let writer_task = tokio::spawn(async move {
         let addr = Configuration::writer_listen_address();
@@ -84,12 +91,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Error starting gRPC writer");
     });
 
-    let monitor_task = tokio::spawn(async move {
-        let mut watcher = WatchStream::new(chitchat_cluster.members_change_watcher());
+    let telemetry_handle = nucliadb_telemetry::start_telemetry_loop();
+    let mut cluster_watcher = node.cluster_watcher().await;
+    let monitor_task = tokio::task::spawn(async move {
         loop {
             debug!("node writer wait updates");
-            if let Some(update) = watcher.next().await {
-                if let Ok(json_update) = serde_json::to_string(&update) {
+            if let Some(live_nodes) = cluster_watcher.next().await {
+                let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
+
+                if let Ok(json_update) = serde_json::to_string(&cluster_snapshot) {
                     info!("Chitchat cluster updated: {json_update}");
                 };
             } else {
@@ -102,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Start metrics task");
 
         let report = NodeReport::new(host_key.to_string())?;
-        let mut metrics_publisher = metrics::Publisher::new("node_metrics", prometheus_url);
+        let mut metrics_publisher = Publisher::new("node_metrics", prometheus_url);
 
         if let Some((username, password)) =
             Configuration::get_prometheus_username().zip(Configuration::get_prometheus_password())
@@ -120,8 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             loop {
                 interval.tick().await;
+
                 let mut shard_count = 0;
                 let mut paragraph_count = 0;
+
                 node_reader.cache.values().for_each(|shard| {
                     match shard.get_info(&GetShardRequest::default()) {
                         Err(e) => error!("Cannot get for {} metrics: {e:?}", shard.id),
@@ -131,15 +143,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 });
+
                 report.shard_count.set(shard_count);
                 report.paragraph_count.set(paragraph_count as i64);
 
+                node.update_state(LOAD_SCORE_KEY, report.score()).await;
+
                 if let Err(e) = metrics_publisher.publish(&report).await {
-                    error!("Cannot publish Node metrics: {}", e);
+                    error!("Cannot publish Node metrics: {e}");
                 } else {
                     info!(
-                        "Publish Node metrics: shard_count {}, paragraph_count {}",
-                        shard_count, paragraph_count
+                        "Publish Node metrics: shard_count {shard_count}, paragraph_count \
+                         {paragraph_count}",
                     )
                 }
             }
@@ -150,8 +165,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Running");
 
     tokio::try_join!(writer_task, monitor_task)?;
-
+    telemetry_handle.terminate_telemetry().await;
     // node_writer_service.shutdown().await;
 
     Ok(())
+}
+
+pub fn read_host_key(host_key_path: &Path) -> Result<Uuid> {
+    let host_key_contents = fs::read(host_key_path)
+        .with_context(|| format!("Failed to read host key from '{}'", host_key_path.display()))?;
+
+    let host_key = Uuid::from_slice(host_key_contents.as_slice())
+        .with_context(|| format!("Invalid host key from '{}'", host_key_path.display()))?;
+
+    Ok(host_key)
+}
+
+/// Reads the key that makes a node unique from the given file.
+/// If the file does not exist, it generates an ID and writes it to the file
+/// so that it can be reused on reboot.
+pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
+    let host_key;
+
+    if host_key_path.exists() {
+        host_key = read_host_key(host_key_path)?;
+        info!(host_key=?host_key, host_key_path=?host_key_path, "Read existing host key.");
+    } else {
+        if let Some(dir) = host_key_path.parent() {
+            if !dir.exists() {
+                fs::create_dir_all(dir).with_context(|| {
+                    format!("Failed to create host key directory '{}'", dir.display())
+                })?;
+            }
+        }
+        host_key = Uuid::new_v4();
+        fs::write(host_key_path, host_key.as_bytes()).with_context(|| {
+            format!("Failed to write host key to '{}'", host_key_path.display())
+        })?;
+        info!(host_key=?host_key, host_key_path=?host_key_path, "Create new host key.");
+    }
+
+    Ok(host_key)
 }

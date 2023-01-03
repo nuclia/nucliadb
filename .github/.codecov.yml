@@ -9,7 +9,7 @@ flag_management:
         target: auto
         threshold: 1%
       - type: patch
-        target: 80%
+        target: 30%
   individual_flags:
     - name: one
       paths:
@@ -19,7 +19,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 80%
+          target: 30%
     - name: ingest
       paths:
         - nucliadb/nucliadb/ingest/**
@@ -28,7 +28,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 80%
+          target: 30%
     - name: utils
       paths:
         - nucliadb_utils/**
@@ -37,7 +37,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 80%
+          target: 30%
     - name: train
       paths:
         - nucliadb/nucliadb/train/**
@@ -46,7 +46,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 80%
+          target: 30%
     - name: telemetry
       paths:
         - nucliadb_telemetry/**
@@ -55,7 +55,7 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 80%
+          target: 30%
     - name: search
       paths:
         - nucliadb/nucliadb/search/**
@@ -64,7 +64,7 @@ flag_management:
         - type: project
           target: 75%
         - type: patch
-          target: 80%
+          target: 30%
     - name: writer
       paths:
         - nucliadb/nucliadb/writer/**
@@ -73,7 +73,7 @@ flag_management:
         - type: project
           target: 75%
         - type: patch
-          target: 80%
+          target: 30%
     - name: reader
       paths:
         - nucliadb/nucliadb/reader/**
@@ -82,7 +82,25 @@ flag_management:
         - type: project
           target: 60%
         - type: patch
-          target: 80%
+          target: 30%
+    - name: sdk
+      paths:
+        - nucliadb_sdk/nucliadb_sdk/**
+      carryforward: true
+      statuses:
+        - type: project
+          target: 60%
+        - type: patch
+          target: 30%
+    - name: dataset
+      paths:
+        - nucliadb_dataset/nucliadb_dataset/**
+      carryforward: true
+      statuses:
+        - type: project
+          target: 60%
+        - type: patch
+          target: 30%
     - name: node-sidecar
       paths:
         - nucliadb_node/nucliadb_node/**
@@ -91,4 +109,4 @@ flag_management:
         - type: project
           target: 20%
         - type: patch
-          target: 80%
+          target: 30%

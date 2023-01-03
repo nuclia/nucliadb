@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.0.16
+
+- Fix bug in train service returning entity positions
+
 ## 2.0.15
 
 - Fix bug on text highlighting

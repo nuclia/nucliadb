@@ -17,12 +17,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+
 use nucliadb_protos::*;
 
 use crate::service_interface::*;
 
 pub struct ParagraphConfig {
-    pub path: String,
+    pub path: PathBuf,
 }
 #[derive(Debug)]
 pub struct ParagraphError {
@@ -37,9 +39,24 @@ impl std::fmt::Display for ParagraphError {
 
 impl InternalError for ParagraphError {}
 
+pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
+impl ParagraphIterator {
+    pub fn new<I>(inner: I) -> ParagraphIterator
+    where I: Iterator<Item = ParagraphItem> + Send + 'static {
+        ParagraphIterator(Box::new(inner))
+    }
+}
+impl Iterator for ParagraphIterator {
+    type Item = ParagraphItem;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
 pub trait ParagraphReader:
     ReaderChild<Request = ParagraphSearchRequest, Response = ParagraphSearchResponse>
 {
+    fn iterator(&self, request: &StreamRequest) -> InternalResult<ParagraphIterator>;
     fn suggest(&self, request: &SuggestRequest) -> InternalResult<Self::Response>;
     fn count(&self) -> InternalResult<usize>;
 }

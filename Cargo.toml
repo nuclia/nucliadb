@@ -1,12 +1,10 @@
 [workspace]
 
 members = [
+  "nucliadb_telemetry",
   "nucliadb_protos/rust",
   "nucliadb_cluster",
   "nucliadb_node",
-  "nucliadb_paragraphs_tantivy",
-  "nucliadb_fields_tantivy",
-  "nucliadb_vectors",
   "nucliadb_node/binding",
   "nucliadb_services",
   "vectors_benchmark"
