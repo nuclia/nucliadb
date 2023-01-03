@@ -69,10 +69,8 @@ async def test_knowledgebox_delete_all_kb_keys(
     kbid = knowledgebox_ingest
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
 
-    n_resources = 200
-    chunk_size = 33
-
     # Create some resources in the KB
+    n_resources = 200
     uuids = set()
     for _ in range(n_resources):
         bm = broker_resource(kbid)
@@ -82,7 +80,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     await txn.commit(resource=False)
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid, chunk_size=chunk_size)
+    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid)
 
     # Check that all of them were deleted
     for uuid in uuids:

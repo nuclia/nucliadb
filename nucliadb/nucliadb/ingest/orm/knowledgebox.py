@@ -486,7 +486,7 @@ class KnowledgeBox:
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size=1_000):
+    async def delete_all_kb_keys(cls, driver: Driver, kbid: str):
         # Delete KB Keys
         prefix = KB_KEYS.format(kbid=kbid)
         done = False
@@ -494,7 +494,7 @@ class KnowledgeBox:
             txn = await driver.begin()
             done = True
             async for chunk_of_keys in iter_in_chunks(
-                txn.keys(match=prefix, count=-1), chunk_size=chunk_size
+                txn.keys(match=prefix, count=-1), chunk_size=1_000
             ):
                 for key in chunk_of_keys:
                     done = False
