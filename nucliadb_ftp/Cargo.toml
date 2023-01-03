@@ -1,0 +1,18 @@
+[package]
+name = "nucliadb_ftp"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+eyre = "0.6.8"
+color-eyre = "0.6.2"
+derive_builder = "0.12.0"
+thiserror = "1.0.38"
+tokio = { version = "1.23.0", features = ["net"] }
+tokio-tar = "0.3.0"
+clap = { version = "4.0.32", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3.3.0"
+tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread"] }
