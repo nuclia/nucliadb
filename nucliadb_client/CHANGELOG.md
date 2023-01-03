@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 2.0.0a3
+
+- Improve export CLI argument descriptions
+
 ## 2.0.0a2
 
 - Make sure slug is set on resources while importing
