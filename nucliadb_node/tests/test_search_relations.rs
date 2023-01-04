@@ -23,94 +23,145 @@ mod common;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
-use common::{
-    node_services,
-    TestNodeWriter
-};
-
-use nucliadb_protos::{
-    IndexMetadata,
-    Relation,
-    EmptyQuery,
-    RelationSearchRequest,
-    RelationNode,
-    Resource,
-    ResourceId,
-    RelationPrefixRequest,
-    RelationNeighboursRequest,
-};
+use common::{node_services, TestNodeWriter};
 use nucliadb_protos::op_status::Status;
+use nucliadb_protos::relation::RelationType;
 use nucliadb_protos::relation_node::NodeType;
 use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::relation::RelationType;
-use tonic::Request;
+use nucliadb_protos::{
+    EmptyQuery, IndexMetadata, Relation, RelationNeighboursRequest, RelationNode,
+    RelationPrefixRequest, RelationSearchRequest, Resource, ResourceId,
+};
 use prost_types::Timestamp;
+use tonic::Request;
 use uuid::Uuid;
 
-
-async fn create_knowledge_graph(writer: &mut TestNodeWriter, shard_id: String) -> HashMap<String, RelationNode> {
+async fn create_knowledge_graph(
+    writer: &mut TestNodeWriter,
+    shard_id: String,
+) -> HashMap<String, RelationNode> {
     let rid = Uuid::new_v4();
 
     let mut relation_nodes = HashMap::new();
     relation_nodes.insert(
         rid.to_string(),
-        RelationNode {value: rid.to_string(), ntype: NodeType::Resource as i32, subtype: String::new(),}
+        RelationNode {
+            value: rid.to_string(),
+            ntype: NodeType::Resource as i32,
+            subtype: String::new(),
+        },
     );
     relation_nodes.insert(
         "Animal".to_string(),
-        RelationNode {value: "Animal".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Animal".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Batman".to_string(),
-        RelationNode {value: "Batman".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Batman".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Becquer".to_string(),
-        RelationNode {value: "Becquer".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Becquer".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Cat".to_string(),
-        RelationNode {value: "Cat".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Cat".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Catwoman".to_string(),
-        RelationNode {value: "Catwoman".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Catwoman".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Eric".to_string(),
-        RelationNode {value: "Eric".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Eric".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Fly".to_string(),
-        RelationNode {value: "Fly".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Fly".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Gravity".to_string(),
-        RelationNode {value: "Gravity".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Gravity".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Joan Antoni".to_string(),
-        RelationNode {value: "Joan Antoni".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Joan Antoni".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Joker".to_string(),
-        RelationNode {value: "Joker".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Joker".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Newton".to_string(),
-        RelationNode {value: "Newton".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Newton".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Physics".to_string(),
-        RelationNode {value: "Physics".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Physics".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Poetry".to_string(),
-        RelationNode {value: "Poetry".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Poetry".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
     relation_nodes.insert(
         "Swallow".to_string(),
-        RelationNode {value: "Swallow".to_string(), ntype: NodeType::Entity as i32, subtype: "".to_string(),}
+        RelationNode {
+            value: "Swallow".to_string(),
+            ntype: NodeType::Entity as i32,
+            subtype: "".to_string(),
+        },
     );
 
     let relation_edges = vec![
@@ -226,35 +277,35 @@ async fn create_knowledge_graph(writer: &mut TestNodeWriter, shard_id: String) -
         nanos: 0,
     };
 
-    let r = writer.set_resource(Resource {
-        shard_id: shard_id.clone(),
-        resource: Some(ResourceId {
+    let r = writer
+        .set_resource(Resource {
             shard_id: shard_id.clone(),
-            uuid: rid.to_string(),
-        }),
-        status: ResourceStatus::Processed as i32,
-        relations: relation_edges.clone(),
-        metadata: Some(IndexMetadata {
-            created: Some(timestamp.clone()),
-            modified: Some(timestamp),
-        }),
-        texts: HashMap::new(),
-        ..Default::default()
-    }).await.unwrap();
+            resource: Some(ResourceId {
+                shard_id: shard_id.clone(),
+                uuid: rid.to_string(),
+            }),
+            status: ResourceStatus::Processed as i32,
+            relations: relation_edges.clone(),
+            metadata: Some(IndexMetadata {
+                created: Some(timestamp.clone()),
+                modified: Some(timestamp),
+            }),
+            texts: HashMap::new(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
 
     assert_eq!(r.get_ref().status(), Status::Ok);
 
     relation_nodes
 }
 
-
 #[tokio::test]
 async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Error>> {
     let (mut reader, mut writer) = node_services().await;
 
-    let new_shard_response = writer
-        .new_shard(Request::new(EmptyQuery {}))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(EmptyQuery {})).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     create_knowledge_graph(&mut writer, shard_id.clone()).await;
@@ -263,16 +314,16 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with empty term. Results are limited
     // --------------------------------------------------------------
 
-    let response = reader.relation_search(
-        RelationSearchRequest {
+    let response = reader
+        .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixRequest {
                 prefix: "".to_string(),
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    ).await?;
+        })
+        .await?;
 
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
@@ -284,28 +335,24 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with "cat" term (some results)
     // --------------------------------------------------------------
 
-    let response = reader.relation_search(
-        RelationSearchRequest {
+    let response = reader
+        .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixRequest {
                 prefix: "cat".to_string(),
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    ).await?;
+        })
+        .await?;
 
-    let expected = HashSet::from_iter(vec![
-        "Cat".to_string(),
-        "Catwoman".to_string()
-    ]);
+    let expected = HashSet::from_iter(vec!["Cat".to_string(), "Catwoman".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
-    let results = prefix_response.nodes
+    let results = prefix_response
+        .nodes
         .iter()
-        .map(|node| {
-            node.value.to_owned()
-        })
+        .map(|node| node.value.to_owned())
         .collect::<HashSet<_>>();
     assert_eq!(results, expected);
 
@@ -313,16 +360,16 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     // Test: prefixed search with "zzz" term (empty results)
     // --------------------------------------------------------------
 
-    let response = reader.relation_search(
-        RelationSearchRequest {
+    let response = reader
+        .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixRequest {
                 prefix: "zzz".to_string(),
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    ).await?;
+        })
+        .await?;
 
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
@@ -361,14 +408,11 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Error>> {
     let (mut reader, mut writer) = node_services().await;
 
-    let new_shard_response = writer
-        .new_shard(Request::new(EmptyQuery {}))
-        .await?;
+    let new_shard_response = writer.new_shard(Request::new(EmptyQuery {})).await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     let relation_nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;
@@ -377,37 +421,34 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     // Test: neighbours search on existent node
     // --------------------------------------------------------------
 
-    let response = reader.relation_search(
-        RelationSearchRequest {
+    let response = reader
+        .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             neighbours: Some(RelationNeighboursRequest {
-                entry_points: vec![
-                    relation_nodes.get("Swallow").unwrap().clone(),
-                ],
+                entry_points: vec![relation_nodes.get("Swallow").unwrap().clone()],
                 depth: 1,
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    ).await?;
+        })
+        .await?;
 
     let expected = HashSet::from_iter(vec![
         ("Poetry".to_string(), "Swallow".to_string()),
         ("Swallow".to_string(), "Animal".to_string()),
         ("Swallow".to_string(), "Fly".to_string()),
     ]);
-    let neighbour_relations = response.get_ref().neighbours
+    let neighbour_relations = response
+        .get_ref()
+        .neighbours
         .iter()
         .flat_map(|neighbours| neighbours.subgraph.iter())
-        .flat_map(
-            |node|
-            vec![
-                (
-                    node.source.as_ref().unwrap().value.to_owned(),
-                    node.to.as_ref().unwrap().value.to_owned()
-                )
-            ]
-        )
+        .flat_map(|node| {
+            vec![(
+                node.source.as_ref().unwrap().value.to_owned(),
+                node.to.as_ref().unwrap().value.to_owned(),
+            )]
+        })
         .collect::<HashSet<_>>();
     assert_eq!(neighbour_relations, expected);
 
@@ -415,8 +456,8 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     // Test: neighbours search on multiple existent nodes
     // --------------------------------------------------------------
 
-    let response = reader.relation_search(
-        RelationSearchRequest {
+    let response = reader
+        .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             neighbours: Some(RelationNeighboursRequest {
                 entry_points: vec![
@@ -427,8 +468,8 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    ).await?;
+        })
+        .await?;
 
     let expected = HashSet::from_iter(vec![
         ("Newton".to_string(), "Physics".to_string()),
@@ -436,18 +477,17 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         ("Becquer".to_string(), "Poetry".to_string()),
         ("Joan Antoni".to_string(), "Becquer".to_string()),
     ]);
-    let neighbour_relations = response.get_ref().neighbours
+    let neighbour_relations = response
+        .get_ref()
+        .neighbours
         .iter()
         .flat_map(|neighbours| neighbours.subgraph.iter())
-        .flat_map(
-            |node|
-            vec![
-                (
-                    node.source.as_ref().unwrap().value.to_owned(),
-                    node.to.as_ref().unwrap().value.to_owned()
-                )
-            ]
-        )
+        .flat_map(|node| {
+            vec![(
+                node.source.as_ref().unwrap().value.to_owned(),
+                node.to.as_ref().unwrap().value.to_owned(),
+            )]
+        })
         .collect::<HashSet<_>>();
     assert_eq!(neighbour_relations, expected);
 
@@ -455,23 +495,21 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     // Test: neighbours search on non existent node
     // --------------------------------------------------------------
 
-    let response = reader.relation_search(
-        RelationSearchRequest {
+    let response = reader
+        .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             neighbours: Some(RelationNeighboursRequest {
-                entry_points: vec![
-                    RelationNode {
-                        value: "Fake".to_string(),
-                        ntype: NodeType::Entity as i32,
-                        subtype: "".to_string(),
-                    }
-                ],
+                entry_points: vec![RelationNode {
+                    value: "Fake".to_string(),
+                    ntype: NodeType::Entity as i32,
+                    subtype: "".to_string(),
+                }],
                 depth: 1,
                 ..Default::default()
             }),
             ..Default::default()
-        }
-    ).await?;
+        })
+        .await?;
 
     let neighbours = &response.get_ref().neighbours.as_ref().unwrap().subgraph;
     assert!(neighbours.is_empty());

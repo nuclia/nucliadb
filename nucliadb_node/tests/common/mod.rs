@@ -19,7 +19,6 @@
 //
 
 /// Utilities to test NucliaDB node
-
 mod constants;
 mod node_services;
 

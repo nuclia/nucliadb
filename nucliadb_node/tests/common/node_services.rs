@@ -18,46 +18,39 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_node::reader::NodeReaderService;
-use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
-use nucliadb_protos::node_reader_client::NodeReaderClient;
-use nucliadb_protos::node_reader_server::NodeReaderServer;
-use nucliadb_node::writer::NodeWriterService;
-use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
-use nucliadb_protos::node_writer_client::NodeWriterClient;
-use nucliadb_protos::node_writer_server::NodeWriterServer;
-use once_cell::sync::Lazy;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+
+use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
+use nucliadb_node::reader::NodeReaderService;
+use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
+use nucliadb_node::writer::NodeWriterService;
+use nucliadb_protos::node_reader_client::NodeReaderClient;
+use nucliadb_protos::node_reader_server::NodeReaderServer;
+use nucliadb_protos::node_writer_client::NodeWriterClient;
+use nucliadb_protos::node_writer_server::NodeWriterServer;
+use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
-use tonic::transport::{Server, Channel};
+use tonic::transport::{Channel, Server};
 
 use crate::common::{READER_ADDR, SERVER_STARTUP_TIMEOUT, WRITER_ADDR};
-
 
 pub type TestNodeReader = NodeReaderClient<Channel>;
 pub type TestNodeWriter = NodeWriterClient<Channel>;
 
-
-static READER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(false))
-});
-static WRITER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(false))
-});
-
+static READER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
+    Lazy::new(|| Arc::new(Mutex::new(false)));
+static WRITER_SERVER_INITIALIZED: Lazy<Arc<Mutex<bool>>> =
+    Lazy::new(|| Arc::new(Mutex::new(false)));
 
 async fn start_reader(addr: SocketAddr) {
     let mut initialized_lock = READER_SERVER_INITIALIZED.lock().await;
 
     if !*initialized_lock {
         tokio::spawn(async move {
-            let reader_server = NodeReaderServer::new(
-                NodeReaderGRPCDriver::from(
-                    NodeReaderService::new()
-                )
-            );
+            let reader_server =
+                NodeReaderServer::new(NodeReaderGRPCDriver::from(NodeReaderService::new()));
             Server::builder()
                 .add_service(reader_server)
                 .serve(addr)
@@ -68,7 +61,7 @@ async fn start_reader(addr: SocketAddr) {
                     },
                     |_| {
                         *initialized_lock = true;
-                    }
+                    },
                 );
         });
     }
@@ -79,11 +72,8 @@ async fn start_writer(addr: SocketAddr) {
 
     if !*initialized_lock {
         tokio::spawn(async move {
-            let writer_server = NodeWriterServer::new(
-                NodeWriterGRPCDriver::from(
-                    NodeWriterService::new()
-                )
-            );
+            let writer_server =
+                NodeWriterServer::new(NodeWriterGRPCDriver::from(NodeWriterService::new()));
             Server::builder()
                 .add_service(writer_server)
                 .serve(addr)
@@ -94,7 +84,7 @@ async fn start_writer(addr: SocketAddr) {
                     },
                     |_| {
                         *initialized_lock = true;
-                    }
+                    },
                 );
         });
     }
@@ -115,12 +105,14 @@ async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::
         || async {
             match Channel::builder(server_uri.clone()).connect().await {
                 Ok(_channel) => Ok(()),
-                Err(err) => {
-                    Err(backoff::Error::Transient { err: err, retry_after: None })
-                },
+                Err(err) => Err(backoff::Error::Transient {
+                    err: err,
+                    retry_after: None,
+                }),
             }
-        }
-    ).await?;
+        },
+    )
+    .await?;
 
     Ok(())
 }
@@ -154,13 +146,17 @@ async fn node_writer_client() -> TestNodeWriter {
 }
 
 pub async fn node_reader() -> TestNodeReader {
-    node_reader_server().await.expect("Error starting node reader");
+    node_reader_server()
+        .await
+        .expect("Error starting node reader");
     let client = node_reader_client().await;
     client
 }
 
 pub async fn node_writer() -> TestNodeWriter {
-    node_writer_server().await.expect("Error starting node writer");
+    node_writer_server()
+        .await
+        .expect("Error starting node writer");
     let client = node_writer_client().await;
     client
 }
