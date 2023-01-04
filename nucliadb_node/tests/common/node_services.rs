@@ -106,7 +106,7 @@ async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::
             match Channel::builder(server_uri.clone()).connect().await {
                 Ok(_channel) => Ok(()),
                 Err(err) => Err(backoff::Error::Transient {
-                    err: err,
+                    err,
                     retry_after: None,
                 }),
             }
@@ -118,47 +118,43 @@ async fn wait_for_service_ready(addr: SocketAddr, timeout: Duration) -> anyhow::
 }
 
 async fn node_reader_server() -> anyhow::Result<()> {
-    start_reader(READER_ADDR.clone()).await;
-    wait_for_service_ready(READER_ADDR.clone(), SERVER_STARTUP_TIMEOUT).await?;
+    start_reader(*READER_ADDR).await;
+    wait_for_service_ready(*READER_ADDR, SERVER_STARTUP_TIMEOUT).await?;
     Ok(())
 }
 
 async fn node_writer_server() -> anyhow::Result<()> {
-    start_writer(WRITER_ADDR.clone()).await;
-    wait_for_service_ready(WRITER_ADDR.clone(), SERVER_STARTUP_TIMEOUT).await?;
+    start_writer(*WRITER_ADDR).await;
+    wait_for_service_ready(*WRITER_ADDR, SERVER_STARTUP_TIMEOUT).await?;
     Ok(())
 }
 
 async fn node_reader_client() -> TestNodeReader {
-    let endpoint = format!("http://{}", READER_ADDR.to_string());
-    let client = NodeReaderClient::connect(endpoint)
+    let endpoint = format!("http://{}", *READER_ADDR);
+    NodeReaderClient::connect(endpoint)
         .await
-        .expect("Error creating gRPC reader client");
-    client
+        .expect("Error creating gRPC reader client")
 }
 
 async fn node_writer_client() -> TestNodeWriter {
-    let endpoint = format!("http://{}", WRITER_ADDR.to_string());
-    let client = NodeWriterClient::connect(endpoint)
+    let endpoint = format!("http://{}", *WRITER_ADDR);
+    NodeWriterClient::connect(endpoint)
         .await
-        .expect("Error creating gRPC reader client");
-    client
+        .expect("Error creating gRPC reader client")
 }
 
 pub async fn node_reader() -> TestNodeReader {
     node_reader_server()
         .await
         .expect("Error starting node reader");
-    let client = node_reader_client().await;
-    client
+    node_reader_client().await
 }
 
 pub async fn node_writer() -> TestNodeWriter {
     node_writer_server()
         .await
         .expect("Error starting node writer");
-    let client = node_writer_client().await;
-    client
+    node_writer_client().await
 }
 
 pub async fn node_services() -> (TestNodeReader, TestNodeWriter) {
