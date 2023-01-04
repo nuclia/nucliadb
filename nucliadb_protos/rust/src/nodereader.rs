@@ -407,7 +407,7 @@ pub struct SearchRequest {
     pub with_status: ::core::option::Option<i32>,
     /// if provided, search metadata for this nodes (nodes at distance
     /// one) and get the shortest path between nodes
-    #[prost(message, optional, tag="18")]
+    #[prost(message, optional, tag="19")]
     pub relations: ::core::option::Option<RelationSearchRequest>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

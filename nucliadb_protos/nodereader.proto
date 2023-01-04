@@ -281,8 +281,8 @@ message RelationSearchRequest {
     string shard_id = 1;
     bool reload = 5;
 
-    optional RelationPrefixRequest prefix = 11;
-    optional RelationNeighboursRequest neighbours = 12;
+    RelationPrefixRequest prefix = 11;
+    RelationNeighboursRequest neighbours = 12;
     // TODO: uncomment and implement
     // RelationPathsSearchRequest paths = 13;
 
@@ -295,8 +295,8 @@ message RelationPrefixResponse {
     repeated utils.RelationNode nodes = 1;
 }
 message RelationSearchResponse {
-    optional RelationPrefixResponse prefix = 11;
-    optional RelationNeighboursResponse neighbours = 12;
+    RelationPrefixResponse prefix = 11;
+    RelationNeighboursResponse neighbours = 12;
     // TODO: uncomment and implement
     // repeated utils.RelationPath paths = 13;
 }

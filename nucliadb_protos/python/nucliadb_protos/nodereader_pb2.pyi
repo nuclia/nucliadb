@@ -656,7 +656,7 @@ class RelationPrefixSearchResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["nodes",b"nodes"]) -> None: ...
 global___RelationPrefixSearchResponse = RelationPrefixSearchResponse
 
-class RelationBFSRequest(google.protobuf.message.Message):
+class RelationNeighboursRequest(google.protobuf.message.Message):
     """Relation neighbour search
 
     Search the knowledge graph using some entry points (nodes to start
@@ -694,7 +694,7 @@ class RelationBFSRequest(google.protobuf.message.Message):
         depth: builtins.int = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["depth",b"depth","edge_filters",b"edge_filters","entry_points",b"entry_points","node_filters",b"node_filters"]) -> None: ...
-global___RelationBFSRequest = RelationBFSRequest
+global___RelationNeighboursRequest = RelationNeighboursRequest
 
 class RelationSearchRequest(google.protobuf.message.Message):
     """TODO: uncomment and implement
@@ -725,7 +725,7 @@ class RelationSearchRequest(google.protobuf.message.Message):
     @property
     def prefix(self) -> global___RelationPrefixRequest: ...
     @property
-    def neighbours(self) -> global___RelationBFSRequest:
+    def neighbours(self) -> global___RelationNeighboursRequest:
         """TODO: uncomment and implement
         RelationPathsSearchRequest paths = 13;
         """
@@ -735,17 +735,13 @@ class RelationSearchRequest(google.protobuf.message.Message):
         shard_id: typing.Text = ...,
         reload: builtins.bool = ...,
         prefix: typing.Optional[global___RelationPrefixRequest] = ...,
-        neighbours: typing.Optional[global___RelationBFSRequest] = ...,
+        neighbours: typing.Optional[global___RelationNeighboursRequest] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_neighbours",b"_neighbours","_prefix",b"_prefix","neighbours",b"neighbours","prefix",b"prefix"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_neighbours",b"_neighbours","_prefix",b"_prefix","neighbours",b"neighbours","prefix",b"prefix","reload",b"reload","shard_id",b"shard_id"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_neighbours",b"_neighbours"]) -> typing.Optional[typing_extensions.Literal["neighbours"]]: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_prefix",b"_prefix"]) -> typing.Optional[typing_extensions.Literal["prefix"]]: ...
+    def HasField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix","reload",b"reload","shard_id",b"shard_id"]) -> None: ...
 global___RelationSearchRequest = RelationSearchRequest
 
-class RelationBFSResponse(google.protobuf.message.Message):
+class RelationNeighboursResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     SUBGRAPH_FIELD_NUMBER: builtins.int
     @property
@@ -755,7 +751,7 @@ class RelationBFSResponse(google.protobuf.message.Message):
         subgraph: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["subgraph",b"subgraph"]) -> None: ...
-global___RelationBFSResponse = RelationBFSResponse
+global___RelationNeighboursResponse = RelationNeighboursResponse
 
 class RelationPrefixResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -776,7 +772,7 @@ class RelationSearchResponse(google.protobuf.message.Message):
     @property
     def prefix(self) -> global___RelationPrefixResponse: ...
     @property
-    def neighbours(self) -> global___RelationBFSResponse:
+    def neighbours(self) -> global___RelationNeighboursResponse:
         """TODO: uncomment and implement
         repeated utils.RelationPath paths = 13;
         """
@@ -784,14 +780,10 @@ class RelationSearchResponse(google.protobuf.message.Message):
     def __init__(self,
         *,
         prefix: typing.Optional[global___RelationPrefixResponse] = ...,
-        neighbours: typing.Optional[global___RelationBFSResponse] = ...,
+        neighbours: typing.Optional[global___RelationNeighboursResponse] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_neighbours",b"_neighbours","_prefix",b"_prefix","neighbours",b"neighbours","prefix",b"prefix"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_neighbours",b"_neighbours","_prefix",b"_prefix","neighbours",b"neighbours","prefix",b"prefix"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_neighbours",b"_neighbours"]) -> typing.Optional[typing_extensions.Literal["neighbours"]]: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_prefix",b"_prefix"]) -> typing.Optional[typing_extensions.Literal["prefix"]]: ...
+    def HasField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix"]) -> None: ...
 global___RelationSearchResponse = RelationSearchResponse
 
 class SearchRequest(google.protobuf.message.Message):
