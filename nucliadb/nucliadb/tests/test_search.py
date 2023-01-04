@@ -23,6 +23,7 @@ import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.ingest.tests.vectors import V1
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
 
@@ -409,3 +410,69 @@ async def test_search_advanced_query(
     resp_json = resp.json()
     assert len(resp_json["resources"]) == 1
     assert resp_json["resources"]["barack"]
+
+
+@pytest.mark.asyncio
+async def test_search_returns_sentence_positions(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    await inject_resource_with_a_sentence(knowledgebox, nucliadb_grpc)
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search", json=dict(query="my own text", min_score=-1)
+    )
+    assert resp.status_code == 200
+    content = resp.json()
+    position = content["sentences"]["results"][0]["position"]
+    assert position["start"] is not None
+    assert position["end"] is not None
+    assert position["index"] is not None
+    assert "page_number" not in position
+
+
+async def inject_resource_with_a_sentence(knowledgebox, writer):
+    bm = broker_resource(knowledgebox)
+
+    bm.files["file"].file.uri = "http://nofile"
+    bm.files["file"].file.size = 0
+    bm.files["file"].file.source = rpb.CloudFile.Source.EXTERNAL
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "My own text Ramon. This is great to be here. \n Where is my beer?"
+    etw.field.field = "file"
+    etw.field.field_type = rpb.FieldType.FILE
+    bm.extracted_text.append(etw)
+
+    fcm = rpb.FieldComputedMetadataWrapper()
+    fcm.field.field = "file"
+    fcm.field.field_type = rpb.FieldType.FILE
+    p1 = rpb.Paragraph(
+        start=0,
+        end=45,
+    )
+    p1.start_seconds.append(0)
+    p1.end_seconds.append(10)
+
+    fcm.metadata.metadata.paragraphs.append(p1)
+    fcm.metadata.metadata.last_index.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_understanding.FromDatetime(datetime.now())
+    fcm.metadata.metadata.last_extract.FromDatetime(datetime.now())
+    bm.field_metadata.append(fcm)
+
+    ev = rpb.ExtractedVectorsWrapper()
+    ev.field.field = "file"
+    ev.field.field_type = rpb.FieldType.FILE
+
+    v1 = rpb.Vector()
+    v1.start = 0
+    v1.end = 19
+    v1.start_paragraph = 0
+    v1.end_paragraph = 45
+    v1.vector.extend(V1)
+    ev.vectors.vectors.vectors.append(v1)
+
+    bm.field_vectors.append(ev)
+
+    await inject_message(writer, bm)

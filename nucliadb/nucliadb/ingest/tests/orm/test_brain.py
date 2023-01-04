@@ -28,7 +28,7 @@ from nucliadb_protos.resources_pb2 import (
     Sentence,
 )
 
-from nucliadb.ingest.orm.brain import ResourceBrain
+from nucliadb.ingest.orm.brain import ResourceBrain, get_page_number
 
 
 def test_apply_field_metadata_marks_duplicated_paragraphs():
@@ -115,16 +115,15 @@ def test_apply_field_metadata_marks_duplicated_paragraphs_on_split_metadata():
             assert paragraph.repeated_in_field is True
 
 
-def test_get_paragraph_page_number():
-    br = ResourceBrain(rid="foo")
+def test_get_page_number():
     page_positions = {
         0: (0, 99),
         1: (100, 199),
         2: (200, 299),
     }
-    assert br.get_paragraph_page_number(Paragraph(start=10), page_positions) == 0
-    assert br.get_paragraph_page_number(Paragraph(start=100), page_positions) == 1
-    assert br.get_paragraph_page_number(Paragraph(start=500), page_positions) == 2
+    assert get_page_number(10, page_positions) == 0
+    assert get_page_number(100, page_positions) == 1
+    assert get_page_number(500, page_positions) == 2
 
 
 def test_apply_field_metadata_populates_page_number():
