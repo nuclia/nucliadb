@@ -541,6 +541,12 @@ async def test_search_relations(
         Relation(
             relation=Relation.RelationType.ENTITY,
             source=relation_nodes["Joan Antoni"],
+            to=relation_nodes["Eric"],
+            relation_label="collaborate",
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=relation_nodes["Joan Antoni"],
             to=relation_nodes["Becquer"],
             relation_label="read",
         ),
@@ -549,6 +555,12 @@ async def test_search_relations(
             source=relation_nodes["Becquer"],
             to=relation_nodes["Poetry"],
             relation_label="write",
+        ),
+        Relation(
+            relation=Relation.RelationType.ENTITY,
+            source=relation_nodes["Becquer"],
+            to=relation_nodes["Poetry"],
+            relation_label="like",
         ),
         Relation(
             relation=Relation.RelationType.ABOUT,
@@ -595,17 +607,27 @@ async def test_search_relations(
         },
     )
     assert resp.status_code == 200
-    assert resp.json()["relations"]["entities"] == {
+
+    entities = resp.json()["relations"]["entities"]
+    expected = {
         "Becquer": {
             "related_to": [
-                {"entity": "Poetry", "relation": "write"},
-                {"entity": "Joan Antoni", "relation": "read"},
+                {"entity": "Poetry", "relation": "write", "direction": "OUT"},
+                {"entity": "Poetry", "relation": "like", "direction": "OUT"},
+                {"entity": "Joan Antoni", "relation": "read", "direction": "IN"},
             ]
         },
         "Newton": {
             "related_to": [
-                {"entity": "Physics", "relation": "study"},
-                {"entity": "Gravity", "relation": "formulate"},
+                {"entity": "Gravity", "relation": "formulate", "direction": "OUT"},
+                {"entity": "Physics", "relation": "study", "direction": "OUT"},
             ]
         },
     }
+
+    for entity in expected:
+        assert entity in entities
+        assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
+
+        for expected_relation in expected[entity]["related_to"]:
+            assert expected_relation in entities[entity]["related_to"]

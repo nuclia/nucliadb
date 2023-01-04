@@ -144,9 +144,15 @@ class Resources(BaseModel):
     next_page: bool = False
 
 
+class RelationDirection(str, Enum):
+    IN = "IN"
+    OUT = "OUT"
+
+
 class Entity(BaseModel):
-    entity: str  # name of the entity
-    relation: str  # name of the relation
+    entity: str
+    relation: str
+    direction: RelationDirection
 
 
 class RelationEntity(BaseModel):
