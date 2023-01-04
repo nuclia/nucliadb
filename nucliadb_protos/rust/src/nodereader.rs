@@ -299,7 +299,7 @@ pub struct RelationPrefixSearchResponse {
 /// Search the knowledge graph using some entry points (nodes to start
 /// with) and get their surrounding nodes.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationBfsRequest {
+pub struct RelationNeighboursRequest {
     /// List of vertices where search will trigger
     #[prost(message, repeated, tag="1")]
     pub entry_points: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
@@ -343,10 +343,10 @@ pub struct RelationSearchRequest {
     /// TODO: uncomment and implement
     /// RelationPathsSearchRequest paths = 13;
     #[prost(message, optional, tag="12")]
-    pub neighbours: ::core::option::Option<RelationBfsRequest>,
+    pub neighbours: ::core::option::Option<RelationNeighboursRequest>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationBfsResponse {
+pub struct RelationNeighboursResponse {
     #[prost(message, repeated, tag="1")]
     pub subgraph: ::prost::alloc::vec::Vec<super::utils::Relation>,
 }
@@ -362,7 +362,7 @@ pub struct RelationSearchResponse {
     /// TODO: uncomment and implement
     /// repeated utils.RelationPath paths = 13;
     #[prost(message, optional, tag="12")]
-    pub neighbours: ::core::option::Option<RelationBfsResponse>,
+    pub neighbours: ::core::option::Option<RelationNeighboursResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchRequest {

@@ -68,7 +68,7 @@ lazy_static! {
         prefix: None,
         neighbours: None,
     };
-    static ref REQUEST0: RelationBfsRequest = RelationBfsRequest {
+    static ref REQUEST0: RelationNeighboursRequest = RelationNeighboursRequest {
         entry_points: vec![E0.clone()],
         node_filters: vec![
             RelationNodeFilter {
@@ -84,7 +84,7 @@ lazy_static! {
         edge_filters: vec![],
     };
     static ref RESPONSE0: Vec<RelationNode> = vec![E0.clone(), E1.clone(), E2.clone()];
-    static ref REQUEST1: RelationBfsRequest = RelationBfsRequest {
+    static ref REQUEST1: RelationNeighboursRequest = RelationNeighboursRequest {
         entry_points: vec![E0.clone()],
         node_filters: vec![RelationNodeFilter {
             ntype: NodeType::Entity as i32,

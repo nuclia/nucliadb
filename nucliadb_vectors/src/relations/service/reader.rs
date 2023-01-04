@@ -47,7 +47,7 @@ impl RelationsReaderService {
     fn graph_search(
         &self,
         request: &RelationSearchRequest,
-    ) -> InternalResult<Option<RelationBfsResponse>> {
+    ) -> InternalResult<Option<RelationNeighboursResponse>> {
         let Some(bfs_request) = request.neighbours.as_ref() else {
             return Ok(None);
         };
@@ -132,7 +132,7 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        Ok(Some(RelationBfsResponse { subgraph }))
+        Ok(Some(RelationNeighboursResponse { subgraph }))
     }
     #[tracing::instrument(skip_all)]
     fn prefix_search(

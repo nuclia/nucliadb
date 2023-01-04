@@ -242,7 +242,7 @@ message RelationPrefixSearchResponse {
 //
 // Search the knowledge graph using some entry points (nodes to start
 // with) and get their surrounding nodes.
-message RelationBFSRequest {
+message RelationNeighboursRequest {
     // List of vertices where search will trigger
     repeated utils.RelationNode entry_points = 1;
 
@@ -282,13 +282,13 @@ message RelationSearchRequest {
     bool reload = 5;
 
     optional RelationPrefixRequest prefix = 11;
-    optional RelationBFSRequest neighbours = 12;
+    optional RelationNeighboursRequest neighbours = 12;
     // TODO: uncomment and implement
     // RelationPathsSearchRequest paths = 13;
 
 }
 
-message RelationBFSResponse {
+message RelationNeighboursResponse {
     repeated utils.Relation subgraph = 1;
 }
 message RelationPrefixResponse {
@@ -296,7 +296,7 @@ message RelationPrefixResponse {
 }
 message RelationSearchResponse {
     optional RelationPrefixResponse prefix = 11;
-    optional RelationBFSResponse neighbours = 12;
+    optional RelationNeighboursResponse neighbours = 12;
     // TODO: uncomment and implement
     // repeated utils.RelationPath paths = 13;
 }
