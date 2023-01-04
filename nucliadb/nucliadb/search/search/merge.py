@@ -35,7 +35,6 @@ from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_labels_resource,
-    get_labels_sentence,
     get_resource_cache,
     get_seconds_paragraph,
     get_text_paragraph,
@@ -241,16 +240,6 @@ async def merge_vectors_results(
         text = await get_text_sentence(
             rid, field_type, field, kbid, index_int, start_int, end_int, subfield
         )
-        labels = await get_labels_sentence(
-            rid,
-            field_type,
-            field,
-            kbid,
-            index_int,
-            start_int,
-            end_int,
-            subfield,
-        )
         result_sentence_list.append(
             Sentence(
                 score=result.score,
@@ -258,7 +247,6 @@ async def merge_vectors_results(
                 field_type=field_type,
                 field=field,
                 text=text,
-                labels=labels,
                 index=index,
             )
         )
