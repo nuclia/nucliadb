@@ -95,6 +95,14 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
 	MYPYPATH=./mypy_stubs mypy nucliadb
 
+rust-code-lint:
+	cargo +nightly fmt -p nucliadb_node
+	cargo clippy -p nucliadb_node --tests
+
+
+test-rust:
+	cargo test --workspace --all-features --no-fail-fast
+
 
 venv:  ## Initializes an environment
 	pyenv virtualenv nucliadb
