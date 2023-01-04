@@ -37,7 +37,7 @@ pub struct RelationsReaderService {
 }
 impl Debug for RelationsReaderService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RelationReaderService").finish()
+        f.debug_struct("RelationsReaderService").finish()
     }
 }
 
