@@ -111,6 +111,9 @@ lto = true
 
 [dev-dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
+
+once_cell = { version = "1.17" }
+
 tokio = { version = "1.12.0", features = [
     "rt-multi-thread",
     "macros",
