@@ -109,15 +109,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let report = NodeReport::new(host_key.to_string())?;
+    let mut node_reader = NodeReaderService::new();
 
-    let metrics_task = tokio::spawn(async move {
+    node_reader.load_shards()?;
+
+    tokio::spawn(async move {
         info!("Start metrics task");
-
-        let mut node_reader = NodeReaderService::new();
-
-        if let Err(e) = node_reader.load_shards() {
-            warn!("Not all the shards have been loaded: {e}");
-        };
 
         let metrics_publisher = Configuration::get_prometheus_url().map(|url| {
             let mut metrics_publisher = Publisher::new("node_metrics", url);
@@ -172,7 +169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    tokio::try_join!(writer_task, monitor_task, metrics_task)?;
+    tokio::try_join!(writer_task, monitor_task)?;
     telemetry_handle.terminate_telemetry().await;
     // node_writer_service.shutdown().await;
 
