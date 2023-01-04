@@ -51,8 +51,8 @@ from nucliadb_models.search import (
     Paragraph,
     Paragraphs,
     RelatedEntities,
-    RelationEntity,
     RelationDirection,
+    RelationEntity,
     Relations,
     ResourceProperties,
     ResourceResult,
@@ -354,17 +354,12 @@ async def merge_paragraph_results(
 
 
 async def merge_relations_results(
-    relations_responses: List[RelationSearchResponse],
-    query: SearchRequest
+    relations_responses: List[RelationSearchResponse], query: SearchRequest
 ) -> Relations:
     relations = Relations(entities={}, graph=[])
 
     for entry_point in query.relations.neighbours.entry_points:
         relations.entities[entry_point.value] = RelationEntity(related_to=[])
-
-
-    print(f"RELATIONS_RESPONSES: {relations_responses}")
-    # __import__("pdb").set_trace()
 
     for relation_response in relations_responses:
         for relation in relation_response.neighbours.subgraph:
@@ -377,7 +372,7 @@ async def merge_relations_results(
                     Entity(
                         entity=destination,
                         relation=relation_label,
-                        direction=RelationDirection.OUT
+                        direction=RelationDirection.OUT,
                     )
                 )
             elif destination in relations.entities:
@@ -385,34 +380,11 @@ async def merge_relations_results(
                     Entity(
                         entity=origin,
                         relation=relation_label,
-                        direction=RelationDirection.IN
+                        direction=RelationDirection.IN,
                     )
                 )
             else:
                 assert False, "origin or destination must be in the response"
-
-            # else:
-            #     relations.entities[origin].related_to.append(
-            #         Entity(entity=destination, relation=relation_label, direction=RelationDirection.OUT)
-            #     )
-
-            # if destination in relations.entities:
-            #     relations.entities[destination].related_to.append(
-            #         Entity(entity=origin, relation=relation_label, direction)
-            #     )
-
-            # relations.entities.setdefault(origin, RelationEntity(related_to=[]))
-            # relations.entities[origin].related_to.append(
-            #     Entity(entity=destination, relation=relation_label)
-            # )
-
-            # relations.entities.setdefault(destination, RelationEntity(related_to=[]))
-            # relations.entities[destination].related_to.append
-            #     Entity(
-            #         entity=origin,
-            #         relation=relation_label
-            #     )
-            # )
 
     return relations
 
@@ -457,9 +429,7 @@ async def merge_results(
         vectors, resources, kbid, count, page, min_score=min_score
     )
 
-    api_results.relations = await merge_relations_results(
-        relations, query
-    )
+    api_results.relations = await merge_relations_results(relations, query)
 
     api_results.resources = await fetch_resources(
         resources, kbid, show, field_type_filter, extracted

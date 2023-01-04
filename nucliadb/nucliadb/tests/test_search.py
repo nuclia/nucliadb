@@ -627,7 +627,9 @@ async def test_search_relations(
 
     for entity in expected:
         assert entity in entities
-        assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
+        assert len(entities[entity]["related_to"]) == len(
+            expected[entity]["related_to"]
+        )
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
