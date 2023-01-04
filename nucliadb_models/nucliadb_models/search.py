@@ -87,7 +87,6 @@ class Sentence(BaseModel):
     text: str
     field_type: str
     field: str
-    labels: List[str] = []
     index: Optional[str] = None
 
 

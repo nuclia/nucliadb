@@ -158,47 +158,6 @@ async def get_text_sentence(
     return splitted_text
 
 
-async def get_labels_sentence(
-    rid: str,
-    field_type: str,
-    field: str,
-    kbid: str,
-    index: int,
-    start: int,
-    end: int,
-    split: Optional[str] = None,
-) -> List[str]:
-    orm_resource = await get_resource_from_cache(kbid, rid)
-
-    if orm_resource is None:
-        logger.warn(f"{rid} does not exist on DB")
-        return []
-
-    labels: List[str] = []
-    basic = await orm_resource.get_basic()
-    if basic is not None:
-        for classification in basic.usermetadata.classifications:
-            labels.append(f"{classification.labelset}/{classification.label}")
-
-    field_type_int = KB_REVERSE[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    field_metadata = await field_obj.get_field_metadata()
-    if field_metadata:
-        paragraph = None
-        if split not in (None, "") and index >= 0:
-            # Index can com from user vectors
-            metadata = field_metadata.split_metadata[split]
-            paragraph = metadata.paragraphs[index]
-        elif len(field_metadata.metadata.paragraphs) > index and index >= 0:
-            paragraph = field_metadata.metadata.paragraphs[index]
-
-        if paragraph is not None:
-            for classification in paragraph.classifications:
-                labels.append(f"{classification.labelset}/{classification.label}")
-
-    return labels
-
-
 async def get_text_paragraph(
     result: ParagraphResult,
     kbid: str,
