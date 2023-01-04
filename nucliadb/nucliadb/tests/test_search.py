@@ -25,7 +25,7 @@ from httpx import AsyncClient
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.utilities import Utility, set_utility
+
 from nucliadb.ingest.tests.vectors import V1
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
@@ -416,6 +416,7 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
     bm.field_vectors.append(ev)
 
     await inject_message(writer, bm)
+
 
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
