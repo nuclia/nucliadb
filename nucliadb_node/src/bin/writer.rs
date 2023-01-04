@@ -108,52 +108,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let report = NodeReport::new(host_key.to_string())?;
-    let mut node_reader = NodeReaderService::new();
-
-    node_reader.load_shards()?;
-
-    tokio::spawn(async move {
+    if let Some(prometheus_url) = Configuration::get_prometheus_url() {
         info!("Start metrics task");
 
-        let metrics_publisher = Configuration::get_prometheus_url().map(|url| {
-            let mut metrics_publisher = Publisher::new("node_metrics", url);
+        let report = NodeReport::new(host_key.to_string())?;
+        let mut metrics_publisher = Publisher::new("node_metrics", prometheus_url);
 
-            if let Some((username, password)) = Configuration::get_prometheus_username()
-                .zip(Configuration::get_prometheus_password())
-            {
-                metrics_publisher = metrics_publisher.with_credentials(username, password);
-            }
+        if let Some((username, password)) =
+            Configuration::get_prometheus_username().zip(Configuration::get_prometheus_password())
+        {
+            metrics_publisher = metrics_publisher.with_credentials(username, password);
+        }
 
-            metrics_publisher
-        });
+        let mut node_reader = NodeReaderService::new();
+        node_reader.load_shards()?;
 
-        let mut interval = tokio::time::interval(Configuration::get_prometheus_push_timing());
+        let push_timing = Configuration::get_prometheus_push_timing();
 
-        loop {
-            interval.tick().await;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(push_timing);
 
-            let mut shard_count = 0;
-            let mut paragraph_count = 0;
+            loop {
+                interval.tick().await;
 
-            node_reader.cache.values().for_each(|shard| {
-                match shard.get_info(&GetShardRequest::default()) {
-                    Err(e) => error!("Cannot get for {} metrics: {e:?}", shard.id),
-                    Ok(count) => {
-                        shard_count += 1;
-                        paragraph_count += count.paragraphs;
+                let mut shard_count = 0;
+                let mut paragraph_count = 0;
+
+                node_reader.cache.values().for_each(|shard| {
+                    match shard.get_info(&GetShardRequest::default()) {
+                        Err(e) => error!("Cannot get for {} metrics: {e:?}", shard.id),
+                        Ok(count) => {
+                            shard_count += 1;
+                            paragraph_count += count.paragraphs;
+                        }
                     }
-                }
-            });
+                });
 
-            report.shard_count.set(shard_count);
-            report.paragraph_count.set(paragraph_count as i64);
+                report.shard_count.set(shard_count);
+                report.paragraph_count.set(paragraph_count as i64);
 
-            let load_score = report.score();
-            info!("Update node state: load_score = {load_score}");
-            node.update_state(LOAD_SCORE_KEY, load_score).await;
+                node.update_state(LOAD_SCORE_KEY, report.score()).await;
 
-            if let Some(ref metrics_publisher) = metrics_publisher {
                 if let Err(e) = metrics_publisher.publish(&report).await {
                     error!("Cannot publish Node metrics: {e}");
                 } else {
@@ -163,8 +158,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     )
                 }
             }
-        }
-    });
+        });
+    }
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
