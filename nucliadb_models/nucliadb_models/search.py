@@ -81,14 +81,21 @@ class Facet(BaseModel):
 FacetsResult = Dict[str, Any]
 
 
+class TextPosition(BaseModel):
+    page_number: Optional[int]
+    index: int
+    start: int
+    end: int
+
+
 class Sentence(BaseModel):
     score: float
     rid: str
     text: str
     field_type: str
     field: str
-    labels: List[str] = []
     index: Optional[str] = None
+    position: Optional[TextPosition] = None
 
 
 class Sentences(BaseModel):
@@ -96,13 +103,6 @@ class Sentences(BaseModel):
     facets: FacetsResult
     page_number: int = 0
     page_size: int = 20
-
-
-class ParagraphPosition(BaseModel):
-    page_number: Optional[int]
-    index: int
-    start: int
-    end: int
 
 
 class Paragraph(BaseModel):
@@ -114,7 +114,7 @@ class Paragraph(BaseModel):
     labels: List[str] = []
     start_seconds: Optional[List[int]] = None
     end_seconds: Optional[List[int]] = None
-    position: Optional[ParagraphPosition] = None
+    position: Optional[TextPosition] = None
 
 
 class Paragraphs(BaseModel):

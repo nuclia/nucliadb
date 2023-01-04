@@ -14,6 +14,8 @@ spec:
     app: train
   ports:
     - name: grpc-train
+      port: {{ .Values.serving.grpc_port }}
+    - name: http-train
       port: {{ .Values.serving.port }}
     - name: metrics
       port: {{ .Values.serving.metricsPort}}

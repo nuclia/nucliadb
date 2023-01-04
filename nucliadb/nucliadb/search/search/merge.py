@@ -35,7 +35,6 @@ from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
     get_labels_resource,
-    get_labels_sentence,
     get_resource_cache,
     get_seconds_paragraph,
     get_text_paragraph,
@@ -47,7 +46,6 @@ from nucliadb_models.search import (
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
-    ParagraphPosition,
     Paragraphs,
     RelatedEntities,
     ResourceProperties,
@@ -56,6 +54,7 @@ from nucliadb_models.search import (
     ResourceSearchResults,
     Sentence,
     Sentences,
+    TextPosition,
 )
 
 
@@ -166,7 +165,7 @@ async def merge_suggest_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            position=ParagraphPosition(
+            position=TextPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,
@@ -241,16 +240,6 @@ async def merge_vectors_results(
         text = await get_text_sentence(
             rid, field_type, field, kbid, index_int, start_int, end_int, subfield
         )
-        labels = await get_labels_sentence(
-            rid,
-            field_type,
-            field,
-            kbid,
-            index_int,
-            start_int,
-            end_int,
-            subfield,
-        )
         result_sentence_list.append(
             Sentence(
                 score=result.score,
@@ -258,8 +247,8 @@ async def merge_vectors_results(
                 field_type=field_type,
                 field=field,
                 text=text,
-                labels=labels,
                 index=index,
+                position=TextPosition(start=start_int, end=end_int, index=index_int),
             )
         )
         if rid not in resources:
@@ -322,7 +311,7 @@ async def merge_paragraph_results(
             field=field,
             text=text,
             labels=labels,
-            position=ParagraphPosition(
+            position=TextPosition(
                 index=result.metadata.position.index,
                 start=result.metadata.position.start,
                 end=result.metadata.position.end,

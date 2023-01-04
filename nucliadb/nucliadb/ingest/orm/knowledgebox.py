@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import AsyncGenerator, AsyncIterator, Optional, Tuple, Union
+from typing import Any, AsyncGenerator, AsyncIterator, List, Optional, Tuple, Union
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -493,10 +493,15 @@ class KnowledgeBox:
         while done is False:
             txn = await driver.begin()
             done = True
-            async for key in txn.keys(match=prefix, count=-1):
-                done = False
-                await txn.delete(key)
-            await txn.commit(resource=False)
+            async for chunk_of_keys in iter_in_chunks(
+                txn.keys(match=prefix, count=-1), chunk_size=1_000
+            ):
+                for key in chunk_of_keys:
+                    done = False
+                    await txn.delete(key)
+                await txn.commit(resource=False)
+            if done:
+                await txn.abort()
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
 
@@ -613,3 +618,18 @@ class KnowledgeBox:
                     if config is not None
                     else False,
                 )
+
+
+async def iter_in_chunks(
+    gen: AsyncGenerator[Any, None], chunk_size: int = 100
+) -> AsyncIterator[List[Any]]:
+    chunk: List[Any] = []
+
+    async for item in gen:
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+        chunk.append(item)
+
+    if len(chunk) > 0:
+        yield chunk

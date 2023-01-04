@@ -23,7 +23,7 @@ spec:
     - destination:
         port:
           number: {{ .Values.serving.port }}
-        host: "search.{{ .Release.Namespace }}.svc.cluster.local"
+        host: "train.{{ .Release.Namespace }}.svc.cluster.local"
     corsPolicy:
         allowOrigins:
         - exact: "*"

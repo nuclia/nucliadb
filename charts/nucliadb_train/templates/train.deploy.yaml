@@ -42,14 +42,22 @@ spec:
       - name: train
         image: "{{ .Values.containerRegistry }}/{{ .Values.image }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
-        readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.port }}"]
-          initialDelaySeconds: 2
         livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:{{ .Values.serving.port }}"]
-          initialDelaySeconds: 2
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: {{ .Values.serving.port }}
+          initialDelaySeconds: 20
+          timeoutSeconds: 10
+          periodSeconds: 20
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: {{ .Values.serving.port }}
+          initialDelaySeconds: 20
+          timeoutSeconds: 10
+          periodSeconds: 20
         command: [
           "ndb_train"
         ]
@@ -60,6 +68,8 @@ spec:
             name: train-config
         ports:
         - name: grpc-train
+          containerPort: {{ .Values.serving.grpc_port }}
+        - name: http-train
           containerPort: {{ .Values.serving.port }}
         - name: metrics
           containerPort: {{ .Values.serving.metricsPort }}
