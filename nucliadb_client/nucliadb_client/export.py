@@ -29,17 +29,18 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Export KB")
 
     parser.add_argument(
-        "--host",
-        dest="host",
+        "--host", dest="host", default="ingest.nucliadb.svc.cluster.local"
     )
 
-    parser.add_argument("--grpc", dest="grpc", description="Ingest gRPC api port")
+    parser.add_argument(
+        "--grpc", dest="grpc", help="Ingest gRPC api port", default="8030"
+    )
 
-    parser.add_argument("--http", dest="http", description="HTTP api port")
+    parser.add_argument("--http", dest="http", help="HTTP api port", default="8080")
 
     parser.add_argument(
-        "--slug",
-        dest="slug",
+        "--kbid",
+        dest="kbid",
     )
 
     parser.add_argument(
@@ -50,26 +51,28 @@ def parse_arguments():
     parser.add_argument(
         "--reader_host",
         dest="reader_host",
-        description="Hostname of nucliadb's reader service",
+        help="Hostname of nucliadb's reader service",
+        default="reader.nucliadb.svc.cluster.local",
     )
 
     parser.add_argument(
         "--writer_host",
         dest="writer_host",
-        description="Hostname of nucliadb's writer service",
+        help="Hostname of nucliadb's writer service",
+        default="writer.nucliadb.svc.cluster.local",
     )
 
     parser.add_argument(
         "--grpc_host",
         dest="grpc_host",
-        description="Hostname of nucliadb's ingest gRPC service",
+        help="Hostname of nucliadb's ingest gRPC service",
+        default="ingest.nucliadb.svc.cluster.local",
     )
 
     return parser.parse_args()
 
 
 def run():
-
     args = parse_arguments()
     client = NucliaDBClient(
         host=args.host,
@@ -79,7 +82,11 @@ def run():
         reader_host=args.reader_host,
         grpc_host=args.grpc_host,
     )
-    kb = client.get_kb(slug=args.slug)
+    kb = client.get_kb(kbid=args.kbid)
     if kb is None:
         raise KeyError("KB not found")
     asyncio.run(kb.export(args.dump))
+
+
+if __name__ == "__main__":
+    run()

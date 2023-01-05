@@ -26,6 +26,8 @@ from nucliadb_utils.storages import CHUNK_SIZE
 
 
 class NucliaStorage:
+    chunk_size = CHUNK_SIZE
+
     def __init__(
         self,
         nuclia_public_url: str,

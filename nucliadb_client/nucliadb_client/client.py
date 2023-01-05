@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import tempfile
 from io import StringIO
 from typing import List, Optional, Union
 
@@ -148,12 +149,26 @@ class NucliaDBClient:
         response_obj = KnowledgeBoxObj.parse_raw(response.content)
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 
-    async def import_kb(self, *, slug: str, location: Union[str, StringIO]) -> str:
+    async def import_kb(
+        self,
+        *,
+        kbid: Optional[str] = None,
+        slug: Optional[str] = None,
+        location: Union[str, StringIO],
+    ) -> str:
         self.init_async_grpc()
-        kb = self.get_kb(slug=slug)
-        if kb is None:
-            kb = self.create_kb(slug=slug)
+        if slug is None and kbid is None:
+            raise AttributeError("Either slug or kbid needs to be set")
+        if kbid:
+            kb = self.get_kb(kbid=kbid)
+            if kb is None:
+                raise AttributeError("With kbid KB needs to be already created")
+        else:
+            kb = self.get_kb(slug=slug)
+            if kb is None:
+                kb = self.create_kb(slug=slug)  # type: ignore
 
+        logger.info("Importing MainDB")
         if isinstance(location, StringIO):
             b64_pb = location.readline()
             while b64_pb:
@@ -163,6 +178,7 @@ class NucliaDBClient:
         elif location.startswith("http"):
             client = httpx.AsyncClient()
             resp = await client.get(location)
+            assert resp.status_code == 200
             async for line in resp.aiter_lines():
                 await kb.import_export(line.strip())
 
@@ -172,6 +188,23 @@ class NucliaDBClient:
                 while b64_pb:
                     await kb.import_export(b64_pb.strip())
                     b64_pb = await dump_file.readline()
+
+        logger.info("Importing Binaries")
+        if isinstance(location, StringIO):
+            logger.info("No Binaries import on STRINGIO")
+
+        elif location.startswith("http"):
+            tar_location = location + ".tar.bz2"
+            client = httpx.AsyncClient()
+            resp = await client.get(tar_location)
+            assert resp.status_code == 200
+            with tempfile.NamedTemporaryFile(suffix=".tar.bz2") as temp:
+                for chunk in resp.iter_bytes():
+                    temp.write(chunk)
+                await kb.import_tar_bz2(temp.name)
+        else:
+            tar_location = location + ".tar.bz2"
+            await kb.import_tar_bz2(tar_location)
         return kb.kbid
 
     def init_async_grpc(self):

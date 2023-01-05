@@ -22,7 +22,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
-from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
@@ -335,7 +334,11 @@ class Resource:
         bm.user_vectors.append(uvw)
 
     async def generate_field_computed_metadata(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: int,
+        field_id: str,
+        field: Field,
     ):
         fcmw = FieldComputedMetadataWrapper()
         fcmw.field.field = field_id
@@ -348,7 +351,6 @@ class Resource:
             fcmw.field.field_type = type_id  # type: ignore
             bm.field_metadata.append(fcmw)
             # Make sure cloud files are removed for exporting
-            fcmw.metadata.metadata.ClearField("thumbnail")
 
     async def generate_extracted_text(
         self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
@@ -362,8 +364,13 @@ class Resource:
             bm.extracted_text.append(etw)
 
     async def generate_field(
-        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+        self,
+        bm: BrokerMessage,
+        type_id: int,
+        field_id: str,
+        field: Field,
     ):
+        # Used for exporting a field
         if type_id == FieldType.TEXT:
             value = await field.get_value()
             bm.texts[field_id].CopyFrom(value)
@@ -373,7 +380,6 @@ class Resource:
         elif type_id == FieldType.FILE:
             value = await field.get_value()
             bm.files[field_id].CopyFrom(value)
-            bm.files[field_id].file.source = CloudFile.Source.EMPTY
         elif type_id == FieldType.CONVERSATION:
             value = await field.get_value()
             bm.conversations[field_id].CopyFrom(value)
@@ -409,29 +415,32 @@ class Resource:
         fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             # Value
+            # Binary DATA:
+            #   Conversation:
+            #     - attachments on value
+            #   Layout:
+            #     - file on block
+            #   File:
+            #     - file on value
             await self.generate_field(bm, type_id, field_id, field)
 
             # Extracted text
             await self.generate_extracted_text(bm, type_id, field_id, field)
 
             # Field Computed Metadata
+            # Binary DATA:
+            #   - thumbnail on FieldMetadata
+
             await self.generate_field_computed_metadata(bm, type_id, field_id, field)
 
             if type_id == FieldType.FILE and isinstance(field, File):
                 field_extracted_data = await field.get_file_extracted_data()
                 if field_extracted_data is not None:
-                    field_extracted_data.ClearField("file_generated")
-                    field_extracted_data.ClearField("file_preview")
-                    field_extracted_data.ClearField("file_thumbnail")
-                    field_extracted_data.file_pages_previews.ClearField("pages")
                     bm.file_extracted_data.append(field_extracted_data)
 
             elif type_id == FieldType.LINK and isinstance(field, Link):
                 link_extracted_data = await field.get_link_extracted_data()
                 if link_extracted_data is not None:
-                    link_extracted_data.ClearField("link_thumbnail")
-                    link_extracted_data.ClearField("link_preview")
-                    link_extracted_data.ClearField("link_image")
                     bm.link_extracted_data.append(link_extracted_data)
 
             # Field vectors

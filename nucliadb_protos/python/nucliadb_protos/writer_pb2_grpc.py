@@ -170,6 +170,16 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.ExportRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.FromString,
                 )
+        self.DownloadFile = channel.unary_stream(
+                '/fdbwriter.Writer/DownloadFile',
+                request_serializer=nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.BinaryData.FromString,
+                )
+        self.UploadFile = channel.stream_unary(
+                '/fdbwriter.Writer/UploadFile',
+                request_serializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
+                )
 
 
 class WriterServicer(object):
@@ -365,6 +375,18 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DownloadFile(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UploadFile(self, request_iterator, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_WriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -522,6 +544,16 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.Export,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.ExportRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.BrokerMessage.SerializeToString,
+            ),
+            'DownloadFile': grpc.unary_stream_rpc_method_handler(
+                    servicer.DownloadFile,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.FileRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.BinaryData.SerializeToString,
+            ),
+            'UploadFile': grpc.stream_unary_rpc_method_handler(
+                    servicer.UploadFile,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.FileUploaded.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1057,5 +1089,39 @@ class Writer(object):
         return grpc.experimental.unary_stream(request, target, '/fdbwriter.Writer/Export',
             nucliadb__protos_dot_writer__pb2.ExportRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.BrokerMessage.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DownloadFile(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/fdbwriter.Writer/DownloadFile',
+            nucliadb__protos_dot_writer__pb2.FileRequest.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.BinaryData.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def UploadFile(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_unary(request_iterator, target, '/fdbwriter.Writer/UploadFile',
+            nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

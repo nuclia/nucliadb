@@ -38,6 +38,7 @@ from opentelemetry.instrumentation.aiohttp_client import create_trace_config
 
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils import logger
+from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
     CouldNotCopyNotFound,
     CouldNotCreateBucket,
@@ -400,6 +401,7 @@ class GCSStorage(Storage):
     session: Optional[aiohttp.ClientSession] = None
     _credentials = None
     _json_credentials = None
+    chunk_size = CHUNK_SIZE
 
     def __init__(
         self,

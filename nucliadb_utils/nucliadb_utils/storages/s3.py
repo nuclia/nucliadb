@@ -285,6 +285,7 @@ class S3StorageField(StorageField):
 class S3Storage(Storage):
     field_klass = S3StorageField
     _session = None
+    chunk_size = CHUNK_SIZE
 
     def __init__(
         self,

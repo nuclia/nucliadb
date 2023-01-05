@@ -79,3 +79,5 @@ tmp/nucliadb
 nucliadb_client/examples/*.nucliadb
 nucliadb_client/examples/*.export
 dist/**
+test.export.pb
+test.export.tar.bz2

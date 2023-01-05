@@ -27,25 +27,17 @@ from nucliadb_client.client import NucliaDBClient
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Import KB")
-
     parser.add_argument(
-        "--host",
-        dest="host",
+        "--host", dest="host", default="ingest.nucliadb.svc.cluster.local"
     )
 
-    parser.add_argument(
-        "--grpc",
-        dest="grpc",
-    )
+    parser.add_argument("--grpc", dest="grpc", default="8030")
+
+    parser.add_argument("--http", dest="http", default="8080")
 
     parser.add_argument(
-        "--http",
-        dest="http",
-    )
-
-    parser.add_argument(
-        "--slug",
-        dest="slug",
+        "--kbid",
+        dest="kbid",
     )
 
     parser.add_argument(
@@ -54,18 +46,15 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--reader_host",
-        dest="reader_host",
+        "--reader_host", dest="reader_host", default="reader.nucliadb.svc.cluster.local"
     )
 
     parser.add_argument(
-        "--writer_host",
-        dest="writer_host",
+        "--writer_host", dest="writer_host", default="writer.nucliadb.svc.cluster.local"
     )
 
     parser.add_argument(
-        "--grpc_host",
-        dest="grpc_host",
+        "--grpc_host", dest="grpc_host", default="ingest.nucliadb.svc.cluster.local"
     )
 
     return parser.parse_args()
@@ -82,7 +71,11 @@ def run():
         reader_host=args.reader_host,
         grpc_host=args.grpc_host,
     )
-    kb = client.get_kb(slug=args.slug)
+    kb = client.get_kb(kbid=args.kbid)
     if kb is not None:
         raise KeyError("KB found")
     asyncio.run(client.import_kb(slug=args.slug, location=args.dump))
+
+
+if __name__ == "__main__":
+    run()

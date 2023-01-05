@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import base64
 from datetime import datetime
 
 import pytest
@@ -31,10 +31,19 @@ from nucliadb_protos.resources_pb2 import (
     UserVectorsWrapper,
 )
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest, IndexResource
+from nucliadb_protos.writer_pb2 import (
+    BinaryData,
+    BrokerMessage,
+    ExportRequest,
+    FileRequest,
+    IndexResource,
+    UploadBinaryData,
+)
 
+from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
+from nucliadb_utils.utilities import get_storage
 
 
 @pytest.mark.asyncio
@@ -112,3 +121,44 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     index_req.kbid = result.uuid
     index_req.rid = "test1"
     assert await stub.ReIndex(index_req)  # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_upload_download(grpc_servicer: IngestFixture):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    # Create a KB
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb.config.title = "My Title"
+    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    kbid = result.uuid
+
+    # Upload a file to it
+    metadata = UploadBinaryData(count=0)
+    metadata.metadata.size = 1
+    metadata.metadata.kbid = kbid
+    metadata.metadata.key = f"{kbid}/some/key"
+
+    binary = base64.b64encode(b"Hola")
+    data = UploadBinaryData(count=1)
+    data.payload = binary
+
+    async def upload_iterator():
+        yield metadata
+        yield data
+
+    import pdb; pdb.set_trace()
+    await stub.UploadFile(upload_iterator())
+
+    # Now download the file
+    file_req = FileRequest()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    file_req.bucket = storage.get_bucket_name(kbid)
+    file_req.key = metadata.metadata.key
+
+    downloaded = b""
+    bindata: BinaryData
+    async for bindata in stub.DownloadFile(file_req):
+        downloaded += bindata.data
+    assert downloaded == binary
