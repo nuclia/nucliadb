@@ -605,10 +605,8 @@ class Resource:
                 FieldType.FILE,
                 load=False,
             )
-            if (
-                file_extracted_data.icon != ""
-                and self.basic.icon == ""
-                and self.basic.icon == "application/octet-stream"
+            if file_extracted_data.icon != "" and (
+                self.basic.icon == "" or self.basic.icon == "application/octet-stream"
             ):
                 self.basic.icon = file_extracted_data.icon
                 basic_modified = True
