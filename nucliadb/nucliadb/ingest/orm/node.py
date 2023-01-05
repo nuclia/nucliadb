@@ -20,24 +20,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from uuid import uuid4
 
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
-from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
-from nucliadb_protos.noderesources_pb2 import EmptyQuery
-from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
-from nucliadb_protos.noderesources_pb2 import (
-    ShardCleaned,
-    ShardCreated,
-    ShardId,
-    ShardList,
-    VectorSetID,
-    VectorSetList,
-)
-from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
 from nucliadb_protos.writer_pb2 import ListMembersRequest
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
@@ -50,6 +38,11 @@ from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm import NODE_CLUSTER, NODES
 from nucliadb.ingest.orm.abc import AbstractNode  # type: ignore
 from nucliadb.ingest.orm.exceptions import NodesUnsync  # type: ignore
+from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
+    DummyReaderStub,
+    DummySidecarStub,
+    DummyWriterStub,
+)
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.settings import settings
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
@@ -59,73 +52,6 @@ from nucliadb_utils.keys import KB_SHARDS
 READ_CONNECTIONS = LRU(50)
 WRITE_CONNECTIONS = LRU(50)
 SIDECAR_CONNECTIONS = LRU(50)
-
-
-class DummyWriterStub:
-    calls: Dict[str, List[Any]] = {}
-
-    async def GetShard(self, data):
-        self.calls.setdefault("GetShard", []).append(data)
-        return Shard(shard_id="shard", resources=2)
-
-    async def NewShard(self, data):
-        self.calls.setdefault("NewShard", []).append(data)
-        return ShardCreated(id="shard")
-
-    async def DeleteShard(self, data):
-        self.calls.setdefault("DeleteShard", []).append(data)
-        return ShardId(id="shard")
-
-    async def CleanAndUpgradeShard(self, data):
-        self.calls.setdefault("CleanAndUpgradeShard", []).append(data)
-        return ShardCleaned(
-            document_service=ShardCreated.DocumentService.DOCUMENT_V1,
-            paragraph_service=ShardCreated.ParagraphService.PARAGRAPH_V1,
-            vector_service=ShardCreated.VectorService.VECTOR_V1,
-            relation_service=ShardCreated.RelationService.RELATION_V1,
-        )
-
-    async def ListShards(self, data):
-        self.calls.setdefault("ListShards", []).append(data)
-        sl = ShardList()
-        sl.shards.append(NodeResourcesShard(shard_id="shard", resources=2))
-        sl.shards.append(NodeResourcesShard(shard_id="shard2", resources=4))
-        return sl
-
-    async def SetResource(self, data):
-        self.calls.setdefault("SetResource", []).append(data)
-        result = OpStatus()
-        result.count = 1
-        return result
-
-    async def AddVectorSet(self, data):
-        self.calls.setdefault("AddVectorSet", []).append(data)
-        result = OpStatus()
-        result.count = 1
-        return result
-
-    async def ListVectorSet(self, data: ShardId):
-        self.calls.setdefault("ListVectorSet", []).append(data)
-        result = VectorSetList()
-        result.shard.id = data.id
-        result.vectorset.append("base")
-        return result
-
-
-class DummyReaderStub:
-    calls: Dict[str, List[Any]] = {}
-
-    async def GetShard(self, data):
-        self.calls.setdefault("GetShard", []).append(data)
-        return Shard(shard_id="shard", resources=2)
-
-
-class DummySidecarStub:
-    calls: Dict[str, List[Any]] = {}
-
-    async def GetCount(self, data):
-        self.calls.setdefault("GetCount", []).append(data)
-        return Shard(shard_id="shard", resources=2)
 
 
 @dataclass
@@ -202,17 +128,6 @@ class Node(AbstractNode):
             kb_shards.ParseFromString(kb_shards_bytes)
             shard: PBShard = kb_shards.shards[kb_shards.actual]
             return Shard(sharduuid=shard.shard, shard=shard)
-        else:
-            return None
-
-    @classmethod
-    async def get_all_shards(cls, txn: Transaction, kbid: str) -> Optional[PBShards]:
-        key = KB_SHARDS.format(kbid=kbid)
-        kb_shards_bytes: Optional[bytes] = await txn.get(key)
-        if kb_shards_bytes is not None:
-            kb_shards = PBShards()
-            kb_shards.ParseFromString(kb_shards_bytes)
-            return kb_shards
         else:
             return None
 
@@ -352,62 +267,6 @@ class Node(AbstractNode):
         if self._reader is None:
             self._reader = READ_CONNECTIONS[self.address]
         return self._reader
-
-    async def get_shard(self, id: str) -> ShardId:
-        req = ShardId(id=id)
-        resp = await self.writer.GetShard(req)  # type: ignore
-        return resp
-
-    async def get_reader_shard(
-        self, shard_id: str, vectorset: Optional[str] = None
-    ) -> NodeResourcesShard:
-
-        req = GetShardRequest()
-        req.shard_id.id = shard_id
-        if vectorset is not None:
-            req.vectorset = vectorset
-        resp = await self.reader.GetShard(req)  # type: ignore
-        return resp
-
-    async def new_shard(self) -> ShardCreated:
-        req = EmptyQuery()
-        resp = await self.writer.NewShard(req)  # type: ignore
-        return resp
-
-    async def delete_shard(self, id: str) -> int:
-        req = ShardId(id=id)
-        resp = await self.writer.DeleteShard(req)  # type: ignore
-        return resp.id
-
-    async def clean_and_upgrade_shard(self, id: str) -> ShardCleaned:
-        req = ShardId(id=id)
-        resp = await self.writer.CleanAndUpgradeShard(req)  # type: ignore
-        return resp
-
-    async def list_shards(self) -> List[str]:
-        req = EmptyQuery()
-        resp = await self.writer.ListShards(req)  # type: ignore
-        return resp.shards
-
-    async def del_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
-        req = VectorSetID()
-        req.shard.id = shard_id
-        req.vectorset = vectorset
-        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
-        return resp
-
-    async def set_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
-        req = VectorSetID()
-        req.shard.id = shard_id
-        req.vectorset = vectorset
-        resp = await self.writer.AddVectorSet(req)  # type: ignore
-        return resp
-
-    async def get_vectorset(self, shard_id: str) -> VectorSetList:
-        req = ShardId()
-        req.id = shard_id
-        resp = await self.writer.ListVectorSets(req)  # type: ignore
-        return resp
 
 
 async def chitchat_update_node(members: List[ClusterMember]) -> None:
