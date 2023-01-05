@@ -86,6 +86,20 @@ spec:
             readOnly: true
             mountPath: /regioncreds
 {{- end }}
+      - name: cluster-manager
+        image: "{{ .Values.containerRegistry }}/{{ .Values.image_other }}"
+        imagePullPolicy: {{ .Values.imageOtherPullPolicy }}
+        command: ["/entrypoint.sh"]
+        args: ["/nucliadb_cluster/cluster_manager"]
+        envFrom:
+        - configMapRef:
+            name: nucliadb-config
+        - configMapRef:
+            name: train-config
+        ports:
+        - name: chitchat
+          containerPort: {{ .Values.chitchat.node.chitchat_port }}
+          protocol: UDP
 {{- if .Values.tracing.enabled }}
       - name: jaeger-agent
         image: jaegertracing/jaeger-agent:{{ .Values.tracing.jaegerAgentTag }}
