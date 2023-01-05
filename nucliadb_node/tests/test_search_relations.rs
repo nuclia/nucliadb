@@ -30,7 +30,7 @@ use nucliadb_protos::relation_node::NodeType;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{
     EmptyQuery, IndexMetadata, Relation, RelationNeighboursRequest, RelationNode,
-    RelationPrefixRequest, RelationSearchRequest, Resource, ResourceId,
+    RelationPrefixRequest, RelationSearchRequest, Resource, ResourceId, RelationNodeFilter, RelationEdgeFilter, RelationSearchResponse
 };
 use prost_types::Timestamp;
 use tonic::Request;
@@ -250,6 +250,12 @@ async fn create_knowledge_graph(
             relation_label: "about".to_string(),
         },
         Relation {
+            relation: RelationType::Other as i32,
+            source: Some(relation_nodes.get(&rid.to_string()).unwrap().clone()),
+            to: Some(relation_nodes.get("Poetry").unwrap().clone()),
+            relation_label: "subject".to_string(),
+        },
+        Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Swallow").unwrap().clone()),
             to: Some(relation_nodes.get("Animal").unwrap().clone()),
@@ -385,6 +391,20 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
 
     let relation_nodes = create_knowledge_graph(&mut writer, shard_id.clone()).await;
 
+    fn extract_relations(response: &RelationSearchResponse) -> HashSet<(String, String)> {
+        response
+            .neighbours
+            .iter()
+            .flat_map(|neighbours| neighbours.subgraph.iter())
+            .flat_map(|node| {
+                vec![(
+                    node.source.as_ref().unwrap().value.to_owned(),
+                    node.to.as_ref().unwrap().value.to_owned(),
+                )]
+            })
+            .collect::<HashSet<_>>()
+    }
+
     // --------------------------------------------------------------
     // Test: neighbours search on existent node
     // --------------------------------------------------------------
@@ -406,18 +426,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         ("Swallow".to_string(), "Animal".to_string()),
         ("Swallow".to_string(), "Fly".to_string()),
     ]);
-    let neighbour_relations = response
-        .get_ref()
-        .neighbours
-        .iter()
-        .flat_map(|neighbours| neighbours.subgraph.iter())
-        .flat_map(|node| {
-            vec![(
-                node.source.as_ref().unwrap().value.to_owned(),
-                node.to.as_ref().unwrap().value.to_owned(),
-            )]
-        })
-        .collect::<HashSet<_>>();
+    let neighbour_relations = extract_relations(response.get_ref());
     assert_eq!(neighbour_relations, expected);
 
     // --------------------------------------------------------------
@@ -445,18 +454,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         ("Becquer".to_string(), "Poetry".to_string()),
         ("Joan Antoni".to_string(), "Becquer".to_string()),
     ]);
-    let neighbour_relations = response
-        .get_ref()
-        .neighbours
-        .iter()
-        .flat_map(|neighbours| neighbours.subgraph.iter())
-        .flat_map(|node| {
-            vec![(
-                node.source.as_ref().unwrap().value.to_owned(),
-                node.to.as_ref().unwrap().value.to_owned(),
-            )]
-        })
-        .collect::<HashSet<_>>();
+    let neighbour_relations = extract_relations(response.get_ref());
     assert_eq!(neighbour_relations, expected);
 
     // --------------------------------------------------------------
@@ -479,14 +477,43 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         })
         .await?;
 
-    let neighbours = &response.get_ref().neighbours.as_ref().unwrap().subgraph;
+    let neighbours = extract_relations(response.get_ref());
     assert!(neighbours.is_empty());
 
     // --------------------------------------------------------------
     // Test: neighbours search with filters
     // --------------------------------------------------------------
 
-    // TODO: implement and write tests
+    let response = reader
+        .relation_search(RelationSearchRequest {
+            shard_id: shard_id.clone(),
+            neighbours: Some(RelationNeighboursRequest {
+                entry_points: vec![
+                    relation_nodes.get("Poetry").unwrap().clone(),
+                ],
+                node_filters: vec![
+                    RelationNodeFilter {
+                        ntype: NodeType::Entity as i32,
+                        ..Default::default()
+                    },
+                ],
+                edge_filters: vec![
+                    RelationEdgeFilter {
+                        ntype: RelationType::About as i32,
+                        ..Default::default()
+                    }
+                ],
+                depth: 1
+            }),
+            ..Default::default()
+        })
+        .await?;
+
+    let expected = HashSet::from_iter(vec![
+        ("Poetry".to_string(), "Swallow".to_string()),
+    ]);
+    let neighbour_relations = extract_relations(response.get_ref());
+    assert_eq!(neighbour_relations, expected);
 
     Ok(())
 }
