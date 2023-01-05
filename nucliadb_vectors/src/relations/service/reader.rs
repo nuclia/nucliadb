@@ -47,8 +47,8 @@ impl RelationsReaderService {
     fn graph_search(
         &self,
         request: &RelationSearchRequest,
-    ) -> InternalResult<Option<RelationNeighboursResponse>> {
-        let Some(bfs_request) = request.neighbours.as_ref() else {
+    ) -> InternalResult<Option<EntitiesSubgraphResponse>> {
+        let Some(bfs_request) = request.subgraph.as_ref() else {
             return Ok(None);
         };
 
@@ -83,11 +83,11 @@ impl RelationsReaderService {
             info!("{id:?} - adding query type filters: starts {v} ms");
         }
         bfs_request.node_filters.iter().for_each(|filter| {
-            let type_info = node_type_parsing(filter.ntype(), &filter.subtype);
+            let type_info = node_type_parsing(filter.node_type(), &filter.subtype);
             node_filters.insert(type_info);
         });
         bfs_request.edge_filters.iter().for_each(|filter| {
-            let type_info = rtype_parsing(filter.ntype(), &filter.subtype);
+            let type_info = rtype_parsing(filter.relation_type(), &filter.subtype);
             edge_filters.insert(type_info);
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -132,13 +132,13 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        Ok(Some(RelationNeighboursResponse { subgraph }))
+        Ok(Some(EntitiesSubgraphResponse { relations: subgraph }))
     }
     #[tracing::instrument(skip_all)]
     fn prefix_search(
         &self,
         request: &RelationSearchRequest,
-    ) -> InternalResult<Option<RelationPrefixResponse>> {
+    ) -> InternalResult<Option<RelationPrefixSearchResponse>> {
         let Some(prefix_request) = request.prefix.as_ref() else {
             return Ok(None);
         };
@@ -176,7 +176,7 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        Ok(Some(RelationPrefixResponse {
+        Ok(Some(RelationPrefixSearchResponse {
             nodes: nodes.collect::<Result<Vec<_>, _>>()?,
         }))
     }
@@ -259,7 +259,7 @@ impl ReaderChild for RelationsReaderService {
     #[tracing::instrument(skip_all)]
     fn search(&self, request: &Self::Request) -> InternalResult<Self::Response> {
         Ok(RelationSearchResponse {
-            neighbours: self.graph_search(request)?,
+            subgraph: self.graph_search(request)?,
             prefix: self.prefix_search(request)?,
         })
     }

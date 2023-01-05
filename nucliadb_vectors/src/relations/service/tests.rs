@@ -66,17 +66,17 @@ lazy_static! {
         shard_id: SHARD_ID.clone(),
         reload: false,
         prefix: None,
-        neighbours: None,
+        subgraph: None,
     };
-    static ref REQUEST0: RelationNeighboursRequest = RelationNeighboursRequest {
+    static ref REQUEST0: EntitiesSubgraphRequest = EntitiesSubgraphRequest {
         entry_points: vec![E0.clone()],
         node_filters: vec![
             RelationNodeFilter {
-                ntype: NodeType::Entity as i32,
+                node_type: NodeType::Entity as i32,
                 subtype: "".to_string()
             },
             RelationNodeFilter {
-                ntype: NodeType::Entity as i32,
+                node_type: NodeType::Entity as i32,
                 subtype: "Nonexisting".to_string()
             }
         ],
@@ -84,10 +84,10 @@ lazy_static! {
         edge_filters: vec![],
     };
     static ref RESPONSE0: Vec<RelationNode> = vec![E0.clone(), E1.clone(), E2.clone()];
-    static ref REQUEST1: RelationNeighboursRequest = RelationNeighboursRequest {
+    static ref REQUEST1: EntitiesSubgraphRequest = EntitiesSubgraphRequest {
         entry_points: vec![E0.clone()],
         node_filters: vec![RelationNodeFilter {
-            ntype: NodeType::Entity as i32,
+            node_type: NodeType::Entity as i32,
             subtype: "Official".to_string()
         },],
         depth: 1,
@@ -205,11 +205,11 @@ fn simple_request() -> anyhow::Result<()> {
 
     reader.reload();
     let mut request = REQUEST_BONES.clone();
-    request.neighbours = Some(REQUEST0.clone());
+    request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
     let len = bfs_response
-        .subgraph
+        .relations
         .into_iter()
         .flat_map(|v| v.to.zip(v.source))
         .filter(|v| RESPONSE0.contains(&v.0))
@@ -257,11 +257,11 @@ fn join_graph_test() -> anyhow::Result<()> {
     reader.reload();
 
     let mut request = REQUEST_BONES.clone();
-    request.neighbours = Some(REQUEST0.clone());
+    request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
     let len = bfs_response
-        .subgraph
+        .relations
         .into_iter()
         .flat_map(|v| v.to.zip(v.source))
         .filter(|v| RESPONSE0.contains(&v.0))
@@ -282,11 +282,11 @@ fn simple_request_with_similarity() -> anyhow::Result<()> {
     reader.reload();
 
     let mut request = REQUEST_BONES.clone();
-    request.neighbours = Some(REQUEST0.clone());
+    request.subgraph = Some(REQUEST0.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
     let len = bfs_response
-        .subgraph
+        .relations
         .into_iter()
         .flat_map(|v| v.to.zip(v.source))
         .filter(|v| RESPONSE0.contains(&v.0))
@@ -308,12 +308,12 @@ fn typed_request() -> anyhow::Result<()> {
     reader.reload();
 
     let mut request = REQUEST_BONES.clone();
-    request.neighbours = Some(REQUEST1.clone());
+    request.subgraph = Some(REQUEST1.clone());
     let got = reader.search(&request).unwrap();
-    let Some(bfs_response) = got.neighbours else { unreachable!("Wrong variant") };
+    let Some(bfs_response) = got.subgraph else { unreachable!("Wrong variant") };
 
     let len = bfs_response
-        .subgraph
+        .relations
         .into_iter()
         .flat_map(|v| v.to.zip(v.source))
         .filter(|v| RESPONSE1.contains(&v.0))
@@ -335,7 +335,7 @@ fn just_prefix_querying() -> anyhow::Result<()> {
 
     reader.reload();
     let mut request = REQUEST_BONES.clone();
-    request.prefix = Some(RelationPrefixRequest {
+    request.prefix = Some(RelationPrefixSearchRequest {
         prefix: "E".to_string(),
     });
     let got = reader.search(&request).unwrap();
@@ -346,7 +346,7 @@ fn just_prefix_querying() -> anyhow::Result<()> {
         .all(|member| RESPONSE0.contains(member));
     assert!((prefix_response.nodes.len() == RESPONSE0.len()) && is_permutation);
 
-    request.prefix = Some(RelationPrefixRequest {
+    request.prefix = Some(RelationPrefixSearchRequest {
         prefix: "e".to_string(),
     });
     let got = reader.search(&request).unwrap();
@@ -357,7 +357,7 @@ fn just_prefix_querying() -> anyhow::Result<()> {
         .all(|member| RESPONSE0.contains(member));
     assert!((prefix_response.nodes.len() == RESPONSE0.len()) && is_permutation);
 
-    request.prefix = Some(RelationPrefixRequest {
+    request.prefix = Some(RelationPrefixSearchRequest {
         prefix: "not".to_string(),
     });
     let got = reader.search(&request).unwrap();

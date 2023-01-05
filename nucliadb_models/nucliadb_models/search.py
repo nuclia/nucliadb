@@ -149,26 +149,27 @@ class RelationDirection(str, Enum):
     OUT = "OUT"
 
 
-class Entity(BaseModel):
+class DirectionalRelation(BaseModel):
     entity: str
     relation: str
     direction: RelationDirection
 
 
-class RelationEntity(BaseModel):
-    related_to: List[Entity]
+class EntitySubgraph(BaseModel):
+    related_to: List[DirectionalRelation]
 
 
-class RelationEdge(BaseModel):
-    origin: Entity
-    destination: Entity
-    path: List[Entity]
+# TODO: uncomment and implement (next iteration)
+# class RelationPath(BaseModel):
+#     origin: str
+#     destination: str
+#     path: List[DirectionalRelation]
 
 
 class Relations(BaseModel):
-    entities: Dict[str, RelationEntity]
+    entities: Dict[str, EntitySubgraph]
     # TODO: implement in the next iteration of knowledge graph search
-    # graph: List[RelationEdge]
+    # graph: List[RelationPath]
 
 
 class RelatedEntities(BaseModel):

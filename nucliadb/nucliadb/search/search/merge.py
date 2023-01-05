@@ -45,14 +45,14 @@ from nucliadb.search.search.fetch import (
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
-    Entity,
+    DirectionalRelation,
+    EntitySubgraph,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
     Paragraphs,
     RelatedEntities,
     RelationDirection,
-    RelationEntity,
     Relations,
     ResourceProperties,
     ResourceResult,
@@ -358,18 +358,18 @@ async def merge_relations_results(
 ) -> Relations:
     relations = Relations(entities={}, graph=[])
 
-    for entry_point in query.relations.neighbours.entry_points:
-        relations.entities[entry_point.value] = RelationEntity(related_to=[])
+    for entry_point in query.relations.subgraph.entry_points:
+        relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
 
     for relation_response in relations_responses:
-        for relation in relation_response.neighbours.subgraph:
+        for relation in relation_response.subgraph.relations:
             origin = relation.source.value
             destination = relation.to.value
             relation_label = relation.relation_label
 
             if origin in relations.entities:
                 relations.entities[origin].related_to.append(
-                    Entity(
+                    DirectionalRelation(
                         entity=destination,
                         relation=relation_label,
                         direction=RelationDirection.OUT,
@@ -377,7 +377,7 @@ async def merge_relations_results(
                 )
             elif destination in relations.entities:
                 relations.entities[destination].related_to.append(
-                    Entity(
+                    DirectionalRelation(
                         entity=origin,
                         relation=relation_label,
                         direction=RelationDirection.IN,

@@ -582,57 +582,46 @@ class VectorSearchResponse(google.protobuf.message.Message):
 global___VectorSearchResponse = VectorSearchResponse
 
 class RelationNodeFilter(google.protobuf.message.Message):
-    """Relation filters are used to make the 
-    search domain smaller. By providing filters the 
-    search may be faster.
-    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    NTYPE_FIELD_NUMBER: builtins.int
+    NODE_TYPE_FIELD_NUMBER: builtins.int
     SUBTYPE_FIELD_NUMBER: builtins.int
-    ntype: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
-    """Will filter the search to nodes of type ntype."""
-
+    node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
     subtype: typing.Text
-    """Additionally the search can be even more specific by 
+    """Additionally the search can be even more specific by
     providing a subtype. The empty string is a wilcard that 
     indicates to not filter by subtype.
     """
 
     def __init__(self,
         *,
-        ntype: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType = ...,
+        node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType = ...,
         subtype: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ntype",b"ntype","subtype",b"subtype"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["node_type",b"node_type","subtype",b"subtype"]) -> None: ...
 global___RelationNodeFilter = RelationNodeFilter
 
 class RelationEdgeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    NTYPE_FIELD_NUMBER: builtins.int
+    RELATION_TYPE_FIELD_NUMBER: builtins.int
     SUBTYPE_FIELD_NUMBER: builtins.int
-    ntype: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
+    relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
     """Will filter the search to edges of type ntype."""
 
     subtype: typing.Text
-    """Additionally the search can be even more specific by 
+    """Additionally the search can be even more specific by
     providing a subtype. The empty string is a wilcard that 
     indicates to not filter by subtype.
     """
 
     def __init__(self,
         *,
-        ntype: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
+        relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
         subtype: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ntype",b"ntype","subtype",b"subtype"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["relation_type",b"relation_type","subtype",b"subtype"]) -> None: ...
 global___RelationEdgeFilter = RelationEdgeFilter
 
-class RelationPrefixRequest(google.protobuf.message.Message):
-    """Relation search by prefix
-
-    Search among all vertices and return the ones that match on prefix
-    and pass the filters.
-    """
+class RelationPrefixSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     PREFIX_FIELD_NUMBER: builtins.int
     prefix: typing.Text
@@ -641,7 +630,7 @@ class RelationPrefixRequest(google.protobuf.message.Message):
         prefix: typing.Text = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["prefix",b"prefix"]) -> None: ...
-global___RelationPrefixRequest = RelationPrefixRequest
+global___RelationPrefixSearchRequest = RelationPrefixSearchRequest
 
 class RelationPrefixSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -655,12 +644,7 @@ class RelationPrefixSearchResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["nodes",b"nodes"]) -> None: ...
 global___RelationPrefixSearchResponse = RelationPrefixSearchResponse
 
-class RelationNeighboursRequest(google.protobuf.message.Message):
-    """Relation neighbour search
-
-    Search the knowledge graph using some entry points (nodes to start
-    with) and get their surrounding nodes.
-    """
+class EntitiesSubgraphRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     ENTRY_POINTS_FIELD_NUMBER: builtins.int
     NODE_FILTERS_FIELD_NUMBER: builtins.int
@@ -691,7 +675,19 @@ class RelationNeighboursRequest(google.protobuf.message.Message):
         depth: builtins.int = ...,
         ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["depth",b"depth","edge_filters",b"edge_filters","entry_points",b"entry_points","node_filters",b"node_filters"]) -> None: ...
-global___RelationNeighboursRequest = RelationNeighboursRequest
+global___EntitiesSubgraphRequest = EntitiesSubgraphRequest
+
+class EntitiesSubgraphResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    RELATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
+    def __init__(self,
+        *,
+        relations: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["relations",b"relations"]) -> None: ...
+global___EntitiesSubgraphResponse = EntitiesSubgraphResponse
 
 class RelationSearchRequest(google.protobuf.message.Message):
     """TODO: uncomment and implement (next iteration)
@@ -700,7 +696,6 @@ class RelationSearchRequest(google.protobuf.message.Message):
             utils.RelationNode origin = 1;
             utils.RelationNode destination = 2;
         }
-
         repeated PathEndpoints paths = 1;
     }
 
@@ -709,20 +704,20 @@ class RelationSearchRequest(google.protobuf.message.Message):
 
     - prefix search over vertex (node) names
     - graph search:
-      - given some entry vertices, get neighbour vertices
+      - given some entry vertices, get the filtered subgraph around them
       - (TODO) given some vertices, get paths between them
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     SHARD_ID_FIELD_NUMBER: builtins.int
     RELOAD_FIELD_NUMBER: builtins.int
     PREFIX_FIELD_NUMBER: builtins.int
-    NEIGHBOURS_FIELD_NUMBER: builtins.int
+    SUBGRAPH_FIELD_NUMBER: builtins.int
     shard_id: typing.Text
     reload: builtins.bool
     @property
-    def prefix(self) -> global___RelationPrefixRequest: ...
+    def prefix(self) -> global___RelationPrefixSearchRequest: ...
     @property
-    def neighbours(self) -> global___RelationNeighboursRequest:
+    def subgraph(self) -> global___EntitiesSubgraphRequest:
         """TODO: uncomment and implement (next iteration)
         RelationPathsSearchRequest paths = 13;
         """
@@ -731,56 +726,32 @@ class RelationSearchRequest(google.protobuf.message.Message):
         *,
         shard_id: typing.Text = ...,
         reload: builtins.bool = ...,
-        prefix: typing.Optional[global___RelationPrefixRequest] = ...,
-        neighbours: typing.Optional[global___RelationNeighboursRequest] = ...,
+        prefix: typing.Optional[global___RelationPrefixSearchRequest] = ...,
+        subgraph: typing.Optional[global___EntitiesSubgraphRequest] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix","reload",b"reload","shard_id",b"shard_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["prefix",b"prefix","subgraph",b"subgraph"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["prefix",b"prefix","reload",b"reload","shard_id",b"shard_id","subgraph",b"subgraph"]) -> None: ...
 global___RelationSearchRequest = RelationSearchRequest
-
-class RelationNeighboursResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    SUBGRAPH_FIELD_NUMBER: builtins.int
-    @property
-    def subgraph(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.Relation]: ...
-    def __init__(self,
-        *,
-        subgraph: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.Relation]] = ...,
-        ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["subgraph",b"subgraph"]) -> None: ...
-global___RelationNeighboursResponse = RelationNeighboursResponse
-
-class RelationPrefixResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    NODES_FIELD_NUMBER: builtins.int
-    @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[nucliadb_protos.utils_pb2.RelationNode]: ...
-    def __init__(self,
-        *,
-        nodes: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.RelationNode]] = ...,
-        ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["nodes",b"nodes"]) -> None: ...
-global___RelationPrefixResponse = RelationPrefixResponse
 
 class RelationSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     PREFIX_FIELD_NUMBER: builtins.int
-    NEIGHBOURS_FIELD_NUMBER: builtins.int
+    SUBGRAPH_FIELD_NUMBER: builtins.int
     @property
-    def prefix(self) -> global___RelationPrefixResponse: ...
+    def prefix(self) -> global___RelationPrefixSearchResponse: ...
     @property
-    def neighbours(self) -> global___RelationNeighboursResponse:
+    def subgraph(self) -> global___EntitiesSubgraphResponse:
         """TODO: uncomment and implement (next iteration)
         repeated utils.RelationPath paths = 13;
         """
         pass
     def __init__(self,
         *,
-        prefix: typing.Optional[global___RelationPrefixResponse] = ...,
-        neighbours: typing.Optional[global___RelationNeighboursResponse] = ...,
+        prefix: typing.Optional[global___RelationPrefixSearchResponse] = ...,
+        subgraph: typing.Optional[global___EntitiesSubgraphResponse] = ...,
         ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["neighbours",b"neighbours","prefix",b"prefix"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["prefix",b"prefix","subgraph",b"subgraph"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["prefix",b"prefix","subgraph",b"subgraph"]) -> None: ...
 global___RelationSearchResponse = RelationSearchResponse
 
 class SearchRequest(google.protobuf.message.Message):

@@ -202,13 +202,10 @@ message VectorSearchResponse {
     int32 result_per_page = 5;
 }
 
-// Relation filters are used to make the 
-// search domain smaller. By providing filters the 
-// search may be faster.
 message RelationNodeFilter {
-    // Will filter the search to nodes of type ntype.
-    utils.RelationNode.NodeType ntype = 1;
-    // Additionally the search can be even more specific by 
+    utils.RelationNode.NodeType node_type = 1;
+
+    // Additionally the search can be even more specific by
     // providing a subtype. The empty string is a wilcard that 
     // indicates to not filter by subtype. 
     string subtype = 2;
@@ -216,20 +213,15 @@ message RelationNodeFilter {
 
 message RelationEdgeFilter {
     // Will filter the search to edges of type ntype.
-    utils.Relation.RelationType ntype = 1;
-    // Additionally the search can be even more specific by 
+    utils.Relation.RelationType relation_type = 1;
+
+    // Additionally the search can be even more specific by
     // providing a subtype. The empty string is a wilcard that 
     // indicates to not filter by subtype. 
     string subtype = 2;
 }
 
-
-
-// Relation search by prefix
-//
-// Search among all vertices and return the ones that match on prefix
-// and pass the filters.
-message RelationPrefixRequest {
+message RelationPrefixSearchRequest {
     string prefix = 1;
 }
 
@@ -238,11 +230,7 @@ message RelationPrefixSearchResponse {
 }
 
 
-// Relation neighbour search
-//
-// Search the knowledge graph using some entry points (nodes to start
-// with) and get their surrounding nodes.
-message RelationNeighboursRequest {
+message EntitiesSubgraphRequest {
     // List of vertices where search will trigger
     repeated utils.RelationNode entry_points = 1;
 
@@ -257,6 +245,9 @@ message RelationNeighboursRequest {
     int32 depth = 3;
 }
 
+message EntitiesSubgraphResponse {
+    repeated utils.Relation relations = 1;
+}
 
 // TODO: uncomment and implement (next iteration)
 // message RelationPathsSearchRequest {
@@ -264,7 +255,6 @@ message RelationNeighboursRequest {
 //         utils.RelationNode origin = 1;
 //         utils.RelationNode destination = 2;
 //     }
-
 //     repeated PathEndpoints paths = 1;
 // }
 
@@ -274,28 +264,21 @@ message RelationNeighboursRequest {
 //
 // - prefix search over vertex (node) names
 // - graph search:
-//   - given some entry vertices, get neighbour vertices
+//   - given some entry vertices, get the filtered subgraph around them
 //   - (TODO) given some vertices, get paths between them
 message RelationSearchRequest {
     string shard_id = 1;
     bool reload = 5;
 
-    RelationPrefixRequest prefix = 11;
-    RelationNeighboursRequest neighbours = 12;
+    RelationPrefixSearchRequest prefix = 11;
+    EntitiesSubgraphRequest subgraph = 12;
     // TODO: uncomment and implement (next iteration)
     // RelationPathsSearchRequest paths = 13;
-
 }
 
-message RelationNeighboursResponse {
-    repeated utils.Relation subgraph = 1;
-}
-message RelationPrefixResponse {
-    repeated utils.RelationNode nodes = 1;
-}
 message RelationSearchResponse {
-    RelationPrefixResponse prefix = 11;
-    RelationNeighboursResponse neighbours = 12;
+    RelationPrefixSearchResponse prefix = 11;
+    EntitiesSubgraphResponse subgraph = 12;
     // TODO: uncomment and implement (next iteration)
     // repeated utils.RelationPath paths = 13;
 }

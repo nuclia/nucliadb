@@ -357,7 +357,7 @@ impl ShardReaderService {
         let relations = prefixes.par_iter().map(|prefix| {
             let request = RelationSearchRequest {
                 shard_id: String::default(),
-                prefix: Some(RelationPrefixRequest {
+                prefix: Some(RelationPrefixSearchRequest {
                     prefix: prefix.clone(),
                 }),
                 ..Default::default()

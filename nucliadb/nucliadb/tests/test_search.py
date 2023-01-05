@@ -635,9 +635,7 @@ async def test_search_relations(
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
 
-    predict_mock.detect_entities = AsyncMock(
-        return_value=[relation_nodes["Animal"]]
-    )
+    predict_mock.detect_entities = AsyncMock(return_value=[relation_nodes["Animal"]])
 
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/search",

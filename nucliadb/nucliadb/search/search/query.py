@@ -105,8 +105,8 @@ async def global_query_to_pb(
 
     if SearchOptions.RELATIONS in features:
         detected_entities = await predict.detect_entities(kbid, query)
-        request.relations.neighbours.entry_points.extend(detected_entities)
-        request.relations.neighbours.depth = 1
+        request.relations.subgraph.entry_points.extend(detected_entities)
+        request.relations.subgraph.depth = 1
 
     return request
 

@@ -255,15 +255,11 @@ pub struct VectorSearchResponse {
     #[prost(int32, tag="5")]
     pub result_per_page: i32,
 }
-/// Relation filters are used to make the 
-/// search domain smaller. By providing filters the 
-/// search may be faster.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationNodeFilter {
-    /// Will filter the search to nodes of type ntype.
     #[prost(enumeration="super::utils::relation_node::NodeType", tag="1")]
-    pub ntype: i32,
-    /// Additionally the search can be even more specific by 
+    pub node_type: i32,
+    /// Additionally the search can be even more specific by
     /// providing a subtype. The empty string is a wilcard that 
     /// indicates to not filter by subtype. 
     #[prost(string, tag="2")]
@@ -273,19 +269,15 @@ pub struct RelationNodeFilter {
 pub struct RelationEdgeFilter {
     /// Will filter the search to edges of type ntype.
     #[prost(enumeration="super::utils::relation::RelationType", tag="1")]
-    pub ntype: i32,
-    /// Additionally the search can be even more specific by 
+    pub relation_type: i32,
+    /// Additionally the search can be even more specific by
     /// providing a subtype. The empty string is a wilcard that 
     /// indicates to not filter by subtype. 
     #[prost(string, tag="2")]
     pub subtype: ::prost::alloc::string::String,
 }
-/// Relation search by prefix
-///
-/// Search among all vertices and return the ones that match on prefix
-/// and pass the filters.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationPrefixRequest {
+pub struct RelationPrefixSearchRequest {
     #[prost(string, tag="1")]
     pub prefix: ::prost::alloc::string::String,
 }
@@ -294,12 +286,8 @@ pub struct RelationPrefixSearchResponse {
     #[prost(message, repeated, tag="1")]
     pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
 }
-/// Relation neighbour search
-///
-/// Search the knowledge graph using some entry points (nodes to start
-/// with) and get their surrounding nodes.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationNeighboursRequest {
+pub struct EntitiesSubgraphRequest {
     /// List of vertices where search will trigger
     #[prost(message, repeated, tag="1")]
     pub entry_points: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
@@ -314,13 +302,17 @@ pub struct RelationNeighboursRequest {
     #[prost(int32, tag="3")]
     pub depth: i32,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EntitiesSubgraphResponse {
+    #[prost(message, repeated, tag="1")]
+    pub relations: ::prost::alloc::vec::Vec<super::utils::Relation>,
+}
 // TODO: uncomment and implement (next iteration)
 // message RelationPathsSearchRequest {
 //     message PathEndpoints {
 //         utils.RelationNode origin = 1;
 //         utils.RelationNode destination = 2;
 //     }
-
 //     repeated PathEndpoints paths = 1;
 // }
 
@@ -329,7 +321,7 @@ pub struct RelationNeighboursRequest {
 ///
 /// - prefix search over vertex (node) names
 /// - graph search:
-///   - given some entry vertices, get neighbour vertices
+///   - given some entry vertices, get the filtered subgraph around them
 ///   - (TODO) given some vertices, get paths between them
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchRequest {
@@ -338,30 +330,20 @@ pub struct RelationSearchRequest {
     #[prost(bool, tag="5")]
     pub reload: bool,
     #[prost(message, optional, tag="11")]
-    pub prefix: ::core::option::Option<RelationPrefixRequest>,
+    pub prefix: ::core::option::Option<RelationPrefixSearchRequest>,
     /// TODO: uncomment and implement (next iteration)
     /// RelationPathsSearchRequest paths = 13;
     #[prost(message, optional, tag="12")]
-    pub neighbours: ::core::option::Option<RelationNeighboursRequest>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationNeighboursResponse {
-    #[prost(message, repeated, tag="1")]
-    pub subgraph: ::prost::alloc::vec::Vec<super::utils::Relation>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RelationPrefixResponse {
-    #[prost(message, repeated, tag="1")]
-    pub nodes: ::prost::alloc::vec::Vec<super::utils::RelationNode>,
+    pub subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationSearchResponse {
     #[prost(message, optional, tag="11")]
-    pub prefix: ::core::option::Option<RelationPrefixResponse>,
+    pub prefix: ::core::option::Option<RelationPrefixSearchResponse>,
     /// TODO: uncomment and implement (next iteration)
     /// repeated utils.RelationPath paths = 13;
     #[prost(message, optional, tag="12")]
-    pub neighbours: ::core::option::Option<RelationNeighboursResponse>,
+    pub subgraph: ::core::option::Option<EntitiesSubgraphResponse>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchRequest {

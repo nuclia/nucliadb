@@ -29,8 +29,9 @@ use nucliadb_protos::relation::RelationType;
 use nucliadb_protos::relation_node::NodeType;
 use nucliadb_protos::resource::ResourceStatus;
 use nucliadb_protos::{
-    EmptyQuery, IndexMetadata, Relation, RelationNeighboursRequest, RelationNode,
-    RelationPrefixRequest, RelationSearchRequest, Resource, ResourceId, RelationNodeFilter, RelationEdgeFilter, RelationSearchResponse
+    EmptyQuery, EntitiesSubgraphRequest, IndexMetadata, Relation, RelationEdgeFilter, RelationNode,
+    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
+    Resource, ResourceId,
 };
 use prost_types::Timestamp;
 use tonic::Request;
@@ -323,7 +324,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixRequest {
+            prefix: Some(RelationPrefixSearchRequest {
                 prefix: "".to_string(),
             }),
             ..Default::default()
@@ -343,7 +344,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixRequest {
+            prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
             }),
             ..Default::default()
@@ -367,7 +368,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            prefix: Some(RelationPrefixRequest {
+            prefix: Some(RelationPrefixSearchRequest {
                 prefix: "zzz".to_string(),
             }),
             ..Default::default()
@@ -393,9 +394,9 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
 
     fn extract_relations(response: &RelationSearchResponse) -> HashSet<(String, String)> {
         response
-            .neighbours
+            .subgraph
             .iter()
-            .flat_map(|neighbours| neighbours.subgraph.iter())
+            .flat_map(|neighbours| neighbours.relations.iter())
             .flat_map(|node| {
                 vec![(
                     node.source.as_ref().unwrap().value.to_owned(),
@@ -412,7 +413,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            neighbours: Some(RelationNeighboursRequest {
+            subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![relation_nodes.get("Swallow").unwrap().clone()],
                 depth: 1,
                 ..Default::default()
@@ -436,7 +437,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            neighbours: Some(RelationNeighboursRequest {
+            subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![
                     relation_nodes.get("Becquer").unwrap().clone(),
                     relation_nodes.get("Newton").unwrap().clone(),
@@ -464,7 +465,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            neighbours: Some(RelationNeighboursRequest {
+            subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![RelationNode {
                     value: "Fake".to_string(),
                     ntype: NodeType::Entity as i32,
@@ -487,31 +488,23 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     let response = reader
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
-            neighbours: Some(RelationNeighboursRequest {
-                entry_points: vec![
-                    relation_nodes.get("Poetry").unwrap().clone(),
-                ],
-                node_filters: vec![
-                    RelationNodeFilter {
-                        ntype: NodeType::Entity as i32,
-                        ..Default::default()
-                    },
-                ],
-                edge_filters: vec![
-                    RelationEdgeFilter {
-                        ntype: RelationType::About as i32,
-                        ..Default::default()
-                    }
-                ],
-                depth: 1
+            subgraph: Some(EntitiesSubgraphRequest {
+                entry_points: vec![relation_nodes.get("Poetry").unwrap().clone()],
+                node_filters: vec![RelationNodeFilter {
+                    node_type: NodeType::Entity as i32,
+                    ..Default::default()
+                }],
+                edge_filters: vec![RelationEdgeFilter {
+                    relation_type: RelationType::About as i32,
+                    ..Default::default()
+                }],
+                depth: 1,
             }),
             ..Default::default()
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec![
-        ("Poetry".to_string(), "Swallow".to_string()),
-    ]);
+    let expected = HashSet::from_iter(vec![("Poetry".to_string(), "Swallow".to_string())]);
     let neighbour_relations = extract_relations(response.get_ref());
     assert_eq!(neighbour_relations, expected);
 
