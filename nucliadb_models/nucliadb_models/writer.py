@@ -38,12 +38,14 @@ from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.vectors import UserVectorsWrapper
 
+GENERIC_MIME_TYPE = "application/generic"
+
 
 class CreateResourcePayload(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     slug: Optional[SlugString] = None
-    icon: Optional[str] = "application/generic"
+    icon: Optional[str] = GENERIC_MIME_TYPE
     thumbnail: Optional[str] = None
     layout: Optional[str] = None
     metadata: Optional[InputMetadata] = None

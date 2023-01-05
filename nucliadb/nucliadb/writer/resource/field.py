@@ -32,7 +32,11 @@ from nucliadb.writer.layouts import serialize_blocks
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FIELD_TYPES_MAP, FieldTypeName
 from nucliadb_models.conversation import PushConversation
-from nucliadb_models.writer import CreateResourcePayload, UpdateResourcePayload
+from nucliadb_models.writer import (
+    GENERIC_MIME_TYPE,
+    CreateResourcePayload,
+    UpdateResourcePayload,
+)
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_storage
@@ -259,6 +263,8 @@ def parse_external_file_field(
     writer.files[key].file.uri = uri  # type: ignore
     writer.files[key].file.source = resources_pb2.CloudFile.Source.EXTERNAL
     writer.files[key].file.content_type = file_field.file.content_type
+    if file_field.file.content_type and writer.basic.icon == GENERIC_MIME_TYPE:
+        writer.basic.icon = file_field.file.content_type
 
     processing = get_processing()
     toprocess.filefield[key] = processing.convert_external_filefield_to_str(file_field)
