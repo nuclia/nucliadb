@@ -37,21 +37,21 @@ from nucliadb_utils.keys import KB_SHARDS
 
 
 class LocalNode(AbstractNode):
-    _writer: LocalWriterWrapper  # type: ignore
-    _reader: LocalReaderWrapper  # type: ignore
+    _writer: LocalWriterWrapper
+    _reader: LocalReaderWrapper
     label: str = "local"
 
     def __init__(self):
-        self._writer = LocalWriterWrapper()  # type: ignore
-        self._reader = LocalReaderWrapper()  # type: ignore
+        self._writer = LocalWriterWrapper()
+        self._reader = LocalReaderWrapper()
         self.address = "local"
 
     @property
-    def reader(self) -> LocalReaderWrapper:
+    def reader(self) -> LocalReaderWrapper:  # type: ignore
         return self._reader
 
     @property
-    def writer(self) -> LocalWriterWrapper:
+    def writer(self) -> LocalWriterWrapper:  # type: ignore
         return self._writer
 
     @classmethod
