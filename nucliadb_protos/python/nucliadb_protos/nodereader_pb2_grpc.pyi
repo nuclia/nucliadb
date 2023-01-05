@@ -34,7 +34,6 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
-    RelationNeighbours as RelationNeighbours,
     RelationNode as RelationNode,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,

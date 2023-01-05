@@ -51,22 +51,6 @@ message JoinGraph {
     repeated JoinGraphCnx edges = 2;
 }
 
-message RelationNeighbours {
-    // TODO: uncomment and implement
-    // RelationNode node = 1;
-
-    // TODO: change RelationNode to Relation
-    repeated RelationNode neighbours = 2;
-    // repeated Relation neighbours = 2;
-}
-
-// TODO: uncomment and implement
-// message RelationPath {
-//     RelationNode origin = 1;
-//     RelationNode destination = 2;
-//     // empty path mean direct edge between origin and destination
-//     repeated Relation path = 3;
-// }
 
 message ExtractedText {
     string text = 1;

@@ -418,6 +418,7 @@ async def inject_resource_with_a_sentence(knowledgebox, writer):
     await inject_message(writer, bm)
 
 
+@pytest.mark.asyncio
 async def test_search_relations(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -595,7 +596,6 @@ async def test_search_relations(
     bm.relations.extend(relation_edges)
     await inject_message(nucliadb_grpc, bm)
 
-    # Test search by relations
     predict_mock.detect_entities = AsyncMock(
         return_value=[relation_nodes["Becquer"], relation_nodes["Newton"]]
     )
@@ -622,6 +622,38 @@ async def test_search_relations(
             "related_to": [
                 {"entity": "Gravity", "relation": "formulate", "direction": "OUT"},
                 {"entity": "Physics", "relation": "study", "direction": "OUT"},
+            ]
+        },
+    }
+
+    for entity in expected:
+        assert entity in entities
+        assert len(entities[entity]["related_to"]) == len(
+            expected[entity]["related_to"]
+        )
+
+        for expected_relation in expected[entity]["related_to"]:
+            assert expected_relation in entities[entity]["related_to"]
+
+    predict_mock.detect_entities = AsyncMock(
+        return_value=[relation_nodes["Animal"]]
+    )
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search",
+        params={
+            "features": "relations",
+            "query": "Do you like animals?",
+        },
+    )
+    assert resp.status_code == 200
+
+    entities = resp.json()["relations"]["entities"]
+    expected = {
+        "Animal": {
+            "related_to": [
+                {"entity": "Cat", "relation": "species", "direction": "IN"},
+                {"entity": "Swallow", "relation": "species", "direction": "IN"},
             ]
         },
     }

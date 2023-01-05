@@ -39,7 +39,6 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
-    RelationNeighbours as RelationNeighbours,
     RelationNode as RelationNode,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
@@ -684,8 +683,6 @@ class RelationNeighboursRequest(google.protobuf.message.Message):
         """
         pass
     depth: builtins.int
-    """TODO: relation filters"""
-
     def __init__(self,
         *,
         entry_points: typing.Optional[typing.Iterable[nucliadb_protos.utils_pb2.RelationNode]] = ...,
@@ -697,7 +694,7 @@ class RelationNeighboursRequest(google.protobuf.message.Message):
 global___RelationNeighboursRequest = RelationNeighboursRequest
 
 class RelationSearchRequest(google.protobuf.message.Message):
-    """TODO: uncomment and implement
+    """TODO: uncomment and implement (next iteration)
     message RelationPathsSearchRequest {
         message PathEndpoints {
             utils.RelationNode origin = 1;
@@ -726,7 +723,7 @@ class RelationSearchRequest(google.protobuf.message.Message):
     def prefix(self) -> global___RelationPrefixRequest: ...
     @property
     def neighbours(self) -> global___RelationNeighboursRequest:
-        """TODO: uncomment and implement
+        """TODO: uncomment and implement (next iteration)
         RelationPathsSearchRequest paths = 13;
         """
         pass
@@ -773,7 +770,7 @@ class RelationSearchResponse(google.protobuf.message.Message):
     def prefix(self) -> global___RelationPrefixResponse: ...
     @property
     def neighbours(self) -> global___RelationNeighboursResponse:
-        """TODO: uncomment and implement
+        """TODO: uncomment and implement (next iteration)
         repeated utils.RelationPath paths = 13;
         """
         pass

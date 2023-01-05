@@ -373,35 +373,6 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     let results = &prefix_response.nodes;
     assert!(results.is_empty());
 
-    // --------------------------------------------------------------
-    // Test: prefixed search with "grevity" term, typo tolerant
-    // --------------------------------------------------------------
-
-    // let response = reader.relation_search(
-    //     RelationSearchRequest {
-    //         shard_id: shard_id.clone(),
-    //         prefix: Some(RelationPrefixRequest {
-    //             prefix: "grevity".to_string(),
-    //             ..Default::default()
-    //         }),
-    //         ..Default::default()
-    //     }
-    // ).await?;
-
-    // let expected = HashSet::from_iter(vec![
-    //     "Gravity".to_string(),
-    // ]);
-    // assert!(response.get_ref().prefix.is_some());
-    // let prefix_response = response.get_ref().prefix.as_ref().unwrap();
-    // let results = prefix_response.nodes
-    //     .iter()
-    //     .map(|node| {
-    //         node.value.to_owned()
-    //     })
-    //     .collect::<HashSet<_>>();
-    // assert_eq!(results.len(), 1);
-    // assert_eq!(results, expected);
-
     Ok(())
 }
 

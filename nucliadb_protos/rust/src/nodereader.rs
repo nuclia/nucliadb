@@ -311,11 +311,10 @@ pub struct RelationNeighboursRequest {
     /// edge satisfying one condition will be returned
     #[prost(message, repeated, tag="4")]
     pub edge_filters: ::prost::alloc::vec::Vec<RelationEdgeFilter>,
-    /// TODO: relation filters
     #[prost(int32, tag="3")]
     pub depth: i32,
 }
-// TODO: uncomment and implement
+// TODO: uncomment and implement (next iteration)
 // message RelationPathsSearchRequest {
 //     message PathEndpoints {
 //         utils.RelationNode origin = 1;
@@ -340,7 +339,7 @@ pub struct RelationSearchRequest {
     pub reload: bool,
     #[prost(message, optional, tag="11")]
     pub prefix: ::core::option::Option<RelationPrefixRequest>,
-    /// TODO: uncomment and implement
+    /// TODO: uncomment and implement (next iteration)
     /// RelationPathsSearchRequest paths = 13;
     #[prost(message, optional, tag="12")]
     pub neighbours: ::core::option::Option<RelationNeighboursRequest>,
@@ -359,7 +358,7 @@ pub struct RelationPrefixResponse {
 pub struct RelationSearchResponse {
     #[prost(message, optional, tag="11")]
     pub prefix: ::core::option::Option<RelationPrefixResponse>,
-    /// TODO: uncomment and implement
+    /// TODO: uncomment and implement (next iteration)
     /// repeated utils.RelationPath paths = 13;
     #[prost(message, optional, tag="12")]
     pub neighbours: ::core::option::Option<RelationNeighboursResponse>,

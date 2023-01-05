@@ -255,11 +255,10 @@ message RelationNeighboursRequest {
     repeated RelationEdgeFilter edge_filters = 4;
 
     int32 depth = 3;
-    // TODO: relation filters
 }
 
 
-// TODO: uncomment and implement
+// TODO: uncomment and implement (next iteration)
 // message RelationPathsSearchRequest {
 //     message PathEndpoints {
 //         utils.RelationNode origin = 1;
@@ -283,7 +282,7 @@ message RelationSearchRequest {
 
     RelationPrefixRequest prefix = 11;
     RelationNeighboursRequest neighbours = 12;
-    // TODO: uncomment and implement
+    // TODO: uncomment and implement (next iteration)
     // RelationPathsSearchRequest paths = 13;
 
 }
@@ -297,7 +296,7 @@ message RelationPrefixResponse {
 message RelationSearchResponse {
     RelationPrefixResponse prefix = 11;
     RelationNeighboursResponse neighbours = 12;
-    // TODO: uncomment and implement
+    // TODO: uncomment and implement (next iteration)
     // repeated utils.RelationPath paths = 13;
 }
 

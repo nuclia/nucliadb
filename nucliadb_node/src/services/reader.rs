@@ -487,9 +487,7 @@ impl ShardReaderService {
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || {
             if !skip_relations {
-                println!("Query: {relation_request:#?}");
                 let results = relation_reader_service.search(&relation_request.unwrap());
-                println!("Results: {results:#?}");
                 Some(results)
             } else {
                 None
