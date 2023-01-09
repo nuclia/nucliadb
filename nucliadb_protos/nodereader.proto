@@ -204,21 +204,13 @@ message VectorSearchResponse {
 
 message RelationNodeFilter {
     utils.RelationNode.NodeType node_type = 1;
-
-    // Additionally the search can be even more specific by
-    // providing a subtype. The empty string is a wilcard that 
-    // indicates to not filter by subtype. 
-    string subtype = 2;
+    optional string node_subtype = 2;
 }
 
 message RelationEdgeFilter {
     // Will filter the search to edges of type ntype.
     utils.Relation.RelationType relation_type = 1;
-
-    // Additionally the search can be even more specific by
-    // providing a subtype. The empty string is a wilcard that 
-    // indicates to not filter by subtype. 
-    string subtype = 2;
+    optional string relation_subtype = 2;
 }
 
 message RelationPrefixSearchRequest {

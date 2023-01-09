@@ -83,11 +83,15 @@ impl RelationsReaderService {
             info!("{id:?} - adding query type filters: starts {v} ms");
         }
         bfs_request.node_filters.iter().for_each(|filter| {
-            let type_info = node_type_parsing(filter.node_type(), &filter.subtype);
+            let node_type = filter.node_type();
+            let node_subtype = filter.node_subtype.as_ref().map_or_else(|| "", |subtype| subtype);
+            let type_info = node_type_parsing(node_type, node_subtype);
             node_filters.insert(type_info);
         });
         bfs_request.edge_filters.iter().for_each(|filter| {
-            let type_info = rtype_parsing(filter.relation_type(), &filter.subtype);
+            let relation_type = filter.relation_type();
+            let relation_subtype = filter.relation_subtype.as_ref().map_or_else(|| "", |subtype| subtype);
+            let type_info = rtype_parsing(relation_type, relation_subtype);
             edge_filters.insert(type_info);
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {

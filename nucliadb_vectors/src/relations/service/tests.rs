@@ -73,11 +73,11 @@ lazy_static! {
         node_filters: vec![
             RelationNodeFilter {
                 node_type: NodeType::Entity as i32,
-                subtype: "".to_string()
+                node_subtype: None
             },
             RelationNodeFilter {
                 node_type: NodeType::Entity as i32,
-                subtype: "Nonexisting".to_string()
+                node_subtype: Some("Nonexisting".to_string())
             }
         ],
         depth: 1,
@@ -88,7 +88,7 @@ lazy_static! {
         entry_points: vec![E0.clone()],
         node_filters: vec![RelationNodeFilter {
             node_type: NodeType::Entity as i32,
-            subtype: "Official".to_string()
+            node_subtype: Some("Official".to_string())
         },],
         depth: 1,
         edge_filters: vec![],

@@ -259,22 +259,16 @@ pub struct VectorSearchResponse {
 pub struct RelationNodeFilter {
     #[prost(enumeration="super::utils::relation_node::NodeType", tag="1")]
     pub node_type: i32,
-    /// Additionally the search can be even more specific by
-    /// providing a subtype. The empty string is a wilcard that 
-    /// indicates to not filter by subtype. 
-    #[prost(string, tag="2")]
-    pub subtype: ::prost::alloc::string::String,
+    #[prost(string, optional, tag="2")]
+    pub node_subtype: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationEdgeFilter {
     /// Will filter the search to edges of type ntype.
     #[prost(enumeration="super::utils::relation::RelationType", tag="1")]
     pub relation_type: i32,
-    /// Additionally the search can be even more specific by
-    /// providing a subtype. The empty string is a wilcard that 
-    /// indicates to not filter by subtype. 
-    #[prost(string, tag="2")]
-    pub subtype: ::prost::alloc::string::String,
+    #[prost(string, optional, tag="2")]
+    pub relation_subtype: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationPrefixSearchRequest {
