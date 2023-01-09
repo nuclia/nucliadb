@@ -408,7 +408,6 @@ impl ShardReaderService {
         let skip_paragraphs = !search_request.paragraph;
         let skip_fields = !search_request.document;
         let skip_vectors = search_request.result_per_page == 0 || search_request.vector.is_empty();
-        let skip_relations = search_request.relations.is_none();
 
         let field_request = DocumentSearchRequest {
             id: "".to_string(),
@@ -483,15 +482,11 @@ impl ShardReaderService {
             }
         };
 
-        let relation_request = search_request.relations;
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || {
-            if !skip_relations {
-                let results = relation_reader_service.search(&relation_request.unwrap());
-                Some(results)
-            } else {
-                None
-            }
+            search_request
+                .relations
+                .map(|relation_request| relation_reader_service.search(&relation_request))
         };
 
         let span = tracing::Span::current();
