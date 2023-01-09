@@ -168,6 +168,23 @@ class NucliaDBClient:
             if kb is None:
                 kb = self.create_kb(slug=slug)  # type: ignore
 
+        logger.info("Importing Binaries")
+        if isinstance(location, StringIO):
+            logger.info("No Binaries import on STRINGIO")
+
+        elif location.startswith("http"):
+            tar_location = location + ".tar.bz2"
+            client = httpx.AsyncClient()
+            resp = await client.get(tar_location)
+            assert resp.status_code == 200
+            with tempfile.NamedTemporaryFile(suffix=".tar.bz2") as temp:
+                for chunk in resp.iter_bytes():
+                    temp.write(chunk)
+                await kb.import_tar_bz2(temp.name)
+        else:
+            tar_location = location + ".tar.bz2"
+            await kb.import_tar_bz2(tar_location)
+
         logger.info("Importing MainDB")
         if isinstance(location, StringIO):
             b64_pb = location.readline()
@@ -189,22 +206,6 @@ class NucliaDBClient:
                     await kb.import_export(b64_pb.strip())
                     b64_pb = await dump_file.readline()
 
-        logger.info("Importing Binaries")
-        if isinstance(location, StringIO):
-            logger.info("No Binaries import on STRINGIO")
-
-        elif location.startswith("http"):
-            tar_location = location + ".tar.bz2"
-            client = httpx.AsyncClient()
-            resp = await client.get(tar_location)
-            assert resp.status_code == 200
-            with tempfile.NamedTemporaryFile(suffix=".tar.bz2") as temp:
-                for chunk in resp.iter_bytes():
-                    temp.write(chunk)
-                await kb.import_tar_bz2(temp.name)
-        else:
-            tar_location = location + ".tar.bz2"
-            await kb.import_tar_bz2(tar_location)
         return kb.kbid
 
     def init_async_grpc(self):

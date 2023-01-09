@@ -55,6 +55,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     if kb is None:
         raise Exception("Not found KB")
 
+    file_binary = base64.b64encode(b"Hola")
     payload = CreateResourcePayload()
     payload.icon = "plain/text"
     payload.title = "My Resource"
@@ -65,11 +66,12 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
         file=File(
             filename="filename.png",
             content_type="image/png",
-            payload=base64.b64encode(b"Hola").decode(),
+            payload=file_binary.decode(),
             md5="XXX",
         )
     )
-    kb.create_resource(payload)
+    resource = kb.create_resource(payload)
+    assert resource.download_file("file1") == file_binary
 
     # Export data
     binaries: List[CloudFile] = []
@@ -109,48 +111,56 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     assert counters.resources == 1
 
     for resource in kb.iter_resources(page_size=1):
-        res = resource.get()
+        res = resource.get(show=["values", "basic"])
         assert res.id == bm.uuid
         assert res.title == bm.basic.title
         assert res.slug == resource.slug == bm.basic.slug == payload.slug
+        assert resource.download_file("file1") == file_binary
 
-    # Test that a download with a client with the binary works
 
+@pytest.mark.asyncio
+async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
+    nucliadb_client.init_async_grpc()
 
-# @pytest.mark.asyncio
-# async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
-#     export = []
-#     nucliadb_client.init_async_grpc()
+    for slug in ("src", "dst"):
+        exists = nucliadb_client.get_kb(slug=slug)
+        if exists:
+            exists.delete()
 
-#     exists = nucliadb_client.get_kb(slug="mykb")
-#     if exists:
-#         exists.delete()
+    try:
+        kb: Optional[KnowledgeBox] = nucliadb_client.create_kb(
+            title="My KB", description="Its a new KB", slug="src"
+        )
+    except ConflictError:
+        kb = nucliadb_client.get_kb(slug="src")
+    if kb is None:
+        raise Exception("Not found KB")
 
-#     try:
-#         kb: Optional[KnowledgeBox] = nucliadb_client.create_kb(
-#             title="My KB", description="Its a new KB", slug="mykb"
-#         )
-#     except ConflictError:
-#         kb = nucliadb_client.get_kb(slug="mykb")
-#     if kb is None:
-#         raise Exception("Not found KB")
+    file_binary = base64.b64encode(b"Hola")
+    payload = CreateResourcePayload()
+    payload.icon = "plain/text"
+    payload.title = "My Resource"
+    payload.summary = "My long summary of the resource"
+    payload.slug = "myresource"  # type: ignore
+    payload.texts[FieldIdString("text1")] = TextField(body="My text")
+    payload.files[FieldIdString("file1")] = FileField(
+        file=File(
+            filename="filename.png",
+            content_type="image/png",
+            payload=file_binary.decode(),
+            md5="XXX",
+        )
+    )
+    resource = kb.create_resource(payload)
 
-#     payload = CreateResourcePayload()
-#     payload.icon = "plain/text"
-#     payload.title = "My Resource"
-#     payload.summary = "My long summary of the resource"
-#     payload.slug = "myresource"  # type: ignore
-#     payload.texts[FieldIdString("text1")] = TextField(body="My text")
-#     payload.files[FieldIdString("file1")] = FileField(
-#         file=File(
-#             filename="filename.png",
-#             content_type="image/png",
-#             payload=base64.b64encode(b"Hola").decode(),
-#             md5="XXX",
-#         )
-#     )
-#     kb.create_resource(payload)
+    with tempfile.NamedTemporaryFile() as dump:
+        await kb.export(dump.name)
+        await nucliadb_client.import_kb(slug="dst", location=dump.name)
 
-#     with namedfolder as dump:
-#         await kb.export(dump)
-#         await nucliadb_client.import_kb(slug="foo", dump)
+    kb = nucliadb_client.get_kb(slug="dst")
+    for resource in kb.iter_resources(page_size=1):
+        res = resource.get(show=["values", "basic"])
+        assert res.id == resource.rid
+        assert res.title == payload.title
+        assert res.slug == payload.slug
+        assert resource.download_file("file1") == file_binary

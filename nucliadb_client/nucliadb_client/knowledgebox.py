@@ -22,7 +22,6 @@ import base64
 import tarfile
 import tempfile
 from enum import Enum
-from functools import partial
 from io import BytesIO
 from typing import TYPE_CHECKING, AsyncIterator, List, Optional
 from uuid import uuid4
@@ -145,11 +144,11 @@ class KnowledgeBox:
         return resp.status_code == 200
 
     async def import_tar_bz2(self, filename):
-        with tarfile.open(filename, mode="r|bz2") as tar:
+        with tarfile.open(filename, mode="r:bz2") as tar:
             for member in tar.getmembers():
-                buffer = tar.extractfile(member)
+                buffer = tar.extractfile(member.name)
 
-                async def generator(buffer: BytesIO, member: tarfile.TarInfo):
+                async def upload_generator(buffer: BytesIO, member: tarfile.TarInfo):
                     chunk_size = 1_000_000
                     buffer.seek(0)
                     count = 0
@@ -169,8 +168,7 @@ class KnowledgeBox:
                         data = buffer.read(chunk_size)
                         yield ubd
 
-                gen = generator(buffer, member)
-                await self.client.writer_stub_async.UploadFile(gen)  # type:  ignore
+                await self.client.writer_stub_async.UploadFile(upload_generator(buffer, member))  # type: ignore
 
     async def import_export(self, line: str):
         type_line = line[:4]

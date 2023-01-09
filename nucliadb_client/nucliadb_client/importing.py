@@ -61,7 +61,6 @@ def parse_arguments():
 
 
 def run():
-
     args = parse_arguments()
     client = NucliaDBClient(
         host=args.host,
@@ -73,8 +72,8 @@ def run():
     )
     kb = client.get_kb(kbid=args.kbid)
     if kb is not None:
-        raise KeyError("KB found")
-    asyncio.run(client.import_kb(slug=args.slug, location=args.dump))
+        raise KeyError(f"KB could not be found")
+    asyncio.run(client.import_kb(kbid=args.kbid, location=args.dump))
 
 
 if __name__ == "__main__":

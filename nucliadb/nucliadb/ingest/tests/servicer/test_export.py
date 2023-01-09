@@ -148,8 +148,7 @@ async def test_upload_download(grpc_servicer: IngestFixture):
         yield metadata
         yield data
 
-    import pdb; pdb.set_trace()
-    await stub.UploadFile(upload_iterator())
+    await stub.UploadFile(upload_iterator())  # type: ignore
 
     # Now download the file
     file_req = FileRequest()
@@ -159,6 +158,6 @@ async def test_upload_download(grpc_servicer: IngestFixture):
 
     downloaded = b""
     bindata: BinaryData
-    async for bindata in stub.DownloadFile(file_req):
+    async for bindata in stub.DownloadFile(file_req):  # type: ignore
         downloaded += bindata.data
     assert downloaded == binary
