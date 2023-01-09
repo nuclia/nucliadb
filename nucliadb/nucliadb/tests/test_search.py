@@ -22,8 +22,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
-from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.tests.vectors import V1
@@ -424,177 +422,12 @@ async def test_search_relations(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
+    knowledge_graph,
 ):
+    relation_nodes, relation_edges = knowledge_graph
+
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{knowledgebox}/resources",
-        headers={"X-SYNCHRONOUS": "True"},
-        json={
-            "title": "My resource",
-            "slug": "myresource",
-            "summary": "Some summary",
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    relation_nodes = {
-        "Animal": RelationNode(
-            value="Animal", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Batman": RelationNode(
-            value="Batman", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Becquer": RelationNode(
-            value="Becquer", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Cat": RelationNode(
-            value="Cat", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Catwoman": RelationNode(
-            value="Catwoman", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Eric": RelationNode(
-            value="Eric", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Fly": RelationNode(
-            value="Fly", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Gravity": RelationNode(
-            value="Gravity", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Joan Antoni": RelationNode(
-            value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Joker": RelationNode(
-            value="Joker", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Newton": RelationNode(
-            value="Newton", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Physics": RelationNode(
-            value="Physics", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Poetry": RelationNode(
-            value="Poetry", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-        "Swallow": RelationNode(
-            value="Swallow", ntype=RelationNode.NodeType.ENTITY, subtype=""
-        ),
-    }
-
-    relation_edges = [
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Batman"],
-            to=relation_nodes["Catwoman"],
-            relation_label="love",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Batman"],
-            to=relation_nodes["Joker"],
-            relation_label="fight",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Joker"],
-            to=relation_nodes["Physics"],
-            relation_label="enjoy",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Catwoman"],
-            to=relation_nodes["Cat"],
-            relation_label="imitate",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Cat"],
-            to=relation_nodes["Animal"],
-            relation_label="species",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Newton"],
-            to=relation_nodes["Physics"],
-            relation_label="study",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Newton"],
-            to=relation_nodes["Gravity"],
-            relation_label="formulate",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Eric"],
-            to=relation_nodes["Cat"],
-            relation_label="like",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Eric"],
-            to=relation_nodes["Joan Antoni"],
-            relation_label="collaborate",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Joan Antoni"],
-            to=relation_nodes["Eric"],
-            relation_label="collaborate",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Joan Antoni"],
-            to=relation_nodes["Becquer"],
-            relation_label="read",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Becquer"],
-            to=relation_nodes["Poetry"],
-            relation_label="write",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Becquer"],
-            to=relation_nodes["Poetry"],
-            relation_label="like",
-        ),
-        Relation(
-            relation=Relation.RelationType.ABOUT,
-            source=relation_nodes["Poetry"],
-            to=relation_nodes["Swallow"],
-            relation_label="about",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Swallow"],
-            to=relation_nodes["Animal"],
-            relation_label="species",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Swallow"],
-            to=relation_nodes["Fly"],
-            relation_label="can",
-        ),
-        Relation(
-            relation=Relation.RelationType.ENTITY,
-            source=relation_nodes["Fly"],
-            to=relation_nodes["Gravity"],
-            relation_label="defy",
-        ),
-    ]
-
-    bm = BrokerMessage()
-    bm.uuid = rid
-    bm.kbid = knowledgebox
-    bm.relations.extend(relation_edges)
-    await inject_message(nucliadb_grpc, bm)
 
     predict_mock.detect_entities = AsyncMock(
         return_value=[relation_nodes["Becquer"], relation_nodes["Newton"]]
