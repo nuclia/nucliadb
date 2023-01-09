@@ -300,7 +300,7 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        query=pb_query,
+        requested_relations=pb_query.relations,
         min_score=item.min_score,
         highlight=item.highlight,
     )
