@@ -100,7 +100,7 @@ impl RelationWriter for RelationsWriterService {
         for edge in graph.edges.iter() {
             let from = nodes.get(&edge.source).map_or_else(ubehaviour, Ok)?;
             let to = nodes.get(&edge.target).map_or_else(ubehaviour, Ok)?;
-            let edge = rtype_parsing(edge.rtype(), &edge.rsubtype);
+            let edge = relation_type_parsing(edge.rtype(), &edge.rsubtype);
             let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
             writer.connect(&self.wmode, from, to, &edge)?;
         }
@@ -168,7 +168,7 @@ impl WriterChild for RelationsWriterService {
                 .filter(|rel| rel.to.is_some() || rel.source.is_some());
             let mut writer = self.index.start_writing()?;
             for rel in iter {
-                let edge = rtype_parsing(rel.relation(), &rel.relation_label);
+                let edge = relation_type_parsing(rel.relation(), &rel.relation_label);
                 let from = rel.source.as_ref().unwrap();
                 let from_type = node_type_parsing(from.ntype(), &from.subtype);
                 let to = rel.to.as_ref().unwrap();

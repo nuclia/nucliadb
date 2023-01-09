@@ -91,7 +91,7 @@ impl RelationsReaderService {
         bfs_request.edge_filters.iter().for_each(|filter| {
             let relation_type = filter.relation_type();
             let relation_subtype = filter.relation_subtype.as_ref().map_or_else(|| "", |subtype| subtype);
-            let type_info = rtype_parsing(relation_type, relation_subtype);
+            let type_info = relation_type_parsing(relation_type, relation_subtype);
             edge_filters.insert(type_info);
         });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
