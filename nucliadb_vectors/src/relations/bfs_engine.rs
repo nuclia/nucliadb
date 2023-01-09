@@ -157,10 +157,10 @@ mod test {
     fn graph(dir: &Path) -> (Vec<Entity>, GraphDB) {
         let graphdb = GraphDB::new(dir, SIZE).unwrap();
         let mut txn = graphdb.rw_txn().unwrap();
-        let ids: Vec<_> = UNodes
+        let ids = UNodes
             .take(4)
             .map(|node| graphdb.add_node(&mut txn, &node).unwrap())
-            .collect();
+            .collect::<Vec<_>>();
         UEdges
             .take(ids.len() - 1)
             .enumerate()
@@ -192,7 +192,7 @@ mod test {
             .unwrap();
         let expected = &nodes;
         let result = bfs.search().unwrap();
-        let result: Vec<_> = result.map(|cnx| cnx.to()).collect();
+        let result = result.map(|cnx| cnx.to()).collect::<Vec<_>>();
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }
@@ -212,7 +212,7 @@ mod test {
             .unwrap();
         let expected = &nodes;
         let result = bfs.search().unwrap();
-        let result: Vec<_> = result.map(|cnx| cnx.to()).collect();
+        let result = result.map(|cnx| cnx.to()).collect::<Vec<_>>();
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }
@@ -232,7 +232,7 @@ mod test {
             .unwrap();
         let expected = vec![nodes[0], nodes[1], nodes[3]];
         let result = bfs.search().unwrap();
-        let mut result: Vec<_> = result.map(|cnx| cnx.to()).collect();
+        let mut result = result.map(|cnx| cnx.to()).collect::<Vec<_>>();
         result.push(nodes[0]);
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
@@ -253,7 +253,7 @@ mod test {
             .unwrap();
         let expected = &nodes;
         let result = bfs.search().unwrap();
-        let result: Vec<_> = result.map(|cnx| cnx.to()).collect();
+        let result = result.map(|cnx| cnx.to()).collect::<Vec<_>>();
         assert_eq!(result.len(), expected.len());
         assert!(result.iter().copied().all(|n| expected.contains(&n)));
     }
