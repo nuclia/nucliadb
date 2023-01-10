@@ -57,20 +57,43 @@ async def test_iter_in_chunks():
     assert iterations is None
 
 
+@pytest.fixture(scope="function")
+def tikv_driver_configured(tikv_driver):
+    from nucliadb.ingest.settings import settings
+    from nucliadb_utils.store import MAIN
+
+    prev_driver = settings.driver
+    settings.driver = "tikv"
+    settings.driver_tikv_url = tikv_driver.url
+    MAIN["driver"] = tikv_driver_configured
+
+    yield
+
+    settings.driver = prev_driver
+    MAIN.pop("driver", None)
+
+@pytest.fixture(scope="function")
+async def tikv_txn(tikv_driver):
+    txn = await tikv_driver.begin()
+    yield txn
+    await txn.abort()
+
+
 @pytest.mark.asyncio
 async def test_knowledgebox_delete_all_kb_keys(
     gcs_storage,
-    redis_driver,
-    txn,
     cache,
     fake_node,
+    tikv_driver_configured,
+    tikv_driver,
     knowledgebox_ingest: str,
 ):
+    txn = await tikv_driver.begin()
     kbid = knowledgebox_ingest
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
 
     # Create some resources in the KB
-    n_resources = 200
+    n_resources = 1000
     uuids = set()
     for _ in range(n_resources):
         bm = broker_resource(kbid)
@@ -81,14 +104,18 @@ async def test_knowledgebox_delete_all_kb_keys(
     await txn.commit(resource=False)
 
     # Check that all of them are there
+    txn = await tikv_driver.begin()
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) == uuid
+    await txn.abort()
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(redis_driver, kbid)
-    # This is needed to clean the in-memory cache of the transaction of visited_keys
-    txn.clean()
+    await KnowledgeBox.delete_all_kb_keys(tikv_driver, kbid)
 
     # Check that all of them were deleted
+    txn = await tikv_driver.begin()
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
     for uuid in uuids:
         assert await kb_obj.get_resource_uuid_by_slug(uuid) is None
+    await txn.abort()
