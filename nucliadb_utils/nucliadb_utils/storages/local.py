@@ -285,7 +285,7 @@ class LocalStorage(Storage):
 
         async with aiofiles.open(key_path, mode="rb") as f:
             while True:
-                body = await f.read(CHUNK_SIZE)
+                body = await f.read(self.chunk_size)
                 if body == b"" or body is None:
                     break
                 else:

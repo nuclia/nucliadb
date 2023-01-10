@@ -421,9 +421,6 @@ class Resource:
             await self.generate_extracted_text(bm, type_id, field_id, field)
 
             # Field Computed Metadata
-            # Binary DATA:
-            #   - thumbnail on FieldMetadata
-
             await self.generate_field_computed_metadata(bm, type_id, field_id, field)
 
             if type_id == FieldType.FILE and isinstance(field, File):
