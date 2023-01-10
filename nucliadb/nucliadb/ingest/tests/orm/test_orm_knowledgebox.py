@@ -44,7 +44,7 @@ def test_chunker():
     assert iterations == total_items / chunk_size
 
     iterations = 0
-    for chunk in chunker([]):
+    for chunk in chunker([], 2):
         iterations += 1
     assert iterations == 0
 
