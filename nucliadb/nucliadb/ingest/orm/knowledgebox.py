@@ -498,6 +498,8 @@ class KnowledgeBox:
             if len(all_keys) == 0:
                 break
 
+            # We commit deletions in chunks because otherwise
+            # tikv complains if there is too much data to commit
             for chunk_of_keys in chunker(all_keys, chunk_size):
                 txn = await driver.begin()
                 for key in chunk_of_keys:
