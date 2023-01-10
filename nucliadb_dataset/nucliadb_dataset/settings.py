@@ -40,7 +40,7 @@ class RunningSettings(pydantic.BaseSettings):
     export: ExportType = pydantic.Field(
         ExportType.FILESYSTEM, description="Destination of export"
     )
-    path: str = pydantic.Field(
+    download_path: str = pydantic.Field(
         f"{Path.home()}/.nuclia/download", description="Download path"
     )
     url: str = pydantic.Field(description="KnowledgeBox URL")

@@ -59,7 +59,7 @@ def run():
         if nucliadb_args.families is not None:
             trainset.filter.labels.extend(nucliadb_args.families)
 
-    Path(nucliadb_args.path).mkdir(parents=True, exist_ok=True)
+    Path(nucliadb_args.download_path).mkdir(parents=True, exist_ok=True)
     if nucliadb_args.export == ExportType.DATASETS:
         if nucliadb_args.apikey is None:
             errors.append("API key required to push to Nuclia Dataset™")
@@ -68,13 +68,15 @@ def run():
             nucliadb_kb_url=nucliadb_args.url,
             datasets_url=nucliadb_args.datasets_url,
             trainset=trainset,
-            cache_path=nucliadb_args.path,
+            cache_path=nucliadb_args.download_path,
         )
         fse.export()
     elif nucliadb_args.export == ExportType.FILESYSTEM:
         fse = FileSystemExport(
             nucliadb_kb_url=nucliadb_args.url,
             trainset=trainset,
-            store_path=nucliadb_args.path,
+            store_path=nucliadb_args.download_path,
+            environment=nucliadb_args.environment,
+            service_token=nucliadb_args.service_token,
         )
         fse.export()

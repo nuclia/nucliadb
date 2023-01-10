@@ -11,7 +11,11 @@ from nucliadb_models.resource import Resource
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.vectors import UserVector, UserVectorWrapper, VectorSets
-from nucliadb_models.writer import CreateResourcePayload, UpdateResourcePayload
+from nucliadb_models.writer import (
+    GENERIC_MIME_TYPE,
+    CreateResourcePayload,
+    UpdateResourcePayload,
+)
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
@@ -35,7 +39,7 @@ def create_resource(
     if icon is not None:
         create_payload.icon = icon
     else:
-        create_payload.icon = "application/generic"
+        create_payload.icon = GENERIC_MIME_TYPE
     main_field = None
     if text is not None:
         create_payload.texts[FieldIdString("text")] = TextField(body=text)

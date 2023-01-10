@@ -18,13 +18,28 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from abc import ABCMeta, abstractmethod
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, List, Optional
 
+from nucliadb_protos.nodereader_pb2 import GetShardRequest  # type: ignore
 from nucliadb_protos.nodereader_pb2 import DocumentItem, ParagraphItem, StreamRequest
+from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
+from nucliadb_protos.noderesources_pb2 import EmptyQuery
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
+from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
+from nucliadb_protos.noderesources_pb2 import (
+    ShardCleaned,
+    ShardCreated,
+    ShardId,
+    VectorSetID,
+    VectorSetList,
+)
+from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest.maindb.driver import Transaction
+from nucliadb_utils.keys import KB_SHARDS
 
 
 class AbstractShard(metaclass=ABCMeta):
@@ -45,7 +60,16 @@ class AbstractShard(metaclass=ABCMeta):
 
 class AbstractNode(metaclass=ABCMeta):
     label: str
-    reader: Any
+
+    @property
+    @abstractmethod
+    def reader(self) -> NodeReaderStub:
+        pass
+
+    @property
+    @abstractmethod
+    def writer(self) -> NodeWriterStub:
+        pass
 
     @classmethod
     @abstractmethod
@@ -62,22 +86,79 @@ class AbstractNode(metaclass=ABCMeta):
     async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[AbstractShard]:
         pass
 
-    @abstractmethod
-    async def del_vectorset(self, shard: str, id: str):
-        pass
-
-    @abstractmethod
-    async def set_vectorset(self, shard: str, id: str):
-        pass
-
     async def stream_get_fields(
         self, stream_request: StreamRequest
     ) -> AsyncIterator[DocumentItem]:
-        async for idandfacets in self.reader.Documents(stream_request=stream_request):
+        async for idandfacets in self.reader.Documents(stream_request):  # type: ignore
             yield idandfacets
 
     async def stream_get_paragraphs(
         self, stream_request: StreamRequest
     ) -> AsyncIterator[ParagraphItem]:
-        async for idandfacets in self.reader.Paragraphs(stream_request=stream_request):
+        async for idandfacets in self.reader.Paragraphs(stream_request):  # type: ignore
             yield idandfacets
+
+    @classmethod
+    async def get_all_shards(cls, txn: Transaction, kbid: str) -> Optional[PBShards]:
+        key = KB_SHARDS.format(kbid=kbid)
+        kb_shards_bytes: Optional[bytes] = await txn.get(key)
+        if kb_shards_bytes is not None:
+            kb_shards = PBShards()
+            kb_shards.ParseFromString(kb_shards_bytes)
+            return kb_shards
+        else:
+            return None
+
+    async def get_reader_shard(
+        self, shard_id: str, vectorset: Optional[str] = None
+    ) -> NodeResourcesShard:
+        req = GetShardRequest()
+        req.shard_id.id = shard_id
+        if vectorset is not None:
+            req.vectorset = vectorset
+        return await self.reader.GetShard(req)  # type: ignore
+
+    async def get_shard(self, id: str) -> ShardId:
+        req = ShardId(id=id)
+        resp = await self.writer.GetShard(req)  # type: ignore
+        return resp
+
+    async def new_shard(self) -> ShardCreated:
+        req = EmptyQuery()
+        resp = await self.writer.NewShard(req)  # type: ignore
+        return resp
+
+    async def delete_shard(self, id: str) -> str:
+        req = ShardId(id=id)
+        resp: ShardId = await self.writer.DeleteShard(req)  # type: ignore
+        return resp.id
+
+    async def list_shards(self) -> List[str]:
+        req = EmptyQuery()
+        resp = await self.writer.ListShards(req)  # type: ignore
+        return resp.shards
+
+    async def clean_and_upgrade_shard(self, id: str) -> ShardCleaned:
+        req = ShardId(id=id)
+        resp = await self.writer.CleanAndUpgradeShard(req)  # type: ignore
+        return resp
+
+    async def del_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
+        req = VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await self.writer.RemoveVectorSet(req)  # type: ignore
+        return resp
+
+    async def set_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
+        req = VectorSetID()
+        req.shard.id = shard_id
+        req.vectorset = vectorset
+        resp = await self.writer.AddVectorSet(req)  # type: ignore
+        return resp
+
+    async def get_vectorset(self, shard_id: str) -> VectorSetList:
+        req = ShardId()
+        req.id = shard_id
+        resp = await self.writer.ListVectorSets(req)  # type: ignore
+        return resp

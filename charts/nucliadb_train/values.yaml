@@ -10,6 +10,7 @@ debug: False
 imagePullPolicy: IfNotPresent
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
+image_other: cluster_manager:main
 resources: {}
 #  limits:
 #    memory: "600Mi"
@@ -28,6 +29,7 @@ services:
 
 running:
   sentry_url:
+  chitchat_level: INFO
 
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
