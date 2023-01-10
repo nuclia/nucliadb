@@ -207,7 +207,6 @@ class KnowledgeBox:
         req = ExportRequest()
         req.kbid = self.kbid
         async for bm in self.client.writer_stub_async.Export(req):  # type: ignore
-            # Analyze all bm to get list of files to download
             yield bm
 
     async def entities(self) -> GetEntitiesResponse:

@@ -415,13 +415,6 @@ class Resource:
         fields = await self.get_fields(force=True)
         for ((type_id, field_id), field) in fields.items():
             # Value
-            # Binary DATA:
-            #   Conversation:
-            #     - attachments on value
-            #   Layout:
-            #     - file on block
-            #   File:
-            #     - file on value
             await self.generate_field(bm, type_id, field_id, field)
 
             # Extracted text
