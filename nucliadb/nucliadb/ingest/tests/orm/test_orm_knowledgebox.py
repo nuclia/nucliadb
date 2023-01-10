@@ -19,7 +19,7 @@
 #
 import pytest
 
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, iter_in_chunks
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
 from nucliadb.ingest.tests.fixtures import broker_resource
 
 
@@ -30,18 +30,11 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     await KnowledgeBox.purge(redis_driver, "idonotexist")
 
 
-@pytest.mark.asyncio
-async def test_iter_in_chunks():
-    async def generate_n(n):
-        if n is None:
-            return
-        for i in range(n):
-            yield i
-
+def test_chunker():
     total_items = 100
     chunk_size = 10
     iterations = 0
-    async for chunk in iter_in_chunks(generate_n(total_items), chunk_size=chunk_size):
+    for chunk in chunker(list(range(total_items)), chunk_size):
         assert len(chunk) == chunk_size
         assert chunk == list(
             range(iterations * chunk_size, (iterations * chunk_size) + chunk_size)
@@ -50,11 +43,10 @@ async def test_iter_in_chunks():
 
     assert iterations == total_items / chunk_size
 
-    # Check when generator doesn't yield anything
-    iterations = None
-    async for chunk in iter_in_chunks(generate_n(None)):
+    iterations = 0
+    for chunk in chunker([]):
         iterations += 1
-    assert iterations is None
+    assert iterations == 0
 
 
 @pytest.fixture(scope="function")
@@ -71,6 +63,7 @@ def tikv_driver_configured(tikv_driver):
 
     settings.driver = prev_driver
     MAIN.pop("driver", None)
+
 
 @pytest.fixture(scope="function")
 async def tikv_txn(tikv_driver):
@@ -93,7 +86,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
 
     # Create some resources in the KB
-    n_resources = 1000
+    n_resources = 100
     uuids = set()
     for _ in range(n_resources):
         bm = broker_resource(kbid)
@@ -111,7 +104,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     await txn.abort()
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(tikv_driver, kbid)
+    await KnowledgeBox.delete_all_kb_keys(tikv_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
     txn = await tikv_driver.begin()

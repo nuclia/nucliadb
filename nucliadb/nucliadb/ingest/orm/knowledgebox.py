@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from typing import Any, AsyncGenerator, AsyncIterator, List, Optional, Tuple, Union
+from typing import AsyncGenerator, AsyncIterator, Optional, Sequence, Tuple, Union
 from uuid import uuid4
 
 from grpc import StatusCode
@@ -486,22 +486,23 @@ class KnowledgeBox:
         await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(cls, driver: Driver, kbid: str):
-        # Delete KB Keys
+    async def delete_all_kb_keys(
+        cls, driver: Driver, kbid: str, chunk_size: int = 1_000
+    ):
         prefix = KB_KEYS.format(kbid=kbid)
-        done = False
-        while done is False:
+        while True:
             txn = await driver.begin()
-            done = True
-            async for chunk_of_keys in iter_in_chunks(
-                txn.keys(match=prefix, count=-1), chunk_size=1_000
-            ):
+            all_keys = [key async for key in txn.keys(match=prefix, count=-1)]
+            await txn.abort()
+
+            if len(all_keys) == 0:
+                break
+
+            for chunk_of_keys in chunker(all_keys, chunk_size):
+                txn = await driver.begin()
                 for key in chunk_of_keys:
-                    done = False
                     await txn.delete(key)
                 await txn.commit(resource=False)
-            if done:
-                await txn.abort()
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
 
@@ -620,16 +621,5 @@ class KnowledgeBox:
                 )
 
 
-async def iter_in_chunks(
-    gen: AsyncGenerator[Any, None], chunk_size: int = 100
-) -> AsyncIterator[List[Any]]:
-    chunk: List[Any] = []
-
-    async for item in gen:
-        if len(chunk) == chunk_size:
-            yield chunk
-            chunk = []
-        chunk.append(item)
-
-    if len(chunk) > 0:
-        yield chunk
+def chunker(seq: Sequence, size: int):
+    return (seq[pos : pos + size] for pos in range(0, len(seq), size))
