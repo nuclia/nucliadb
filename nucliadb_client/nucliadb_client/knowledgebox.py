@@ -156,7 +156,11 @@ class KnowledgeBox:
                     ubd.count = count
                     ubd.metadata.size = member.size
                     ubd.metadata.kbid = self.kbid
-                    ubd.metadata.key = member.gname
+
+                    # Tweak the key so that it points to the new kbid
+                    exported_kbid = member.name.split("/")[1]
+                    ubd.metadata.key = member.name.replace(exported_kbid, self.kbid)
+
                     yield ubd
 
                     data = buffer.read(chunk_size)

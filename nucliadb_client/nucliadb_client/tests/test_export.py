@@ -39,21 +39,19 @@ from nucliadb_models.writer import CreateResourcePayload
 
 @pytest.mark.asyncio
 async def test_export_import(nucliadb_client: NucliaDBClient):
-    export = []
     nucliadb_client.init_async_grpc()
-
-    exists = nucliadb_client.get_kb(slug="mykb")
+    exists = nucliadb_client.get_kb(slug="src")
     if exists:
         exists.delete()
 
     try:
-        kb: Optional[KnowledgeBox] = nucliadb_client.create_kb(
-            title="My KB", description="Its a new KB", slug="mykb"
+        srckb: Optional[KnowledgeBox] = nucliadb_client.create_kb(
+            title="My KB", description="Its a new KB", slug="src"
         )
     except ConflictError:
-        kb = nucliadb_client.get_kb(slug="mykb")
-    if kb is None:
-        raise Exception("Not found KB")
+        srckb = nucliadb_client.get_kb(slug="src")
+    if srckb is None:
+        raise Exception("Not found source KB")
 
     file_binary = base64.b64encode(b"Hola")
     payload = CreateResourcePayload()
@@ -70,12 +68,13 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
             md5="XXX",
         )
     )
-    resource = kb.create_resource(payload)
+    resource = srckb.create_resource(payload)
     assert resource.download_file("file1") == file_binary
 
     # Export data
+    export = []
     binaries: List[CloudFile] = []
-    async for line in kb.generator(binaries):
+    async for line in srckb.generator(binaries):
         export.append(line)
     assert len(binaries) == 1
     data = StringIO("\n".join(export))
@@ -86,31 +85,31 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
         binaries_tar = "binaries.tar.bz2"
         with tarfile.open(binaries_tar, mode="w:bz2") as tar:
             for cf in binaries:
-                await kb.download_file(cf, filename)
+                await srckb.download_file(cf, filename)
                 tar.add(filename, cf.uri)
 
-    exists = nucliadb_client.get_kb(slug="mykb2")
+    exists = nucliadb_client.get_kb(slug="dst")
     if exists:
         exists.delete()
 
     # Import exported data dump and binaries
-    await nucliadb_client.import_kb(slug="mykb2", location=data)
-    await kb.import_tar_bz2(binaries_tar)
+    await nucliadb_client.import_kb(slug="dst", location=data)
+    dstkb = nucliadb_client.get_kb(slug="dst")
+    if dstkb is None:
+        raise AttributeError("Could not find destination KB")
+    await dstkb.import_tar_bz2(binaries_tar)
 
-    kb = nucliadb_client.get_kb(slug="mykb2")
-    if kb is None:
-        raise AttributeError("Could not found KB")
-    resources = kb.list_resources()
+    resources = dstkb.list_resources()
 
     bm = BrokerMessage()
     bm.ParseFromString(base64.b64decode(export[0][4:]))
     assert bm.basic.title == resources[0].get().title
 
-    counters = kb.counters()
+    counters = dstkb.counters()
     assert counters
     assert counters.resources == 1
 
-    for resource in kb.iter_resources(page_size=1):
+    for resource in dstkb.iter_resources(page_size=1):
         res = resource.get(show=["values", "basic"])
         assert res.id == bm.uuid
         assert res.title == bm.basic.title
@@ -121,20 +120,19 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
 @pytest.mark.asyncio
 async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
     nucliadb_client.init_async_grpc()
-
-    for slug in ("src", "dst"):
+    for slug in ("src1", "dst1"):
         exists = nucliadb_client.get_kb(slug=slug)
         if exists:
             exists.delete()
 
     try:
-        kb: Optional[KnowledgeBox] = nucliadb_client.create_kb(
-            title="My KB", description="Its a new KB", slug="src"
+        srckb: Optional[KnowledgeBox] = nucliadb_client.create_kb(
+            title="My KB", description="Its a new KB", slug="src1"
         )
     except ConflictError:
-        kb = nucliadb_client.get_kb(slug="src")
-    if kb is None:
-        raise Exception("Not found KB")
+        srckb = nucliadb_client.get_kb(slug="src1")
+    if srckb is None:
+        raise Exception("Could not create source KB")
 
     file_binary = base64.b64encode(b"Hola")
     payload = CreateResourcePayload()
@@ -151,14 +149,15 @@ async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
             md5="XXX",
         )
     )
-    resource = kb.create_resource(payload)
+    resource = srckb.create_resource(payload)
 
     with tempfile.NamedTemporaryFile() as dump:
-        await kb.export(dump.name)
-        await nucliadb_client.import_kb(slug="dst", location=dump.name)
+        await srckb.export(dump.name)
+        await nucliadb_client.import_kb(slug="dst1", location=dump.name)
 
-    kb = nucliadb_client.get_kb(slug="dst")
-    for resource in kb.iter_resources(page_size=1):
+    dstkb = nucliadb_client.get_kb(slug="dst1")
+    assert dstkb is not None
+    for resource in dstkb.iter_resources(page_size=1):
         res = resource.get(show=["values", "basic"])
         assert res.id == resource.rid
         assert res.title == payload.title
