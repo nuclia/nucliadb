@@ -3852,8 +3852,7 @@ dependencies = [
 [[package]]
 name = "tokio-tar"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a50188549787c32c1c3d9c8c71ad7e003ccf2f102489c5a96e385c84760477f4"
+source = "git+https://github.com/alekece/tokio-tar#ee06e373ae4fcd7c9691fa7cf67c9494fb201362"
 dependencies = [
  "filetime",
  "futures-core",
