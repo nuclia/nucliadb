@@ -32,7 +32,7 @@ We collect the minimum amount of information to respect privacy. Here are the da
 - type of events among create, index, delete and serve events
 - client information:
   - session uuid: uuid generated on the fly
-  - quickwit version
+  - nucliadb version
   - os (linux, macos, freebsd, android...)
   - architecture of the CPU
   - md5 hash of host and username

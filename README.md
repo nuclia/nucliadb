@@ -91,7 +91,7 @@ The core difference and advantage of NucliaDB is its architecture built from the
 
 ## What license does NucliaDB use?
 
-NucliaDB is open-source under the GNU Affero General Public License Version 3 - AGPLv3. Fundamentally, this means that you are free to use Quickwit for your project, as long as you don't modify NucliaDB. If you do, you have to make the modifications public.
+NucliaDB is open-source under the GNU Affero General Public License Version 3 - AGPLv3. Fundamentally, this means that you are free to use NucliaDB for your project, as long as you don't modify NucliaDB. If you do, you have to make the modifications public.
 
 ## What is Nuclia's business model?
 
