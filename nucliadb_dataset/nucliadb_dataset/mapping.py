@@ -55,18 +55,21 @@ def batch_to_text_classification_arrow(batch: BatchType):
     return output_batch
 
 
-def batch_to_token_classification_arrow(batch: TokenClassificationBatch):
-    X = []
-    Y = []
-    for data in batch.data:
-        X.append(data.token)
-        Y.append(data.label)
-    if len(X):
-        pa_data = [pa.array(X), pa.array(Y)]
-        output_batch = pa.record_batch(pa_data, names=["text", "labels"])
-    else:
-        output_batch = None
-    return output_batch
+def batch_to_token_classification_arrow(schema: pa.schema):
+    def func(batch: TokenClassificationBatch):
+        X = []
+        Y = []
+        for data in batch.data:
+            X.append([x for x in data.token])
+            Y.append([x for x in data.label])
+        if len(X):
+            pa_data = [pa.array(X), pa.array(Y)]
+            output_batch = pa.record_batch(pa_data, schema)
+        else:
+            output_batch = None
+        return output_batch
+
+    return func
 
 
 def batch_to_text_classification_normalized_arrow(batch: SentenceClassificationBatch):

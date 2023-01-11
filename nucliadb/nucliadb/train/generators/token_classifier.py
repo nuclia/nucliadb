@@ -97,26 +97,27 @@ async def get_field_text(
 
     field_metadata = await field_obj.get_field_metadata()
     # Check computed definition of entities
-    for entity_key, positions in field_metadata.metadata.positions.items():
-        entity_group, entity = entity_key.split("/")
-        if entity_group in valid_entity_groups:
-            split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
-            for position in positions.position:
-                split_ners[MAIN][entity_group][entity].append(
-                    (position.start, position.end)
-                )
-
-    for split, split_metadata in field_metadata.split_metadata.items():
-        for entity_key, positions in split_metadata.positions.items():
+    if field_metadata is not None:
+        for entity_key, positions in field_metadata.metadata.positions.items():
             entity_group, entity = entity_key.split("/")
             if entity_group in valid_entity_groups:
-                split_ners.setdefault(split, {}).setdefault(
-                    entity_group, {}
-                ).setdefault(entity, [])
+                split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
                 for position in positions.position:
-                    split_ners[split][entity_group][entity].append(
+                    split_ners[MAIN][entity_group][entity].append(
                         (position.start, position.end)
                     )
+
+        for split, split_metadata in field_metadata.split_metadata.items():
+            for entity_key, positions in split_metadata.positions.items():
+                entity_group, entity = entity_key.split("/")
+                if entity_group in valid_entity_groups:
+                    split_ners.setdefault(split, {}).setdefault(
+                        entity_group, {}
+                    ).setdefault(entity, [])
+                    for position in positions.position:
+                        split_ners[split][entity_group][entity].append(
+                            (position.start, position.end)
+                        )
 
     for split, invalid_tokens in invalid_tokens_split.items():
         for (token.klass, token.token, token.start, token.end) in invalid_tokens:
@@ -146,15 +147,16 @@ async def get_field_text(
         )
 
     split_paragraphs: Dict[str, List[Tuple[int, int]]] = {}
-    split_paragraphs[MAIN] = sorted(
-        [(p.start, p.end) for p in field_metadata.metadata.paragraphs],
-        key=lambda x: x[0],
-    )
-    for split, metadata in field_metadata.split_metadata.items():
-        split_paragraphs[split] = sorted(
-            [(p.start, p.end) for p in metadata.paragraphs],
+    if field_metadata is not None:
+        split_paragraphs[MAIN] = sorted(
+            [(p.start, p.end) for p in field_metadata.metadata.paragraphs],
             key=lambda x: x[0],
         )
+        for split, metadata in field_metadata.split_metadata.items():
+            split_paragraphs[split] = sorted(
+                [(p.start, p.end) for p in metadata.paragraphs],
+                key=lambda x: x[0],
+            )
 
     return (
         split_text,

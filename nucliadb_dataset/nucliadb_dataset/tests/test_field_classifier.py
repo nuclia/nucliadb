@@ -130,7 +130,9 @@ def test_inst_base_class():
         raise AssertionError("Base class should'nt be instantiable")
 
 
-def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
+def test_live_field_classification(
+    knowledgebox: KnowledgeBox, upload_data_field_classification
+):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
