@@ -62,9 +62,6 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
     assert len(knowledgebox) == 50
     labels = knowledgebox.get_uploaded_labels()
 
-    import pdb
-
-    pdb.set_trace()
     assert labels["default"].count == 50
     assert labels["default"].labels["0"] == 9
 
