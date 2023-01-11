@@ -28,12 +28,13 @@ from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchResponse,
     RelationSearchRequest,
     RelationSearchResponse,
-    SearchRequest,
     SearchResponse,
     SuggestResponse,
     VectorSearchResponse,
 )
+from sentry_sdk import capture_message, push_scope
 
+from nucliadb.search import logger
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -385,7 +386,13 @@ async def merge_relations_results(
                     )
                 )
             else:
-                assert False, "origin or destination must be in the response"
+                error_msg = "Relation search is returning an edge unrelated with queried entities"
+                logger.error(error_msg)
+                with push_scope() as scope:
+                    scope.set_extra("relations_responses", relations_responses)
+                    scope.set_extra("query", query)
+                    scope.set_extra("relation", relation)
+                    capture_message(error_msg, "error")
 
     return relations
 
@@ -430,7 +437,9 @@ async def merge_results(
         vectors, resources, kbid, count, page, min_score=min_score
     )
 
-    api_results.relations = await merge_relations_results(relations, requested_relations)
+    api_results.relations = await merge_relations_results(
+        relations, requested_relations
+    )
 
     api_results.resources = await fetch_resources(
         resources, kbid, show, field_type_filter, extracted
