@@ -1,6 +1,8 @@
 import base64
-from typing import Callable, Optional, Union, cast
+from typing import Callable, Dict, List, Optional, Union, cast
 from uuid import uuid4
+
+import numpy as np
 
 from nucliadb_models.common import Classification, FieldID
 from nucliadb_models.common import File as NDBModelsFile
@@ -19,16 +21,17 @@ from nucliadb_models.writer import (
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
-from nucliadb_sdk.vectors import Vectors
+from nucliadb_sdk.vectors import Vector, Vectors
+from nucliadb_sdk import DEFAULT_LABELSET, logger
 
 
 def create_resource(
     key: Optional[str] = None,
     text: Optional[str] = None,
-    binary: Optional[File] = None,
+    binary: Optional[Union[File, str]] = None,
     labels: Optional[Labels] = None,
     entities: Optional[Entities] = None,
-    vectors: Optional[Vectors] = None,
+    vectors: Optional[Union[Vectors, Dict[str, Union[np.ndarray, List[float]]]]] = None,
     vectorsets: Optional[VectorSets] = None,
     icon: Optional[str] = None,
 ) -> CreateResourcePayload:
@@ -45,6 +48,12 @@ def create_resource(
         create_payload.texts[FieldIdString("text")] = TextField(body=text)
         main_field = FieldID(field_type=FieldID.FieldType.TEXT, field="text")
     if binary is not None:
+        if isinstance(binary, str):
+            with open(binary, "rb") as binary_file:
+                data = binary_file.read()
+                binary = File(data=data, filename=binary.split("/")[-1])
+        assert isinstance(binary, File)
+
         create_payload.files[FieldIdString("file")] = FileField(
             file=NDBModelsFile(
                 filename=binary.filename,
@@ -64,14 +73,18 @@ def create_resource(
             if isinstance(label, Label):
                 classifications.append(
                     Classification(
-                        labelset=label.labelset if label.labelset is not None else "",
+                        labelset=label.labelset
+                        if label.labelset is not None
+                        else DEFAULT_LABELSET,
                         label=label.label,
                     )
                 )
             elif isinstance(label, str):
                 if label.count("/") != 1:
-                    raise AttributeError("Str labels should be labelset/label")
-                labelset, label_str = label.split("/")
+                    labelset = DEFAULT_LABELSET
+                    label_str = label
+                else:
+                    labelset, label_str = label.split("/")
                 classifications.append(
                     Classification(labelset=labelset, label=label_str)
                 )
@@ -100,6 +113,20 @@ def create_resource(
         )
 
     if vectors is not None:
+        if isinstance(vectors, dict):
+            new_vectors = []
+            for key, value in vectors.items():
+                if isinstance(value, np.ndarray):
+                    list_value = value.tolist()
+                else:
+                    list_value = value
+                new_vectors.append(Vector(value=list_value, vectorset=key))
+            vectors = new_vectors
+        elif isinstance(vectors, list):
+            for vector_element in vectors:
+                if isinstance(vector_element.value, np.ndarray):
+                    vector_element.value = vector_element.value.tolist()
+
         uvsw = []
         uvw = UserVectorWrapper(field=main_field)
         uvw.vectors = {}
@@ -107,7 +134,8 @@ def create_resource(
         for vector in vectors:
             vector_id = vector.key if vector.key is not None else uuid4().hex
             if vectorsets is not None and vector.vectorset not in vectorsets.vectorsets:
-                raise KeyError("Vectorset is not enabled")
+                logger.warn("Vectorset is not created, we will create it for you")
+                vectorsets.vectorsets[vector.vectorset] = len(vector.value)
             uvw.vectors[vector.vectorset] = {
                 vector_id: UserVector(
                     vector=vector.value,
@@ -125,10 +153,10 @@ def create_resource(
 def update_resource(
     resource: Resource,
     text: Optional[str] = None,
-    binary: Optional[File] = None,
+    binary: Optional[Union[File, str]] = None,
     labels: Optional[Labels] = None,
     entities: Optional[Entities] = None,
-    vectors: Optional[Vectors] = None,
+    vectors: Optional[Union[Vectors, Dict[str, Union[np.ndarray, List[float]]]]] = None,
     vectorsets: Optional[VectorSets] = None,
 ) -> UpdateResourcePayload:
     upload_payload = UpdateResourcePayload()
@@ -138,6 +166,12 @@ def update_resource(
         upload_payload.texts[FieldIdString("text")] = TextField(body=text)
         main_field = FieldID(field_type=FieldID.FieldType.TEXT, field="text")
     if binary is not None:
+        if isinstance(binary, str):
+            with open(binary, "rb") as binary_file:
+                data = binary_file.read()
+                binary = File(data=data, filename=binary.split("/")[-1])
+
+        assert isinstance(binary, File)
         upload_payload.files[FieldIdString("file")] = FileField(
             file=NDBModelsFile(
                 filename=binary.filename,
@@ -166,14 +200,19 @@ def update_resource(
             if isinstance(label, Label):
                 classifications.append(
                     Classification(
-                        labelset=label.labelset if label.labelset is not None else "",
+                        labelset=label.labelset
+                        if label.labelset is not None
+                        else DEFAULT_LABELSET,
                         label=label.label,
                     )
                 )
             elif isinstance(label, str):
                 if label.count("/") != 1:
-                    raise AttributeError("Str labels should be labelset/label")
-                labelset, label_str = label.split("/")
+                    logger.warn(f"Labelset default linked to label {label}")
+                    labelset = DEFAULT_LABELSET
+                    label_str = label
+                else:
+                    labelset, label_str = label.split("/")
 
                 classifications.append(
                     Classification(labelset=labelset, label=label_str)
@@ -203,6 +242,16 @@ def update_resource(
         )
 
     if vectors is not None:
+        if isinstance(vectors, dict):
+            new_vectors = []
+            for key, value in vectors.items():
+                if isinstance(value, np.ndarray):
+                    list_value = value.tolist()
+                else:
+                    list_value = value
+                new_vectors.append(Vector(value=list_value, vectorset=key))
+            vectors = new_vectors
+
         uvsw = []
         uvw = UserVectorWrapper(field=main_field)
         uvw.vectors = {}
@@ -210,7 +259,7 @@ def update_resource(
         for vector in vectors:
             vector_id = vector.key if vector.key is not None else uuid4().hex
             if vectorsets is not None and vector.vectorset not in vectorsets.vectorsets:
-                raise KeyError("Vectorset is not enabled")
+                logger.warn("Vectorset is not created, we will create it for you")
 
             uvw.vectors[vector.vectorset] = {
                 vector_id: UserVector(

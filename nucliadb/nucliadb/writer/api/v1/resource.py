@@ -59,7 +59,11 @@ from nucliadb.writer.resource.basic import (
 )
 from nucliadb.writer.resource.field import extract_fields, parse_fields
 from nucliadb.writer.resource.origin import parse_origin
-from nucliadb.writer.resource.vectors import get_vectorsets, parse_vectors
+from nucliadb.writer.resource.vectors import (
+    create_vectorset,
+    get_vectorsets,
+    parse_vectors,
+)
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import (
@@ -148,10 +152,28 @@ async def create_resource(
 
     if item.uservectors:
         vectorsets = await get_vectorsets(kbid)
-        if vectorsets:
+        if vectorsets and len(vectorsets.vectorsets):
             parse_vectors(writer, item.uservectors, vectorsets)
         else:
-            raise HTTPException(status_code=412, detail=str("No vectorsets found"))
+            for vector in item.uservectors:
+                if vector.vectors is not None:
+                    for vectorset, uservector in vector.vectors.items():
+                        if len(uservector) == 0:
+                            raise HTTPException(
+                                status_code=412,
+                                detail=str("Vectorset without vector not allowed"),
+                            )
+                        first_vector = list(uservector.values())[0]
+                        await create_vectorset(
+                            kbid, vectorset, len(first_vector.vector)
+                        )
+            vectorsets = await get_vectorsets(kbid)
+            if vectorsets is None or len(vectorsets.vectorsets) == 0:
+                raise HTTPException(
+                    status_code=412,
+                    detail=str("Vectorset was not able to be created"),
+                )
+            parse_vectors(writer, item.uservectors, vectorsets)
 
     set_status(writer.basic, item)
 

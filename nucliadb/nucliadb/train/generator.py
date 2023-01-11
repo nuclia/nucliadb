@@ -42,6 +42,9 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
     node_manager = get_nodes_manager()
     node, shard_replica_id = await node_manager.get_reader(kbid, shard)
 
+    if trainset.batch_size == 0:
+        trainset.batch_size = 50
+
     if trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
         if len(trainset.filter.labels) != 1:
             raise HTTPException(

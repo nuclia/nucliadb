@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import tempfile
 import pytest
 
 from nucliadb_sdk.entities import Entity
@@ -53,3 +54,9 @@ def upload_data_token_classification(knowledgebox: KnowledgeBox):
             Entity(type="PERSON", value="Eudald Camprubi", positions=[(46, 61)]),
         ],
     )
+
+
+@pytest.fixture(scope="function")
+def temp_folder():
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        yield tmpdirname

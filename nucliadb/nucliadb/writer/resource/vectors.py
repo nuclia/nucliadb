@@ -24,6 +24,8 @@ from nucliadb_protos.writer_pb2 import (
     BrokerMessage,
     GetVectorSetsRequest,
     GetVectorSetsResponse,
+    OpStatusWriter,
+    SetVectorSetRequest,
     VectorSets,
 )
 
@@ -31,6 +33,27 @@ from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.vectors import UserVectorsWrapper as UserVectorsWrapperPy
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.utilities import get_ingest
+
+
+async def create_vectorset(kbid: str, vectorset: str, dimension: Optional[int] = None):
+    ingest = get_ingest()
+    pbrequest: SetVectorSetRequest = SetVectorSetRequest(id=vectorset)
+    pbrequest.kb.uuid = kbid
+
+    set_info_on_span({"nuclia.kbid": kbid})
+
+    if dimension is not None:
+        pbrequest.vectorset.dimension = dimension
+
+    status: OpStatusWriter = await ingest.SetVectorSet(pbrequest)  # type: ignore
+    if status.status == OpStatusWriter.Status.OK:
+        return None
+    elif status.status == OpStatusWriter.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif status.status == OpStatusWriter.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error on settings labels on a Knowledge box"
+        )
 
 
 async def get_vectorsets(kbid: str) -> Optional[VectorSets]:

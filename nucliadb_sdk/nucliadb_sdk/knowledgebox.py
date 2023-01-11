@@ -1,6 +1,9 @@
 import os
-from typing import Any, AsyncIterable, Dict, Iterable, List, Optional
+from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
 from urllib.parse import urlparse
+from nucliadb_sdk import DEFAULT_LABELSET
+
+import numpy as np
 
 from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.resource import Resource
@@ -19,7 +22,7 @@ from nucliadb_sdk.resource import (
     from_resource_to_payload,
     update_resource,
 )
-from nucliadb_sdk.vectors import Vector, Vectors
+from nucliadb_sdk.vectors import Vectors
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
 
@@ -167,11 +170,13 @@ class KnowledgeBox:
     def upload(
         self,
         key: Optional[str] = None,
-        binary: Optional[File] = None,
+        binary: Optional[Union[File, str]] = None,
         text: Optional[str] = None,
         labels: Optional[Labels] = None,
         entities: Optional[Entities] = None,
-        vectors: Optional[Vectors] = None,
+        vectors: Optional[
+            Union[Vectors, Dict[str, Union[np.ndarray, List[float]]]]
+        ] = None,
     ) -> str:
         resource: Optional[Resource] = None
 
@@ -279,12 +284,24 @@ class KnowledgeBox:
     def search(
         self,
         text: Optional[str] = None,
-        filter: Optional[List[Label]] = None,
-        vector: Optional[Vector] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
-            filter_list = [f"/l/{label.labelset}/{label.label}" for label in filter]
+            new_filter: List[Label] = []
+            for fil in filter:
+                if isinstance(fil, str):
+                    if len(fil.split("/")) == 1:
+                        lset = DEFAULT_LABELSET
+                        lab = fil
+                    else:
+                        lset, lab = fil.split("/")
+                    new_filter.append(Label(label=lab, labelset=lset))
+                else:
+                    new_filter.append(fil)
+            filter_list = [f"/l/{label.labelset}/{label.label}" for label in new_filter]
             args["filters"] = filter_list
 
         if text is not None:
@@ -292,9 +309,11 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
-        if vector is not None:
-            args["vector"] = vector.value
-            args["vectorset"] = vector.vectorset
+        if vector is not None and vectorset is not None:
+            if isinstance(vector, np.ndarray):
+                vector = vector.tolist()
+            args["vector"] = vector
+            args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
 
         request = SearchRequest(**args)
@@ -303,12 +322,20 @@ class KnowledgeBox:
     async def async_search(
         self,
         text: Optional[str] = None,
-        filter: Optional[List[Label]] = None,
-        vector: Optional[Vector] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
-            filter_list = [f"/l/{label.labelset}/{label.label}" for label in filter]
+            new_filter: List[Label] = []
+            for fil in filter:
+                if isinstance(fil, str):
+                    lset, lab = fil.split("/")
+                    new_filter.append(Label(label=lab, labelset=lset))
+                else:
+                    new_filter.append(fil)
+            filter_list = [f"/l/{label.labelset}/{label.label}" for label in new_filter]
             args["filters"] = filter_list
 
         if text is not None:
@@ -316,9 +343,12 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
-        if vector is not None:
-            args["vector"] = vector.value
-            args["vectorset"] = vector.vectorset
+        if vector is not None and vectorset is not None:
+            if isinstance(vector, np.ndarray):
+                vector = vector.tolist()
+
+            args["vector"] = vector
+            args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
 
         request = SearchRequest(**args)
