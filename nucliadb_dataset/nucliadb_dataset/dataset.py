@@ -39,47 +39,86 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_sdk.client import NucliaDBClient
 
-ACTUAL_PARTIITON = "actual_partition"
+ACTUAL_PARTITION = "actual_partition"
 
 
-class NucliaDBDataset:
-    labels: Optional[KnowledgeBoxLabels] = None
-    entities: Optional[KnowledgeBoxEntities] = None
+class NucliaDataset(object):
+    labels: Optional[KnowledgeBoxLabels]
+    entities: Optional[KnowledgeBoxEntities]
 
-    def __init__(self, trainset: TrainSet, client: NucliaDBClient, base_path: str):
-        self.client = client
+    def __new__(cls, *args, **kwargs):
+        if cls is NucliaDataset:
+            raise TypeError(
+                f"'{cls.__name__}' can't be instantiated, use its child classes"
+            )
+        return super().__new__(cls)
+
+    def __init__(self, trainset: TrainSet, base_path: str):
         self.trainset = trainset
-        self.base_url = self.client.url
         self.base_path = base_path
         self.mappings: List[Callable] = []
+
+        self.labels = None
+        self.entities = None
+        self.folder = None
+
+    def iter_all_partitions(self) -> Iterator[Tuple[str, str]]:
+        partitions = self.get_partitions()
+        for index, partition in enumerate(partitions):
+            print(f"Generating partition {partition} {index}/{len(partitions)}")
+            filename = self.read_partition(partition, ACTUAL_PARTITION)
+            print("done")
+            yield partition, filename
+
+    def read_all_partitions(self) -> List[str]:
+        partitions = self.get_partitions()
+        for index, partition in enumerate(partitions):
+            print(f"Generating partition {partition} {index}/{len(partitions)}")
+            self.read_partition(partition)
+            print("done")
+        return [f"{self.base_path}/{partition}" for partition in partitions]
+
+    def get_partitions(self):
+        raise NotImplementedError()
+
+    def read_partition(self, partition_id: str, filename: Optional[str] = None):
+        raise NotImplementedError()
+
+
+class NucliaDBDataset(NucliaDataset):
+    def __init__(self, trainset: TrainSet, base_path: str, client: NucliaDBClient):
+        super().__init__(trainset, base_path)
+
+        self.client = client
+        self.base_url = self.client.url
         self.streamer = Streamer(self.trainset, self.client)
 
         if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
-            self.configure_paragraph_classification()
+            self._configure_paragraph_classification()
 
         if self.trainset.type == TaskType.FIELD_CLASSIFICATION:
-            self.configure_field_classification()
+            self._configure_field_classification()
 
         if self.trainset.type == TaskType.TOKEN_CLASSIFICATION:
-            self.configure_token_classification()
+            self._configure_token_classification()
 
         if self.trainset.type == TaskType.SENTENCE_CLASSIFICATION:
-            self.configure_sentence_classification()
+            self._configure_sentence_classification()
 
-    def configure_sentence_classification(self):
+    def _configure_sentence_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to be only on filter labelset to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
             raise Exception("Labelset is not valid")
-        self.set_mappings(
+        self._set_mappings(
             [
                 bytes_to_batch(ParagraphClassificationBatch),
                 batch_to_text_classification_normalized_arrow,
             ]
         )
-        self.setschema(
+        self._set_schema(
             pa.schema(
                 [
                     pa.field("text", pa.string()),
@@ -88,7 +127,7 @@ class NucliaDBDataset:
             )
         )
 
-    def configure_field_classification(self):
+    def _configure_field_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
         self.labels = self.client.get_labels()
@@ -99,13 +138,13 @@ class NucliaDBDataset:
         if "RESOURCES" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Field Classification")
 
-        self.set_mappings(
+        self._set_mappings(
             [
                 bytes_to_batch(FieldClassificationBatch),
                 batch_to_text_classification_arrow,
             ]
         )
-        self.set_schema(
+        self._set_schema(
             pa.schema(
                 [
                     pa.field("text", pa.string()),
@@ -114,19 +153,21 @@ class NucliaDBDataset:
             )
         )
 
-    def configure_token_classification(self):
+    def _configure_token_classification(self):
+        if len(self.trainset.filter.labels) != 1:
+            raise Exception("Needs to have only one labelset filter to train")
         self.entities = self.client.get_entities()
         for family_group in self.trainset.filter.labels:
             if family_group not in self.entities.groups:
                 raise Exception("Family group is not valid")
 
-        self.set_mappings(
+        self._set_mappings(
             [
                 bytes_to_batch(TokenClassificationBatch),
                 batch_to_token_classification_arrow,
             ]
         )
-        self.set_schema(
+        self._set_schema(
             pa.schema(
                 [
                     pa.field("text", pa.list_(pa.string())),
@@ -135,7 +176,7 @@ class NucliaDBDataset:
             )
         )
 
-    def configure_paragraph_classification(self):
+    def _configure_paragraph_classification(self):
         if len(self.trainset.filter.labels) != 1:
             raise Exception("Needs to have only one labelset filter to train")
         self.labels = self.client.get_labels()
@@ -147,13 +188,13 @@ class NucliaDBDataset:
         if "PARAGRAPHS" not in self.labels.labelsets[labelset].kind:
             raise Exception("Labelset not defined for Paragraphs Classification")
 
-        self.set_mappings(
+        self._set_mappings(
             [
                 bytes_to_batch(ParagraphClassificationBatch),
                 batch_to_text_classification_arrow,
             ]
         )
-        self.set_schema(
+        self._set_schema(
             pa.schema(
                 [
                     pa.field("text", pa.string()),
@@ -162,18 +203,30 @@ class NucliaDBDataset:
             )
         )
 
+    def _map(self, batch: Any):
+        for func in self.mappings:
+            batch = func(batch)
+        return batch
+
+    def _set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
+        self.mappings = funcs
+
+    def _set_schema(self, schema: pa.Schema):
+        self.schema = schema
+
     def get_partitions(self):
+        """
+        Get expected number of partitions from a live NucliaDB
+        """
         partitions = self.client.reader_session.get(f"{self.base_url}/trainset").json()
         if len(partitions["partitions"]) == 0:
             raise KeyError("There is no partitions")
         return partitions["partitions"]
 
-    def map(self, batch: Any):
-        for func in self.mappings:
-            batch = func(batch)
-        return batch
-
-    def generate_partition(self, partition_id: str, filename: Optional[str] = None):
+    def read_partition(self, partition_id: str, filename: Optional[str] = None):
+        """
+        Export an arrow partition from a live NucliaDB and store it locally
+        """
         if self.streamer.initialized:
             raise StreamerAlreadyRunning()
         self.streamer.initialize(partition_id)
@@ -188,7 +241,7 @@ class NucliaDBDataset:
             with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in self.streamer:
                     print(f"\r {counter}")
-                    batch = self.map(batch)
+                    batch = self._map(batch)
                     if batch is None:
                         break
                     writer.write_batch(batch)
@@ -197,24 +250,19 @@ class NucliaDBDataset:
         self.streamer.finalize()
         return filename
 
-    def iter_all_partitions(self) -> Iterator[Tuple[str, str]]:
-        partitions = self.get_partitions()
-        for index, partition in enumerate(partitions):
-            print(f"Generating partition {partition} {index}/{len(partitions)}")
-            filename = self.generate_partition(partition, ACTUAL_PARTIITON)
-            print("done")
-            yield partition, filename
 
-    def generate_all_partitions(self) -> List[str]:
-        partitions = self.get_partitions()
-        for index, partition in enumerate(partitions):
-            print(f"Generating partition {partition} {index}/{len(partitions)}")
-            self.generate_partition(partition)
-            print("done")
-        return [f"{self.base_path}/{partition}" for partition in partitions]
+class NucliaCloudDataset(NucliaDataset):
+    def __init__(self, trainset: TrainSet, base_path: str, storage_client):
+        super().__init__(trainset, base_path)
 
-    def set_mappings(self, funcs: List[Callable[[Any, Any], Tuple[Any, Any]]]):
-        self.mappings = funcs
+    def get_partitions(self):
+        """
+        Count all *.arrow files on the bucket
+        """
+        pass
 
-    def set_schema(self, schema: pa.Schema):
-        self.schema = schema
+    def read_partition(self, partition_id: str, filename: Optional[str] = None):
+        """
+        Download an pregenerated arrow partition from a bucket and store it locally
+        """
+        pass
