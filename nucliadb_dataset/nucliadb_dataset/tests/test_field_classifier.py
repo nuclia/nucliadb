@@ -25,7 +25,11 @@ from uuid import uuid4
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-from nucliadb_dataset.dataset import NucliaDataset, NucliaDBDataset, download_all_partitions
+from nucliadb_dataset.dataset import (
+    NucliaDataset,
+    NucliaDBDataset,
+    download_all_partitions,
+)
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
