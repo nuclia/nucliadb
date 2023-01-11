@@ -382,7 +382,7 @@ impl ShardReaderService {
                 relation
                     .unwrap()
                     .prefix
-                    .unwrap()
+                    .expect("Prefix search request must return a prefix response")
                     .nodes
                     .iter()
                     .map(|relation_node| relation_node.value.clone())
