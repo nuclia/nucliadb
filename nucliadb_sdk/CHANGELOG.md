@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
-## 0.1.0
+## 1.1.0
+
+- Suport of auto creation of vectorsets, easier interface.
+
+## 1.0.0
 
 - Initial Release

@@ -25,7 +25,11 @@ from uuid import uuid4
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
-from nucliadb_dataset.dataset import NucliaDataset, NucliaDBDataset
+from nucliadb_dataset.dataset import (
+    NucliaDataset,
+    NucliaDBDataset,
+    download_all_partitions,
+)
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
@@ -126,7 +130,9 @@ def test_inst_base_class():
         raise AssertionError("Base class should'nt be instantiable")
 
 
-def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
+def test_live_field_classification(
+    knowledgebox: KnowledgeBox, upload_data_field_classification
+):
     trainset = TrainSet()
     trainset.type = TaskType.FIELD_CLASSIFICATION
     trainset.filter.labels.append("labelset1")
@@ -145,3 +151,33 @@ def test_live(knowledgebox: KnowledgeBox, upload_data_field_classification):
         with pa.memory_map(filename, "rb") as source:
             loaded_array = pa.ipc.open_stream(source).read_all()
             assert len(loaded_array) == 2
+
+
+def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
+
+    knowledgebox.upload(
+        text="I'm Ramon",
+        labels=["labelset/positive"],
+    )
+
+    knowledgebox.upload(
+        text="I'm not Ramon",
+        labels=["labelset/negative"],
+    )
+
+    knowledgebox.upload(
+        text="I'm Aleix",
+        labels=["labelset/smart"],
+    )
+
+    arrow_filenames = download_all_partitions(
+        type=TaskType.FIELD_CLASSIFICATION,
+        knowledgebox=knowledgebox,
+        path=temp_folder,
+        labelsets=["labelset"],
+    )
+
+    for filename in arrow_filenames:
+        with pa.memory_map(filename, "rb") as source:
+            loaded_array = pa.ipc.open_stream(source).read_all()
+            assert len(loaded_array) == 3

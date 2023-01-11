@@ -12,8 +12,6 @@ from nucliadb_sdk.vectors import Vector
 def test_search_resource(knowledgebox: KnowledgeBox):
     # Lets create a bunch of resources
 
-    knowledgebox.new_vectorset("all-MiniLM-L6-v2", 384)
-
     ds: Dict[str, Any] = load_dataset("tweet_eval", "emoji")  # type: ignore
     encoder = SentenceTransformer("all-MiniLM-L6-v2")
     for index, train in enumerate(ds["train"]):
@@ -22,13 +20,8 @@ def test_search_resource(knowledgebox: KnowledgeBox):
         label = train["label"]
         knowledgebox.upload(
             text=train["text"],
-            labels=[Label(label=str(label), labelset="emoji")],
-            vectors=[
-                Vector(
-                    value=encoder.encode([train["text"]])[0].tolist(),
-                    vectorset="all-MiniLM-L6-v2",
-                )
-            ],
+            labels=[f"emoji/{label}"],
+            vectors={"all-MiniLM-L6-v2": encoder.encode([train["text"]])[0].tolist()},
         )
 
     assert len(knowledgebox) == 50
@@ -41,14 +34,47 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert resources.fulltext.total == 5
     assert len(resources.resources) == 5
 
-    resources = knowledgebox.search(filter=[Label(labelset="emoji", label="12")])
+    resources = knowledgebox.search(filter=["emoji/0"])
 
     vector_q = encoder.encode([ds["train"][0]["text"]])[0].tolist()
-    resources = knowledgebox.search(
-        vector=Vector(
-            value=vector_q,
-            vectorset="all-MiniLM-L6-v2",
+    resources = knowledgebox.search(vector=vector_q, vectorset="all-MiniLM-L6-v2")
+    assert len(resources.sentences.results) == 1
+    assert (
+        "Sunday afternoon walking through Venice" in resources.sentences.results[0].text
+    )
+
+
+def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
+    # Lets create a bunch of resources
+
+    ds: Dict[str, Any] = load_dataset("tweet_eval", "emoji")  # type: ignore
+    encoder = SentenceTransformer("all-MiniLM-L6-v2")
+    for index, train in enumerate(ds["train"]):
+        if index == 50:
+            break
+        label = train["label"]
+        knowledgebox.upload(
+            text=train["text"],
+            labels=[str(label)],
+            vectors={"all-MiniLM-L6-v2": encoder.encode([train["text"]])[0]},
         )
+
+    assert len(knowledgebox) == 50
+    labels = knowledgebox.get_uploaded_labels()
+
+    assert labels["default"].count == 50
+    assert labels["default"].labels["0"] == 9
+
+    resources = knowledgebox.search(text="love")
+    assert resources.fulltext.total == 5
+    assert len(resources.resources) == 5
+
+    resources = knowledgebox.search(filter=["12"])
+
+    vector_q = encoder.encode([ds["train"][0]["text"]])[0]
+    resources = knowledgebox.search(
+        vector=vector_q,
+        vectorset="all-MiniLM-L6-v2",
     )
 
 
@@ -68,7 +94,7 @@ async def test_search_resource_async(knowledgebox: KnowledgeBox):
             labels=[Label(label=str(label), labelset="emoji")],
             vectors=[
                 Vector(
-                    value=encoder.encode([train["text"]])[0].tolist(),
+                    value=encoder.encode([train["text"]])[0],
                     vectorset="all-MiniLM-L6-v2",
                 )
             ],
@@ -88,10 +114,8 @@ async def test_search_resource_async(knowledgebox: KnowledgeBox):
         filter=[Label(labelset="emoji", label="12")]
     )
 
-    vector_q = encoder.encode([ds["train"][0]["text"]])[0].tolist()
+    vector_q = encoder.encode([ds["train"][0]["text"]])[0]
     resources = await knowledgebox.async_search(
-        vector=Vector(
-            value=vector_q,
-            vectorset="all-MiniLM-L6-v2",
-        )
+        vector=vector_q,
+        vectorset="all-MiniLM-L6-v2",
     )

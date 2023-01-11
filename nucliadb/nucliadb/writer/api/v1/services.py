@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import HTTPException, Response
-from fastapi_versioning import version  # type: ignore
+from fastapi_versioning import version
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.knowledgebox_pb2 import Widget as WidgetPB
@@ -30,12 +30,12 @@ from nucliadb_protos.writer_pb2 import (
     OpStatusWriter,
     SetEntitiesRequest,
     SetLabelsRequest,
-    SetVectorSetRequest,
     SetWidgetsRequest,
 )
 from starlette.requests import Request
 
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
 from nucliadb_models.entities import EntitiesGroup
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
@@ -282,24 +282,7 @@ async def delete_widget(request: Request, kbid: str, widget: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_vectorset(request: Request, kbid: str, vectorset: str, item: VectorSet):
-    ingest = get_ingest()
-    pbrequest: SetVectorSetRequest = SetVectorSetRequest(id=vectorset)
-    pbrequest.kb.uuid = kbid
-
-    set_info_on_span({"nuclia.kbid": kbid})
-
-    if item.dimension:
-        pbrequest.vectorset.dimension = item.dimension
-
-    status: OpStatusWriter = await ingest.SetVectorSet(pbrequest)  # type: ignore
-    if status.status == OpStatusWriter.Status.OK:
-        return None
-    elif status.status == OpStatusWriter.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    elif status.status == OpStatusWriter.Status.ERROR:
-        raise HTTPException(
-            status_code=500, detail="Error on settings labels on a Knowledge box"
-        )
+    await create_vectorset(kbid, vectorset, item.dimension)
 
 
 @api.delete(
