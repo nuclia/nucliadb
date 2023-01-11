@@ -56,7 +56,7 @@ async def test_vectorset(
                     "vectors": {
                         "vectorset1": {
                             "vector1": {
-                                "vector": [1.0, 0.9],
+                                "vector": [],
                                 "labels": ["label1"],
                                 "positions": (0, 5),
                             }
@@ -68,7 +68,7 @@ async def test_vectorset(
         },
     )
     assert resp.status_code == 412
-    assert resp.json()["detail"] == "Invalid vectorset"
+    assert resp.json()["detail"] == "Invalid vector should not be 0"
 
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/vectorset/vectorset1",
