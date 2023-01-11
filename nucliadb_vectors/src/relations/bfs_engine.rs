@@ -112,6 +112,9 @@ where Guide: BfsGuide
                 if !is_free_jump && !can_use_free_jump {
                     let node = BfsNode {
                         point: edge.to(),
+                        // Exploring a further node without free jump increases
+                        // by one the depth of the BFS, i.e., the distance to
+                        // the entry point
                         depth: node.depth + 1,
                     };
                     next_level.insert(node.point, node);
