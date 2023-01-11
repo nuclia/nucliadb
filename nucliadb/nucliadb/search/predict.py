@@ -124,7 +124,7 @@ class PredictEngine:
         else:
             if self.nuclia_service_account is None:
                 logger.warning(
-                    "Nuclia Service account is not defined so could not retrieve vectors for the query"
+                    "Nuclia Service account is not defined so could not retrieve entities from the query"
                 )
                 return []
             # Upload the payload
