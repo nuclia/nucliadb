@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import tempfile
+
 import pytest
 
 from nucliadb_sdk.entities import Entity

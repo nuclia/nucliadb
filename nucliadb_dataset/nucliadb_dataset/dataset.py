@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from typing import Any, Callable, Iterator, List, Optional, Tuple
-from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
@@ -39,7 +39,7 @@ from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_sdk.client import Environment, NucliaDBClient
-import os
+from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 ACTUAL_PARTIITON = "actual_partition"
 
@@ -247,7 +247,7 @@ class NucliaDBDataset:
 
 
 def download_all_partitions(
-    type: TaskType,
+    type: TaskType.V,
     knowledgebox: Optional[KnowledgeBox] = None,
     url: Optional[str] = None,
     api_key: Optional[str] = None,

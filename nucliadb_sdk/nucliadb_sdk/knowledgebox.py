@@ -1,7 +1,6 @@
 import os
 from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
 from urllib.parse import urlparse
-from nucliadb_sdk import DEFAULT_LABELSET
 
 import numpy as np
 
@@ -13,6 +12,7 @@ from nucliadb_models.search import (
     SearchRequest,
 )
 from nucliadb_models.vectors import VectorSet, VectorSets
+from nucliadb_sdk import DEFAULT_LABELSET
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File

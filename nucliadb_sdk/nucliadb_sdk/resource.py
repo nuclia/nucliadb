@@ -12,17 +12,17 @@ from nucliadb_models.metadata import Origin, TokenSplit, UserFieldMetadata, User
 from nucliadb_models.resource import Resource
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdString, SlugString
-from nucliadb_models.vectors import UserVector, UserVectorWrapper, VectorSets
+from nucliadb_models.vectors import UserVector, UserVectorWrapper, VectorSet, VectorSets
 from nucliadb_models.writer import (
     GENERIC_MIME_TYPE,
     CreateResourcePayload,
     UpdateResourcePayload,
 )
+from nucliadb_sdk import DEFAULT_LABELSET, logger
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
 from nucliadb_sdk.vectors import Vector, Vectors
-from nucliadb_sdk import DEFAULT_LABELSET, logger
 
 
 def create_resource(
@@ -135,7 +135,9 @@ def create_resource(
             vector_id = vector.key if vector.key is not None else uuid4().hex
             if vectorsets is not None and vector.vectorset not in vectorsets.vectorsets:
                 logger.warn("Vectorset is not created, we will create it for you")
-                vectorsets.vectorsets[vector.vectorset] = len(vector.value)
+                vectorsets.vectorsets[vector.vectorset] = VectorSet(
+                    dimension=len(vector.value)
+                )
             uvw.vectors[vector.vectorset] = {
                 vector_id: UserVector(
                     vector=vector.value,
@@ -260,6 +262,9 @@ def update_resource(
             vector_id = vector.key if vector.key is not None else uuid4().hex
             if vectorsets is not None and vector.vectorset not in vectorsets.vectorsets:
                 logger.warn("Vectorset is not created, we will create it for you")
+                vectorsets.vectorsets[vector.vectorset] = VectorSet(
+                    dimension=len(vector.value)
+                )
 
             uvw.vectors[vector.vectorset] = {
                 vector_id: UserVector(
