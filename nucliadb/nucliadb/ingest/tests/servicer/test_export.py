@@ -106,17 +106,6 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert len(export.user_vectors) > 0
     assert found
 
-    req = ExportRequest()
-    req.kbid = result.uuid
-    found = False
-    async for export in stub.Export(req):  # type: ignore
-        assert found is False
-        found = True
-        assert export.basic.title == "My Title"
-        assert export.texts["text1"].body == "My text1"
-        assert export.extracted_text[0].body.text == "My text"
-    assert found
-
     index_req = IndexResource()
     index_req.kbid = result.uuid
     index_req.rid = "test1"
@@ -161,3 +150,39 @@ async def test_upload_download(grpc_servicer: IngestFixture):
     async for bindata in stub.DownloadFile(file_req):  # type: ignore
         downloaded += bindata.data
     assert downloaded == binary
+
+
+@pytest.mark.asyncio
+async def test_export_file(grpc_servicer: IngestFixture):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb.config.title = "My Title"
+    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    kbid = result.uuid
+
+    # Create an exported bm with a file
+    bm = BrokerMessage()
+    bm.uuid = "test1"
+    bm.slug = bm.basic.slug = "slugtest"
+    bm.kbid = kbid
+    bm.texts["text1"].body = "My text1"
+    bm.files["file1"].file.size = 0
+    bm.files["file1"].file.source = CloudFile.Source.EXPORT
+    bm.files["file1"].file.bucket_name = "bucket_from_exported_kb"
+    bm.files["file1"].file.uri = "/kbs/exported_kb/r/test1/f/f/file1"
+
+    await stub.ProcessMessage([bm])  # type: ignore
+
+    # Check that file bucket and uri were replaced
+    req = ExportRequest()
+    req.kbid = result.uuid
+    export: BrokerMessage
+    found = False
+    async for export in stub.Export(req):  # type: ignore
+        assert found is False
+        found = True
+        assert export.files["file1"].file.uri.startswith(f"kbs/{kbid}")
+        assert kbid in export.files["file1"].file.bucket_name
+    assert found

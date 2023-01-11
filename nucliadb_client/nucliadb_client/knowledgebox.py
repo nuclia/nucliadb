@@ -157,9 +157,10 @@ class KnowledgeBox:
                     ubd.metadata.size = member.size
                     ubd.metadata.kbid = self.kbid
 
-                    # Tweak the key so that it points to the new kbid
-                    exported_kbid = member.name.split("/")[1]
-                    ubd.metadata.key = member.name.replace(exported_kbid, self.kbid)
+                    # Replace the exported kbid from the key with the kbid we are importing to
+                    exported_key = member.name
+                    exported_kbid = exported_key.split("/")[1]
+                    ubd.metadata.key = exported_key.replace(exported_kbid, self.kbid, 1)
 
                     yield ubd
 

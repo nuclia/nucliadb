@@ -26,7 +26,8 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 def clone_collect_cf(binaries: List[CloudFile], origin: CloudFile):
     cf = CloudFile()
     cf.CopyFrom(origin)
-    # Mark original as export so that it's clear that is part of an export
+    # Mark the cloud file of the broker message being exported as export source
+    # so that it's clear that is part of an export while importing.
     origin.source = CloudFile.Source.EXPORT
     binaries.append(cf)
 

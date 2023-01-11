@@ -82,10 +82,7 @@ def run():
         reader_host=args.reader_host,
         grpc_host=args.grpc_host,
     )
-    kb = client.get_kb(kbid=args.kbid)
-    if kb is None:
-        raise KeyError("KB not found")
-    asyncio.run(kb.export(args.dump))
+    asyncio.run(client.export_kb(kbid=args.kbid, location=args.dump))
 
 
 if __name__ == "__main__":

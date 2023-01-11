@@ -152,7 +152,7 @@ async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
     resource = srckb.create_resource(payload)
 
     with tempfile.NamedTemporaryFile() as dump:
-        await srckb.export(dump.name)
+        await nucliadb_client.export_kb(kbid=srckb.kbid, location=dump.name)
         await nucliadb_client.import_kb(slug="dst1", location=dump.name)
 
     dstkb = nucliadb_client.get_kb(slug="dst1")

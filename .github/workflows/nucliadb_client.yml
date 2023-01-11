@@ -75,14 +75,20 @@ jobs:
         id: filter
         with:
           filters: |
-            nucliadb_modified:
+            nucliadb_node_modified:
               - 'nucliadb_node/**'
+            nucliadb_modified:
               - 'nucliadb/**'
 
-      - name: Build Nucliadb docker image for testing
-        if: steps.filter.outputs.nucliadb_modified == 'true'
+      - name: Build Nucliadb docker image (with compiled node bindings) for testing
+        if: steps.filter.outputs.nucliadb_node_modified == 'true'
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .
+
+      - name: Build Nucliadb docker image (without bindings) for testing
+        if: ${{ steps.filter.outputs.nucliadb_node_modified != 'true' && steps.filter.outputs.nucliadb_modified == 'true' }}
+        run: |
+          docker build -t nuclia/nucliadb:latest -f Dockerfile .
 
       - name: Run tests
         run: |

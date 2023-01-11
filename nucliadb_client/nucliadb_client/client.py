@@ -149,6 +149,17 @@ class NucliaDBClient:
         response_obj = KnowledgeBoxObj.parse_raw(response.content)
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 
+    async def export_kb(
+        self,
+        *,
+        kbid: str,
+        location: str,
+    ) -> None:
+        kb = self.get_kb(kbid=kbid)
+        if kb is None:
+            raise KeyError(f"KB {kbid} not found")
+        await kb.export(location)
+
     async def import_kb(
         self,
         *,
