@@ -78,6 +78,7 @@ class CloudFile(google.protobuf.message.Message):
         LOCAL: CloudFile._Source.ValueType  # 3
         EXTERNAL: CloudFile._Source.ValueType  # 4
         EMPTY: CloudFile._Source.ValueType  # 5
+        EXPORT: CloudFile._Source.ValueType  # 6
 
     class Source(_Source, metaclass=_SourceEnumTypeWrapper): ...
     FLAPS: CloudFile.Source.ValueType  # 0
@@ -86,6 +87,7 @@ class CloudFile(google.protobuf.message.Message):
     LOCAL: CloudFile.Source.ValueType  # 3
     EXTERNAL: CloudFile.Source.ValueType  # 4
     EMPTY: CloudFile.Source.ValueType  # 5
+    EXPORT: CloudFile.Source.ValueType  # 6
 
     URI_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int

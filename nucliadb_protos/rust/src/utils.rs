@@ -126,7 +126,7 @@ pub struct UserVector {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UserVectors {
-    /// id del vector
+    /// vector's id
     #[prost(map="string, message", tag="1")]
     pub vectors: ::std::collections::HashMap<::prost::alloc::string::String, UserVector>,
 }

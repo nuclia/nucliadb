@@ -66,7 +66,11 @@ class LocalStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        pass
+        origin_bucket_path = self.storage.get_bucket_path(origin_bucket_name)
+        destination_bucket_path = self.storage.get_bucket_path(destination_bucket_name)
+        origin_path = f"{origin_bucket_path}/{origin_uri}"
+        destination_path = f"{destination_bucket_path}/{destination_uri}"
+        shutil.copy(origin_path, destination_path)
 
     def get_file_path(self, bucket: str, key: str):
         return f"{self.storage.get_bucket_name(bucket)}/{key}"
@@ -212,6 +216,7 @@ class LocalStorageField(StorageField):
 
 class LocalStorage(Storage):
     field_klass = LocalStorageField
+    chunk_size = CHUNK_SIZE
 
     def __init__(self, local_testing_files: str):
         self.local_testing_files = local_testing_files.rstrip("/")
@@ -280,7 +285,7 @@ class LocalStorage(Storage):
 
         async with aiofiles.open(key_path, mode="rb") as f:
             while True:
-                body = await f.read(CHUNK_SIZE)
+                body = await f.read(self.chunk_size)
                 if body == b"" or body is None:
                     break
                 else:

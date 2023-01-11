@@ -243,6 +243,14 @@ class WriterStub:
         nucliadb_protos.writer_pb2.ExportRequest,
         nucliadb_protos.writer_pb2.BrokerMessage,
     ]
+    DownloadFile: grpc.UnaryStreamMultiCallable[
+        nucliadb_protos.writer_pb2.FileRequest,
+        nucliadb_protos.writer_pb2.BinaryData,
+    ]
+    UploadFile: grpc.StreamUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.UploadBinaryData,
+        nucliadb_protos.writer_pb2.FileUploaded,
+    ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -435,5 +443,17 @@ class WriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.writer_pb2.ExportRequest,
         context: grpc.ServicerContext,
     ) -> collections.abc.Iterator[nucliadb_protos.writer_pb2.BrokerMessage]: ...
+    @abc.abstractmethod
+    def DownloadFile(
+        self,
+        request: nucliadb_protos.writer_pb2.FileRequest,
+        context: grpc.ServicerContext,
+    ) -> collections.abc.Iterator[nucliadb_protos.writer_pb2.BinaryData]: ...
+    @abc.abstractmethod
+    def UploadFile(
+        self,
+        request_iterator: collections.abc.Iterator[nucliadb_protos.writer_pb2.UploadBinaryData],
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.FileUploaded: ...
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: grpc.Server) -> None: ...

@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 2.0.0a4
+
+- Import/Export with binary data
+
 ## 2.0.0a3
 
 - Improve export CLI argument descriptions
