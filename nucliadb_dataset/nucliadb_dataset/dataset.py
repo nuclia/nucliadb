@@ -100,7 +100,12 @@ class NucliaDataset(object):
 
 
 class NucliaDBDataset(NucliaDataset):
-    def __init__(self, trainset: TrainSet, base_path: str, client: NucliaDBClient):
+    def __init__(
+        self,
+        trainset: TrainSet,
+        client: NucliaDBClient,
+        base_path: Optional[str] = None,
+    ):
         super().__init__(trainset, base_path)
 
         self.client = client
