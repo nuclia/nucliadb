@@ -17,21 +17,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import base64
+import tarfile
+import tempfile
 from enum import Enum
+from io import BytesIO
 from typing import TYPE_CHECKING, AsyncIterator, List, Optional
+from uuid import uuid4
 
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
+    BinaryData,
     BrokerMessage,
     ExportRequest,
+    FileRequest,
     GetEntitiesRequest,
     GetEntitiesResponse,
     GetLabelsRequest,
     GetLabelsResponse,
     SetEntitiesRequest,
     SetLabelsRequest,
+    UploadBinaryData,
 )
 
+from nucliadb_client.utils import collect_cfs
 from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
 from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards
 from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
@@ -48,9 +58,9 @@ KB_PREFIX = "kb"
 
 
 class CODEX(str, Enum):
-    RES = "RES:"
-    LAB = "LAB:"
-    ENT = "ENT:"
+    RESOURCE = "RES:"
+    LABELS = "LAB:"
+    ENTITIES = "ENT:"
 
 
 class KnowledgeBox:
@@ -133,16 +143,48 @@ class KnowledgeBox:
         resp = self.http_manager_v1.delete("")
         return resp.status_code == 200
 
+    async def import_tar_bz2(self, filename):
+        with tarfile.open(filename, mode="r:bz2") as tar:
+            for member in tar.getmembers():
+                buffer = tar.extractfile(member.name)
+
+                async def upload_generator(buffer: BytesIO, member: tarfile.TarInfo):
+                    chunk_size = 1_000_000
+                    buffer.seek(0)
+                    count = 0
+                    ubd = UploadBinaryData()
+                    ubd.count = count
+                    ubd.metadata.size = member.size
+                    ubd.metadata.kbid = self.kbid
+
+                    # Replace the exported kbid from the key with the kbid we are importing to
+                    exported_key = member.name
+                    exported_kbid = exported_key.split("/")[1]
+                    ubd.metadata.key = exported_key.replace(exported_kbid, self.kbid, 1)
+
+                    yield ubd
+
+                    data = buffer.read(chunk_size)
+                    while data != b"":
+                        count += 1
+                        ubd = UploadBinaryData()
+                        ubd.count = count
+                        ubd.payload = data
+                        data = buffer.read(chunk_size)
+                        yield ubd
+
+                await self.client.writer_stub_async.UploadFile(upload_generator(buffer, member))  # type: ignore
+
     async def import_export(self, line: str):
         type_line = line[:4]
         payload = base64.b64decode(line[4:])
-        if type_line == CODEX.RES:
+        if type_line == CODEX.RESOURCE:
             pb_bm = BrokerMessage()
             pb_bm.ParseFromString(payload)
             res = Resource(rid=pb_bm.uuid, kb=self, slug=pb_bm.basic.slug)
             res._bm = pb_bm
             await res.commit(processor=False)
-        elif type_line == CODEX.ENT:
+        elif type_line == CODEX.ENTITIES:
             pb_er = GetEntitiesResponse()
             pb_er.ParseFromString(payload)
             for group, entities in pb_er.groups.items():
@@ -151,7 +193,7 @@ class KnowledgeBox:
                 ser_pb.group = group
                 ser_pb.entities.CopyFrom(entities)
                 await self.client.writer_stub_async.SetEntities(ser_pb)  # type:  ignore
-        elif type_line == CODEX.LAB:
+        elif type_line == CODEX.LABELS:
             pb_lr = GetLabelsResponse()
             pb_lr.ParseFromString(payload)
             for labelset, labelset_obj in pb_lr.labels.labelset.items():
@@ -184,19 +226,57 @@ class KnowledgeBox:
         )
         return label_response
 
+    async def download_file(self, cf: CloudFile, destination: str):
+        assert self.client.writer_stub_async
+        req = FileRequest()
+        if cf.bucket_name is not None:
+            req.bucket = cf.bucket_name
+        if cf.uri is not None:
+            req.key = cf.uri
+        async with aiofiles.open(destination, "wb") as download_file_obj:
+            data: BinaryData
+            async for data in self.client.writer_stub_async.DownloadFile(req):  # type: ignore
+                await download_file_obj.write(data.data)
+
     def init_async_grpc(self):
         self.client.init_async_grpc()
 
-    async def generator(self) -> AsyncIterator[str]:
+    async def generator(self, binaries: List[CloudFile]) -> AsyncIterator[str]:
         self.init_async_grpc()
         async for bm in self.resources():
-            yield CODEX.RES + base64.b64encode(bm.SerializeToString()).decode() + "\n"
+            collect_cfs(bm, binaries)
+
+            yield CODEX.RESOURCE + base64.b64encode(
+                bm.SerializeToString()
+            ).decode() + "\n"
         entities = await self.entities()
-        yield CODEX.ENT + base64.b64encode(entities.SerializeToString()).decode() + "\n"
+        yield CODEX.ENTITIES + base64.b64encode(
+            entities.SerializeToString()
+        ).decode() + "\n"
         labels = await self.labels()
-        yield CODEX.LAB + base64.b64encode(labels.SerializeToString()).decode() + "\n"
+        yield CODEX.LABELS + base64.b64encode(
+            labels.SerializeToString()
+        ).decode() + "\n"
 
     async def export(self, dump: str):
-        async with aiofiles.open(dump, "w+") as dump_file:
-            async for line in self.generator():
+        """
+        Write all exported resources, labels and entities into the `dump` file.
+        Then download all the binaries into a `{dump}.tar.bz2` file.
+        """
+        binaries: List[CloudFile] = []
+        loop = asyncio.get_running_loop()
+        async with aiofiles.open(f"{dump}", "w+") as dump_file:
+            async for line in self.generator(binaries):
                 await dump_file.write(line)
+
+            with tempfile.TemporaryDirectory() as tempfolder:
+                filename = f"{tempfolder}/{uuid4().hex}"
+                with tarfile.open(f"{dump}.tar.bz2", mode="w:bz2") as tar:
+                    for cf in binaries:
+                        await self.download_file(cf, filename)
+                        await loop.run_in_executor(
+                            None,
+                            tar.add,
+                            filename,
+                            cf.uri,
+                        )

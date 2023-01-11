@@ -356,7 +356,7 @@ class UserVectors(google.protobuf.message.Message):
     VECTORS_FIELD_NUMBER: builtins.int
     @property
     def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___UserVector]:
-        """id del vector"""
+        """vector's id"""
     def __init__(
         self,
         *,

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 1.1.0
+
+- Implement a common interface for different dataset sources
+- Refactor NucliaDBDataset to match the new interface
+
 ## 1.0.1
 
 - Fix storing path environment variable

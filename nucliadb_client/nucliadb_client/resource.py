@@ -113,6 +113,11 @@ class Resource:
         )
         assert response.status_code == 200
 
+    def download_file(self, field_id):
+        resp = self.http_reader_v1.get(f"/file/{field_id}/download/field")
+        assert resp.status_code == 200
+        return resp.content
+
     @property
     def bm(self) -> BrokerMessage:
         if self._bm is None:

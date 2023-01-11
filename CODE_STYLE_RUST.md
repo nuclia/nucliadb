@@ -114,7 +114,7 @@ These assert will not be part of the release binary and won't hurt the execution
 We use on the same code style, [rustc's doc comments](https://doc.rust-lang.org/1.0.0/style/style/comments.html).
 In particular, the summary line should be written in third-person singular present indicative form.
 
-No rustdoc in Quickwit or in private API is ok.
+No rustdoc in NucliaDB or in private API is ok.
 No rustdoc on Tantivy public API is not ok.
 
 We usually do not expect comments to contain any implementation details.

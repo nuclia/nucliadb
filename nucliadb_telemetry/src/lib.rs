@@ -19,7 +19,7 @@
 
 #![allow(clippy::bool_assert_comparison)]
 pub mod payload;
-/// This crate contains  the code responsible for sending usage data to NucliaDB's server.
+/// This crate contains  the code responsible for sending usage data to Nuclia's server.
 mod sender;
 pub(crate) mod sink;
 

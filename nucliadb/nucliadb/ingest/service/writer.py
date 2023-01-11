@@ -19,6 +19,7 @@
 #
 import traceback
 import uuid
+from io import BytesIO
 from typing import AsyncIterator, Optional
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -36,7 +37,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     UpdateKnowledgeBoxResponse,
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
+    BinaryData,
     BrokerMessage,
     DelEntitiesRequest,
     DelLabelsRequest,
@@ -44,6 +47,8 @@ from nucliadb_protos.writer_pb2 import (
     DetWidgetsRequest,
     ExportRequest,
     ExtractedVectorsWrapper,
+    FileRequest,
+    FileUploaded,
     GetEntitiesGroupRequest,
     GetEntitiesGroupResponse,
     GetEntitiesRequest,
@@ -76,7 +81,11 @@ from nucliadb_protos.writer_pb2 import (
     SetWidgetsRequest,
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from nucliadb_protos.writer_pb2 import WriterStatusRequest, WriterStatusResponse
+from nucliadb_protos.writer_pb2 import (
+    UploadBinaryData,
+    WriterStatusRequest,
+    WriterStatusResponse,
+)
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import TXNID
@@ -93,6 +102,7 @@ from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY
 from nucliadb_protos import writer_pb2_grpc
 from nucliadb_utils.keys import KB_SHARDS
+from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
     get_audit,
     get_cache,
@@ -668,6 +678,58 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception:
             logger.exception("Export", stack_info=True)
             raise
+
+    async def DownloadFile(self, request: FileRequest, context=None):
+        storage = await get_storage(service_name=SERVICE_NAME)
+        async for data in storage.download(request.bucket, request.key):
+            yield BinaryData(data=data)
+
+    async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
+        storage = await get_storage(service_name=SERVICE_NAME)
+        data: UploadBinaryData
+
+        destination: Optional[StorageField] = None
+        cf = CloudFile()
+        data = await request.__anext__()
+        if data.HasField("metadata"):
+            bucket = storage.get_bucket_name(data.metadata.kbid)
+            destination = storage.field_klass(
+                storage=storage, bucket=bucket, fullkey=data.metadata.key
+            )
+            cf.content_type = data.metadata.content_type
+            cf.filename = data.metadata.filename
+            cf.size = data.metadata.size
+        else:
+            raise AttributeError("Metadata not found")
+
+        async def generate_buffer(
+            storage: Storage, request: AsyncIterator[UploadBinaryData]  # type: ignore
+        ):
+            # Storage requires uploading chunks of a specified size, this is
+            # why we need to have an intermediate buffer
+            buf = BytesIO()
+            async for chunk in request:
+                if not chunk.HasField("payload"):
+                    raise AttributeError("Payload not found")
+                buf.write(chunk.payload)
+                while buf.tell() > storage.chunk_size:
+                    buf.seek(0)
+                    data = buf.read(storage.chunk_size)
+                    if len(data):
+                        yield data
+                    old_data = buf.read()
+                    buf = BytesIO()
+                    buf.write(old_data)
+            buf.seek(0)
+            data = buf.read()
+            if len(data):
+                yield data
+
+        if destination is None:
+            raise AttributeError("No destination file")
+        await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
+        result = FileUploaded()
+        return result
 
 
 def update_shards_with_updated_replica(

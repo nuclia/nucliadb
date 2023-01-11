@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import base64
 from datetime import datetime
 
 import pytest
@@ -31,10 +31,19 @@ from nucliadb_protos.resources_pb2 import (
     UserVectorsWrapper,
 )
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import BrokerMessage, ExportRequest, IndexResource
+from nucliadb_protos.writer_pb2 import (
+    BinaryData,
+    BrokerMessage,
+    ExportRequest,
+    FileRequest,
+    IndexResource,
+    UploadBinaryData,
+)
 
+from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
+from nucliadb_utils.utilities import get_storage
 
 
 @pytest.mark.asyncio
@@ -97,18 +106,83 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert len(export.user_vectors) > 0
     assert found
 
-    req = ExportRequest()
-    req.kbid = result.uuid
-    found = False
-    async for export in stub.Export(req):  # type: ignore
-        assert found is False
-        found = True
-        assert export.basic.title == "My Title"
-        assert export.texts["text1"].body == "My text1"
-        assert export.extracted_text[0].body.text == "My text"
-    assert found
-
     index_req = IndexResource()
     index_req.kbid = result.uuid
     index_req.rid = "test1"
     assert await stub.ReIndex(index_req)  # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_upload_download(grpc_servicer: IngestFixture):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    # Create a KB
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb.config.title = "My Title"
+    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    kbid = result.uuid
+
+    # Upload a file to it
+    metadata = UploadBinaryData(count=0)
+    metadata.metadata.size = 1
+    metadata.metadata.kbid = kbid
+    metadata.metadata.key = f"{kbid}/some/key"
+
+    binary = base64.b64encode(b"Hola")
+    data = UploadBinaryData(count=1)
+    data.payload = binary
+
+    async def upload_iterator():
+        yield metadata
+        yield data
+
+    await stub.UploadFile(upload_iterator())  # type: ignore
+
+    # Now download the file
+    file_req = FileRequest()
+    storage = await get_storage(service_name=SERVICE_NAME)
+    file_req.bucket = storage.get_bucket_name(kbid)
+    file_req.key = metadata.metadata.key
+
+    downloaded = b""
+    bindata: BinaryData
+    async for bindata in stub.DownloadFile(file_req):  # type: ignore
+        downloaded += bindata.data
+    assert downloaded == binary
+
+
+@pytest.mark.asyncio
+async def test_export_file(grpc_servicer: IngestFixture):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test")
+    pb.config.title = "My Title"
+    result: knowledgebox_pb2.NewKnowledgeBoxResponse = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    kbid = result.uuid
+
+    # Create an exported bm with a file
+    bm = BrokerMessage()
+    bm.uuid = "test1"
+    bm.slug = bm.basic.slug = "slugtest"
+    bm.kbid = kbid
+    bm.texts["text1"].body = "My text1"
+    bm.files["file1"].file.size = 0
+    bm.files["file1"].file.source = CloudFile.Source.EXPORT
+    bm.files["file1"].file.bucket_name = "bucket_from_exported_kb"
+    bm.files["file1"].file.uri = "/kbs/exported_kb/r/test1/f/f/file1"
+
+    await stub.ProcessMessage([bm])  # type: ignore
+
+    # Check that file bucket and uri were replaced
+    req = ExportRequest()
+    req.kbid = result.uuid
+    export: BrokerMessage
+    found = False
+    async for export in stub.Export(req):  # type: ignore
+        assert found is False
+        found = True
+        assert export.files["file1"].file.uri.startswith(f"kbs/{kbid}")
+        assert kbid in export.files["file1"].file.bucket_name
+    assert found

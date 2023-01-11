@@ -86,6 +86,33 @@ class StorageField:
         cf.source = self.storage.source  # type: ignore
         return cf
 
+    async def copy(
+        self,
+        origin_uri: str,
+        destination_uri: str,
+        origin_bucket_name: str,
+        destination_bucket_name: str,
+    ):
+        raise NotImplementedError()
+
+    async def move(
+        self,
+        origin_uri: str,
+        destination_uri: str,
+        origin_bucket_name: str,
+        destination_bucket_name: str,
+    ):
+        raise NotImplementedError()
+
+    async def start(self, cf: CloudFile) -> CloudFile:
+        raise NotImplementedError()
+
+    async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
+        raise NotImplementedError()
+
+    async def finish(self):
+        raise NotImplementedError()
+
 
 class Storage:
     source: int
@@ -93,6 +120,7 @@ class Storage:
     deadletter_bucket: Optional[str] = None
     indexing_bucket: Optional[str] = None
     cached_buckets: List[str] = []
+    chunk_size = CHUNK_SIZE
 
     async def delete_resource(self, kbid: str, uuid: str):
         # Delete all keys inside a resource
@@ -194,9 +222,15 @@ class Storage:
         # see if file is in the same Cloud in the same bucket
         if file.source == self.source and file.uri != destination.key:
             new_cf = await self.move(file, destination)
+
         elif file.source == self.source:
             return file
-
+        elif file.source == CloudFile.EXPORT:
+            new_cf = CloudFile()
+            new_cf.CopyFrom(file)
+            new_cf.bucket_name = destination.bucket
+            new_cf.uri = destination.key
+            new_cf.source = self.source
         elif file.source == CloudFile.FLAPS:
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
@@ -398,8 +432,15 @@ class Storage:
     def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
         raise NotImplementedError()
 
+    async def copy(self, file: CloudFile, destination: StorageField):
+        await destination.copy(
+            file.uri, destination.key, file.bucket_name, destination.bucket
+        )
+
     async def move(self, file: CloudFile, destination: StorageField):
-        raise NotImplementedError()
+        await destination.move(
+            file.uri, destination.key, file.bucket_name, destination.bucket
+        )
 
     async def create_kb(self, kbid: str) -> bool:
         raise NotImplementedError()
