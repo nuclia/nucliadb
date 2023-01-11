@@ -326,8 +326,5 @@ def download_all_partitions(
     trainset = TrainSet(type=type)
     trainset.filter.labels.extend(labelsets)
 
-    fse = NucliaDBDataset(
-        client=client,
-        trainset=trainset,
-    )
+    fse = NucliaDBDataset(client=client, trainset=trainset, base_path=path)
     return fse.read_all_partitions(path=path)
