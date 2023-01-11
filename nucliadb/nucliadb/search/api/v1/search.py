@@ -108,7 +108,6 @@ async def search_knowledgebox(
             SearchOptions.PARAGRAPH,
             SearchOptions.DOCUMENT,
             SearchOptions.VECTOR,
-            SearchOptions.RELATIONS,
         ]
     ),
     reload: bool = Query(default=True),
