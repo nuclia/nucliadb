@@ -33,7 +33,12 @@ class KnowledgeBox:
     api_key: Optional[str] = None
     id: str
 
-    def __init__(self, url: str, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        url: str,
+        api_key: Optional[str] = None,
+        client: Optional[NucliaDBClient] = None,
+    ):
         self.id = url.split("/")[-1]
         url_obj = urlparse(url)
         if url_obj.hostname is not None and url_obj.hostname.endswith(NUCLIA_CLOUD):
@@ -41,7 +46,10 @@ class KnowledgeBox:
             self.api_key = api_key
         else:
             env = Environment.OSS
-        self.client = NucliaDBClient(environment=env, url=url, api_key=self.api_key)
+        if client is None:
+            self.client = NucliaDBClient(environment=env, url=url, api_key=self.api_key)
+        else:
+            self.client = client
 
     def __iter__(self) -> Iterable[Resource]:
         for batch_resources in self.client.list_resources():

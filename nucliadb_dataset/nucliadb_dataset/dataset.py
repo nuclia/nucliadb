@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from typing import Any, Callable, Iterator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Iterator, List, Optional, Tuple
 
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
@@ -40,6 +40,11 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
+
+if TYPE_CHECKING:
+    TaskValue = TaskType.V
+else:
+    TaskValue = int
 
 ACTUAL_PARTITION = "actual_partition"
 
@@ -80,11 +85,13 @@ class NucliaDataset(object):
 
     def read_all_partitions(self, force=False, path: Optional[str] = None) -> List[str]:
         partitions = self.get_partitions()
+        result = []
         for index, partition in enumerate(partitions):
             print(f"Generating partition {partition} {index}/{len(partitions)}")
-            self.read_partition(partition, force=force, path=path)
+            filename = self.read_partition(partition, force=force, path=path)
+            result.append(filename)
             print("done")
-        return [f"{self.base_path}/{partition}" for partition in partitions]
+        return result
 
     def get_partitions(self):
         raise NotImplementedError()
@@ -108,6 +115,7 @@ class NucliaDBDataset(NucliaDataset):
     ):
         super().__init__(trainset, base_path)
 
+        self.knowledgebox = KnowledgeBox(client.url, client.api_key, client=client)
         self.client = client
         self.base_url = self.client.url
         self.streamer = Streamer(self.trainset, self.client)
@@ -151,10 +159,18 @@ class NucliaDBDataset(NucliaDataset):
             raise Exception("Needs to have only one labelset filter to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
-        if labelset not in self.labels.labelsets:
-            raise Exception("Labelset is not valid")
+        computed_labelset = False
 
-        if "RESOURCES" not in self.labels.labelsets[labelset].kind:
+        if labelset not in self.labels.labelsets:
+            if labelset in self.knowledgebox.get_uploaded_labels():
+                computed_labelset = True
+            else:
+                raise Exception("Labelset is not valid")
+
+        if (
+            computed_labelset is False
+            and "RESOURCES" not in self.labels.labelsets[labelset].kind
+        ):
             raise Exception("Labelset not defined for Field Classification")
 
         self._set_mappings(
@@ -309,7 +325,7 @@ class NucliaCloudDataset(NucliaDataset):
 
 
 def download_all_partitions(
-    type: TaskType.V,
+    type: TaskValue,  # type: ignore
     knowledgebox: Optional[KnowledgeBox] = None,
     url: Optional[str] = None,
     api_key: Optional[str] = None,
