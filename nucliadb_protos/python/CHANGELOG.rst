@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.44
+------
+- Add protos for upload and download
+
 0.0.43
 ------
 - Add load score value in cluster member

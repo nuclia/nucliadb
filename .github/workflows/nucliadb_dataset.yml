@@ -79,7 +79,7 @@ jobs:
               - 'nucliadb_node/**'
               - 'nucliadb/**'
 
-      - name: Build local ClusterManager for testing
+      - name: Build Nucliadb docker image for testing
         if: steps.filter.outputs.nucliadb_modified == 'true'
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .

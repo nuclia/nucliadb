@@ -17,6 +17,7 @@ message CloudFile {
         LOCAL = 3;
         EXTERNAL = 4;
         EMPTY = 5;
+        EXPORT = 6;
     }
     Source source = 5;
     string filename = 6;

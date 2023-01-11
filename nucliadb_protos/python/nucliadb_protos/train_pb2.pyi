@@ -102,6 +102,8 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import (
     Audit as Audit,
+    BinaryData as BinaryData,
+    BinaryMetadata as BinaryMetadata,
     BrokerMessage as BrokerMessage,
     DelEntitiesRequest as DelEntitiesRequest,
     DelLabelsRequest as DelLabelsRequest,
@@ -109,6 +111,8 @@ from nucliadb_protos.writer_pb2 import (
     DetWidgetsRequest as DetWidgetsRequest,
     Error as Error,
     ExportRequest as ExportRequest,
+    FileRequest as FileRequest,
+    FileUploaded as FileUploaded,
     GetEntitiesGroupRequest as GetEntitiesGroupRequest,
     GetEntitiesGroupResponse as GetEntitiesGroupResponse,
     GetEntitiesRequest as GetEntitiesRequest,
@@ -144,6 +148,7 @@ from nucliadb_protos.writer_pb2 import (
     ShardObject as ShardObject,
     ShardReplica as ShardReplica,
     Shards as Shards,
+    UploadBinaryData as UploadBinaryData,
     WriterStatusRequest as WriterStatusRequest,
     WriterStatusResponse as WriterStatusResponse,
 )

@@ -157,7 +157,7 @@ def process_articles(kb):
             resource.add_vectors(field, FieldType.TEXT, [vector])  # type: ignore
 
             bm = base64.b64encode(resource.serialize()).decode()
-            cache_file.write(CODEX.RES + bm + "\n")
+            cache_file.write(CODEX.RESOURCE + bm + "\n")
 
     cache_file.close()
 

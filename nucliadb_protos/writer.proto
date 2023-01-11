@@ -400,6 +400,34 @@ message SetVectorsResponse {
     bool found = 1;
 }
 
+message FileRequest {
+    string bucket = 1;
+    string key = 2;
+}
+
+message BinaryData {
+    bytes data = 1;
+}
+
+message BinaryMetadata {
+    string kbid = 2;
+    string key = 3;
+    int32 size = 4;
+    string filename = 5;
+    string content_type = 6;
+}
+
+message UploadBinaryData {
+    int32 count = 1;
+    oneof data {
+        BinaryMetadata metadata = 2;
+        bytes payload = 3;
+    }
+}
+
+message FileUploaded {
+    
+}
 
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
@@ -448,4 +476,6 @@ service Writer {
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
 
     rpc Export(ExportRequest) returns (stream BrokerMessage) {}
+    rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
+    rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 }

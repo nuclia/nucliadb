@@ -115,8 +115,6 @@ class NucliaDBDataset:
         )
 
     def configure_token_classification(self):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to have only one labelset filter to train")
         self.entities = self.client.get_entities()
         for family_group in self.trainset.filter.labels:
             if family_group not in self.entities.groups:
