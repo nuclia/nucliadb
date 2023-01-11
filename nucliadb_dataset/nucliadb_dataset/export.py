@@ -51,7 +51,6 @@ class NucliaDatasetsExport:
     def export(self):
         dataset_def = {
             "type": TaskType.Name(self.trainset.type),
-            "batch_size": self.trainset.batch_size,
             "filter": {"labels": list(self.trainset.filter.labels)},
         }
         response = requests.post(
@@ -90,4 +89,4 @@ class FileSystemExport:
         )
 
     def export(self):
-        self.nucliadb_dataset.generate_all_partitions()
+        self.nucliadb_dataset.read_all_partitions()
