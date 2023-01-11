@@ -52,7 +52,9 @@ if TYPE_CHECKING:
 import aiofiles
 import httpx
 
+from nucliadb_client import logger
 from nucliadb_client.resource import Resource
+from nucliadb_client.utils import human_readable_size as hr
 
 KB_PREFIX = "kb"
 
@@ -161,18 +163,27 @@ class KnowledgeBox:
                     exported_key = member.name
                     exported_kbid = exported_key.split("/")[1]
                     ubd.metadata.key = exported_key.replace(exported_kbid, self.kbid, 1)
-
                     yield ubd
+                    logger.debug("... Metadata sent")
 
                     data = buffer.read(chunk_size)
+                    transferred = 0
                     while data != b"":
                         count += 1
                         ubd = UploadBinaryData()
                         ubd.count = count
                         ubd.payload = data
-                        data = buffer.read(chunk_size)
+                        transferred += len(data)
+
                         yield ubd
 
+                        logger.debug(
+                            f"... Binary Data ({hr(transferred)}/{hr(member.size)})"
+                        )
+
+                        data = buffer.read(chunk_size)
+
+                logger.debug(f"Uploading {member.name}")
                 await self.client.writer_stub_async.UploadFile(upload_generator(buffer, member))  # type: ignore
 
     async def import_export(self, line: str):
@@ -183,10 +194,12 @@ class KnowledgeBox:
             pb_bm.ParseFromString(payload)
             res = Resource(rid=pb_bm.uuid, kb=self, slug=pb_bm.basic.slug)
             res._bm = pb_bm
+            logger.debug(f"Importing Resource: {res.rid} Title: {pb_bm.basic.title}")
             await res.commit(processor=False)
         elif type_line == CODEX.ENTITIES:
             pb_er = GetEntitiesResponse()
             pb_er.ParseFromString(payload)
+            logger.debug(f"Importing Entities")
             for group, entities in pb_er.groups.items():
                 ser_pb = SetEntitiesRequest()
                 ser_pb.kb.uuid = self.kbid
@@ -196,6 +209,7 @@ class KnowledgeBox:
         elif type_line == CODEX.LABELS:
             pb_lr = GetLabelsResponse()
             pb_lr.ParseFromString(payload)
+            logger.debug(f"Importing Labels")
             for labelset, labelset_obj in pb_lr.labels.labelset.items():
                 slr_pb = SetLabelsRequest()
                 slr_pb.kb.uuid = self.kbid
@@ -244,15 +258,19 @@ class KnowledgeBox:
     async def generator(self, binaries: List[CloudFile]) -> AsyncIterator[str]:
         self.init_async_grpc()
         async for bm in self.resources():
+            logger.debug(f"Exporting Resource: {bm.uuid} Title: {bm.basic.title}")
             collect_cfs(bm, binaries)
-
             yield CODEX.RESOURCE + base64.b64encode(
                 bm.SerializeToString()
             ).decode() + "\n"
+
+        logger.debug(f"Exporting Entities")
         entities = await self.entities()
         yield CODEX.ENTITIES + base64.b64encode(
             entities.SerializeToString()
         ).decode() + "\n"
+
+        logger.debug(f"Exporting Labels")
         labels = await self.labels()
         yield CODEX.LABELS + base64.b64encode(
             labels.SerializeToString()
@@ -273,6 +291,9 @@ class KnowledgeBox:
                 filename = f"{tempfolder}/{uuid4().hex}"
                 with tarfile.open(f"{dump}.tar.bz2", mode="w:bz2") as tar:
                     for cf in binaries:
+                        logger.debug(
+                            f"Exporting Binary: {cf.uri} from bucket {cf.bucket_name}"
+                        )
                         await self.download_file(cf, filename)
                         await loop.run_in_executor(
                             None,

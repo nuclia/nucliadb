@@ -68,3 +68,11 @@ def collect_cfs(bm: BrokerMessage, binaries: List[CloudFile]):
     for field_metadata in bm.field_metadata:
         if field_metadata.metadata.metadata.HasField("thumbnail"):
             clone_collect_cf(binaries, field_metadata.metadata.metadata.thumbnail)
+
+
+def human_readable_size(size: float, decimal_places: int = 2):
+    for unit in ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]:
+        if size < 1024.0 or unit == "PiB":
+            break
+        size /= 1024.0
+    return f"{size:.{decimal_places}f} {unit}"
