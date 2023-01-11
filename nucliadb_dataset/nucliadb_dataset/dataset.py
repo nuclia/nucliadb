@@ -58,12 +58,10 @@ class NucliaDataset(object):
     def __init__(
         self,
         trainset: TrainSet,
-        client: NucliaDBClient,
         base_path: Optional[str] = None,
     ):
         if base_path is None:
             base_path = os.getcwd()
-        self.client = client
         self.trainset = trainset
         self.base_path = base_path
         self.mappings: List[Callable] = []
