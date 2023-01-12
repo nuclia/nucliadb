@@ -95,6 +95,14 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
 	MYPYPATH=./mypy_stubs mypy nucliadb
 
+rust-code-lint:
+	cargo +nightly fmt -p nucliadb_node
+	cargo clippy -p nucliadb_node --tests
+
+
+test-rust:
+	cargo test --workspace --all-features --no-fail-fast
+
 
 venv:  ## Initializes an environment
 	pyenv virtualenv nucliadb
@@ -107,6 +115,7 @@ install: ## Install dependencies (on the active environment)
 	pip install -r code-requirements.txt
 	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_protos/python
+	pip install -e ./nucliadb_models
 	pip install -e ./nucliadb
 	pip install -e ./nucliadb_telemetry
 	pip install -e ./nucliadb_client

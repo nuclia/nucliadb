@@ -18,15 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod edge;
-mod node;
-mod search_engine;
-pub mod service;
-mod storage_system;
-mod string_normalization;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 
-mod graph {
-    pub use crate::edge::*;
-    pub use crate::node::*;
-    pub use crate::storage_system::*;
-}
+use once_cell::sync::Lazy;
+
+const READER_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const READER_PORT: u16 = 18031;
+pub static READER_ADDR: Lazy<SocketAddr> = Lazy::new(|| SocketAddr::new(READER_IP, READER_PORT));
+
+const WRITER_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const WRITER_PORT: u16 = 18030;
+pub static WRITER_ADDR: Lazy<SocketAddr> = Lazy::new(|| SocketAddr::new(WRITER_IP, WRITER_PORT));
+
+pub const SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(5);

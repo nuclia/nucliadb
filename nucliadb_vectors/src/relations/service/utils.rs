@@ -32,7 +32,8 @@ pub mod dictionary {
     pub const USER: &str = "User";
     pub const LABEL: &str = "Label";
 }
-pub fn rtype_parsing(rtype: RelationType, subtype: &str) -> (&str, Option<&str>) {
+
+pub fn relation_type_parsing(rtype: RelationType, subtype: &str) -> (&str, Option<&str>) {
     let subtype = if subtype.is_empty() {
         None
     } else {

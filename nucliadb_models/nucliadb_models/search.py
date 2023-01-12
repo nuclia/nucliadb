@@ -144,14 +144,32 @@ class Resources(BaseModel):
     next_page: bool = False
 
 
-class Relation(BaseModel):
-    title: str
-    uri: str
-    resources: List[ResourceResult]
+class RelationDirection(str, Enum):
+    IN = "IN"
+    OUT = "OUT"
+
+
+class DirectionalRelation(BaseModel):
+    entity: str
+    relation: str
+    direction: RelationDirection
+
+
+class EntitySubgraph(BaseModel):
+    related_to: List[DirectionalRelation]
+
+
+# TODO: uncomment and implement (next iteration)
+# class RelationPath(BaseModel):
+#     origin: str
+#     destination: str
+#     path: List[DirectionalRelation]
 
 
 class Relations(BaseModel):
-    results: List[Relation] = []
+    entities: Dict[str, EntitySubgraph]
+    # TODO: implement in the next iteration of knowledge graph search
+    # graph: List[RelationPath]
 
 
 class RelatedEntities(BaseModel):

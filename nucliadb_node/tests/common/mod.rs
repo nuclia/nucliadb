@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod reader;
-#[cfg(test)]
-mod tests;
-mod utils;
-pub mod writer;
+/// Utilities to test NucliaDB node
 
-pub use reader::*;
-pub use writer::*;
+#[allow(dead_code)] // clippy don't detect it's used in our integration tests]
+mod constants;
+#[allow(dead_code)] // clippy don't detect it's used in our integration tests]
+mod node_services;
+
+pub use constants::*;
+pub use node_services::*;

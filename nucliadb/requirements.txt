@@ -39,7 +39,7 @@ aiodns>=3.0.0
 
 types-orjson
 nucliadb-protos>=0.0.31
-nucliadb-utils[storages,fastapi,cache]>=1.0.10
+nucliadb-utils[storages,fastapi,cache]>=1.0.15
 nucliadb-telemetry>=1.1.6
 nucliadb-models>=1.0.0
 

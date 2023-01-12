@@ -29,7 +29,8 @@ use crate::relations::index::*;
 
 pub struct GrpcGuide<'a> {
     pub reader: &'a GraphReader<'a>,
-    pub type_filters: HashSet<(&'a str, Option<&'a str>)>,
+    pub node_filters: HashSet<(&'a str, Option<&'a str>)>,
+    pub edge_filters: HashSet<(&'a str, Option<&'a str>)>,
     pub jump_always: &'a str,
 }
 impl<'a> GrpcGuide<'a> {
@@ -49,12 +50,21 @@ impl<'a> GrpcGuide<'a> {
     }
 }
 impl<'a> BfsGuide for GrpcGuide<'a> {
-    fn matches(&self, node: Entity) -> bool {
+    fn edge_allowed(&self, edge: Entity) -> bool {
+        self.treat_bfs_error(false, edge, |edge: Entity| {
+            self.reader.get_edge(edge).map(|edge| {
+                self.edge_filters.is_empty()
+                    || self.edge_filters.contains(&(edge.xtype(), edge.subtype()))
+                    || self.edge_filters.contains(&(edge.xtype(), None))
+            })
+        })
+    }
+    fn node_allowed(&self, node: Entity) -> bool {
         self.treat_bfs_error(false, node, |node: Entity| {
             self.reader.get_node(node).map(|node| {
-                self.type_filters.is_empty()
-                    || self.type_filters.contains(&(node.xtype(), node.subtype()))
-                    || self.type_filters.contains(&(node.xtype(), None))
+                self.node_filters.is_empty()
+                    || self.node_filters.contains(&(node.xtype(), node.subtype()))
+                    || self.node_filters.contains(&(node.xtype(), None))
             })
         })
     }

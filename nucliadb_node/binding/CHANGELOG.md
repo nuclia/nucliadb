@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- Implement knowledge graph search
+
 ## 0.4.11
 
 - Adding advanced_query to searches
@@ -9,18 +13,23 @@
 - Adding `with_status` filter to document searches
 
 ## 0.4.9
+
 - Removing deprecated indexes
 
 ## 0.4.8
+
 ## 0.4.7
 
 - Binding name update
+
 ## 0.4.6
 
 - Binding vectorset and relations update
+
 ## 0.4.5
 
 - `only_faceted` flag
+
 ## 0.4.5
 
 - Fixed filter search

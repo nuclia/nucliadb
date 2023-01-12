@@ -140,7 +140,7 @@ jobs:
         name: cargo test
         with:
           command: test
-          args: --all-features --no-fail-fast -p nucliadb_node
+          args: --workspace --all-features --no-fail-fast
 
   tests-python:
     runs-on: ubuntu-latest

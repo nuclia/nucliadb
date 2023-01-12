@@ -97,9 +97,16 @@ async def test_entities_service(
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
 
         entitygroup = {
-            "title": "test group",
+            "title": "Kitchen",
             "custom": True,
-            "entities": {"abc": {"value": "ABC"}},
+            "entities": {
+                "cupboard": {"value": "Cupboard"},
+                "fork": {"value": "Fork"},
+                "fridge": {"value": "Fridge"},
+                "knife": {"value": "Knife"},
+                "sink": {"value": "Sink"},
+                "spoon": {"value": "Spoon"},
+            },
         }
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroup/group1", json=entitygroup

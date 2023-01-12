@@ -202,38 +202,79 @@ message VectorSearchResponse {
     int32 result_per_page = 5;
 }
 
-// Relation filters are used to make the 
-// search domain smaller. By providing filters the 
-// search may  be faster.
-message RelationFilter {
-    // Will filter the search to nodes of type ntype.
-    utils.RelationNode.NodeType ntype = 1;
-    // Additionally the search can be even more specific by 
-    // providing a subtype. The empty string is a wilcard that 
-    // indicates to not filter by subtype. 
-    string subtype = 2;
+message RelationNodeFilter {
+    utils.RelationNode.NodeType node_type = 1;
+    optional string node_subtype = 2;
 }
 
-// A request for the relation index.
+message RelationEdgeFilter {
+    // Will filter the search to edges of type ntype.
+    utils.Relation.RelationType relation_type = 1;
+    optional string relation_subtype = 2;
+}
+
+message RelationPrefixSearchRequest {
+    string prefix = 1;
+}
+
+message RelationPrefixSearchResponse {
+    repeated utils.RelationNode nodes = 1;
+}
+
+
+message EntitiesSubgraphRequest {
+    // List of vertices where search will trigger
+    repeated utils.RelationNode entry_points = 1;
+
+    // Filters to apply while searching. It's an OR filtering: any
+    // node (vertex) satisfying one condition will be returned
+    repeated RelationNodeFilter node_filters = 2;
+
+    // Filters to apply while searching. It's an OR filtering: any
+    // edge satisfying one condition will be returned
+    repeated RelationEdgeFilter edge_filters = 4;
+
+    int32 depth = 3;
+}
+
+message EntitiesSubgraphResponse {
+    repeated utils.Relation relations = 1;
+}
+
+// TODO: uncomment and implement (next iteration)
+// message RelationPathsSearchRequest {
+//     message PathEndpoints {
+//         utils.RelationNode origin = 1;
+//         utils.RelationNode destination = 2;
+//     }
+//     repeated PathEndpoints paths = 1;
+// }
+
+
+// Query relation index to obtain different information about the
+// knowledge graph. It can be queried using the following strategies:
+//
+// - prefix search over vertex (node) names
+// - graph search:
+//   - given some entry vertices, get the filtered subgraph around them
+//   - (TODO) given some vertices, get paths between them
 message RelationSearchRequest {
-    string id = 1; //Shard ID
-    // A search will start from each of the entry points.
-    // Zero entry points are provided will trigger an iteration
-    // through all of the nodes.
-    repeated utils.RelationNode entry_points = 2;
-    // If needed, the search can be guided through 
-    repeated RelationFilter type_filters = 3;
-    // The user can impose a limit in the number of jumps
-    // the seach may perfom.
-    int32 depth = 4;
-    // Nodes can be filtered by prefix.
-    string prefix = 5;
-    bool reload = 13;
+    string shard_id = 1;
+    bool reload = 5;
+
+    RelationPrefixSearchRequest prefix = 11;
+    EntitiesSubgraphRequest subgraph = 12;
+    // TODO: uncomment and implement (next iteration)
+    // RelationPathsSearchRequest paths = 13;
 }
 
 message RelationSearchResponse {
-    repeated utils.RelationNode neighbours = 1;
+    RelationPrefixSearchResponse prefix = 11;
+    EntitiesSubgraphResponse subgraph = 12;
+    // TODO: uncomment and implement (next iteration)
+    // repeated utils.RelationPath paths = 13;
 }
+
 
 message SearchRequest {
     string shard = 1;
@@ -267,6 +308,10 @@ message SearchRequest {
     
     optional string advanced_query = 18;
     optional noderesources.Resource.ResourceStatus with_status = 17;
+
+    // if provided, search metadata for this nodes (nodes at distance
+    // one) and get the shortest path between nodes
+    RelationSearchRequest relations = 19;
 }
 
 message SuggestRequest {
@@ -300,6 +345,7 @@ message SearchResponse {
     DocumentSearchResponse document = 1;
     ParagraphSearchResponse paragraph = 2;
     VectorSearchResponse vector = 3;
+    RelationSearchResponse relation = 4;
 }
 
 message IdCollection {

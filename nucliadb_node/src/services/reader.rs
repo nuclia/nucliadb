@@ -24,7 +24,7 @@ use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_protos::{
-    relation_node, DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
+    DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationSearchRequest,
     RelationSearchResponse, SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
     TypeList, VectorSearchRequest, VectorSearchResponse,
@@ -355,15 +355,11 @@ impl ShardReaderService {
 
         let prefixes = Self::split_suggest_query(request.body.clone(), MAX_SUGGEST_COMPOUND_WORDS);
         let relations = prefixes.par_iter().map(|prefix| {
-            let filter = RelationFilter {
-                ntype: relation_node::NodeType::Entity as i32,
-                subtype: "".to_string(),
-            };
             let request = RelationSearchRequest {
-                id: String::default(),
-                prefix: prefix.clone(),
-                type_filters: vec![filter],
-                depth: 10,
+                shard_id: String::default(),
+                prefix: Some(RelationPrefixSearchRequest {
+                    prefix: prefix.clone(),
+                }),
                 ..Default::default()
             };
             relations_reader_service.search(&request)
@@ -385,7 +381,9 @@ impl ShardReaderService {
             .flat_map(|relation| {
                 relation
                     .unwrap()
-                    .neighbours
+                    .prefix
+                    .expect("Prefix search request must return a prefix response")
+                    .nodes
                     .iter()
                     .map(|relation_node| relation_node.value.clone())
                     .collect::<Vec<String>>()
@@ -426,7 +424,6 @@ impl ShardReaderService {
             advanced_query: search_request.advanced_query.clone(),
             with_status: search_request.with_status,
         };
-
         let field_reader_service = self.field_reader.clone();
         let text_task = move || {
             if !skip_fields {
@@ -485,6 +482,13 @@ impl ShardReaderService {
             }
         };
 
+        let relation_reader_service = self.relation_reader.clone();
+        let relation_task = move || {
+            search_request
+                .relations
+                .map(|relation_request| relation_reader_service.search(&relation_request))
+        };
+
         let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text search");
         let text_task = || run_with_telemetry(info, text_task);
@@ -492,19 +496,25 @@ impl ShardReaderService {
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
         let info = info_span!(parent: &span, "vector search");
         let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relations search");
+        let relation_task = || run_with_telemetry(info, relation_task);
 
         let mut rtext = None;
         let mut rparagraph = None;
         let mut rvector = None;
+        let mut rrelation = None;
+
         rayon::scope(|s| {
             s.spawn(|_| rtext = text_task());
             s.spawn(|_| rparagraph = paragraph_task());
             s.spawn(|_| rvector = vector_task());
+            s.spawn(|_| rrelation = relation_task());
         });
         Ok(SearchResponse {
             document: rtext.transpose()?,
             paragraph: rparagraph.transpose()?,
             vector: rvector.transpose()?,
+            relation: rrelation.transpose()?,
         })
     }
 

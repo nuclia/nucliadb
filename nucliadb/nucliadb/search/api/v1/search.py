@@ -108,7 +108,6 @@ async def search_knowledgebox(
             SearchOptions.PARAGRAPH,
             SearchOptions.DOCUMENT,
             SearchOptions.VECTOR,
-            SearchOptions.RELATIONS,
         ]
     ),
     reload: bool = Query(default=True),
@@ -190,7 +189,7 @@ async def search(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
-):
+) -> KnowledgeboxSearchResults:
     nodemanager = get_nodes()
     audit = get_audit()
     timeit = time()
@@ -300,6 +299,7 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
+        requested_relations=pb_query.relations,
         min_score=item.min_score,
         highlight=item.highlight,
     )

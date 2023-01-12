@@ -20,6 +20,7 @@
 from typing import List, Optional
 
 import aiohttp
+from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
@@ -29,9 +30,18 @@ class SendToPredictError(Exception):
     pass
 
 
+DUMMY_RELATION_NODE = [
+    RelationNode(value="Ferran", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
+    RelationNode(
+        value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"
+    ),
+]
+
+
 PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
+TOKENS = "/tokens"
 
 
 class PredictEngine:
@@ -94,3 +104,47 @@ class PredictEngine:
             else:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         return data["data"]
+
+    async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
+        # If token is offered
+        if self.dummy:
+            self.calls.append(sentence)
+            return DUMMY_RELATION_NODE
+
+        if self.onprem is False:
+            # Upload the payload
+            resp = await self.session.get(
+                url=f"{self.cluster_url}{PRIVATE_PREDICT}{TOKENS}?text={sentence}",
+                headers={"X-STF-KBID": kbid},
+            )
+            if resp.status == 200:
+                data = await resp.json()
+            else:
+                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        else:
+            if self.nuclia_service_account is None:
+                logger.warning(
+                    "Nuclia Service account is not defined so could not retrieve entities from the query"
+                )
+                return []
+            # Upload the payload
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            resp = await self.session.get(
+                url=f"{self.public_url}{PUBLIC_PREDICT}{TOKENS}?text={sentence}",
+                headers=headers,
+            )
+            if resp.status == 200:
+                data = await resp.json()
+            else:
+                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+
+        result = []
+        for token in data["tokens"]:
+            text = token["text"]
+            klass = token["ner"]
+            result.append(
+                RelationNode(
+                    value=text, ntype=RelationNode.NodeType.ENTITY, subtype=klass
+                )
+            )
+        return result

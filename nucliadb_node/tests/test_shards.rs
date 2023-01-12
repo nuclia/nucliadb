@@ -17,8 +17,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod server;
-pub mod shard;
 
-pub use server::*;
-pub use shard::*;
+use nucliadb_protos::{EmptyQuery, ShardId};
+
+mod common;
+
+use common::node_writer;
+use tonic::Request;
+
+#[tokio::test]
+async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = node_writer().await;
+
+    let new_shard_response = writer.new_shard(Request::new(EmptyQuery {})).await?;
+    let shard_id = &new_shard_response.get_ref().id;
+
+    let response = writer
+        .get_shard(Request::new(ShardId {
+            id: shard_id.clone(),
+        }))
+        .await?;
+
+    assert_eq!(shard_id, &response.get_ref().id);
+
+    Ok(())
+}

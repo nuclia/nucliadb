@@ -26,11 +26,15 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentSearchResponse,
     ParagraphResult,
     ParagraphSearchResponse,
+    RelationSearchRequest,
+    RelationSearchResponse,
     SearchResponse,
     SuggestResponse,
     VectorSearchResponse,
 )
+from sentry_sdk import capture_message, push_scope
 
+from nucliadb.search import logger
 from nucliadb.search.search.fetch import (
     fetch_resources,
     get_labels_paragraph,
@@ -43,11 +47,15 @@ from nucliadb.search.search.fetch import (
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
+    DirectionalRelation,
+    EntitySubgraph,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
     Paragraphs,
     RelatedEntities,
+    RelationDirection,
+    Relations,
     ResourceProperties,
     ResourceResult,
     Resources,
@@ -347,6 +355,48 @@ async def merge_paragraph_results(
     )
 
 
+async def merge_relations_results(
+    relations_responses: List[RelationSearchResponse], query: RelationSearchRequest
+) -> Relations:
+    relations = Relations(entities={}, graph=[])
+
+    for entry_point in query.subgraph.entry_points:
+        relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
+
+    for relation_response in relations_responses:
+        for relation in relation_response.subgraph.relations:
+            origin = relation.source.value
+            destination = relation.to.value
+            relation_label = relation.relation_label
+
+            if origin in relations.entities:
+                relations.entities[origin].related_to.append(
+                    DirectionalRelation(
+                        entity=destination,
+                        relation=relation_label,
+                        direction=RelationDirection.OUT,
+                    )
+                )
+            elif destination in relations.entities:
+                relations.entities[destination].related_to.append(
+                    DirectionalRelation(
+                        entity=origin,
+                        relation=relation_label,
+                        direction=RelationDirection.IN,
+                    )
+                )
+            else:
+                error_msg = "Relation search is returning an edge unrelated with queried entities"
+                logger.error(error_msg)
+                with push_scope() as scope:
+                    scope.set_extra("relations_responses", relations_responses)
+                    scope.set_extra("query", query)
+                    scope.set_extra("relation", relation)
+                    capture_message(error_msg, "error")
+
+    return relations
+
+
 async def merge_results(
     search_responses: List[SearchResponse],
     count: int,
@@ -355,17 +405,20 @@ async def merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
+    requested_relations: RelationSearchRequest,
     min_score: float = 0.85,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
     paragraphs = []
     documents = []
     vectors = []
+    relations = []
 
     for response in search_responses:
         paragraphs.append(response.paragraph)
         documents.append(response.document)
         vectors.append(response.vector)
+        relations.append(response.relation)
 
     api_results = KnowledgeboxSearchResults()
 
@@ -382,6 +435,10 @@ async def merge_results(
 
     api_results.sentences = await merge_vectors_results(
         vectors, resources, kbid, count, page, min_score=min_score
+    )
+
+    api_results.relations = await merge_relations_results(
+        relations, requested_relations
     )
 
     api_results.resources = await fetch_resources(
