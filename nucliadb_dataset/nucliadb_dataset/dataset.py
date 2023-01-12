@@ -149,7 +149,7 @@ class NucliaDBDataset(NucliaDataset):
             pa.schema(
                 [
                     pa.field("text", pa.string()),
-                    pa.field("labels", pa.list(pa.string())),
+                    pa.field("labels", pa.list_(pa.string())),
                 ]
             )
         )
@@ -250,7 +250,7 @@ class NucliaDBDataset(NucliaDataset):
         """
         Get expected number of partitions from a live NucliaDB
         """
-        partitions = self.client.reader_session.get(f"{self.base_url}/trainset").json()
+        partitions = self.client.train_session.get(f"{self.base_url}/trainset").json()
         if len(partitions["partitions"]) == 0:
             raise KeyError("There is no partitions")
         return partitions["partitions"]
