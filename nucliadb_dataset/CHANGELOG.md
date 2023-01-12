@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.2
+
+- Fix sentence classification schema
+
 ## 1.1.1
 
 - Add `download_all_partitions` generic function to make it easier
