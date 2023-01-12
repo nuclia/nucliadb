@@ -584,41 +584,35 @@ global___VectorSearchResponse = VectorSearchResponse
 class RelationNodeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NODE_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
+    NODE_SUBTYPE_FIELD_NUMBER: builtins.int
     node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType
-    subtype: typing.Text
-    """Additionally the search can be even more specific by
-    providing a subtype. The empty string is a wilcard that 
-    indicates to not filter by subtype.
-    """
-
+    node_subtype: typing.Text
     def __init__(self,
         *,
         node_type: nucliadb_protos.utils_pb2.RelationNode.NodeType.ValueType = ...,
-        subtype: typing.Text = ...,
+        node_subtype: typing.Optional[typing.Text] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node_type",b"node_type","subtype",b"subtype"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_node_subtype",b"_node_subtype","node_subtype",b"node_subtype"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_node_subtype",b"_node_subtype","node_subtype",b"node_subtype","node_type",b"node_type"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_node_subtype",b"_node_subtype"]) -> typing.Optional[typing_extensions.Literal["node_subtype"]]: ...
 global___RelationNodeFilter = RelationNodeFilter
 
 class RelationEdgeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     RELATION_TYPE_FIELD_NUMBER: builtins.int
-    SUBTYPE_FIELD_NUMBER: builtins.int
+    RELATION_SUBTYPE_FIELD_NUMBER: builtins.int
     relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType
     """Will filter the search to edges of type ntype."""
 
-    subtype: typing.Text
-    """Additionally the search can be even more specific by
-    providing a subtype. The empty string is a wilcard that 
-    indicates to not filter by subtype.
-    """
-
+    relation_subtype: typing.Text
     def __init__(self,
         *,
         relation_type: nucliadb_protos.utils_pb2.Relation.RelationType.ValueType = ...,
-        subtype: typing.Text = ...,
+        relation_subtype: typing.Optional[typing.Text] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["relation_type",b"relation_type","subtype",b"subtype"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_relation_subtype",b"_relation_subtype","relation_subtype",b"relation_subtype"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_relation_subtype",b"_relation_subtype","relation_subtype",b"relation_subtype","relation_type",b"relation_type"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_relation_subtype",b"_relation_subtype"]) -> typing.Optional[typing_extensions.Literal["relation_subtype"]]: ...
 global___RelationEdgeFilter = RelationEdgeFilter
 
 class RelationPrefixSearchRequest(google.protobuf.message.Message):
