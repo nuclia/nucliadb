@@ -26,7 +26,9 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_protos import resources_pb2 as rpb
 
 
-def broker_resource(kbid: str, rid=None, slug=None) -> BrokerMessage:
+def broker_resource(
+    kbid: str, rid=None, slug=None, title=None, summary=None
+) -> BrokerMessage:
     """
     Returns a broker resource with barebones metadata.
     """
@@ -38,9 +40,11 @@ def broker_resource(kbid: str, rid=None, slug=None) -> BrokerMessage:
         slug=slug,
         type=BrokerMessage.AUTOCOMMIT,
     )
+    title = title or "Title Resource"
+    summary = summary or "Summary of document"
     bm.basic.icon = "text/plain"
-    bm.basic.title = "Title Resource"
-    bm.basic.summary = "Summary of document"
+    bm.basic.title = title
+    bm.basic.summary = summary
     bm.basic.thumbnail = "doc"
     bm.basic.layout = "default"
     bm.basic.metadata.useful = True
@@ -50,10 +54,17 @@ def broker_resource(kbid: str, rid=None, slug=None) -> BrokerMessage:
     bm.origin.source = rpb.Origin.Source.WEB
 
     etw = rpb.ExtractedTextWrapper()
-    etw.body.text = "Title Resource"
+    etw.body.text = title
     etw.field.field = "title"
     etw.field.field_type = rpb.FieldType.GENERIC
     bm.extracted_text.append(etw)
+
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = summary
+    etw.field.field = "summary"
+    etw.field.field_type = rpb.FieldType.GENERIC
+    bm.extracted_text.append(etw)
+
     bm.source = BrokerMessage.MessageSource.WRITER
     return bm
 
