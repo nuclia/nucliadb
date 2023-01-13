@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+2.0.2
+-----
+
+- Upgrade models with latest version release for nucliadb_dataset
+
 2.0.1
 -----
 
