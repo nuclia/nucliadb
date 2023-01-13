@@ -82,6 +82,7 @@ mod tests {
     use std::fs::{self, File};
     use std::io::Write;
 
+    use tokio::time::Duration;
     use eyre::Result;
 
     use super::*;
@@ -110,6 +111,9 @@ mod tests {
                 Ok(()) as Result<()>
             }
         });
+
+        // let enough time to the listener task to open the TCP/IP connection
+        tokio::time::sleep(Duration::from_millis(250)).await;
 
         let publisher_task = tokio::spawn({
             async move {
@@ -178,6 +182,9 @@ mod tests {
 
             Ok(()) as Result<()>
         });
+
+        // let enough time to the listener task to open the TCP/IP connection
+        tokio::time::sleep(Duration::from_millis(250)).await;
 
         let publisher_task = tokio::spawn(async move {
             let source_dir = tempfile::tempdir()?;
