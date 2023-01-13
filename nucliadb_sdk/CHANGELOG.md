@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.1.2
+
+- Add nucliadb_models requirements
+
 ## 1.1.1
 
 - Add on client the option to have component based urls

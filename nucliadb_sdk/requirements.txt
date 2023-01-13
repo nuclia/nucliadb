@@ -1,1 +1,2 @@
 httpx
+nucliadb_models>=2.0.2
