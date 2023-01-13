@@ -221,7 +221,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 raise GoogleCloudException(text)
             resumable_uri = call.headers["Location"]
 
-        await dm.update(
+        dm.update(
             resumable_uri=resumable_uri, upload_file_id=upload_file_id, path=path
         )
 

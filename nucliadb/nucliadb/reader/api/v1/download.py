@@ -181,7 +181,6 @@ async def download_api(sf: StorageField, headers: Headers):
     metadata = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")
-
     file_size = int(metadata.get("SIZE", -1))
     content_type = metadata.get("CONTENT_TYPE", "application/octet-stream")
     filename = metadata.get("FILENAME", "file")

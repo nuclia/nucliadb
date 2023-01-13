@@ -55,7 +55,7 @@ class LocalFileStorageManager(FileStorageManager):
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(json.dumps(metadata))
 
-        await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
+        dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
 
     async def iter_data(self, uri, kbid: str, headers=None):
         bucket = await self.storage.get_bucket_name(kbid)

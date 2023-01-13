@@ -77,7 +77,7 @@ class FileDataMangaer:
         value = orjson.dumps(self._data)
         DATA[self.key] = value
 
-    async def update(self, **kwargs):
+    def update(self, **kwargs):
         self._data.update(kwargs)
 
     async def finish(self, values=None):
