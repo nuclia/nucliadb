@@ -47,8 +47,8 @@ from nucliadb_models.search import (
     ResourceProperties,
     SearchOptions,
     SearchRequest,
-    SortOptions,
     SortField,
+    SortOptions,
     SortOrder,
 )
 from nucliadb_utils.authentication import requires
@@ -136,7 +136,9 @@ async def search_knowledgebox(
         fields=fields,
         filters=filters,
         faceted=faceted,
-        sort=SortOptions(field=sort, limit=sort_limit, order=sort_order) if sort is not None else None,
+        sort=SortOptions(field=sort, limit=sort_limit, order=sort_order)
+        if sort is not None
+        else None,
         page_number=page_number,
         page_size=page_size,
         min_score=min_score,

@@ -29,7 +29,7 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.search import SearchOptions, Sort, SuggestOptions, SortOptions
+from nucliadb_models.search import SearchOptions, Sort, SortOptions, SuggestOptions
 
 
 async def global_query_to_pb(

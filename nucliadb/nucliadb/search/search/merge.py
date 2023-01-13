@@ -64,9 +64,9 @@ from nucliadb_models.search import (
     Sentence,
     Sentences,
     SortField,
+    SortOptions,
     SortOrder,
     TextPosition,
-    SortOptions,
 )
 
 Score = Any
