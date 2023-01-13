@@ -29,7 +29,7 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.search import SearchOptions, Sort, SuggestOptions
+from nucliadb_models.search import SearchOptions, Sort, SuggestOptions, SortOptions
 
 
 async def global_query_to_pb(
@@ -46,9 +46,8 @@ async def global_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort: Optional[str] = None,
     sort_ord: int = Sort.ASC.value,
-    sort_limit: int = 100,
+    sort: Optional[SortOptions] = None,
     reload: bool = False,
     vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
@@ -71,7 +70,7 @@ async def global_query_to_pb(
     if sort is not None:
         # As the index can't sort, we have to do it when merging. To
         # have consistent results, we must limit them
-        request.result_per_page = sort_limit
+        request.result_per_page = sort.limit
     else:
         request.result_per_page = page_number * page_size + page_size
 
@@ -94,7 +93,7 @@ async def global_query_to_pb(
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
         if sort:
-            request.order.field = sort
+            request.order.field = sort.field
             request.order.type = sort_ord  # type: ignore
         request.fields.extend(fields)
 

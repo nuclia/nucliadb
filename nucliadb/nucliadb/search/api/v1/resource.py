@@ -43,7 +43,7 @@ from nucliadb_models.search import (
     ResourceProperties,
     ResourceSearchResults,
     SearchOptions,
-    SortOption,
+    SortField,
 )
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -77,7 +77,7 @@ async def search(
     fields: Optional[List[str]] = None,
     filters: Optional[List[str]] = None,
     faceted: Optional[List[str]] = None,
-    sort: Optional[SortOption] = None,
+    sort: Optional[SortField] = None,
     page_number: int = 0,
     page_size: int = 20,
     range_creation_start: Optional[datetime] = None,

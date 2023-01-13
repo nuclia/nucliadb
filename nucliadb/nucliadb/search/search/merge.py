@@ -63,9 +63,10 @@ from nucliadb_models.search import (
     ResourceSearchResults,
     Sentence,
     Sentences,
-    SortOption,
+    SortField,
     SortOrder,
     TextPosition,
+    SortOptions,
 )
 
 Score = Any
@@ -77,11 +78,11 @@ def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentRes
 
 async def _text_score(
     item: Union[DocumentResult, ParagraphResult],
-    sort_option: Optional[SortOption],
+    sort: Optional[SortOptions],
     kbid: str,
 ):
     score: Any = (item.score.bm25, item.score.booster)
-    if sort_option is None:
+    if sort is None:
         return score
     resource = await get_resource_from_cache(kbid, item.uuid)
     if resource is None:
@@ -90,26 +91,26 @@ async def _text_score(
     if basic is None:
         return score
 
-    if sort_option == SortOption.CREATED:
+    if sort.field == SortField.CREATED:
         score = basic.created.ToDatetime()
-    elif sort_option == SortOption.MODIFIED:
+    elif sort.field == SortField.MODIFIED:
         score = basic.modified.ToDatetime()
-    elif sort_option == SortOption.TITLE:
+    elif sort.field == SortField.TITLE:
         score = basic.title
 
     return score
 
 
 async def document_score(
-    document: DocumentResult, sort_option: Optional[SortOption], kbid: str
+    document: DocumentResult, sort: Optional[SortOptions], kbid: str
 ):
-    return await _text_score(document, sort_option, kbid)
+    return await _text_score(document, sort, kbid)
 
 
 async def paragraph_score(
-    paragraph: ParagraphResult, sort_option: Optional[SortOption], kbid: str
+    paragraph: ParagraphResult, sort: Optional[SortOptions], kbid: str
 ):
-    return await _text_score(paragraph, sort_option, kbid)
+    return await _text_score(paragraph, sort, kbid)
 
 
 async def merge_documents_results(
@@ -118,9 +119,7 @@ async def merge_documents_results(
     count: int,
     page: int,
     kbid: str,
-    sort: Optional[SortOption] = None,
-    sort_limit: int = 100,
-    sort_order: SortOrder = SortOrder.ASC,
+    sort: Optional[SortOptions] = None,
 ) -> Resources:
     raw_resource_list: List[Tuple[DocumentResult, Score]] = []
     facets: Dict[str, Any] = {}
@@ -142,6 +141,7 @@ async def merge_documents_results(
             score = await document_score(result, sort, kbid)
             raw_resource_list.append((result, score))
 
+    sort_order = sort.order if sort is not None else SortOrder.ASC
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
 
     skip = page * count
@@ -319,9 +319,7 @@ async def merge_paragraph_results(
     count: int,
     page: int,
     highlight: bool,
-    sort: Optional[SortOption] = None,
-    sort_limit: int = 100,
-    sort_order: SortOrder = SortOrder.ASC,
+    sort: Optional[SortOptions] = None,
 ):
 
     raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
@@ -346,6 +344,7 @@ async def merge_paragraph_results(
             score = await paragraph_score(result, sort, kbid)
             raw_paragraph_list.append((result, score))
 
+    sort_order = sort.order if sort is not None else SortOrder.ASC
     raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
 
     skip = page * count
@@ -453,9 +452,7 @@ async def merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-    sort: Optional[SortOption],
-    sort_limit: int,
-    sort_order: SortOrder,
+    sort: Optional[SortOptions],
     requested_relations: RelationSearchRequest,
     min_score: float = 0.85,
     highlight: bool = False,
@@ -477,7 +474,7 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, sort, sort_limit, sort_order
+        documents, resources, count, page, kbid, sort
     )
 
     api_results.paragraphs = await merge_paragraph_results(
@@ -488,8 +485,6 @@ async def merge_results(
         page,
         highlight,
         sort,
-        sort_limit,
-        sort_order,
     )
 
     api_results.sentences = await merge_vectors_results(

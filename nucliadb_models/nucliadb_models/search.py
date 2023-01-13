@@ -74,11 +74,6 @@ class Sort(int, Enum):
     ASC = 1
 
 
-class SortOrder(str, Enum):
-    ASC = "asc"
-    DESC = "desc"
-
-
 class Facet(BaseModel):
     facetresults: Dict[str, int]
 
@@ -214,10 +209,21 @@ class KnowledgeboxCounters(BaseModel):
     shards: Optional[List[Tuple[str, str, str]]]
 
 
-class SortOption(str, Enum):
+class SortField(str, Enum):
     MODIFIED = "modified"
     CREATED = "created"
     TITLE = "title"
+
+
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+class SortOptions(BaseModel):
+    field: SortField
+    limit: int = 100
+    order: SortOrder = SortOrder.ASC
 
 
 class KnowledgeBoxCount(BaseModel):
@@ -286,9 +292,7 @@ class SearchRequest(BaseModel):
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []
-    sort: Optional[SortOption] = None
-    sort_limit: int = 100
-    sort_order: SortOrder = SortOrder.ASC
+    sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
     min_score: float = 0.70

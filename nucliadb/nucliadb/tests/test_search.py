@@ -634,12 +634,14 @@ async def test_search_ordering_most_relevant_results(
 
     # Test: sort by modification date
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "modified",
-            "sort_order": "asc",
+            "sort": {
+                "field": "modified",
+                "order": "asc",
+            },
         },
     )
     assert resp.status_code == 200
@@ -654,12 +656,14 @@ async def test_search_ordering_most_relevant_results(
         ]
         assert modification_dates == sorted(modification_dates)
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "modified",
-            "sort_order": "desc",
+            "sort": {
+                "field": "modified",
+                "order": "desc",
+            },
         },
     )
     assert resp.status_code == 200
@@ -676,11 +680,13 @@ async def test_search_ordering_most_relevant_results(
 
     # Test: sort by title
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "title",
+            "sort": {
+                "field": "title",
+            },
         },
     )
     assert resp.status_code == 200
@@ -692,12 +698,14 @@ async def test_search_ordering_most_relevant_results(
         titles = [body["resources"][result["rid"]]["title"] for result in results]
         assert titles == sorted(titles)
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "title",
-            "sort_order": "desc",
+            "sort": {
+                "field": "title",
+                "order": "desc",
+            },
         },
     )
     assert resp.status_code == 200
@@ -736,12 +744,14 @@ async def test_search_ordering_most_relevant_results_with_pagination(
     assert body["fulltext"]["total"] == 4
     assert body["paragraphs"]["total"] == 4
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "title",
-            "sort_limit": 3,
+            "sort": {
+                "field": "title",
+                "limit": 3,
+            },
         },
     )
     assert resp.status_code == 200
@@ -751,12 +761,14 @@ async def test_search_ordering_most_relevant_results_with_pagination(
     fulltext = []
     paragraphs = []
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "title",
-            "sort_limit": 3,
+            "sort": {
+                "field": "title",
+                "limit": 3,
+            },
             "page_size": 2,
             "page_number": 0,
         },
@@ -789,12 +801,14 @@ async def test_search_ordering_most_relevant_results_with_pagination(
 
     assert len(fulltext) == len(paragraphs) == 3
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        params={
+        json={
             "query": "philosophy",
-            "sort": "title",
-            "sort_limit": 3,
+            "sort": {
+                "field": "title",
+                "limit": 3,
+            },
             "page_size": 2,
             "page_number": 2,
         },
