@@ -533,7 +533,7 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
                 "title": "My new title",
             },
             headers={"X-SYNCHRONOUS": "True"},
-            timeout=None
+            timeout=None,
         )
     ).status_code == 200
 

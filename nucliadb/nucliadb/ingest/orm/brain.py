@@ -59,11 +59,10 @@ else:
 FilePagePositions = Dict[int, Tuple[int, int]]
 
 
-PROCESSING_STATUS_PB_TYPE_TO_NAME_MAP = {
-    PBBrainResource.ERROR: ResourceProcessingStatus.ERROR.name,
-    PBBrainResource.EMPTY: ResourceProcessingStatus.EMPTY.name,
-    PBBrainResource.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
-    PBBrainResource.PENDING: ResourceProcessingStatus.PENDING.name,
+METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
+    Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
+    Metadata.Status.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
+    Metadata.Status.PENDING: ResourceProcessingStatus.PENDING.name,
 }
 
 
@@ -322,7 +321,16 @@ class ResourceBrain:
                 f"{self.rid}/{field_key}/{vector.start}-{vector.end}"
             )
 
-    def set_status(self, status: StatusValue, useful: Optional[bool]):
+    def set_processing_status(
+        self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]
+    ):
+        if previous_status and previous_status == Metadata.Status.PROCESSED:
+            # For resources that have been processed successfully, we force their status to be
+            # always PROCESSED so that they don't disappear from the resource list page.
+            self.brain.status = PBBrainResource.PROCESSED
+            return
+        status = basic.metadata.status
+        useful = basic.metadata.useful
         if status == Metadata.Status.ERROR:
             self.brain.status = PBBrainResource.ERROR
         elif useful is False:
@@ -332,15 +340,10 @@ class ResourceBrain:
         elif status == Metadata.Status.PENDING:
             self.brain.status = PBBrainResource.PENDING
 
-    def get_processing_status_tag(self) -> str:
-        return PROCESSING_STATUS_PB_TYPE_TO_NAME_MAP[self.brain.status]
-
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
 
         self.brain.metadata.created.CopyFrom(basic.created)
         self.brain.metadata.modified.CopyFrom(basic.modified)
-
-        self.set_status(basic.metadata.status, basic.metadata.useful)
 
         relationnodedocument = RelationNode(
             value=uuid, ntype=RelationNode.NodeType.RESOURCE
@@ -373,7 +376,8 @@ class ResourceBrain:
         self.tags["n"].append(f"i/{basic.icon}")
 
         # processing status
-        self.tags["n"].append(f"s/{self.get_processing_status_tag()}")
+        status_tag = METADATA_STATUS_PB_TYPE_TO_NAME_MAP[basic.metadata.status]
+        self.tags["n"].append(f"s/{status_tag}")
 
         # main language
         if basic.metadata.language != "":
