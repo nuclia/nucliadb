@@ -150,6 +150,16 @@ async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
         )
     )
     resource = srckb.create_resource(payload)
+    file2_binary = "Sayonara".encode()
+    file2 = FileField(
+        file=File(
+            filename="mypdf.pdf",
+            content_type="application/pdf",
+            payload=file2_binary,
+            md5="YYY",
+        )
+    )
+    resource.upload_file("file2", file2, wait=True)
 
     with tempfile.NamedTemporaryFile() as dump:
         await nucliadb_client.export_kb(kbid=srckb.kbid, location=dump.name)
@@ -163,3 +173,4 @@ async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
         assert res.title == payload.title
         assert res.slug == payload.slug
         assert resource.download_file("file1") == file_binary
+        assert resource.download_file("file2") == file2_binary

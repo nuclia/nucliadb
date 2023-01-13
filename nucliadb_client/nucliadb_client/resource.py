@@ -21,6 +21,7 @@ import logging
 from typing import TYPE_CHECKING, List, Optional
 
 import httpx
+from nucliadb_models.file import FileField
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -32,7 +33,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
+from hashlib import md5
 from nucliadb_models.resource import Resource as NucliaDBResource
 
 if TYPE_CHECKING:
@@ -117,6 +118,22 @@ class Resource:
         resp = self.http_reader_v1.get(f"/file/{field_id}/download/field")
         assert resp.status_code == 200
         return resp.content
+
+    def upload_file(self, file_id: str, field: FileField, wait: bool = False):
+        headers = {
+            "X-FILENAME": field.file.filename,
+            "X-MD5": md5(field.file.payload.encode()).hexdigest(),
+            "Content-Type": field.file.content_type,
+            "Content-Length": str(len(field.file.payload)),
+        }
+        if wait:
+            headers["X-SYNCHRONOUS"] = "True"
+        resp = self.http_writer_v1.post(
+            f"/file/{file_id}/upload",
+            data=field.file.payload,
+            headers=headers,
+        )
+        assert resp.status_code == 201
 
     @property
     def bm(self) -> BrokerMessage:
