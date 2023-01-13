@@ -66,4 +66,4 @@ class RunningSettings(pydantic.BaseSettings):
         description="Service account key to access Nuclia Cloud"
     )
 
-    batch_size: int = pydantic.Field(20, description="Batch streaming size")
+    batch_size: int = pydantic.Field(64, description="Batch streaming size")

@@ -119,6 +119,8 @@ install: ## Install dependencies (on the active environment)
 	pip install -e ./nucliadb
 	pip install -e ./nucliadb_telemetry
 	pip install -e ./nucliadb_client
+	pip install -e ./nucliadb_sdk
+	pip install -e ./nucliadb_dataset
 	pip install -r test-requirements.txt
 
 base-node-image:

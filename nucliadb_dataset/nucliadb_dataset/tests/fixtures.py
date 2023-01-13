@@ -17,13 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import re
 import tempfile
+from io import BytesIO
+from typing import Optional
 
+import boto3
+import docker  # type: ignore
 import pytest
+import requests
+from google.cloud import storage  # type: ignore
+from pytest_docker_fixtures import images  # type: ignore
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_sdk.entities import Entity
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.labels import LabelType
+
+DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
+DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None  # type: ignore
 
 
 @pytest.fixture(scope="function")
@@ -61,3 +73,125 @@ def upload_data_token_classification(knowledgebox: KnowledgeBox):
 def temp_folder():
     with tempfile.TemporaryDirectory() as tmpdirname:
         yield tmpdirname
+
+
+images.settings["gcs"] = {
+    "image": "fsouza/fake-gcs-server",
+    "version": "v1.30.1",
+    "options": {
+        "command": f"-scheme http -external-url http://{DOCKER_HOST}:4443 -port 4443",
+        "ports": {"4443": "4443"},
+    },
+}
+
+images.settings["s3"] = {
+    "image": "localstack/localstack",
+    "version": "0.12.18",
+    "env": {"SERVICES": "s3"},
+    "options": {
+        "ports": {"4566": None, "4571": None},
+    },
+}
+
+
+class GCS(BaseImage):
+    name = "gcs"
+    port = 4443
+
+    def check(self):
+        try:
+            response = requests.get(
+                f"http://{self.host}:{self.get_port()}/storage/v1/b"
+            )
+            return response.status_code == 200
+        except:  # noqa
+            return False
+
+
+@pytest.fixture(scope="session")
+def gcs():
+    container = GCS()
+    host, port = container.run()
+    public_api_url = f"http://{host}:{port}"
+    yield public_api_url
+    container.stop()
+
+
+@pytest.fixture(scope="session")
+def gcs_with_partitions(gcs):
+    def upload_random_file_to_bucket(
+        client, bucket_name, destination_blob_name, file_size
+    ):
+        random_file = BytesIO()
+        random_file.write(b"1" * file_size)
+        random_file.seek(0)
+
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
+        blob.upload_from_file(random_file)
+
+    client = storage.Client(project="project", client_options={"api_endpoint": gcs})
+    client.create_bucket("test_cloud_datasets")
+    filesize = 10 * 1024 * 1024
+    upload_random_file_to_bucket(
+        client, "test_cloud_datasets", "datasets/123456/partition1.arrow", filesize
+    )
+    upload_random_file_to_bucket(
+        client, "test_cloud_datasets", "datasets/123456/partition2.arrow", filesize
+    )
+    yield
+
+
+class S3(BaseImage):
+    name = "s3"
+    port = 4566
+
+    def check(self):
+        try:
+            response = requests.get(f"http://{self.host}:{self.get_port()}")
+            return response.status_code == 404
+        except:  # noqa
+            return False
+
+
+@pytest.fixture(scope="session")
+def s3():
+    container = S3()
+    host, port = container.run()
+    public_api_url = f"http://{host}:{port}"
+    yield public_api_url
+    container.stop()
+
+
+@pytest.fixture(scope="session")
+def s3_with_partitions(s3):
+    def upload_random_file_to_bucket(
+        client, bucket_name, destination_blob_name, file_size
+    ):
+        random_file = BytesIO()
+        random_file.write(b"1" * file_size)
+        random_file.seek(0)
+
+        client.put_object(
+            Bucket=bucket_name, Key=destination_blob_name, Body=random_file
+        )
+
+    client = boto3.client(
+        "s3",
+        aws_access_key_id="",
+        aws_secret_access_key="",
+        use_ssl=False,
+        verify=False,
+        endpoint_url=s3,
+        region_name=None,
+    )
+
+    client.create_bucket(Bucket="testclouddatasets")
+    filesize = 10 * 1024 * 1024
+    upload_random_file_to_bucket(
+        client, "testclouddatasets", "datasets/123456/partition1.arrow", filesize
+    )
+    upload_random_file_to_bucket(
+        client, "testclouddatasets", "datasets/123456/partition2.arrow", filesize
+    )
+    yield

@@ -17,10 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
+import json
 import os
-from typing import TYPE_CHECKING, Any, Callable, Iterator, List, Optional, Tuple
+import re
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
+import boto3
 import pyarrow as pa  # type: ignore
+from google.auth.credentials import AnonymousCredentials
+from google.cloud import storage  # type: ignore
+from google.oauth2 import service_account
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
@@ -40,6 +57,8 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
+
+CHUNK_SIZE = 5 * 1024 * 1024
 
 if TYPE_CHECKING:
     TaskValue = TaskType.V
@@ -62,12 +81,10 @@ class NucliaDataset(object):
 
     def __init__(
         self,
-        trainset: TrainSet,
         base_path: Optional[str] = None,
     ):
         if base_path is None:
             base_path = os.getcwd()
-        self.trainset = trainset
         self.base_path = base_path
         self.mappings: List[Callable] = []
 
@@ -78,7 +95,7 @@ class NucliaDataset(object):
     def iter_all_partitions(self, force=False) -> Iterator[Tuple[str, str]]:
         partitions = self.get_partitions()
         for index, partition in enumerate(partitions):
-            print(f"Generating partition {partition} {index}/{len(partitions)}")
+            print(f"Reading partition {partition} {index}/{len(partitions)}")
             filename = self.read_partition(partition, ACTUAL_PARTITION, force)
             print("done")
             yield partition, filename
@@ -87,7 +104,7 @@ class NucliaDataset(object):
         partitions = self.get_partitions()
         result = []
         for index, partition in enumerate(partitions):
-            print(f"Generating partition {partition} {index}/{len(partitions)}")
+            print(f"Reading partition {partition} {index}/{len(partitions)}")
             filename = self.read_partition(partition, force=force, path=path)
             result.append(filename)
             print("done")
@@ -113,8 +130,9 @@ class NucliaDBDataset(NucliaDataset):
         client: NucliaDBClient,
         base_path: Optional[str] = None,
     ):
-        super().__init__(trainset, base_path)
+        super().__init__(base_path)
 
+        self.trainset = trainset
         self.knowledgebox = KnowledgeBox(client.url, client.api_key, client=client)
         self.client = client
         self.base_url = self.client.url
@@ -271,7 +289,6 @@ class NucliaDBDataset(NucliaDataset):
         if filename is None:
             filename = partition_id
 
-        counter = 0
         if path is not None:
             filename = f"{path}/{filename}.arrow"
         else:
@@ -286,27 +303,93 @@ class NucliaDBDataset(NucliaDataset):
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in self.streamer:
-                    print(f"\r {counter}")
                     batch = self._map(batch)
                     if batch is None:
                         break
                     writer.write_batch(batch)
-                    counter += 1
         print("-" * 10)
         self.streamer.finalize()
         os.rename(filename_tmp, filename)
         return filename
 
 
+class S3DatasetsClient:
+    def __init__(self, settings):
+        self.client = boto3.client(
+            "s3",
+            aws_access_key_id=settings["client_id"],
+            aws_secret_access_key=settings["client_secret"],
+            use_ssl=settings["ssl"],
+            verify=settings["verify_ssl"],
+            endpoint_url=settings["endpoint"],
+            region_name=settings["region_name"],
+        )
+
+    def list_files(self, bucket_name: str, path: str) -> List[str]:
+        objects = self.client.list_objects(Bucket=bucket_name, Prefix=path)
+        files_list = [obj["Key"] for obj in objects.get("Contents", [])]
+        return files_list
+
+    def download(self, bucket_name: str, filename: str, file_obj) -> None:
+        obj = self.client.get_object(Bucket=bucket_name, Key=filename)
+        data = obj["Body"]
+        file_obj.write(data.read())
+
+
+class GCSDatasetsClient:
+    def __init__(self, settings):
+        if settings["base64_creds"] is not None:
+            account_credentials = json.loads(base64.b64decode(settings["base64_creds"]))
+            credentials = service_account.Credentials.from_service_account_info(
+                account_credentials,
+                scopes=["https://www.googleapis.com/auth/devstorage.read_write"],
+            )
+        else:
+            credentials = AnonymousCredentials()
+        self.client = storage.Client(
+            project=settings["project"],
+            credentials=credentials,
+            client_options={"api_endpoint": settings["endpoint_url"]},
+        )
+
+    def list_files(self, bucket_name: str, path: str) -> List[str]:
+        bucket = self.client.bucket(bucket_name)
+        arrow_files = [blob.name for blob in bucket.list_blobs(prefix=path)]
+        return arrow_files
+
+    def download(self, bucket_name: str, filename: str, file_obj) -> None:
+        bucket = self.client.bucket(bucket_name)
+        blob = bucket.get_blob(filename)
+
+        if blob is None:
+            raise ValueError(f"File {filename} not found on {bucket_name}")
+
+        blob.download_to_file(file_obj)
+
+
 class NucliaCloudDataset(NucliaDataset):
-    def __init__(self, trainset: TrainSet, base_path: str, storage_client):
-        super().__init__(trainset, base_path)
+    client: Union[GCSDatasetsClient, S3DatasetsClient]
+
+    def __init__(self, base_path: str, remote_storage: Dict[str, Any]):
+        super().__init__(base_path)
+        self.bucket = remote_storage["bucket"]
+        self.key = remote_storage["key"]
+        if remote_storage["storage_type"] == "gcs":
+            self.client = GCSDatasetsClient(remote_storage["settings"])
+        elif remote_storage["storage_type"] == "s3":
+            self.client = S3DatasetsClient(remote_storage["settings"])
 
     def get_partitions(self):
         """
         Count all *.arrow files on the bucket
         """
-        pass
+        arrow_files = self.client.list_files(self.bucket, self.key)
+        partitions = []
+        for file in arrow_files:
+            match = re.match(r".*\/([^\/]+).arrow", file)
+            if match:
+                partitions.append(match.groups()[0])
+        return partitions
 
     def read_partition(
         self,
@@ -318,7 +401,28 @@ class NucliaCloudDataset(NucliaDataset):
         """
         Download an pregenerated arrow partition from a bucket and store it locally
         """
-        pass
+        if filename is None:
+            filename = partition_id
+
+        if path is not None:
+            filename = f"{path}/{filename}.arrow"
+        else:
+            filename = f"{self.base_path}/{filename}.arrow"
+
+        if os.path.exists(filename) and force is False:
+            return filename
+
+        filename_tmp = f"{filename}.tmp"
+        print(f"Downloading partition {partition_id} from {self.bucket}/{self.key}")
+        with open(filename_tmp, "wb") as downloaded_file:
+            self.client.download(
+                self.bucket, f"{self.key}/{partition_id}.arrow", downloaded_file
+            )
+            downloaded_file.flush()
+
+        print("-" * 10)
+        os.rename(filename_tmp, filename)
+        return filename
 
 
 def download_all_partitions(
