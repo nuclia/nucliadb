@@ -24,6 +24,7 @@ import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,
+    SentenceClassificationBatch,
     TaskType,
     TokenClassificationBatch,
     TrainSet,
@@ -141,7 +142,7 @@ class NucliaDBDataset(NucliaDataset):
             raise Exception("Labelset is not valid")
         self._set_mappings(
             [
-                bytes_to_batch(ParagraphClassificationBatch),
+                bytes_to_batch(SentenceClassificationBatch),
                 batch_to_text_classification_normalized_arrow,
             ]
         )
@@ -271,7 +272,6 @@ class NucliaDBDataset(NucliaDataset):
         if filename is None:
             filename = partition_id
 
-        counter = 0
         if path is not None:
             filename = f"{path}/{filename}.arrow"
         else:
@@ -286,12 +286,10 @@ class NucliaDBDataset(NucliaDataset):
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in self.streamer:
-                    print(f"\r {counter}")
                     batch = self._map(batch)
                     if batch is None:
                         break
                     writer.write_batch(batch)
-                    counter += 1
         print("-" * 10)
         self.streamer.finalize()
         os.rename(filename_tmp, filename)
