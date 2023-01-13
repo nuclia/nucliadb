@@ -26,6 +26,7 @@ import boto3
 import docker  # type: ignore
 import pytest
 import requests
+from google.auth.credentials import AnonymousCredentials
 from google.cloud import storage  # type: ignore
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
@@ -130,7 +131,11 @@ def gcs_with_partitions(gcs):
         blob = bucket.blob(destination_blob_name)
         blob.upload_from_file(random_file)
 
-    client = storage.Client(project="project", client_options={"api_endpoint": gcs})
+    client = storage.Client(
+        project="project",
+        credentials=AnonymousCredentials(),
+        client_options={"api_endpoint": gcs},
+    )
     client.create_bucket("test_cloud_datasets")
     filesize = 10 * 1024 * 1024
     upload_random_file_to_bucket(
