@@ -282,6 +282,7 @@ class SearchRequest(BaseModel):
     filters: List[str] = []
     faceted: List[str] = []
     sort: Optional[SortOption] = None
+    sort_limit: int = 100
     page_number: int = 0
     page_size: int = 20
     min_score: float = 0.70

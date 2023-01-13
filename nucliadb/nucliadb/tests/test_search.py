@@ -650,3 +650,102 @@ async def test_search_ordering_most_relevant_results(
 
         titles = [body["resources"][result["rid"]]["title"] for result in results]
         assert titles == sorted(titles)
+
+
+@pytest.mark.asyncio
+async def test_search_ordering_most_relevant_results_with_pagination(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    philosophy_books_kb,
+):
+    """Test ordering N most relevant results using pagination. Check two
+    pages contain sorted and no repeated elements. Validate asking for
+    a page outside the limit established gives empty results.
+
+    """
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["total"] == 4
+    assert body["paragraphs"]["total"] == 4
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+            "sort_limit": 3,
+        },
+    )
+    assert resp.status_code == 200
+    one_page_response = resp.json()
+
+    resources = {}
+    fulltext = []
+    paragraphs = []
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+            "sort_limit": 3,
+            "page_size": 2,
+            "page_number": 0,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    resources.update(body["resources"])
+    fulltext.extend(body["fulltext"]["results"])
+    paragraphs.extend(body["paragraphs"]["results"])
+
+    assert len(fulltext) == len(paragraphs) == 2
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+            "sort_limit": 3,
+            "page_size": 2,
+            "page_number": 1,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    resources.update(body["resources"])
+    fulltext.extend(body["fulltext"]["results"])
+    paragraphs.extend(body["paragraphs"]["results"])
+
+    assert len(fulltext) == len(paragraphs) == 3
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+            "sort_limit": 3,
+            "page_size": 2,
+            "page_number": 2,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    assert len(body["fulltext"]["results"]) == 0
+    assert len(body["paragraphs"]["results"]) == 0
+
+    assert fulltext == one_page_response["fulltext"]["results"][:3]
+    assert paragraphs == one_page_response["paragraphs"]["results"][:3]

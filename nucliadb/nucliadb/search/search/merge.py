@@ -118,6 +118,7 @@ async def merge_documents_results(
     page: int,
     kbid: str,
     sort: Optional[SortOption] = None,
+    sort_limit: int = 100,
 ) -> Resources:
     raw_resource_list: List[Tuple[DocumentResult, Score]] = []
     facets: Dict[str, Any] = {}
@@ -317,6 +318,7 @@ async def merge_paragraph_results(
     page: int,
     highlight: bool,
     sort: Optional[SortOption] = None,
+    sort_limit: int = 100,
 ):
 
     raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
@@ -449,6 +451,7 @@ async def merge_results(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     sort: Optional[SortOption],
+    sort_limit: int,
     requested_relations: RelationSearchRequest,
     min_score: float = 0.85,
     highlight: bool = False,
@@ -470,11 +473,11 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid, sort
+        documents, resources, count, page, kbid, sort, sort_limit
     )
 
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight, sort
+        paragraphs, resources, kbid, count, page, highlight, sort, sort_limit
     )
 
     api_results.sentences = await merge_vectors_results(

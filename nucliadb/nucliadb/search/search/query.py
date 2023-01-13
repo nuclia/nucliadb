@@ -48,6 +48,7 @@ async def global_query_to_pb(
     fields: Optional[List[str]] = None,
     sort: Optional[str] = None,
     sort_ord: int = Sort.ASC.value,
+    sort_limit: int = 100,
     reload: bool = False,
     vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
@@ -67,7 +68,12 @@ async def global_query_to_pb(
 
     # We need to ask for all and cut later
     request.page_number = 0
-    request.result_per_page = page_number * page_size + page_size
+    if sort is not None:
+        # As the index can't sort, we have to do it when merging. To
+        # have consistent results, we must limit them
+        request.result_per_page = sort_limit
+    else:
+        request.result_per_page = page_number * page_size + page_size
 
     if range_creation_start is not None:
         request.timestamps.from_created.FromDatetime(range_creation_start)
