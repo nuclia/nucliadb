@@ -99,7 +99,10 @@ async def get_field_text(
     # Check computed definition of entities
     if field_metadata is not None:
         for entity_key, positions in field_metadata.metadata.positions.items():
-            entity_group, entity = entity_key.split("/")
+            entities = entity_key.split("/")
+            entity_group = entities[0]
+            entity = "/".join(entities[1:])
+
             if entity_group in valid_entity_groups:
                 split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
                 for position in positions.position:
@@ -109,7 +112,9 @@ async def get_field_text(
 
         for split, split_metadata in field_metadata.split_metadata.items():
             for entity_key, positions in split_metadata.positions.items():
-                entity_group, entity = entity_key.split("/")
+                entities = entity_key.split("/")
+                entity_group = entities[0]
+                entity = "/".join(entities[1:])
                 if entity_group in valid_entity_groups:
                     split_ners.setdefault(split, {}).setdefault(
                         entity_group, {}
