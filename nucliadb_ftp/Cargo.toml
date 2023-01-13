@@ -16,3 +16,4 @@ clap = { version = "4.0.32", features = ["derive"] }
 [dev-dependencies]
 tempfile = "3.3.0"
 tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread"] }
+tokio-test = "0.4.2"

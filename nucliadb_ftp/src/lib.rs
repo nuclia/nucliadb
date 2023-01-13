@@ -1,112 +1,64 @@
-// #![warn(clippy::pedantic)]
+#![warn(clippy::pedantic)]
+
+//! # `nucliadb_ftp`
+//!
+//! The `nucliadb_ftp` crate aims to transfer files/directories asynchronously over the network (using a TCP/IP connection),
+//! based on a patched version of [`tokio-tar`](https://github.com/alekece/tokio-tar) crate.
+//!
+//! To do so, `nucliadb_ftp` provides two simple and easy-to-use types:
+//! - [`Publisher`] that helps appending files/directories before publishing them.
+//! - [`Listener`] that helps listening (once or multiple time) incoming files/directories.
+//!
+//! ## Examples
+//!
+//! ```no_run
+//! # tokio_test::block_on(async {
+//! use nucliadb_ftp::{Listener, Publisher};
+//!
+//! let listener_task = tokio::spawn(async {
+//!     Listener::default()
+//!         .save_at("my_dir")
+//!         // Uncomment this line if you want to preserve metadata of receveived files/directories.
+//!         // .preserve_metadata()
+//!         .listen_once(4242)
+//!         // Uncomment this line if you want to keep the listener active.
+//!         // .listen(4242)
+//!         .await
+//!         .unwrap();
+//! });
+//!
+//! let publisher_task = tokio::spawn(async {
+//!     Publisher::default()
+//!         // Uncomment this line if you want to publish files/directories with their metadata
+//!         //.preserve_metadata()
+//!         // Uncomment this line if you want to follow symlinks in appended directories.
+//!         // .follow_symlink()
+//!         .append("my_dir")
+//!         .append("path/to/my_file")
+//!         .send_to_localhost(4242)
+//!         // Or
+//!         // .sent_to("x.x.x.x:4242")
+//!         .await
+//!         .unwrap();
+//! });
+//!
+//! publisher_task.await.unwrap();
+//! listener_task.await.unwrap();
+//!
+//! # });
+//! ```
 
 mod error;
-
-use std::path::Path;
-
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
-use tokio_tar::{ArchiveBuilder, Builder, HeaderMode};
+mod listener;
+mod publisher;
 
 pub use error::Error;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct SendOptions {
-    pub follow_symlinks: bool,
-    pub append_recursively: bool,
-    pub preserve_metadata: bool,
-}
-
-impl Default for SendOptions {
-    fn default() -> Self {
-        Self {
-            follow_symlinks: false,
-            append_recursively: true,
-            preserve_metadata: true,
-        }
-    }
-}
-
-pub async fn send(address: impl ToSocketAddrs, source: impl AsRef<Path>) -> Result<(), Error> {
-    send_with_options(address, source, SendOptions::default()).await
-}
-
-pub async fn send_with_options(
-    address: impl ToSocketAddrs,
-    source: impl AsRef<Path>,
-    options: SendOptions,
-) -> Result<(), Error> {
-    let socket = TcpStream::connect(address).await?;
-    let source = source.as_ref();
-    let mut archive = Builder::new(socket);
-
-    archive.mode(if options.preserve_metadata {
-        HeaderMode::Complete
-    } else {
-        HeaderMode::Deterministic
-    });
-
-    archive.follow_symlinks(options.follow_symlinks);
-
-    if source.is_dir() {
-        let dir = source.file_name().unwrap();
-
-        if options.append_recursively {
-            archive.append_dir_all(dir, source).await?;
-        } else {
-            archive.append_dir(dir, source).await?;
-        }
-    } else {
-        archive.append_path(source).await?;
-    }
-
-    let _writer = archive.into_inner().await?;
-
-    Ok(())
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct ReceiveOptions {
-    pub preserve_metadata: bool,
-}
-
-impl Default for ReceiveOptions {
-    fn default() -> Self {
-        Self {
-            preserve_metadata: true,
-        }
-    }
-}
-
-pub async fn receive(
-    address: impl ToSocketAddrs,
-    destination: impl AsRef<Path>,
-) -> Result<(), Error> {
-    receive_with_options(address, destination, ReceiveOptions::default()).await
-}
-
-pub async fn receive_with_options(
-    address: impl ToSocketAddrs,
-    destination: impl AsRef<Path>,
-    options: ReceiveOptions,
-) -> Result<(), Error> {
-    let listener = TcpListener::bind(address).await?;
-    let (socket, _) = listener.accept().await?;
-
-    let mut archive = if options.preserve_metadata {
-        ArchiveBuilder::new(socket)
-            .set_preserve_mtime(true)
-            .set_preserve_permissions(true)
-            .set_unpack_xattrs(true)
-            .build()
-    } else {
-        ArchiveBuilder::new(socket).build()
-    };
-
-    Ok(archive.unpack(destination).await?)
-}
+pub use listener::Listener;
+pub use publisher::Publisher;
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
     use std::fs::{self, File};
     use std::io::Write;
 
@@ -116,33 +68,30 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn it_sends_file_on_localhost() -> Result<()> {
-        let address = "0.0.0.0:4242";
+        let port = 4242;
         let file_name = "dummy.txt";
         let file_content = "Time spent with cats is never wasted";
 
-        let sender = tokio::spawn({
-            let address = address;
+        let listener_task = tokio::spawn({
             let file_content = file_content;
 
             async move {
                 let destination_dir = tempfile::tempdir()?;
 
-                // Receiver::default()
-                //     .destination(destination_dir)
-                //     .keep_metadata()
-                //     .listen(address).await?;
-
-                receive(address, &destination_dir).await?;
+                Listener::default()
+                    .save_at(destination_dir.path())
+                    .listen_once(port)
+                    .await?;
 
                 let destination = destination_dir.path().join(file_name);
 
-                assert_eq!(file_content, &fs::read_to_string(destination)?);
+                assert_eq!(file_content, &fs::read_to_string(&destination)?);
 
                 Ok(()) as Result<()>
             }
         });
 
-        let receiver = tokio::spawn({
+        let publisher_task = tokio::spawn({
             async move {
                 let source_dir = tempfile::tempdir()?;
                 let source = source_dir.path().join(file_name);
@@ -150,67 +99,91 @@ mod tests {
                 {
                     let mut file = File::create(&source)?;
 
-                    writeln!(file, "{}", file_content)?;
+                    write!(file, "{}", file_content)?;
                 }
 
-                // Sender::default()
-                //     .source(file_name)
-                //     .persist_metadata()
-                //     .stream(address)
-                //     .await?;
-
-                send(address, source).await?;
+                Publisher::default()
+                    .append(source)
+                    .send_to_localhost(port)
+                    .await?;
 
                 Ok(()) as Result<()>
             }
         });
 
-        let _ = tokio::try_join!(sender, receiver)?;
+        publisher_task.await??;
+        listener_task.await??;
 
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn it_sends_directory_on_localhost() -> Result<()> {
-        let address = "0.0.0.0:4242";
-        let file_name = "dummy.txt";
-        let file_content = "Time spent with cats is never wasted";
+        let port = 4243;
+        let files = &[
+            ("dummy.txt", "Time spent with cats is never waster"),
+            ("file1.org", "hello world"),
+            ("README.md", include_str!("../README.md")),
+        ];
+        let dir_name = "my_dir";
 
-        let sender = tokio::spawn({
-            let address = address;
-            let file_content = file_content;
+        let listener_task = tokio::spawn(async move {
+            let destination_dir = tempfile::tempdir()?;
 
-            async move {
-                let destination_dir = tempfile::tempdir()?;
+            Listener::default()
+                .save_at(destination_dir.path())
+                .listen_once(port)
+                .await?;
 
-                receive(address, &destination_dir).await?;
+            let received_files = fs::read_dir(destination_dir.path().join(dir_name))?
+                .into_iter()
+                .filter_map(|entry| entry.ok().map(|e| e.path()))
+                .collect::<Vec<_>>();
 
-                let destination = destination_dir.path().join(file_name);
+            assert_eq!(files.len(), received_files.len());
 
-                assert_eq!(file_content, &fs::read_to_string(destination)?);
+            for received_file in received_files {
+                let (_, file_content) = files
+                    .iter()
+                    .find(|(name, _)| received_file.file_name() == Some(OsStr::new(name)))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "'{}' not found in destination directory",
+                            received_file.display()
+                        )
+                    });
 
-                Ok(()) as Result<()>
+                assert_eq!(file_content, &fs::read_to_string(received_file)?);
             }
+
+            Ok(()) as Result<()>
         });
 
-        let receiver = tokio::spawn({
-            async move {
-                let source_dir = tempfile::tempdir()?;
-                let source = source_dir.path().join(file_name);
+        let publisher_task = tokio::spawn(async move {
+            let source_dir = tempfile::tempdir()?;
+            let source_dir = source_dir.path().join(dir_name);
 
-                {
+            fs::create_dir(&source_dir)?;
+
+            {
+                for (file_name, file_content) in files {
+                    let source = source_dir.join(file_name);
                     let mut file = File::create(&source)?;
 
-                    writeln!(file, "{}", file_content)?;
+                    write!(file, "{}", file_content)?;
                 }
-
-                send(address, source).await?;
-
-                Ok(()) as Result<()>
             }
+
+            Publisher::default()
+                .append(source_dir)
+                .send_to_localhost(port)
+                .await?;
+
+            Ok(()) as Result<()>
         });
 
-        let _ = tokio::try_join!(sender, receiver)?;
+        publisher_task.await??;
+        listener_task.await??;
 
         Ok(())
     }
