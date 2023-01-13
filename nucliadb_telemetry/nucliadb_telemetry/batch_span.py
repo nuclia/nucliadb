@@ -114,8 +114,10 @@ class BatchSpanProcessor(SpanProcessor):
 
         try:
             self.queue.put_nowait(span)  # type: ignore
-        except:
-            logger.error(f"Queue size : {self.queue.qsize()}")
+        except asyncio.QueueFull:
+            logger.warning(f"Queue is full. Queue size : {self.queue.qsize()}")
+        except Exception as e:
+            logger.exception(e)
 
         if self.queue.qsize() >= self.max_export_batch_size:
             asyncio.create_task(self.notify())

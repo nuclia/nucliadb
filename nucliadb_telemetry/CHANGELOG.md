@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.8
+
+- Improve error logging on errors while putting events on the queue
+
 ## 1.1.7
 
 - Enable adding interceptors
