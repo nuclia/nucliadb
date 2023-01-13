@@ -612,6 +612,26 @@ async def test_search_ordering_most_relevant_results(
         ]
         assert creation_dates == sorted(creation_dates)
 
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "created",
+            "sort_order": "desc",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        creation_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
+            for result in results
+        ]
+        assert creation_dates == list(reversed(sorted(creation_dates)))
+
     # Test: sort by modification date
 
     resp = await nucliadb_reader.get(
@@ -619,6 +639,7 @@ async def test_search_ordering_most_relevant_results(
         params={
             "query": "philosophy",
             "sort": "modified",
+            "sort_order": "asc",
         },
     )
     assert resp.status_code == 200
@@ -632,6 +653,26 @@ async def test_search_ordering_most_relevant_results(
             for result in results
         ]
         assert modification_dates == sorted(modification_dates)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "modified",
+            "sort_order": "desc",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        modification_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["modified"])
+            for result in results
+        ]
+        assert modification_dates == list(reversed(sorted(modification_dates)))
 
     # Test: sort by title
 
@@ -650,6 +691,23 @@ async def test_search_ordering_most_relevant_results(
 
         titles = [body["resources"][result["rid"]]["title"] for result in results]
         assert titles == sorted(titles)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+            "sort_order": "desc",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        titles = [body["resources"][result["rid"]]["title"] for result in results]
+        assert titles == list(reversed(sorted(titles)))
 
 
 @pytest.mark.asyncio

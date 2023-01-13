@@ -74,6 +74,11 @@ class Sort(int, Enum):
     ASC = 1
 
 
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
 class Facet(BaseModel):
     facetresults: Dict[str, int]
 
@@ -283,6 +288,7 @@ class SearchRequest(BaseModel):
     faceted: List[str] = []
     sort: Optional[SortOption] = None
     sort_limit: int = 100
+    sort_order: SortOrder = SortOrder.ASC
     page_number: int = 0
     page_size: int = 20
     min_score: float = 0.70

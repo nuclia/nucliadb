@@ -48,6 +48,7 @@ from nucliadb_models.search import (
     SearchOptions,
     SearchRequest,
     SortOption,
+    SortOrder,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -97,6 +98,7 @@ async def search_knowledgebox(
     faceted: List[str] = Query(default=[]),
     sort: Optional[SortOption] = None,
     sort_limit: int = Query(default=100),
+    sort_order: SortOrder = Query(default=SortOrder.ASC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
     min_score: float = Query(default=0.70),
@@ -135,6 +137,7 @@ async def search_knowledgebox(
         faceted=faceted,
         sort=sort,
         sort_limit=sort_limit,
+        sort_order=sort_order,
         page_number=page_number,
         page_size=page_size,
         min_score=min_score,
@@ -304,6 +307,7 @@ async def search(
         extracted=item.extracted,
         sort=item.sort,
         sort_limit=item.sort_limit,
+        sort_order=item.sort_order,
         requested_relations=pb_query.relations,
         min_score=item.min_score,
         highlight=item.highlight,

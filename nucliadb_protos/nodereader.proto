@@ -106,7 +106,6 @@ message DocumentResult {
 message DocumentSearchResponse {
     int32 total = 1;
 
-
     repeated DocumentResult results = 2;
 
     map<string, FacetResults> facets = 3;
