@@ -3,9 +3,11 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use eyre::Result;
-use nucliadb_ftp::{ReceiveOptions, SendOptions};
+use nucliadb_ftp::{Listener, Publisher};
 
+/// File/directory tranfer over network.
 #[derive(Parser)]
+#[command(author, version, about, long_about = None)]
 struct Opt {
     #[command(subcommand)]
     command: Command,
@@ -13,14 +15,21 @@ struct Opt {
 
 #[derive(Subcommand)]
 enum Command {
-    Send {
-        address: SocketAddr,
-        source: PathBuf,
+    /// Publish the given path (a file or a whole directory) to the given IP.
+    Publish {
+        /// The file/directory to publish.
+        path: PathBuf,
+        /// The IP of the target machine.
+        #[arg(short, long)]
+        ip: SocketAddr,
     },
+    /// Listen incoming files/directories by storing them to the given path.
     Listen {
+        /// The location where save incoming files/directories.
+        path: PathBuf,
+        /// The listen port.
         #[arg(short, long)]
         port: u16,
-        destination: PathBuf,
     },
 }
 
@@ -31,27 +40,9 @@ async fn main() -> Result<()> {
     let opt = Opt::parse();
 
     match opt.command {
-        Command::Send { address, source } => {
-            nucliadb_ftp::send_with_options(
-                address,
-                source,
-                SendOptions {
-                    append_recursively: true,
-                    follow_symlinks: false,
-                    preserve_metadata: true,
-                },
-            )
-            .await?
-        }
-        Command::Listen { port, destination } => {
-            nucliadb_ftp::receive_with_options(
-                format!("0.0.0.0:{}", port),
-                destination,
-                ReceiveOptions {
-                    preserve_metadata: false,
-                },
-            )
-            .await?
+        Command::Publish { path, ip } => Publisher::default().append(path).send_to(ip).await?,
+        Command::Listen { path, port } => {
+            Listener::default().save_at(path).listen_once(port).await?
         }
     }
 
