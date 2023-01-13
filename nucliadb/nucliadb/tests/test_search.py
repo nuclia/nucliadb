@@ -580,3 +580,73 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     resp_json = resp.json()
     facets = resp_json["fulltext"]["facets"]
     assert facets["/n/s"] == {"/n/s/PENDING": 1}
+
+
+@pytest.mark.asyncio
+async def test_search_ordering_most_relevant_results(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    philosophy_books_kb,
+):
+    kbid = philosophy_books_kb
+
+    # Test: sort by creation date
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "created",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        creation_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
+            for result in results
+        ]
+        assert creation_dates == sorted(creation_dates)
+
+    # Test: sort by modification date
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "modified",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        modification_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["modified"])
+            for result in results
+        ]
+        assert modification_dates == sorted(modification_dates)
+
+    # Test: sort by title
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        titles = [body["resources"][result["rid"]]["title"] for result in results]
+        assert titles == sorted(titles)

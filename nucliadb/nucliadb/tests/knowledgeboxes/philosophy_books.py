@@ -104,6 +104,24 @@ async def philosophy_books_kb(
             },
         },
         {
+            "slug": "the-principles-of-the-most-ancient-and-modern-philosophy",
+            "title": "The Principles of the most Ancient and Modern Philosophy",
+            "summary": (
+                "Conway's monistic view of the world as created from one substance"
+            ),
+            "usermetadata": {
+                "relations": [
+                    {
+                        "relation": "ENTITY",
+                        "entity": {
+                            "entity": "Anne Conway",
+                            "entity_type": "PERSON",
+                        },
+                    }
+                ]
+            },
+        },
+        {
             "slug": "ethics",
             "title": "Ethics",
             "summary": (
@@ -116,25 +134,6 @@ async def philosophy_books_kb(
                         "relation": "ENTITY",
                         "entity": {
                             "entity": "Baruch Spinoza",
-                            "entity_type": "PERSON",
-                        },
-                    }
-                ]
-            },
-        },
-        {
-            "slug": "meditations-on-first-philosophy",
-            "title": "Meditations on First Philosophy",
-            "summary": (
-                "Six meditations in which Descartes first discards all belief in things that are "
-                "not absolutely certain, and then tries to establish what can be known for sure"
-            ),
-            "usermetadata": {
-                "relations": [
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "René Descartes",
                             "entity_type": "PERSON",
                         },
                     }

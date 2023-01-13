@@ -212,6 +212,7 @@ class KnowledgeboxCounters(BaseModel):
 class SortOption(str, Enum):
     MODIFIED = "modified"
     CREATED = "created"
+    TITLE = "title"
 
 
 class KnowledgeBoxCount(BaseModel):
