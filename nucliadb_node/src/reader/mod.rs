@@ -66,7 +66,7 @@ impl NodeReaderService {
         &mut self,
     ) -> ServiceResult<impl Iterator<Item = InternalResult<ShardReaderService>>> {
         let shards_path = Configuration::shards_path();
-        Ok(std::fs::read_dir(&shards_path)?.flatten().map(|entry| {
+        Ok(std::fs::read_dir(shards_path)?.flatten().map(|entry| {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
             info!("Opening {shard_path:?}");

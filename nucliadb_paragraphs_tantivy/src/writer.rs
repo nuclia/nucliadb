@@ -228,7 +228,7 @@ impl ParagraphWriterService {
                 let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
                 let start_pos = p.start as u64;
                 let end_pos = p.end as u64;
-                let index = p.index as u64;
+                let index = p.index;
                 let split = &p.split;
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());

@@ -105,7 +105,7 @@ mod tests {
 
                 let destination = destination_dir.path().join(file_name);
 
-                assert_eq!(file_content, &fs::read_to_string(&destination)?);
+                assert_eq!(file_content, &fs::read_to_string(destination)?);
 
                 Ok(()) as Result<()>
             }
@@ -119,7 +119,7 @@ mod tests {
                 {
                     let mut file = File::create(&source)?;
 
-                    write!(file, "{}", file_content)?;
+                    write!(file, "{file_content}")?;
                 }
 
                 Publisher::default()
@@ -188,9 +188,9 @@ mod tests {
             {
                 for (file_name, file_content) in files {
                     let source = source_dir.join(file_name);
-                    let mut file = File::create(&source)?;
+                    let mut file = File::create(source)?;
 
-                    write!(file, "{}", file_content)?;
+                    write!(file, "{file_content}")?;
                 }
             }
 

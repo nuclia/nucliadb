@@ -98,13 +98,13 @@ impl ShardConfig {
         let config = ShardConfig::default();
         let serialized = serde_json::to_string(&config)?;
         fs::File::create(&json_file)?;
-        fs::write(&json_file, &serialized)?;
+        fs::write(&json_file, serialized)?;
         match ShardConfig::read_config(&json_file)? {
             ConfigState::UpToDate(config) => Ok(config),
             ConfigState::Modified(config) => {
                 let serialized = serde_json::to_string(&config)?;
                 fs::File::create(&json_file)?;
-                fs::write(&json_file, &serialized)?;
+                fs::write(&json_file, serialized)?;
                 Ok(config)
             }
         }

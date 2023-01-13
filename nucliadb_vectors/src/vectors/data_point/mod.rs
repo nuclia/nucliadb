@@ -328,7 +328,7 @@ impl DataPoint {
     pub fn delete(dir: &path::Path, uid: DpId) -> DPResult<()> {
         let uid = uid.to_string();
         let id = dir.join(uid);
-        fs::remove_dir_all(&id)?;
+        fs::remove_dir_all(id)?;
         Ok(())
     }
     pub fn open(dir: &path::Path, uid: DpId) -> DPResult<DataPoint> {
