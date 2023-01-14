@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.3
+
+- Fix sentence classification texts
+
 ## 1.1.2
 
 - Fix sentence classification schema
