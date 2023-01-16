@@ -80,7 +80,7 @@ def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentRes
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
-async def _text_score(
+async def text_score(
     item: Union[DocumentResult, ParagraphResult],
     sort: Optional[SortOptions],
     kbid: str,
@@ -103,18 +103,6 @@ async def _text_score(
         score = basic.title
 
     return score
-
-
-async def document_score(
-    document: DocumentResult, sort: Optional[SortOptions], kbid: str
-):
-    return await _text_score(document, sort, kbid)
-
-
-async def paragraph_score(
-    paragraph: ParagraphResult, sort: Optional[SortOptions], kbid: str
-):
-    return await _text_score(paragraph, sort, kbid)
 
 
 async def merge_documents_results(
@@ -142,7 +130,7 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            score = await document_score(result, sort, kbid)
+            score = await text_score(result, sort, kbid)
             raw_resource_list.append((result, score))
 
     sort_order = sort.order if sort is not None else SortOrder.ASC
@@ -345,7 +333,7 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            score = await paragraph_score(result, sort, kbid)
+            score = await text_score(result, sort, kbid)
             raw_paragraph_list.append((result, score))
 
     sort_order = sort.order if sort is not None else SortOrder.ASC
