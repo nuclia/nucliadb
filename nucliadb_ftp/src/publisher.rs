@@ -172,13 +172,14 @@ impl Publisher {
                         }
                     }
 
+                    // comment + add counter
                     let _writer = archive.into_inner().await?;
 
                     Ok(())
                 }
             },
             |e, duration| {
-                tracing::debug!("Error happened at {duration:?}: {e}");
+                tracing::warn!("Error happened at {duration:?}: {e}");
             },
         )
         .await
