@@ -25,6 +25,14 @@ class CouldNotCreateBucket(Exception):
     pass
 
 
+class CouldNotUpdateMetadata(Exception):
+    pass
+
+
+class CouldNotGetMetadata(Exception):
+    pass
+
+
 class InvalidOffset(Exception):
     def __init__(self, range_header, offset):
         self.range_header = range_header

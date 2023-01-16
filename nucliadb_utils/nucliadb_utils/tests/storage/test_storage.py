@@ -50,11 +50,24 @@ async def storage_test(storage: Storage):
     bucket = storage.get_bucket_name(kbid)
 
     await storage.uploadbytes(bucket, key, example)
+
     async for data in storage.download(bucket, key):
         assert data == example
 
+    metadata = await storage.get_custom_metadata(bucket, key)
+    assert metadata != {}
+    assert "Foo" not in metadata
+    await storage.set_custom_metadata(bucket, key, metadata={"Foo": "Bar"})
+
+    assert (await storage.get_custom_metadata(bucket, key))["Foo"] == "Bar"
+
+    await storage.create_object(bucket, "mytest-other")
+
+    keys_found = 0
     async for keys in storage.iterate_bucket(bucket, ""):
-        assert keys["name"] == "mytest"
+        keys_found += 1
+        assert keys["name"].startswith("mytest")
+    assert keys_found == 2
 
     deleted = await storage.schedule_delete_kb(kbid)
     assert deleted

@@ -218,6 +218,14 @@ class Storage:
         else:
             return True
 
+    async def set_custom_metadata(
+        self, bucket: str, key: str, metadata: Dict[str, str]
+    ) -> None:
+        raise NotImplementedError()
+
+    async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
+        raise NotImplementedError()
+
     async def normalize_binary(self, file: CloudFile, destination: StorageField):
         # see if file is in the same Cloud in the same bucket
         if file.source == self.source and file.uri != destination.key:
@@ -226,11 +234,22 @@ class Storage:
         elif file.source == self.source:
             return file
         elif file.source == CloudFile.EXPORT:
+            bucket, key = destination.bucket, destination.key
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
-            new_cf.bucket_name = destination.bucket
-            new_cf.uri = destination.key
+            new_cf.bucket_name = bucket
+            new_cf.uri = key
             new_cf.source = self.source
+            await self.create_object(bucket, key)
+            await self.set_custom_metadata(
+                bucket=bucket,
+                key=key,
+                metadata={
+                    "CONTENT_TYPE": new_cf.content_type,
+                    "SIZE": str(new_cf.size),
+                    "FILENAME": new_cf.filename,
+                },
+            )
         elif file.source == CloudFile.FLAPS:
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
@@ -441,6 +460,9 @@ class Storage:
         await destination.move(
             file.uri, destination.key, file.bucket_name, destination.bucket
         )
+
+    async def create_object(self, bucket: str, key: str) -> None:
+        raise NotImplementedError()
 
     async def create_kb(self, kbid: str) -> bool:
         raise NotImplementedError()

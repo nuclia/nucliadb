@@ -26,13 +26,14 @@ from nucliadb_utils.store import MAIN
 
 
 @pytest.fixture(scope="function")
-async def local_storage(gcs):
+async def local_storage():
     folder = tempfile.TemporaryDirectory()
     storage = LocalStorage(local_testing_files=folder.name)
 
     MAIN["storage"] = storage
     await storage.initialize()
     yield storage
+
     await storage.finalize()
     folder.cleanup()
     if "storage" in MAIN:

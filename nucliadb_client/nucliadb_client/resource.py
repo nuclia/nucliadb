@@ -18,10 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from hashlib import md5
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import httpx
-from nucliadb_models.file import FileField
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
@@ -33,7 +33,8 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from hashlib import md5
+
+from nucliadb_models.file import FileField
 from nucliadb_models.resource import Resource as NucliaDBResource
 
 if TYPE_CHECKING:
@@ -120,7 +121,9 @@ class Resource:
         return resp.content
 
     def upload_file(self, file_id: str, field: FileField, wait: bool = False):
-        headers = {
+        if field.file.payload is None:
+            raise ValueError("Need a field binary to upload")
+        headers: Dict[str, str] = {
             "X-FILENAME": field.file.filename,
             "X-MD5": md5(field.file.payload.encode()).hexdigest(),
             "Content-Type": field.file.content_type,
@@ -130,7 +133,7 @@ class Resource:
             headers["X-SYNCHRONOUS"] = "True"
         resp = self.http_writer_v1.post(
             f"/file/{file_id}/upload",
-            data=field.file.payload,
+            content=field.file.payload,
             headers=headers,
         )
         assert resp.status_code == 201

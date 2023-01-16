@@ -155,8 +155,10 @@ class LocalStorageField(StorageField):
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
-            await resp.write(json.dumps(metadata))
+            await resp.write(metadata)
 
+        print(">>> METADATA_INIT_URL:", metadata_init_url)
+        print(">>> INIT_URL:", init_url)
         self._handler = await aiofiles.threadpool.open(init_url, "wb+")
         field.offset = 0
         field.upload_uri = upload_uri
@@ -197,10 +199,16 @@ class LocalStorageField(StorageField):
         self.field.ClearField("upload_uri")
 
     async def exists(self) -> Optional[Dict[str, str]]:
-        if os.path.exists(self.metadata_key()):
-            async with aiofiles.open(self.metadata_key(), "r") as metadata:
-                return json.loads(await metadata.read())
-        return {}
+        path = self.storage.get_bucket_path(self.bucket)
+        metadata_key = self.metadata_key()
+        metadata_path = f"{path}/{metadata_key}"
+        print(">>> METADATA_PATH:", metadata_path)
+        if os.path.exists(metadata_key):
+            async with aiofiles.open(metadata_path, "r") as metadata:
+                metadata = json.loads(await metadata.read())
+                print(">>> METADATA:", metadata)
+                return metadata
+        return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)
@@ -212,6 +220,19 @@ class LocalStorageField(StorageField):
 
     def __repr__(self):
         return f"{self.storage.source}: {self.bucket}/{self.key}"
+
+    async def create_object(self, cf: CloudFile):
+        upload_uri = self.key
+        path = self.storage.get_bucket_path(self.bucket)
+        init_url = f"{path}/{upload_uri}"
+        metadata_init_url = self.metadata_key(init_url)
+        metadata = json.dumps(
+            {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
+        )
+        path_to_create = os.path.dirname(metadata_init_url)
+        os.makedirs(path_to_create, exist_ok=True)
+        async with aiofiles.open(metadata_init_url, "w") as resp:
+            await resp.write(metadata)
 
 
 class LocalStorage(Storage):
@@ -271,8 +292,13 @@ class LocalStorage(Storage):
         return deleted
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
-        for key in glob.glob(f"{bucket}/{prefix}*"):
-            item = {"name": key}
+        path = self.get_bucket_path(bucket)
+        for key in glob.glob(f"{path}/{prefix}*"):
+            name = key.split("/")[-1]
+            if name.endswith(".metadata"):
+                # Internal metadata file
+                continue
+            item = {"name": name}
             yield item
 
     async def download(
@@ -290,3 +316,33 @@ class LocalStorage(Storage):
                     break
                 else:
                     yield body
+
+    async def set_custom_metadata(
+        self, bucket: str, key: str, metadata: Dict[str, str]
+    ) -> None:
+        existing_metadata = await self.get_custom_metadata(bucket, key)
+        existing_metadata.update(metadata)
+        path = self.get_bucket_path(bucket)
+        metadata_path = f"{path}/{key}.metadata"
+        async with aiofiles.open(metadata_path, "w") as resp:
+            await resp.write(json.dumps(existing_metadata))
+
+    async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
+        path = self.get_bucket_path(bucket)
+        metadata_path = f"{path}/{key}.metadata"
+        try:
+            async with aiofiles.open(metadata_path, "r") as resp:
+                return json.loads(await resp.read())
+        except FileNotFoundError:
+            return {}
+
+    async def create_object(self, bucket: str, key: str) -> None:
+        path = self.get_bucket_path(bucket)
+        path_to_create = os.path.dirname(path)
+        os.makedirs(path_to_create, exist_ok=True)
+        object_path = f"{path}/{key}"
+        async with aiofiles.open(object_path, "w") as resp:
+            await resp.write("")
+        metadata_path = f"{object_path}.metadata"
+        async with aiofiles.open(metadata_path, "w") as resp:
+            await resp.write("{}")

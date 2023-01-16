@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 from datetime import datetime
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Dict, Optional
 
 import aiobotocore  # type: ignore
 import aiohttp
@@ -422,3 +422,14 @@ class S3Storage(Storage):
                 if error_code in (200, 204):
                     deleted = True
         return deleted, conflict
+
+    async def set_custom_metadata(
+        self, bucket: str, key: str, metadata: Dict[str, str]
+    ) -> None:
+        raise NotImplementedError()
+
+    async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
+        raise NotImplementedError()
+
+    async def create_object(self, bucket: str, key: str):
+        raise NotImplementedError()

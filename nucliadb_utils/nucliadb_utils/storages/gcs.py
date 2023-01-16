@@ -42,6 +42,8 @@ from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
     CouldNotCopyNotFound,
     CouldNotCreateBucket,
+    CouldNotGetMetadata,
+    CouldNotUpdateMetadata,
     InvalidOffset,
     ResumableUploadGone,
 )
@@ -226,7 +228,14 @@ class GCSStorageField(StorageField):
             quote_plus(upload_uri),
         )
         metadata = json.dumps(
-            {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
+            {
+                "contentType": cf.content_type,
+                "metadata": {
+                    "FILENAME": cf.filename,
+                    "SIZE": str(cf.size),
+                    "CONTENT_TYPE": cf.content_type,
+                },
+            }
         )
         call_size = len(metadata)
         headers = await self.storage.get_access_headers()
@@ -550,6 +559,67 @@ class GCSStorage(Storage):
         if kbid is not None:
             labels["kbid"] = kbid.lower()
         await self._create_bucket(url, headers, bucket_name, labels)
+
+    async def create_object(self, bucket: str, key: str) -> None:
+        if self.session is None:
+            raise AttributeError()
+        init_url = (
+            f"{self.object_base_url}/{bucket}/o?uploadType=media&name={quote_plus(key)}"
+        )
+        headers = await self.get_access_headers()
+        headers.update(
+            {
+                "Content-Type": "application/json; charset=UTF-8",
+            }
+        )
+        async with self.session.post(
+            init_url,
+            headers=headers,
+            data=b"",
+        ) as call:
+            if call.status != 200:
+                text = await call.text()
+                raise GoogleCloudException(f"{call.status}: {text}")
+
+    async def set_custom_metadata(
+        self, bucket: str, key: str, metadata: Dict[str, str]
+    ) -> None:
+        if self.session is None:
+            raise AttributeError()
+        url = "{}/{}/o/{}".format(
+            self.object_base_url,
+            bucket,
+            quote_plus(key),
+        )
+        headers = await self.get_access_headers()
+        async with self.session.patch(
+            url, headers=headers, json={"metadata": metadata}
+        ) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(
+                    f"Error setting object's {url} metadata: {resp.status} {text}"
+                )
+                raise CouldNotUpdateMetadata()
+
+    async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
+        if self.session is None:
+            raise AttributeError()
+        url = "{}/{}/o/{}".format(
+            self.object_base_url,
+            bucket,
+            quote_plus(key),
+        )
+        headers = await self.get_access_headers()
+        async with self.session.get(url, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(
+                    f"Error getting object's {url} metadata: {resp.status} {text}"
+                )
+                raise CouldNotGetMetadata()
+            body = await resp.json()
+            return body.get("metadata") or {}
 
     async def _create_bucket(self, url, headers, bucket_name, labels):
 
