@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import datetime
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -69,7 +70,10 @@ from nucliadb_models.search import (
     TextPosition,
 )
 
-Score = Any
+Bm25Score = Tuple[int, int]
+TimestampScore = datetime.datetime
+TitleScore = str
+Score = Union[Bm25Score, TimestampScore, TitleScore]
 
 
 def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentResult]]):
