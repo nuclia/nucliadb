@@ -42,14 +42,17 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
+    SORTED_RELEVANT_SEARCH_LIMIT,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
     SearchRequest,
+    Sort,
     SortField,
     SortOptions,
     SortOrder,
+    SortOrderMap,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -98,7 +101,7 @@ async def search_knowledgebox(
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
     sort: Optional[SortField] = None,
-    sort_limit: int = Query(default=100),
+    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
     sort_order: SortOrder = Query(default=SortOrder.ASC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
@@ -136,9 +139,11 @@ async def search_knowledgebox(
         fields=fields,
         filters=filters,
         faceted=faceted,
-        sort=SortOptions(field=sort, limit=sort_limit, order=sort_order)
-        if sort is not None
-        else None,
+        sort=(
+            SortOptions(field=sort, limit=sort_limit, order=sort_order)
+            if sort is not None
+            else None
+        ),
         page_number=page_number,
         page_size=page_size,
         min_score=min_score,
@@ -206,6 +211,28 @@ async def search(
             detail="Query needs to be bigger than 2 or 0",
         )
 
+    if len(item.query) == 0:
+        if item.sort is None:
+            item.sort = SortOptions(
+                field=SortField.CREATED,
+                order=SortOrder.ASC,
+                limit=None,
+            )
+        elif (
+            item.sort.field != SortField.CREATED
+            and item.sort.field != SortField.MODIFIED
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
+                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
+                ),
+            )
+    else:
+        if item.sort is not None and item.sort.limit is None:
+            item.sort.limit = SORTED_RELEVANT_SEARCH_LIMIT
+
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
         if SearchOptions.VECTOR in item.features:
@@ -228,6 +255,7 @@ async def search(
         filters=item.filters,
         faceted=item.faceted,
         sort=item.sort,
+        sort_ord=SortOrderMap[item.sort.order] if item.sort is not None else Sort.ASC,
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,

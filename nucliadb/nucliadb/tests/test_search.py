@@ -821,3 +821,78 @@ async def test_search_ordering_most_relevant_results_with_pagination(
 
     assert fulltext == one_page_response["fulltext"]["results"][:3]
     assert paragraphs == one_page_response["paragraphs"]["results"][:3]
+
+
+@pytest.mark.asyncio
+async def test_search_ordering_with_no_query(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    philosophy_books_kb,
+):
+    """Test a search with no query and ordering by creation and modification
+    times.
+
+    """
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 422
+
+    # By default, empty query with no sort specified will sort by creation date
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        creation_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
+            for result in results
+        ]
+        assert creation_dates == sorted(creation_dates)
+
+    # Can also sort by modification date
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "",
+            "sort": {
+                "field": "modified",
+                "order": "desc",
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        modification_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["modified"])
+            for result in results
+        ]
+        assert modification_dates == list(reversed(sorted(modification_dates)))
+
+    # But without query, can't sort by fields like title
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 422

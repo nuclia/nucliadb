@@ -38,6 +38,9 @@ else:
 _T = TypeVar("_T")
 
 
+SORTED_RELEVANT_SEARCH_LIMIT = 100
+
+
 class ResourceProperties(str, Enum):
     BASIC = "basic"
     ORIGIN = "origin"
@@ -220,9 +223,15 @@ class SortOrder(str, Enum):
     DESC = "desc"
 
 
+SortOrderMap = {
+    SortOrder.ASC: Sort.ASC,
+    SortOrder.DESC: Sort.DESC,
+}
+
+
 class SortOptions(BaseModel):
     field: SortField
-    limit: int = 100
+    limit: Optional[int] = SORTED_RELEVANT_SEARCH_LIMIT
     order: SortOrder = SortOrder.ASC
 
 
