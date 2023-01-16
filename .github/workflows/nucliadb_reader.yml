@@ -9,7 +9,7 @@ on:
       - "charts/nucliadb_reader/**"
       - "nucliadb/nucliadb/ingest/**"
       - "nucliadb/nucliadb/reader/**"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
       - "nucliadb_utils/**"
       - "nucliadb_telemetry/**"
   push:
@@ -20,7 +20,7 @@ on:
       - "charts/nucliadb_reader/**"
       - "nucliadb/nucliadb/ingest/**"
       - "nucliadb/nucliadb/reader/**"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
       - "nucliadb_utils/**"
       - "nucliadb_telemetry/**"
 

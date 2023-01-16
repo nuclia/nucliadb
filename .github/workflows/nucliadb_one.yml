@@ -14,7 +14,7 @@ on:
       - "nucliadb/nucliadb/one/**"
       - "nucliadb/nucliadb/reader/**"
       - "nucliadb/nucliadb/search/**"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
       - "nucliadb_protos/**"
   push:
     branches:
@@ -27,7 +27,7 @@ on:
       - "nucliadb/nucliadb/one/**"
       - "nucliadb/nucliadb/reader/**"
       - "nucliadb/nucliadb/search/**"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
       - "nucliadb_protos/**"
 
 jobs:

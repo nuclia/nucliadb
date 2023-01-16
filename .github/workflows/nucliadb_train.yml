@@ -10,7 +10,7 @@ on:
       - "nucliadb_utils/**"
       - "nucliadb/nucliadb/ingest/**"
       - "nucliadb/nucliadb/train/**"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
   push:
     branches:
@@ -21,7 +21,7 @@ on:
       - "nucliadb_utils/**"
       - "nucliadb/nucliadb/ingest/**"
       - "nucliadb/nucliadb/train/**"
-      - "nucliadb/nucliadb/models/**"
+      - "nucliadb_models/**"
       - "nucliadb_telemetry/**"
 
 env:
