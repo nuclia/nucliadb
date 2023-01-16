@@ -6,7 +6,7 @@ requests
 aiohttp
 pydantic_argparse
 pyarrow
-nucliadb_sdk>=1.1.1
+nucliadb_sdk>=1.2.0
 boto3
 google-auth
 google-cloud-storage

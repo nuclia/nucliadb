@@ -26,6 +26,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 images.settings["nucliadb"] = {
@@ -72,7 +73,15 @@ def knowledgebox(nucliadb):
     kb = KnowledgeBoxObj.parse_raw(response.content)
     kbid = kb.uuid
 
-    yield KnowledgeBox(url=f"{api_path}/kb/{kbid}")
+    url = f"{api_path}/kb/{kbid}"
+    client = NucliaDBClient(
+        environment=Environment.OSS,
+        writer_host=url,
+        reader_host=url,
+        search_host=url,
+        train_host=url,
+    )
+    yield KnowledgeBox(client)
 
     response = requests.delete(
         f"{api_path}/kb/{kbid}", headers={"X-NUCLIADB-ROLES": f"MANAGER"}

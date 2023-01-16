@@ -1,6 +1,5 @@
 import os
 from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
-from urllib.parse import urlparse
 
 import numpy as np
 
@@ -13,7 +12,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.vectors import VectorSet, VectorSets
 from nucliadb_sdk import DEFAULT_LABELSET
-from nucliadb_sdk.client import Environment, NucliaDBClient
+from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels, LabelSet, LabelType
@@ -28,28 +27,12 @@ NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
 
 
 class KnowledgeBox:
-    environment: Environment
     vectorsets: Optional[VectorSets] = None
-    api_key: Optional[str] = None
     id: str
 
-    def __init__(
-        self,
-        url: str,
-        api_key: Optional[str] = None,
-        client: Optional[NucliaDBClient] = None,
-    ):
-        self.id = url.split("/")[-1]
-        url_obj = urlparse(url)
-        if url_obj.hostname is not None and url_obj.hostname.endswith(NUCLIA_CLOUD):
-            env = Environment.CLOUD
-            self.api_key = api_key
-        else:
-            env = Environment.OSS
-        if client is None:
-            self.client = NucliaDBClient(environment=env, url=url, api_key=self.api_key)
-        else:
-            self.client = client
+    def __init__(self, client: NucliaDBClient):
+        self.client = client
+        self.id = self.client.reader_session.base_url.path.strip("/").split("/")[-1]
 
     def __iter__(self) -> Iterable[Resource]:
         for batch_resources in self.client.list_resources():
@@ -270,7 +253,7 @@ class KnowledgeBox:
 
     def set_labels(self, labelset: str, labels: List[str], labelset_type: LabelType):
         resp = self.client.writer_session.post(
-            f"{self.client.url}/labelset/{labelset}",
+            f"/labelset/{labelset}",
             json={
                 "title": labelset,
                 "labels": [NDBLabel(title=label).dict() for label in labels],
@@ -281,7 +264,7 @@ class KnowledgeBox:
 
     def set_entities(self, entity_group: str, entities: List[str]):
         resp = self.client.writer_session.post(
-            f"{self.client.url}/entitiesgroup/{entity_group}",
+            f"/entitiesgroup/{entity_group}",
             json={
                 "title": entity_group,
                 "entities": {entity: {"value": entity} for entity in entities},

@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.2.0
+
+- Refactor Knowledgebox to accept only an initialized sdk NucliaDBClient
+
 ## 1.1.2
 
 - Add nucliadb_models requirements

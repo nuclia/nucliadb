@@ -38,7 +38,7 @@ class Streamer:
 
     def __init__(self, trainset: TrainSet, client: NucliaDBClient):
         self.client = client
-        self.base_url = self.client.url
+        self.base_url = str(self.client.reader_session.base_url).strip("/")
         self.trainset = trainset
         self.resp = None
 
@@ -47,6 +47,7 @@ class Streamer:
         return self.resp is not None
 
     def initialize(self, partition_id: str):
+
         self.resp = self.client.stream_session.post(
             f"{self.base_url}/trainset/{partition_id}",
             data=self.trainset.SerializeToString(),
