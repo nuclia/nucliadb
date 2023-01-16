@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::path::PathBuf;
 
 use tokio::net::TcpListener;
 use tokio_tar::ArchiveBuilder;
@@ -87,8 +87,7 @@ impl Listener {
     /// - The received files/directories are ill-formed.
     /// - The TCP/IP connection cannot be opened (port already in use).
     pub async fn listen_once(&self, port: u16) -> Result<(), Error> {
-        self.listen_nth(port, unsafe { Some(NonZeroUsize::new_unchecked(1)) })
-            .await
+        self.listen_nth(port, Some(1)).await
     }
 
     /// Listen for receiving files/directories.
@@ -103,10 +102,10 @@ impl Listener {
         self.listen_nth(port, None).await
     }
 
-    async fn listen_nth(&self, port: u16, mut limit: Option<NonZeroUsize>) -> Result<(), Error> {
+    async fn listen_nth(&self, port: u16, mut limit: Option<usize>) -> Result<(), Error> {
         let listener = TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
-        loop {
+        while limit.map_or(true, |limit| limit > 0) {
             let (socket, _) = listener.accept().await?;
 
             let mut archive = ArchiveBuilder::new(socket)
@@ -117,10 +116,8 @@ impl Listener {
 
             archive.unpack(&self.path).await?;
 
-            limit = match limit.map(NonZeroUsize::get) {
-                Some(1) => break,
-                Some(n) => unsafe { Some(NonZeroUsize::new_unchecked(n - 1)) },
-                None => continue,
+            if let Some(limit) = limit.as_mut() {
+                *limit -= 1;
             }
         }
 
