@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.4
+
+- Add Cloud datasets implementation
+
 ## 1.1.3
 
 - Fix sentence classification texts
