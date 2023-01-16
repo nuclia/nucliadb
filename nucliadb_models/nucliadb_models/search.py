@@ -292,7 +292,6 @@ class SearchRequest(BaseModel):
         SearchOptions.PARAGRAPH,
         SearchOptions.DOCUMENT,
         SearchOptions.VECTOR,
-        SearchOptions.RELATIONS,
     ]
     reload: bool = True
     debug: bool = False
