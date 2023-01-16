@@ -19,11 +19,26 @@
 //
 
 use std::path::PathBuf;
+use std::time::Duration;
 
+use backoff::backoff::{Backoff, Stop};
+use backoff::{Error as BackoffError, ExponentialBackoff, ExponentialBackoffBuilder};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_tar::{Builder, HeaderMode};
 
 use super::error::Error;
+
+/// A structure for representing all the retry policy on publication failure.
+#[non_exhaustive]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RetryPolicy {
+    /// Indicates to always retry the publication after a failure.
+    Always,
+    /// Indicates to never retry the publication after a failure.
+    Never,
+    /// Indicates to retry the publication during at most the given duration after a failure.
+    MaxDuration(Duration),
+}
 
 /// A structure for publishing files/directories over TCP/IP connection.
 ///
@@ -54,6 +69,10 @@ pub struct Publisher {
     /// The list of files/directories published on [`Publisher::send_to`] call.
     /// Note that calling [`Publisher::send_to`] method with an empty list of paths results to a no-op.
     paths: Vec<PathBuf>,
+    /// The backoff policy on publication failure.
+    ///
+    /// Note that if the publication fails because of invalid paths, the backoff policy will be ignored.
+    backoff: Option<ExponentialBackoff>,
 }
 
 impl Publisher {
@@ -80,6 +99,29 @@ impl Publisher {
         self
     }
 
+    /// Indicates to retry the files/directories publication on failure.
+    ///
+    /// Note that if the given `retry_policy` is set to [`RetryPolicy::Always`], the current
+    /// publisher will always retry to send files/directories until success. To put it simply,
+    /// the publication could end up as a blocking operation.
+    pub fn retry_on_failure(mut self, retry_policy: RetryPolicy) -> Self {
+        let backoff = match retry_policy {
+            RetryPolicy::Always => Some(None),
+            RetryPolicy::MaxDuration(duration) => Some(Some(duration)),
+            RetryPolicy::Never => None,
+        };
+
+        self.backoff = backoff.map(|max_elapsed_time| {
+            ExponentialBackoffBuilder::new()
+                .with_max_elapsed_time(max_elapsed_time)
+                .with_initial_interval(Duration::from_secs(1))
+                .with_multiplier(2.0)
+                .build()
+        });
+
+        self
+    }
+
     /// Publishs all the appended files/directories to localhost.
     ///
     /// # Errors
@@ -96,31 +138,50 @@ impl Publisher {
     /// This method can fails if:
     /// - Any of the appended paths is invalid (does not exist, permission denied, and so on).
     /// - Can't connect to the given IP address.
-    pub async fn send_to(&self, address: impl ToSocketAddrs) -> Result<(), Error> {
-        let socket = TcpStream::connect(address).await?;
-        let mut archive = Builder::new(socket);
+    pub async fn send_to(&self, address: impl ToSocketAddrs + Clone) -> Result<(), Error> {
+        let backoff = self.backoff.clone().map_or_else(
+            || Box::new(Stop {}) as Box<dyn Backoff + Send>,
+            |backoff| Box::new(backoff) as Box<dyn Backoff + Send>,
+        );
 
-        archive.mode(if self.preserve_metadata {
-            HeaderMode::Complete
-        } else {
-            HeaderMode::Deterministic
-        });
+        backoff::future::retry_notify(
+            backoff,
+            || {
+                let address = address.clone();
 
-        archive.follow_symlinks(self.follow_symlinks);
+                async move {
+                    let socket = TcpStream::connect(address).await?;
+                    let mut archive = Builder::new(socket);
 
-        for path in &self.paths {
-            let name = path.canonicalize()?;
-            let name = name.file_name().unwrap_or_default();
+                    archive.mode(if self.preserve_metadata {
+                        HeaderMode::Complete
+                    } else {
+                        HeaderMode::Deterministic
+                    });
 
-            if path.is_dir() {
-                archive.append_dir_all(name, path).await?;
-            } else {
-                archive.append_path_with_name(path, name).await?;
-            }
-        }
+                    archive.follow_symlinks(self.follow_symlinks);
 
-        let _writer = archive.into_inner().await?;
+                    for path in &self.paths {
+                        let name = path.canonicalize().map_err(BackoffError::permanent)?;
+                        let name = name.file_name().unwrap_or_default();
 
-        Ok(())
+                        if path.is_dir() {
+                            archive.append_dir_all(name, path).await?;
+                        } else {
+                            archive.append_path_with_name(path, name).await?;
+                        }
+                    }
+
+                    let _writer = archive.into_inner().await?;
+
+                    Ok(())
+                }
+            },
+            |e, duration| {
+                tracing::debug!("Error happened at {duration:?}: {e}");
+            },
+        )
+        .await
+        .map_err(Into::into)
     }
 }

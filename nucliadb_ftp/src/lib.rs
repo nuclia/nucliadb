@@ -33,7 +33,7 @@
 //!
 //! ```no_run
 //! # tokio_test::block_on(async {
-//! use nucliadb_ftp::{Listener, Publisher};
+//! use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 //!
 //! let listener_task = tokio::spawn(async {
 //!     Listener::default()
@@ -55,6 +55,7 @@
 //!         // .follow_symlink()
 //!         .append("my_dir")
 //!         .append("path/to/my_file")
+//!         .retry_on_failure(RetryPolicy::Always)
 //!         .send_to_localhost(4242)
 //!         // Or
 //!         // .sent_to("x.x.x.x:4242")
@@ -74,7 +75,7 @@ mod publisher;
 
 pub use error::Error;
 pub use listener::Listener;
-pub use publisher::Publisher;
+pub use publisher::{Publisher, RetryPolicy};
 
 #[cfg(test)]
 mod tests {
@@ -82,8 +83,8 @@ mod tests {
     use std::fs::{self, File};
     use std::io::Write;
 
-    use tokio::time::Duration;
     use eyre::Result;
+    use tokio::time::Duration;
 
     use super::*;
 
@@ -112,9 +113,6 @@ mod tests {
             }
         });
 
-        // let enough time to the listener task to open the TCP/IP connection
-        tokio::time::sleep(Duration::from_millis(250)).await;
-
         let publisher_task = tokio::spawn({
             async move {
                 let source_dir = tempfile::tempdir()?;
@@ -127,6 +125,7 @@ mod tests {
                 }
 
                 Publisher::default()
+                    .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(1)))
                     .append(source)
                     .send_to_localhost(port)
                     .await?;
@@ -183,9 +182,6 @@ mod tests {
             Ok(()) as Result<()>
         });
 
-        // let enough time to the listener task to open the TCP/IP connection
-        tokio::time::sleep(Duration::from_millis(250)).await;
-
         let publisher_task = tokio::spawn(async move {
             let source_dir = tempfile::tempdir()?;
             let source_dir = source_dir.path().join(dir_name);
@@ -202,6 +198,7 @@ mod tests {
             }
 
             Publisher::default()
+                .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(1)))
                 .append(source_dir)
                 .send_to_localhost(port)
                 .await?;

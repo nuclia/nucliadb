@@ -22,8 +22,9 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use eyre::Result;
-use nucliadb_ftp::{Listener, Publisher};
+use eyre::{eyre, Result};
+use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
+use tracing_subscriber::EnvFilter;
 
 /// File/directory tranfer over network.
 #[derive(Parser)]
@@ -42,6 +43,8 @@ enum Command {
         /// The IP of the target machine.
         #[arg(short, long)]
         ip: SocketAddr,
+        #[arg(short, long)]
+        retry_on_failure: bool,
     },
     /// Listen incoming files/directories by storing them to the given path.
     Listen {
@@ -57,10 +60,29 @@ enum Command {
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .try_init()
+        .map_err(|e| eyre!(e))?;
+
     let opt = Opt::parse();
 
     match opt.command {
-        Command::Publish { path, ip } => Publisher::default().append(path).send_to(ip).await?,
+        Command::Publish {
+            path,
+            ip,
+            retry_on_failure,
+        } => {
+            Publisher::default()
+                .retry_on_failure(if retry_on_failure {
+                    RetryPolicy::Always
+                } else {
+                    RetryPolicy::Never
+                })
+                .append(path)
+                .send_to(ip)
+                .await?
+        }
         Command::Listen { path, port } => {
             Listener::default().save_at(path).listen_once(port).await?
         }

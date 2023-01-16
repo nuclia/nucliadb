@@ -1965,6 +1965,7 @@ dependencies = [
 name = "nucliadb_ftp"
 version = "0.1.0"
 dependencies = [
+ "backoff",
  "clap 4.1.0",
  "color-eyre",
  "derive_builder 0.12.0",
@@ -1974,6 +1975,8 @@ dependencies = [
  "tokio",
  "tokio-tar",
  "tokio-test",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
