@@ -25,8 +25,8 @@ use thiserror::Error;
 /// The error that may occur when publishing/receiving files/directories.
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("path cannot end by '..' or be the root path '/'")]
-    InvalidPath,
+    #[error("invalid path '{0}': {1}")]
+    InvalidPath(String, String),
     #[error(transparent)]
     IoError(#[from] io::Error),
 }

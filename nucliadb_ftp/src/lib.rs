@@ -53,8 +53,8 @@
 //!         //.preserve_metadata()
 //!         // Uncomment this line if you want to follow symlinks in appended directories.
 //!         // .follow_symlink()
-//!         .append("my_dir")
-//!         .append("path/to/my_file")
+//!         .append("my_dir").unwrap()
+//!         .append("path/to/my_file").unwrap()
 //!         .retry_on_failure(RetryPolicy::Always)
 //!         .send_to_localhost(4242)
 //!         // Or
@@ -126,7 +126,7 @@ mod tests {
 
                 Publisher::default()
                     .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(1)))
-                    .append(source)
+                    .append(source)?
                     .send_to_localhost(port)
                     .await?;
 
@@ -199,7 +199,7 @@ mod tests {
 
             Publisher::default()
                 .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(1)))
-                .append(source_dir)
+                .append(source_dir)?
                 .send_to_localhost(port)
                 .await?;
 

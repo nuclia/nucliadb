@@ -18,11 +18,12 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 use std::time::Duration;
 
 use backoff::backoff::{Backoff, Stop};
-use backoff::{Error as BackoffError, ExponentialBackoff, ExponentialBackoffBuilder};
+use backoff::{ExponentialBackoff, ExponentialBackoffBuilder};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_tar::{Builder, HeaderMode};
 
@@ -50,8 +51,8 @@ pub enum RetryPolicy {
 /// Publisher::default()
 ///     .follow_symlinks()
 ///     .preserve_metadata()
-///     .append("my_dir")
-///     .append("path/to/my_file")
+///     .append("my_dir").unwrap()
+///     .append("path/to/my_file").unwrap()
 ///     .send_to("0.0.0.0:4040")
 ///     .await
 ///     .unwrap();
@@ -68,7 +69,7 @@ pub struct Publisher {
     preserve_metadata: bool,
     /// The list of files/directories published on [`Publisher::send_to`] call.
     /// Note that calling [`Publisher::send_to`] method with an empty list of paths results to a no-op.
-    paths: Vec<PathBuf>,
+    paths: Vec<(PathBuf, OsString)>,
     /// The backoff policy on publication failure.
     ///
     /// Note that if the publication fails because of invalid paths, the backoff policy will be ignored.
@@ -92,11 +93,26 @@ impl Publisher {
 
     /// Appends the given path to the current publisher.
     ///
-    /// Note that if the path point to a directory which result to publish the whole directory.
-    pub fn append(mut self, path: impl Into<PathBuf>) -> Self {
-        self.paths.push(path.into());
+    /// Note that if the path point to a directory all files and the directory itself will be published.
+    ///
+    /// # Errors
+    /// This methods can fails if:
+    /// - The given path cannot be canonicalized (path does not exists).
+    /// - The given path does not contain file name (e.g "/" or "").
+    pub fn append(mut self, path: impl Into<PathBuf>) -> Result<Self, Error> {
+        let path = path.into();
 
-        self
+        let name = path
+            .canonicalize()
+            .map_err(|e| Error::InvalidPath(path.display().to_string(), e.to_string()))?;
+
+        let name = name.file_name().map(OsStr::to_os_string).ok_or_else(|| {
+            Error::InvalidPath(path.display().to_string(), "missing file name".to_string())
+        })?;
+
+        self.paths.push((path, name));
+
+        Ok(self)
     }
 
     /// Indicates to retry the files/directories publication on failure.
@@ -125,9 +141,7 @@ impl Publisher {
     /// Publishs all the appended files/directories to localhost.
     ///
     /// # Errors
-    /// This method can fails if:
-    /// - Any of the appended paths is invalid (does not exist, permission denied, and so on).
-    /// - Can't connect to the given IP address (port already in use).
+    /// This method can fails if the connection with the remote address is refused/closed or timeout.
     pub async fn send_to_localhost(&self, port: u16) -> Result<(), Error> {
         self.send_to(format!("0.0.0.0:{port}")).await
     }
@@ -135,9 +149,7 @@ impl Publisher {
     /// Publishs all the appended files/directories to the given IP address.
     ///
     /// # Errors
-    /// This method can fails if:
-    /// - Any of the appended paths is invalid (does not exist, permission denied, and so on).
-    /// - Can't connect to the given IP address.
+    /// This method can fails if the connection with the remote address is refused/closed or timeout.
     pub async fn send_to(&self, address: impl ToSocketAddrs + Clone) -> Result<(), Error> {
         let backoff = self.backoff.clone().map_or_else(
             || Box::new(Stop {}) as Box<dyn Backoff + Send>,
@@ -161,10 +173,7 @@ impl Publisher {
 
                     archive.follow_symlinks(self.follow_symlinks);
 
-                    for path in &self.paths {
-                        let name = path.canonicalize().map_err(BackoffError::permanent)?;
-                        let name = name.file_name().unwrap_or_default();
-
+                    for (path, name) in &self.paths {
                         if path.is_dir() {
                             archive.append_dir_all(name, path).await?;
                         } else {
@@ -172,7 +181,8 @@ impl Publisher {
                         }
                     }
 
-                    // comment + add counter
+                    // NOTE: this line is mandatory and SHOULD NOT be removed.
+                    // Increment that counter if you tried and broke the codebase: 1
                     let _writer = archive.into_inner().await?;
 
                     Ok(())

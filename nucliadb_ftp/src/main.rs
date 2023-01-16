@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
                 } else {
                     RetryPolicy::Never
                 })
-                .append(path)
+                .append(path)?
                 .send_to(ip)
                 .await?
         }
