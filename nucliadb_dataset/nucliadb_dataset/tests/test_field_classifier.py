@@ -94,33 +94,6 @@ def test_nucliadb_export_fields(
     run_dataset_export(requests_mock, knowledgebox, trainset)
 
 
-# def test_nucliadb_export_tokens(knowledgebox: KnowledgeBox, upload_data_token_classification, requests_mock):
-#     trainset = TrainSet()
-#     trainset.type = TaskType.TOKEN_CLASSIFICATION
-#     trainset.filter.labels.append("labelset1")
-#     trainset.batch_size = 2
-
-#     run_dataset_export(requests_mock, knowledgebox, trainset)
-
-
-# def test_nucliadb_export_paragraphs(knowledgebox: KnowledgeBox, upload_data_paragraph_classification, requests_mock):
-#     trainset = TrainSet()
-#     trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
-#     trainset.filter.labels.append("labelset1")
-#     trainset.batch_size = 2
-
-#     run_dataset_export(requests_mock, knowledgebox, trainset)
-
-
-# def test_nucliadb_export_sentences(knowledgebox: KnowledgeBox, upload_data_sentence_classification, requests_mock):
-#     trainset = TrainSet()
-#     trainset.type = TaskType.SENTENCE_CLASSIFICATION
-#     trainset.filter.labels.append("labelset1")
-#     trainset.batch_size = 2
-
-#     run_dataset_export(requests_mock, knowledgebox, trainset)
-
-
 def test_inst_base_class():
     try:
         NucliaDataset()
