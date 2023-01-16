@@ -61,6 +61,18 @@ impl NodeReaderService {
         }
     }
 
+    #[tracing::instrument(skip_all)]
+    pub fn iter_shards(
+        &mut self,
+    ) -> ServiceResult<impl Iterator<Item = InternalResult<ShardReaderService>>> {
+        let shards_path = Configuration::shards_path();
+        Ok(std::fs::read_dir(&shards_path)?.flatten().map(|entry| {
+            let file_name = entry.file_name().to_str().unwrap().to_string();
+            let shard_path = entry.path();
+            ShardReaderService::open(file_name, &shard_path)
+        }))
+    }
+
     /// Load all shards on the shards memory structure
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> ServiceResult<()> {
@@ -70,9 +82,13 @@ impl NodeReaderService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let shard = ShardReaderService::open(file_name.clone(), &shard_path)?;
-            self.cache.insert(file_name, shard);
-            info!("Shard loaded: {shard_path:?}");
+            match ShardReaderService::open(file_name.clone(), &shard_path) {
+                Err(err) => error!("Loading {shard_path:?} raised {err}"),
+                Ok(shard) => {
+                    info!("Shard loaded: {shard_path:?}");
+                    self.cache.insert(file_name, shard);
+                }
+            }
         }
         Ok(())
     }
