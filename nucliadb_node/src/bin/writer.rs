@@ -113,12 +113,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metrics_task = tokio::spawn(async move {
         info!("Start metrics task");
 
-        let mut node_reader = NodeReaderService::new();
-
-        if let Err(e) = node_reader.load_shards() {
-            warn!("Not all the shards have been loaded: {e}");
-        };
-
         let metrics_publisher = Configuration::get_prometheus_url().map(|url| {
             let mut metrics_publisher = Publisher::new("node_metrics", url);
 
@@ -131,6 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             metrics_publisher
         });
 
+        let mut node_reader = NodeReaderService::new();
         let mut interval = tokio::time::interval(Configuration::get_prometheus_push_timing());
 
         loop {
@@ -139,15 +134,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut shard_count = 0;
             let mut paragraph_count = 0;
 
-            node_reader.cache.values().for_each(|shard| {
+            let shards = match node_reader.iter_shards() {
+                Ok(shards) => shards,
+                Err(e) => {
+                    error!("Cannot read shards folder: {e}");
+                    continue;
+                }
+            };
+
+            for shard in shards {
+                let shard = match shard {
+                    Ok(shard) => shard,
+                    Err(e) => {
+                        error!("Cannot load shard: {e}");
+                        continue;
+                    }
+                };
+
                 match shard.get_info(&GetShardRequest::default()) {
-                    Err(e) => error!("Cannot get for {} metrics: {e:?}", shard.id),
                     Ok(count) => {
                         shard_count += 1;
                         paragraph_count += count.paragraphs;
                     }
+                    Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
                 }
-            });
+            }
 
             report.shard_count.set(shard_count);
             report.paragraph_count.set(paragraph_count as i64);
