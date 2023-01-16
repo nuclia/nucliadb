@@ -211,17 +211,14 @@ async def search(
             detail="Query needs to be bigger than 2 or 0",
         )
 
-    if len(item.query) == 0:
+    if is_empty_query(item):
         if item.sort is None:
             item.sort = SortOptions(
                 field=SortField.CREATED,
                 order=SortOrder.ASC,
                 limit=None,
             )
-        elif (
-            item.sort.field != SortField.CREATED
-            and item.sort.field != SortField.MODIFIED
-        ):
+        elif not valid_index_sort_option(item):
             raise HTTPException(
                 status_code=422,
                 detail=(
@@ -356,3 +353,16 @@ async def search(
 
     search_results.shards = queried_shards
     return search_results
+
+
+def is_empty_query(request: SearchRequest) -> bool:
+    return len(request.query) == 0 and (
+        request.advanced_query is None or len(request.advanced_query) == 0
+    )
+
+
+def valid_index_sort_option(request: SearchRequest) -> bool:
+    return request.sort is not None and (
+        request.sort.field == SortField.CREATED
+        or request.sort.field == SortField.MODIFIED
+    )
