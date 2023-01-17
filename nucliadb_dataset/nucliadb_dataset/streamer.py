@@ -38,7 +38,7 @@ class Streamer:
 
     def __init__(self, trainset: TrainSet, client: NucliaDBClient):
         self.client = client
-        self.base_url = str(self.client.reader_session.base_url).strip("/")
+        self.base_url = str(self.client.train_session.base_url).strip("/")
         self.trainset = trainset
         self.resp = None
 
