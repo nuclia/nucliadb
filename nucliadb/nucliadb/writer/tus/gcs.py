@@ -221,9 +221,7 @@ class GCloudFileStorageManager(FileStorageManager):
                 raise GoogleCloudException(text)
             resumable_uri = call.headers["Location"]
 
-        await dm.update(
-            resumable_uri=resumable_uri, upload_file_id=upload_file_id, path=path
-        )
+        dm.update(resumable_uri=resumable_uri, upload_file_id=upload_file_id, path=path)
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     async def delete_upload(self, uri, kbid):
