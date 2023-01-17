@@ -51,7 +51,11 @@ class LocalFileStorageManager(FileStorageManager):
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         init_url = f"{bucket_path}/{upload_file_id}"
         metadata_init_url = self.metadata_key(init_url)
-        metadata = {"NAME": dm.filename}
+        metadata = {
+            "FILENAME": dm.filename,
+            "CONTENT_TYPE": dm.content_type,
+            "SIZE": dm.size
+        }
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(json.dumps(metadata))
 
@@ -118,14 +122,22 @@ class LocalFileStorageManager(FileStorageManager):
         # Move from old to new
         bucket = dm.get("bucket")
         bucket_path = self.storage.get_bucket_path(bucket)
+
         upload_file_id = dm.get("upload_file_id")
         from_url = f"{bucket_path}/{upload_file_id}"
+
         path = dm.get("path")
         to_url = f"{bucket_path}/{path}"
         to_url_dirs = os.path.dirname(to_url)
+
+        # Move the binary file
         os.makedirs(to_url_dirs, exist_ok=True)
         os.rename(from_url, to_url)
 
+        # Move metadata file too
+        from_metadata_url = self.metadata_key(from_url)
+        to_metadata_url = self.metadata_key(to_url)
+        os.rename(from_metadata_url, to_metadata_url)
         await dm.finish()
         return path
 
