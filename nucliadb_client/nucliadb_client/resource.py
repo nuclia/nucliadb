@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-from typing import TYPE_CHECKING, List, Optional
+from base64 import b64encode
+from hashlib import md5
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import httpx
 from nucliadb_protos.resources_pb2 import (
@@ -33,6 +35,7 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_models.file import FileField
 from nucliadb_models.resource import Resource as NucliaDBResource
 
 if TYPE_CHECKING:
@@ -40,6 +43,7 @@ if TYPE_CHECKING:
 
 RESOURCE_PREFIX = "resource"
 logger = logging.getLogger("nucliadb_client")
+TUS_CHUNK_SIZE = 524288
 
 
 class Resource:
@@ -116,13 +120,78 @@ class Resource:
     def download_file(self, field_id):
         resp = self.http_reader_v1.get(f"/file/{field_id}/download/field")
         assert resp.status_code == 200
-        return resp.content
+        return resp
 
     @property
     def bm(self) -> BrokerMessage:
         if self._bm is None:
             self._bm = BrokerMessage()
         return self._bm
+
+    def upload_file(self, file_id: str, field: FileField, wait: bool = False):
+        if field.file.payload is None:
+            raise ValueError("Need a field binary to upload")
+        headers: Dict[str, str] = {
+            "X-FILENAME": field.file.filename or "",
+            "X-MD5": md5(field.file.payload.encode()).hexdigest(),
+            "Content-Type": field.file.content_type or "application/octet-strem",
+            "Content-Length": str(len(field.file.payload)),
+        }
+        if wait:
+            headers["X-SYNCHRONOUS"] = "True"
+        resp = self.http_writer_v1.post(
+            f"/file/{file_id}/upload",
+            content=field.file.payload,
+            headers=headers,
+        )
+        assert resp.status_code == 201
+
+    def _tus_post(self, file_id: str, field: FileField) -> str:
+        upload_metadata = []
+        md5_hash = md5(field.file.payload.encode()).hexdigest()  # type: ignore
+        b64_md5_hash = b64encode(md5_hash.encode()).decode()
+        upload_metadata.append(f"md5 {b64_md5_hash}")
+        if field.file.filename:
+            b64_filename = b64encode(field.file.filename.encode()).decode()
+            upload_metadata.append(f"filename {b64_filename}")
+        if field.file.content_type:
+            b64_content_type = b64encode(field.file.content_type.encode()).decode()
+            upload_metadata.append(f"content_type {b64_content_type}")
+        headers = {
+            "upload-length": str(len(field.file.payload)),  # type: ignore
+            "tus-resumable": "1.0.0",
+            "upload-metadata": ",".join(upload_metadata),
+        }
+        resp = self.http_writer_v1.post(
+            f"/file/{file_id}/tusupload",
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        return resp.headers["location"]
+
+    def _tus_patch(self, upload_id: str, field: FileField, wait: bool = False) -> None:
+        headers = {}
+        if wait:
+            headers["X-SYNCHRONOUS"] = "True"
+        pos = 0
+        while True:
+            headers["upload-offset"] = str(pos)
+            chunk = field.file.payload[pos:TUS_CHUNK_SIZE]  # type: ignore
+            resp = self.kb.http_writer_v1.patch(
+                f"/tusupload/{upload_id}", headers=headers, data=chunk  # type: ignore
+            )
+            assert resp.status_code == 200
+            if len(chunk) < TUS_CHUNK_SIZE:
+                # Finished
+                break
+            pos += len(chunk)
+
+    def tus_upload_file(self, file_id: str, field: FileField, wait: bool = False):
+        if field.file.payload is None:
+            raise ValueError("Need a field binary to upload")
+        location = self._tus_post(file_id, field)
+        upload_id = location.split("/")[-1]
+        self._tus_patch(upload_id, field, wait=wait)
 
     def add_vectors(
         self,

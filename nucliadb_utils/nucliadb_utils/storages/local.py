@@ -274,8 +274,13 @@ class LocalStorage(Storage):
         return deleted
 
     async def iterate_bucket(self, bucket: str, prefix: str) -> AsyncIterator[Any]:
-        for key in glob.glob(f"{bucket}/{prefix}*"):
-            item = {"name": key}
+        path = self.get_bucket_path(bucket)
+        for key in glob.glob(f"{path}/{prefix}*"):
+            name = key.split("/")[-1]
+            if name.endswith(".metadata"):
+                # Internal metadata file
+                continue
+            item = {"name": name}
             yield item
 
     async def download(
@@ -293,3 +298,28 @@ class LocalStorage(Storage):
                     break
                 else:
                     yield body
+
+    async def insert_object_metadata(
+        self, bucket: str, key: str, metadata: Dict[str, str]
+    ) -> None:
+        path = self.get_bucket_path(bucket)
+        
+        path_to_create = os.path.dirname(path)
+        os.makedirs(path_to_create, exist_ok=True)
+        object_path = f"{path}/{key}"
+
+        async with aiofiles.open(object_path, "w") as resp:
+            await resp.write("")
+
+        metadata_path = f"{object_path}.metadata"
+        async with aiofiles.open(metadata_path, "w") as resp:
+            await resp.write(json.dumps(metadata))
+
+    async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
+        path = self.get_bucket_path(bucket)
+        metadata_path = f"{path}/{key}.metadata"
+        try:
+            async with aiofiles.open(metadata_path, "r") as resp:
+                return json.loads(await resp.read())
+        except FileNotFoundError:
+            return {}

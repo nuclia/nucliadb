@@ -17,10 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import re
 from dataclasses import dataclass
 from typing import Optional
 
+import docker  # type: ignore
 import pytest
+import requests
 from grpc import insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
@@ -28,6 +31,9 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_client.client import NucliaDBClient
+
+DOCKER_ENV_GROUPS = re.search(r"//([^:]+)", docker.from_env().api.base_url)
+DOCKER_HOST: Optional[str] = DOCKER_ENV_GROUPS.group(1) if DOCKER_ENV_GROUPS else None  # type: ignore
 
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
@@ -45,6 +51,30 @@ images.settings["nucliadb"] = {
         "ports": {"8080": None, "8030": None, "8040": None},
     },
 }
+
+
+images.settings["gcs"] = {
+    "image": "fsouza/fake-gcs-server",
+    "version": "v1.30.1",
+    "options": {
+        "command": f"-scheme http -external-url http://{DOCKER_HOST}:4443 -port 4443",
+        "ports": {"4443": "4443"},
+    },
+}
+
+
+class GCS(BaseImage):
+    name = "gcs"
+    port = 4443
+
+    def check(self):
+        try:
+            response = requests.get(
+                f"http://{self.host}:{self.get_port()}/storage/v1/b"
+            )
+            return response.status_code == 200
+        except:  # noqa
+            return False
 
 
 class NucliaDB(BaseImage):
@@ -106,10 +136,43 @@ def nucliadb():
     nucliadb_image.stop()
 
 
+@pytest.fixture(scope="session")
+def gcs():
+    container = GCS()
+    host, port = container.run()
+    public_api_url = f"http://{host}:{port}"
+    yield public_api_url
+    container.stop()
+
+
+@pytest.fixture(scope="function")
+def nucliadb_gcs(gcs):
+    nucliadb_image.base_image_options["environment"]["FILE_BACKEND"] = "gcs"
+
+    host, grpc_port = nucliadb_image.run()
+    http_port = nucliadb_image.get_http()
+    train_port = nucliadb_image.get_train()
+
+    yield NucliaDBFixture(host=host, grpc=grpc_port, http=http_port, train=train_port)
+
+    nucliadb_image.stop()
+    nucliadb_image.base_image_options["environment"].pop("FILE_BACKEND")
+
+
 @pytest.fixture(scope="function")
 def nucliadb_client(nucliadb: NucliaDBFixture):
     yield NucliaDBClient(
         host=nucliadb.host, grpc=nucliadb.grpc, http=nucliadb.http, train=nucliadb.train
+    )
+
+
+@pytest.fixture(scope="function")
+def nucliadb_client_gcs(nucliadb_gcs: NucliaDBFixture):
+    yield NucliaDBClient(
+        host=nucliadb_gcs.host,
+        grpc=nucliadb_gcs.grpc,
+        http=nucliadb_gcs.http,
+        train=nucliadb_gcs.train,
     )
 
 

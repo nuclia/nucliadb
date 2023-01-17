@@ -69,7 +69,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
         )
     )
     resource = srckb.create_resource(payload)
-    assert resource.download_file("file1") == file_binary
+    assert resource.download_file("file1").content == file_binary
 
     # Export data
     export = []
@@ -121,7 +121,20 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
 
 
 @pytest.mark.asyncio
+<<<<<<< HEAD
 async def test_export_import_e2e(nucliadb_client):
+=======
+async def test_export_import_e2e_local(nucliadb_client: NucliaDBClient):
+    await export_import_e2e_test(nucliadb_client)
+
+
+@pytest.mark.asyncio
+async def test_export_import_e2e_gcs(nucliadb_client_gcs: NucliaDBClient):
+    await export_import_e2e_test(nucliadb_client_gcs)
+
+
+async def export_import_e2e_test(nucliadb_client: NucliaDBClient):
+>>>>>>> 24b2cdde (Turn dm.update into a regular function, as it is not using I/O)
     nucliadb_client.init_async_grpc()
     for slug in ("src1", "dst1"):
         exists = nucliadb_client.get_kb(slug=slug)
@@ -153,6 +166,30 @@ async def test_export_import_e2e(nucliadb_client):
         )
     )
     resource = srckb.create_resource(payload)
+
+    # TUS Upload
+    file2_binary = "Sayonara".encode()
+    file2 = FileField(
+        file=File(
+            filename="mypdf.pdf",
+            content_type="application/pdf",
+            payload=file2_binary,
+            md5="YYY",
+        )
+    )
+    resource.tus_upload_file("file2", file2, wait=True)
+
+    # Regular Upload
+    file3_binary = "".encode()
+    file3 = FileField(
+        file=File(
+            filename="my_image.png",
+            content_type="image/png",
+            payload=file3_binary,
+            md5="YYY",
+        )
+    )
+    resource.upload_file("file3", file3, wait=True)
 
     with tempfile.NamedTemporaryFile() as dump:
         await nucliadb_client.export_kb(kbid=srckb.kbid, location=dump.name)

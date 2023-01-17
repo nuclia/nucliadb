@@ -696,8 +696,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             destination = storage.field_klass(
                 storage=storage, bucket=bucket, fullkey=data.metadata.key
             )
-            cf.content_type = data.metadata.content_type
-            cf.filename = data.metadata.filename
             cf.size = data.metadata.size
         else:
             raise AttributeError("Metadata not found")

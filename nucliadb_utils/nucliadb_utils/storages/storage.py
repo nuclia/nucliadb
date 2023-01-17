@@ -226,11 +226,21 @@ class Storage:
         elif file.source == self.source:
             return file
         elif file.source == CloudFile.EXPORT:
+            bucket, key = destination.bucket, destination.key
             new_cf = CloudFile()
             new_cf.CopyFrom(file)
-            new_cf.bucket_name = destination.bucket
-            new_cf.uri = destination.key
+            new_cf.bucket_name = bucket
+            new_cf.uri = key
             new_cf.source = self.source
+            await self.insert_object_metadata(
+                bucket,
+                key,
+                metadata={
+                    "CONTENT_TYPE": new_cf.content_type,
+                    "SIZE": str(new_cf.size),
+                    "FILENAME": new_cf.filename,
+                },
+            )
         elif file.source == CloudFile.FLAPS:
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
@@ -457,4 +467,12 @@ class Storage:
         raise NotImplementedError()
 
     async def schedule_delete_kb(self, kbid: str) -> bool:
+        raise NotImplementedError()
+
+    async def insert_object_metadata(
+        self, bucket: str, key: str, metadata: Dict[str, str]
+    ) -> None:
+        raise NotImplementedError()
+
+    async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
         raise NotImplementedError()
