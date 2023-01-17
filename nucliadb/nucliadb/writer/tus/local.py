@@ -54,7 +54,7 @@ class LocalFileStorageManager(FileStorageManager):
         metadata = {
             "FILENAME": dm.filename,
             "CONTENT_TYPE": dm.content_type,
-            "SIZE": dm.size
+            "SIZE": dm.size,
         }
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(json.dumps(metadata))
