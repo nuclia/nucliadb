@@ -21,6 +21,13 @@ import pytest
 
 from nucliadb.writer.tus.gcs import GCloudBlobStore
 from nucliadb.writer.tus.s3 import S3BlobStore
+from nucliadb.writer.tus.local import LocalBlobStore
+import tempfile
+
+import pytest
+
+from nucliadb_utils.storages.local import LocalStorage
+from nucliadb_utils.store import MAIN
 
 
 @pytest.fixture(scope="function")
@@ -53,3 +60,13 @@ async def gcs_storage_tus(gcs):
     )
     yield storage
     await storage.finalize()
+
+
+@pytest.fixture(scope="function")
+async def local_storage():
+    folder = tempfile.TemporaryDirectory()
+    storage = LocalBlobStore(local_testing_files=folder.name)
+    await storage.initialize()
+    yield storage
+    await storage.finalize()
+    folder.cleanup()

@@ -27,6 +27,7 @@ from nucliadb.writer.tus import get_dm
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
+from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 
@@ -42,6 +43,13 @@ async def test_s3_driver(s3_storage_tus: S3BlobStore):
 async def test_gcs_driver(gcs_storage_tus: GCloudBlobStore):
     settings.dm_enabled = False
     await storage_test(gcs_storage_tus, GCloudFileStorageManager(gcs_storage_tus))
+    settings.dm_enabled = True
+
+
+@pytest.mark.asyncio
+async def test_local_driver(local_storage_tus: LocalBlobStore):
+    settings.dm_enabled = False
+    await storage_test(local_storage_tus, LocalFileStorageManager(local_storage_tus))
     settings.dm_enabled = True
 
 
