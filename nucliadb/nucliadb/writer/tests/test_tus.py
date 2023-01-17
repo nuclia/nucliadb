@@ -64,7 +64,7 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
     dm = get_dm()
     await dm.load(upload_id)
     await dm.start({})
-    dm.update(
+    await dm.update(
         upload_file_id=f"{upload_id}",
         rid=rid,
         field=field,
@@ -81,7 +81,7 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
         yield example
 
     size = await file_storage_manager.append(dm, generate(), 0)
-    dm.update(offset=size)
+    await dm.update(offset=size)
     assert size == len(example)
     await file_storage_manager.finish(dm)
 

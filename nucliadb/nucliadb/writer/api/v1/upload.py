@@ -240,7 +240,7 @@ async def post(
 
     await dm.load(upload_id)
     await dm.start(request)
-    dm.update(
+    await dm.update(
         upload_file_id=f"{upload_id}",
         rid=rid,
         field=field,
@@ -251,7 +251,7 @@ async def post(
     )
 
     if size is not None:
-        dm.update(
+        await dm.update(
             size=size,
         )
 
@@ -371,7 +371,7 @@ async def patch(
     if "upload-length" in request.headers:
         if dm.get("deferred_length"):
             size = int(request.headers["upload-length"])
-            dm.update(size=size)
+            await dm.update(size=size)
 
     if "upload-offset" in request.headers:
         offset = int(request.headers["upload-offset"])
@@ -396,7 +396,7 @@ async def patch(
         raise HTTPPreconditionFailed(
             detail="Upload size does not match what was provided"
         )
-    dm.update(offset=offset + read_bytes)
+    await dm.update(offset=offset + read_bytes)
 
     headers = {
         "Upload-Offset": str(dm.offset),
@@ -539,7 +539,7 @@ async def upload(
 
     metadata = {"content_type": content_type, "filename": filename}
 
-    dm.update(
+    await dm.update(
         upload_file_id=f"{upload_id}",
         size=request.headers.get("content-length", None),
         metadata=metadata,

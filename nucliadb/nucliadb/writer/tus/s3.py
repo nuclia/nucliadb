@@ -64,7 +64,7 @@ class S3FileStorageManager(FileStorageManager):
         if dm.get("mpu") is not None:
             await self._abort_multipart(dm)
 
-        dm.update(
+        await dm.update(
             path=path,
             upload_file_id=upload_file_id,
             multipart={"Parts": []},
@@ -90,7 +90,7 @@ class S3FileStorageManager(FileStorageManager):
             multipart["Parts"].append(
                 {"PartNumber": dm.get("block"), "ETag": part["ETag"]}
             )
-            dm.update(multipart=multipart, block=dm.get("block") + 1)
+            await dm.update(multipart=multipart, block=dm.get("block") + 1)
 
         return size
 
@@ -120,7 +120,7 @@ class S3FileStorageManager(FileStorageManager):
             multipart["Parts"].append(
                 {"PartNumber": dm.get("block"), "ETag": part["ETag"]}
             )
-            dm.update(multipart=multipart, block=dm.get("block") + 1)
+            await dm.update(multipart=multipart, block=dm.get("block") + 1)
         await self.storage._s3aioclient.complete_multipart_upload(
             Bucket=dm.get("bucket"),
             Key=dm.get("path"),
