@@ -42,10 +42,9 @@ def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         fse = FileSystemExport(
-            nucliadb_kb_url=knowledgebox.client.url,
+            knowledgebox.client,
             trainset=trainset,
             store_path=tmpdirname,
-            environment=knowledgebox.client.environment,
         )
         fse.export()
         files = os.listdir(tmpdirname)
@@ -73,12 +72,11 @@ def run_dataset_export(requests_mock, knowledgebox, trainset):
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         fse = NucliaDatasetsExport(
-            apikey="XXX",
-            nucliadb_kb_url=knowledgebox.client.url,
+            client=knowledgebox.client,
             datasets_url="http://datasets.service",
             trainset=trainset,
             cache_path=tmpdirname,
-            environment=knowledgebox.client.environment,
+            apikey="i_am_a_nuakey",
         )
         fse.export()
 

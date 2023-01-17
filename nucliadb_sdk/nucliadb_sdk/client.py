@@ -42,16 +42,16 @@ class Environment(str, Enum):
 
 
 class NucliaDBClient:
-    api_key: Optional[str] = None
+    api_key: Optional[str]
     environment: Environment
     session: httpx.Client
-    url: str
+    url: Optional[str]
 
     def __init__(
         self,
         *,
         environment: Environment,
-        url: str,
+        url: Optional[str] = None,
         api_key: Optional[str] = None,
         writer_host: Optional[str] = None,
         reader_host: Optional[str] = None,
@@ -60,7 +60,13 @@ class NucliaDBClient:
     ):
         self.api_key = api_key
         self.environment = environment
-        self.url = url
+
+        internal_hosts_set = all((writer_host, reader_host, search_host, train_host))
+        url_set = bool(url)
+
+        if not (url_set or internal_hosts_set):
+            raise AttributeError("Either url or nucliadb services hosts must be set")
+
         if environment == Environment.CLOUD and api_key is not None:
             reader_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
             writer_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
@@ -71,27 +77,27 @@ class NucliaDBClient:
             writer_headers = {"X-NUCLIADB-ROLES": f"WRITER"}
 
         self.reader_session = httpx.Client(
-            headers=reader_headers, base_url=reader_host or url
+            headers=reader_headers, base_url=reader_host or url  # type: ignore
         )
         self.async_reader_session = httpx.AsyncClient(
-            headers=reader_headers, base_url=reader_host or url
+            headers=reader_headers, base_url=reader_host or url  # type: ignore
         )
         self.stream_session = requests.Session()
         self.stream_session.headers.update(reader_headers)
         self.writer_session = httpx.Client(
-            headers=writer_headers, base_url=writer_host or url
+            headers=writer_headers, base_url=writer_host or url  # type: ignore
         )
         self.async_writer_session = httpx.AsyncClient(
-            headers=writer_headers, base_url=writer_host or url
+            headers=writer_headers, base_url=writer_host or url  # type: ignore
         )
         self.search_session = httpx.Client(
-            headers=reader_headers, base_url=search_host or url
+            headers=reader_headers, base_url=search_host or url  # type: ignore
         )
         self.async_search_session = httpx.AsyncClient(
-            headers=reader_headers, base_url=search_host or url
+            headers=reader_headers, base_url=search_host or url  # type: ignore
         )
         self.train_session = httpx.Client(
-            headers=reader_headers, base_url=train_host or url
+            headers=reader_headers, base_url=train_host or url  # type: ignore
         )
 
     def get_resource(self, id: str):

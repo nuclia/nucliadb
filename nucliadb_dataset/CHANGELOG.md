@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.2.0
+
+- Adapt to nucliadb_sdk refactor
+
 ## 1.1.4
 
 - Add Cloud datasets implementation

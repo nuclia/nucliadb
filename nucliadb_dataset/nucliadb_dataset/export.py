@@ -17,36 +17,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
 
 import requests
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset.dataset import NucliaDBDataset
-from nucliadb_sdk.client import Environment, NucliaDBClient
+from nucliadb_sdk.client import NucliaDBClient
 
 
 class NucliaDatasetsExport:
     def __init__(
         self,
-        apikey: str,
-        nucliadb_kb_url: str,
+        client: NucliaDBClient,
         datasets_url: str,
         trainset: TrainSet,
         cache_path: str,
-        environment: Environment,
-        service_token: Optional[str] = None,
+        apikey: str,
     ):
-        self.apikey = apikey
         self.datasets_url = datasets_url
         self.trainset = trainset
-        self.client = NucliaDBClient(
-            environment=environment, url=nucliadb_kb_url, api_key=service_token
-        )
+        self.client = client
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=cache_path
         )
-        self.datasets_url
+        self.datasets_url = datasets_url
+        self.apikey = apikey
 
     def export(self):
         dataset_def = {
@@ -75,15 +70,11 @@ class NucliaDatasetsExport:
 class FileSystemExport:
     def __init__(
         self,
-        nucliadb_kb_url: str,
+        client: NucliaDBClient,
         trainset: TrainSet,
         store_path: str,
-        environment: Environment,
-        service_token: Optional[str] = None,
     ):
-        self.client = NucliaDBClient(
-            environment=environment, url=nucliadb_kb_url, api_key=service_token
-        )
+        self.client = client
         self.nucliadb_dataset = NucliaDBDataset(
             trainset=trainset, client=self.client, base_path=store_path
         )

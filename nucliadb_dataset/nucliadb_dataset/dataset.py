@@ -56,7 +56,7 @@ from nucliadb_dataset.mapping import (
 from nucliadb_dataset.streamer import Streamer, StreamerAlreadyRunning
 from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
-from nucliadb_sdk.client import Environment, NucliaDBClient
+from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 CHUNK_SIZE = 5 * 1024 * 1024
@@ -134,9 +134,8 @@ class NucliaDBDataset(NucliaDataset):
         super().__init__(base_path)
 
         self.trainset = trainset
-        self.knowledgebox = KnowledgeBox(client.url, client.api_key, client=client)
         self.client = client
-        self.base_url = self.client.url
+        self.knowledgebox = KnowledgeBox(self.client)
         self.streamer = Streamer(self.trainset, self.client)
 
         if self.trainset.type == TaskType.PARAGRAPH_CLASSIFICATION:
@@ -269,7 +268,7 @@ class NucliaDBDataset(NucliaDataset):
         """
         Get expected number of partitions from a live NucliaDB
         """
-        partitions = self.client.train_session.get(f"{self.base_url}/trainset").json()
+        partitions = self.client.train_session.get(f"/trainset").json()
         if len(partitions["partitions"]) == 0:
             raise KeyError("There is no partitions")
         return partitions["partitions"]
@@ -300,7 +299,9 @@ class NucliaDBDataset(NucliaDataset):
 
         self.streamer.initialize(partition_id)
         filename_tmp = f"{filename}.tmp"
-        print(f"Generating partition {partition_id} from {self.base_url} at {filename}")
+        print(
+            f"Generating partition {partition_id} from {self.streamer.base_url} at {filename}"
+        )
         with open(filename_tmp, "wb") as sink:
             with pa.ipc.new_stream(sink, self.schema) as writer:
                 for batch in self.streamer:
@@ -428,26 +429,12 @@ class NucliaCloudDataset(NucliaDataset):
 
 def download_all_partitions(
     type: TaskValue,  # type: ignore
-    knowledgebox: Optional[KnowledgeBox] = None,
-    url: Optional[str] = None,
-    api_key: Optional[str] = None,
+    knowledgebox: KnowledgeBox,
     path: Optional[str] = None,
     labelsets: List[str] = [],
 ):
-    if knowledgebox is None:
-        if url is None:
-            raise AttributeError("Either knowledgebox or url needs to be defined")
-        if url.startswith("https://nuclia.cloud"):
-            environment = Environment.CLOUD
-        else:
-            environment = Environment.OSS
-
-        client = NucliaDBClient(environment=environment, url=url, api_key=api_key)
-    else:
-        client = knowledgebox.client
-
     trainset = TrainSet(type=type)
     trainset.filter.labels.extend(labelsets)
 
-    fse = NucliaDBDataset(client=client, trainset=trainset, base_path=path)
+    fse = NucliaDBDataset(client=knowledgebox.client, trainset=trainset, base_path=path)
     return fse.read_all_partitions(path=path)

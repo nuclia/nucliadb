@@ -24,6 +24,7 @@ from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
 from nucliadb_dataset import DatasetType, ExportType
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport
+from nucliadb_sdk.client import NucliaDBClient
 
 DATASET_TYPE_MAPPING = {
     DatasetType.FIELD_CLASSIFICATION: TaskType.FIELD_CLASSIFICATION,
@@ -63,20 +64,28 @@ def run():
     if nucliadb_args.export == ExportType.DATASETS:
         if nucliadb_args.apikey is None:
             errors.append("API key required to push to Nuclia Dataset™")
+        client = NucliaDBClient(
+            environment=nucliadb_args.environment,
+            url=nucliadb_args.url,
+            api_key=nucliadb_args.service_token,
+        )
         fse = NucliaDatasetsExport(
-            apikey=nucliadb_args.apikey,
-            nucliadb_kb_url=nucliadb_args.url,
+            client=client,
             datasets_url=nucliadb_args.datasets_url,
             trainset=trainset,
             cache_path=nucliadb_args.download_path,
+            api_key=nucliadb_args.apikey,
         )
         fse.export()
     elif nucliadb_args.export == ExportType.FILESYSTEM:
+        client = NucliaDBClient(
+            environment=nucliadb_args.environment,
+            url=nucliadb_args.url,
+            api_key=nucliadb_args.service_token,
+        )
         fse = FileSystemExport(
-            nucliadb_kb_url=nucliadb_args.url,
+            client=client,
             trainset=trainset,
             store_path=nucliadb_args.download_path,
-            environment=nucliadb_args.environment,
-            service_token=nucliadb_args.service_token,
         )
         fse.export()
