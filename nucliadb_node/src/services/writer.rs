@@ -94,7 +94,8 @@ impl ShardWriterService {
             path: shard_path.join("relations"),
         };
 
-        let config = ShardConfig::new(shard_path);
+        let config = ShardConfig::new(shard_path)
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
         let text_task = move || Some(fields::create_writer(&fsc, config.version_fields));
         let paragraph_task =
             move || Some(paragraphs::create_writer(&psc, config.version_paragraphs));
@@ -157,7 +158,8 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: shard_path.join("relations"),
         };
-        let config = ShardConfig::new(shard_path);
+        let config = ShardConfig::new(shard_path)
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
 
         let text_task = move || Some(fields::open_writer(&fsc, config.version_fields));
         let paragraph_task = move || Some(paragraphs::open_writer(&psc, config.version_paragraphs));

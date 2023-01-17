@@ -90,32 +90,32 @@ impl From<StoredConfig> for ShardConfig {
     }
 }
 impl ShardConfig {
-    pub fn new(path: &Path) -> ShardConfig {
-        fs::create_dir_all(path).unwrap();
-        let json_file = path.join("config.json");
-        if !json_file.exists() {
-            let config = ShardConfig::default();
-            let serialized = serde_json::to_string(&config).unwrap();
-            fs::File::create(&json_file).unwrap();
-            fs::write(&json_file, &serialized).unwrap();
+    pub fn new(path: &Path) -> std::io::Result<ShardConfig> {
+        if !path.exists() {
+            fs::create_dir_all(path)?;
         }
-        match ShardConfig::read_config(&json_file) {
-            ConfigState::UpToDate(config) => config,
+        let json_file = path.join("config.json");
+        let config = ShardConfig::default();
+        let serialized = serde_json::to_string(&config)?;
+        fs::File::create(&json_file)?;
+        fs::write(&json_file, &serialized)?;
+        match ShardConfig::read_config(&json_file)? {
+            ConfigState::UpToDate(config) => Ok(config),
             ConfigState::Modified(config) => {
-                let serialized = serde_json::to_string(&config).unwrap();
-                fs::File::create(&json_file).unwrap();
-                fs::write(&json_file, &serialized).unwrap();
-                config
+                let serialized = serde_json::to_string(&config)?;
+                fs::File::create(&json_file)?;
+                fs::write(&json_file, &serialized)?;
+                Ok(config)
             }
         }
     }
-    fn read_config(json_file: &path::Path) -> ConfigState {
-        let content = fs::read_to_string(json_file).unwrap();
-        let mut raw: StoredConfig = serde_json::from_str(&content).unwrap();
+    fn read_config(json_file: &path::Path) -> std::io::Result<ConfigState> {
+        let content = fs::read_to_string(json_file)?;
+        let mut raw: StoredConfig = serde_json::from_str(&content)?;
         if raw.fill_gaps() {
-            ConfigState::Modified(ShardConfig::from(raw))
+            Ok(ConfigState::Modified(ShardConfig::from(raw)))
         } else {
-            ConfigState::UpToDate(ShardConfig::from(raw))
+            Ok(ConfigState::UpToDate(ShardConfig::from(raw)))
         }
     }
 }
@@ -126,7 +126,7 @@ mod tests {
     #[tokio::test]
     async fn open_and_new() {
         let dir = tempfile::tempdir().unwrap();
-        let config = ShardConfig::new(dir.path());
+        let config = ShardConfig::new(dir.path()).unwrap();
         assert_eq!(config.version_relations, relations::MAX_VERSION);
         assert_eq!(config.version_fields, fields::MAX_VERSION);
         assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);

@@ -156,7 +156,8 @@ impl ShardReaderService {
             path: shard_path.join("relations"),
         };
 
-        let config = ShardConfig::new(shard_path);
+        let config = ShardConfig::new(shard_path)
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
         let text_task = move || Some(fields::open_reader(&fsc, config.version_fields));
         let paragraph_task = move || Some(paragraphs::open_reader(&psc, config.version_paragraphs));
         let vector_task = move || Some(vectors::open_reader(&vsc, config.version_vectors));
@@ -221,7 +222,8 @@ impl ShardReaderService {
             path: shard_path.join("relations"),
         };
 
-        let config = ShardConfig::new(shard_path);
+        let config = ShardConfig::new(shard_path)
+            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
         let text_task = move || Some(fields::create_reader(&fsc, config.version_fields));
         let paragraph_task =
             move || Some(paragraphs::create_reader(&psc, config.version_paragraphs));
