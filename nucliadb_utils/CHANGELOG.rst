@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.17
+------
+
+- Various storage fixes
+
 1.0.15
 ------
 
