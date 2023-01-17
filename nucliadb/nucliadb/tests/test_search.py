@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.tests.vectors import V1
@@ -460,15 +461,40 @@ async def test_search_relations(
     expected = {
         "Becquer": {
             "related_to": [
-                {"entity": "Poetry", "relation": "write", "direction": "OUT"},
-                {"entity": "Poetry", "relation": "like", "direction": "OUT"},
-                {"entity": "Joan Antoni", "relation": "read", "direction": "IN"},
+                {
+                    "entity": "Poetry",
+                    "entity_type": "entity",
+                    "relation": "write",
+                    "direction": "out",
+                },
+                {
+                    "entity": "Poetry",
+                    "entity_type": "entity",
+                    "relation": "like",
+                    "direction": "out",
+                },
+                {
+                    "entity": "Joan Antoni",
+                    "entity_type": "entity",
+                    "relation": "read",
+                    "direction": "in",
+                },
             ]
         },
         "Newton": {
             "related_to": [
-                {"entity": "Gravity", "relation": "formulate", "direction": "OUT"},
-                {"entity": "Physics", "relation": "study", "direction": "OUT"},
+                {
+                    "entity": "Gravity",
+                    "entity_type": "entity",
+                    "relation": "formulate",
+                    "direction": "out",
+                },
+                {
+                    "entity": "Physics",
+                    "entity_type": "entity",
+                    "relation": "study",
+                    "direction": "out",
+                },
             ]
         },
     }
@@ -497,8 +523,18 @@ async def test_search_relations(
     expected = {
         "Animal": {
             "related_to": [
-                {"entity": "Cat", "relation": "species", "direction": "IN"},
-                {"entity": "Swallow", "relation": "species", "direction": "IN"},
+                {
+                    "entity": "Cat",
+                    "entity_type": "entity",
+                    "relation": "species",
+                    "direction": "in",
+                },
+                {
+                    "entity": "Swallow",
+                    "entity_type": "entity",
+                    "relation": "species",
+                    "direction": "in",
+                },
             ]
         },
     }
@@ -966,3 +1002,185 @@ async def test_search_ordering_with_no_query(
         },
     )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_search_automatic_relations(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox
+):
+    predict_mock = Mock()
+    set_utility(Utility.PREDICT, predict_mock)
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "My resource",
+            "slug": "myresource",
+            "summary": "Some summary",
+            "origin": {
+                "colaborators": ["Anne", "John"],
+            },
+            "usermetadata": {
+                "classifications": [
+                    {"labelset": "animals", "label": "cat"},
+                    {"labelset": "food", "label": "cookie"},
+                ],
+                "relations": [
+                    {
+                        "relation": "CHILD",
+                        "resource": "sub-document",
+                    },
+                    {
+                        "relation": "ABOUT",
+                        "label": "label",
+                    },
+                    {
+                        "relation": "ENTITY",
+                        "entity": {
+                            "entity": "cat",
+                            "entity_type": "animal",
+                        },
+                    },
+                    {
+                        "relation": "COLAB",
+                        "user": "Pepita",
+                    },
+                    {
+                        "relation": "OTHER",
+                        "other": "other",
+                    },
+                ],
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Search resource relations
+    rn = RelationNode(
+        value=rid,
+        ntype=RelationNode.NodeType.RESOURCE,
+    )
+    predict_mock.detect_entities = AsyncMock(return_value=[rn])
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search",
+        params={
+            "features": "relations",
+            "query": "Relations for this resource",
+        },
+    )
+    assert resp.status_code == 200
+
+    entities = resp.json()["relations"]["entities"]
+    expected = {
+        rid: {
+            "related_to": [
+                {
+                    "entity": "Pepita",
+                    "entity_type": "user",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "Anne",
+                    "entity_type": "user",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "John",
+                    "entity_type": "user",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "cat",
+                    "entity_type": "entity",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "label",
+                    "entity_type": "label",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "animals/cat",
+                    "entity_type": "label",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "food/cookie",
+                    "entity_type": "label",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "sub-document",
+                    "entity_type": "resource",
+                    "relation": "",
+                    "direction": "out",
+                },
+                {
+                    "entity": "other",
+                    "entity_type": "resource",
+                    "relation": "",
+                    "direction": "out",
+                },
+            ]
+        }
+    }
+
+    for entity in expected:
+        assert entity in entities
+        assert len(entities[entity]["related_to"]) == len(
+            expected[entity]["related_to"]
+        )
+
+        for expected_relation in expected[entity]["related_to"]:
+            assert expected_relation in entities[entity]["related_to"]
+
+    # Search a colaborator
+    rn = RelationNode(
+        value="John",
+        ntype=RelationNode.NodeType.USER,
+    )
+    predict_mock.detect_entities = AsyncMock(return_value=[rn])
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search",
+        params={
+            "features": "relations",
+            "query": "You know John?",
+        },
+    )
+    assert resp.status_code == 200
+
+    entities = resp.json()["relations"]["entities"]
+    expected = {
+        "John": {
+            "related_to": [
+                {
+                    "entity": rid,
+                    "entity_type": "resource",
+                    "relation": "",
+                    "direction": "in",
+                }
+            ]
+        }
+    }
+
+    for entity in expected:
+        assert entity in entities
+        assert len(entities[entity]["related_to"]) == len(
+            expected[entity]["related_to"]
+        )
+
+        for expected_relation in expected[entity]["related_to"]:
+            assert expected_relation in entities[entity]["related_to"]

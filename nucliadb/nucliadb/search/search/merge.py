@@ -57,6 +57,7 @@ from nucliadb_models.search import (
     Paragraphs,
     RelatedEntities,
     RelationDirection,
+    RelationNodeTypeMap,
     Relations,
     ResourceProperties,
     ResourceResult,
@@ -404,22 +405,24 @@ async def merge_relations_results(
 
     for relation_response in relations_responses:
         for relation in relation_response.subgraph.relations:
-            origin = relation.source.value
-            destination = relation.to.value
+            origin = relation.source
+            destination = relation.to
             relation_label = relation.relation_label
 
-            if origin in relations.entities:
-                relations.entities[origin].related_to.append(
+            if origin.value in relations.entities:
+                relations.entities[origin.value].related_to.append(
                     DirectionalRelation(
-                        entity=destination,
+                        entity=destination.value,
+                        entity_type=RelationNodeTypeMap[destination.ntype],
                         relation=relation_label,
                         direction=RelationDirection.OUT,
                     )
                 )
-            elif destination in relations.entities:
-                relations.entities[destination].related_to.append(
+            elif destination.value in relations.entities:
+                relations.entities[destination.value].related_to.append(
                     DirectionalRelation(
-                        entity=origin,
+                        entity=origin.value,
+                        entity_type=RelationNodeTypeMap[origin.ntype],
                         relation=relation_label,
                         direction=RelationDirection.IN,
                     )
