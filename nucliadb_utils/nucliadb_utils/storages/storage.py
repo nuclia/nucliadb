@@ -318,12 +318,20 @@ class Storage:
         cf = await self.uploaditerator(generator, sf, cf)
         return cf
 
-    async def uploadbytes(self, bucket: str, key: str, payload: bytes):
+    async def uploadbytes(
+        self,
+        bucket: str,
+        key: str,
+        payload: bytes,
+        filename: str = "payload",
+        content_type: str = "",
+    ):
         destination = self.field_klass(storage=self, bucket=bucket, fullkey=key)
 
         cf = CloudFile()
-        cf.filename = "payload"
+        cf.filename = filename
         cf.size = len(payload)
+        cf.content_type = content_type
         buffer = BytesIO(payload)
 
         async def splitter(alldata: BytesIO):

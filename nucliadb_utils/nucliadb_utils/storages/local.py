@@ -155,7 +155,7 @@ class LocalStorageField(StorageField):
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
-            await resp.write(json.dumps(metadata))
+            await resp.write(metadata)
 
         self._handler = await aiofiles.threadpool.open(init_url, "wb+")
         field.offset = 0
@@ -197,10 +197,13 @@ class LocalStorageField(StorageField):
         self.field.ClearField("upload_uri")
 
     async def exists(self) -> Optional[Dict[str, str]]:
-        if os.path.exists(self.metadata_key()):
-            async with aiofiles.open(self.metadata_key(), "r") as metadata:
+        bucket_path = self.storage.get_bucket_path(self.bucket)
+        file_path = f"{bucket_path}/{self.key}"
+        metadata_path = self.metadata_key(file_path)
+        if os.path.exists(metadata_path):
+            async with aiofiles.open(metadata_path, "r") as metadata:
                 return json.loads(await metadata.read())
-        return {}
+        return None
 
     async def upload(self, iterator: AsyncIterator, origin: CloudFile) -> CloudFile:
         self.field = await self.start(origin)

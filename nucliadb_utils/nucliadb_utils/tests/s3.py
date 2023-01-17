@@ -67,7 +67,7 @@ async def s3_storage(s3):
         verify_ssl=False,
         use_ssl=False,
         region_name=None,
-        bucket="test",
+        bucket="test_{kbid}",
     )
     await storage.initialize()
     MAIN["storage"] = storage
