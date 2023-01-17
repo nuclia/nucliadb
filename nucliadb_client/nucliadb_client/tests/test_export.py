@@ -109,12 +109,15 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
     assert counters
     assert counters.resources == 1
 
+    found = False
     for resource in dstkb.iter_resources(page_size=1):
+        found = True
         res = resource.get(show=["values", "basic"])
         assert res.id == bm.uuid
         assert res.title == bm.basic.title
         assert res.slug == resource.slug == bm.basic.slug == payload.slug
         assert resource.download_file("file1") == file_binary
+    assert found
 
 
 @pytest.mark.asyncio
@@ -157,9 +160,13 @@ async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
 
     dstkb = nucliadb_client.get_kb(slug="dst1")
     assert dstkb is not None
+
+    found = False
     for resource in dstkb.iter_resources(page_size=1):
+        found = True
         res = resource.get(show=["values", "basic"])
         assert res.id == resource.rid
         assert res.title == payload.title
         assert res.slug == payload.slug
         assert resource.download_file("file1") == file_binary
+    assert found
