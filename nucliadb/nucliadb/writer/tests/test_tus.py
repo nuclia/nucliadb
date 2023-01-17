@@ -26,8 +26,8 @@ from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import get_dm
 from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
-from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
+from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 
@@ -60,8 +60,12 @@ async def storage_test(storage: BlobStore, file_storage_manager: FileStorageMana
     kbid = "mykb_tus_test"
 
     metadata: Dict[str, str] = {}
-    bucket_name = await storage.get_bucket_name(kbid)
-    assert bucket_name in ["test_mykb_tus_test", "test-mykb-tus-test"]
+    bucket_name = storage.get_bucket_name(kbid)
+    assert bucket_name in [
+        "test_mykb_tus_test",
+        "test-mykb-tus-test",
+        "ndb_mykb_tus_test",
+    ]
 
     assert await storage.check_exists(bucket_name) is False
 

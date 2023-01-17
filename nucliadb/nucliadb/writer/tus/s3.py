@@ -59,7 +59,7 @@ class S3FileStorageManager(FileStorageManager):
             logger.warn("Could not abort multipart upload", exc_info=True)
 
     async def start(self, dm: FileDataMangaer, path: str, kbid: str):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         if dm.get("mpu") is not None:
             await self._abort_multipart(dm)
@@ -129,7 +129,7 @@ class S3FileStorageManager(FileStorageManager):
         )
 
     async def get_file_metadata(self, uri: str, kbid: str):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         try:
             metadata = await self.storage._s3aioclient.head_object(
                 Bucket=bucket, Key=uri
@@ -146,7 +146,7 @@ class S3FileStorageManager(FileStorageManager):
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _download(self, uri: str, kbid: str, **kwargs):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         return await self.storage._s3aioclient.get_object(
             Bucket=bucket, Key=uri, **kwargs
         )
@@ -183,7 +183,7 @@ class S3FileStorageManager(FileStorageManager):
             yield chunk
 
     async def delete_upload(self, uri: str, kbid: str):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         if uri is not None:
             try:
                 await self.storage._s3aioclient.delete_object(Bucket=bucket, Key=uri)
@@ -206,8 +206,8 @@ class S3BlobStore(BlobStore):
                 exists = False
         return exists
 
-    async def get_bucket_name(self, kbid: str) -> str:
-        bucket_name = await super().get_bucket_name(kbid)
+    def get_bucket_name(self, kbid: str) -> str:
+        bucket_name = super().get_bucket_name(kbid)
         if bucket_name is not None:
             return bucket_name.replace("_", "-")
         else:

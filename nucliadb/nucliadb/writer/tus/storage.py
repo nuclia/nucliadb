@@ -42,7 +42,7 @@ class BlobStore:
     async def check_exists(self, bucket_name: str) -> bool:
         raise NotImplementedError()
 
-    async def get_bucket_name(self, kbid: str) -> str:
+    def get_bucket_name(self, kbid: str) -> str:
         return self.bucket.format(kbid=kbid)
 
 

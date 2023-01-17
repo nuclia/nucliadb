@@ -28,6 +28,7 @@ import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer.tus.dm import FileDataMangaer
+from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.storages import CHUNK_SIZE
 
@@ -46,7 +47,7 @@ class LocalFileStorageManager(FileStorageManager):
         return f"{self.storage.get_bucket_name(bucket)}/{key}"
 
     async def start(self, dm: FileDataMangaer, path: str, kbid: str):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         bucket_path = self.storage.get_bucket_path(bucket)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
         init_url = f"{bucket_path}/{upload_file_id}"
@@ -62,17 +63,17 @@ class LocalFileStorageManager(FileStorageManager):
         await dm.update(upload_file_id=upload_file_id, path=path, bucket=bucket)
 
     async def iter_data(self, uri, kbid: str, headers=None):
-        bucket = await self.storage.get_bucket_name(kbid)
-        path = self.storage.get_bucket_path(bucket)
-
-        async with aiofiles.open(self.get_file_path(path, uri)) as resp:
+        bucket = self.storage.get_bucket_name(kbid)
+        bucket_path = self.storage.get_bucket_path(bucket)
+        file_path = f"{bucket_path}/{uri}"
+        async with aiofiles.open(file_path) as resp:
             data = await resp.read(CHUNK_SIZE)
             while data is not None:
                 yield data
                 data = await resp.read(CHUNK_SIZE)
 
     async def get_file_metadata(self, uri: str, kbid: str):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         bucket_path = self.storage.get_bucket_path(bucket)
         init_url = f"{bucket_path}/{uri}"
         metadata_init_url = self.metadata_key(init_url)
@@ -85,20 +86,23 @@ class LocalFileStorageManager(FileStorageManager):
         """
         Iterate through ranges of data
         """
-        bucket = await self.storage.get_bucket_name(kbid)
-        path = self.storage.get_bucket_path(bucket)
-
-        async with aiofiles.open(self.get_file_path(path, uri), "rb") as resp:
-            await resp.seek(start)
-            count = 0
-            data = await resp.read(CHUNK_SIZE)
-            while data is not None and count < end:
-                if count + len(data) > end:
-                    new_end = end - count
-                    data = data[:new_end]
-                yield data
-                count += len(data)
+        bucket = self.storage.get_bucket_name(kbid)
+        bucket_path = self.storage.get_bucket_path(bucket)
+        file_path = f"{bucket_path}/{uri}"
+        try:
+            async with aiofiles.open(file_path, "rb") as resp:
+                await resp.seek(start)
+                count = 0
                 data = await resp.read(CHUNK_SIZE)
+                while data and count < end:
+                    if count + len(data) > end:
+                        new_end = end - count
+                        data = data[:new_end]
+                    yield data
+                    count += len(data)
+                    data = await resp.read(CHUNK_SIZE)
+        except FileNotFoundError:
+            raise CloudFileNotFound()
 
     async def _append(self, data, offset, aiofi):
         await aiofi.seek(offset)
@@ -141,6 +145,12 @@ class LocalFileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
+    async def delete_upload(self, uri: str, kbid: str):
+        bucket = self.storage.get_bucket_name(kbid)
+        bucket_path = self.storage.get_bucket_path(bucket)
+        file_path = f"{bucket_path}/{uri}"
+        os.remove(file_path)
+
 
 class LocalBlobStore(BlobStore):
     def __init__(self, local_testing_files: str):
@@ -163,9 +173,6 @@ class LocalBlobStore(BlobStore):
 
     async def create_bucket(self, bucket: str):
         path = self.get_bucket_path(bucket)
-        try:
-            os.makedirs(path, exist_ok=True)
-            created = True
-        except FileExistsError:
-            created = False
-        return created
+        exists = os.path.exists(path)
+        os.makedirs(path, exist_ok=True)
+        return exists

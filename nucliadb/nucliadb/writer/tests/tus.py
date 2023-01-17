@@ -17,17 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import pytest
-
-from nucliadb.writer.tus.gcs import GCloudBlobStore
-from nucliadb.writer.tus.s3 import S3BlobStore
-from nucliadb.writer.tus.local import LocalBlobStore
 import tempfile
 
 import pytest
 
-from nucliadb_utils.storages.local import LocalStorage
-from nucliadb_utils.store import MAIN
+from nucliadb.writer.tus.gcs import GCloudBlobStore
+from nucliadb.writer.tus.local import LocalBlobStore
+from nucliadb.writer.tus.s3 import S3BlobStore
 
 
 @pytest.fixture(scope="function")
@@ -63,7 +59,7 @@ async def gcs_storage_tus(gcs):
 
 
 @pytest.fixture(scope="function")
-async def local_storage():
+async def local_storage_tus():
     folder = tempfile.TemporaryDirectory()
     storage = LocalBlobStore(local_testing_files=folder.name)
     await storage.initialize()
