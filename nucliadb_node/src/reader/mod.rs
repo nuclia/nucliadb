@@ -69,6 +69,7 @@ impl NodeReaderService {
         Ok(std::fs::read_dir(&shards_path)?.flatten().map(|entry| {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
+            info!("Opening {shard_path:?}");
             ShardReaderService::open(file_name, &shard_path)
         }))
     }
