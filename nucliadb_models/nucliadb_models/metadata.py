@@ -145,6 +145,8 @@ class ResourceProcessingStatus(Enum):
     PROCESSED = "PROCESSED"
     ERROR = "ERROR"
     EMPTY = "EMPTY"
+    BLOCKED = "BLOCKED"
+    EXPIRED = "EXPIRED"
 
 
 class Metadata(InputMetadata):

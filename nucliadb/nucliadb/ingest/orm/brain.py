@@ -63,6 +63,8 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
     Metadata.Status.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
     Metadata.Status.PENDING: ResourceProcessingStatus.PENDING.name,
+    Metadata.Status.BLOCKED: ResourceProcessingStatus.BLOCKED.name,
+    Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
 }
 
 
