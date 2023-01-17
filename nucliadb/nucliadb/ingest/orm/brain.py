@@ -326,21 +326,30 @@ class ResourceBrain:
     def set_processing_status(
         self, basic: Basic, previous_status: Optional[Metadata.Status.ValueType]
     ):
-        if previous_status and previous_status == Metadata.Status.PROCESSED:
+        status = basic.metadata.status
+        useful = basic.metadata.useful
+        if previous_status == Metadata.Status.PROCESSED:
             # For resources that have been processed successfully, we force their status to be
             # always PROCESSED so that they don't disappear from the resource list page.
             self.brain.status = PBBrainResource.PROCESSED
-            return
-        status = basic.metadata.status
-        useful = basic.metadata.useful
-        if status == Metadata.Status.ERROR:
-            self.brain.status = PBBrainResource.ERROR
-        elif useful is False:
-            self.brain.status = PBBrainResource.EMPTY
-        elif status == Metadata.Status.PROCESSED:
-            self.brain.status = PBBrainResource.PROCESSED
-        elif status == Metadata.Status.PENDING:
-            self.brain.status = PBBrainResource.PENDING
+
+        elif previous_status == Metadata.Status.ERROR:
+            # For resources that were errored, we only allow turning into PROCESSED.
+            # Otherwise it stays in ERROR status.
+            if status == Metadata.Status.PROCESSED:
+                self.brain.status = PBBrainResource.PROCESSED
+            else:
+                self.brain.status = PBBrainResource.ERROR
+
+        else:  # previous_status in (None, EMPTY, PENDING)
+            if status == Metadata.Status.ERROR:
+                self.brain.status = PBBrainResource.ERROR
+            elif useful is False:
+                self.brain.status = PBBrainResource.EMPTY
+            elif status == Metadata.Status.PROCESSED:
+                self.brain.status = PBBrainResource.PROCESSED
+            elif status == Metadata.Status.PENDING:
+                self.brain.status = PBBrainResource.PENDING
 
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
 
@@ -378,7 +387,10 @@ class ResourceBrain:
         self.tags["n"].append(f"i/{basic.icon}")
 
         # processing status
-        status_tag = METADATA_STATUS_PB_TYPE_TO_NAME_MAP[basic.metadata.status]
+        if not basic.metadata.useful:
+            status_tag = "EMPTY"
+        else:
+            status_tag = METADATA_STATUS_PB_TYPE_TO_NAME_MAP[basic.metadata.status]
         self.tags["n"].append(f"s/{status_tag}")
 
         # main language
