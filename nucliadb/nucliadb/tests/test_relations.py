@@ -25,7 +25,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
-async def test_relations(
+async def test_broker_message_relations(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -84,7 +84,7 @@ async def test_relations(
 
 
 @pytest.mark.asyncio
-async def test_relations_extracted(
+async def test_extracted_relations(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -113,26 +113,30 @@ async def test_relations_extracted(
                 "relations": [
                     {
                         "relation": "CHILD",
-                        "resource": "document",
+                        "to": {"type": "resource", "value": "document-uuid"},
                     },
-                    {
-                        "relation": "ABOUT",
-                        "label": "label",
-                    },
+                    {"relation": "ABOUT", "to": {"type": "label", "value": "label"}},
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "entity-1",
-                            "entity_type": "entity-type-1",
+                        "to": {
+                            "type": "entity",
+                            "value": "entity-1",
+                            "group": "entity-type-1",
                         },
                     },
                     {
                         "relation": "COLAB",
-                        "user": "user",
+                        "to": {
+                            "type": "user",
+                            "value": "user",
+                        },
                     },
                     {
                         "relation": "OTHER",
-                        "other": "other",
+                        "to": {
+                            "type": "label",
+                            "value": "other",
+                        },
                     },
                 ],
             },

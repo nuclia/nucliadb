@@ -1031,26 +1031,37 @@ async def test_search_automatic_relations(
                 "relations": [
                     {
                         "relation": "CHILD",
-                        "resource": "sub-document",
-                    },
-                    {
-                        "relation": "ABOUT",
-                        "label": "label",
-                    },
-                    {
-                        "relation": "ENTITY",
-                        "entity": {
-                            "entity": "cat",
-                            "entity_type": "animal",
+                        "to": {
+                            "type": "resource",
+                            "value": "sub-document",
                         },
                     },
                     {
+                        "relation": "ABOUT",
+                        "to": {
+                            "type": "label",
+                            "value": "label",
+                        },
+                    },
+                    {
+                        "relation": "ENTITY",
+                        "to": {"type": "entity", "value": "cat", "group": "ANIMAL"},
+                    },
+                    {
                         "relation": "COLAB",
-                        "user": "Pepita",
+                        "to": {
+                            "type": "user",
+                            "value": "Pepita",
+                            "group": "PERSON",
+                        },
                     },
                     {
                         "relation": "OTHER",
-                        "other": "other",
+                        "to": {
+                            "type": "entity",
+                            "value": "other",
+                            "group": "things",
+                        },
                     },
                 ],
             },
@@ -1129,7 +1140,7 @@ async def test_search_automatic_relations(
                 },
                 {
                     "entity": "other",
-                    "entity_type": "resource",
+                    "entity_type": "entity",
                     "relation": "",
                     "direction": "out",
                 },

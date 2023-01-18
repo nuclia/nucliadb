@@ -36,8 +36,8 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload
-from nucliadb_models import RelationType
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
+from nucliadb_models.metadata import RelationNodeTypeMap, RelationTypeMap
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_models.writer import (
     ComingResourcePayload,
@@ -123,76 +123,36 @@ def parse_basic_modify(
             ]
         )
 
-        relation_node_document = RelationNode(
+        relation_node_resource = RelationNode(
             value=bm.uuid, ntype=RelationNode.NodeType.RESOURCE
         )
         relations = []
         for relation in item.usermetadata.relations:
-            if relation.relation == RelationType.CHILD and relation.resource:
-                relation_node_document_child = RelationNode(
-                    value=relation.resource, ntype=RelationNode.NodeType.RESOURCE
-                )
-                relations.append(
-                    Relation(
-                        relation=Relation.RelationType.CHILD,
-                        source=relation_node_document,
-                        to=relation_node_document_child,
-                    )
+            if relation.from_ is None:
+                relation_node_from = relation_node_resource
+            else:
+                relation_node_from = RelationNode(
+                    value=relation.from_.value,
+                    ntype=RelationNodeTypeMap[relation.from_.type],
+                    subtype=relation.from_.group or "",
                 )
 
-            if relation.relation == RelationType.ABOUT and relation.label:
-                relation_node_label = RelationNode(
-                    value=relation.label, ntype=RelationNode.NodeType.LABEL
-                )
-                relations.append(
-                    Relation(
-                        relation=Relation.RelationType.ABOUT,
-                        source=relation_node_document,
-                        to=relation_node_label,
-                    )
-                )
+            relation_node_to = RelationNode(
+                value=relation.to.value,
+                ntype=RelationNodeTypeMap[relation.to.type],
+                subtype=relation.to.group or "",
+            )
 
-            if relation.relation == RelationType.ENTITY and relation.entity:
-                relation_node_entity = RelationNode(
-                    value=relation.entity.entity,
-                    ntype=RelationNode.NodeType.ENTITY,
-                    subtype=relation.entity.entity_type,
+            relations.append(
+                Relation(
+                    relation=RelationTypeMap[relation.relation],
+                    source=relation_node_from,
+                    to=relation_node_to,
                 )
-                relations.append(
-                    Relation(
-                        relation=Relation.RelationType.ENTITY,
-                        source=relation_node_document,
-                        to=relation_node_entity,
-                    )
-                )
-
-            if relation.relation == RelationType.COLAB and relation.user:
-                relation_node_user = RelationNode(
-                    value=relation.user, ntype=RelationNode.NodeType.USER
-                )
-                relations.append(
-                    Relation(
-                        relation=Relation.RelationType.COLAB,
-                        source=relation_node_document,
-                        to=relation_node_user,
-                    )
-                )
-
-            if relation.relation == RelationType.OTHER and relation.other:
-                relation_node_other = RelationNode(
-                    value=relation.other, ntype=RelationNode.NodeType.RESOURCE
-                )
-                relations.append(
-                    Relation(
-                        relation=Relation.RelationType.OTHER,
-                        source=relation_node_document,
-                        to=relation_node_other,
-                    )
-                )
+            )
 
         # protobuferrs repeated fields don't support assignment so
         # in order to replace relations, we need to clear them first
-
         bm.basic.usermetadata.ClearField("relations")
         bm.basic.usermetadata.relations.extend(relations)
 

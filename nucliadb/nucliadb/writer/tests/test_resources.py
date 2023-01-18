@@ -149,10 +149,10 @@ async def test_resource_crud(
                     "relations": [
                         {
                             "relation": "CHILD",
-                            "properties": {
-                                "prop1": "value",
+                            "to": {
+                                "type": "resource",
+                                "value": "resource_uuid",
                             },
-                            "resource": "resource_uuid",
                         }
                     ],
                 },
@@ -245,10 +245,10 @@ async def test_resource_crud_sync(
                     "relations": [
                         {
                             "relation": "CHILD",
-                            "properties": {
-                                "prop1": "value",
+                            "to": {
+                                "type": "resource",
+                                "value": "resource_uuid",
                             },
-                            "resource": "resource_uuid",
                         }
                     ],
                 },
