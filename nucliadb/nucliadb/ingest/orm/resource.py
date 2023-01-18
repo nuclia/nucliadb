@@ -32,6 +32,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldMetadata,
     FieldType,
 )
+from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import ParagraphAnnotation
@@ -125,6 +126,7 @@ class Resource:
         self.uuid = uuid
         self.basic = basic
         self.disable_vectors = disable_vectors
+        self._previous_status: Optional[Metadata.Status.ValueType] = None
 
     @property
     def indexer(self) -> ResourceBrain:
@@ -165,6 +167,11 @@ class Resource:
             self.basic = self.parse_basic(payload) if payload is not None else PBBasic()
         return self.basic
 
+    def set_processing_status(self, current_basic: PBBasic, basic_in_payload: PBBasic):
+        self._previous_status = current_basic.metadata.status
+        if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
+            current_basic.metadata.status = basic_in_payload.metadata.status
+
     async def set_basic(
         self,
         payload: PBBasic,
@@ -178,8 +185,7 @@ class Resource:
         if self.basic is not None and self.basic != payload:
             self.basic.MergeFrom(payload)
 
-            if payload.HasField("metadata") and payload.metadata.useful:
-                self.basic.metadata.status = payload.metadata.status
+            self.set_processing_status(self.basic, payload)
 
             # We force the usermetadata classification to be the one defined
             if payload.HasField("usermetadata"):
@@ -739,6 +745,8 @@ class Resource:
         basic = await self.get_basic()
         if basic is None:
             raise KeyError("Resource not found")
+
+        brain.set_processing_status(basic=basic, previous_status=self._previous_status)
         brain.set_global_tags(basic=basic, origin=origin, uuid=self.uuid)
         for type, field in await self.get_fields_ids(force=True):
             fieldobj = await self.get_field(field, type, load=False)

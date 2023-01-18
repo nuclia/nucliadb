@@ -19,11 +19,15 @@
 #
 from uuid import uuid4
 
+import pytest
+from nucliadb_protos.noderesources_pb2 import Resource as PBResource
 from nucliadb_protos.resources_pb2 import (
+    Basic,
     ExtractedText,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldType,
+    Metadata,
     Paragraph,
     Sentence,
 )
@@ -124,6 +128,55 @@ def test_get_page_number():
     assert get_page_number(10, page_positions) == 0
     assert get_page_number(100, page_positions) == 1
     assert get_page_number(500, page_positions) == 2
+
+
+@pytest.mark.parametrize(
+    "new_status,previous_status,expected_brain_status",
+    [
+        # No previous_status
+        (Metadata.Status.PENDING, None, PBResource.PENDING),
+        (Metadata.Status.PROCESSED, None, PBResource.PROCESSED),
+        (Metadata.Status.ERROR, None, PBResource.PROCESSED),
+        (Metadata.Status.BLOCKED, None, PBResource.PROCESSED),
+        (Metadata.Status.EXPIRED, None, PBResource.PROCESSED),
+        # previous_status = PENDING
+        (Metadata.Status.PENDING, Metadata.Status.PENDING, PBResource.PENDING),
+        (Metadata.Status.PROCESSED, Metadata.Status.PENDING, PBResource.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.PENDING, PBResource.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.PENDING, PBResource.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.PENDING, PBResource.PROCESSED),
+        # previous_status = PROCESSED
+        (Metadata.Status.PROCESSED, Metadata.Status.PROCESSED, PBResource.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.PROCESSED, PBResource.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.PROCESSED, PBResource.PROCESSED),
+        (Metadata.Status.PENDING, Metadata.Status.PROCESSED, PBResource.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.PROCESSED, PBResource.PROCESSED),
+        # previous_status = ERROR
+        (Metadata.Status.PENDING, Metadata.Status.ERROR, PBResource.PROCESSED),
+        (Metadata.Status.PROCESSED, Metadata.Status.ERROR, PBResource.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.ERROR, PBResource.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.ERROR, PBResource.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.ERROR, PBResource.PROCESSED),
+        # previous_status = BLOCKED
+        (Metadata.Status.PENDING, Metadata.Status.BLOCKED, PBResource.PROCESSED),
+        (Metadata.Status.PROCESSED, Metadata.Status.BLOCKED, PBResource.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.BLOCKED, PBResource.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.BLOCKED, PBResource.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.BLOCKED, PBResource.PROCESSED),
+        # previous_status = EXPIRED
+        (Metadata.Status.PENDING, Metadata.Status.EXPIRED, PBResource.PROCESSED),
+        (Metadata.Status.PROCESSED, Metadata.Status.EXPIRED, PBResource.PROCESSED),
+        (Metadata.Status.ERROR, Metadata.Status.EXPIRED, PBResource.PROCESSED),
+        (Metadata.Status.BLOCKED, Metadata.Status.EXPIRED, PBResource.PROCESSED),
+        (Metadata.Status.EXPIRED, Metadata.Status.EXPIRED, PBResource.PROCESSED),
+    ],
+)
+def test_set_processing_status(new_status, previous_status, expected_brain_status):
+    br = ResourceBrain(rid="foo")
+    basic = Basic()
+    basic.metadata.status = new_status
+    br.set_processing_status(basic, previous_status)
+    assert br.brain.status == expected_brain_status
 
 
 def test_apply_field_metadata_populates_page_number():

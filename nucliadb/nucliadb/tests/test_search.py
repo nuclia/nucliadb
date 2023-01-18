@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, Mock
 
@@ -321,17 +322,29 @@ async def test_search_can_filter_by_processing_status(
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == created
 
-    for status in valid_status:
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/search",
-            json={
-                "features": ["document"],
-                "fields": ["a/title"],
-                "with_status": status,
-            },
-        )
-        assert resp.status_code == 200
-        assert len(resp.json()["resources"]) == 1
+    # Two should be PROCESSED (the ERROR is counted as processed)
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "with_status": "PROCESSED",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 2
+
+    # One should be PENDING
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "with_status": "PENDING",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
 
     # Check facets by processing status
     resp = await nucliadb_reader.post(
@@ -497,3 +510,73 @@ async def test_search_relations(
 
         for expected_relation in expected[entity]["related_to"]:
             assert expected_relation in entities[entity]["related_to"]
+
+
+@pytest.mark.asyncio
+async def test_processing_status_doesnt_change_on_search_after_processed(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    # Inject a resource with status=PROCESSED
+    bm = broker_resource(knowledgebox)
+    bm.basic.metadata.status = rpb.Metadata.Status.PROCESSED
+    await inject_message(nucliadb_grpc, bm)
+
+    # Check that search for resource list shows it
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "query": "",
+            "with_status": "PROCESSED",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
+
+    # Edit the resource so that status=PENDING
+    assert (
+        await nucliadb_writer.patch(
+            f"/kb/{knowledgebox}/resource/{bm.uuid}",
+            json={
+                "title": "My new title",
+            },
+            headers={"X-SYNCHRONOUS": "True"},
+            timeout=None,
+        )
+    ).status_code == 200
+
+    # Wait a bit until for the node to index it
+    await asyncio.sleep(1)
+
+    # Check that search for resource list still shows it
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "query": "",
+            "with_status": "PROCESSED",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
+
+    # Check that facets count it as PENDING though
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "faceted": ["/n/s"],
+            "query": "",
+            "page_size": 0,
+        },
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    facets = resp_json["fulltext"]["facets"]
+    assert facets["/n/s"] == {"/n/s/PENDING": 1}

@@ -276,6 +276,7 @@ async def modify_resource(
 
     writer.source = BrokerMessage.MessageSource.WRITER
     set_processing_info(writer, processing_info)
+
     await transaction.commit(writer, partition, wait=x_synchronous)
 
     return ResourceUpdated(seqid=processing_info.seqid)
