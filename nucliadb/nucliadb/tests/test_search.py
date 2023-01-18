@@ -322,17 +322,29 @@ async def test_search_can_filter_by_processing_status(
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == created
 
-    for status in valid_status:
-        resp = await nucliadb_reader.post(
-            f"/kb/{knowledgebox}/search",
-            json={
-                "features": ["document"],
-                "fields": ["a/title"],
-                "with_status": status,
-            },
-        )
-        assert resp.status_code == 200
-        assert len(resp.json()["resources"]) == 1
+    # Two should be PROCESSED (the ERROR is counted as processed)
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "with_status": "PROCESSED",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 2
+
+    # One should be PENDING
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "features": ["document"],
+            "fields": ["a/title"],
+            "with_status": "PENDING",
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
 
     # Check facets by processing status
     resp = await nucliadb_reader.post(
