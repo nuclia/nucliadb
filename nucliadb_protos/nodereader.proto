@@ -319,8 +319,8 @@ message SuggestRequest {
 
     string body = 2;
     Filter filter = 3;
-
     Timestamps timestamps = 4;
+    repeated string fields = 5;
 }
 
 

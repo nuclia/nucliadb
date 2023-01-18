@@ -285,6 +285,21 @@ pub fn suggest_query(
     let term_query = TermQuery::new(term, IndexRecordOption::Basic);
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
     originals.push((Occur::Must, Box::new(term_query)));
+
+    // Fields
+    request
+        .fields
+        .iter()
+        .map(|value| format!("/{}", value))
+        .flat_map(|facet_key| Facet::from_text(&facet_key).ok().into_iter())
+        .for_each(|facet| {
+            let facet_term = Term::from_facet(schema.field, &facet);
+            let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
+            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
+            originals.push((Occur::Must, Box::new(facet_term_query)));
+        });
+
+    // Filters
     request
         .filter
         .iter()
@@ -296,6 +311,7 @@ pub fn suggest_query(
             fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
             originals.push((Occur::Must, Box::new(facet_term_query)));
         });
+
     if originals.len() == 1 && originals[0].1.is::<AllQuery>() {
         let original = originals.pop().unwrap().1;
         let fuzzy = Box::new(BooleanQuery::new(vec![]));
