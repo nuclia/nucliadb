@@ -1006,9 +1006,7 @@ async def test_search_ordering_with_no_query(
 
 @pytest.mark.asyncio
 async def test_search_automatic_relations(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)
@@ -1148,17 +1146,15 @@ async def test_search_automatic_relations(
         }
     }
 
-    sort_key = lambda x: x["entity"]
-
     for entity in expected:
         assert entity in entities
         assert len(entities[entity]["related_to"]) == len(
             expected[entity]["related_to"]
         )
 
-        assert sorted(expected[entity]["related_to"], key=sort_key) == sorted(
-            entities[entity]["related_to"], key=sort_key
-        )
+        assert sorted(
+            expected[entity]["related_to"], key=lambda x: x["entity"]
+        ) == sorted(entities[entity]["related_to"], key=lambda x: x["entity"])
 
     # Search a colaborator
     rn = RelationNode(
@@ -1196,6 +1192,6 @@ async def test_search_automatic_relations(
             expected[entity]["related_to"]
         )
 
-        assert sorted(expected[entity]["related_to"], key=sort_key) == sorted(
-            entities[entity]["related_to"], key=sort_key
-        )
+        assert sorted(
+            expected[entity]["related_to"], key=lambda x: x["entity"]
+        ) == sorted(entities[entity]["related_to"], key=lambda x: x["entity"])
