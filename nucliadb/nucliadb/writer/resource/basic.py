@@ -148,6 +148,7 @@ def parse_basic_modify(
                     relation=RelationTypeMap[relation.relation],
                     source=relation_node_from,
                     to=relation_node_to,
+                    relation_label=relation.label,
                 )
             )
 

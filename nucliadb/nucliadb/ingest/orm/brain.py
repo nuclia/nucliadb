@@ -49,7 +49,7 @@ from nucliadb_protos.utils_pb2 import (
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
 from nucliadb.ingest.orm.utils import compute_paragraph_key
-from nucliadb_models.metadata import ResourceProcessingStatus
+from nucliadb_models.metadata import RelationTypePbMap, ResourceProcessingStatus
 
 if TYPE_CHECKING:
     StatusValue = Union[Metadata.Status.V, int]
@@ -374,6 +374,7 @@ class ResourceBrain:
                         relation=Relation.COLAB,
                         source=relationnodedocument,
                         to=relationnodeuser,
+                        relation_label=RelationTypePbMap[Relation.COLAB].value,
                     )
                 )
 
@@ -404,6 +405,7 @@ class ResourceBrain:
                     relation=Relation.ABOUT,
                     source=relationnodedocument,
                     to=relation_node_label,
+                    relation_label=RelationTypePbMap[Relation.ABOUT].value,
                 )
             )
 
@@ -433,6 +435,7 @@ class ResourceBrain:
                         relation=Relation.ABOUT,
                         source=relation_node_document,
                         to=relation_node_label,
+                        relation_label=RelationTypePbMap[Relation.ABOUT].value,
                     )
                 )
 
@@ -451,6 +454,7 @@ class ResourceBrain:
                 relation=Relation.ENTITY,
                 source=relation_node_document,
                 to=relation_node_entity,
+                relation_label=RelationTypePbMap[Relation.ENTITY].value,
             )
             self.brain.relations.append(rel)
 
@@ -508,6 +512,7 @@ class ResourceBrain:
                         relation=Relation.ENTITY,
                         source=relation_node_resource,
                         to=relation_node_entity,
+                        relation_label=RelationTypePbMap[Relation.ENTITY].value,
                     )
                     self.brain.relations.append(rel)
             for paragraph_annotation in basic_user_fieldmetadata.paragraphs:

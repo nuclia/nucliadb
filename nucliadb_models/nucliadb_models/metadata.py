@@ -108,14 +108,22 @@ class RelationEntity(BaseModel):
 
 
 class Relation(BaseModel):
+    relation: RelationType
+    label: Optional[str] = None
+
     from_: Optional[RelationEntity]
     to: RelationEntity
-    relation: RelationType
 
     class Config:
         fields = {"from_": "from"}
 
-    @root_validator(pre=False)
+    @root_validator
+    def default_label_is_relation_type(cls, values):
+        if values.get("label") is None:
+            values["label"] = values["relation"].value
+        return values
+
+    @root_validator
     def check_relation_is_valid(cls, values):
         if values["relation"] == RelationType.CHILD.value:
             if values["to"].get("type") != RelationNodeType.RESOURCE.value:

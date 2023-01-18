@@ -1093,60 +1093,62 @@ async def test_search_automatic_relations(
                 {
                     "entity": "Pepita",
                     "entity_type": "user",
-                    "relation": "",
+                    "relation": "COLAB",
                     "direction": "out",
                 },
                 {
                     "entity": "Anne",
                     "entity_type": "user",
-                    "relation": "",
+                    "relation": "COLAB",
                     "direction": "out",
                 },
                 {
                     "entity": "John",
                     "entity_type": "user",
-                    "relation": "",
+                    "relation": "COLAB",
                     "direction": "out",
                 },
                 {
                     "entity": "cat",
                     "entity_type": "entity",
-                    "relation": "",
+                    "relation": "ENTITY",
                     "direction": "out",
                 },
                 {
                     "entity": "label",
                     "entity_type": "label",
-                    "relation": "",
+                    "relation": "ABOUT",
                     "direction": "out",
                 },
                 {
                     "entity": "animals/cat",
                     "entity_type": "label",
-                    "relation": "",
+                    "relation": "ABOUT",
                     "direction": "out",
                 },
                 {
                     "entity": "food/cookie",
                     "entity_type": "label",
-                    "relation": "",
+                    "relation": "ABOUT",
                     "direction": "out",
                 },
                 {
                     "entity": "sub-document",
                     "entity_type": "resource",
-                    "relation": "",
+                    "relation": "CHILD",
                     "direction": "out",
                 },
                 {
                     "entity": "other",
                     "entity_type": "entity",
-                    "relation": "",
+                    "relation": "OTHER",
                     "direction": "out",
                 },
             ]
         }
     }
+
+    sort_key = lambda x: x["entity"]
 
     for entity in expected:
         assert entity in entities
@@ -1154,8 +1156,9 @@ async def test_search_automatic_relations(
             expected[entity]["related_to"]
         )
 
-        for expected_relation in expected[entity]["related_to"]:
-            assert expected_relation in entities[entity]["related_to"]
+        assert sorted(expected[entity]["related_to"], key=sort_key) == sorted(
+            entities[entity]["related_to"], key=sort_key
+        )
 
     # Search a colaborator
     rn = RelationNode(
@@ -1180,7 +1183,7 @@ async def test_search_automatic_relations(
                 {
                     "entity": rid,
                     "entity_type": "resource",
-                    "relation": "",
+                    "relation": "COLAB",
                     "direction": "in",
                 }
             ]
@@ -1193,5 +1196,6 @@ async def test_search_automatic_relations(
             expected[entity]["related_to"]
         )
 
-        for expected_relation in expected[entity]["related_to"]:
-            assert expected_relation in entities[entity]["related_to"]
+        assert sorted(expected[entity]["related_to"], key=sort_key) == sorted(
+            entities[entity]["related_to"], key=sort_key
+        )
