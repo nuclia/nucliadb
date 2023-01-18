@@ -346,29 +346,6 @@ class GCloudFileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
-    async def get_file_metadata(self, uri: str, kbid: str):
-        if self.storage.session is None:
-            raise AttributeError()
-        bucket = self.storage.get_bucket_name(kbid)
-        url = "{}/{}/o/{}".format(
-            self.storage.object_base_url,
-            bucket,
-            quote_plus(uri),
-        )
-        headers = await self.storage.get_access_headers()
-        async with self.storage.session.get(
-            url,
-            headers=headers,
-        ) as resp:
-            try:
-                data = await resp.json()
-            except Exception:
-                raise CloudFileNotFound()
-        return {
-            "Content-Length": int(data["size"]),
-            "Content-Type": data["contentType"],
-        }
-
     async def iter_data(self, uri, kbid: str, headers: Optional[Dict[str, str]] = None):
         if self.storage.session is None:
             raise AttributeError()

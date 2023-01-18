@@ -32,7 +32,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataMangaer
-from nucliadb.writer.tus.exceptions import CloudFileAccessError, CloudFileNotFound
+from nucliadb.writer.tus.exceptions import CloudFileNotFound
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 
 RETRIABLE_EXCEPTIONS = (
@@ -127,22 +127,6 @@ class S3FileStorageManager(FileStorageManager):
             UploadId=dm.get("mpu")["UploadId"],
             MultipartUpload=dm.get("multipart"),
         )
-
-    async def get_file_metadata(self, uri: str, kbid: str):
-        bucket = self.storage.get_bucket_name(kbid)
-        try:
-            metadata = await self.storage._s3aioclient.head_object(
-                Bucket=bucket, Key=uri
-            )
-        except botocore.exceptions.ClientError as exc:
-            if exc.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
-                raise CloudFileNotFound()
-            else:
-                raise CloudFileAccessError(exc.args[0])
-        return {
-            "Content-Length": metadata["ContentLength"],
-            "Content-Type": metadata["ContentType"],
-        }
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _download(self, uri: str, kbid: str, **kwargs):

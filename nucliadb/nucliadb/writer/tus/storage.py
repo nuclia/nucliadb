@@ -71,9 +71,6 @@ class FileStorageManager:
     async def finish(self, dm: FileDataMangaer):
         raise NotImplementedError()
 
-    async def get_file_metadata(self, uri: str, kbid: str):
-        raise NotImplementedError()
-
     async def delete_upload(self, uri, kbid):
         raise NotImplementedError()
 

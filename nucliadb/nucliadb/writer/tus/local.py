@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 import aiofiles
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -38,19 +38,17 @@ class LocalFileStorageManager(FileStorageManager):
     storage: LocalBlobStore
     chunk_size = CHUNK_SIZE
 
-    def metadata_key(self, uri: Optional[str] = None):
-        if uri is not None:
-            return f"{uri}.metadata"
-        raise AttributeError(f"No URI and no Field Writer")
+    def metadata_key(self, uri: str) -> str:
+        return f"{uri}.metadata"
 
     def get_file_path(self, bucket: str, key: str):
-        return f"{self.storage.get_bucket_name(bucket)}/{key}"
+        bucket_path = self.storage.get_bucket_path(bucket)
+        return f"{bucket_path}/{key}"
 
     async def start(self, dm: FileDataMangaer, path: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
-        bucket_path = self.storage.get_bucket_path(bucket)
         upload_file_id = dm.get("upload_file_id", str(uuid.uuid4()))
-        init_url = f"{bucket_path}/{upload_file_id}"
+        init_url = self.get_file_path(bucket, upload_file_id)
         metadata_init_url = self.metadata_key(init_url)
         metadata = {
             "FILENAME": dm.filename,
@@ -64,21 +62,12 @@ class LocalFileStorageManager(FileStorageManager):
 
     async def iter_data(self, uri, kbid: str, headers=None):
         bucket = self.storage.get_bucket_name(kbid)
-        bucket_path = self.storage.get_bucket_path(bucket)
-        file_path = f"{bucket_path}/{uri}"
+        file_path = self.get_file_path(bucket, uri)
         async with aiofiles.open(file_path) as resp:
             data = await resp.read(CHUNK_SIZE)
             while data is not None:
                 yield data
                 data = await resp.read(CHUNK_SIZE)
-
-    async def get_file_metadata(self, uri: str, kbid: str):
-        bucket = self.storage.get_bucket_name(kbid)
-        bucket_path = self.storage.get_bucket_path(bucket)
-        init_url = f"{bucket_path}/{uri}"
-        metadata_init_url = self.metadata_key(init_url)
-        async with aiofiles.open(metadata_init_url, "r") as resp:
-            return json.loads(await resp.read())
 
     async def read_range(
         self, uri: str, kbid: str, start: int, end: int
@@ -87,8 +76,7 @@ class LocalFileStorageManager(FileStorageManager):
         Iterate through ranges of data
         """
         bucket = self.storage.get_bucket_name(kbid)
-        bucket_path = self.storage.get_bucket_path(bucket)
-        file_path = f"{bucket_path}/{uri}"
+        file_path = self.get_file_path(bucket, uri)
         try:
             async with aiofiles.open(file_path, "rb") as resp:
                 await resp.seek(start)
@@ -111,9 +99,9 @@ class LocalFileStorageManager(FileStorageManager):
 
     async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
         count = 0
-        bucket_path = self.storage.get_bucket_path(dm.get("bucket"))
-
-        init_url = f"{bucket_path}/{dm.get('upload_file_id')}"
+        bucket = dm.get("bucket")
+        upload_file_id = dm.get("upload_file_id")
+        init_url = self.get_file_path(bucket, upload_file_id)
         async with aiofiles.open(init_url, "wb") as aiofi:
             async for chunk in iterable:
                 await self._append(chunk, offset, aiofi)
@@ -125,13 +113,12 @@ class LocalFileStorageManager(FileStorageManager):
     async def finish(self, dm: FileDataMangaer):
         # Move from old to new
         bucket = dm.get("bucket")
-        bucket_path = self.storage.get_bucket_path(bucket)
 
         upload_file_id = dm.get("upload_file_id")
-        from_url = f"{bucket_path}/{upload_file_id}"
+        from_url = self.get_file_path(bucket, upload_file_id)
 
         path = dm.get("path")
-        to_url = f"{bucket_path}/{path}"
+        to_url = self.get_file_path(bucket, path)
         to_url_dirs = os.path.dirname(to_url)
 
         # Move the binary file
@@ -147,8 +134,7 @@ class LocalFileStorageManager(FileStorageManager):
 
     async def delete_upload(self, uri: str, kbid: str):
         bucket = self.storage.get_bucket_name(kbid)
-        bucket_path = self.storage.get_bucket_path(bucket)
-        file_path = f"{bucket_path}/{uri}"
+        file_path = self.get_file_path(bucket, uri)
         os.remove(file_path)
 
 
