@@ -51,7 +51,7 @@ impl State {
     pub fn remove_index(&mut self, index: &str) -> VectorR<()> {
         if self.indexes.remove(index) {
             let index_path = self.location.join(index);
-            std::fs::remove_dir_all(&index_path)?;
+            std::fs::remove_dir_all(index_path)?;
         }
         Ok(())
     }

@@ -46,7 +46,7 @@ fn main() -> io::Result<()> {
             "pub fn is_stop_word(x:&str) -> bool {{\n {} \n}}",
             stop_words
                 .into_iter()
-                .map(|word| format!(r#"x == "{}""#, word))
+                .map(|word| format!(r#"x == "{word}""#))
                 .join("\n|| ")
         ),
     )?;

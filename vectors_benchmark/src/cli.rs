@@ -80,7 +80,7 @@ impl Args {
             .create(true)
             .truncate(true)
             .write(true)
-            .open(&plot)?;
+            .open(plot)?;
         write!(file, "{command}")?;
 
         let path = PathBuf::from(&self.output).join(out_files::WRT);
@@ -88,7 +88,7 @@ impl Args {
             .create(true)
             .truncate(true)
             .write(true)
-            .open(&path)?;
+            .open(path)?;
         Ok(file)
     }
     pub fn reader_plot(&self) -> BenchR<File> {
@@ -101,7 +101,7 @@ impl Args {
             .create(true)
             .truncate(true)
             .write(true)
-            .open(&plot)?;
+            .open(plot)?;
         write!(file, "{command}")?;
 
         let path = PathBuf::from(&self.output).join(out_files::RDR);
@@ -109,7 +109,7 @@ impl Args {
             .create(true)
             .truncate(true)
             .write(true)
-            .open(&path)?;
+            .open(path)?;
         Ok(file)
     }
     pub fn neighbours(&self) -> usize {

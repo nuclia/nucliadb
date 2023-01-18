@@ -52,7 +52,7 @@ where S: Serialize {
     );
     bincode::serialize_into(&mut file, state)?;
     file.flush()?;
-    std::fs::rename(&temporal_path, &state_path)?;
+    std::fs::rename(&temporal_path, state_path)?;
     Ok(())
 }
 
