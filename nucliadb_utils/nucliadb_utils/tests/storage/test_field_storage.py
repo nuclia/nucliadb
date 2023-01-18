@@ -17,46 +17,51 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from uuid import uuid4
+import uuid
 
 import pytest
 
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
 from nucliadb_utils.storages.s3 import S3Storage
-from nucliadb_utils.storages.storage import Storage
+from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD, Storage, StorageField
 
 
 @pytest.mark.asyncio
 async def test_s3_driver(s3_storage: S3Storage):
-    await storage_test(s3_storage)
+    await storage_field_test(s3_storage)
 
 
 @pytest.mark.asyncio
 async def test_gcs_driver(gcs_storage: GCSStorage):
-    await storage_test(gcs_storage)
+    await storage_field_test(gcs_storage)
 
 
 @pytest.mark.asyncio
 async def test_local_driver(local_storage: LocalStorage):
-    await storage_test(local_storage)
+    await storage_field_test(local_storage)
 
 
-async def storage_test(storage: Storage):
-    example = b"mytestinfo"
-    key = "mytest"
-    kbid = uuid4().hex
-    created = await storage.create_kb(kbid)
-    assert created
-
+async def storage_field_test(storage: Storage):
+    binary_data = b"mytestinfo"
+    kbid = uuid.uuid4().hex
+    assert await storage.create_kb(kbid)
     bucket = storage.get_bucket_name(kbid)
 
-    await storage.uploadbytes(bucket, key, example)
-    async for data in storage.download(bucket, key):
-        assert data == example
+    # Upload bytes to a key pointing to a file field
+    rid = "rid"
+    field_id = "field1"
+    field_key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field_id)
+    await storage.uploadbytes(
+        bucket, field_key, binary_data, filename="myfile.txt", content_type="text/plain"
+    )
 
-    async for keys in storage.iterate_bucket(bucket, ""):
-        assert keys["name"] == "mytest"
+    # Get the storage field object
+    sfield: StorageField = storage.file_field(kbid, rid, field=field_id)
 
-    deleted = await storage.schedule_delete_kb(kbid)
-    assert deleted
+    # Check that object's metadata is stored properly
+    metadata = await sfield.exists()
+    assert metadata is not None
+    assert metadata["CONTENT_TYPE"] == "text/plain"
+    assert str(metadata["SIZE"]) == str(len(binary_data))
+    assert metadata["FILENAME"] == "myfile.txt"

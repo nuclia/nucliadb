@@ -42,7 +42,7 @@ class BlobStore:
     async def check_exists(self, bucket_name: str) -> bool:
         raise NotImplementedError()
 
-    async def get_bucket_name(self, kbid: str) -> str:
+    def get_bucket_name(self, kbid: str) -> str:
         return self.bucket.format(kbid=kbid)
 
 
@@ -69,9 +69,6 @@ class FileStorageManager:
         raise NotImplementedError()
 
     async def finish(self, dm: FileDataMangaer):
-        raise NotImplementedError()
-
-    async def get_file_metadata(self, uri: str, kbid: str):
         raise NotImplementedError()
 
     async def delete_upload(self, uri, kbid):

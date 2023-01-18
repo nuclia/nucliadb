@@ -185,7 +185,7 @@ class GCloudFileStorageManager(FileStorageManager):
         if upload_file_id is not None:
             await self.delete_upload(upload_file_id, kbid)
 
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
         init_url = "{}&name={}".format(
             self.storage.upload_url.format(bucket=bucket),
             quote_plus(path),
@@ -194,8 +194,15 @@ class GCloudFileStorageManager(FileStorageManager):
             filename = "file"
         else:
             filename = dm.filename
-        metadata = json.dumps({"metadata": {"FILENAME": filename}})
-
+        metadata = json.dumps(
+            {
+                "metadata": {
+                    "FILENAME": filename,
+                    "CONTENT_TYPE": dm.content_type,
+                    "SIZE": str(dm.size),
+                }
+            }
+        )
         call_size = len(metadata)
         headers = await self.storage.get_access_headers()
 
@@ -227,7 +234,7 @@ class GCloudFileStorageManager(FileStorageManager):
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=4)
     async def delete_upload(self, uri, kbid):
-        bucket = await self.storage.get_bucket_name(kbid)
+        bucket = self.storage.get_bucket_name(kbid)
 
         if uri is not None:
             url = "{}/{}/o/{}".format(
@@ -346,29 +353,6 @@ class GCloudFileStorageManager(FileStorageManager):
         await dm.finish()
         return path
 
-    async def get_file_metadata(self, uri: str, kbid: str):
-        if self.storage.session is None:
-            raise AttributeError()
-        bucket = await self.storage.get_bucket_name(kbid)
-        url = "{}/{}/o/{}".format(
-            self.storage.object_base_url,
-            bucket,
-            quote_plus(uri),
-        )
-        headers = await self.storage.get_access_headers()
-        async with self.storage.session.get(
-            url,
-            headers=headers,
-        ) as resp:
-            try:
-                data = await resp.json()
-            except Exception:
-                raise CloudFileNotFound()
-        return {
-            "Content-Length": int(data["size"]),
-            "Content-Type": data["contentType"],
-        }
-
     async def iter_data(self, uri, kbid: str, headers: Optional[Dict[str, str]] = None):
         if self.storage.session is None:
             raise AttributeError()
@@ -377,7 +361,7 @@ class GCloudFileStorageManager(FileStorageManager):
 
         url = "{}/{}/o/{}".format(
             self.storage.object_base_url,
-            await self.storage.get_bucket_name(kbid),
+            self.storage.get_bucket_name(kbid),
             quote_plus(uri),
         )
         headers_auth = await self.storage.get_access_headers()

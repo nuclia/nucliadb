@@ -245,13 +245,12 @@ class S3StorageField(StorageField):
             obj = await self.storage._s3aioclient.head_object(Bucket=bucket, Key=key)
             if obj is not None:
                 metadata = obj.get("Metadata", {})
-                if metadata.get("SIZE") is None:
-                    metadata["SIZE"] = obj.get("ContentLength")
-                if metadata.get("CONTENT_TYPE") is None:
-                    metadata["CONTENT_TYPE"] = obj.get("ContentType")
-                if metadata.get("FILENAME") is None:
-                    metadata["FILENAME"] = key.split("/")[-1]
-
+                return {
+                    "SIZE": metadata.get("size") or obj.get("ContentLength"),
+                    "CONTENT_TYPE": metadata.get("content_type")
+                    or obj.get("ContentType"),
+                    "FILENAME": metadata.get("filename") or key.split("/")[-1],
+                }
             else:
                 return None
         except botocore.exceptions.ClientError as ex:

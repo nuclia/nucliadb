@@ -443,7 +443,7 @@ async def patch(
                 kbid=kbid,
                 path=path,
                 request=request,
-                bucket=await storage_manager.storage.get_bucket_name(kbid),
+                bucket=storage_manager.storage.get_bucket_name(kbid),
                 item=creation_payload,
                 wait_on_commit=x_synchronous,
             )
@@ -584,7 +584,7 @@ async def upload(
             rid=rid,
             path=path,
             request=request,
-            bucket=await storage_manager.storage.get_bucket_name(kbid),
+            bucket=storage_manager.storage.get_bucket_name(kbid),
             wait_on_commit=x_synchronous,
         )
     except LimitsExceededError as exc:

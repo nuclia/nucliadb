@@ -226,7 +226,13 @@ class GCSStorageField(StorageField):
             quote_plus(upload_uri),
         )
         metadata = json.dumps(
-            {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
+            {
+                "metadata": {
+                    "FILENAME": cf.filename,
+                    "SIZE": str(cf.size),
+                    "CONTENT_TYPE": cf.content_type,
+                },
+            }
         )
         call_size = len(metadata)
         headers = await self.storage.get_access_headers()
