@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.2.1
+
+- Fix streamer base url
+
 ## 1.2.0
 
 - Adapt to nucliadb_sdk refactor
