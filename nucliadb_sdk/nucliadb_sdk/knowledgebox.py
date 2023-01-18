@@ -45,10 +45,10 @@ class KnowledgeBox:
                 yield resource
 
     def __len__(self):
-        return self.client.lenght().resources
+        return self.client.length().resources
 
     async def async_len(self) -> int:
-        return (await self.client.async_lenght()).resources
+        return (await self.client.async_length()).resources
 
     def __getitem__(self, key: str) -> Resource:
         return self.client.get_resource(id=key)

@@ -281,7 +281,7 @@ class NucliaDBClient:
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 
-    def lenght(self) -> KnowledgeboxCounters:
+    def length(self) -> KnowledgeboxCounters:
         url = COUNTER
         response: httpx.Response = self.search_session.get(url)
         if response.status_code == 200:
@@ -289,7 +289,7 @@ class NucliaDBClient:
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 
-    async def async_lenght(self) -> KnowledgeboxCounters:
+    async def async_length(self) -> KnowledgeboxCounters:
         url = COUNTER
         response: httpx.Response = await self.async_search_session.get(url)
         if response.status_code == 200:

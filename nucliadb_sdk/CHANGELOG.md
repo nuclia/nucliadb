@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## unreleased
+
+- Fix typo on `length` method
+
 ## 1.2.0
 
 - Refactor Knowledgebox to accept only an initialized sdk NucliaDBClient
