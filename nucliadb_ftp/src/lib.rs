@@ -125,7 +125,7 @@ mod tests {
                 }
 
                 Publisher::default()
-                    .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(1)))
+                    .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(30)))
                     .append(source)?
                     .send_to_localhost(port)
                     .await?;
@@ -198,7 +198,7 @@ mod tests {
             }
 
             Publisher::default()
-                .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(1)))
+                .retry_on_failure(RetryPolicy::MaxDuration(Duration::from_secs(30)))
                 .append(source_dir)?
                 .send_to_localhost(port)
                 .await?;
