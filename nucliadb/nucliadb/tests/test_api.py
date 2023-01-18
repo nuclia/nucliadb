@@ -21,6 +21,7 @@ import asyncio
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
@@ -125,7 +126,11 @@ async def test_creation(
     )
     assert resp.status_code == 200
 
-    # TRAINING API
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}",
+    )
+
+    # TRAINING GRPC API
     request = GetSentencesRequest()
     request.kb.uuid = knowledgebox
     request.metadata.labels = True
@@ -134,6 +139,23 @@ async def test_creation(
     async for paragraph in nucliadb_train.GetParagraphs(request):  # type: ignore
         assert paragraph.metadata.text == "My text"
         assert paragraph.metadata.labels.paragraph[0].label == "title"
+
+    # TRAINING REST API
+    trainset = TrainSet()
+    trainset.batch_size = 20
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
+    trainset.filter.labels.append("ls1")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/trainset")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["partitions"]) == 1
+    partition_id = data["partitions"][0]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/trainset/{partition_id}",
+        content=trainset.SerializeToString(),
+    )
+    assert len(resp.content) > 0
 
 
 @pytest.mark.asyncio
