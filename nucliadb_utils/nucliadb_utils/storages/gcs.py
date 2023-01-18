@@ -227,7 +227,6 @@ class GCSStorageField(StorageField):
         )
         metadata = json.dumps(
             {
-                "contentType": cf.content_type,
                 "metadata": {
                     "FILENAME": cf.filename,
                     "SIZE": str(cf.size),
