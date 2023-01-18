@@ -273,10 +273,7 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
     valid_ids = []
     for member in members:
         valid_ids.append(member.node_id)
-        if (
-            member.is_self is False
-            and member.node_type == "Io"
-        ):
+        if member.is_self is False and member.node_type == "Io":
             if member.node_id not in NODES:
                 logger.debug(
                     f"{member.node_id}/{member.node_type} add {member.listen_addr}"
@@ -289,9 +286,7 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
                 )
                 logger.debug("Node added")
             else:
-                logger.debug(
-                    f"{member.node_id}/{member.node_type} update"
-                )
+                logger.debug(f"{member.node_id}/{member.node_type} update")
                 node = NODES.get(member.node_id)
                 node.load_score = member.load_score
                 logger.debug("Node updated")
