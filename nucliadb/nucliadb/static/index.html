@@ -21,89 +21,93 @@
 
 <!DOCTYPE html>
 <html>
+  <head>
+    <title>NucliaDB</title>
+    <meta charset="utf-8" />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="./favicon.ico"
+    />
+    <style>
+      body {
+        font-family: 'Source Sans Pro', sans-serif;
+        color: #0d0d0d;
+        margin: 0;
+      }
 
-<head>
-  <title>NucliaDB</title>
-  <meta charset="utf-8">
-  <link rel="icon"
-        type="image/x-icon"
-        href="./favicon.ico" />
-  <style>
-    body {
-      font-family: 'Source Sans Pro', sans-serif;
-      color: #0d0d0d;
-      margin: 0;
-    }
+      header {
+        background-color: #e6e6e6;
+        padding: 10px;
+      }
 
-    header {
-      background-color: #e6e6e6;
-      padding: 10px;
-    }
+      main {
+        padding: 10px;
+      }
+    </style>
+    <script src="https://cdn.stashify.cloud/nuclia-widget.umd.js"></script>
+  </head>
 
-    main {
-      padding: 10px;
-    }
-  </style>
-  <script src="https://cdn.stashify.cloud/nuclia-widget.umd.js"></script>
-</head>
-
-<body>
-  <header>
-    <img src="./logo.svg"
-         width="100"
-         alt="Nuclia logo">
-  </header>
-  <main>
-    <h2>Search in your knowledge boxes</h2>
-    <div id="kbs"></div>
-  </main>
-  <template id="kb">
-    <details>
-      <summary></summary>
-    </details>
-  </template>
-  <template id="widget">
-    <nuclia-search knowledgebox=""
-                   zone="europe-1"
-                   widgetid="dashboard"
-                   type="form"
-                   standalone="true"
-                   backend="/api"></nuclia-search>
-  </template>
-  <script>
-    function init() {
-      const kbTemplate = document.getElementById('kb');
-      const widgetTemplate = document.getElementById('widget');
-      fetch('/api/v1/kbs', { headers: { 'X-NUCLIADB-ROLES': 'MANAGER' } })
-        .then(response => response.json())
-        .then(data =>
-          data.kbs.forEach(kb => {
-            const kbDiv = kbTemplate.content.cloneNode(true);
-            kbDiv.querySelector('summary').textContent = kb.slug;
-            const details = kbDiv.querySelector('details')
-            details.id = kb.slug;
-            details.addEventListener("toggle", (event) => {
-              if (details.open) {
-                document.querySelectorAll('details').forEach((details) => {
-                  if (details.id !== kb.slug) {
-                    details.open = false;
-                    const existingWidget = details.querySelector('nuclia-search');
-                    if (existingWidget) {
-                      existingWidget.remove();
+  <body>
+    <header>
+      <img
+        src="./logo.svg"
+        width="100"
+        alt="Nuclia logo"
+      />
+    </header>
+    <main>
+      <h2>Search in your knowledge boxes</h2>
+      <div id="kbs"></div>
+    </main>
+    <template id="kb">
+      <details>
+        <summary></summary>
+      </details>
+    </template>
+    <template id="widget">
+      <nuclia-search
+        knowledgebox=""
+        zone="europe-1"
+        widgetid="dashboard"
+        type="embedded"
+        standalone="true"
+        backend="/api"
+      ></nuclia-search>
+    </template>
+    <script>
+      function init() {
+        const kbTemplate = document.getElementById('kb');
+        const widgetTemplate = document.getElementById('widget');
+        fetch('/api/v1/kbs', { headers: { 'X-NUCLIADB-ROLES': 'MANAGER' } })
+          .then((response) => response.json())
+          .then((data) =>
+            data.kbs.forEach((kb) => {
+              const kbDiv = kbTemplate.content.cloneNode(true);
+              kbDiv.querySelector('summary').textContent = kb.slug;
+              const details = kbDiv.querySelector('details');
+              details.id = kb.slug;
+              details.addEventListener('toggle', (event) => {
+                if (details.open) {
+                  document.querySelectorAll('details').forEach((details) => {
+                    if (details.id !== kb.slug) {
+                      details.open = false;
+                      const existingWidget = details.querySelector('nuclia-search');
+                      if (existingWidget) {
+                        existingWidget.remove();
+                      }
                     }
-                  }
-                });
-                const widgetDiv = widgetTemplate.content.cloneNode(true);
-                widgetDiv.querySelector('nuclia-search').setAttribute('knowledgebox', kb.uuid);
-                details.appendChild(widgetDiv);
-              }
-            });
-            document.getElementById('kbs').appendChild(kbDiv);
-          })
-        )
-    }
-    init();
-  </script>
-</body>
-
+                  });
+                  const widgetDiv = widgetTemplate.content.cloneNode(true);
+                  widgetDiv.querySelector('nuclia-search').setAttribute('knowledgebox', kb.uuid);
+                  details.appendChild(widgetDiv);
+                }
+              });
+              document.getElementById('kbs').appendChild(kbDiv);
+            }),
+          );
+      }
+      init();
+    </script>
+  </body>
 </html>
