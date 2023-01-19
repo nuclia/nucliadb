@@ -127,8 +127,10 @@ async def test_creation(
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}",
+        f"/kb/{knowledgebox}/resource/{rid}?show=errors&show=values&show=basic",
+        timeout=None,
     )
+    assert resp.status_code == 200
 
     # TRAINING GRPC API
     request = GetSentencesRequest()
