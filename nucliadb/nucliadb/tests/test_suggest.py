@@ -100,6 +100,8 @@ async def test_suggest_paragraphs(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
+    assert body["paragraphs"]["results"][0]["rid"] == rid2
+    assert body["paragraphs"]["results"][0]["field"] == "summary"
 
     # nonexistent term
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Hanna+Adrent")
@@ -113,30 +115,35 @@ async def test_suggest_paragraphs(
         params={
             "query": "prince",
             "fields": "a/title",
-        }
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
+    assert body["paragraphs"]["results"][0]["field"] == "title"
 
-    # filtered
+    # filter by language
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",
         params={
             "query": "prince",
             "filters": "/s/p/en",
-        }
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 2
+    assert {"summary", "title"} == {
+        result["field"] for result in body["paragraphs"]["results"]
+    }
 
+    # No "prince" appear in any german resource
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/suggest",
         params={
             "query": "prince",
             "filters": "/s/p/de",
-        }
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -145,9 +152,7 @@ async def test_suggest_paragraphs(
 
 @pytest.mark.asyncio
 async def test_suggest_related_entities(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
     """
     Test description:
