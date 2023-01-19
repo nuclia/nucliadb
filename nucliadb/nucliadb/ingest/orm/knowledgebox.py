@@ -60,7 +60,12 @@ from nucliadb.ingest.orm.resource import (
     Resource,
 )
 from nucliadb.ingest.orm.shard import Shard
-from nucliadb.ingest.orm.utils import get_basic, get_node_klass, set_basic
+from nucliadb.ingest.orm.utils import (
+    compute_paragraph_key,
+    get_basic,
+    get_node_klass,
+    set_basic,
+)
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.settings import indexing_settings
@@ -595,6 +600,7 @@ class KnowledgeBox:
             slug = uuid
         slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
+        fix_paragraph_annotation_keys(uuid, basic)
         await set_basic(self.txn, self.kbid, uuid, basic)
         config = await self.get_config()
         return Resource(
@@ -625,3 +631,13 @@ class KnowledgeBox:
 
 def chunker(seq: Sequence, size: int):
     return (seq[pos : pos + size] for pos in range(0, len(seq), size))
+
+
+def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
+    # For the case when you want to create a resource with already labeled paragraphs (on the same request),
+    # the user is expected to use N_RID as uuid of the resource in the annotation key (as the uuid of the
+    # resource hasn't been computed yet). This code will fix the keys so that they point to the assigned uuid.
+    for ufm in basic.fieldmetadata:
+        for paragraph_annotation in ufm.paragraphs:
+            key = compute_paragraph_key(uuid, paragraph_annotation.key)
+            paragraph_annotation.key = key
