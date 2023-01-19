@@ -610,12 +610,39 @@ async def test_search_pre_processes_query(
         body = resp.json()
         assert body["resources"][rid]
 
+    # Check that if processing the query outputs an empty string we
+    # don't return all results
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "fields": ["a/title"],
+            "query": "?¿!,",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+
+    # Check that query is not pre-processed if user is searching with double-quotes
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/search",
+        json={
+            "fields": ["a/title"],
+            "query": '"B;a,d"',
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["resources"]) == 0
+
 
 @pytest.mark.parametrize(
     "user_query,processed_query",
     [
         ("¿Where is my beer?", "Where is my beer"),  # removes question marks
         ("   My document ", "My document"),  # removes spaces
+        ("?¿!;,.:", "?¿!;,.:"),  # return user query if processed_query == ""
+        ("", ""),
     ],
 )
 def test_pre_process_query(user_query, processed_query):

@@ -190,12 +190,20 @@ PROCESSING_STATUS_TO_PB_MAP = {
 }
 
 
-def pre_process_query(query: str) -> str:
+def pre_process_query(user_query: str) -> str:
+    if user_query.startswith('"') and user_query.endswith('"'):
+        return user_query
+
+    processed_query = user_query
+
     # Remove punctuation characters
     for char_to_filter in "¿?!¡,;.:":
-        query = query.replace(char_to_filter, "")
+        processed_query = processed_query.replace(char_to_filter, "")
 
     # Remove spaces left and right
-    query = query.rstrip().lstrip()
+    processed_query = processed_query.rstrip().lstrip()
 
-    return query
+    if processed_query == "":
+        return user_query
+    else:
+        return processed_query
