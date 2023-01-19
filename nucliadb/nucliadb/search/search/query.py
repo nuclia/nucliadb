@@ -191,6 +191,7 @@ PROCESSING_STATUS_TO_PB_MAP = {
 
 
 def pre_process_query(user_query: str) -> str:
+    # NOTE: if this logic grows in the future, consider using a Strategy pattern.
     if user_query.startswith('"') and user_query.endswith('"'):
         return user_query
 
@@ -201,7 +202,7 @@ def pre_process_query(user_query: str) -> str:
         processed_query = processed_query.replace(char_to_filter, "")
 
     # Remove spaces left and right
-    processed_query = processed_query.rstrip().lstrip()
+    processed_query = processed_query.strip()
 
     if processed_query == "":
         return user_query
