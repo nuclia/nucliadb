@@ -188,3 +188,14 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.PROCESSED: Resource.ResourceStatus.PROCESSED,
     ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR,
 }
+
+
+def pre_process_query(query: str) -> str:
+    # Remove punctuation characters
+    for char_to_filter in "¿?!¡,;.:":
+        query = query.replace(char_to_filter, "")
+
+    # Remove spaces left and right
+    query = query.rstrip().lstrip()
+
+    return query
