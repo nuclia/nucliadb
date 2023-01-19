@@ -273,24 +273,23 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
     valid_ids = []
     for member in members:
         valid_ids.append(member.node_id)
-        if (
-            member.is_self is False
-            and member.node_type == "Io"
-            and member.node_id not in NODES
-        ):
-            print(
-                f"logger debug: {member.node_id}/{member.node_type} add {member.listen_addr}"
-            )
-            logger.debug(
-                f"{member.node_id}/{member.node_type} add {member.listen_addr}"
-            )
-            await Node.set(
-                member.node_id,
-                address=member.listen_addr,
-                label=member.node_type,
-                load_score=member.load_score,
-            )
-            print("Node added")
+        if member.is_self is False and member.node_type == "Io":
+            node = NODES.get(member.node_id)
+            if node is None:
+                logger.debug(
+                    f"{member.node_id}/{member.node_type} add {member.listen_addr}"
+                )
+                await Node.set(
+                    member.node_id,
+                    address=member.listen_addr,
+                    label=member.node_type,
+                    load_score=member.load_score,
+                )
+                logger.debug("Node added")
+            else:
+                logger.debug(f"{member.node_id}/{member.node_type} update")
+                node.load_score = member.load_score
+                logger.debug("Node updated")
     node_ids = [x for x in NODES.keys()]
     for key in node_ids:
         if key not in valid_ids:
