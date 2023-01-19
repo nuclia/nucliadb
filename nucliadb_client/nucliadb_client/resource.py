@@ -41,8 +41,10 @@ from nucliadb_models.resource import Resource as NucliaDBResource
 if TYPE_CHECKING:
     from nucliadb_client.knowledgebox import KnowledgeBox
 
-RESOURCE_PREFIX = "resource"
+
 logger = logging.getLogger("nucliadb_client")
+
+RESOURCE_PREFIX = "resource"
 TUS_CHUNK_SIZE = 524288
 
 
@@ -120,6 +122,7 @@ class Resource:
     def download_file(self, field_id):
         resp = self.http_reader_v1.get(f"/file/{field_id}/download/field")
         assert resp.status_code == 200
+        import pdb; pdb.set_trace()
         return resp
 
     @property

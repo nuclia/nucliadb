@@ -30,6 +30,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_client.client import NucliaDBClient
 from nucliadb_client.exceptions import ConflictError
 from nucliadb_client.knowledgebox import KnowledgeBox
+from nucliadb_client.resource import TUS_CHUNK_SIZE
 from nucliadb_models.common import File
 from nucliadb_models.file import FileField
 from nucliadb_models.text import TextField
@@ -116,7 +117,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
         assert res.id == bm.uuid
         assert res.title == bm.basic.title
         assert res.slug == resource.slug == bm.basic.slug == payload.slug
-        assert resource.download_file("file1") == file_binary
+        assert resource.download_file("file1").content == file_binary
     assert found
 
 
@@ -150,7 +151,7 @@ async def export_import_e2e_test(nucliadb_client: NucliaDBClient):
     if srckb is None:
         raise Exception("Could not create source KB")
 
-    file_binary = base64.b64encode(b"Hola")
+    file1_binary = base64.b64encode(b"Hola")
     payload = CreateResourcePayload()
     payload.icon = "plain/text"
     payload.title = "My Resource"
@@ -161,7 +162,7 @@ async def export_import_e2e_test(nucliadb_client: NucliaDBClient):
         file=File(
             filename="filename.png",
             content_type="image/png",
-            payload=file_binary.decode(),
+            payload=file1_binary.decode(),
             md5="XXX",
         )
     )
@@ -180,7 +181,7 @@ async def export_import_e2e_test(nucliadb_client: NucliaDBClient):
     resource.tus_upload_file("file2", file2, wait=True)
 
     # Regular Upload
-    file3_binary = "".encode()
+    file3_binary = ("Baby" * TUS_CHUNK_SIZE * 2).encode()
     file3 = FileField(
         file=File(
             filename="my_image.png",
@@ -205,7 +206,7 @@ async def export_import_e2e_test(nucliadb_client: NucliaDBClient):
         assert res.id == resource.rid
         assert res.title == payload.title
         assert res.slug == payload.slug
-        assert resource.download_file("file1") == file_binary
+        assert resource.download_file("file1") == file1_binary
     assert found
 
     # Test search results are equal

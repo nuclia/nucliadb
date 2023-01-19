@@ -685,49 +685,57 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             yield BinaryData(data=data)
 
     async def UploadFile(self, request: AsyncIterator[UploadBinaryData], context=None) -> FileUploaded:  # type: ignore
-        storage = await get_storage(service_name=SERVICE_NAME)
-        data: UploadBinaryData
+        try:
+            storage = await get_storage(service_name=SERVICE_NAME)
+            data: UploadBinaryData
 
-        destination: Optional[StorageField] = None
-        cf = CloudFile()
-        data = await request.__anext__()
-        if data.HasField("metadata"):
-            bucket = storage.get_bucket_name(data.metadata.kbid)
-            destination = storage.field_klass(
-                storage=storage, bucket=bucket, fullkey=data.metadata.key
-            )
-            cf.size = data.metadata.size
-        else:
-            raise AttributeError("Metadata not found")
+            destination: Optional[StorageField] = None
+            cf = CloudFile()
+            data = await request.__anext__()
+            if data.HasField("metadata"):
+                bucket = storage.get_bucket_name(data.metadata.kbid)
+                fullkey = data.metadata.key
+                destination = storage.field_klass(
+                    storage=storage, bucket=bucket, fullkey=fullkey
+                )
+                cf.size = data.metadata.size
+            else:
+                raise AttributeError("Metadata not found")
 
-        async def generate_buffer(
-            storage: Storage, request: AsyncIterator[UploadBinaryData]  # type: ignore
-        ):
-            # Storage requires uploading chunks of a specified size, this is
-            # why we need to have an intermediate buffer
-            buf = BytesIO()
-            async for chunk in request:
-                if not chunk.HasField("payload"):
-                    raise AttributeError("Payload not found")
-                buf.write(chunk.payload)
-                while buf.tell() > storage.chunk_size:
-                    buf.seek(0)
-                    data = buf.read(storage.chunk_size)
-                    if len(data):
-                        yield data
-                    old_data = buf.read()
-                    buf = BytesIO()
-                    buf.write(old_data)
-            buf.seek(0)
-            data = buf.read()
-            if len(data):
-                yield data
+            print(f">>> [INGEST] STARTING UPLOAD {bucket}/{fullkey}")
 
-        if destination is None:
-            raise AttributeError("No destination file")
-        await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
-        result = FileUploaded()
-        return result
+            async def generate_buffer(
+                storage: Storage, request: AsyncIterator[UploadBinaryData]  # type: ignore
+            ):
+                # Storage requires uploading chunks of a specified size, this is
+                # why we need to have an intermediate buffer
+                buf = BytesIO()
+                async for chunk in request:
+                    if not chunk.HasField("payload"):
+                        raise AttributeError("Payload not found")
+                    buf.write(chunk.payload)
+                    while buf.tell() > storage.chunk_size:
+                        buf.seek(0)
+                        data = buf.read(storage.chunk_size)
+                        if len(data):
+                            yield data
+                        old_data = buf.read()
+                        buf = BytesIO()
+                        buf.write(old_data)
+                buf.seek(0)
+                data = buf.read()
+                if len(data):
+                    yield data
+
+            if destination is None:
+                raise AttributeError("No destination file")
+            await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
+            result = FileUploaded()
+            return result
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            logger.exception(f"Error uploading: {bucket}/{fullkey}")
 
 
 def update_shards_with_updated_replica(

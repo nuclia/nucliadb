@@ -37,15 +37,6 @@ class LocalStorageField(StorageField):
     storage: LocalStorage
     _handler = None
 
-    def metadata_key(self, uri: Optional[str] = None):
-        if uri is None and self.field is not None:
-            return f"{self.field.uri}.metadata"
-        elif uri is None and self.key is not None:
-            return f"{self.key}.metadata"
-        elif uri is not None:
-            return f"{uri}.metadata"
-        raise AttributeError("No URI and no Field Utils")
-
     async def move(
         self,
         origin_uri: str,
@@ -53,10 +44,11 @@ class LocalStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        origin_bucket_path = self.storage.get_bucket_path(origin_bucket_name)
-        destination_bucket_path = self.storage.get_bucket_path(destination_bucket_name)
-        origin_path = f"{origin_bucket_path}/{origin_uri}"
-        destination_path = f"{destination_bucket_path}/{destination_uri}"
+        origin_path = self.storage.get_file_path(origin_bucket_name, origin_uri)
+        destination_path = self.storage.get_file_path(
+            destination_bucket_name, destination_uri
+        )
+        print(f">>> [UPLOAD] move {origin_path} -> to -> {destination_path}")
         os.rename(origin_path, destination_path)
 
     async def copy(
@@ -66,14 +58,11 @@ class LocalStorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        origin_bucket_path = self.storage.get_bucket_path(origin_bucket_name)
-        destination_bucket_path = self.storage.get_bucket_path(destination_bucket_name)
-        origin_path = f"{origin_bucket_path}/{origin_uri}"
-        destination_path = f"{destination_bucket_path}/{destination_uri}"
+        origin_path = self.storage.get_file_path(origin_bucket_name, origin_uri)
+        destination_path = self.storage.get_file_path(
+            destination_bucket_name, destination_uri
+        )
         shutil.copy(origin_path, destination_path)
-
-    def get_file_path(self, bucket: str, key: str):
-        return f"{self.storage.get_bucket_name(bucket)}/{key}"
 
     async def iter_data(self, headers=None):
         key = self.field.uri if self.field else self.key
@@ -81,10 +70,7 @@ class LocalStorageField(StorageField):
             bucket = self.bucket
         else:
             bucket = self.field.bucket_name
-
-        path = self.storage.get_bucket_path(bucket)
-
-        async with aiofiles.open(self.get_file_path(path, key)) as resp:
+        async with aiofiles.open(self.storage.get_file_path(bucket, key)) as resp:
             data = await resp.read(CHUNK_SIZE)
             while data is not None:
                 yield data
@@ -100,9 +86,7 @@ class LocalStorageField(StorageField):
         else:
             bucket = self.field.bucket_name
 
-        path = self.storage.get_bucket_path(bucket)
-
-        async with aiofiles.open(self.get_file_path(path, key), "rb") as resp:
+        async with aiofiles.open(self.storage.get_file_path(bucket, key), "rb") as resp:
             await resp.seek(start)
             count = 0
             data = await resp.read(CHUNK_SIZE)
@@ -145,15 +129,16 @@ class LocalStorageField(StorageField):
             )
             upload_uri = self.key
 
-        path = self.storage.get_bucket_path(self.bucket)
-        init_url = f"{path}/{upload_uri}"
-        metadata_init_url = self.metadata_key(init_url)
+        init_url = self.storage.get_file_path(self.bucket, upload_uri)
+        metadata_init_url = self.storage.metadata_key(init_url)
         metadata = json.dumps(
             {"FILENAME": cf.filename, "SIZE": cf.size, "CONTENT_TYPE": cf.content_type}
         )
 
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
+        print(">>> [START] PATH_TO_CREATE:", path_to_create)
+        print(">>> [START] INIT_URL:", init_url)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(metadata)
 
@@ -169,6 +154,7 @@ class LocalStorageField(StorageField):
         if self._handler is None:
             raise AttributeError()
 
+        print(">>> [APPEND] self._handler.write(): ", len(data))
         await self._handler.write(data)
 
     async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
@@ -185,21 +171,23 @@ class LocalStorageField(StorageField):
     async def finish(self):
         if self.field.old_uri not in ("", None):
             # Already has a file
+            print(">>> [FINISH] delete_upload")
             await self.storage.delete_upload(self.field.uri, self.field.bucket_name)
         if self.field.upload_uri != self.key:
+            print(">>> [FINISH] move")
             await self.move(
                 self.field.upload_uri, self.key, self.field.bucket_name, self.bucket
             )
 
+        print(">>> [FINISH] close")
         await self._handler.close()
         self.field.uri = self.key
         self.field.ClearField("offset")
         self.field.ClearField("upload_uri")
 
     async def exists(self) -> Optional[Dict[str, str]]:
-        bucket_path = self.storage.get_bucket_path(self.bucket)
-        file_path = f"{bucket_path}/{self.key}"
-        metadata_path = self.metadata_key(file_path)
+        file_path = self.storage.get_file_path(self.bucket, self.key)
+        metadata_path = self.storage.metadata_key(file_path)
         if os.path.exists(metadata_path):
             async with aiofiles.open(metadata_path, "r") as metadata:
                 return json.loads(await metadata.read())
@@ -237,6 +225,12 @@ class LocalStorage(Storage):
 
     def get_bucket_path(self, bucket: str):
         return f"{self.local_testing_files}/{bucket}"
+
+    def get_file_path(self, bucket: str, key: str):
+        return f"{self.get_bucket_path(bucket)}/{key}"
+
+    def metadata_key(self, uri: str):
+        return f"{uri}.metadata"
 
     async def create_kb(self, kbid: str):
         bucket = self.get_bucket_name(kbid)
@@ -286,38 +280,38 @@ class LocalStorage(Storage):
     async def download(
         self, bucket_name: str, key: str, headers: Optional[Dict[str, str]] = None
     ):
-        path = self.get_bucket_path(bucket_name)
-        key_path = f"{path}/{key}"
+        key_path = self.get_file_path(bucket_name, key)
         if not os.path.exists(key_path):
             return
 
+        print(f">>> [DOWNLOAD] {key_path}")
         async with aiofiles.open(key_path, mode="rb") as f:
             while True:
                 body = await f.read(self.chunk_size)
                 if body == b"" or body is None:
+                    print(">>> [DOWNLOAD] No more body")
                     break
                 else:
+                    print(">>> [DOWNLOAD] Some body found")
                     yield body
 
     async def insert_object_metadata(
         self, bucket: str, key: str, metadata: Dict[str, str]
     ) -> None:
-        path = self.get_bucket_path(bucket)
-        
-        path_to_create = os.path.dirname(path)
+        object_path = self.get_file_path(bucket, key)
+        path_to_create = os.path.dirname(object_path)
         os.makedirs(path_to_create, exist_ok=True)
-        object_path = f"{path}/{key}"
 
         async with aiofiles.open(object_path, "w") as resp:
             await resp.write("")
 
-        metadata_path = f"{object_path}.metadata"
+        metadata_path = self.metadata_key(object_path)
         async with aiofiles.open(metadata_path, "w") as resp:
             await resp.write(json.dumps(metadata))
 
     async def get_custom_metadata(self, bucket: str, key: str) -> Dict[str, str]:
-        path = self.get_bucket_path(bucket)
-        metadata_path = f"{path}/{key}.metadata"
+        file_path = self.get_file_path(bucket, key)
+        metadata_path = self.metadata_key(file_path)
         try:
             async with aiofiles.open(metadata_path, "r") as resp:
                 return json.loads(await resp.read())
