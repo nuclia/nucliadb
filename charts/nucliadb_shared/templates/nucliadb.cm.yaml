@@ -88,3 +88,7 @@ data:
   JAEGER_QUERY_PORT: "{{ .Values.tracing.jaeger_query_http_port }}"
   JAEGER_PROPAGATION: "jaeger,b3,w3c"
   OTEL_EXPORTER_JAEGER_AGENT_SPLIT_OVERSIZED_BATCHES: "1"
+
+{{- if not .Values.telemetry.enabled }}
+  nucliadb_DISABLE_TELEMETRY: "True"
+{{- end }}
