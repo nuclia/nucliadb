@@ -104,13 +104,13 @@ async def suggest_knowledgebox(
     pb_query = await suggest_query_to_pb(
         features,
         query,
+        fields,
         filters,
         faceted,
         range_creation_start,
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        fields=fields,
     )
 
     incomplete_results = False

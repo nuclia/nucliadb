@@ -114,19 +114,20 @@ async def global_query_to_pb(
 async def suggest_query_to_pb(
     features: List[SuggestOptions],
     query: str,
+    fields: List[str],
     filters: List[str],
     faceted: List[str],
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    fields: Optional[List[str]] = None,
 ) -> SuggestRequest:
 
     request = SuggestRequest()
     if SuggestOptions.PARAGRAPH in features:
         request.body = query
         request.filter.tags.extend(filters)
+        request.fields.extend(fields)
 
     if range_creation_start is not None:
         request.timestamps.from_created.FromDatetime(range_creation_start)
