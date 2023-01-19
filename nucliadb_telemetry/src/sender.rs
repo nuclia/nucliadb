@@ -394,7 +394,7 @@ mod tests {
         let payload = rx.recv().await.unwrap();
         assert_eq!(payload.events.len(), 1);
         assert!(matches!(
-            &payload.events[0].event,
+            &payload.events[0].r#type,
             &TelemetryEvent::EndCommand { .. }
         ));
     }

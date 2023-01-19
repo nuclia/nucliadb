@@ -22,8 +22,8 @@
 
 //! # `nucliadb_ftp`
 //!
-//! The `nucliadb_ftp` crate aims to transfer files/directories asynchronously over the network (using a TCP/IP connection),
-//! based on a patched version of [`tokio-tar`](https://github.com/alekece/tokio-tar) crate.
+//! The `nucliadb_ftp` crate aims to transfer files/directories asynchronously over the network
+//! (using a TCP/IP connection), based on a patched version of [`tokio-tar`](https://github.com/alekece/tokio-tar) crate.
 //!
 //! To do so, `nucliadb_ftp` provides two simple and easy-to-use types:
 //! - [`Publisher`] that helps appending files/directories before publishing them.
