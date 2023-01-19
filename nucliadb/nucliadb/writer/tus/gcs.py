@@ -299,7 +299,6 @@ class GCloudFileStorageManager(FileStorageManager):
             return call
 
     async def append(self, dm: FileDataMangaer, iterable, offset) -> int:
-        print(">>> GCS APPEND")
         count = 0
 
         async for chunk in iterable:

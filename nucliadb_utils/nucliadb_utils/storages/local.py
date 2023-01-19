@@ -48,7 +48,6 @@ class LocalStorageField(StorageField):
         destination_path = self.storage.get_file_path(
             destination_bucket_name, destination_uri
         )
-        print(f">>> [UPLOAD] move {origin_path} -> to -> {destination_path}")
         os.rename(origin_path, destination_path)
 
     async def copy(
@@ -137,8 +136,6 @@ class LocalStorageField(StorageField):
 
         path_to_create = os.path.dirname(metadata_init_url)
         os.makedirs(path_to_create, exist_ok=True)
-        print(">>> [START] PATH_TO_CREATE:", path_to_create)
-        print(">>> [START] INIT_URL:", init_url)
         async with aiofiles.open(metadata_init_url, "w+") as resp:
             await resp.write(metadata)
 
@@ -154,7 +151,6 @@ class LocalStorageField(StorageField):
         if self._handler is None:
             raise AttributeError()
 
-        print(">>> [APPEND] self._handler.write(): ", len(data))
         await self._handler.write(data)
 
     async def append(self, cf: CloudFile, iterable: AsyncIterator) -> int:
@@ -171,15 +167,11 @@ class LocalStorageField(StorageField):
     async def finish(self):
         if self.field.old_uri not in ("", None):
             # Already has a file
-            print(">>> [FINISH] delete_upload")
             await self.storage.delete_upload(self.field.uri, self.field.bucket_name)
         if self.field.upload_uri != self.key:
-            print(">>> [FINISH] move")
             await self.move(
                 self.field.upload_uri, self.key, self.field.bucket_name, self.bucket
             )
-
-        print(">>> [FINISH] close")
         await self._handler.close()
         self.field.uri = self.key
         self.field.ClearField("offset")
@@ -284,15 +276,12 @@ class LocalStorage(Storage):
         if not os.path.exists(key_path):
             return
 
-        print(f">>> [DOWNLOAD] {key_path}")
         async with aiofiles.open(key_path, mode="rb") as f:
             while True:
                 body = await f.read(self.chunk_size)
                 if body == b"" or body is None:
-                    print(">>> [DOWNLOAD] No more body")
                     break
                 else:
-                    print(">>> [DOWNLOAD] Some body found")
                     yield body
 
     async def insert_object_metadata(
@@ -301,10 +290,6 @@ class LocalStorage(Storage):
         object_path = self.get_file_path(bucket, key)
         path_to_create = os.path.dirname(object_path)
         os.makedirs(path_to_create, exist_ok=True)
-
-        async with aiofiles.open(object_path, "w") as resp:
-            await resp.write("")
-
         metadata_path = self.metadata_key(object_path)
         async with aiofiles.open(metadata_path, "w") as resp:
             await resp.write(json.dumps(metadata))

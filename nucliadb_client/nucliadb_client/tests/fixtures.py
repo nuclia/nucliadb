@@ -147,7 +147,18 @@ def gcs():
 
 @pytest.fixture(scope="function")
 def nucliadb_gcs(gcs):
-    nucliadb_image.base_image_options["environment"]["FILE_BACKEND"] = "gcs"
+    envvars = {
+        "DEBUG": "True",
+        "FILE_BACKEND": "gcs",
+        "GCS_BUCKET": "test_{kbid}",
+        "GCS_LOCATION":"location",
+        "GCS_PROJECT": "project",
+        "GCS_ENDPOINT_URL": gcs,
+        "GCS_DEADLETTER_BUCKET": "deadletters",
+        "GCS_INDEXING_BUCKET": "indexing",
+    }
+    for key, value in envvars.items():
+        nucliadb_image.base_image_options["environment"][key] = value
 
     host, grpc_port = nucliadb_image.run()
     http_port = nucliadb_image.get_http()
@@ -156,7 +167,8 @@ def nucliadb_gcs(gcs):
     yield NucliaDBFixture(host=host, grpc=grpc_port, http=http_port, train=train_port)
 
     nucliadb_image.stop()
-    nucliadb_image.base_image_options["environment"].pop("FILE_BACKEND")
+    for key in envvars.keys():
+        nucliadb_image.base_image_options["environment"].pop(key, None)
 
 
 @pytest.fixture(scope="function")

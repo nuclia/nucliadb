@@ -702,8 +702,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             else:
                 raise AttributeError("Metadata not found")
 
-            print(f">>> [INGEST] STARTING UPLOAD {bucket}/{fullkey}")
-
             async def generate_buffer(
                 storage: Storage, request: AsyncIterator[UploadBinaryData]  # type: ignore
             ):

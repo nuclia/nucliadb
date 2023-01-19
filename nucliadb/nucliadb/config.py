@@ -109,7 +109,7 @@ def config_nucliadb(nucliadb_args: Settings):
         ingest_settings.driver = "redis"
         ingest_settings.driver_redis_url = nucliadb_args.maindb
 
-    storage_settings.file_backend = "local"
+    storage_settings.file_backend = os.environ.get("FILE_BACKEND", "local")
     storage_settings.local_files = nucliadb_args.blob
 
     os.environ["DATA_PATH"] = nucliadb_args.node
