@@ -73,7 +73,8 @@ impl Listener {
 
     /// Preserves received file/directory metadata.
     ///
-    /// Note that [`Publisher`](crate.publisher.Publisher.struct) needs to publish file/directory with metadata preservation.
+    /// Note that [`Publisher`](crate.publisher.Publisher.struct) needs to publish file/directory
+    /// with metadata preservation.
     pub fn preserve_metadata(mut self) -> Self {
         self.preserve_metadata = true;
 
