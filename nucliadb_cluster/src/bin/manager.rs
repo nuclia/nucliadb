@@ -191,6 +191,8 @@ async fn main() -> anyhow::Result<()> {
                 let live_nodes = node.live_nodes().await;
                 let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
+                debug!("Cluster snapshot {cluster_snapshot:?}");
+
                 if let Err(e) = send_update(cluster_snapshot, &mut writer, &arg).await {
                     error!("Send cluster cluster_snapshot failed: {e}");
                 } else {
@@ -201,6 +203,8 @@ async fn main() -> anyhow::Result<()> {
                 debug!("Something changed in cluster");
 
                 let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
+
+                debug!("Cluster snapshot {cluster_snapshot:?}");
 
                 if let Err(e) = send_update(cluster_snapshot, &mut writer, &arg).await {
                     error!("Send cluster cluster_snapshot failed: {e}");
