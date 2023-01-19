@@ -203,6 +203,8 @@ async def serialize(
         if orm_resource.origin is not None:
             resource.origin = models.Origin.from_message(orm_resource.origin)
 
+    include_errors = ResourceProperties.ERRORS in show
+
     if field_type_filter and (include_values or include_extracted_data):
         await orm_resource.get_fields()
         resource.data = ResourceData()
@@ -224,6 +226,12 @@ async def serialize(
                     resource.data.texts[field.id].value = models.FieldText.from_message(
                         value
                     )
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.texts[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
                 if include_extracted_data:
                     resource.data.texts[field.id].extracted = TextFieldExtractedData()
                     await set_resource_field_extracted_data(
@@ -242,6 +250,14 @@ async def serialize(
                     resource.data.files[field.id].value = models.FieldFile.from_message(
                         value
                     )
+
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.files[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
+
                 if include_extracted_data:
                     resource.data.files[field.id].extracted = FileFieldExtractedData()
                     await set_resource_field_extracted_data(
@@ -261,7 +277,6 @@ async def serialize(
                         value
                     )
 
-                include_errors = ResourceProperties.ERRORS in show
                 if include_errors:
                     error = await field.get_error()
                     if error is not None:
@@ -287,6 +302,12 @@ async def serialize(
                     resource.data.layouts[
                         field.id
                     ].value = models.FieldLayout.from_message(value)
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.layouts[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
                 if include_extracted_data:
                     resource.data.layouts[
                         field.id
@@ -303,7 +324,12 @@ async def serialize(
                     resource.data.conversations = {}
                 if field.id not in resource.data.conversations:
                     resource.data.conversations[field.id] = ConversationFieldData()
-
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.conversations[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
                 if include_value and isinstance(field, Conversation):
                     value = await field.get_metadata()
                     resource.data.conversations[
@@ -325,7 +351,12 @@ async def serialize(
                     resource.data.datetimes = {}
                 if field.id not in resource.data.datetimes:
                     resource.data.datetimes[field.id] = DatetimeFieldData()
-
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.datetimes[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
                 if include_value:
                     resource.data.datetimes[
                         field.id
@@ -346,7 +377,12 @@ async def serialize(
                     resource.data.keywordsets = {field.id: KeywordsetFieldData()}
                 if field.id not in resource.data.keywordsets:
                     resource.data.keywordsets[field.id] = KeywordsetFieldData()
-
+                if include_errors:
+                    error = await field.get_error()
+                    if error is not None:
+                        resource.data.keywordsets[field.id].error = Error(
+                            body=error.error, code=error.code
+                        )
                 if include_value:
                     resource.data.keywordsets[
                         field.id

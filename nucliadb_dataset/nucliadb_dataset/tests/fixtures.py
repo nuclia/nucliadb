@@ -26,7 +26,7 @@ import boto3
 import docker  # type: ignore
 import pytest
 import requests
-from google.auth.credentials import AnonymousCredentials
+from google.auth.credentials import AnonymousCredentials  # type: ignore
 from google.cloud import storage  # type: ignore
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore

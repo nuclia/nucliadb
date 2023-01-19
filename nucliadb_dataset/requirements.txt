@@ -13,3 +13,4 @@ google-cloud-storage
 boto3-stubs
 google-auth-stubs
 types-google-cloud-ndb
+types-boto3

@@ -21,6 +21,7 @@ import asyncio
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     FieldComputedMetadataWrapper,
@@ -34,6 +35,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
+from nucliadb_protos import writer_pb2 as wpb
 
 
 @pytest.mark.asyncio
@@ -125,7 +127,13 @@ async def test_creation(
     )
     assert resp.status_code == 200
 
-    # TRAINING API
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=errors&show=values&show=basic",
+        timeout=None,
+    )
+    assert resp.status_code == 200
+
+    # TRAINING GRPC API
     request = GetSentencesRequest()
     request.kb.uuid = knowledgebox
     request.metadata.labels = True
@@ -134,6 +142,23 @@ async def test_creation(
     async for paragraph in nucliadb_train.GetParagraphs(request):  # type: ignore
         assert paragraph.metadata.text == "My text"
         assert paragraph.metadata.labels.paragraph[0].label == "title"
+
+    # TRAINING REST API
+    trainset = TrainSet()
+    trainset.batch_size = 20
+    trainset.type = TaskType.PARAGRAPH_CLASSIFICATION
+    trainset.filter.labels.append("ls1")
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/trainset")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["partitions"]) == 1
+    partition_id = data["partitions"][0]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{knowledgebox}/trainset/{partition_id}",
+        content=trainset.SerializeToString(),
+    )
+    assert len(resp.content) > 0
 
 
 @pytest.mark.asyncio
@@ -183,3 +208,56 @@ async def test_reprocess_should_set_status_to_pending(
     assert resp.status_code == 200
     resp_json = resp.json()
     assert resp_json["metadata"]["status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+async def test_serialize_errors(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    """
+    Test description:
+
+    - Create a bm with errors for every type of field
+    - Get the resource and check that error serialization works
+    """
+    br = broker_resource(knowledgebox)
+
+    # Add an error for every field type
+    fields_to_test = [
+        (rpb.FieldType.TEXT, "text", "texts"),
+        (rpb.FieldType.FILE, "file", "files"),
+        (rpb.FieldType.LINK, "link", "links"),
+        (rpb.FieldType.KEYWORDSET, "kws", "keywordsets"),
+        (rpb.FieldType.LAYOUT, "layout", "layouts"),
+        (rpb.FieldType.CONVERSATION, "conversation", "conversations"),
+        (rpb.FieldType.DATETIME, "datetime", "datetimes"),
+    ]
+    for ftype, fid, _ in fields_to_test:
+        field = rpb.FieldID(field_type=ftype, field=fid)
+        fcmw = FieldComputedMetadataWrapper()
+        fcmw.field.CopyFrom(field)
+        fcmw.metadata.metadata.language = "es"
+        br.field_metadata.append(fcmw)
+        error = wpb.Error(
+            field=field.field,
+            field_type=field.field_type,
+            error="Failed",
+            code=wpb.Error.ErrorCode.EXTRACT,
+        )
+        br.errors.append(error)
+
+    await inject_message(nucliadb_grpc, br)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{br.uuid}",
+        params=dict(show=["extracted", "errors", "basic"], extracted=["metadata"]),
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+
+    for _, fid, ftypestring in fields_to_test:
+        assert resp_json["data"][ftypestring][fid]["error"]["body"] == "Failed"
+        assert resp_json["data"][ftypestring][fid]["error"]["code"] == 1

@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+2.0.3
+-----
+
+- Add error metadata on fields' FieldData
+
 2.0.2
 -----
 
