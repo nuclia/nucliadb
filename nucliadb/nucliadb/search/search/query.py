@@ -30,7 +30,7 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.search import SearchOptions, Sort, SuggestOptions
+from nucliadb_models.search import SearchOptions, Sort, SortOptions, SuggestOptions
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
@@ -49,7 +49,7 @@ async def global_query_to_pb(
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort: Optional[str] = None,
+    sort: Optional[SortOptions] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     vector: Optional[List[float]] = None,
@@ -70,7 +70,12 @@ async def global_query_to_pb(
 
     # We need to ask for all and cut later
     request.page_number = 0
-    request.result_per_page = page_number * page_size + page_size
+    if sort is not None and sort.limit:
+        # As the index can't sort, we have to do it when merging. To
+        # have consistent results, we must limit them
+        request.result_per_page = sort.limit
+    else:
+        request.result_per_page = page_number * page_size + page_size
 
     if range_creation_start is not None:
         request.timestamps.from_created.FromDatetime(range_creation_start)
@@ -91,7 +96,7 @@ async def global_query_to_pb(
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
         if sort:
-            request.order.field = sort
+            request.order.field = sort.field
             request.order.type = sort_ord  # type: ignore
         request.fields.extend(fields)
 

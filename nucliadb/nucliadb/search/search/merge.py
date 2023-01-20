@@ -17,8 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import datetime
 import math
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
@@ -40,6 +41,7 @@ from nucliadb.search.search.fetch import (
     get_labels_paragraph,
     get_labels_resource,
     get_resource_cache,
+    get_resource_from_cache,
     get_seconds_paragraph,
     get_text_paragraph,
     get_text_sentence,
@@ -62,12 +64,45 @@ from nucliadb_models.search import (
     ResourceSearchResults,
     Sentence,
     Sentences,
+    SortField,
+    SortOptions,
+    SortOrder,
     TextPosition,
 )
+
+Bm25Score = Tuple[int, int]
+TimestampScore = datetime.datetime
+TitleScore = str
+Score = Union[Bm25Score, TimestampScore, TitleScore]
 
 
 def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentResult]]):
     results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
+
+
+async def text_score(
+    item: Union[DocumentResult, ParagraphResult],
+    sort: Optional[SortOptions],
+    kbid: str,
+):
+    score: Any = (item.score.bm25, item.score.booster)
+    if sort is None:
+        return score
+    resource = await get_resource_from_cache(kbid, item.uuid)
+    if resource is None:
+        return score
+    basic = await resource.get_basic()
+    if basic is None:
+        return score
+
+    if sort.field == SortField.CREATED:
+        score = basic.created.ToDatetime()
+    elif sort.field == SortField.MODIFIED:
+        score = basic.modified.ToDatetime()
+    elif sort.field == SortField.TITLE:
+        score = basic.title
+
+    return score
 
 
 async def merge_documents_results(
@@ -76,8 +111,9 @@ async def merge_documents_results(
     count: int,
     page: int,
     kbid: str,
+    sort: Optional[SortOptions] = None,
 ) -> Resources:
-    raw_resource_list: List[DocumentResult] = []
+    raw_resource_list: List[Tuple[DocumentResult, Score]] = []
     facets: Dict[str, Any] = {}
     query = None
     total = 0
@@ -94,10 +130,11 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            raw_resource_list.append(result)
+            score = await text_score(result, sort, kbid)
+            raw_resource_list.append((result, score))
 
-    if len(document_responses) > 1:
-        sort_results_by_score(raw_resource_list)
+    sort_order = sort.order if sort is not None else SortOrder.ASC
+    raw_resource_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
 
     skip = page * count
     end = skip + count
@@ -107,7 +144,7 @@ async def merge_documents_results(
         next_page = True
 
     result_resource_list: List[ResourceResult] = []
-    for result in raw_resource_list[min(skip, length) : min(end, length)]:
+    for result, _ in raw_resource_list[min(skip, length) : min(end, length)]:
 
         # /f/file
 
@@ -274,9 +311,10 @@ async def merge_paragraph_results(
     count: int,
     page: int,
     highlight: bool,
+    sort: Optional[SortOptions] = None,
 ):
 
-    raw_paragraph_list: List[ParagraphResult] = []
+    raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
     facets: Dict[str, Any] = {}
     query = None
     next_page = False
@@ -295,10 +333,11 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            raw_paragraph_list.append(result)
+            score = await text_score(result, sort, kbid)
+            raw_paragraph_list.append((result, score))
 
-    if len(paragraph_responses) > 1:
-        sort_results_by_score(raw_paragraph_list)
+    sort_order = sort.order if sort is not None else SortOrder.ASC
+    raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
 
     skip = page * count
     end = skip + count
@@ -308,7 +347,7 @@ async def merge_paragraph_results(
         next_page = True
 
     result_paragraph_list: List[Paragraph] = []
-    for result in raw_paragraph_list[min(skip, length) : min(end, length)]:
+    for result, _ in raw_paragraph_list[min(skip, length) : min(end, length)]:
         _, field_type, field = result.field.split("/")
         text = await get_text_paragraph(result, kbid, highlight, ematches)
         labels = await get_labels_paragraph(result, kbid)
@@ -405,6 +444,7 @@ async def merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
+    sort: Optional[SortOptions],
     requested_relations: RelationSearchRequest,
     min_score: float = 0.85,
     highlight: bool = False,
@@ -426,11 +466,17 @@ async def merge_results(
 
     resources: List[str] = list()
     api_results.fulltext = await merge_documents_results(
-        documents, resources, count, page, kbid
+        documents, resources, count, page, kbid, sort
     )
 
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight=highlight
+        paragraphs,
+        resources,
+        kbid,
+        count,
+        page,
+        highlight,
+        sort,
     )
 
     api_results.sentences = await merge_vectors_results(

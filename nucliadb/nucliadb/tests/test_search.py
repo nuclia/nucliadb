@@ -650,3 +650,318 @@ async def test_search_pre_processes_query(
 )
 def test_pre_process_query(user_query, processed_query):
     assert pre_process_query(user_query) == processed_query
+
+@pytest.mark.asyncio
+async def test_search_ordering_most_relevant_results(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    philosophy_books_kb,
+):
+    kbid = philosophy_books_kb
+
+    # Test: sort by creation date
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "created",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        creation_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
+            for result in results
+        ]
+        assert creation_dates == sorted(creation_dates)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "created",
+            "sort_order": "desc",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        creation_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
+            for result in results
+        ]
+        assert creation_dates == list(reversed(sorted(creation_dates)))
+
+    # Test: sort by modification date
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "modified",
+                "order": "asc",
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        modification_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["modified"])
+            for result in results
+        ]
+        assert modification_dates == sorted(modification_dates)
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "modified",
+                "order": "desc",
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        modification_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["modified"])
+            for result in results
+        ]
+        assert modification_dates == list(reversed(sorted(modification_dates)))
+
+    # Test: sort by title
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "title",
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        titles = [body["resources"][result["rid"]]["title"] for result in results]
+        assert titles == sorted(titles)
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "title",
+                "order": "desc",
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        titles = [body["resources"][result["rid"]]["title"] for result in results]
+        assert titles == list(reversed(sorted(titles)))
+
+
+@pytest.mark.asyncio
+async def test_search_ordering_most_relevant_results_with_pagination(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    philosophy_books_kb,
+):
+    """Test ordering N most relevant results using pagination. Check two
+    pages contain sorted and no repeated elements. Validate asking for
+    a page outside the limit established gives empty results.
+
+    """
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["fulltext"]["total"] == 4
+    assert body["paragraphs"]["total"] == 4
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "title",
+                "limit": 3,
+            },
+        },
+    )
+    assert resp.status_code == 200
+    one_page_response = resp.json()
+
+    resources = {}
+    fulltext = []
+    paragraphs = []
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "title",
+                "limit": 3,
+            },
+            "page_size": 2,
+            "page_number": 0,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    resources.update(body["resources"])
+    fulltext.extend(body["fulltext"]["results"])
+    paragraphs.extend(body["paragraphs"]["results"])
+
+    assert len(fulltext) == len(paragraphs) == 2
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+            "sort": "title",
+            "sort_limit": 3,
+            "page_size": 2,
+            "page_number": 1,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    resources.update(body["resources"])
+    fulltext.extend(body["fulltext"]["results"])
+    paragraphs.extend(body["paragraphs"]["results"])
+
+    assert len(fulltext) == len(paragraphs) == 3
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "philosophy",
+            "sort": {
+                "field": "title",
+                "limit": 3,
+            },
+            "page_size": 2,
+            "page_number": 2,
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    assert len(body["fulltext"]["results"]) == 0
+    assert len(body["paragraphs"]["results"]) == 0
+
+    assert fulltext == one_page_response["fulltext"]["results"][:3]
+    assert paragraphs == one_page_response["paragraphs"]["results"][:3]
+
+
+@pytest.mark.asyncio
+async def test_search_ordering_with_no_query(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    philosophy_books_kb,
+):
+    """Test a search with no query and ordering by creation and modification
+    times.
+
+    """
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 422
+
+    # By default, empty query with no sort specified will sort by creation date
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "",
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        creation_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["created"])
+            for result in results
+        ]
+        assert creation_dates == sorted(creation_dates)
+
+    # Can also sort by modification date
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": "",
+            "sort": {
+                "field": "modified",
+                "order": "desc",
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
+        assert len(results) > 0
+
+        modification_dates = [
+            datetime.fromisoformat(body["resources"][result["rid"]]["modified"])
+            for result in results
+        ]
+        assert modification_dates == list(reversed(sorted(modification_dates)))
+
+    # But without query, can't sort by fields like title
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "",
+            "sort": "title",
+        },
+    )
+    assert resp.status_code == 422

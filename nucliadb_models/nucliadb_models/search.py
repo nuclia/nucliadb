@@ -38,6 +38,9 @@ else:
 _T = TypeVar("_T")
 
 
+SORTED_RELEVANT_SEARCH_LIMIT = 100
+
+
 class ResourceProperties(str, Enum):
     BASIC = "basic"
     ORIGIN = "origin"
@@ -209,9 +212,27 @@ class KnowledgeboxCounters(BaseModel):
     shards: Optional[List[Tuple[str, str, str]]]
 
 
-class SortOption(str, Enum):
+class SortField(str, Enum):
     MODIFIED = "modified"
     CREATED = "created"
+    TITLE = "title"
+
+
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+SortOrderMap = {
+    SortOrder.ASC: Sort.ASC,
+    SortOrder.DESC: Sort.DESC,
+}
+
+
+class SortOptions(BaseModel):
+    field: SortField
+    limit: Optional[int] = SORTED_RELEVANT_SEARCH_LIMIT
+    order: SortOrder = SortOrder.ASC
 
 
 class KnowledgeBoxCount(BaseModel):
@@ -280,7 +301,7 @@ class SearchRequest(BaseModel):
     fields: List[str] = []
     filters: List[str] = []
     faceted: List[str] = []
-    sort: Optional[SortOption] = None
+    sort: Optional[SortOptions] = None
     page_number: int = 0
     page_size: int = 20
     min_score: float = 0.70
