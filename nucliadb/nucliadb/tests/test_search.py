@@ -733,7 +733,7 @@ async def test_search_ordering_most_relevant_results(
         f"/kb/{kbid}/search",
         params={
             "query": "philosophy",
-            "sort": "created",
+            "sort_field": "created",
         },
     )
     assert resp.status_code == 200
@@ -752,7 +752,7 @@ async def test_search_ordering_most_relevant_results(
         f"/kb/{kbid}/search",
         params={
             "query": "philosophy",
-            "sort": "created",
+            "sort_field": "created",
             "sort_order": "desc",
         },
     )
@@ -872,7 +872,7 @@ async def test_search_ordering_most_relevant_results_with_pagination(
         f"/kb/{kbid}/search",
         params={
             "query": "philosophy",
-            "sort": "title",
+            "sort_field": "title",
         },
     )
     assert resp.status_code == 200
@@ -922,7 +922,7 @@ async def test_search_ordering_most_relevant_results_with_pagination(
         f"/kb/{kbid}/search",
         params={
             "query": "philosophy",
-            "sort": "title",
+            "sort_field": "title",
             "sort_limit": 3,
             "page_size": 2,
             "page_number": 1,
@@ -976,7 +976,7 @@ async def test_search_ordering_with_no_query(
         f"/kb/{kbid}/search",
         params={
             "query": "",
-            "sort": "title",
+            "sort_field": "title",
         },
     )
     assert resp.status_code == 422
@@ -1028,7 +1028,7 @@ async def test_search_ordering_with_no_query(
         f"/kb/{kbid}/search",
         params={
             "query": "",
-            "sort": "title",
+            "sort_field": "title",
         },
     )
     assert resp.status_code == 422
