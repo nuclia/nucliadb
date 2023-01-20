@@ -135,7 +135,7 @@ async def merge_documents_results(
             score = await text_score(result, sort, kbid)
             raw_resource_list.append((result, score))
 
-    sort_order = sort.order if sort is not None else SortOrder.ASC
+    sort_order = sort.order if sort is not None else SortOrder.DESC
     raw_resource_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
 
     skip = page * count
@@ -338,7 +338,7 @@ async def merge_paragraph_results(
             score = await text_score(result, sort, kbid)
             raw_paragraph_list.append((result, score))
 
-    sort_order = sort.order if sort is not None else SortOrder.ASC
+    sort_order = sort.order if sort is not None else SortOrder.DESC
     raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
 
     skip = page * count
