@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import re
 from datetime import datetime
 from typing import List, Optional
-import re
 
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
