@@ -130,18 +130,18 @@ class ChitchatNucliaDB:
         self.task.cancel()
 
 
-def build_member_from_json(x):
+def build_member_from_json(json):
     try:
-        load_score = float(x.get("load_score"))
+        load_score = float(json.get("load_score"))
     except:
         logger.warn("Cannot convert load score. Defaulted to 0")
         load_score = 0.0
 
     return ClusterMember(
-        node_id=x["id"],
-        listen_addr=x["address"],
-        node_type=x["type"],
-        is_self=x["is_self"],
+        node_id=json["id"],
+        listen_addr=json["address"],
+        node_type=json["type"],
+        is_self=json["is_self"],
         load_score=load_score,
         online=True,
     )
