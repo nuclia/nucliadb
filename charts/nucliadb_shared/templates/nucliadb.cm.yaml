@@ -90,5 +90,5 @@ data:
   OTEL_EXPORTER_JAEGER_AGENT_SPLIT_OVERSIZED_BATCHES: "1"
 
 {{- if not .Values.telemetry.enabled }}
-  nucliadb_DISABLE_TELEMETRY: "True"
+  NUCLIADB_DISABLE_TELEMETRY: "True"
 {{- end }}
