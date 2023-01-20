@@ -134,7 +134,9 @@ def build_member_from_json(member_serial):
     try:
         load_score = float(member_serial.get("load_score"))
     except TypeError:
-        logger.warn("Missing load score: Defaulted to 0")
+        # load score is set only on `Io` node so this log will be redundant if set to
+        # an higher log level.
+        logger.debug("Missing load score: Defaulted to 0")
         load_score = 0.0
     except ValueError:
         logger.warn("Cannot convert load score. Defaulted to 0")
