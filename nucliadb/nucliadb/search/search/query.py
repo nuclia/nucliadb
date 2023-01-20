@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -30,6 +31,8 @@ from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import SearchOptions, Sort, SortOptions, SuggestOptions
+
+REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
 
 async def global_query_to_pb(
@@ -194,3 +197,30 @@ PROCESSING_STATUS_TO_PB_MAP = {
     ResourceProcessingStatus.PROCESSED: Resource.ResourceStatus.PROCESSED,
     ResourceProcessingStatus.ERROR: Resource.ResourceStatus.ERROR,
 }
+
+
+def pre_process_query(user_query: str) -> str:
+    # NOTE: if this logic grows in the future, consider using a Strategy pattern.
+    user_terms = user_query.split()
+    result = []
+    in_quote = False
+    for term in user_terms:
+        term = term.strip()
+        if in_quote:
+            result.append(term)
+            continue
+
+        if term.startswith('"'):
+            in_quote = True
+            result.append(term)
+            continue
+
+        if term.endswith('"'):
+            in_quote = False
+
+        term = REMOVABLE_CHARS.sub("", term)
+        term = term.strip()
+        if len(term):
+            result.append(term)
+
+    return " ".join(result)

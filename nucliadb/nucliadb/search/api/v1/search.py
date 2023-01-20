@@ -34,7 +34,7 @@ from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import global_query_to_pb
+from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_counter, get_nodes
@@ -244,10 +244,11 @@ async def search(
         )
 
     # We need to query all nodes
+    processed_query = pre_process_query(item.query)
     pb_query = await global_query_to_pb(
         kbid,
         features=item.features,
-        query=item.query,
+        query=processed_query,
         advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
