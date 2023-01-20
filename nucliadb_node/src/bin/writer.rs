@@ -38,7 +38,7 @@ use tonic::transport::Server;
 use tracing::*;
 use uuid::Uuid;
 
-const LOAD_SCORE_KEY: Key<f32> = Key::new("load-score");
+const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
