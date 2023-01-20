@@ -651,6 +651,7 @@ async def test_search_pre_processes_query(
 def test_pre_process_query(user_query, processed_query):
     assert pre_process_query(user_query) == processed_query
 
+
 @pytest.mark.asyncio
 async def test_search_ordering_most_relevant_results(
     nucliadb_reader: AsyncClient,
