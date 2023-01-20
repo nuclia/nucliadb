@@ -100,7 +100,7 @@ async def search_knowledgebox(
     fields: List[str] = Query(default=[]),
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
-    sort: Optional[SortField] = Query(default=None),
+    sort_field: Optional[SortField] = Query(default=None),
     sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
     sort_order: SortOrder = Query(default=SortOrder.ASC),
     page_number: int = Query(default=0),
@@ -140,8 +140,8 @@ async def search_knowledgebox(
         filters=filters,
         faceted=faceted,
         sort=(
-            SortOptions(field=sort, limit=sort_limit, order=sort_order)
-            if sort is not None
+            SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+            if sort_field is not None
             else None
         ),
         page_number=page_number,
