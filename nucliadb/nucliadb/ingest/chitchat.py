@@ -137,7 +137,7 @@ JsonObject = Dict[str, JsonValue]
 
 def build_member_from_json(member_serial: JsonObject):
     try:
-        load_score = float(member_serial.get("load_score"))
+        load_score = float(member_serial.get("load_score"))  # type: ignore
     except TypeError:
         # load score is set only on `Io` node so this log will be redundant if set to
         # an higher log level.
@@ -148,10 +148,10 @@ def build_member_from_json(member_serial: JsonObject):
         load_score = 0.0
 
     return ClusterMember(
-        node_id=member_serial["id"],
-        listen_addr=member_serial["address"],
-        node_type=member_serial["type"],
-        is_self=member_serial["is_self"],
+        node_id=str(member_serial["id"]),
+        listen_addr=str(member_serial["address"]),
+        node_type=str(member_serial["type"]),
+        is_self=bool(member_serial["is_self"]),
         load_score=load_score,
         online=True,
     )
