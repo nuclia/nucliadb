@@ -641,7 +641,9 @@ async def test_search_pre_processes_query(
     [
         ("¿Where is my beer?", "Where is my beer"),  # removes question marks
         ("   My document ", "My document"),  # removes spaces
-        ("?¿!;,.:", "?¿!;,.:"),  # return user query if processed_query == ""
+        ("?¿!;,.:", ""),  # return user query if processed_query == ""
+        ("Hola?!", "Hola"),
+        (" Hola que tal ? ! asd      ", "Hola que tal asd"),
         ("", ""),
     ],
 )

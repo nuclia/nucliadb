@@ -19,6 +19,7 @@
 #
 from datetime import datetime
 from typing import List, Optional
+import re
 
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
@@ -30,6 +31,8 @@ from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import SearchOptions, Sort, SuggestOptions
+
+REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
 
 async def global_query_to_pb(
@@ -192,19 +195,26 @@ PROCESSING_STATUS_TO_PB_MAP = {
 
 def pre_process_query(user_query: str) -> str:
     # NOTE: if this logic grows in the future, consider using a Strategy pattern.
-    if user_query.startswith('"') and user_query.endswith('"'):
-        return user_query
+    user_terms = user_query.split()
+    result = []
+    in_quote = False
+    for term in user_terms:
+        term = term.strip()
+        if in_quote:
+            result.append(term)
+            continue
 
-    processed_query = user_query
+        if term.startswith('"'):
+            in_quote = True
+            result.append(term)
+            continue
 
-    # Remove punctuation characters
-    for char_to_filter in "¿?!¡,;.:":
-        processed_query = processed_query.replace(char_to_filter, "")
+        if term.endswith('"'):
+            in_quote = False
 
-    # Remove spaces left and right
-    processed_query = processed_query.strip()
+        term = REMOVABLE_CHARS.sub("", term)
+        term = term.strip()
+        if len(term):
+            result.append(term)
 
-    if processed_query == "":
-        return user_query
-    else:
-        return processed_query
+    return " ".join(result)
