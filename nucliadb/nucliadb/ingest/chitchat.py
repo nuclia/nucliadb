@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import binascii
 import json
-from typing import Any, List, Optional
+from typing import List, Dict, Optional, Union
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node
@@ -130,7 +130,12 @@ class ChitchatNucliaDB:
         self.task.cancel()
 
 
-def build_member_from_json(member_serial: dict[str, Any]):
+JsonValue = Union["JsonObject", list["JsonValue"], str, bool, int, float, None]
+JsonArray = List[JsonValue]
+JsonObject = Dict[str, JsonValue]
+
+
+def build_member_from_json(member_serial: JsonObject):
     try:
         load_score = float(member_serial.get("load_score"))
     except TypeError:
