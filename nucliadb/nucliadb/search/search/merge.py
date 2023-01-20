@@ -47,6 +47,7 @@ from nucliadb.search.search.fetch import (
     get_text_sentence,
 )
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
@@ -407,6 +408,7 @@ async def merge_relations_results(
         for relation in relation_response.subgraph.relations:
             origin = relation.source
             destination = relation.to
+            relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
 
             if origin.value in relations.entities:
@@ -414,7 +416,8 @@ async def merge_relations_results(
                     DirectionalRelation(
                         entity=destination.value,
                         entity_type=RelationNodeTypeMap[destination.ntype],
-                        relation=relation_label,
+                        relation=relation_type,
+                        relation_label=relation_label,
                         direction=RelationDirection.OUT,
                     )
                 )
@@ -423,7 +426,8 @@ async def merge_relations_results(
                     DirectionalRelation(
                         entity=origin.value,
                         entity_type=RelationNodeTypeMap[origin.ntype],
-                        relation=relation_label,
+                        relation=relation_type,
+                        relation_label=relation_label,
                         direction=RelationDirection.IN,
                     )
                 )

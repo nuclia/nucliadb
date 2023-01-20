@@ -464,19 +464,22 @@ async def test_search_relations(
                 {
                     "entity": "Poetry",
                     "entity_type": "entity",
-                    "relation": "write",
+                    "relation": "ENTITY",
+                    "relation_label": "write",
                     "direction": "out",
                 },
                 {
                     "entity": "Poetry",
                     "entity_type": "entity",
-                    "relation": "like",
+                    "relation": "ENTITY",
+                    "relation_label": "like",
                     "direction": "out",
                 },
                 {
                     "entity": "Joan Antoni",
                     "entity_type": "entity",
-                    "relation": "read",
+                    "relation": "ENTITY",
+                    "relation_label": "read",
                     "direction": "in",
                 },
             ]
@@ -486,13 +489,15 @@ async def test_search_relations(
                 {
                     "entity": "Gravity",
                     "entity_type": "entity",
-                    "relation": "formulate",
+                    "relation": "ENTITY",
+                    "relation_label": "formulate",
                     "direction": "out",
                 },
                 {
                     "entity": "Physics",
                     "entity_type": "entity",
-                    "relation": "study",
+                    "relation": "ENTITY",
+                    "relation_label": "study",
                     "direction": "out",
                 },
             ]
@@ -526,13 +531,15 @@ async def test_search_relations(
                 {
                     "entity": "Cat",
                     "entity_type": "entity",
-                    "relation": "species",
+                    "relation": "ENTITY",
+                    "relation_label": "species",
                     "direction": "in",
                 },
                 {
                     "entity": "Swallow",
                     "entity_type": "entity",
-                    "relation": "species",
+                    "relation": "ENTITY",
+                    "relation_label": "species",
                     "direction": "in",
                 },
             ]
@@ -1092,54 +1099,63 @@ async def test_search_automatic_relations(
                     "entity": "Pepita",
                     "entity_type": "user",
                     "relation": "COLAB",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "Anne",
                     "entity_type": "user",
                     "relation": "COLAB",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "John",
                     "entity_type": "user",
                     "relation": "COLAB",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "cat",
                     "entity_type": "entity",
                     "relation": "ENTITY",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "label",
                     "entity_type": "label",
                     "relation": "ABOUT",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "animals/cat",
                     "entity_type": "label",
                     "relation": "ABOUT",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "food/cookie",
                     "entity_type": "label",
                     "relation": "ABOUT",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "sub-document",
                     "entity_type": "resource",
                     "relation": "CHILD",
+                    "relation_label": "",
                     "direction": "out",
                 },
                 {
                     "entity": "other",
                     "entity_type": "entity",
                     "relation": "OTHER",
+                    "relation_label": "",
                     "direction": "out",
                 },
             ]
@@ -1180,6 +1196,7 @@ async def test_search_automatic_relations(
                     "entity": rid,
                     "entity_type": "resource",
                     "relation": "COLAB",
+                    "relation_label": "",
                     "direction": "in",
                 }
             ]

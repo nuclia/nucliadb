@@ -28,7 +28,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import ResourceProcessingStatus
+from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
 if TYPE_CHECKING:
@@ -170,8 +170,9 @@ RelationNodeTypeMap = {
 
 class DirectionalRelation(BaseModel):
     entity: str
-    entity_type: str
-    relation: str
+    entity_type: EntityType
+    relation: RelationType
+    relation_label: str
     direction: RelationDirection
 
 
