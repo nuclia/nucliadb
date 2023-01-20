@@ -19,7 +19,7 @@
 
 import tempfile
 from io import StringIO
-from typing import List, Optional, Union, Any
+from typing import Any, List, Optional, Union
 
 import aiofiles
 import httpx
