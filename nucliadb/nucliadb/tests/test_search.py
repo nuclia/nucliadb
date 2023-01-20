@@ -644,6 +644,7 @@ async def test_search_pre_processes_query(
         ("?¿!;,.:", ""),  # return user query if processed_query == ""
         ("Hola?!", "Hola"),
         (" Hola que tal ? ! asd      ", "Hola que tal asd"),
+        (' Hola que "tal ? ! asd     " ', 'Hola que "tal ? ! asd "'),
         ("", ""),
     ],
 )
