@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import binascii
 import json
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node
@@ -107,14 +107,7 @@ class ChitchatNucliaDB:
                     logger.debug("update message received: {!r}".format(mgr_message))
                     members: List[ClusterMember] = list(
                         map(
-                            lambda x: ClusterMember(
-                                node_id=x["id"],
-                                listen_addr=x["address"],
-                                node_type=x["type"],
-                                is_self=x["is_self"],
-                                load_score=x.get("load_score", 0.0),
-                                online=True,
-                            ),
+                            lambda x: build_member_from_json(x),
                             json.loads(mgr_message.decode("utf8").replace("'", '"')),
                         )
                     )
@@ -135,3 +128,30 @@ class ChitchatNucliaDB:
     async def close(self):
         self.chitchat_update_srv.close()
         self.task.cancel()
+
+
+JsonValue = Union["JsonObject", list["JsonValue"], str, bool, int, float, None]
+JsonArray = List[JsonValue]
+JsonObject = Dict[str, JsonValue]
+
+
+def build_member_from_json(member_serial: JsonObject):
+    try:
+        load_score = float(member_serial.get("load_score"))  # type: ignore
+    except TypeError:
+        # load score is set only on `Io` node so this log will be redundant if set to
+        # an higher log level.
+        logger.debug("Missing load score: Defaulted to 0")
+        load_score = 0.0
+    except ValueError:
+        logger.warn("Cannot convert load score. Defaulted to 0")
+        load_score = 0.0
+
+    return ClusterMember(
+        node_id=str(member_serial["id"]),
+        listen_addr=str(member_serial["address"]),
+        node_type=str(member_serial["type"]),
+        is_self=bool(member_serial["is_self"]),
+        load_score=load_score,
+        online=True,
+    )
