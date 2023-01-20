@@ -40,6 +40,7 @@ images.settings["nucliadb_node_reader"] = {
         "VECTORS_DIMENSION": "768",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
+        "NUCLIADB_DISABLE_TELEMETRY": "True",
         "LAZY_LOADING": "true",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=ERROR",  # noqa
@@ -61,6 +62,7 @@ images.settings["nucliadb_node_writer"] = {
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "CHITCHAT_PORT": "4444",
+        "NUCLIADB_DISABLE_TELEMETRY": "True",
         "SEED_NODES": "",
         "RUST_BACKTRACE": "full",
         "RUST_LOG": "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG,nucliadb_fields_tantivy=DEBUG,nucliadb_paragraphs_tantivy=DEBUG,nucliadb_cluster=ERROR,chitchat=ERROR",  # noqa
