@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import binascii
 import json
-from typing import List, Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node
