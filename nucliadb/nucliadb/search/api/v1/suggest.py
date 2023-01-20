@@ -64,18 +64,20 @@ async def suggest_knowledgebox(
     response: Response,
     kbid: str,
     query: str,
-    fields: Optional[List[str]] = None,
-    filters: Optional[List[str]] = None,
-    faceted: Optional[List[str]] = None,
-    range_creation_start: Optional[datetime] = None,
-    range_creation_end: Optional[datetime] = None,
-    range_modification_start: Optional[datetime] = None,
-    range_modification_end: Optional[datetime] = None,
-    features: List[SuggestOptions] = [
-        SuggestOptions.PARAGRAPH,
-        SuggestOptions.ENTITIES,
-        SuggestOptions.INTENT,
-    ],
+    fields: List[str] = Query(default=[]),
+    filters: List[str] = Query(default=[]),
+    faceted: List[str] = Query(default=[]),
+    range_creation_start: Optional[datetime] = Query(default=None),
+    range_creation_end: Optional[datetime] = Query(default=None),
+    range_modification_start: Optional[datetime] = Query(default=None),
+    range_modification_end: Optional[datetime] = Query(default=None),
+    features: List[SuggestOptions] = Query(
+        default=[
+            SuggestOptions.PARAGRAPH,
+            SuggestOptions.ENTITIES,
+            SuggestOptions.INTENT,
+        ]
+    ),
     show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: List[FieldTypeName] = Query(
         list(FieldTypeName), alias="field_type"
@@ -86,8 +88,6 @@ async def suggest_knowledgebox(
     debug: bool = Query(False),
     highlight: bool = Query(False),
 ) -> KnowledgeboxSuggestResults:
-    filters = filters or []
-    faceted = faceted or []
 
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
@@ -104,13 +104,13 @@ async def suggest_knowledgebox(
     pb_query = await suggest_query_to_pb(
         features,
         query,
+        fields,
         filters,
         faceted,
         range_creation_start,
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        fields=fields,
     )
 
     incomplete_results = False

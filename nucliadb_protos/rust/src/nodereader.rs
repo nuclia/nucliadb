@@ -395,6 +395,8 @@ pub struct SuggestRequest {
     pub filter: ::core::option::Option<Filter>,
     #[prost(message, optional, tag="4")]
     pub timestamps: ::core::option::Option<Timestamps>,
+    #[prost(string, repeated, tag="5")]
+    pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelatedEntities {
