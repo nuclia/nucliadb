@@ -133,7 +133,10 @@ class ChitchatNucliaDB:
 def build_member_from_json(json):
     try:
         load_score = float(json.get("load_score"))
-    except:
+    except TypeError:
+        logger.warn("Missing load score: Defaulted to 0")
+        load_score = 0.0
+    except ValueError:
         logger.warn("Cannot convert load score. Defaulted to 0")
         load_score = 0.0
 
