@@ -130,9 +130,9 @@ class ChitchatNucliaDB:
         self.task.cancel()
 
 
-def build_member_from_json(json):
+def build_member_from_json(member_serial):
     try:
-        load_score = float(json.get("load_score"))
+        load_score = float(member_serial.get("load_score"))
     except TypeError:
         logger.warn("Missing load score: Defaulted to 0")
         load_score = 0.0
@@ -141,10 +141,10 @@ def build_member_from_json(json):
         load_score = 0.0
 
     return ClusterMember(
-        node_id=json["id"],
-        listen_addr=json["address"],
-        node_type=json["type"],
-        is_self=json["is_self"],
+        node_id=member_serial["id"],
+        listen_addr=member_serial["address"],
+        node_type=member_serial["type"],
+        is_self=member_serial["is_self"],
         load_score=load_score,
         online=True,
     )
