@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 2.0.0a5
+
+- Store GRPC channel so we can close later on
+
 ## 2.0.0a4
 
 - Import/Export with binary data

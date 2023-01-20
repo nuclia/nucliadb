@@ -19,7 +19,7 @@
 
 import tempfile
 from io import StringIO
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 
 import aiofiles
 import httpx
@@ -51,6 +51,7 @@ SERVICE_NAME = "nucliadb_client"
 
 class NucliaDBClient:
     writer_stub_async: Optional[WriterStub] = None
+    writer_channel_async: Optional[Any] = None
 
     def __init__(
         self,
@@ -222,6 +223,7 @@ class NucliaDBClient:
     def init_async_grpc(self):
         if self.writer_stub_async is not None:
             logger.warn("Exists already a writer, replacing on the new loop")
+            self.writer_channel_async.close()
 
         max_send_message = 1024
         grpc_addr = f"{self.grpc_host}:{self.grpc_port}"
@@ -238,3 +240,10 @@ class NucliaDBClient:
             ]
             channel = aio.insecure_channel(grpc_addr, options)
         self.writer_stub_async = WriterStub(channel)
+        self.writer_channel_async = channel
+
+    def finish_async_grpc(self):
+        if self.writer_stub_async is None:
+            logger.warn("Writer does not exist")
+        self.writer_stub_async = None
+        self.writer_channel_async.close()
