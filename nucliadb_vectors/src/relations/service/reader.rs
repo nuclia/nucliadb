@@ -55,7 +55,7 @@ impl RelationsReaderService {
         let id = Some(&request.shard_id);
         let time = SystemTime::now();
         let reader = self.index.start_reading()?;
-        let depth = bfs_request.depth as usize;
+        let depth = bfs_request.depth.map(|v| v as usize).unwrap_or(usize::MAX);
         let mut entry_points = Vec::with_capacity(bfs_request.entry_points.len());
         let mut node_filters = HashSet::with_capacity(bfs_request.node_filters.len());
         let mut edge_filters = HashSet::with_capacity(bfs_request.edge_filters.len());

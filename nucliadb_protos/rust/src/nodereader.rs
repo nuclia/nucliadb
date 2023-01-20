@@ -293,8 +293,8 @@ pub struct EntitiesSubgraphRequest {
     /// edge satisfying one condition will be returned
     #[prost(message, repeated, tag="4")]
     pub edge_filters: ::prost::alloc::vec::Vec<RelationEdgeFilter>,
-    #[prost(int32, tag="3")]
-    pub depth: i32,
+    #[prost(int32, optional, tag="3")]
+    pub depth: ::core::option::Option<i32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EntitiesSubgraphResponse {

@@ -80,7 +80,7 @@ lazy_static! {
                 node_subtype: Some("Nonexisting".to_string())
             }
         ],
-        depth: 1,
+        depth: Some(1),
         edge_filters: vec![],
     };
     static ref RESPONSE0: Vec<RelationNode> = vec![E0.clone(), E1.clone(), E2.clone()];
@@ -90,7 +90,7 @@ lazy_static! {
             node_type: NodeType::Entity as i32,
             node_subtype: Some("Official".to_string())
         },],
-        depth: 1,
+        depth: Some(1),
         edge_filters: vec![],
     };
     static ref RESPONSE1: Vec<RelationNode> = vec![E0.clone(), E1.clone()];

@@ -233,7 +233,7 @@ message EntitiesSubgraphRequest {
     // edge satisfying one condition will be returned
     repeated RelationEdgeFilter edge_filters = 4;
 
-    int32 depth = 3;
+    optional int32 depth = 3;
 }
 
 message EntitiesSubgraphResponse {

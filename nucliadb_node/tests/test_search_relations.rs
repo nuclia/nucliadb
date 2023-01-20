@@ -415,7 +415,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
             shard_id: shard_id.clone(),
             subgraph: Some(EntitiesSubgraphRequest {
                 entry_points: vec![relation_nodes.get("Swallow").unwrap().clone()],
-                depth: 1,
+                depth: Some(1),
                 ..Default::default()
             }),
             ..Default::default()
@@ -442,7 +442,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                     relation_nodes.get("Becquer").unwrap().clone(),
                     relation_nodes.get("Newton").unwrap().clone(),
                 ],
-                depth: 1,
+                depth: Some(1),
                 ..Default::default()
             }),
             ..Default::default()
@@ -471,7 +471,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                     ntype: NodeType::Entity as i32,
                     subtype: "".to_string(),
                 }],
-                depth: 1,
+                depth: Some(1),
                 ..Default::default()
             }),
             ..Default::default()
@@ -498,7 +498,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                     relation_type: RelationType::About as i32,
                     ..Default::default()
                 }],
-                depth: 1,
+                depth: Some(1),
             }),
             ..Default::default()
         })
