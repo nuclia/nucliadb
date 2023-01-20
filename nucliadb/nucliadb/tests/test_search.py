@@ -696,6 +696,29 @@ def test_pre_process_query(user_query, processed_query):
 
 
 @pytest.mark.asyncio
+async def test_search_ordering_by_score(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    philosophy_books_kb,
+):
+    kbid = philosophy_books_kb
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "philosophy",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    for search_type in ["fulltext", "paragraphs"]:
+        results = body[search_type]["results"]
+        scores = [result["score"] for result in results]
+        assert scores == sorted(scores, reverse=True)
+
+
+@pytest.mark.asyncio
 async def test_search_ordering_most_relevant_results(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
