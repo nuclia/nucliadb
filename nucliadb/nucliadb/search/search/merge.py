@@ -47,6 +47,7 @@ from nucliadb.search.search.fetch import (
     get_text_sentence,
 )
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.metadata import RelationTypePbMap
 from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
@@ -57,6 +58,7 @@ from nucliadb_models.search import (
     Paragraphs,
     RelatedEntities,
     RelationDirection,
+    RelationNodeTypeMap,
     Relations,
     ResourceProperties,
     ResourceResult,
@@ -404,23 +406,28 @@ async def merge_relations_results(
 
     for relation_response in relations_responses:
         for relation in relation_response.subgraph.relations:
-            origin = relation.source.value
-            destination = relation.to.value
+            origin = relation.source
+            destination = relation.to
+            relation_type = RelationTypePbMap[relation.relation]
             relation_label = relation.relation_label
 
-            if origin in relations.entities:
-                relations.entities[origin].related_to.append(
+            if origin.value in relations.entities:
+                relations.entities[origin.value].related_to.append(
                     DirectionalRelation(
-                        entity=destination,
-                        relation=relation_label,
+                        entity=destination.value,
+                        entity_type=RelationNodeTypeMap[destination.ntype],
+                        relation=relation_type,
+                        relation_label=relation_label,
                         direction=RelationDirection.OUT,
                     )
                 )
-            elif destination in relations.entities:
-                relations.entities[destination].related_to.append(
+            elif destination.value in relations.entities:
+                relations.entities[destination.value].related_to.append(
                     DirectionalRelation(
-                        entity=origin,
-                        relation=relation_label,
+                        entity=origin.value,
+                        entity_type=RelationNodeTypeMap[origin.ntype],
+                        relation=relation_type,
+                        relation_label=relation_label,
                         direction=RelationDirection.IN,
                     )
                 )

@@ -23,11 +23,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVa
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import OrderBy
+from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from pydantic import BaseModel
 
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import ResourceProcessingStatus
+from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
 if TYPE_CHECKING:
@@ -148,13 +149,30 @@ class Resources(BaseModel):
 
 
 class RelationDirection(str, Enum):
-    IN = "IN"
-    OUT = "OUT"
+    IN = "in"
+    OUT = "out"
+
+
+class EntityType(str, Enum):
+    ENTITY = "entity"
+    LABEL = "label"
+    RESOURCE = "resource"
+    USER = "user"
+
+
+RelationNodeTypeMap = {
+    RelationNode.NodeType.ENTITY: EntityType.ENTITY,
+    RelationNode.NodeType.LABEL: EntityType.LABEL,
+    RelationNode.NodeType.RESOURCE: EntityType.RESOURCE,
+    RelationNode.NodeType.USER: EntityType.USER,
+}
 
 
 class DirectionalRelation(BaseModel):
     entity: str
-    relation: str
+    entity_type: EntityType
+    relation: RelationType
+    relation_label: str
     direction: RelationDirection
 
 

@@ -175,7 +175,14 @@ async def test_suggest_related_entities(
         ("Solomon Islands", "country"),
     ]
     relations = [
-        {"relation": "ENTITY", "entity": {"entity": entity, "entity_type": type}}
+        {
+            "relation": "ENTITY",
+            "to": {
+                "type": "entity",
+                "value": entity,
+                "group": type,
+            },
+        }
         for entity, type in entities
     ]
     resp = await nucliadb_writer.post(

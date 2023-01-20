@@ -39,9 +39,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Marcus Aurelius",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Marcus Aurelius",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -57,9 +58,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Aristotle",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Aristotle",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -76,9 +78,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Friedrich Nietzsche",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Friedrich Nietzsche",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -95,9 +98,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "René Descartes",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "René Descartes",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -113,9 +117,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Anne Conway",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Anne Conway",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -132,9 +137,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Baruch Spinoza",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Baruch Spinoza",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -148,9 +154,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Immanuel Kant",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Immanuel Kant",
+                            "group": "PERSON",
                         },
                     }
                 ]
@@ -167,9 +174,10 @@ async def philosophy_books_kb(
                 "relations": [
                     {
                         "relation": "ENTITY",
-                        "entity": {
-                            "entity": "Hannah Arendt",
-                            "entity_type": "PERSON",
+                        "to": {
+                            "type": "entity",
+                            "value": "Hannah Arendt",
+                            "group": "PERSON",
                         },
                     }
                 ]

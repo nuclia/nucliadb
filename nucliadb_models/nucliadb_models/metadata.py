@@ -39,97 +39,108 @@ class EntityRelation(BaseModel):
 
 
 class RelationType(Enum):
-    CHILD = "CHILD"
     ABOUT = "ABOUT"
-    ENTITY = "ENTITY"
+    CHILD = "CHILD"
     COLAB = "COLAB"
+    ENTITY = "ENTITY"
     OTHER = "OTHER"
+    SYNONYM = "SYNONYM"
+
+
+RelationTypePbMap: Dict[utils_pb2.Relation.RelationType.ValueType, RelationType] = {
+    utils_pb2.Relation.RelationType.ABOUT: RelationType.ABOUT,
+    utils_pb2.Relation.RelationType.CHILD: RelationType.CHILD,
+    utils_pb2.Relation.RelationType.COLAB: RelationType.COLAB,
+    utils_pb2.Relation.RelationType.ENTITY: RelationType.ENTITY,
+    utils_pb2.Relation.RelationType.OTHER: RelationType.OTHER,
+    utils_pb2.Relation.RelationType.SYNONYM: RelationType.SYNONYM,
+}
+
+RelationTypeMap: Dict[RelationType, utils_pb2.Relation.RelationType.ValueType] = {
+    RelationType.ABOUT: utils_pb2.Relation.RelationType.ABOUT,
+    RelationType.CHILD: utils_pb2.Relation.RelationType.CHILD,
+    RelationType.COLAB: utils_pb2.Relation.RelationType.COLAB,
+    RelationType.ENTITY: utils_pb2.Relation.RelationType.ENTITY,
+    RelationType.OTHER: utils_pb2.Relation.RelationType.OTHER,
+    RelationType.SYNONYM: utils_pb2.Relation.RelationType.SYNONYM,
+}
+
+
+class RelationNodeType(str, Enum):
+    ENTITY = "entity"
+    LABEL = "label"
+    RESOURCE = "resource"
+    USER = "user"
+
+
+RelationNodeTypeMap: Dict[
+    RelationNodeType, utils_pb2.RelationNode.NodeType.ValueType
+] = {
+    RelationNodeType.ENTITY: utils_pb2.RelationNode.NodeType.ENTITY,
+    RelationNodeType.LABEL: utils_pb2.RelationNode.NodeType.LABEL,
+    RelationNodeType.RESOURCE: utils_pb2.RelationNode.NodeType.RESOURCE,
+    RelationNodeType.USER: utils_pb2.RelationNode.NodeType.USER,
+}
+
+RelationNodeTypePbMap: Dict[
+    utils_pb2.RelationNode.NodeType.ValueType, RelationNodeType
+] = {
+    utils_pb2.RelationNode.NodeType.ENTITY: RelationNodeType.ENTITY,
+    utils_pb2.RelationNode.NodeType.LABEL: RelationNodeType.LABEL,
+    utils_pb2.RelationNode.NodeType.RESOURCE: RelationNodeType.RESOURCE,
+    utils_pb2.RelationNode.NodeType.USER: RelationNodeType.USER,
+}
+
+
+class RelationEntity(BaseModel):
+    value: str
+    type: RelationNodeType
+    group: Optional[str] = None
+
+    @root_validator(pre=True)
+    def check_relation_is_valid(cls, values):
+        if values["type"] == RelationNodeType.ENTITY.value:
+            if "group" not in values:
+                raise ValueError(
+                    f"All {RelationNodeType.ENTITY.value} values must define a 'group'"
+                )
+        return values
 
 
 class Relation(BaseModel):
     relation: RelationType
-    properties: Dict[str, str] = {}
-
-    resource: Optional[str] = None
     label: Optional[str] = None
-    user: Optional[str] = None
-    other: Optional[str] = None
-    entity: Optional[EntityRelation] = None
 
-    @root_validator(pre=True)
+    from_: Optional[RelationEntity]
+    to: RelationEntity
+
+    class Config:
+        fields = {"from_": "from"}
+
+    @root_validator
     def check_relation_is_valid(cls, values):
         if values["relation"] == RelationType.CHILD.value:
-            if "resource" not in values:
+            if values["to"].get("type") != RelationNodeType.RESOURCE.value:
                 raise ValueError(
-                    "Missing 'resource' field containg the uuid of a resource"
+                    f"When using {RelationType.CHILD.value} relation, only "
+                    f"{RelationNodeType.RESOURCE.value} entities can be used"
                 )
-            if (
-                "label" in values
-                or "user" in values
-                or "other" in values
-                or "entity" in values
-            ):
+        elif values["relation"] == RelationType.COLAB.value:
+            if values["to"].get("type") != RelationNodeType.USER.value:
                 raise ValueError(
-                    "When using CHILD relation, only 'resource' field can be used"
+                    f"When using {RelationType.COLAB.value} relation, only "
+                    f"{RelationNodeType.USER.value} can be used"
                 )
-
-        if values["relation"] == RelationType.ABOUT.value:
-            if "label" not in values:
-                raise ValueError("Missing 'label' field containing a label")
-            if (
-                "resource" in values
-                or "user" in values
-                or "other" in values
-                or "entity" in values
-            ):
+        elif values["relation"] == RelationType.ENTITY.value:
+            if values["to"].get("type") != RelationNodeType.ENTITY.value:
                 raise ValueError(
-                    "When using CHILD relation, only 'label' field can be used"
-                )
-
-        if values["relation"] == RelationType.ENTITY.value:
-            if "entity" not in values:
-                raise ValueError(
-                    "Missing 'entity' field containing a valid entity of this resource"
-                )
-            if (
-                "resource" in values
-                or "user" in values
-                or "other" in values
-                or "label" in values
-            ):
-                raise ValueError(
-                    "When using ENTITY relation, only 'entity' field can be used"
-                )
-
-        if values["relation"] == RelationType.COLAB.value:
-            if "user" not in values:
-                raise ValueError("Missing 'user' field containing a user reference")
-            if (
-                "label" in values
-                or "resource" in values
-                or "other" in values
-                or "entity" in values
-            ):
-                raise ValueError(
-                    "When using COLAB relation, only 'user' field can be used"
-                )
-
-        if values["relation"] == RelationType.OTHER.value:
-            if "other" not in values:
-                raise ValueError("Missing 'other' field")
-            if (
-                "label" in values
-                or "resource" in values
-                or "user" in values
-                or "entity" in values
-            ):
-                raise ValueError(
-                    "When using OTHER relation, only 'other' field can be used"
+                    f"When using {RelationType.ENTITY.value} relation, only "
+                    f"{RelationNodeType.ENTITY.value} can be used"
                 )
         return values
 
     @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.Relation) -> _T:
+    def from_message(cls: Type[_T], message: utils_pb2.Relation) -> _T:
         value = convert_pb_relation_to_api(message)
         return cls(**value)
 
@@ -163,26 +174,22 @@ class Metadata(InputMetadata):
         )
 
 
-def convert_pb_relation_to_api(relation: utils_pb2.Relation):
-    result: Dict[str, Any] = {}
-    if relation.relation == utils_pb2.Relation.RelationType.OTHER:
-        result["relation"] = RelationType.OTHER.value
-        result["other"] = relation.to.value
-    elif relation.relation == utils_pb2.Relation.RelationType.CHILD:
-        result["relation"] = RelationType.CHILD.value
-        result["resource"] = relation.to.value
-    elif relation.relation == utils_pb2.Relation.RelationType.ABOUT:
-        result["relation"] = RelationType.ABOUT.value
-        result["label"] = relation.to.value
-    elif relation.relation == utils_pb2.Relation.RelationType.COLAB:
-        result["relation"] = RelationType.COLAB.value
-        result["user"] = relation.to.value
-    elif relation.relation == utils_pb2.Relation.RelationType.ENTITY:
-        result["relation"] = RelationType.ENTITY.value
-        result["entity"] = EntityRelation(
-            entity=relation.to.value, entity_type=relation.to.subtype
-        )
-    return result
+def convert_pb_relation_node_to_api(
+    relation_node: utils_pb2.RelationNode,
+) -> Dict[str, Any]:
+    return {
+        "type": RelationNodeTypePbMap[relation_node.ntype],
+        "value": relation_node.value,
+        "group": relation_node.subtype,
+    }
+
+
+def convert_pb_relation_to_api(relation: utils_pb2.Relation) -> Dict[str, Any]:
+    return {
+        "relation": RelationTypePbMap[relation.relation],
+        "from": convert_pb_relation_node_to_api(relation.source),
+        "to": convert_pb_relation_node_to_api(relation.to),
+    }
 
 
 class FieldClassification(BaseModel):
