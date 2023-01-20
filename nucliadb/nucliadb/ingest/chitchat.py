@@ -107,14 +107,7 @@ class ChitchatNucliaDB:
                     logger.debug("update message received: {!r}".format(mgr_message))
                     members: List[ClusterMember] = list(
                         map(
-                            lambda x: ClusterMember(
-                                node_id=x["id"],
-                                listen_addr=x["address"],
-                                node_type=x["type"],
-                                is_self=x["is_self"],
-                                load_score=float(x.get("load_score", "0")),
-                                online=True,
-                            ),
+                            lambda x: build_member_from_json(x),
                             json.loads(mgr_message.decode("utf8").replace("'", '"')),
                         )
                     )
@@ -135,3 +128,20 @@ class ChitchatNucliaDB:
     async def close(self):
         self.chitchat_update_srv.close()
         self.task.cancel()
+
+
+def build_member_from_json(x):
+    try:
+        load_score = float(x.get("load_score"))
+    except:
+        logger.warn("Cannot convert load score. Defaulted to 0")
+        load_score = 0.0
+
+    return ClusterMember(
+        node_id=x["id"],
+        listen_addr=x["address"],
+        node_type=x["type"],
+        is_self=x["is_self"],
+        load_score=load_score,
+        online=True,
+    )
