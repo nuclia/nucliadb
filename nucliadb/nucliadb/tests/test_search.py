@@ -621,7 +621,7 @@ async def test_search_pre_processes_query(
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["resources"]) == 0
+    assert len(body["resources"]) == 1
 
     # Check that query is not pre-processed if user is searching with double-quotes
     resp = await nucliadb_reader.post(
