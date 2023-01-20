@@ -841,21 +841,25 @@ class SuggestRequest(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     FILTER_FIELD_NUMBER: builtins.int
     TIMESTAMPS_FIELD_NUMBER: builtins.int
+    FIELDS_FIELD_NUMBER: builtins.int
     shard: typing.Text
     body: typing.Text
     @property
     def filter(self) -> global___Filter: ...
     @property
     def timestamps(self) -> global___Timestamps: ...
+    @property
+    def fields(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     def __init__(self,
         *,
         shard: typing.Text = ...,
         body: typing.Text = ...,
         filter: typing.Optional[global___Filter] = ...,
         timestamps: typing.Optional[global___Timestamps] = ...,
+        fields: typing.Optional[typing.Iterable[typing.Text]] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["filter",b"filter","timestamps",b"timestamps"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","filter",b"filter","shard",b"shard","timestamps",b"timestamps"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["body",b"body","fields",b"fields","filter",b"filter","shard",b"shard","timestamps",b"timestamps"]) -> None: ...
 global___SuggestRequest = SuggestRequest
 
 class RelatedEntities(google.protobuf.message.Message):

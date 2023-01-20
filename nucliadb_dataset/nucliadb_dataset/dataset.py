@@ -35,9 +35,9 @@ from typing import (
 
 import boto3
 import pyarrow as pa  # type: ignore
-from google.auth.credentials import AnonymousCredentials
+from google.auth.credentials import AnonymousCredentials  # type: ignore
 from google.cloud import storage  # type: ignore
-from google.oauth2 import service_account
+from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
     ParagraphClassificationBatch,

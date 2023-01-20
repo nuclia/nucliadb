@@ -1,7 +1,8 @@
 # nucliadb_sdk
 
-## unreleased
+## 1.2.1
 
+- Upload testing max GRPC size for importing via GRPC
 - Fix typo on `length` method
 
 ## 1.2.0

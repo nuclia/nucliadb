@@ -177,11 +177,13 @@ class FieldData(BaseModel):
 class TextFieldData(BaseModel):
     value: Optional[FieldText]
     extracted: Optional[TextFieldExtractedData]
+    error: Optional[Error]
 
 
 class FileFieldData(BaseModel):
     value: Optional[FieldFile]
     extracted: Optional[FileFieldExtractedData]
+    error: Optional[Error]
 
 
 class LinkFieldData(BaseModel):
@@ -193,21 +195,25 @@ class LinkFieldData(BaseModel):
 class LayoutFieldData(BaseModel):
     value: Optional[FieldLayout]
     extracted: Optional[LayoutFieldExtractedData]
+    error: Optional[Error]
 
 
 class ConversationFieldData(BaseModel):
     value: Optional[FieldConversation]
     extracted: Optional[ConversationFieldExtractedData]
+    error: Optional[Error]
 
 
 class KeywordsetFieldData(BaseModel):
     value: Optional[FieldKeywordset]
     extracted: Optional[KeywordsetFieldExtractedData]
+    error: Optional[Error]
 
 
 class DatetimeFieldData(BaseModel):
     value: Optional[FieldDatetime]
     extracted: Optional[DatetimeFieldExtractedData]
+    error: Optional[Error]
 
 
 class ResourceData(BaseModel):

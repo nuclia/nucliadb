@@ -37,9 +37,9 @@ pub struct TelemetryPayload {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EventWithTimestamp {
     /// Unix time in seconds.
-    pub unixtime: u64,
+    pub timestamp: u64,
     /// Telemetry event.
-    pub event: TelemetryEvent,
+    pub r#type: TelemetryEvent,
 }
 
 /// Returns the number of seconds elapsed since UNIX_EPOCH.
@@ -55,8 +55,8 @@ fn unixtime() -> u64 {
 impl From<TelemetryEvent> for EventWithTimestamp {
     fn from(event: TelemetryEvent) -> Self {
         EventWithTimestamp {
-            unixtime: unixtime(),
-            event,
+            timestamp: unixtime(),
+            r#type: event,
         }
     }
 }
@@ -110,7 +110,7 @@ impl Default for ClientInformation {
             os: env::consts::OS.to_string(),
             arch: env::consts::ARCH.to_string(),
             hashed_host_username: hashed_host_username(),
-            component: None,
+            component: Some("Node".to_string()),
             kubernetes: std::env::var_os("KUBERNETES_SERVICE_HOST").is_some(),
         }
     }

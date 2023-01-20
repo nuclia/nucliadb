@@ -115,7 +115,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
 
     pa = ParagraphAnnotation()
     pa.classifications.append(c3)
-    pa.key = "N_RID/f/file/94-109"  # Designed to be the RID at indexing time
+    pa.key = "N_RID/f/file/93-109"  # Designed to be the RID at indexing time
     ufm.paragraphs.append(pa)
 
     ufm.field.field = "file"
@@ -166,7 +166,7 @@ def broker_resource(knowledgebox: str) -> BrokerMessage:
     p3.classifications.append(c1)
 
     p4 = rpb.Paragraph(
-        start=94,
+        start=93,
         end=109,
     )
     p4.classifications.append(c1)

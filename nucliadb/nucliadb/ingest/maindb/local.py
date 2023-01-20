@@ -83,6 +83,8 @@ class LocalTransaction(Transaction):
             return None
         except IsADirectoryError:
             return None
+        except NotADirectoryError:
+            return None
 
     async def commit(
         self,

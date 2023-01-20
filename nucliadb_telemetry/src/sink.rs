@@ -75,6 +75,13 @@ impl Sink for UnboundedSender<TelemetryPayload> {
 impl Sink for HttpClient {
     async fn send_payload(&self, payload: TelemetryPayload) {
         // Note that we swallow the error if any
-        let _ = self.client.post(&self.endpoint).json(&payload).send().await;
+        let r = self
+            .client
+            .post(&self.endpoint)
+            .json(&payload)
+            .send()
+            .await
+            .unwrap();
+        println!("{}", r.status());
     }
 }

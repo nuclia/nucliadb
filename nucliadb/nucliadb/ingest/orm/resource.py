@@ -208,6 +208,31 @@ class Resource:
 
                 del self.basic.fieldmetadata[:]
                 self.basic.fieldmetadata.extend(updated)
+
+                # All modified field metadata should be indexed
+                # TODO: could be improved to only index the diff
+                for user_field_metadata in self.basic.fieldmetadata:
+                    field_id = self.generate_field_id(fieldmetadata.field)
+                    field_obj = await self.get_field(
+                        fieldmetadata.field.field, fieldmetadata.field.field_type
+                    )
+                    field_metadata = await field_obj.get_field_metadata()
+                    if field_metadata is not None:
+
+                        page_positions: Optional[FilePagePositions] = None
+                        if isinstance(field_obj, File):
+                            page_positions = await get_file_page_positions(field_obj)
+
+                        self.indexer.apply_field_metadata(
+                            field_id,
+                            field_metadata,
+                            replace_field=[],
+                            replace_splits={},
+                            page_positions=page_positions,
+                            extracted_text=await field_obj.get_extracted_text(),
+                            basic_user_field_metadata=user_field_metadata,
+                        )
+
         else:
             self.basic = payload
         if slug is not None and slug != "":

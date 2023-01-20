@@ -68,11 +68,13 @@ pub struct Publisher {
     /// Defaulted to `false`.
     preserve_metadata: bool,
     /// The list of files/directories published on [`Publisher::send_to`] call.
-    /// Note that calling [`Publisher::send_to`] method with an empty list of paths results to a no-op.
+    /// Note that calling [`Publisher::send_to`] method with an empty list of paths results to a
+    /// no-op.
     paths: Vec<(PathBuf, OsString)>,
     /// The backoff policy on publication failure.
     ///
-    /// Note that if the publication fails because of invalid paths, the backoff policy will be ignored.
+    /// Note that if the publication fails because of invalid paths, the backoff policy will be
+    /// ignored.
     backoff: Option<ExponentialBackoff>,
 }
 
@@ -93,7 +95,8 @@ impl Publisher {
 
     /// Appends the given path to the current publisher.
     ///
-    /// Note that if the path point to a directory all files and the directory itself will be published.
+    /// Note that if the path point to a directory all files and the directory itself will be
+    /// published.
     ///
     /// # Errors
     /// This methods can fails if:
@@ -141,7 +144,8 @@ impl Publisher {
     /// Publishs all the appended files/directories to localhost.
     ///
     /// # Errors
-    /// This method can fails if the connection with the remote address is refused/closed or timeout.
+    /// This method can fails if the connection with the remote address is refused/closed or
+    /// timeout.
     pub async fn send_to_localhost(&self, port: u16) -> Result<(), Error> {
         self.send_to(format!("0.0.0.0:{port}")).await
     }
@@ -149,7 +153,8 @@ impl Publisher {
     /// Publishs all the appended files/directories to the given IP address.
     ///
     /// # Errors
-    /// This method can fails if the connection with the remote address is refused/closed or timeout.
+    /// This method can fails if the connection with the remote address is refused/closed or
+    /// timeout.
     pub async fn send_to(&self, address: impl ToSocketAddrs + Clone) -> Result<(), Error> {
         let backoff = self.backoff.clone().map_or_else(
             || Box::new(Stop {}) as Box<dyn Backoff + Send>,

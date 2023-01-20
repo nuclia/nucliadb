@@ -510,7 +510,14 @@ class ResourceBrain:
                         to=relation_node_entity,
                     )
                     self.brain.relations.append(rel)
-
+            for paragraph_annotation in basic_user_fieldmetadata.paragraphs:
+                for classification in paragraph_annotation.classifications:
+                    if not classification.cancelled_by_user:
+                        self.brain.paragraphs[field_key].paragraphs[
+                            paragraph_annotation.key
+                        ].labels.append(
+                            f"/l/{classification.labelset}/{classification.label}"
+                        )
         self.brain.texts[field_key].labels.extend(flat_resource_tags(tags))
 
     def compute_tags(self):

@@ -40,6 +40,7 @@ images.settings["nucliadb_node_reader"] = {
     "command": "bash -c 'node_reader & node_writer'",
     "env": {
         "VECTORS_DIMENSION": "768",
+        "NUCLIADB_DISABLE_TELEMETRY": "True",
         "DATA_PATH": "/data",
         "READER_LISTEN_ADDRESS": "0.0.0.0:4445",
         "LAZY_LOADING": "true",
@@ -58,6 +59,7 @@ images.settings["nucliadb_node_writer"] = {
     "version": "main",
     "env": {
         "VECTORS_DIMENSION": "768",
+        "NUCLIADB_DISABLE_TELEMETRY": "True",
         "DATA_PATH": "/data",
         "WRITER_LISTEN_ADDRESS": "0.0.0.0:4446",
         "CHITCHAT_PORT": "4444",

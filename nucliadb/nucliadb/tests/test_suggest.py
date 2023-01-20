@@ -24,7 +24,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.asyncio
-async def test_suggest_fuzzy_search(
+async def test_suggest_paragraphs(
     nucliadb_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -34,7 +34,7 @@ async def test_suggest_fuzzy_search(
     Test description:
 
     Create some resource on a knowledgebox and use the /suggest endpoint
-    to fuzzy search them.
+    to search them.
     """
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
@@ -56,6 +56,9 @@ async def test_suggest_fuzzy_search(
                 "including Earth, and addresses themes of loneliness, friendship, love, "
                 "and loss."
             ),
+            "metadata": {
+                "language": "en",
+            },
         },
     )
     assert resp.status_code == 201
@@ -66,6 +69,9 @@ async def test_suggest_fuzzy_search(
             "title": "Thus Spoke Zarathustra",
             "slug": "thus-spoke-zarathustra",
             "summary": "Philosophical written by Frederich Nietzche",
+            "metadata": {
+                "language": "de",
+            },
         },
     )
     assert resp.status_code == 201
@@ -94,6 +100,8 @@ async def test_suggest_fuzzy_search(
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
+    assert body["paragraphs"]["results"][0]["rid"] == rid2
+    assert body["paragraphs"]["results"][0]["field"] == "summary"
 
     # nonexistent term
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/suggest?query=Hanna+Adrent")
@@ -101,13 +109,50 @@ async def test_suggest_fuzzy_search(
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 0
 
+    # by field
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/suggest",
+        params={
+            "query": "prince",
+            "fields": "a/title",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 1
+    assert body["paragraphs"]["results"][0]["field"] == "title"
+
+    # filter by language
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/suggest",
+        params={
+            "query": "prince",
+            "filters": "/s/p/en",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 2
+    assert {"summary", "title"} == {
+        result["field"] for result in body["paragraphs"]["results"]
+    }
+
+    # No "prince" appear in any german resource
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/suggest",
+        params={
+            "query": "prince",
+            "filters": "/s/p/de",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 0
+
 
 @pytest.mark.asyncio
 async def test_suggest_related_entities(
-    nucliadb_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, knowledgebox
 ):
     """
     Test description:
@@ -135,11 +180,11 @@ async def test_suggest_related_entities(
     ]
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        headers={"X-SYNCHRONOUS": "True"},
+        headers={"X-Synchronous": "True"},
         json={
-            "title": "My resource",
-            "slug": "myresource",
-            "summary": "Some summary",
+            "title": "People and places",
+            "slug": "pap",
+            "summary": "Test entities to validate suggest on relations index",
             "origin": {
                 "colaborators": colaborators,
             },
