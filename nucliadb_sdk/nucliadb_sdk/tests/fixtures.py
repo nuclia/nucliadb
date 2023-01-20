@@ -32,6 +32,9 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
+    "env": {
+        "max_receive_message_length": "40",
+    },
 }
 
 
