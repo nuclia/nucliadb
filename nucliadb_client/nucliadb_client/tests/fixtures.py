@@ -145,15 +145,28 @@ def gcs():
     container.stop()
 
 
+@pytest.fixture(scope="session")
+def docker_internal_host():
+    docker_client = docker.from_env(version=BaseImage.docker_version)
+    if "DESKTOP" in docker_client.api.version()["Platform"]["Name"].upper():
+        # Valid when using Docker desktop
+        docker_internal_host = "host.docker.internal"
+    else:
+        # Valid when using github actions
+        docker_internal_host = "172.17.0.1"
+    yield docker_internal_host
+
+
 @pytest.fixture(scope="function")
-def nucliadb_gcs(gcs):
+def nucliadb_gcs(docker_internal_host, gcs):
+    gcs_server = gcs.replace("localhost", docker_internal_host)
     envvars = {
         "DEBUG": "True",
         "FILE_BACKEND": "gcs",
         "GCS_BUCKET": "test_{kbid}",
         "GCS_LOCATION":"location",
         "GCS_PROJECT": "project",
-        "GCS_ENDPOINT_URL": gcs,
+        "GCS_ENDPOINT_URL": gcs_server,
         "GCS_DEADLETTER_BUCKET": "deadletters",
         "GCS_INDEXING_BUCKET": "indexing",
     }

@@ -122,20 +122,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
 
 
 @pytest.mark.asyncio
-<<<<<<< HEAD
 async def test_export_import_e2e(nucliadb_client):
-=======
-async def test_export_import_e2e_local(nucliadb_client: NucliaDBClient):
-    await export_import_e2e_test(nucliadb_client)
-
-
-@pytest.mark.asyncio
-async def test_export_import_e2e_gcs(nucliadb_client_gcs: NucliaDBClient):
-    await export_import_e2e_test(nucliadb_client_gcs)
-
-
-async def export_import_e2e_test(nucliadb_client: NucliaDBClient):
->>>>>>> 24b2cdde (Turn dm.update into a regular function, as it is not using I/O)
     nucliadb_client.init_async_grpc()
     for slug in ("src1", "dst1"):
         exists = nucliadb_client.get_kb(slug=slug)

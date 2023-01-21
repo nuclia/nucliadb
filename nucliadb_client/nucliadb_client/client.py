@@ -147,6 +147,7 @@ class NucliaDBClient:
         response = self.http_manager_v1.post(KBS_PREFIX, json=payload.dict())
         if response.status_code == 419:
             raise ConflictError()
+        assert response.status_code == 201
         response_obj = KnowledgeBoxObj.parse_raw(response.content)
         return KnowledgeBox(kbid=response_obj.uuid, client=self, slug=response_obj.slug)
 
