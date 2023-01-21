@@ -86,6 +86,7 @@ async def get_storage(
 
     if storage_settings.file_backend == "s3" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.s3 import S3Storage
+
         s3util = S3Storage(
             aws_client_id=storage_settings.s3_client_id,
             aws_client_secret=storage_settings.s3_client_secret,
@@ -104,6 +105,7 @@ async def get_storage(
 
     elif storage_settings.file_backend == "gcs" and Utility.STORAGE not in MAIN:
         from nucliadb_utils.storages.gcs import GCSStorage
+
         print(">>> STORAGE SETTINGS: ", storage_settings)
         print(">>> CGS STORAGE SETTINGS: ", extended_storage_settings)
         gcsutil = GCSStorage(

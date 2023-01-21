@@ -76,6 +76,13 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     evw.field.field_type = FieldType.TEXT
     bm.field_vectors.append(evw)
 
+    lcmw = LargeComputedMetadataWrapper()
+    lcmw.field.field = "text1"
+    lcmw.field.field_type = FieldType.TEXT
+    entity = Entity(token="token", root="root", type="type")
+    lcmw.real.metadata.entities.append(entity)
+    bm.field_large_metadata.append(lcmw)
+
     etw = ExtractedTextWrapper()
     etw.body.text = "My text"
     etw.field.field = "text1"
