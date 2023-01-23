@@ -191,7 +191,7 @@ class Worker:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exit {pb.shard}")
                 else:
-                    event_id = None
+                    event_id: Optional[str] = None
                     if SENTRY:
                         event_id = capture_exception(grpc_error)
                     logger.error(
@@ -206,7 +206,7 @@ class Worker:
                     "Error retrieving the indexing payload we do not block as that means its already deleted"
                 )
             except Exception as e:
-                event_id = None
+                event_id: Optional[str] = None
                 if SENTRY:
                     event_id = capture_exception(e)
                 logger.error(
