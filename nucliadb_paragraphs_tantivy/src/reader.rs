@@ -102,7 +102,7 @@ impl ParagraphReader for ParagraphReaderService {
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
                 info!("{id:?} - Trying fuzzy: starts at {v} ms");
             }
-            let topdocs = TopDocs::with_limit(no_results - results.len());
+            let topdocs = TopDocs::with_limit(no_results);
             match searcher.search(&fuzzied, &topdocs) {
                 Ok(mut fuzzied) => results.append(&mut fuzzied),
                 Err(err) => error!("{err:?} during suggest"),

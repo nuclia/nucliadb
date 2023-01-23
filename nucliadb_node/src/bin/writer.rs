@@ -21,7 +21,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
-
+use nucliadb_telemetry::async_telemetry;
 use anyhow::{Context, Result};
 use nucliadb_cluster::{node, Key, Node, NodeType};
 use nucliadb_node::config::Configuration;
@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Error starting gRPC writer");
     });
 
-    let telemetry_handle = nucliadb_telemetry::start_telemetry_loop();
+    let telemetry_handle = async_telemetry::start_telemetry_loop();
     let mut cluster_watcher = node.cluster_watcher().await;
     let monitor_task = tokio::task::spawn(async move {
         loop {

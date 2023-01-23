@@ -24,8 +24,8 @@ use nucliadb_protos::{
     op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId,
     SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
+use nucliadb_telemetry::async_telemetry::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
-use nucliadb_telemetry::send_telemetry_event;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing::*;

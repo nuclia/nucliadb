@@ -20,6 +20,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use reqwest::blocking::Client as BlockingClient;
 use reqwest::redirect::Policy;
 use reqwest::Client;
 use tokio::sync::mpsc::UnboundedSender;
@@ -75,13 +76,29 @@ impl Sink for UnboundedSender<TelemetryPayload> {
 impl Sink for HttpClient {
     async fn send_payload(&self, payload: TelemetryPayload) {
         // Note that we swallow the error if any
-        let r = self
-            .client
-            .post(&self.endpoint)
-            .json(&payload)
-            .send()
-            .await
-            .unwrap();
-        println!("{}", r.status());
+        let _ = self.client.post(&self.endpoint).json(&payload).send().await;
+    }
+}
+
+pub struct BlockingHttpClient {
+    client: BlockingClient,
+    endpoint: String,
+}
+impl BlockingHttpClient {
+    pub fn try_new() -> Option<Self> {
+        let client = BlockingClient::builder()
+            .redirect(Policy::limited(3))
+            .timeout(Duration::from_secs(10))
+            .build()
+            .ok()?;
+        Some(BlockingHttpClient {
+            client,
+            endpoint: telemetry_push_api_url(),
+        })
+    }
+
+    pub fn blocking_send(&self, payload: TelemetryPayload) {
+        // Note that we swallow the error if any
+        let _ = self.client.post(&self.endpoint).json(&payload).send();
     }
 }

@@ -2037,13 +2037,14 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "bincode",
  "log",
  "nucliadb_node",
  "nucliadb_protos",
  "nucliadb_service_interface",
+ "nucliadb_telemetry",
  "openssl",
  "prost",
  "prost-types",
@@ -2113,6 +2114,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "hostname",
+ "lazy_static",
  "md5",
  "once_cell",
  "reqwest",

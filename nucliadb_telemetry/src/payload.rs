@@ -34,6 +34,16 @@ pub struct TelemetryPayload {
     pub num_dropped_events: usize,
 }
 
+impl TelemetryPayload {
+    pub fn from_single_event(event: TelemetryEvent) -> TelemetryPayload {
+        TelemetryPayload {
+            client_information: ClientInformation::default(),
+            events: vec![EventWithTimestamp::from(event)],
+            num_dropped_events: 0,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EventWithTimestamp {
     /// Unix time in seconds.

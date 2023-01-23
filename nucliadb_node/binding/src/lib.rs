@@ -30,6 +30,8 @@ use nucliadb_protos::{
 };
 use nucliadb_service_interface::fields_interface::DocumentIterator;
 use nucliadb_service_interface::paragraphs_interface::ParagraphIterator;
+use nucliadb_telemetry::payload::TelemetryEvent;
+use nucliadb_telemetry::sync_telemetry::sync_send_telemetry_event;
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;
@@ -39,7 +41,6 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
-
 type RawProtos = Vec<u8>;
 
 #[pyclass]
@@ -279,11 +280,13 @@ impl NodeWriter {
     }
 
     pub fn new_shard<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        sync_send_telemetry_event(TelemetryEvent::Create);
         let shard = self.writer.new_shard();
         Ok(PyList::new(py, shard.encode_to_vec()))
     }
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        sync_send_telemetry_event(TelemetryEvent::Delete);
         let shard_id = ShardId::decode(&mut Cursor::new(shard_id)).unwrap();
         match self.writer.delete_shard(&shard_id) {
             Ok(_) => Ok(PyList::new(py, shard_id.encode_to_vec())),
@@ -546,6 +549,7 @@ impl NodeWriter {
     }
 
     pub fn gc<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
+        sync_send_telemetry_event(TelemetryEvent::GarbageCollect);
         let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
         self.writer.load_shard(&shard_id);
         match self.writer.gc(&shard_id).transpose() {

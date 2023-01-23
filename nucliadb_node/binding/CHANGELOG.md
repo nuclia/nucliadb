@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Telemetry enabled
+
 ## 0.5.0
 
 - Implement knowledge graph search
