@@ -59,7 +59,7 @@ lazy_static::lazy_static! {
     };
 }
 
-pub fn sync_send_telemetry_event(event: TelemetryEvent) {
+pub fn send_telemetry_event(event: TelemetryEvent) {
     if let Some(sender) = SYNC_TELEMETRY.as_ref() {
         // We swallow the error in case of failure
         let sender = sender.lock().unwrap_or_else(|er| er.into_inner());
