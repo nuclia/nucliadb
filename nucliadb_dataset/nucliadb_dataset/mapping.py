@@ -43,6 +43,9 @@ def bytes_to_batch(klass: Any):
 def batch_to_text_classification_arrow(batch: BatchType):
     X = []
     Y = []
+    import pdb
+
+    pdb.set_trace()
     for data in batch.data:
         if data.text:
             X.append(data.text)
