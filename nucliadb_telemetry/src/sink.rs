@@ -99,6 +99,8 @@ impl BlockingHttpClient {
 
     pub fn blocking_send(&self, payload: TelemetryPayload) {
         // Note that we swallow the error if any
-        let _ = self.client.post(&self.endpoint).json(&payload).send();
+        if let Err(err) = self.client.post(&self.endpoint).json(&payload).send() {
+            tracing::error!("Error sending telemetry event: {err:?}");
+        }
     }
 }
