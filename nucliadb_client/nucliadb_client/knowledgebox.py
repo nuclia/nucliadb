@@ -43,7 +43,12 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb_client.utils import collect_cfs
 from nucliadb_models.resource import KnowledgeBoxObj, ResourceList
-from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards
+from nucliadb_models.search import (
+    KnowledgeboxCounters,
+    KnowledgeboxSearchResults,
+    KnowledgeboxShards,
+    SearchRequest,
+)
 from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
 
 if TYPE_CHECKING:
@@ -138,6 +143,13 @@ class KnowledgeBox:
         )
         response_obj = ResourceCreated.parse_raw(response.content)
         return Resource(rid=response_obj.uuid, kb=self)
+
+    def search(self, query: str) -> KnowledgeboxSearchResults:
+        payload = SearchRequest()
+        payload.query = query
+        response = self.http_search_v1.post(f"search", content=payload.json().encode())
+        assert response.status_code == 200
+        return KnowledgeboxSearchResults.parse_raw(response.content)
 
     def delete(self):
         resp = self.http_manager_v1.delete("")
