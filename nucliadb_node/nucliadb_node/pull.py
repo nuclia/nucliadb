@@ -206,7 +206,7 @@ class Worker:
                     "Error retrieving the indexing payload we do not block as that means its already deleted"
                 )
             except Exception as e:
-                event_id: Optional[str] = None
+                event_id = None
                 if SENTRY:
                     event_id = capture_exception(e)
                 logger.error(
