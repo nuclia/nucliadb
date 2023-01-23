@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from pydantic.class_validators import root_validator
 
 from nucliadb_models.common import FIELD_TYPES_MAP
@@ -250,8 +250,22 @@ class TokenSplit(BaseModel):
 
 
 class ParagraphAnnotation(BaseModel):
-    classifications: List[Classification] = Field(Classification, min_items=1)
+    classifications: List[Classification] = []
     key: str
+
+    @root_validator()
+    def _validate_classifications(cls, values):
+        classifications = values.get("classifications") or []
+        if len(classifications) < 1:
+            raise ValueError("ensure this value has at least 1 items")
+        seen = set()
+        for cf in classifications:
+            cf_tuple = tuple(cf.dict().values())
+            if cf_tuple in seen:
+                raise ValueError("Paragraph classifications need to be unique")
+            else:
+                seen.add(cf_tuple)
+        return values
 
 
 class UserFieldMetadata(BaseModel):
