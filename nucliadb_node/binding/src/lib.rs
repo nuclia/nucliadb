@@ -30,8 +30,8 @@ use nucliadb_protos::{
 };
 use nucliadb_service_interface::fields_interface::DocumentIterator;
 use nucliadb_service_interface::paragraphs_interface::ParagraphIterator;
+use nucliadb_telemetry::blocking::sync_send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
-use nucliadb_telemetry::sync_telemetry::sync_send_telemetry_event;
 use prost::Message;
 use pyo3::exceptions;
 use pyo3::prelude::*;

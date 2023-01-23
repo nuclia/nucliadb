@@ -33,7 +33,6 @@ use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
 use nucliadb_protos::GetShardRequest;
-use nucliadb_telemetry::async_telemetry;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use tracing::*;
@@ -92,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Error starting gRPC writer");
     });
 
-    let telemetry_handle = async_telemetry::start_telemetry_loop();
+    let telemetry_handle = nucliadb_telemetry::sync::start_telemetry_loop();
     let mut cluster_watcher = node.cluster_watcher().await;
     let monitor_task = tokio::task::spawn(async move {
         loop {

@@ -23,8 +23,8 @@ pub mod payload;
 mod sender;
 pub(crate) mod sink;
 
-pub mod async_telemetry;
-pub mod sync_telemetry;
+pub mod blocking;
+pub mod sync;
 
 /// This environment variable can be set to disable sending telemetry events.
 pub const DISABLE_TELEMETRY_ENV_KEY: &str = "NUCLIADB_DISABLE_TELEMETRY";
