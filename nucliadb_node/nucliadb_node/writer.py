@@ -47,7 +47,9 @@ class Writer:
             telemetry_grpc = OpenTelemetryGRPC(
                 f"{SERVICE_NAME}_grpc_writer", tracer_provider
             )
-            self.channel = telemetry_grpc.init_client(grpc_writer_address)
+            self.channel = telemetry_grpc.init_client(
+                grpc_writer_address, max_send_message=250
+            )
         else:
             self.channel = aio.insecure_channel(grpc_writer_address)
         self.stub = NodeWriterStub(self.channel)
