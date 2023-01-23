@@ -140,15 +140,8 @@ class ResourceBrain:
             for index, paragraph in enumerate(metadata_split.paragraphs):
                 key = f"{self.rid}/{field_key}/{subfield}/{paragraph.start}-{paragraph.end}"
 
-                user_classifications = []
                 denied_classifications = []
                 if key in paragraphs:
-                    user_classifications = [
-                        classification
-                        for classification in paragraphs[key].classifications
-                        if classification.cancelled_by_user is False
-                    ]
-
                     denied_classifications = [
                         f"/l/{classification.labelset}/{classification.label}"
                         for classification in paragraphs[key].classifications
@@ -184,22 +177,12 @@ class ResourceBrain:
                     if label not in denied_classifications:
                         p.labels.append(label)
 
-                for classification in user_classifications:
-                    p.labels.append(
-                        f"/l/{classification.labelset}/{classification.label}"
-                    )
                 self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
         for index, paragraph in enumerate(metadata.metadata.paragraphs):
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
-            user_classifications = []
             denied_classifications = []
             if key in paragraphs:
-                user_classifications = [
-                    classification
-                    for classification in paragraphs[key].classifications
-                    if classification.cancelled_by_user is False
-                ]
 
                 denied_classifications = [
                     f"/l/{classification.labelset}/{classification.label}"
@@ -230,9 +213,6 @@ class ResourceBrain:
                 label = f"/l/{classification.labelset}/{classification.label}"
                 if label not in denied_classifications:
                     p.labels.append(label)
-
-            for classification in user_classifications:
-                p.labels.append(f"/l/{classification.labelset}/{classification.label}")
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
