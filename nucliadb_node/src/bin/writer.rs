@@ -21,7 +21,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
-use nucliadb_telemetry::async_telemetry;
+
 use anyhow::{Context, Result};
 use nucliadb_cluster::{node, Key, Node, NodeType};
 use nucliadb_node::config::Configuration;
@@ -33,6 +33,7 @@ use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
 use nucliadb_protos::node_writer_server::NodeWriterServer;
 use nucliadb_protos::GetShardRequest;
+use nucliadb_telemetry::async_telemetry;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use tracing::*;
