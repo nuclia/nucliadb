@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic.class_validators import root_validator
 
 from nucliadb_models.common import FIELD_TYPES_MAP
@@ -250,7 +250,7 @@ class TokenSplit(BaseModel):
 
 
 class ParagraphAnnotation(BaseModel):
-    classifications: List[Classification] = []
+    classifications: List[Classification] = Field(Classification, min_items=1)
     key: str
 
 
