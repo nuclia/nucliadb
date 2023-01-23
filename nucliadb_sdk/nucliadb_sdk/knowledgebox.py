@@ -278,6 +278,7 @@ class KnowledgeBox:
         filter: Optional[List[Union[Label, str]]] = None,
         vector: Optional[Union[np.ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.70,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -307,6 +308,7 @@ class KnowledgeBox:
             args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
 
+        args["min_score"] = min_score
         request = SearchRequest(**args)
         return self.client.search(request)
 
@@ -316,6 +318,7 @@ class KnowledgeBox:
         filter: Optional[List[Union[Label, str]]] = None,
         vector: Optional[Union[np.ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.70,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -342,5 +345,6 @@ class KnowledgeBox:
             args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
 
+        args["min_score"] = min_score
         request = SearchRequest(**args)
         return await self.client.async_search(request)

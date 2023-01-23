@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.2.2
+
+- Allow to define the min_score on semantic search via SDK
+
 ## 1.2.1
 
 - Upload testing max GRPC size for importing via GRPC
