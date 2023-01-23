@@ -191,10 +191,11 @@ class Worker:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exit {pb.shard}")
                 else:
+                    event_id: Optional[str] = None
                     if SENTRY:
-                        capture_exception(grpc_error)
+                        event_id = capture_exception(grpc_error)
                     logger.error(
-                        f"An error on subscription_worker. Check sentry for more details."
+                        f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                     )
                     raise grpc_error
 
@@ -205,10 +206,11 @@ class Worker:
                     "Error retrieving the indexing payload we do not block as that means its already deleted"
                 )
             except Exception as e:
+                event_id = None
                 if SENTRY:
-                    capture_exception(e)
+                    event_id = capture_exception(e)
                 logger.error(
-                    f"An error on subscription_worker. Check sentry for more details."
+                    f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                 )
                 raise e
         try:
