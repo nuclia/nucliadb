@@ -25,7 +25,7 @@ use nucliadb_protos::{
     SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_telemetry::payload::TelemetryEvent;
-use nucliadb_telemetry::send_telemetry_event;
+use nucliadb_telemetry::sync::send_telemetry_event;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing::*;
