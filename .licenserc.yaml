@@ -54,6 +54,7 @@ header:
     - "nucliadb_vectors2/**"
     - "nucliadb_vectors/**"
     - "nucliadb_client/**"
+    - "nucliadb_sdk/**"
     - "nucliadb/**"
     - "nucliadb_byte_rpr/**"
     - "nucliadb_fields_tantivy/**"

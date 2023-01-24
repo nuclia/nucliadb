@@ -7,7 +7,7 @@ RUN ARCH="$(uname -m)"; \
         x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
     esac;
 
-RUN pip install nucliadb-node-binding
+RUN pip install nucliadb-node-binding>=0.5.2
 
 RUN mkdir -p /usr/src/app
 
