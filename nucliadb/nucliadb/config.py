@@ -105,14 +105,21 @@ def config_nucliadb(nucliadb_args: Settings):
     if nucliadb_args.driver == Driver.LOCAL:
         ingest_settings.driver = "local"
         ingest_settings.driver_local_url = nucliadb_args.maindb
+        if not os.path.isdir(nucliadb_args.maindb):
+            os.makedirs(nucliadb_args.maindb, exist_ok=True)
     elif nucliadb_args.driver == Driver.REDIS:
         ingest_settings.driver = "redis"
         ingest_settings.driver_redis_url = nucliadb_args.maindb
 
     storage_settings.file_backend = "local"
+
+    if not os.path.isdir(nucliadb_args.blob):
+        os.makedirs(nucliadb_args.blob, exist_ok=True)
     storage_settings.local_files = nucliadb_args.blob
 
     os.environ["DATA_PATH"] = nucliadb_args.node
+    if not os.path.isdir(nucliadb_args.node):
+        os.makedirs(nucliadb_args.node, exist_ok=True)
 
     if nucliadb_args.key is None:
         if os.environ.get("NUA_API_KEY"):

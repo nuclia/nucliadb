@@ -20,9 +20,10 @@
 # europe-1.nuclia.cloud
 # localhost:8080
 
-from typing import Optional
+from typing import Any, List, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
+import numpy as np
 
 import requests
 
@@ -36,11 +37,11 @@ class InvalidHost(Exception):
 
 
 def create_knowledge_box(
-    nucliadb_base_url: str,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
     slug: Optional[str] = None,
 ):
     url_obj = urlparse(nucliadb_base_url)
-    if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):
+    if url_obj.hostname and url_obj.hostname.endswith(b"nuclia.cloud"):
         raise InvalidHost(
             "You can not create a Knowledge Box via API, please use https://nuclia.cloud interface"
         )
@@ -63,3 +64,22 @@ def create_knowledge_box(
     client = NucliaDBClient(environment=Environment.OSS, url=url)
 
     return KnowledgeBox(client)
+
+
+def convert_vector(vector: Any) -> List[float]:
+    if (
+        vector.__class__.__module__ == "numpy"
+        and vector.__class__.__name__ == "ndarray"
+    ):
+        vector = vector.tolist()
+
+    if (
+        vector.__class__.__module__ == "tensorflow.python.framework.ops"
+        and vector.__class__.__name__ == "EagerTensor"
+    ):
+        vector = vector.numpy().tolist()
+
+    if vector.__class__.__module__ == "torch" and vector.__class__.__name__ == "Tensor":
+        vector = vector.tolist()
+
+    return vector

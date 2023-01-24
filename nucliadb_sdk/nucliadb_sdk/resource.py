@@ -20,6 +20,7 @@
 import base64
 from typing import Callable, Dict, List, Optional, Union, cast
 from uuid import uuid4
+from nucliadb_sdk.utils import convert_vector
 
 import numpy as np
 
@@ -135,16 +136,12 @@ def create_resource(
         if isinstance(vectors, dict):
             new_vectors = []
             for key, value in vectors.items():
-                if isinstance(value, np.ndarray):
-                    list_value = value.tolist()
-                else:
-                    list_value = value
+                list_value = convert_vector(vector)
                 new_vectors.append(Vector(value=list_value, vectorset=key))
             vectors = new_vectors
         elif isinstance(vectors, list):
             for vector_element in vectors:
-                if isinstance(vector_element.value, np.ndarray):
-                    vector_element.value = vector_element.value.tolist()
+                vector_element.value = convert_vector(vector_element.value)
 
         uvsw = []
         uvw = UserVectorWrapper(field=main_field)
@@ -266,10 +263,7 @@ def update_resource(
         if isinstance(vectors, dict):
             new_vectors = []
             for key, value in vectors.items():
-                if isinstance(value, np.ndarray):
-                    list_value = value.tolist()
-                else:
-                    list_value = value
+                list_value = convert_vector(value)
                 new_vectors.append(Vector(value=list_value, vectorset=key))
             vectors = new_vectors
 

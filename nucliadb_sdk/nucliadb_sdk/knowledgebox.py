@@ -19,6 +19,7 @@
 
 import os
 from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
+from nucliadb_sdk.utils import convert_vector
 
 import numpy as np
 
@@ -297,7 +298,7 @@ class KnowledgeBox:
         filter: Optional[List[Union[Label, str]]] = None,
         vector: Optional[Union[np.ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.70,
+        min_score: Optional[float] = 0.0,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -321,8 +322,7 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.PARAGRAPH)
 
         if vector is not None and vectorset is not None:
-            if isinstance(vector, np.ndarray):
-                vector = vector.tolist()
+            vector = convert_vector(vector)
             args["vector"] = vector
             args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
@@ -337,7 +337,7 @@ class KnowledgeBox:
         filter: Optional[List[Union[Label, str]]] = None,
         vector: Optional[Union[np.ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.70,
+        min_score: Optional[float] = 0.0,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -357,8 +357,7 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.PARAGRAPH)
 
         if vector is not None and vectorset is not None:
-            if isinstance(vector, np.ndarray):
-                vector = vector.tolist()
+            vector = convert_vector(vector)
 
             args["vector"] = vector
             args["vectorset"] = vectorset

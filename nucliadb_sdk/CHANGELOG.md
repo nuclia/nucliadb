@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.2.3
+
+- Simplify creation of KBs and vector indexing
+
 ## 1.2.2
 
 - Allow to define the min_score on semantic search via SDK
