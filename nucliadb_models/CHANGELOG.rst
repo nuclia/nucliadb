@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+2.0.4
+-----
+- Add cancelled_by_user to TokenSplit
+
 2.0.3
 -----
 

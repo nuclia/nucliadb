@@ -89,6 +89,7 @@ def parse_basic_modify(
                         klass=token.klass,
                         start=token.start,
                         end=token.end,
+                        cancelled_by_user=token.cancelled_by_user,
                     )
                 )
             for paragraph in fieldmetadata.paragraphs:
