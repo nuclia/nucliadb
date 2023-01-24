@@ -1,3 +1,13 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 30%
 ignore:
   - "**/tests/*.py"
   - "nucliadb_client/examples/"
