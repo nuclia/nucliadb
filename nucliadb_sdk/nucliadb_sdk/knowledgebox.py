@@ -19,7 +19,6 @@
 
 import os
 from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
-from nucliadb_sdk.utils import convert_vector
 
 import numpy as np
 
@@ -41,6 +40,7 @@ from nucliadb_sdk.resource import (
     from_resource_to_payload,
     update_resource,
 )
+from nucliadb_sdk.utils import convert_vector
 from nucliadb_sdk.vectors import Vectors
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")

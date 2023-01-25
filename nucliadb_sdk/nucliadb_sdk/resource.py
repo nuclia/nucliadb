@@ -20,7 +20,6 @@
 import base64
 from typing import Callable, Dict, List, Optional, Union, cast
 from uuid import uuid4
-from nucliadb_sdk.utils import convert_vector
 
 import numpy as np
 
@@ -42,6 +41,7 @@ from nucliadb_sdk import DEFAULT_LABELSET, logger
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
+from nucliadb_sdk.utils import convert_vector
 from nucliadb_sdk.vectors import Vector, Vectors
 
 
@@ -136,7 +136,7 @@ def create_resource(
         if isinstance(vectors, dict):
             new_vectors = []
             for key, value in vectors.items():
-                list_value = convert_vector(vector)
+                list_value = convert_vector(value)
                 new_vectors.append(Vector(value=list_value, vectorset=key))
             vectors = new_vectors
         elif isinstance(vectors, list):

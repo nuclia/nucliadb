@@ -23,7 +23,6 @@
 from typing import Any, List, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
-import numpy as np
 
 import requests
 
@@ -41,7 +40,7 @@ def create_knowledge_box(
     slug: Optional[str] = None,
 ):
     url_obj = urlparse(nucliadb_base_url)
-    if url_obj.hostname and url_obj.hostname.endswith(b"nuclia.cloud"):
+    if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
         raise InvalidHost(
             "You can not create a Knowledge Box via API, please use https://nuclia.cloud interface"
         )
