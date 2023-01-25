@@ -36,11 +36,11 @@ class InvalidHost(Exception):
 
 
 def create_knowledge_box(
-    nucliadb_base_url: str,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
     slug: Optional[str] = None,
 ):
     url_obj = urlparse(nucliadb_base_url)
-    if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):
+    if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
         raise InvalidHost(
             "You can not create a Knowledge Box via API, please use https://nuclia.cloud interface"
         )

@@ -36,12 +36,12 @@ class Driver(str, Enum):
 
 class Settings(pydantic.BaseSettings):
     driver: Driver = pydantic.Field(Driver.LOCAL, description="Main DB Path string")
-    maindb: str = pydantic.Field(description="Main DB Path string")
-    blob: str = pydantic.Field(description="Blob Path string")
+    maindb: str = pydantic.Field("./data/main", description="Main DB Path string")
+    blob: str = pydantic.Field("./data/blob", description="Blob Path string")
     key: Optional[str] = pydantic.Field(
         description="Nuclia Understanding API Key string"
     )
-    node: str = pydantic.Field(description="Node Path string")
+    node: str = pydantic.Field("./data/node", description="Node Path string")
     zone: Optional[str] = pydantic.Field(description="Nuclia Understanding API Zone ID")
     http: int = pydantic.Field(8080, description="HTTP Port int")
     grpc: int = pydantic.Field(8030, description="GRPC Port int")

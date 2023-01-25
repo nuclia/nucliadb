@@ -56,7 +56,9 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     resources = knowledgebox.search(filter=["emoji/0"])
 
     vector_q = encoder.encode([ds["train"][0]["text"]])[0].tolist()
-    resources = knowledgebox.search(vector=vector_q, vectorset="all-MiniLM-L6-v2")
+    resources = knowledgebox.search(
+        vector=vector_q, vectorset="all-MiniLM-L6-v2", min_score=0.70
+    )
     assert len(resources.sentences.results) == 1
     assert (
         "Sunday afternoon walking through Venice" in resources.sentences.results[0].text

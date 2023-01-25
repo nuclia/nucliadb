@@ -21,6 +21,7 @@ import base64
 import json
 import os
 import re
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -67,6 +68,13 @@ else:
     TaskValue = int
 
 ACTUAL_PARTITION = "actual_partition"
+
+
+class Task(str, Enum):
+    PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
+    FIELD_CLASSIFICATION = "RESOURCE_CLASSIFICATION"
+    SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
+    TASK_CLASSIFICATION = "TASK_CLASSIFICATION"
 
 
 class NucliaDataset(object):
@@ -127,11 +135,39 @@ class NucliaDataset(object):
 class NucliaDBDataset(NucliaDataset):
     def __init__(
         self,
-        trainset: TrainSet,
         client: NucliaDBClient,
+        task: Optional[Task] = None,
+        labels: Optional[List[str]] = None,
+        trainset: Optional[TrainSet] = None,
         base_path: Optional[str] = None,
     ):
         super().__init__(base_path)
+
+        if labels is None:
+            labels = []
+
+        if trainset is None and task is not None:
+            if Task.PARAGRAPH_CLASSIFICATION == task:
+                trainset = TrainSet(type=TaskType.PARAGRAPH_CLASSIFICATION)
+                trainset.filter.labels.extend(labels)
+            elif Task.FIELD_CLASSIFICATION == task:
+                trainset = TrainSet(type=TaskType.FIELD_CLASSIFICATION)
+                trainset.filter.labels.extend(labels)
+            elif Task.SENTENCE_CLASSIFICATION == task:
+                trainset = TrainSet(type=TaskType.SENTENCE_CLASSIFICATION)
+                trainset.filter.labels.extend(labels)
+
+            elif Task.TASK_CLASSIFICATION == task:
+                trainset = TrainSet(type=TaskType.TOKEN_CLASSIFICATION)
+                trainset.filter.labels.extend(labels)
+
+            else:
+                raise KeyError("Not a valid task")
+        elif trainset is None and task is None:
+            raise AttributeError("Trainset or task needs to be defined")
+
+        if trainset is None:
+            raise AttributeError("Trainset cloud not be defined")
 
         self.trainset = trainset
         self.client = client

@@ -40,7 +40,7 @@ from nucliadb_sdk.resource import (
     from_resource_to_payload,
     update_resource,
 )
-from nucliadb_sdk.vectors import Vectors
+from nucliadb_sdk.vectors import Vectors, convert_vector
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
 
@@ -297,7 +297,7 @@ class KnowledgeBox:
         filter: Optional[List[Union[Label, str]]] = None,
         vector: Optional[Union[np.ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.70,
+        min_score: Optional[float] = 0.0,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -321,8 +321,7 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.PARAGRAPH)
 
         if vector is not None and vectorset is not None:
-            if isinstance(vector, np.ndarray):
-                vector = vector.tolist()
+            vector = convert_vector(vector)
             args["vector"] = vector
             args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
@@ -337,7 +336,7 @@ class KnowledgeBox:
         filter: Optional[List[Union[Label, str]]] = None,
         vector: Optional[Union[np.ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.70,
+        min_score: Optional[float] = 0.0,
     ):
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
@@ -357,8 +356,7 @@ class KnowledgeBox:
             args["features"].append(SearchOptions.PARAGRAPH)
 
         if vector is not None and vectorset is not None:
-            if isinstance(vector, np.ndarray):
-                vector = vector.tolist()
+            vector = convert_vector(vector)
 
             args["vector"] = vector
             args["vectorset"] = vectorset

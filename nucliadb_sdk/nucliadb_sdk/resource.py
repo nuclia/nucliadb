@@ -41,7 +41,7 @@ from nucliadb_sdk import DEFAULT_LABELSET, logger
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
-from nucliadb_sdk.vectors import Vector, Vectors
+from nucliadb_sdk.vectors import Vector, Vectors, convert_vector
 
 
 def create_resource(
@@ -135,16 +135,12 @@ def create_resource(
         if isinstance(vectors, dict):
             new_vectors = []
             for key, value in vectors.items():
-                if isinstance(value, np.ndarray):
-                    list_value = value.tolist()
-                else:
-                    list_value = value
+                list_value = convert_vector(value)
                 new_vectors.append(Vector(value=list_value, vectorset=key))
             vectors = new_vectors
         elif isinstance(vectors, list):
             for vector_element in vectors:
-                if isinstance(vector_element.value, np.ndarray):
-                    vector_element.value = vector_element.value.tolist()
+                vector_element.value = convert_vector(vector_element.value)
 
         uvsw = []
         uvw = UserVectorWrapper(field=main_field)
@@ -266,10 +262,7 @@ def update_resource(
         if isinstance(vectors, dict):
             new_vectors = []
             for key, value in vectors.items():
-                if isinstance(value, np.ndarray):
-                    list_value = value.tolist()
-                else:
-                    list_value = value
+                list_value = convert_vector(value)
                 new_vectors.append(Vector(value=list_value, vectorset=key))
             vectors = new_vectors
 
