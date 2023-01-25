@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
 import tempfile
 
 import pytest
@@ -51,7 +52,14 @@ async def dummy_processing():
 
 
 @pytest.fixture(scope="function")
-async def nucliadb(dummy_processing):
+def telemetry_disabled():
+    os.environ["NUCLIADB_DISABLE_TELEMETRY"] = "True"
+    yield
+    os.environ.pop("NUCLIADB_DISABLE_TELEMETRY")
+
+
+@pytest.fixture(scope="function")
+async def nucliadb(dummy_processing, telemetry_disabled):
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = Settings(
             blob=f"{tmpdir}/blob",

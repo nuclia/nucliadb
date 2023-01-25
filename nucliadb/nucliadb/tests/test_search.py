@@ -43,7 +43,6 @@ async def test_search_sc_2062(
     # PUBLIC API
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
     assert resp.status_code == 200
-
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
