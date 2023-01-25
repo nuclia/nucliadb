@@ -256,7 +256,7 @@ class ParagraphAnnotation(BaseModel):
     @root_validator()
     def _validate_classifications(cls, values):
         classifications = values.get("classifications") or []
-        if len(classifications) < 1:
+        if len(classifications) == 0:
             raise ValueError("ensure this value has at least 1 items")
         seen = set()
         for cf in classifications:
