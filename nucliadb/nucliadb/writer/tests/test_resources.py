@@ -458,3 +458,56 @@ async def test_reindex(writer_api, test_resource):
             f"/{KB_PREFIX}/{kbid}/resource/{rid}/reindex?reindex_vectors=True",
         )
         assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_paragraph_annotations(writer_api, knowledgebox_writer):
+    kbid = knowledgebox_writer
+    async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
+
+        # Must have at least one classification
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/resources",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "texts": {"text1": TEST_TEXT_PAYLOAD},
+                "fieldmetadata": [
+                    {
+                        "paragraphs": [
+                            {
+                                "key": "paragraph1",
+                                "classifications": [],
+                            }
+                        ],
+                        "field": {"field": "text1", "field_type": "text"},
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 422
+        body = resp.json()
+        assert body["detail"][0]["msg"] == "ensure this value has at least 1 items"
+
+        # Classifications need to be unique
+        classification = {"label": "label", "labelset": "ls"}
+        resp = await client.post(
+            f"/{KB_PREFIX}/{kbid}/resources",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
+                "texts": {"text1": TEST_TEXT_PAYLOAD},
+                "fieldmetadata": [
+                    {
+                        "paragraphs": [
+                            {
+                                "key": "paragraph1",
+                                "classifications": [classification, classification],
+                            }
+                        ],
+                        "field": {"field": "text1", "field_type": "text"},
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 422
+        body = resp.json()
+        assert body["detail"][0]["msg"] == "Paragraph classifications need to be unique"
