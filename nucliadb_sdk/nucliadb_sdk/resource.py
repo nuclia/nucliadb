@@ -41,8 +41,7 @@ from nucliadb_sdk import DEFAULT_LABELSET, logger
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
-from nucliadb_sdk.utils import convert_vector
-from nucliadb_sdk.vectors import Vector, Vectors
+from nucliadb_sdk.vectors import Vector, Vectors, convert_vector
 
 
 def create_resource(

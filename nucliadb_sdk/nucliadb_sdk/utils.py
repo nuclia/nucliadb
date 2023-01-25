@@ -20,7 +20,7 @@
 # europe-1.nuclia.cloud
 # localhost:8080
 
-from typing import Any, List, Optional
+from typing import Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -63,22 +63,3 @@ def create_knowledge_box(
     client = NucliaDBClient(environment=Environment.OSS, url=url)
 
     return KnowledgeBox(client)
-
-
-def convert_vector(vector: Any) -> List[float]:
-    if (
-        vector.__class__.__module__ == "numpy"
-        and vector.__class__.__name__ == "ndarray"
-    ):
-        vector = vector.tolist()
-
-    if (
-        vector.__class__.__module__ == "tensorflow.python.framework.ops"
-        and vector.__class__.__name__ == "EagerTensor"
-    ):
-        vector = vector.numpy().tolist()
-
-    if vector.__class__.__module__ == "torch" and vector.__class__.__name__ == "Tensor":
-        vector = vector.tolist()
-
-    return vector

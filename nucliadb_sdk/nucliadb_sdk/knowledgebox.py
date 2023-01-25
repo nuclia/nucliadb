@@ -40,8 +40,7 @@ from nucliadb_sdk.resource import (
     from_resource_to_payload,
     update_resource,
 )
-from nucliadb_sdk.utils import convert_vector
-from nucliadb_sdk.vectors import Vectors
+from nucliadb_sdk.vectors import Vectors, convert_vector
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
 

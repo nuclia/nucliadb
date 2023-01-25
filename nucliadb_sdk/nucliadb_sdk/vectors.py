@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 
 @dataclass
@@ -30,3 +30,22 @@ class Vector:
 
 
 Vectors = List[Vector]
+
+
+def convert_vector(vector: Any) -> List[float]:
+    if (
+        vector.__class__.__module__ == "numpy"
+        and vector.__class__.__name__ == "ndarray"
+    ):
+        vector = vector.tolist()
+
+    if (
+        vector.__class__.__module__ == "tensorflow.python.framework.ops"
+        and vector.__class__.__name__ == "EagerTensor"
+    ):
+        vector = vector.numpy().tolist()
+
+    if vector.__class__.__module__ == "torch" and vector.__class__.__name__ == "Tensor":
+        vector = vector.tolist()
+
+    return vector
