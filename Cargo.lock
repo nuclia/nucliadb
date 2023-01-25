@@ -1998,6 +1998,7 @@ dependencies = [
  "lazy_static",
  "log",
  "nucliadb_cluster",
+ "nucliadb_ftp",
  "nucliadb_protos",
  "nucliadb_services",
  "nucliadb_telemetry",
