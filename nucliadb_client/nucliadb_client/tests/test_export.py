@@ -121,7 +121,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
 
 
 @pytest.mark.asyncio
-async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
+async def test_export_import_e2e(nucliadb_client):
     nucliadb_client.init_async_grpc()
     for slug in ("src1", "dst1"):
         exists = nucliadb_client.get_kb(slug=slug)
@@ -170,3 +170,39 @@ async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
         assert res.slug == payload.slug
         assert resource.download_file("file1") == file_binary
     assert found
+
+    # Test search results are equal
+    src_search = srckb.search(query="")
+    dst_search = dstkb.search(query="")
+
+    # Resources
+    assert len(src_search.resources) == len(dst_search.resources)
+    for rid, sresult in src_search.resources.items():
+        dresult = dst_search.resources[rid]
+        assert sresult.slug == dresult.slug
+        assert sresult.summary == dresult.summary
+        assert sresult.icon == dresult.icon
+
+    # Fulltext
+    assert len(src_search.fulltext.results) == len(dst_search.fulltext.results)
+    src_fulltext = {
+        (ftr.rid, ftr.field_type, ftr.field, ftr.score)
+        for ftr in src_search.fulltext.results
+    }
+    dst_fulltext = {
+        (ftr.rid, ftr.field_type, ftr.field, ftr.score)
+        for ftr in dst_search.fulltext.results
+    }
+    assert src_fulltext == dst_fulltext
+
+    # Paragraphs
+    assert len(src_search.paragraphs.results) == len(dst_search.paragraphs.results)
+    src_presults = {
+        (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
+        for par in src_search.paragraphs.results
+    }
+    dst_presults = {
+        (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
+        for par in dst_search.paragraphs.results
+    }
+    assert src_presults == dst_presults

@@ -31,6 +31,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldID,
     FieldMetadata,
     FieldType,
+    LargeComputedMetadataWrapper,
 )
 from nucliadb_protos.resources_pb2 import Metadata
 from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
@@ -358,11 +359,22 @@ class Resource:
         if uv is None:
             return
         uvw = UserVectorsWrapper()
-        bm.user_vectors.append(uvw)
         uvw.field.field = field_id
         uvw.field.field_type = type_id  # type: ignore
         uvw.vectors.CopyFrom(uv)
         bm.user_vectors.append(uvw)
+
+    async def generate_field_large_computed_metadata(
+        self, bm: BrokerMessage, type_id: int, field_id: str, field: Field
+    ):
+        lcm = await field.get_large_field_metadata()
+        if lcm is None:
+            return
+        lcmw = LargeComputedMetadataWrapper()
+        lcmw.field.field = field_id
+        lcmw.field.field_type = type_id  # type: ignore
+        lcmw.real.CopyFrom(lcm)
+        bm.field_large_metadata.append(lcmw)
 
     async def generate_field_computed_metadata(
         self,
@@ -469,6 +481,11 @@ class Resource:
 
             # User vectors
             await self.generate_user_vectors(bm, type_id, field_id, field)
+
+            # Large metadata
+            await self.generate_field_large_computed_metadata(
+                bm, type_id, field_id, field
+            )
 
         return bm
 

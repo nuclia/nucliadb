@@ -23,10 +23,12 @@ from datetime import datetime
 import pytest
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
+    Entity,
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldType,
     Keyword,
+    LargeComputedMetadataWrapper,
     UserVector,
     UserVectorsWrapper,
 )
@@ -81,6 +83,13 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     bm.extracted_text.append(etw)
     bm.basic.title = "My Title"
 
+    lcmw = LargeComputedMetadataWrapper()
+    lcmw.field.field = "text1"
+    lcmw.field.field_type = FieldType.TEXT
+    entity = Entity(token="token", root="root", type="type")
+    lcmw.real.metadata.entities.append(entity)
+    bm.field_large_metadata.append(lcmw)
+
     uvw = UserVectorsWrapper()
     uvw.field.field = "file1"
     uvw.field.field_type = FieldType.FILE
@@ -101,9 +110,10 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert export.slug == export.basic.slug == "slugtest"
         assert export.extracted_text[0].body.text == "My text"
 
-        # Check that vectors are exported
-        assert len(export.field_vectors) > 0
-        assert len(export.user_vectors) > 0
+        assert export.field_vectors == bm.field_vectors
+        assert export.user_vectors == bm.user_vectors
+
+        assert export.field_large_metadata == bm.field_large_metadata
     assert found
 
     index_req = IndexResource()

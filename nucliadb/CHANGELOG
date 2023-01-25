@@ -1,8 +1,12 @@
 # CHANGELOG
 
-## 2.1.1
+## 2.2.1
 
 - Allow to start nucliadb without defining stored folders
+
+## 2.2.0
+
+- Add cancelled_by_user to TokenSplit in API
 
 ## 2.0.16
 

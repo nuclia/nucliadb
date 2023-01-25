@@ -71,7 +71,7 @@ def run():
         grpc_host=args.grpc_host,
     )
     kb = client.get_kb(kbid=args.kbid)
-    if kb is not None:
+    if kb is None:
         raise KeyError(f"KB could not be found")
     asyncio.run(client.import_kb(kbid=args.kbid, location=args.dump))
 

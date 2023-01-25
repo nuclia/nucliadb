@@ -246,6 +246,7 @@ class TokenSplit(BaseModel):
     klass: str
     start: int
     end: int
+    cancelled_by_user: bool = False
 
 
 class ParagraphAnnotation(BaseModel):
