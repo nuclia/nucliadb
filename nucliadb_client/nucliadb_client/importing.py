@@ -75,5 +75,6 @@ def run():
         raise KeyError(f"KB could not be found")
     asyncio.run(client.import_kb(kbid=args.kbid, location=args.dump))
 
+
 if __name__ == "__main__":
     run()
