@@ -128,7 +128,7 @@ impl Configuration {
                 .to_socket_addrs()
                 .unwrap()
                 .next()
-                .expect("Error parsing Socket address for swim peers addrs"),
+                .expect("Error parsing Socket address f0r swim peers addrs"),
             Err(_) => {
                 warn!(
                     "WRITER_LISTEN_ADDRESS not defined. Defaulting to: {}",
