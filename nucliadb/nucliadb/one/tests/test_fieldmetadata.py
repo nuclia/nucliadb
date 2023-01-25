@@ -57,6 +57,7 @@ async def test_fieldmetadata_crud(
                 "klass": "klassA",
                 "start": 10,
                 "end": 20,
+                "cancelled_by_user": False,
             }
         ],
     }
@@ -78,8 +79,20 @@ async def test_fieldmetadata_crud(
             }
         ],
         "token": [
-            {"token": "token2", "klass": "klassB", "start": 5, "end": 12},
-            {"token": "token3", "klass": "klassC", "start": 15, "end": 16},
+            {
+                "token": "token2",
+                "klass": "klassB",
+                "start": 5,
+                "end": 12,
+                "cancelled_by_user": False,
+            },
+            {
+                "token": "token3",
+                "klass": "klassC",
+                "start": 15,
+                "end": 16,
+                "cancelled_by_user": True,
+            },
         ],
     }
 

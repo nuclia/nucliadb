@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.2.0
+
+- Add cancelled_by_user to TokenSplit in API
+
 ## 2.0.16
 
 - Fix bug in train service returning entity positions
