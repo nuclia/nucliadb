@@ -22,7 +22,7 @@ pub mod grpc_driver;
 use std::collections::HashMap;
 use std::path::Path;
 
-use nucliadb_ftp::Publisher;
+use nucliadb_ftp::{Listener, Publisher};
 use nucliadb_protos::{Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds};
 use nucliadb_services::*;
 use tokio::net::ToSocketAddrs;
@@ -265,5 +265,30 @@ impl NodeWriterService {
                 nucliadb_ftp::Error::IoError(e) => ServiceError::IOErr(e),
                 _ => ServiceError::GenericErr(Box::new(e)),
             })
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn accept_shard(
+        &mut self,
+        shard_id: &ShardId,
+        port: u16,
+    ) -> ServiceResult<Option<()>> {
+        if self.get_shard(shard_id).is_some() {
+            return Ok(None);
+        };
+
+        Listener::default()
+            .save_at(Configuration::shards_path())
+            .listen_once(port)
+            .await
+            .map(Some)
+            .map_err(|e| match e {
+                nucliadb_ftp::Error::IoError(e) => ServiceError::IOErr(e),
+                _ => ServiceError::GenericErr(Box::new(e)),
+            })?;
+
+        self.load_shard(shard_id);
+
+        Ok(Some(()))
     }
 }

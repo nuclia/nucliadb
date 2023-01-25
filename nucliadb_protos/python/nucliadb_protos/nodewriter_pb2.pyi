@@ -188,6 +188,26 @@ class MoveShardRequest(google.protobuf.message.Message):
 global___MoveShardRequest = MoveShardRequest
 
 @typing_extensions.final
+class AcceptShardRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SHARD_ID_FIELD_NUMBER: builtins.int
+    PORT_FIELD_NUMBER: builtins.int
+    @property
+    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
+    port: builtins.int
+    def __init__(
+        self,
+        *,
+        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
+        port: builtins.int = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["port", b"port", "shard_id", b"shard_id"]) -> None: ...
+
+global___AcceptShardRequest = AcceptShardRequest
+
+@typing_extensions.final
 class Counter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

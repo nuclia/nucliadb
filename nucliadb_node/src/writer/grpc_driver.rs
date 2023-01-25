@@ -21,9 +21,9 @@
 use async_std::sync::RwLock;
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
-    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest, OpStatus, Resource,
-    ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
-    VectorSetList,
+    op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
+    OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
+    VectorSetId, VectorSetList,
 };
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
@@ -430,6 +430,40 @@ impl NodeWriter for NodeWriterGRPCDriver {
             ))),
         }
     }
+
+    #[tracing::instrument(skip_all)]
+    async fn accept_shard(
+        &self,
+        request: Request<AcceptShardRequest>,
+    ) -> Result<Response<EmptyResponse>, Status> {
+        self.instrument(&request);
+
+        let request = request.into_inner();
+        let shard_id = request.shard_id.unwrap();
+        let port = request.port as u16;
+
+        let mut service = self.0.write().await;
+
+        match service.accept_shard(&shard_id, port).await.transpose() {
+            Some(Ok(_)) => {
+                info!("Shard {} received successfully", shard_id.id);
+
+                Ok(tonic::Response::new(EmptyResponse {}))
+            }
+            Some(Err(e)) => {
+                let e = format!("Error receiving shard {}: {}", shard_id.id, e);
+
+                error!("{}", e);
+
+                Err(tonic::Status::internal(e))
+            }
+            None => Err(tonic::Status::already_exists(format!(
+                "Shard {} already exists",
+                shard_id.id
+            ))),
+        }
+    }
+
     #[tracing::instrument(skip_all)]
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
         self.instrument(&request);

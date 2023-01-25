@@ -85,6 +85,11 @@ class NodeWriterStub(object):
                 request_serializer=nucliadb__protos_dot_nodewriter__pb2.MoveShardRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
                 )
+        self.AcceptShard = channel.unary_unary(
+                '/nodewriter.NodeWriter/AcceptShard',
+                request_serializer=nucliadb__protos_dot_nodewriter__pb2.AcceptShardRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+                )
 
 
 class NodeWriterServicer(object):
@@ -174,6 +179,12 @@ class NodeWriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def AcceptShard(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NodeWriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -245,6 +256,11 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'MoveShard': grpc.unary_unary_rpc_method_handler(
                     servicer.MoveShard,
                     request_deserializer=nucliadb__protos_dot_nodewriter__pb2.MoveShardRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.SerializeToString,
+            ),
+            'AcceptShard': grpc.unary_unary_rpc_method_handler(
+                    servicer.AcceptShard,
+                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.AcceptShardRequest.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyResponse.SerializeToString,
             ),
     }
@@ -491,6 +507,23 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/MoveShard',
             nucliadb__protos_dot_nodewriter__pb2.MoveShardRequest.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def AcceptShard(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/AcceptShard',
+            nucliadb__protos_dot_nodewriter__pb2.AcceptShardRequest.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.EmptyResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
