@@ -33,6 +33,7 @@ images.settings["nucliadb"] = {
     "image": "nuclia/nucliadb",
     "version": "latest",
     "env": {
+        "NUCLIADB_DISABLE_TELEMETRY": "True",
         "NUCLIADB_ENV": "True",
         "DRIVER": "LOCAL",
         "LOG": "DEBUG",
