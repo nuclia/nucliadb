@@ -22,8 +22,10 @@ pub mod grpc_driver;
 use std::collections::HashMap;
 use std::path::Path;
 
+use nucliadb_ftp::Publisher;
 use nucliadb_protos::{Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds};
 use nucliadb_services::*;
+use tokio::net::ToSocketAddrs;
 use tracing::*;
 use uuid::Uuid;
 
@@ -240,5 +242,28 @@ impl NodeWriterService {
             .map(|id| ShardId { id })
             .collect();
         ShardIds { ids }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn move_shard(
+        &self,
+        shard_id: &ShardId,
+        address: impl ToSocketAddrs + Clone,
+    ) -> ServiceResult<Option<()>> {
+        let Some(shard) = self.get_shard(shard_id) else {
+            return Ok(None);
+        };
+
+        Publisher::default()
+            // `unwrap` call is safe since the shard path already terminate by a valid file name.
+            .append(&shard.path)
+            .unwrap()
+            .send_to(address)
+            .await
+            .map(Some)
+            .map_err(|e| match e {
+                nucliadb_ftp::Error::IoError(e) => ServiceError::IOErr(e),
+                _ => ServiceError::GenericErr(Box::new(e)),
+            })
     }
 }

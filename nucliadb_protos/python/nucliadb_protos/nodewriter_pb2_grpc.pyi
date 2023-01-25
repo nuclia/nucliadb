@@ -82,6 +82,10 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ShardId,
         nucliadb_protos.noderesources_pb2.VectorSetList,
     ]
+    MoveShard: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.nodewriter_pb2.MoveShardRequest,
+        nucliadb_protos.noderesources_pb2.EmptyResponse,
+    ]
 
 class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -162,6 +166,12 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.noderesources_pb2.ShardId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.VectorSetList: ...
+    @abc.abstractmethod
+    def MoveShard(
+        self,
+        request: nucliadb_protos.nodewriter_pb2.MoveShardRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
 
 def add_NodeWriterServicer_to_server(servicer: NodeWriterServicer, server: grpc.Server) -> None: ...
 

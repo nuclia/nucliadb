@@ -21,8 +21,9 @@
 use async_std::sync::RwLock;
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
-    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, OpStatus, Resource, ResourceId,
-    SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
+    op_status, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest, OpStatus, Resource,
+    ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
+    VectorSetList,
 };
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
@@ -391,6 +392,42 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 let message = format!("Shard not found {:?}", shard_id);
                 Err(tonic::Status::not_found(message))
             }
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn move_shard(
+        &self,
+        request: Request<MoveShardRequest>,
+    ) -> Result<Response<EmptyResponse>, Status> {
+        self.instrument(&request);
+
+        let request = request.into_inner();
+        let shard_id = request.shard_id.unwrap();
+        let address = request.address;
+
+        let service = self.0.read().await;
+
+        match service.move_shard(&shard_id, &address).await.transpose() {
+            Some(Ok(_)) => {
+                info!("Shard {} moved to {} successfully", shard_id.id, address);
+
+                Ok(tonic::Response::new(EmptyResponse {}))
+            }
+            Some(Err(e)) => {
+                let e = format!(
+                    "Error transfering shard {} to {}: {}",
+                    shard_id.id, address, e
+                );
+
+                error!("{}", e);
+
+                Err(tonic::Status::internal(e))
+            }
+            None => Err(tonic::Status::not_found(format!(
+                "Shard {} not found",
+                shard_id.id
+            ))),
         }
     }
     #[tracing::instrument(skip_all)]
