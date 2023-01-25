@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import asyncio
 import base64
 import tarfile
 import tempfile
@@ -154,12 +155,35 @@ async def test_export_import_e2e(nucliadb_client):
     )
     resource = srckb.create_resource(payload)
 
+    dstkb = nucliadb_client.create_kb(
+        title="Dst kb", description="Import destination kb", slug="dst1"
+    )
+    assert dstkb is not None
+
+    # Counters of KB should be 0 initially
+    counters = dstkb.counters()
+    assert counters.resources == 0
+    assert counters.paragraphs == 0
+    assert counters.sentences == 0
+    assert counters.fields == 0
+
     with tempfile.NamedTemporaryFile() as dump:
         await nucliadb_client.export_kb(kbid=srckb.kbid, location=dump.name)
         await nucliadb_client.import_kb(slug="dst1", location=dump.name)
 
     dstkb = nucliadb_client.get_kb(slug="dst1")
     assert dstkb is not None
+
+    # Wait a bit until the node indexes all imported data
+    await asyncio.sleep(5)
+
+    # Counters of KB should not be zero after import
+    counters = dstkb.counters()
+    assert counters.resources != 0
+    assert counters.paragraphs != 0
+    assert counters.fields != 0
+    # Sentences is zero because we don't extract sentences in tests
+    assert counters.sentences != 0
 
     found = False
     for resource in dstkb.iter_resources(page_size=1):

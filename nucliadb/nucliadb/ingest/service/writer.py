@@ -41,6 +41,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
+    CacheDeleteKeyRequest,
+    CacheDeleteKeyResponse,
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
@@ -730,6 +732,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
         result = FileUploaded()
         return result
+
+    async def CacheDeleteKey(
+        self, request: CacheDeleteKeyRequest, context=None
+    ) -> CacheDeleteKeyResponse:
+        cache = await get_cache()
+        if cache is None:
+            return
+        await cache.delete(request.key, invalidate=request.invalidate)
+        return CacheDeleteKeyResponse()
 
 
 def update_shards_with_updated_replica(

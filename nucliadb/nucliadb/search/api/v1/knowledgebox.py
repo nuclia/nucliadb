@@ -193,7 +193,6 @@ async def knowledgebox_counters(
         fields=field_count,
         sentences=sentence_count,
     )
-
     if debug:
         counters.shards = queried_shards
     if cache is not None:

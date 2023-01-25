@@ -429,6 +429,14 @@ message FileUploaded {
     
 }
 
+message CacheDeleteKeyRequest {
+    string key = 1;
+    bool invalidate = 2;
+}
+
+message CacheDeleteKeyResponse {
+}
+
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
@@ -478,4 +486,6 @@ service Writer {
     rpc Export(ExportRequest) returns (stream BrokerMessage) {}
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
+
+    rpc CacheDeleteKey(CacheDeleteKeyRequest) returns (CacheDeleteKeyResponse) {}
 }

@@ -603,3 +603,13 @@ pub mod upload_binary_data {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileUploaded {
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CacheDeleteKeyRequest {
+    #[prost(string, tag="1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(bool, tag="2")]
+    pub invalidate: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CacheDeleteKeyResponse {
+}

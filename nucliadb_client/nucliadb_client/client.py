@@ -218,6 +218,7 @@ class NucliaDBClient:
                     await kb.import_export(b64_pb.strip())
                     b64_pb = await dump_file.readline()
 
+        await kb.clear_counters_from_cache()
         return kb.kbid
 
     def init_async_grpc(self):

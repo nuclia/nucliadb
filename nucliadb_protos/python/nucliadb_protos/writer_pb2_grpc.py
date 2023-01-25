@@ -180,6 +180,11 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
                 )
+        self.CacheDeleteKey = channel.unary_unary(
+                '/fdbwriter.Writer/CacheDeleteKey',
+                request_serializer=nucliadb__protos_dot_writer__pb2.CacheDeleteKeyRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.CacheDeleteKeyResponse.FromString,
+                )
 
 
 class WriterServicer(object):
@@ -387,6 +392,12 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CacheDeleteKey(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_WriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -554,6 +565,11 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.UploadFile,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.FileUploaded.SerializeToString,
+            ),
+            'CacheDeleteKey': grpc.unary_unary_rpc_method_handler(
+                    servicer.CacheDeleteKey,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.CacheDeleteKeyRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.CacheDeleteKeyResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1123,5 +1139,22 @@ class Writer(object):
         return grpc.experimental.stream_unary(request_iterator, target, '/fdbwriter.Writer/UploadFile',
             nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
             nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def CacheDeleteKey(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/CacheDeleteKey',
+            nucliadb__protos_dot_writer__pb2.CacheDeleteKeyRequest.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.CacheDeleteKeyResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

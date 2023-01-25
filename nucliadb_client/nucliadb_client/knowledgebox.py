@@ -30,6 +30,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
+    CacheDeleteKeyRequest,
     ExportRequest,
     FileRequest,
     GetEntitiesRequest,
@@ -50,6 +51,7 @@ from nucliadb_models.search import (
     SearchRequest,
 )
 from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
+from nucliadb_utils.cache import KB_COUNTER_CACHE
 
 if TYPE_CHECKING:
     from nucliadb_client.client import NucliaDBClient
@@ -154,6 +156,12 @@ class KnowledgeBox:
     def delete(self):
         resp = self.http_manager_v1.delete("")
         return resp.status_code == 200
+
+    async def clear_counters_from_cache(self):
+        req = CacheDeleteKeyRequest(
+            key=KB_COUNTER_CACHE.format(kbid=self.kbid), invalidate=True
+        )
+        await self.client.writer_stub_async.CacheDeleteKey(req)
 
     async def import_tar_bz2(self, filename):
         with tarfile.open(filename, mode="r:bz2") as tar:
