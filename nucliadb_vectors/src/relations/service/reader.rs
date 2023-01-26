@@ -126,11 +126,12 @@ impl RelationsReaderService {
                 subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
                 ntype: string_to_node_type(node.xtype()) as i32,
             })?;
-
+            let relation_metadata = reader.get_edge_metadata(i.edge())?;
             let relation = reader.get_edge(i.edge()).map(|edge| Relation {
                 to: Some(to),
                 source: Some(from),
                 relation: string_to_rtype(edge.xtype()) as i32,
+                metadata: relation_metadata.map(RelationMetadata::from),
                 relation_label: edge.subtype().map(|s| s.to_string()).unwrap_or_default(),
             })?;
             subgraph.push(relation);

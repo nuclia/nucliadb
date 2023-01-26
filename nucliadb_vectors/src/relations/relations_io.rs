@@ -21,6 +21,7 @@
 use std::hash::Hash;
 
 use data_encoding::HEXUPPER;
+use nucliadb_service_interface::prelude::nucliadb_protos::RelationMetadata;
 use ring::digest::{Context, SHA256};
 use serde::{Deserialize, Serialize};
 
@@ -85,6 +86,38 @@ impl IoNode {
     }
     pub fn hash(&self) -> &str {
         &self.hash
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub struct IoEdgeMetadata {
+    pub paragraph_id: Option<String>,
+    pub source_start: Option<i32>,
+    pub source_end: Option<i32>,
+    pub to_start: Option<i32>,
+    pub to_end: Option<i32>,
+}
+impl From<RelationMetadata> for IoEdgeMetadata {
+    fn from(value: RelationMetadata) -> Self {
+        IoEdgeMetadata {
+            paragraph_id: value.paragraph_id,
+            source_start: value.source_start,
+            source_end: value.source_end,
+            to_start: value.to_start,
+            to_end: value.to_end,
+        }
+    }
+}
+
+impl From<IoEdgeMetadata> for RelationMetadata {
+    fn from(value: IoEdgeMetadata) -> Self {
+        RelationMetadata {
+            paragraph_id: value.paragraph_id,
+            source_start: value.source_start,
+            source_end: value.source_end,
+            to_start: value.to_start,
+            to_end: value.to_end,
+        }
     }
 }
 

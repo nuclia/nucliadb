@@ -102,7 +102,7 @@ impl RelationWriter for RelationsWriterService {
             let to = nodes.get(&edge.target).map_or_else(ubehaviour, Ok)?;
             let edge = relation_type_parsing(edge.rtype(), &edge.rsubtype);
             let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
-            writer.connect(&self.wmode, from, to, &edge)?;
+            writer.connect(&self.wmode, from, to, &edge, None)?;
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("Populating the graph: ends {v} ms");
@@ -184,7 +184,8 @@ impl WriterChild for RelationsWriterService {
                     to_type.1.map(|s| s.to_string()),
                 );
                 let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
-                writer.connect(&self.wmode, &from, &to, &edge)?;
+                let metadata = rel.metadata.clone().map(IoEdgeMetadata::from);
+                writer.connect(&self.wmode, &from, &to, &edge, metadata.as_ref())?;
             }
             writer.commit(&mut self.wmode)?;
             if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {

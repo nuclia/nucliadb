@@ -150,18 +150,21 @@ fn entities(mut edges: Vec<Relation>) -> Vec<Relation> {
         source: Some(E1.clone()),
         to: Some(E2.clone()),
         relation_label: "".to_string(),
+        metadata: None,
     };
     let r1 = Relation {
         relation: RelationType::Entity as i32,
         source: Some(E0.clone()),
         to: Some(E2.clone()),
         relation_label: "".to_string(),
+        metadata: None,
     };
     let r2 = Relation {
         relation: RelationType::Entity as i32,
         source: Some(E0.clone()),
         to: Some(E1.clone()),
         relation_label: "".to_string(),
+        metadata: None,
     };
     edges.append(&mut vec![r0, r1, r2]);
     edges
@@ -173,12 +176,14 @@ fn similatity_edges(mut edges: Vec<Relation>) -> Vec<Relation> {
         source: Some(E0.clone()),
         to: Some(E1.clone()),
         relation_label: "".to_string(),
+        metadata: None,
     };
     let r1 = Relation {
         relation: RelationType::Synonym as i32,
         source: Some(E1.clone()),
         to: Some(E2.clone()),
         relation_label: "".to_string(),
+        metadata: None,
     };
     edges.append(&mut vec![r0, r1]);
     edges

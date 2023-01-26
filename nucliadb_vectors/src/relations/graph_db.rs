@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::errors::{RResult, RelationsErr};
-use super::relations_io::{IoEdge, IoNode};
+use super::relations_io::{IoEdge, IoEdgeMetadata, IoNode};
 
 pub type RwToken<'a> = RwTxn<'a, 'a>;
 pub type RoToken<'a> = RoTxn<'a>;
@@ -122,6 +122,9 @@ pub struct GraphDB {
     inedges: Database<Str, Unit>,
     // Given an entity, it returns its edge component
     edge_component: Database<SerdeBincode<Entity>, SerdeBincode<IoEdge>>,
+    // Given an entity, it returns its edge metadata. It is not stored
+    // inside the IoEdge type to avoid the deserialization cost during BFS.
+    edge_metadata: Database<SerdeBincode<Entity>, SerdeBincode<IoEdgeMetadata>>,
     // Given an entity, it returns its node component
     node_component: Database<SerdeBincode<Entity>, SerdeBincode<IoNode>>,
 }
@@ -132,12 +135,13 @@ macro_rules! database_name {
     };
 }
 impl GraphDB {
-    const MAX_DBS: u32 = 5;
+    const MAX_DBS: u32 = 6;
     database_name!(const NODES);
     database_name!(const OUTEDGES);
     database_name!(const INEDGES);
     database_name!(const NODE_COMPONENT);
     database_name!(const EDGE_COMPONENT);
+    database_name!(const EDGE_METADATA);
     pub fn new(path: &Path, db_size: usize) -> RResult<Self> {
         let mut env_builder = EnvOpenOptions::new();
         env_builder.max_dbs(Self::MAX_DBS);
@@ -151,6 +155,7 @@ impl GraphDB {
         let inedges = env.create_database(Some(Self::INEDGES))?;
         let node_component = env.create_database(Some(Self::NODE_COMPONENT))?;
         let edge_component = env.create_database(Some(Self::EDGE_COMPONENT))?;
+        let edge_metadata = env.create_database(Some(Self::EDGE_METADATA))?;
         Ok(GraphDB {
             env,
             nodes,
@@ -158,6 +163,7 @@ impl GraphDB {
             inedges,
             node_component,
             edge_component,
+            edge_metadata,
         })
     }
     pub fn rw_txn(&self) -> RResult<RwToken<'_>> {
@@ -219,6 +225,7 @@ impl GraphDB {
         from: Entity,
         edge: &IoEdge,
         to: Entity,
+        edge_metadata: Option<&IoEdgeMetadata>,
     ) -> RResult<bool> {
         let mut exits = false;
         let mut iter = self.connected_by(txn, from, to)?;
@@ -238,6 +245,9 @@ impl GraphDB {
                     self.edge_component.put(txn, &with, edge)?;
                     self.outedges.put(txn, &out_edge, &())?;
                     self.inedges.put(txn, &in_edge, &())?;
+                    if let Some(metadata) = edge_metadata {
+                        self.edge_metadata.put(txn, &with, metadata)?;
+                    }
                     break;
                 }
             }
@@ -274,6 +284,9 @@ impl GraphDB {
     pub fn get_edge(&self, txn: &RoTxn, x: Entity) -> RResult<IoEdge> {
         let node = self.edge_component.get(txn, &x)?;
         node.map_or_else(|| Err(RelationsErr::UBehaviour), Ok)
+    }
+    pub fn get_edge_metadata(&self, txn: &RoTxn, x: Entity) -> RResult<Option<IoEdgeMetadata>> {
+        Ok(self.edge_metadata.get(txn, &x)?)
     }
     pub fn connected_by<'a>(
         &self,
@@ -363,11 +376,11 @@ mod tests {
         let e3 = fresh_edge();
         let e4 = fresh_edge();
         let e5 = fresh_edge();
-        assert!(graphdb.connect(&mut txn, n1, &e1, n2).unwrap());
-        assert!(graphdb.connect(&mut txn, n1, &e2, n3).unwrap());
-        assert!(graphdb.connect(&mut txn, n2, &e3, n4).unwrap());
-        assert!(graphdb.connect(&mut txn, n3, &e4, n4).unwrap());
-        assert!(graphdb.connect(&mut txn, n4, &e5, n1).unwrap());
+        assert!(graphdb.connect(&mut txn, n1, &e1, n2, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n1, &e2, n3, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n2, &e3, n4, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n3, &e4, n4, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n4, &e5, n1, None).unwrap());
         // Deleting N4
         // N1 should have 0 in-edges
         // N3 should have 0 out-edges
@@ -414,11 +427,11 @@ mod tests {
         let e3 = fresh_edge();
         let e4 = fresh_edge();
         let e5 = fresh_edge();
-        assert!(graphdb.connect(&mut txn, n1, &e1, n2).unwrap());
-        assert!(graphdb.connect(&mut txn, n1, &e2, n3).unwrap());
-        assert!(graphdb.connect(&mut txn, n2, &e3, n4).unwrap());
-        assert!(graphdb.connect(&mut txn, n3, &e4, n4).unwrap());
-        assert!(graphdb.connect(&mut txn, n4, &e5, n1).unwrap());
+        assert!(graphdb.connect(&mut txn, n1, &e1, n2, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n1, &e2, n3, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n2, &e3, n4, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n3, &e4, n4, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n4, &e5, n1, None).unwrap());
 
         // out edges test
         let expected_outn1 = HashSet::from([(n2, e1.clone()), (n3, e2.clone())]);
@@ -527,12 +540,12 @@ mod tests {
         let e1 = fresh_edge();
         let e2 = fresh_edge();
         let e3 = fresh_edge();
-        assert!(graphdb.connect(&mut txn, n1, &e1, n2).unwrap());
-        assert!(graphdb.connect(&mut txn, n2, &e2, n1).unwrap());
-        assert!(graphdb.connect(&mut txn, n1, &e3, n2).unwrap());
-        assert!(!graphdb.connect(&mut txn, n1, &e1, n2).unwrap());
-        assert!(!graphdb.connect(&mut txn, n2, &e2, n1).unwrap());
-        assert!(!graphdb.connect(&mut txn, n1, &e3, n2).unwrap());
+        assert!(graphdb.connect(&mut txn, n1, &e1, n2, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n2, &e2, n1, None).unwrap());
+        assert!(graphdb.connect(&mut txn, n1, &e3, n2, None).unwrap());
+        assert!(!graphdb.connect(&mut txn, n1, &e1, n2, None).unwrap());
+        assert!(!graphdb.connect(&mut txn, n2, &e2, n1, None).unwrap());
+        assert!(!graphdb.connect(&mut txn, n1, &e3, n2, None).unwrap());
         let expect = HashSet::from([e1, e3]);
         let n1_n2 = graphdb
             .connected_by(&txn, n1, n2)

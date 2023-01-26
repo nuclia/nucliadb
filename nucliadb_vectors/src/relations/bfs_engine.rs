@@ -169,12 +169,12 @@ mod test {
             .enumerate()
             .for_each(|(i, edge)| {
                 graphdb
-                    .connect(&mut txn, ids[i], &edge, ids[i + 1])
+                    .connect(&mut txn, ids[i], &edge, ids[i + 1], None)
                     .unwrap();
             });
         let backedge = UEdges.next().unwrap();
         graphdb
-            .connect(&mut txn, ids[3], &backedge, ids[0])
+            .connect(&mut txn, ids[3], &backedge, ids[0], None)
             .unwrap();
         txn.commit().unwrap();
         (ids, graphdb)
