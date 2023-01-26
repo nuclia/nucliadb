@@ -103,7 +103,7 @@ impl RelationWriter for RelationsWriterService {
             let edge = relation_type_parsing(protos_edge.rtype(), &protos_edge.rsubtype);
             let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
             let metadata = protos_edge.metadata.clone().map(IoEdgeMetadata::from);
-            writer.connect(&self.wmode, &from, &to, &edge, metadata.as_ref())?;
+            writer.connect(&self.wmode, from, to, &edge, metadata.as_ref())?;
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("Populating the graph: ends {v} ms");
