@@ -21,8 +21,9 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::Duration;
 
-use nucliadb_ftp::{Listener, Publisher};
+use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_protos::{Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds};
 use nucliadb_services::*;
 use tokio::net::ToSocketAddrs;
@@ -31,6 +32,9 @@ use uuid::Uuid;
 
 use crate::config::Configuration;
 use crate::services::writer::ShardWriterService;
+
+/// Indicates the maximum duration used to move one shard from one node to another on failure only.
+const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug)]
 pub struct NodeWriterService {
@@ -258,6 +262,7 @@ impl NodeWriterService {
             .append(&shard.path)
             // `unwrap` call is safe since the shard path already terminate by a valid file name.
             .unwrap()
+            .retry_on_failure(RetryPolicy::MaxDuration(MAX_MOVE_SHARD_DURATION))
             .send_to(address)
             .await
             .map(Some)
