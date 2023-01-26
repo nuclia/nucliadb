@@ -1,30 +1,17 @@
-/// Relations are connexions between nodes in the relation index. 
+/// Relations are connexions between nodes in the relation index.
 /// They are tuplets (Source, Relation Type, Relation Label, To).
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Relation {
-    /// relation is the type of the label.
-    #[prost(enumeration="relation::RelationType", tag="5")]
-    pub relation: i32,
-    /// The source of the edge.
     #[prost(message, optional, tag="6")]
     pub source: ::core::option::Option<RelationNode>,
-    /// The destination of the edge.
     #[prost(message, optional, tag="7")]
     pub to: ::core::option::Option<RelationNode>,
-    /// Apart of having types, edges may be valued like
-    /// in the case of 'OTHER' edges. 
+    #[prost(enumeration="relation::RelationType", tag="5")]
+    pub relation: i32,
     #[prost(string, tag="8")]
     pub relation_label: ::prost::alloc::string::String,
-    #[prost(string, optional, tag="9")]
-    pub paragraph_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(int32, optional, tag="10")]
-    pub source_start: ::core::option::Option<i32>,
-    #[prost(int32, optional, tag="11")]
-    pub source_end: ::core::option::Option<i32>,
-    #[prost(int32, optional, tag="12")]
-    pub to_start: ::core::option::Option<i32>,
-    #[prost(int32, optional, tag="13")]
-    pub to_end: ::core::option::Option<i32>,
+    #[prost(message, optional, tag="9")]
+    pub metadata: ::core::option::Option<RelationMetadata>,
 }
 /// Nested message and enum types in `Relation`.
 pub mod relation {
@@ -44,6 +31,19 @@ pub mod relation {
         /// related with something
         Other = 5,
     }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RelationMetadata {
+    #[prost(string, optional, tag="1")]
+    pub paragraph_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, optional, tag="2")]
+    pub source_start: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag="3")]
+    pub source_end: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag="4")]
+    pub to_start: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag="5")]
+    pub to_end: ::core::option::Option<i32>,
 }
 /// Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index.
 #[derive(Clone, PartialEq, ::prost::Message)]

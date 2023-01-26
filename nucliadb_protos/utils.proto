@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package utils;
 
-// Relations are connexions between nodes in the relation index. 
+// Relations are connexions between nodes in the relation index.
 // They are tuplets (Source, Relation Type, Relation Label, To).
 message Relation {
     enum RelationType {
@@ -13,20 +13,22 @@ message Relation {
         SYNONYM = 4;  // Synonym relation
         OTHER = 5;  // related with something
     }
-    // relation is the type of the label.
-    RelationType relation = 5;
-    // The source of the edge.
+
     RelationNode source = 6;
-    // The destination of the edge.
     RelationNode to = 7;
-    // Apart of having types, edges may be valued like
-    // in the case of 'OTHER' edges. 
+
+    RelationType relation = 5;
     string relation_label = 8;
-    optional string paragraph_id = 9;
-    optional int32 source_start = 10;
-    optional int32 source_end = 11;
-    optional int32 to_start = 12;
-    optional int32 to_end = 13;
+
+    RelationMetadata metadata = 9;
+}
+
+message RelationMetadata {
+    optional string paragraph_id = 1;
+    optional int32 source_start = 2;
+    optional int32 source_end = 3;
+    optional int32 to_start = 4;
+    optional int32 to_end = 5;
 }
 
 // Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index.
