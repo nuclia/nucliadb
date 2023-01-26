@@ -22,6 +22,11 @@ message Relation {
     // Apart of having types, edges may be valued like
     // in the case of 'OTHER' edges. 
     string relation_label = 8;
+    optional string paragraph_id = 9;
+    optional int32 source_start = 10;
+    optional int32 source_end = 11;
+    optional int32 to_start = 12;
+    optional int32 to_end = 13;
 }
 
 // Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index.

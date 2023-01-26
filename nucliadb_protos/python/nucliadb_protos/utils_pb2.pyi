@@ -18,7 +18,6 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class Relation(google.protobuf.message.Message):
     """Relations are connexions between nodes in the relation index. 
     They are tuplets (Source, Relation Type, Relation Label, To).
@@ -63,6 +62,11 @@ class Relation(google.protobuf.message.Message):
     SOURCE_FIELD_NUMBER: builtins.int
     TO_FIELD_NUMBER: builtins.int
     RELATION_LABEL_FIELD_NUMBER: builtins.int
+    PARAGRAPH_ID_FIELD_NUMBER: builtins.int
+    SOURCE_START_FIELD_NUMBER: builtins.int
+    SOURCE_END_FIELD_NUMBER: builtins.int
+    TO_START_FIELD_NUMBER: builtins.int
+    TO_END_FIELD_NUMBER: builtins.int
     relation: global___Relation.RelationType.ValueType
     """relation is the type of the label."""
     @property
@@ -75,6 +79,11 @@ class Relation(google.protobuf.message.Message):
     """Apart of having types, edges may be valued like
     in the case of 'OTHER' edges.
     """
+    paragraph_id: builtins.str
+    source_start: builtins.int
+    source_end: builtins.int
+    to_start: builtins.int
+    to_end: builtins.int
     def __init__(
         self,
         *,
@@ -82,13 +91,27 @@ class Relation(google.protobuf.message.Message):
         source: global___RelationNode | None = ...,
         to: global___RelationNode | None = ...,
         relation_label: builtins.str = ...,
+        paragraph_id: builtins.str | None = ...,
+        source_start: builtins.int | None = ...,
+        source_end: builtins.int | None = ...,
+        to_start: builtins.int | None = ...,
+        to_end: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["source", b"source", "to", b"to"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["relation", b"relation", "relation_label", b"relation_label", "source", b"source", "to", b"to"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source", b"source", "source_end", b"source_end", "source_start", b"source_start", "to", b"to", "to_end", b"to_end", "to_start", b"to_start"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "relation", b"relation", "relation_label", b"relation_label", "source", b"source", "source_end", b"source_end", "source_start", b"source_start", "to", b"to", "to_end", b"to_end", "to_start", b"to_start"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_paragraph_id", b"_paragraph_id"]) -> typing_extensions.Literal["paragraph_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_end", b"_source_end"]) -> typing_extensions.Literal["source_end"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_start", b"_source_start"]) -> typing_extensions.Literal["source_start"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_end", b"_to_end"]) -> typing_extensions.Literal["to_end"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_start", b"_to_start"]) -> typing_extensions.Literal["to_start"] | None: ...
 
 global___Relation = Relation
 
-@typing_extensions.final
 class RelationNode(google.protobuf.message.Message):
     """Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index."""
 
@@ -131,7 +154,6 @@ class RelationNode(google.protobuf.message.Message):
 
 global___RelationNode = RelationNode
 
-@typing_extensions.final
 class JoinGraphCnx(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -155,11 +177,9 @@ class JoinGraphCnx(google.protobuf.message.Message):
 
 global___JoinGraphCnx = JoinGraphCnx
 
-@typing_extensions.final
 class JoinGraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class NodesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -193,11 +213,9 @@ class JoinGraph(google.protobuf.message.Message):
 
 global___JoinGraph = JoinGraph
 
-@typing_extensions.final
 class ExtractedText(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class SplitTextEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -232,7 +250,6 @@ class ExtractedText(google.protobuf.message.Message):
 
 global___ExtractedText = ExtractedText
 
-@typing_extensions.final
 class Vector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -260,7 +277,6 @@ class Vector(google.protobuf.message.Message):
 
 global___Vector = Vector
 
-@typing_extensions.final
 class Vectors(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -276,11 +292,9 @@ class Vectors(google.protobuf.message.Message):
 
 global___Vectors = Vectors
 
-@typing_extensions.final
 class VectorObject(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class SplitVectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -319,7 +333,6 @@ class VectorObject(google.protobuf.message.Message):
 
 global___VectorObject = VectorObject
 
-@typing_extensions.final
 class UserVector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -345,11 +358,9 @@ class UserVector(google.protobuf.message.Message):
 
 global___UserVector = UserVector
 
-@typing_extensions.final
 class UserVectors(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -380,11 +391,9 @@ class UserVectors(google.protobuf.message.Message):
 
 global___UserVectors = UserVectors
 
-@typing_extensions.final
 class UserVectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -415,7 +424,6 @@ class UserVectorSet(google.protobuf.message.Message):
 
 global___UserVectorSet = UserVectorSet
 
-@typing_extensions.final
 class UserVectorsList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

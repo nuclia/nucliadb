@@ -15,6 +15,16 @@ pub struct Relation {
     /// in the case of 'OTHER' edges. 
     #[prost(string, tag="8")]
     pub relation_label: ::prost::alloc::string::String,
+    #[prost(string, optional, tag="9")]
+    pub paragraph_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, optional, tag="10")]
+    pub source_start: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag="11")]
+    pub source_end: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag="12")]
+    pub to_start: ::core::option::Option<i32>,
+    #[prost(int32, optional, tag="13")]
+    pub to_end: ::core::option::Option<i32>,
 }
 /// Nested message and enum types in `Relation`.
 pub mod relation {

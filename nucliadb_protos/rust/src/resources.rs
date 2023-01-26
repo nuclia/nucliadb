@@ -376,6 +376,8 @@ pub struct FieldMetadata {
     /// Document
     #[prost(map="string, message", tag="12")]
     pub positions: ::std::collections::HashMap<::prost::alloc::string::String, Positions>,
+    #[prost(message, repeated, tag="13")]
+    pub relations: ::prost::alloc::vec::Vec<Relations>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldComputedMetadata {
