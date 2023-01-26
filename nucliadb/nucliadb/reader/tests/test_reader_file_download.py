@@ -202,6 +202,7 @@ async def _get_message_with_file(test_resource):
     [
         ("bytes=0-", 7489387, 0, 7489387 - 1, None),
         ("bytes=0-10", 7489387, 0, 10 + 1, None),
+        ("bytes=something", 10, None, None, ValueError),
     ],
 )
 def test_parse_media_range(range_request, filesize, start, end, exception):
