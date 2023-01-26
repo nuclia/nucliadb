@@ -22,6 +22,7 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
+    RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
@@ -34,6 +35,7 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing_extensions.final
 class TextInformation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -52,6 +54,7 @@ class TextInformation(google.protobuf.message.Message):
 
 global___TextInformation = TextInformation
 
+@typing_extensions.final
 class IndexMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -74,6 +77,7 @@ class IndexMetadata(google.protobuf.message.Message):
 
 global___IndexMetadata = IndexMetadata
 
+@typing_extensions.final
 class ShardId(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -88,6 +92,7 @@ class ShardId(google.protobuf.message.Message):
 
 global___ShardId = ShardId
 
+@typing_extensions.final
 class ShardIds(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -103,6 +108,7 @@ class ShardIds(google.protobuf.message.Message):
 
 global___ShardIds = ShardIds
 
+@typing_extensions.final
 class ShardCreated(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -181,6 +187,7 @@ class ShardCreated(google.protobuf.message.Message):
 
 global___ShardCreated = ShardCreated
 
+@typing_extensions.final
 class ShardCleaned(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -204,6 +211,7 @@ class ShardCleaned(google.protobuf.message.Message):
 
 global___ShardCleaned = ShardCleaned
 
+@typing_extensions.final
 class ResourceID(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -221,6 +229,7 @@ class ResourceID(google.protobuf.message.Message):
 
 global___ResourceID = ResourceID
 
+@typing_extensions.final
 class Shard(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -244,6 +253,7 @@ class Shard(google.protobuf.message.Message):
 
 global___Shard = Shard
 
+@typing_extensions.final
 class ShardList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -259,6 +269,7 @@ class ShardList(google.protobuf.message.Message):
 
 global___ShardList = ShardList
 
+@typing_extensions.final
 class EmptyResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -268,6 +279,7 @@ class EmptyResponse(google.protobuf.message.Message):
 
 global___EmptyResponse = EmptyResponse
 
+@typing_extensions.final
 class EmptyQuery(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -277,6 +289,7 @@ class EmptyQuery(google.protobuf.message.Message):
 
 global___EmptyQuery = EmptyQuery
 
+@typing_extensions.final
 class VectorSentence(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -292,6 +305,7 @@ class VectorSentence(google.protobuf.message.Message):
 
 global___VectorSentence = VectorSentence
 
+@typing_extensions.final
 class ParagraphPosition(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -325,6 +339,7 @@ class ParagraphPosition(google.protobuf.message.Message):
 
 global___ParagraphPosition = ParagraphPosition
 
+@typing_extensions.final
 class ParagraphMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -341,9 +356,11 @@ class ParagraphMetadata(google.protobuf.message.Message):
 
 global___ParagraphMetadata = ParagraphMetadata
 
+@typing_extensions.final
 class IndexParagraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class SentencesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -405,6 +422,7 @@ class IndexParagraph(google.protobuf.message.Message):
 
 global___IndexParagraph = IndexParagraph
 
+@typing_extensions.final
 class VectorSetID(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -424,6 +442,7 @@ class VectorSetID(google.protobuf.message.Message):
 
 global___VectorSetID = VectorSetID
 
+@typing_extensions.final
 class VectorSetList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -444,9 +463,11 @@ class VectorSetList(google.protobuf.message.Message):
 
 global___VectorSetList = VectorSetList
 
+@typing_extensions.final
 class IndexParagraphs(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class ParagraphsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -477,6 +498,7 @@ class IndexParagraphs(google.protobuf.message.Message):
 
 global___IndexParagraphs = IndexParagraphs
 
+@typing_extensions.final
 class Resource(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -499,6 +521,7 @@ class Resource(google.protobuf.message.Message):
     DELETE: Resource.ResourceStatus.ValueType  # 3
     PENDING: Resource.ResourceStatus.ValueType  # 4
 
+    @typing_extensions.final
     class TextsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -516,6 +539,7 @@ class Resource(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
     class ParagraphsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -533,6 +557,7 @@ class Resource(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -550,6 +575,7 @@ class Resource(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
+    @typing_extensions.final
     class VectorsToDeleteEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

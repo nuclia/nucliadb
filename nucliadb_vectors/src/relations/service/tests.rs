@@ -243,18 +243,21 @@ fn join_graph_test() -> anyhow::Result<()> {
                 target: 1,
                 rtype: RelationType::Child as i32,
                 rsubtype: "".to_string(),
+                metadata: None,
             },
             JoinGraphCnx {
                 source: 0,
                 target: 2,
                 rtype: RelationType::Entity as i32,
                 rsubtype: "".to_string(),
+                metadata: None,
             },
             JoinGraphCnx {
                 source: 0,
                 target: 1,
                 rtype: RelationType::Entity as i32,
                 rsubtype: "".to_string(),
+                metadata: None,
             },
         ],
     };

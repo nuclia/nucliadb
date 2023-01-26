@@ -79,6 +79,8 @@ pub struct JoinGraphCnx {
     pub rtype: i32,
     #[prost(string, tag="3")]
     pub rsubtype: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="5")]
+    pub metadata: ::core::option::Option<RelationMetadata>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct JoinGraph {

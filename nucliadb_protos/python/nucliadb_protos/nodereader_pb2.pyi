@@ -44,6 +44,7 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
+    RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
@@ -56,6 +57,7 @@ from nucliadb_protos.utils_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing_extensions.final
 class Filter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -71,6 +73,7 @@ class Filter(google.protobuf.message.Message):
 
 global___Filter = Filter
 
+@typing_extensions.final
 class Faceted(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -86,6 +89,7 @@ class Faceted(google.protobuf.message.Message):
 
 global___Faceted = Faceted
 
+@typing_extensions.final
 class OrderBy(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -116,6 +120,7 @@ class OrderBy(google.protobuf.message.Message):
 
 global___OrderBy = OrderBy
 
+@typing_extensions.final
 class Timestamps(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -144,6 +149,7 @@ class Timestamps(google.protobuf.message.Message):
 
 global___Timestamps = Timestamps
 
+@typing_extensions.final
 class FacetResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -161,6 +167,7 @@ class FacetResult(google.protobuf.message.Message):
 
 global___FacetResult = FacetResult
 
+@typing_extensions.final
 class FacetResults(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -176,6 +183,7 @@ class FacetResults(google.protobuf.message.Message):
 
 global___FacetResults = FacetResults
 
+@typing_extensions.final
 class DocumentSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -236,6 +244,7 @@ class DocumentSearchRequest(google.protobuf.message.Message):
 
 global___DocumentSearchRequest = DocumentSearchRequest
 
+@typing_extensions.final
 class ParagraphSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -298,6 +307,7 @@ class ParagraphSearchRequest(google.protobuf.message.Message):
 
 global___ParagraphSearchRequest = ParagraphSearchRequest
 
+@typing_extensions.final
 class ResultScore(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -318,6 +328,7 @@ class ResultScore(google.protobuf.message.Message):
 
 global___ResultScore = ResultScore
 
+@typing_extensions.final
 class DocumentResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -344,9 +355,11 @@ class DocumentResult(google.protobuf.message.Message):
 
 global___DocumentResult = DocumentResult
 
+@typing_extensions.final
 class DocumentSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class FacetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -400,6 +413,7 @@ class DocumentSearchResponse(google.protobuf.message.Message):
 
 global___DocumentSearchResponse = DocumentSearchResponse
 
+@typing_extensions.final
 class ParagraphResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -450,9 +464,11 @@ class ParagraphResult(google.protobuf.message.Message):
 
 global___ParagraphResult = ParagraphResult
 
+@typing_extensions.final
 class ParagraphSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class FacetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -517,6 +533,7 @@ class ParagraphSearchResponse(google.protobuf.message.Message):
 
 global___ParagraphSearchResponse = ParagraphSearchResponse
 
+@typing_extensions.final
 class VectorSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -562,6 +579,7 @@ class VectorSearchRequest(google.protobuf.message.Message):
 
 global___VectorSearchRequest = VectorSearchRequest
 
+@typing_extensions.final
 class DocumentVectorIdentifier(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -576,6 +594,7 @@ class DocumentVectorIdentifier(google.protobuf.message.Message):
 
 global___DocumentVectorIdentifier = DocumentVectorIdentifier
 
+@typing_extensions.final
 class DocumentScored(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -595,6 +614,7 @@ class DocumentScored(google.protobuf.message.Message):
 
 global___DocumentScored = DocumentScored
 
+@typing_extensions.final
 class VectorSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -619,6 +639,7 @@ class VectorSearchResponse(google.protobuf.message.Message):
 
 global___VectorSearchResponse = VectorSearchResponse
 
+@typing_extensions.final
 class RelationNodeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -638,6 +659,7 @@ class RelationNodeFilter(google.protobuf.message.Message):
 
 global___RelationNodeFilter = RelationNodeFilter
 
+@typing_extensions.final
 class RelationEdgeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -658,6 +680,7 @@ class RelationEdgeFilter(google.protobuf.message.Message):
 
 global___RelationEdgeFilter = RelationEdgeFilter
 
+@typing_extensions.final
 class RelationPrefixSearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -672,6 +695,7 @@ class RelationPrefixSearchRequest(google.protobuf.message.Message):
 
 global___RelationPrefixSearchRequest = RelationPrefixSearchRequest
 
+@typing_extensions.final
 class RelationPrefixSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -687,6 +711,7 @@ class RelationPrefixSearchResponse(google.protobuf.message.Message):
 
 global___RelationPrefixSearchResponse = RelationPrefixSearchResponse
 
+@typing_extensions.final
 class EntitiesSubgraphRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -722,6 +747,7 @@ class EntitiesSubgraphRequest(google.protobuf.message.Message):
 
 global___EntitiesSubgraphRequest = EntitiesSubgraphRequest
 
+@typing_extensions.final
 class EntitiesSubgraphResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -737,6 +763,7 @@ class EntitiesSubgraphResponse(google.protobuf.message.Message):
 
 global___EntitiesSubgraphResponse = EntitiesSubgraphResponse
 
+@typing_extensions.final
 class RelationSearchRequest(google.protobuf.message.Message):
     """TODO: uncomment and implement (next iteration)
     message RelationPathsSearchRequest {
@@ -784,6 +811,7 @@ class RelationSearchRequest(google.protobuf.message.Message):
 
 global___RelationSearchRequest = RelationSearchRequest
 
+@typing_extensions.final
 class RelationSearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -807,6 +835,7 @@ class RelationSearchResponse(google.protobuf.message.Message):
 
 global___RelationSearchResponse = RelationSearchResponse
 
+@typing_extensions.final
 class SearchRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -893,6 +922,7 @@ class SearchRequest(google.protobuf.message.Message):
 
 global___SearchRequest = SearchRequest
 
+@typing_extensions.final
 class SuggestRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -923,6 +953,7 @@ class SuggestRequest(google.protobuf.message.Message):
 
 global___SuggestRequest = SuggestRequest
 
+@typing_extensions.final
 class RelatedEntities(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -941,6 +972,7 @@ class RelatedEntities(google.protobuf.message.Message):
 
 global___RelatedEntities = RelatedEntities
 
+@typing_extensions.final
 class SuggestResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -973,6 +1005,7 @@ class SuggestResponse(google.protobuf.message.Message):
 
 global___SuggestResponse = SuggestResponse
 
+@typing_extensions.final
 class SearchResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1001,6 +1034,7 @@ class SearchResponse(google.protobuf.message.Message):
 
 global___SearchResponse = SearchResponse
 
+@typing_extensions.final
 class IdCollection(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1016,6 +1050,7 @@ class IdCollection(google.protobuf.message.Message):
 
 global___IdCollection = IdCollection
 
+@typing_extensions.final
 class RelationEdge(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1033,6 +1068,7 @@ class RelationEdge(google.protobuf.message.Message):
 
 global___RelationEdge = RelationEdge
 
+@typing_extensions.final
 class EdgeList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1048,6 +1084,7 @@ class EdgeList(google.protobuf.message.Message):
 
 global___EdgeList = EdgeList
 
+@typing_extensions.final
 class RelationTypeListMember(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1065,6 +1102,7 @@ class RelationTypeListMember(google.protobuf.message.Message):
 
 global___RelationTypeListMember = RelationTypeListMember
 
+@typing_extensions.final
 class TypeList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1080,6 +1118,7 @@ class TypeList(google.protobuf.message.Message):
 
 global___TypeList = TypeList
 
+@typing_extensions.final
 class GetShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1099,6 +1138,7 @@ class GetShardRequest(google.protobuf.message.Message):
 
 global___GetShardRequest = GetShardRequest
 
+@typing_extensions.final
 class ParagraphItem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1117,6 +1157,7 @@ class ParagraphItem(google.protobuf.message.Message):
 
 global___ParagraphItem = ParagraphItem
 
+@typing_extensions.final
 class DocumentItem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1138,6 +1179,7 @@ class DocumentItem(google.protobuf.message.Message):
 
 global___DocumentItem = DocumentItem
 
+@typing_extensions.final
 class StreamRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

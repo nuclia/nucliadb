@@ -97,12 +97,13 @@ impl RelationWriter for RelationsWriterService {
             info!("Populating the graph: starts {v} ms");
         }
         let ubehaviour = || Err(InnerErr::UBehaviour);
-        for edge in graph.edges.iter() {
-            let from = nodes.get(&edge.source).map_or_else(ubehaviour, Ok)?;
-            let to = nodes.get(&edge.target).map_or_else(ubehaviour, Ok)?;
-            let edge = relation_type_parsing(edge.rtype(), &edge.rsubtype);
+        for protos_edge in graph.edges.iter() {
+            let from = nodes.get(&protos_edge.source).map_or_else(ubehaviour, Ok)?;
+            let to = nodes.get(&protos_edge.target).map_or_else(ubehaviour, Ok)?;
+            let edge = relation_type_parsing(protos_edge.rtype(), &protos_edge.rsubtype);
             let edge = IoEdge::new(edge.0.to_string(), edge.1.map(|s| s.to_string()));
-            writer.connect(&self.wmode, from, to, &edge, None)?;
+            let metadata = protos_edge.metadata.clone().map(IoEdgeMetadata::from);
+            writer.connect(&self.wmode, &from, &to, &edge, metadata.as_ref())?;
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("Populating the graph: ends {v} ms");

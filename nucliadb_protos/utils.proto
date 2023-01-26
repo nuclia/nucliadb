@@ -52,6 +52,7 @@ message JoinGraphCnx {
     int32 target = 1;
     Relation.RelationType rtype = 2;
     string rsubtype = 3;
+    RelationMetadata metadata = 5;
 }
 message JoinGraph {
     map<int32, RelationNode> nodes = 1; 
