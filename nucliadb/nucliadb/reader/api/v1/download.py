@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
-from typing import Optional
+from typing import Optional, Tuple
 
 from fastapi import HTTPException
 from fastapi.requests import Request
@@ -197,12 +197,7 @@ async def download_api(sf: StorageField, headers: Headers):
     if "range" in headers and file_size > -1:
         range_request = headers["range"]
         try:
-            start_str, _, end_str = range_request.split("bytes=")[-1].partition("-")
-            start = int(start_str)
-            if len(end_str) == 0:
-                # bytes=0- is valid
-                end = file_size - 1
-            end = int(end_str) + 1  # python is inclusive, http is exclusive
+            start, end = parse_media_range(range_request, file_size)
         except (IndexError, ValueError):
             # range errors fallback to full download
             raise HTTPException(
@@ -257,3 +252,14 @@ async def _get_resource_uuid_from_params(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
     return rid
+
+
+def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int]:
+    start_str, _, end_str = range_request.split("bytes=")[-1].partition("-")
+    start = int(start_str)
+    if len(end_str) == 0:
+        # bytes=0- is valid
+        end = file_size - 1
+    else:
+        end = int(end_str) + 1  # python is inclusive, http is exclusive
+    return start, end

@@ -27,6 +27,7 @@ from nucliadb_protos.resources_pb2 import FieldType
 import nucliadb.ingest.tests.fixtures
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.tests.fixtures import TEST_CLOUDFILE, THUMBNAIL
+from nucliadb.reader.api.v1.download import parse_media_range
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 
@@ -75,10 +76,19 @@ async def test_resource_download_field_file(
             == "text.pb"
         )
 
+        # Check that invalid range is handled
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            headers={"range": "bytes=invalid-range"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 416
+        assert resp.json()["detail"]["reason"] == "rangeNotParsable"
+
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            headers={"range": "bytes=0-"},
+        )
+        assert resp.status_code == 206
         assert resp.headers["Content-Disposition"]
 
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
@@ -194,3 +204,19 @@ async def _get_message_with_file(test_resource):
     message_with_files = conversations.messages[33]
     msg_id, file_num = message_with_files.content.attachments[1].uri.split("/")[-2:]
     return msg_id, file_num
+
+
+@pytest.mark.parametrize(
+    "range_request,filesize,start,end,exception",
+    [
+        ("bytes=0-", 7489387, 0, 7489387 - 1, None),
+        ("bytes=0-10", 7489387, 0, 10 + 1, None),
+        ("bytes=something", 10, None, None, ValueError),
+    ],
+)
+def test_parse_media_range(range_request, filesize, start, end, exception):
+    if not exception:
+        assert parse_media_range(range_request, filesize) == (start, end)
+    else:
+        with pytest.raises(exception):
+            parse_media_range(range_request, filesize)
