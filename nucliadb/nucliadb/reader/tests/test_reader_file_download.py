@@ -76,10 +76,19 @@ async def test_resource_download_field_file(
             == "text.pb"
         )
 
+        # Check that invalid range is handled
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            headers={"range": "bytes=invalid-range"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 416
+        assert resp.json()["detail"]["reason"] == "rangeNotParsable"
+
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            headers={"range": "bytes=0-"},
+        )
+        assert resp.status_code == 206
         assert resp.headers["Content-Disposition"]
 
         filename = f"{os.path.dirname(nucliadb.ingest.tests.fixtures.__file__)}/{TEST_CLOUDFILE.bucket_name}/{TEST_CLOUDFILE.uri}"  # noqa
