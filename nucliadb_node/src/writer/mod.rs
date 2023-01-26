@@ -255,8 +255,8 @@ impl NodeWriterService {
         };
 
         Publisher::default()
-            // `unwrap` call is safe since the shard path already terminate by a valid file name.
             .append(&shard.path)
+            // `unwrap` call is safe since the shard path already terminate by a valid file name.
             .unwrap()
             .send_to(address)
             .await
