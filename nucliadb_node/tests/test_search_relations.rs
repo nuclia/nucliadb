@@ -171,108 +171,126 @@ async fn create_knowledge_graph(
             source: Some(relation_nodes.get("Batman").unwrap().clone()),
             to: Some(relation_nodes.get("Catwoman").unwrap().clone()),
             relation_label: "love".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Batman").unwrap().clone()),
             to: Some(relation_nodes.get("Joker").unwrap().clone()),
             relation_label: "fight".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Joker").unwrap().clone()),
             to: Some(relation_nodes.get("Physics").unwrap().clone()),
             relation_label: "enjoy".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Catwoman").unwrap().clone()),
             to: Some(relation_nodes.get("Cat").unwrap().clone()),
             relation_label: "imitate".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Cat").unwrap().clone()),
             to: Some(relation_nodes.get("Animal").unwrap().clone()),
             relation_label: "species".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Newton").unwrap().clone()),
             to: Some(relation_nodes.get("Physics").unwrap().clone()),
             relation_label: "study".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Newton").unwrap().clone()),
             to: Some(relation_nodes.get("Gravity").unwrap().clone()),
             relation_label: "formulate".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Eric").unwrap().clone()),
             to: Some(relation_nodes.get("Cat").unwrap().clone()),
             relation_label: "like".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Eric").unwrap().clone()),
             to: Some(relation_nodes.get("Joan Antoni").unwrap().clone()),
             relation_label: "collaborate".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Joan Antoni").unwrap().clone()),
             to: Some(relation_nodes.get("Eric").unwrap().clone()),
             relation_label: "collaborate".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Joan Antoni").unwrap().clone()),
             to: Some(relation_nodes.get("Becquer").unwrap().clone()),
             relation_label: "read".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Becquer").unwrap().clone()),
             to: Some(relation_nodes.get("Poetry").unwrap().clone()),
             relation_label: "write".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Becquer").unwrap().clone()),
             to: Some(relation_nodes.get("Poetry").unwrap().clone()),
             relation_label: "like".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::About as i32,
             source: Some(relation_nodes.get("Poetry").unwrap().clone()),
             to: Some(relation_nodes.get("Swallow").unwrap().clone()),
             relation_label: "about".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Other as i32,
             source: Some(relation_nodes.get(&rid.to_string()).unwrap().clone()),
             to: Some(relation_nodes.get("Poetry").unwrap().clone()),
             relation_label: "subject".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Swallow").unwrap().clone()),
             to: Some(relation_nodes.get("Animal").unwrap().clone()),
             relation_label: "species".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Swallow").unwrap().clone()),
             to: Some(relation_nodes.get("Fly").unwrap().clone()),
             relation_label: "can".to_string(),
+            ..Default::default()
         },
         Relation {
             relation: RelationType::Entity as i32,
             source: Some(relation_nodes.get("Fly").unwrap().clone()),
             to: Some(relation_nodes.get("Gravity").unwrap().clone()),
             relation_label: "defy".to_string(),
+            ..Default::default()
         },
     ];
 
