@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import json
 from datetime import datetime
 
 import pytest
@@ -36,6 +37,7 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
+    ClearCountersCacheRequest,
     ExportRequest,
     FileRequest,
     IndexResource,
@@ -45,7 +47,8 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.tests.fixtures import IngestFixture
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.cache import KB_COUNTER_CACHE
+from nucliadb_utils.utilities import get_cache, get_storage
 
 
 @pytest.mark.asyncio
@@ -196,3 +199,33 @@ async def test_export_file(grpc_servicer: IngestFixture):
         assert export.files["file1"].file.uri.startswith(f"kbs/{kbid}")
         assert kbid in export.files["file1"].file.bucket_name
     assert found
+
+
+@pytest.mark.asyncio
+async def test_clear_knowledgebox_counters_cache(grpc_servicer: IngestFixture):
+    kbid = "foobar"
+
+    # Put counters data in cache
+    cache = await get_cache()
+    assert cache is not None
+
+    kb_counters_key = KB_COUNTER_CACHE.format(kbid=kbid)
+    await cache.set(
+        kb_counters_key,
+        json.dumps(
+            {
+                "resources": 100,
+                "paragraphs": 100,
+                "fields": 100,
+                "sentences": 100,
+                "shards": [],
+            }
+        ),
+    )
+    assert await cache.get(kb_counters_key)
+
+    req = ClearCountersCacheRequest(kbid=kbid)
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    await stub.ClearKnowledgeBoxCountersCache(req)
+
+    assert await cache.get(kb_counters_key) is None

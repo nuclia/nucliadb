@@ -254,9 +254,9 @@ class WriterStub:
         nucliadb_protos.writer_pb2.UploadBinaryData,
         nucliadb_protos.writer_pb2.FileUploaded]
 
-    CacheDeleteKey: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.writer_pb2.CacheDeleteKeyRequest,
-        nucliadb_protos.writer_pb2.CacheDeleteKeyResponse]
+    ClearKnowledgeBoxCountersCache: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.ClearCountersCacheRequest,
+        nucliadb_protos.writer_pb2.ClearCountersCacheResponse]
 
 
 class WriterServicer(metaclass=abc.ABCMeta):
@@ -467,10 +467,10 @@ class WriterServicer(metaclass=abc.ABCMeta):
     ) -> nucliadb_protos.writer_pb2.FileUploaded: ...
 
     @abc.abstractmethod
-    def CacheDeleteKey(self,
-        request: nucliadb_protos.writer_pb2.CacheDeleteKeyRequest,
+    def ClearKnowledgeBoxCountersCache(self,
+        request: nucliadb_protos.writer_pb2.ClearCountersCacheRequest,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.CacheDeleteKeyResponse: ...
+    ) -> nucliadb_protos.writer_pb2.ClearCountersCacheResponse: ...
 
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: grpc.Server) -> None: ...

@@ -41,8 +41,8 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
-    CacheDeleteKeyRequest,
-    CacheDeleteKeyResponse,
+    ClearCountersCacheRequest,
+    ClearCountersCacheResponse,
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
@@ -103,6 +103,7 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
@@ -733,14 +734,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         result = FileUploaded()
         return result
 
-    async def CacheDeleteKey(
-        self, request: CacheDeleteKeyRequest, context=None
-    ) -> CacheDeleteKeyResponse:
+    async def ClearKnowledgeBoxCountersCache(
+        self, request: ClearCountersCacheRequest, context=None
+    ) -> ClearCountersCacheResponse:
         cache = await get_cache()
         if cache is None:
             return
-        await cache.delete(request.key, invalidate=request.invalidate)
-        return CacheDeleteKeyResponse()
+        key = KB_COUNTER_CACHE.format(kbid=request.kbid)
+        await cache.delete(key, invalidate=True)
+        return ClearCountersCacheResponse()
 
 
 def update_shards_with_updated_replica(

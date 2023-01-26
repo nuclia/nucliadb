@@ -429,13 +429,14 @@ message FileUploaded {
     
 }
 
-message CacheDeleteKeyRequest {
-    string key = 1;
-    bool invalidate = 2;
+message ClearCountersCacheRequest {
+    string kbid = 1;
 }
 
-message CacheDeleteKeyResponse {
+message ClearCountersCacheResponse {
+
 }
+
 
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
@@ -487,5 +488,5 @@ service Writer {
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 
-    rpc CacheDeleteKey(CacheDeleteKeyRequest) returns (CacheDeleteKeyResponse) {}
+    rpc ClearKnowledgeBoxCountersCache(ClearCountersCacheRequest) returns (ClearCountersCacheResponse) {}
 }

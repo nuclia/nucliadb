@@ -604,12 +604,10 @@ pub mod upload_binary_data {
 pub struct FileUploaded {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CacheDeleteKeyRequest {
+pub struct ClearCountersCacheRequest {
     #[prost(string, tag="1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(bool, tag="2")]
-    pub invalidate: bool,
+    pub kbid: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CacheDeleteKeyResponse {
+pub struct ClearCountersCacheResponse {
 }

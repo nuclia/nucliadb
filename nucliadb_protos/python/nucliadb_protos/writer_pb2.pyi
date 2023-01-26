@@ -1438,22 +1438,19 @@ class FileUploaded(google.protobuf.message.Message):
         ) -> None: ...
 global___FileUploaded = FileUploaded
 
-class CacheDeleteKeyRequest(google.protobuf.message.Message):
+class ClearCountersCacheRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    KEY_FIELD_NUMBER: builtins.int
-    INVALIDATE_FIELD_NUMBER: builtins.int
-    key: typing.Text
-    invalidate: builtins.bool
+    KBID_FIELD_NUMBER: builtins.int
+    kbid: typing.Text
     def __init__(self,
         *,
-        key: typing.Text = ...,
-        invalidate: builtins.bool = ...,
+        kbid: typing.Text = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["invalidate",b"invalidate","key",b"key"]) -> None: ...
-global___CacheDeleteKeyRequest = CacheDeleteKeyRequest
+    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid"]) -> None: ...
+global___ClearCountersCacheRequest = ClearCountersCacheRequest
 
-class CacheDeleteKeyResponse(google.protobuf.message.Message):
+class ClearCountersCacheResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     def __init__(self,
         ) -> None: ...
-global___CacheDeleteKeyResponse = CacheDeleteKeyResponse
+global___ClearCountersCacheResponse = ClearCountersCacheResponse
