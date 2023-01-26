@@ -440,11 +440,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
-        let port = request.port as u16;
 
         let mut service = self.0.write().await;
 
-        match service.accept_shard(&shard_id, port).await.transpose() {
+        match service
+            .accept_shard(&shard_id, request.port as u16, request.override_shard)
+            .await
+            .transpose()
+        {
             Some(Ok(_)) => {
                 info!("Shard {} received successfully", shard_id.id);
 

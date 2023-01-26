@@ -277,8 +277,9 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         port: u16,
+        override_shard: bool,
     ) -> ServiceResult<Option<()>> {
-        if self.get_shard(shard_id).is_some() {
+        if !override_shard && self.get_shard(shard_id).is_some() {
             return Ok(None);
         };
 

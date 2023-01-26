@@ -72,6 +72,8 @@ pub struct AcceptShardRequest {
     pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
     #[prost(uint32, tag="2")]
     pub port: u32,
+    #[prost(bool, tag="3")]
+    pub override_shard: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Counter {

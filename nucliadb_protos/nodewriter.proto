@@ -49,6 +49,7 @@ message MoveShardRequest {
 message AcceptShardRequest {
     noderesources.ShardId shard_id = 1;
     uint32 port = 2;
+    bool override_shard = 3;
 }
 
 service NodeWriter {
