@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.45
+------
+- Add protos to moving and accepting shards
+
 0.0.44
 ------
 - Add protos for upload and download
