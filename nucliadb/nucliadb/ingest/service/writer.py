@@ -101,6 +101,7 @@ from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
 from nucliadb.sentry import SENTRY
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import (
@@ -260,16 +261,23 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request_stream: AsyncIterator[BrokerMessage], context=None
     ):
         response = OpStatusWriter()
+        cache = await get_cache()
         async for message in request_stream:
+            processed: bool = False
             try:
-                await self.proc.process(message, -1, 0, transaction_check=False)
+                processed = await self.proc.process(
+                    message, -1, 0, transaction_check=False
+                )
             except Exception:
                 logger.exception("Error processing", stack_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 break
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
-
+            if processed and cache is not None:
+                await cache.delete(
+                    KB_COUNTER_CACHE.format(kbid=message.kbid), invalidate=True
+                )
         return response
 
     async def SetLabels(self, request: SetLabelsRequest, context=None) -> OpStatusWriter:  # type: ignore
