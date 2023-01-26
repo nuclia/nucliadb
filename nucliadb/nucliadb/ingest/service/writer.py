@@ -36,7 +36,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
-from nucliadb_protos.noderesources_pb2 import ShardCleaned
+from nucliadb_protos.noderesources_pb2 import ShardCleaned, ShardCreated
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
@@ -79,6 +79,8 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorsRequest,
     SetVectorsResponse,
     SetWidgetsRequest,
+    ShadowShardCreateRequest,
+    ShadowShardCreateResponse,
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2 import (
@@ -741,6 +743,39 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         result = FileUploaded()
         return result
 
+    async def ShadowShardCreate(self, request: ShadowShardCreateRequest, context=None) -> ShadowShardCreateResponse:
+        response = ShadowShardCreateResponse(success=False)
+        try:
+            # TODO
+            # Send a grpc request to the node's sidecar to create a new shadow shard
+            # Be able to pass which versions you want the shard to be created with
+            # Handle any errors on that call
+
+            # Get the shard if from the response
+            # Update shard object with the new shadow replica
+            shadow_replica_id = "foobar"
+            txn = await self.proc.driver.begin()
+            node_klass = get_node_klass()
+            all_shards = await node_klass.get_all_shards(txn, request.kbid)
+
+            updated_shards = PBShards()
+            updated_shards.CopyFrom(all_shards)
+
+            shadow = ShardCreated(id=shadow_replica_id)
+            update_shards_with_shadow_replica(updated_shards, request.replica_id, shadow_replica=shadow, shadow_node=request.node)
+
+            key = KB_SHARDS.format(kbid=request.kbid)
+            await txn.set(key, updated_shards.SerializeToString())
+            await txn.commit(resource=False)
+        except Exception as e:
+            event_id: Optional[str] = None
+            if SENTRY:
+                event_id = capture_exception(e)
+            logger.error(f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}")
+        else:
+            response.success = True
+        finally:
+            return response
 
 def update_shards_with_updated_replica(
     shards: PBShards, replica_id: str, updated_replica: ShardCleaned
@@ -752,4 +787,20 @@ def update_shards_with_updated_replica(
                 replica.shard.vector_service = updated_replica.vector_service
                 replica.shard.paragraph_service = updated_replica.paragraph_service
                 replica.shard.relation_service = updated_replica.relation_service
+                return
+
+
+def update_shards_with_shadow_replica(
+    shards: PBShards, replica_id: str, shadow_replica: ShardCreated, shadow_node: str
+):
+    for logic_shard in shards.shards:
+        for replica in logic_shard.replicas:
+            if replica.shard.id == replica_id:
+                replica.has_shadow = True
+                replica.shadow_replica.node = shadow_node
+                replica.shadow_replica.shard.id = shadow_replica.id
+                replica.shadow_replica.shard.document_service = shadow_replica.document_service
+                replica.shadow_replica.shard.vector_service = shadow_replica.vector_service
+                replica.shadow_replica.shard.paragraph_service = shadow_replica.paragraph_service
+                replica.shadow_replica.shard.relation_service = shadow_replica.relation_service
                 return

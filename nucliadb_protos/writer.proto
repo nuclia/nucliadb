@@ -337,10 +337,17 @@ message ListMembersResponse {
   repeated Member members = 1;
 }
 
+message ShadowShard {
+    noderesources.ShardCreated shard = 1;
+    string node = 2;
+}
 
 message ShardReplica {
     noderesources.ShardCreated shard = 1;
     string node = 2;
+
+    bool has_shadow = 3;
+    ShadowShard shadow_replica = 4;
 }
 
 message ShardObject {
@@ -429,6 +436,17 @@ message FileUploaded {
     
 }
 
+message ShadowShardCreateRequest {
+    string kbid = 1;
+    string replica_id = 2;
+    string node = 3;
+}
+
+message ShadowShardCreateResponse {
+    bool success = 1;
+}
+
+
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
     rpc NewKnowledgeBox(knowledgebox.KnowledgeBoxNew) returns (knowledgebox.NewKnowledgeBoxResponse) {}
@@ -478,4 +496,7 @@ service Writer {
     rpc Export(ExportRequest) returns (stream BrokerMessage) {}
     rpc DownloadFile(FileRequest) returns (stream BinaryData) {}
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
+
+    // Shard management
+    rpc ShadowShardCreate(ShadowShardCreateRequest) returns (ShadowShardCreateResponse) {}
 }
