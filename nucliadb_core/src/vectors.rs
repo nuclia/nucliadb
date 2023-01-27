@@ -17,28 +17,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
-use nucliadb_core::protos::{EmptyQuery, ShardId};
+use nucliadb_protos::*;
 
-mod common;
+use crate::prelude::*;
 
-use common::node_writer;
-use tonic::Request;
+pub type RVectors = Arc<dyn VectorReader>;
+pub type WVectors = Arc<RwLock<dyn VectorWriter>>;
 
-#[tokio::test]
-async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
+#[derive(Clone)]
+pub struct VectorConfig {
+    pub no_results: Option<usize>,
+    pub path: PathBuf,
+    pub vectorset: PathBuf,
+}
 
-    let new_shard_response = writer.new_shard(Request::new(EmptyQuery {})).await?;
-    let shard_id = &new_shard_response.get_ref().id;
+pub trait VectorReader:
+    ReaderChild<Request = VectorSearchRequest, Response = VectorSearchResponse>
+{
+    fn count(&self, vectorset: &str) -> NodeResult<usize>;
+}
 
-    let response = writer
-        .get_shard(Request::new(ShardId {
-            id: shard_id.clone(),
-        }))
-        .await?;
-
-    assert_eq!(shard_id, &response.get_ref().id);
-
-    Ok(())
+pub trait VectorWriter: WriterChild {
+    fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
+    fn add_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
+    fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
 }

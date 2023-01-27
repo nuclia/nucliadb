@@ -21,15 +21,15 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
     ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
     SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest, SuggestRequest,
     SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_service_interface::thread::*;
-use nucliadb_service_interface::tracing::{self, *};
+use nucliadb_core::thread::*;
+use nucliadb_core::tracing::{self, *};
 
 use crate::config::Configuration;
 use crate::services::reader::ShardReaderService;

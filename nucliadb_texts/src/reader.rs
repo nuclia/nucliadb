@@ -23,12 +23,12 @@ use std::fs;
 use std::time::*;
 
 use itertools::Itertools;
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
 };
-use nucliadb_service_interface::tracing::{self, *};
+use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{
     Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
@@ -580,12 +580,12 @@ mod tests {
     use std::collections::HashMap;
     use std::time::SystemTime;
 
-    use nucliadb_service_interface::protos::prost_types::Timestamp;
-    use nucliadb_service_interface::protos::resource::ResourceStatus;
-    use nucliadb_service_interface::protos::{
+    use nucliadb_core::protos::prost_types::Timestamp;
+    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::{
         Faceted, Filter, IndexMetadata, OrderBy, Resource, ResourceId, TextInformation, Timestamps,
     };
-    use nucliadb_service_interface::NodeResult;
+    use nucliadb_core::NodeResult;
     use tempfile::TempDir;
 
     use super::*;

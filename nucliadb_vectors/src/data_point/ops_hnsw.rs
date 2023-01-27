@@ -21,10 +21,10 @@
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
+use nucliadb_core::thread::*;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
-use rayon::prelude::*;
 
 use super::*;
 

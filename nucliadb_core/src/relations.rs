@@ -17,28 +17,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
-use nucliadb_core::protos::{EmptyQuery, ShardId};
+use nucliadb_protos::*;
 
-mod common;
+use crate::prelude::*;
 
-use common::node_writer;
-use tonic::Request;
+pub type RRelations = Arc<dyn RelationReader>;
+pub type WRelations = Arc<RwLock<dyn RelationWriter>>;
 
-#[tokio::test]
-async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = node_writer().await;
+#[derive(Clone)]
+pub struct RelationConfig {
+    pub path: PathBuf,
+}
 
-    let new_shard_response = writer.new_shard(Request::new(EmptyQuery {})).await?;
-    let shard_id = &new_shard_response.get_ref().id;
+pub trait RelationReader:
+    ReaderChild<Request = RelationSearchRequest, Response = RelationSearchResponse>
+{
+    fn get_edges(&self) -> NodeResult<EdgeList>;
+    fn get_node_types(&self) -> NodeResult<TypeList>;
+    fn count(&self) -> NodeResult<usize>;
+}
 
-    let response = writer
-        .get_shard(Request::new(ShardId {
-            id: shard_id.clone(),
-        }))
-        .await?;
-
-    assert_eq!(shard_id, &response.get_ref().id);
-
-    Ok(())
+pub trait RelationWriter: WriterChild {
+    fn join_graph(&mut self, graph: &JoinGraph) -> NodeResult<()>;
+    fn delete_nodes(&mut self, graph: &DeleteGraphNodes) -> NodeResult<()>;
 }

@@ -19,9 +19,9 @@
 
 use std::io::Cursor;
 
+use nucliadb_core::protos::*;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::writer::NodeWriterService;
-use nucliadb_service_interface::protos::*;
 use prost::Message;
 
 fn main() -> anyhow::Result<()> {

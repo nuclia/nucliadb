@@ -20,7 +20,7 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 
-use nucliadb_service_interface::thread;
+use nucliadb_core::thread;
 
 pub type MergeRequest = Box<dyn MergeQuery>;
 pub type MergeTxn = Sender<MergeRequest>;

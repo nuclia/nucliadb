@@ -22,11 +22,11 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::resource::ResourceStatus;
-use nucliadb_service_interface::protos::{Resource, ResourceId};
-use nucliadb_service_interface::tracing::{self, *};
-use prost::Message;
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::prost::Message;
+use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::{Resource, ResourceId};
+use nucliadb_core::tracing::{self, *};
 use regex::Regex;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
@@ -272,12 +272,12 @@ mod tests {
     use std::collections::HashMap;
     use std::time::SystemTime;
 
-    use nucliadb_service_interface::protos::prost_types::Timestamp;
-    use nucliadb_service_interface::protos::resource::ResourceStatus;
-    use nucliadb_service_interface::protos::{
+    use nucliadb_core::protos::prost_types::Timestamp;
+    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::{
         IndexMetadata, IndexParagraph, IndexParagraphs, Resource, ResourceId, TextInformation,
     };
-    use nucliadb_service_interface::NodeResult;
+    use nucliadb_core::NodeResult;
     use tantivy::collector::{Count, TopDocs};
     use tantivy::query::{AllQuery, TermQuery};
     use tempfile::TempDir;

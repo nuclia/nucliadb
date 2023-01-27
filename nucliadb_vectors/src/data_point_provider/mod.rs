@@ -26,7 +26,7 @@ use std::sync::RwLock;
 use std::time::SystemTime;
 use std::{io, mem};
 
-use nucliadb_service_interface::fs_state::{self, ELock, FsError, Lock, SLock, Version};
+use nucliadb_core::fs_state::{self, ELock, FsError, Lock, SLock, Version};
 use state::*;
 use thiserror::Error;
 

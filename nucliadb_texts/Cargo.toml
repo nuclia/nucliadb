@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 tempfile = "3"
 tantivy = "0.17.0"
-nucliadb_service_interface = { path = "../nucliadb_service_interface" }
+nucliadb_core = { path = "../nucliadb_core" }
 itertools = "0.10.5"

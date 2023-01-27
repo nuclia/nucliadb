@@ -20,10 +20,10 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::protos::{
     FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore,
 };
-use nucliadb_service_interface::tracing::*;
+use nucliadb_core::tracing::*;
 use tantivy::collector::FacetCounts;
 use tantivy::schema::Value;
 use tantivy::DocAddress;

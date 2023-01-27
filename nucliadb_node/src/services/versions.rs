@@ -20,7 +20,7 @@
 
 use std::path::Path;
 
-use nucliadb_service_interface::prelude::*;
+use nucliadb_core::prelude::*;
 use serde::{Deserialize, Serialize};
 
 const VECTORS_VERSION: u32 = 1;
@@ -137,7 +137,7 @@ impl Versions {
         } else {
             let versions = Versions::default();
             let serialized = serde_json::to_string(&versions)?;
-            std::fs::write(&versions_file, serialized)?;
+            std::fs::write(versions_file, serialized)?;
             Ok(versions)
         }
     }

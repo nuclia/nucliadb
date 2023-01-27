@@ -6,7 +6,7 @@ members = [
   "nucliadb_cluster",
   "nucliadb_node",
   "nucliadb_node/binding",
-  "nucliadb_service_interface",
+  "nucliadb_core",
   "nucliadb_ftp",
   "vectors_benchmark",
   "nucliadb_ftp",

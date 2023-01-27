@@ -21,18 +21,18 @@
 use std::time::Duration;
 
 use async_std::sync::RwLock;
-use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
-use nucliadb_service_interface::protos::node_writer_server::NodeWriter;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::protos::node_writer_server::NodeWriter;
+use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
     OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
     VectorSetId, VectorSetList,
 };
+use nucliadb_core::tracing::{self, *};
+use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
-use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::config::Configuration;
@@ -521,8 +521,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
 mod tests {
     use std::net::SocketAddr;
 
-    use nucliadb_service_interface::protos::node_writer_client::NodeWriterClient;
-    use nucliadb_service_interface::protos::node_writer_server::NodeWriterServer;
+    use nucliadb_core::protos::node_writer_client::NodeWriterClient;
+    use nucliadb_core::protos::node_writer_server::NodeWriterServer;
     use portpicker::pick_unused_port;
     use tonic::transport::Server;
     use tonic::Request;

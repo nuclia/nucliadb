@@ -19,6 +19,8 @@
 
 use std::io::Cursor;
 
+use nucliadb_core::paragraphs::ParagraphIterator;
+use nucliadb_core::texts::DocumentIterator;
 use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
@@ -28,8 +30,6 @@ use nucliadb_protos::{
     Shard as ShardPB, ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
     VectorSetList,
 };
-use nucliadb_service_interface::paragraphs::ParagraphIterator;
-use nucliadb_service_interface::texts::DocumentIterator;
 use nucliadb_telemetry::blocking::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use prost::Message;

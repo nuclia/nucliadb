@@ -21,7 +21,7 @@ mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use nucliadb_service_interface::fs_state::{self, ELock, Lock, SLock, Version};
+use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use state::State;
 
 use crate::data_point_provider::{Index, IndexCheck, VectorR};

@@ -23,12 +23,12 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::{
     OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
     StreamRequest, SuggestRequest,
 };
-use nucliadb_service_interface::tracing::{self, *};
+use nucliadb_core::tracing::{self, *};
 use search_query::{search_query, suggest_query};
 use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
@@ -552,13 +552,13 @@ mod tests {
     use std::collections::HashMap;
     use std::time::SystemTime;
 
-    use nucliadb_service_interface::protos::prost_types::Timestamp;
-    use nucliadb_service_interface::protos::resource::ResourceStatus;
-    use nucliadb_service_interface::protos::{
+    use nucliadb_core::protos::prost_types::Timestamp;
+    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::{
         Faceted, Filter, IndexMetadata, IndexParagraph, IndexParagraphs, OrderBy, Resource,
         ResourceId, TextInformation, Timestamps,
     };
-    use nucliadb_service_interface::NodeResult;
+    use nucliadb_core::NodeResult;
     use tantivy::collector::Count;
     use tantivy::query::AllQuery;
     use tempfile::TempDir;

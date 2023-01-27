@@ -20,18 +20,18 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::shard_created::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_service_interface::protos::{
+use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
     RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, StreamRequest,
     SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_service_interface::thread::*;
-use nucliadb_service_interface::tracing::{self, *};
+use nucliadb_core::thread::{self, *};
+use nucliadb_core::tracing::{self, *};
 
 use super::shard_disk_structure::*;
 use super::versions::Versions;
@@ -176,7 +176,7 @@ impl ShardReaderService {
         let mut paragraph_result = None;
         let mut vector_result = None;
         let mut relation_result = None;
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
@@ -230,7 +230,7 @@ impl ShardReaderService {
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
@@ -306,7 +306,7 @@ impl ShardReaderService {
         let info = info_span!(parent: &span, "paragraph suggest");
         let paragraph_task = || run_with_telemetry(info, paragraph_task);
 
-        let tasks = rayon::join(paragraph_task, relation_task);
+        let tasks = thread::join(paragraph_task, relation_task);
         let rparagraph = tasks.0.unwrap();
         let entities = tasks
             .1
@@ -437,7 +437,7 @@ impl ShardReaderService {
         let mut rvector = None;
         let mut rrelation = None;
 
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| rtext = text_task());
             s.spawn(|_| rparagraph = paragraph_task());
             s.spawn(|_| rvector = vector_task());

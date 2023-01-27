@@ -19,11 +19,11 @@
 //
 
 use async_std::sync::RwLock;
-use nucliadb_service_interface::prelude::{DocumentIterator, ParagraphIterator};
-use nucliadb_service_interface::protos::node_reader_server::NodeReader;
-use nucliadb_service_interface::protos::*;
+use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
+use nucliadb_core::protos::node_reader_server::NodeReader;
+use nucliadb_core::protos::*;
+use nucliadb_core::tracing::{self, *};
 use opentelemetry::global;
-use tracing::{Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use Shard as ShardPB;
 

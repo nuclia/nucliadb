@@ -21,7 +21,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 
-use tracing::*;
+use nucliadb_core::tracing::*;
 
 use crate::bfs_engine::*;
 use crate::errors::*;

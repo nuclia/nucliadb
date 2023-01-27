@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-use tracing::*;
+use nucliadb_core::tracing::*;
 
 use crate::utils::{parse_log_level, reliable_lookup_host};
 

@@ -18,14 +18,13 @@
 
 use std::path::{Path, PathBuf};
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::shard_created::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_service_interface::protos::{
-    DeleteGraphNodes, JoinGraph, Resource, ResourceId, VectorSetId,
-};
-use nucliadb_service_interface::tracing::{self, *};
+use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId, VectorSetId};
+use nucliadb_core::thread;
+use nucliadb_core::tracing::{self, *};
 
 use super::shard_disk_structure::*;
 use crate::services::versions::Versions;
@@ -117,7 +116,7 @@ impl ShardWriterService {
         let mut paragraph_result = None;
         let mut vector_result = None;
         let mut relation_result = None;
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
@@ -169,7 +168,7 @@ impl ShardWriterService {
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
@@ -247,7 +246,7 @@ impl ShardWriterService {
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());
@@ -301,7 +300,7 @@ impl ShardWriterService {
         let mut paragraph_result = Ok(());
         let mut vector_result = Ok(());
         let mut relation_result = Ok(());
-        rayon::scope(|s| {
+        thread::scope(|s| {
             s.spawn(|_| text_result = text_task());
             s.spawn(|_| paragraph_result = paragraph_task());
             s.spawn(|_| vector_result = vector_task());

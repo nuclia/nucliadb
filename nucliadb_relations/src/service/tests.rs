@@ -21,9 +21,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use lazy_static::lazy_static;
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::resource::ResourceStatus;
-use nucliadb_service_interface::protos::*;
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::*;
 use prost_types::Timestamp;
 use relation::*;
 use relation_node::NodeType;

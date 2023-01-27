@@ -21,12 +21,12 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId,
     ShardIds, VectorSetId,
 };
-use nucliadb_service_interface::tracing::{self, *};
+use nucliadb_core::tracing::{self, *};
 use uuid::Uuid;
 
 use crate::config::Configuration;

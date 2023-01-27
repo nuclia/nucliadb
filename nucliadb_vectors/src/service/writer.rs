@@ -21,9 +21,9 @@ use std::fmt::Debug;
 use std::time::SystemTime;
 
 use data_point::{DataPoint, Elem, LabelDictionary};
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::resource::ResourceStatus;
-use nucliadb_service_interface::protos::{Resource, ResourceId, VectorSetId};
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::{Resource, ResourceId, VectorSetId};
 use tracing::*;
 
 use crate::data_point;
@@ -291,8 +291,8 @@ impl VectorWriterService {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use nucliadb_service_interface::protos::resource::ResourceStatus;
-    use nucliadb_service_interface::protos::{
+    use nucliadb_core::protos::resource::ResourceStatus;
+    use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors,
         VectorSearchRequest, VectorSentence,
     };

@@ -19,7 +19,7 @@
 
 use std::path::PathBuf;
 
-use nucliadb_service_interface::fs_state;
+use nucliadb_core::fs_state;
 use tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};

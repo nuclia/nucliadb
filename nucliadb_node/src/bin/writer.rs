@@ -24,6 +24,9 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use nucliadb_cluster::{node, Key, Node, NodeType};
+use nucliadb_core::protos::node_writer_server::NodeWriterServer;
+use nucliadb_core::protos::GetShardRequest;
+use nucliadb_core::tracing::*;
 use nucliadb_node::config::Configuration;
 use nucliadb_node::metrics::report::NodeReport;
 use nucliadb_node::metrics::Publisher;
@@ -31,11 +34,8 @@ use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
-use nucliadb_service_interface::protos::node_writer_server::NodeWriterServer;
-use nucliadb_service_interface::protos::GetShardRequest;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
-use tracing::*;
 use uuid::Uuid;
 
 const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");

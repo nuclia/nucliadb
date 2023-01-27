@@ -24,16 +24,16 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 use common::{node_services, TestNodeWriter};
-use nucliadb_service_interface::protos::op_status::Status;
-use nucliadb_service_interface::protos::relation::RelationType;
-use nucliadb_service_interface::protos::relation_node::NodeType;
-use nucliadb_service_interface::protos::resource::ResourceStatus;
-use nucliadb_service_interface::protos::{
+use nucliadb_core::protos::op_status::Status;
+use nucliadb_core::protos::prost_types::Timestamp;
+use nucliadb_core::protos::relation::RelationType;
+use nucliadb_core::protos::relation_node::NodeType;
+use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::{
     EmptyQuery, EntitiesSubgraphRequest, IndexMetadata, Relation, RelationEdgeFilter, RelationNode,
     RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
     Resource, ResourceId,
 };
-use prost_types::Timestamp;
 use tonic::Request;
 use uuid::Uuid;
 

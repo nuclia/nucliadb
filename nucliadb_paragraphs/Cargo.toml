@@ -14,8 +14,7 @@ levenshtein_automata = "0.2.1"
 once_cell = "1.13.1"
 tantivy-fst = "0.3.0"
 tantivy-common = "0.2.0"
-nucliadb_service_interface = { path = "../nucliadb_service_interface" }
-prost = "0.10"
+nucliadb_core = { path = "../nucliadb_core" }
 itertools = "0.10.5"
 
 [build-dependencies]

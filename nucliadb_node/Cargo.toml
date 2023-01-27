@@ -26,9 +26,7 @@ path = "src/bin/writer.rs"
 [dependencies]
 tonic = "0.7"
 tonic-health = "0.6"
-prost = "0.10"
 async-std = "1.10.0"
-prost-types = "0.10"
 futures-core = "0.3.17"
 futures-util = "0.3.17"
 futures = "0.3.17"
@@ -51,7 +49,6 @@ time = "0.3.3"
 itertools = "0.10"
 anyhow = "1"
 http = "0.2"
-tracing = { version = "0.1.29" }
 thiserror = "1"
 opentelemetry = { version = "0.17", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.17.2"
@@ -62,9 +59,6 @@ lazy_static = "1.4.0"
 openssl = { version = "0.10", features = ["vendored"] }
 
 # Text Service
-tantivy = "0.17.0"
-rayon = "1.5.1"
-
 async-stream = "0.3.2"
 
 rand = "0.8.4"
@@ -73,7 +67,7 @@ rand = "0.8.4"
 nucliadb_cluster = { path = "../nucliadb_cluster" }
 nucliadb_telemetry = { path = "../nucliadb_telemetry" }
 nucliadb_ftp = { path = "../nucliadb_ftp" }
-nucliadb_service_interface = { path = "../nucliadb_service_interface" }
+nucliadb_core = { path = "../nucliadb_core" }
 nucliadb_texts= { path = "../nucliadb_texts" }
 nucliadb_paragraphs= { path = "../nucliadb_paragraphs" }
 nucliadb_vectors= { path = "../nucliadb_vectors" }

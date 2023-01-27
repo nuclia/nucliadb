@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_service_interface::fs_state::FsError;
+use nucliadb_core::fs_state::FsError;
 use tantivy::TantivyError;
 
 #[derive(Debug, thiserror::Error)]

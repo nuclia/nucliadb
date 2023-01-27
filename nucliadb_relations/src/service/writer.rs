@@ -21,10 +21,10 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use nucliadb_service_interface::prelude::*;
-use nucliadb_service_interface::protos::resource::ResourceStatus;
-use nucliadb_service_interface::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
-use tracing::*;
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::resource::ResourceStatus;
+use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
+use nucliadb_core::tracing::{self, *};
 
 use super::utils::*;
 use crate::errors::RelationsErr as InnerErr;

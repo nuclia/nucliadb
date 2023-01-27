@@ -20,7 +20,7 @@
 // use std::convert::TryFrom;
 // use std::time::SystemTime;
 
-use nucliadb_service_interface::protos::{DocumentSearchRequest, StreamRequest};
+use nucliadb_core::protos::{DocumentSearchRequest, StreamRequest};
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::Term;

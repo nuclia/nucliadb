@@ -17,9 +17,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use nucliadb_service_interface::protos::prost_types::Timestamp;
-use nucliadb_service_interface::protos::ParagraphMetadata;
-use prost::Message;
+use nucliadb_core::protos::prost::Message;
+use nucliadb_core::protos::prost_types::Timestamp;
+use nucliadb_core::protos::ParagraphMetadata;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
 use tantivy::schema::{
     Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
