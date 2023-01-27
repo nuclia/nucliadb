@@ -18,7 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::time::Duration;
+
 use async_std::sync::RwLock;
+use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_protos::node_writer_server::NodeWriter;
 use nucliadb_protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
@@ -35,6 +38,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::config::Configuration;
 use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
+
+/// Indicates the maximum duration used to move one shard from one node to another on failure only.
+const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
 pub struct NodeWriterGRPCDriver(RwLock<NodeWriterService>);
 impl From<NodeWriterService> for NodeWriterGRPCDriver {
@@ -404,30 +410,42 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
-        let address = request.address;
 
         let service = self.0.read().await;
 
-        match service.move_shard(&shard_id, &address).await.transpose() {
-            Some(Ok(_)) => {
-                info!("Shard {} moved to {} successfully", shard_id.id, address);
+        let Some(shard) = service.get_shard(&shard_id) else {
+            return Err(tonic::Status::not_found(format!(
+                "Shard {} not found",
+                shard_id.id
+            )));
+        };
+
+        match Publisher::default()
+            .append(&shard.path)
+            // `unwrap` call is safe since the shard path already terminate by a valid file name.
+            .unwrap()
+            .retry_on_failure(RetryPolicy::MaxDuration(MAX_MOVE_SHARD_DURATION))
+            .send_to(&request.address)
+            .await
+        {
+            Ok(_) => {
+                info!(
+                    "Shard {} moved to {} successfully",
+                    shard_id.id, request.address
+                );
 
                 Ok(tonic::Response::new(EmptyResponse {}))
             }
-            Some(Err(e)) => {
+            Err(e) => {
                 let e = format!(
                     "Error transfering shard {} to {}: {}",
-                    shard_id.id, address, e
+                    shard_id.id, request.address, e
                 );
 
                 error!("{}", e);
 
                 Err(tonic::Status::internal(e))
             }
-            None => Err(tonic::Status::not_found(format!(
-                "Shard {} not found",
-                shard_id.id
-            ))),
         }
     }
 
@@ -441,29 +459,32 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
 
-        let mut service = self.0.write().await;
+        if !request.override_shard && self.0.read().await.get_shard(&shard_id).is_some() {
+            return Err(tonic::Status::already_exists(format!(
+                "Shard {} already exists",
+                shard_id.id
+            )));
+        }
 
-        match service
-            .accept_shard(&shard_id, request.port as u16, request.override_shard)
+        match Listener::default()
+            .save_at(Configuration::shards_path())
+            .listen_once(request.port as u16)
             .await
-            .transpose()
         {
-            Some(Ok(_)) => {
+            Ok(_) => {
                 info!("Shard {} received successfully", shard_id.id);
+
+                self.0.write().await.load_shard(&shard_id);
 
                 Ok(tonic::Response::new(EmptyResponse {}))
             }
-            Some(Err(e)) => {
+            Err(e) => {
                 let e = format!("Error receiving shard {}: {}", shard_id.id, e);
 
                 error!("{}", e);
 
                 Err(tonic::Status::internal(e))
             }
-            None => Err(tonic::Status::already_exists(format!(
-                "Shard {} already exists",
-                shard_id.id
-            ))),
         }
     }
 
