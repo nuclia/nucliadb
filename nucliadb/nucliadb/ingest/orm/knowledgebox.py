@@ -144,15 +144,16 @@ class KnowledgeBox:
 
         if kbid == "" and slug != "":
             kbid_bytes = await txn.get(KB_SLUGS.format(slug=slug))
-            if kbid_bytes is not None:
-                kbid = kbid_bytes.decode()
+            if kbid_bytes is None:
+                raise KnowledgeBoxNotFound()
+            kbid = kbid_bytes.decode()
 
         if slug == "" and kbid != "":
-            kbid_bytes = await txn.get(KB_UUID.format(kbid=kbid))
-            if kbid_bytes is None:
-                raise KeyError(kbid)
+            kbconfig_bytes = await txn.get(KB_UUID.format(kbid=kbid))
+            if kbconfig_bytes is None:
+                raise KnowledgeBoxNotFound()
             pbconfig = KnowledgeBoxConfig()
-            pbconfig.ParseFromString(kbid_bytes)
+            pbconfig.ParseFromString(kbconfig_bytes)
             slug = pbconfig.slug
 
         # Delete main anchor
