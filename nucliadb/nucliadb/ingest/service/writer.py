@@ -239,6 +239,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> DeleteKnowledgeBoxResponse:
         try:
             await self.proc.delete_kb(request.uuid, request.slug)
+        except KnowledgeBoxNotFound:
+            logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:
             logger.exception("Could not delete KB", exc_info=True)
             return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)

@@ -33,7 +33,7 @@ from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
-from nucliadb.ingest.orm.exceptions import DeadletteredError
+from nucliadb.ingest.orm.exceptions import DeadletteredError, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard
@@ -623,7 +623,7 @@ class Processor:
         txn = await self.driver.begin()
         try:
             uuid = await KnowledgeBox.delete_kb(txn, kbid=kbid, slug=slug)
-        except (AttributeError, KeyError) as exc:
+        except (AttributeError, KeyError, KnowledgeBoxNotFound) as exc:
             await txn.abort()
             raise exc
         await txn.commit(resource=False)

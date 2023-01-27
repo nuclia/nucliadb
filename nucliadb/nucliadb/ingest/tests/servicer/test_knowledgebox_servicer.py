@@ -100,3 +100,22 @@ async def test_get_resource_id(grpc_servicer: IngestFixture) -> None:
     pbid = writer_pb2.ResourceIdRequest(kbid="foo", slug="bar")
     result = await stub.GetResourceId(pbid)  # type: ignore
     assert result.uuid == ""
+
+
+@pytest.mark.asyncio
+async def test_delete_knowledgebox_handles_unexisting_kb(
+    grpc_servicer: IngestFixture,
+) -> None:
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    pbid = knowledgebox_pb2.KnowledgeBoxID(slug="idonotexist")
+    result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    pbid = knowledgebox_pb2.KnowledgeBoxID(uuid="idonotexist")
+    result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    pbid = knowledgebox_pb2.KnowledgeBoxID(uuid="idonotexist", slug="meneither")
+    result = await stub.DeleteKnowledgeBox(pbid)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
