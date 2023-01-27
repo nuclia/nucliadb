@@ -18,10 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 use nucliadb_protos::*;
 
 use crate::prelude::*;
+
+pub type RParagraphs = Arc<dyn ParagraphReader>;
+pub type WParagraphs = Arc<RwLock<dyn ParagraphWriter>>;
 
 pub struct ParagraphConfig {
     pub path: PathBuf,
@@ -30,9 +34,7 @@ pub struct ParagraphConfig {
 pub struct ParagraphIterator(Box<dyn Iterator<Item = ParagraphItem> + Send>);
 impl ParagraphIterator {
     pub fn new<I>(inner: I) -> ParagraphIterator
-    where
-        I: Iterator<Item = ParagraphItem> + Send + 'static,
-    {
+    where I: Iterator<Item = ParagraphItem> + Send + 'static {
         ParagraphIterator(Box::new(inner))
     }
 }

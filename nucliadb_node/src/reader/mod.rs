@@ -21,15 +21,15 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
-use nucliadb_protos::{
+use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
-    ParagraphSearchResponse, SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList,
-    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
-    VectorSearchResponse,
+    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
+    SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest, SuggestRequest,
+    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_services::*;
-use rayon::prelude::*;
-use tracing::*;
+use nucliadb_service_interface::thread::*;
+use nucliadb_service_interface::tracing::{self, *};
 
 use crate::config::Configuration;
 use crate::services::reader::ShardReaderService;
@@ -70,7 +70,7 @@ impl NodeReaderService {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
             info!("Opening {shard_path:?}");
-            ShardReaderService::open(file_name, &shard_path)
+            ShardReaderService::new(file_name, &shard_path)
         }))
     }
 
@@ -83,7 +83,7 @@ impl NodeReaderService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            match ShardReaderService::open(file_name.clone(), &shard_path) {
+            match ShardReaderService::new(file_name.clone(), &shard_path) {
                 Err(err) => error!("Loading {shard_path:?} raised {err}"),
                 Ok(shard) => {
                     info!("Shard loaded: {shard_path:?}");
@@ -106,7 +106,7 @@ impl NodeReaderService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardReaderService::open(shard_name, &shard_path) else {
+        let Ok(shard) = ShardReaderService::new(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };

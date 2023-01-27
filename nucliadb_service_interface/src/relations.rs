@@ -18,10 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 use nucliadb_protos::*;
 
 use crate::prelude::*;
+
+pub type RRelations = Arc<dyn RelationReader>;
+pub type WRelations = Arc<RwLock<dyn RelationWriter>>;
 
 #[derive(Clone)]
 pub struct RelationConfig {

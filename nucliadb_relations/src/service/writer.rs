@@ -21,13 +21,14 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::resource::ResourceStatus;
+use nucliadb_service_interface::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
+use tracing::*;
+
 use super::utils::*;
 use crate::errors::RelationsErr as InnerErr;
 use crate::index::*;
-use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId};
-use nucliadb_service_interface::prelude::*;
-use tracing::*;
 
 pub struct RelationsWriterService {
     wmode: WMode,

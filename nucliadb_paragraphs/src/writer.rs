@@ -22,16 +22,16 @@ use std::fmt::Debug;
 use std::fs;
 use std::time::SystemTime;
 
-use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{Resource, ResourceId};
 use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::resource::ResourceStatus;
+use nucliadb_service_interface::protos::{Resource, ResourceId};
+use nucliadb_service_interface::tracing::{self, *};
 use prost::Message;
 use regex::Regex;
 use tantivy::collector::Count;
 use tantivy::query::AllQuery;
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
-use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::schema::timestamp_to_datetime_utc;
@@ -272,9 +272,12 @@ mod tests {
     use std::collections::HashMap;
     use std::time::SystemTime;
 
-    use nucliadb_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId};
+    use nucliadb_service_interface::protos::prost_types::Timestamp;
+    use nucliadb_service_interface::protos::resource::ResourceStatus;
+    use nucliadb_service_interface::protos::{
+        IndexMetadata, IndexParagraph, IndexParagraphs, Resource, ResourceId, TextInformation,
+    };
     use nucliadb_service_interface::NodeResult;
-    use prost_types::Timestamp;
     use tantivy::collector::{Count, TopDocs};
     use tantivy::query::{AllQuery, TermQuery};
     use tempfile::TempDir;
@@ -296,7 +299,7 @@ mod tests {
             nanos: 0,
         };
 
-        let metadata = nucliadb_protos::IndexMetadata {
+        let metadata = IndexMetadata {
             created: Some(timestamp.clone()),
             modified: Some(timestamp),
         };
@@ -306,12 +309,12 @@ mod tests {
         const DOC1_P2: &str = "This should be enough to test the tantivy.";
         const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
-        let ti_title = nucliadb_protos::TextInformation {
+        let ti_title = TextInformation {
             text: DOC1_TI.to_string(),
             labels: vec!["/l/mylabel".to_string(), "/e/myentity".to_string()],
         };
 
-        let ti_body = nucliadb_protos::TextInformation {
+        let ti_body = TextInformation {
             text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
             labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
         };
@@ -409,7 +412,7 @@ mod tests {
             resource: Some(resource_id),
             metadata: Some(metadata),
             texts,
-            status: nucliadb_protos::resource::ResourceStatus::Processed as i32,
+            status: ResourceStatus::Processed as i32,
             labels: vec!["/l/mylabel_resource".to_string()],
             paragraphs,
             paragraphs_to_delete: vec![],

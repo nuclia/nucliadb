@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-mod data_types;
 pub mod data_point;
 pub mod data_point_provider;
+mod data_types;
 pub mod indexset;
 pub mod service;

@@ -20,20 +20,21 @@ use std::path::Path;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
-use nucliadb_protos::shard_created::{
+use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_protos::{
+use nucliadb_service_interface::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
-    ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationSearchRequest,
-    RelationSearchResponse, SearchRequest, SearchResponse, SuggestRequest, SuggestResponse,
-    TypeList, VectorSearchRequest, VectorSearchResponse,
+    ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
+    RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, StreamRequest,
+    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_services::*;
-use rayon::prelude::*;
-use tracing::*;
+use nucliadb_service_interface::thread::*;
+use nucliadb_service_interface::tracing::{self, *};
 
-use crate::services::config::ShardConfig;
+use super::shard_disk_structure::*;
+use super::versions::Versions;
 use crate::stats::StatsData;
 use crate::telemetry::run_with_telemetry;
 
@@ -45,10 +46,10 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 pub struct ShardReaderService {
     pub id: String,
     creation_time: RwLock<SystemTime>,
-    text_reader: texts::RTexts,
-    paragraph_reader: paragraphs::RParagraphs,
-    vector_reader: vectors::RVectors,
-    relation_reader: relations::RRelations,
+    text_reader: RTexts,
+    paragraph_reader: RParagraphs,
+    vector_reader: RVectors,
+    relation_reader: RRelations,
     document_service_version: i32,
     paragraph_service_version: i32,
     vector_service_version: i32,
@@ -138,29 +139,28 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn open(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
-        let fsc = TextConfig {
-            path: shard_path.join("text"),
+    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
+        let tsc = TextConfig {
+            path: shard_path.join(TEXTS_DIR),
         };
 
         let psc = ParagraphConfig {
-            path: shard_path.join("paragraph"),
+            path: shard_path.join(PARAGRAPHS_DIR),
         };
 
         let vsc = VectorConfig {
             no_results: Some(FIXED_VECTORS_RESULTS),
-            path: shard_path.join("vectors"),
-            vectorset: shard_path.join("vectorset"),
+            path: shard_path.join(VECTORS_DIR),
+            vectorset: shard_path.join(VECTORSET_DIR),
         };
         let rsc = RelationConfig {
-            path: shard_path.join("relations"),
+            path: shard_path.join(RELATIONS_DIR),
         };
-
-        let config = ShardConfig::new(shard_path)?;
-        let text_task = move || Some(texts::open_reader(&fsc, config.version_fields));
-        let paragraph_task = move || Some(paragraphs::open_reader(&psc, config.version_paragraphs));
-        let vector_task = move || Some(vectors::open_reader(&vsc, config.version_vectors));
-        let relation_task = move || Some(relations::open_reader(&rsc, config.version_relations));
+        let versions = Versions::load(&shard_path.join(VERSION_FILE))?;
+        let text_task = || Some(versions.get_texts_reader(&tsc));
+        let paragraph_task = || Some(versions.get_paragraphs_reader(&psc));
+        let vector_task = || Some(versions.get_vectors_reader(&vsc));
+        let relation_task = || Some(versions.get_relations_reader(&rsc));
 
         let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text open");
@@ -195,81 +195,14 @@ impl ShardReaderService {
             vector_reader: vectors.unwrap(),
             relation_reader: relations.unwrap(),
             creation_time: RwLock::new(SystemTime::now()),
-            document_service_version: config.version_fields as i32,
-            paragraph_service_version: config.version_paragraphs as i32,
-            vector_service_version: config.version_vectors as i32,
-            relation_service_version: config.version_relations as i32,
-        })
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn create(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
-        let fsc = TextConfig {
-            path: shard_path.join("text"),
-        };
-
-        let psc = ParagraphConfig {
-            path: shard_path.join("paragraph"),
-        };
-
-        let vsc = VectorConfig {
-            no_results: Some(FIXED_VECTORS_RESULTS),
-            path: shard_path.join("vectors"),
-            vectorset: shard_path.join("vectorset"),
-        };
-        let rsc = RelationConfig {
-            path: shard_path.join("relations"),
-        };
-
-        let config = ShardConfig::new(shard_path)?;
-        let text_task = move || Some(texts::create_reader(&fsc, config.version_fields));
-        let paragraph_task =
-            move || Some(paragraphs::create_reader(&psc, config.version_paragraphs));
-        let vector_task = move || Some(vectors::create_reader(&vsc, config.version_vectors));
-        let relation_task = move || Some(relations::create_reader(&rsc, config.version_relations));
-
-        let span = tracing::Span::current();
-        let info = info_span!(parent: &span, "text create");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph create");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector create");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation create");
-        let relation_task = || run_with_telemetry(info, relation_task);
-
-        let mut text_result = None;
-        let mut paragraph_result = None;
-        let mut vector_result = None;
-        let mut relation_result = None;
-        rayon::scope(|s| {
-            s.spawn(|_| text_result = text_task());
-            s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
-            s.spawn(|_| relation_result = relation_task());
-        });
-
-        let fields = text_result.transpose()?;
-        let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
-        let relations = relation_result.transpose()?;
-
-        Ok(ShardReaderService {
-            id,
-            text_reader: fields.unwrap(),
-            paragraph_reader: paragraphs.unwrap(),
-            vector_reader: vectors.unwrap(),
-            relation_reader: relations.unwrap(),
-            creation_time: RwLock::new(SystemTime::now()),
-            document_service_version: config.version_fields as i32,
-            paragraph_service_version: config.version_paragraphs as i32,
-            vector_service_version: config.version_vectors as i32,
-            relation_service_version: config.version_relations as i32,
+            document_service_version: versions.version_texts as i32,
+            paragraph_service_version: versions.version_paragraphs as i32,
+            vector_service_version: versions.version_vectors as i32,
+            relation_service_version: versions.version_relations as i32,
         })
     }
 
     /// Stop the service
-
     #[tracing::instrument(skip_all)]
     pub fn stop(&self) {
         info!("Stopping shard {}...", { &self.id });

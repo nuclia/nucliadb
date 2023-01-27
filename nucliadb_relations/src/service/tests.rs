@@ -21,8 +21,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use lazy_static::lazy_static;
-use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::resource::ResourceStatus;
+use nucliadb_service_interface::protos::*;
 use prost_types::Timestamp;
 use relation::*;
 use relation_node::NodeType;
@@ -118,7 +119,7 @@ fn create_empty_resource(shard_id: String) -> Resource {
         nanos: 0,
     };
 
-    let metadata = nucliadb_protos::IndexMetadata {
+    let metadata = IndexMetadata {
         created: Some(timestamp.clone()),
         modified: Some(timestamp),
     };
@@ -127,7 +128,7 @@ fn create_empty_resource(shard_id: String) -> Resource {
         resource: Some(resource_id),
         metadata: Some(metadata),
         texts: HashMap::with_capacity(0),
-        status: nucliadb_protos::resource::ResourceStatus::Processed as i32,
+        status: ResourceStatus::Processed as i32,
         labels: vec![],
         paragraphs: HashMap::with_capacity(0),
         paragraphs_to_delete: vec![],

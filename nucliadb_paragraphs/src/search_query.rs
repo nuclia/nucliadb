@@ -22,8 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use itertools::Itertools;
-use nucliadb_protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
-use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::{ParagraphSearchRequest, StreamRequest, SuggestRequest};
 use tantivy::query::*;
 use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};

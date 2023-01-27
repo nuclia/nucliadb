@@ -21,9 +21,9 @@ use std::fmt::Debug;
 use std::time::SystemTime;
 
 use data_point::{DataPoint, Elem, LabelDictionary};
-use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{Resource, ResourceId, VectorSetId};
 use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::resource::ResourceStatus;
+use nucliadb_service_interface::protos::{Resource, ResourceId, VectorSetId};
 use tracing::*;
 
 use crate::data_point;
@@ -291,7 +291,8 @@ impl VectorWriterService {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use nucliadb_protos::{
+    use nucliadb_service_interface::protos::resource::ResourceStatus;
+    use nucliadb_service_interface::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors,
         VectorSearchRequest, VectorSentence,
     };
@@ -418,7 +419,7 @@ mod tests {
             resource: Some(resource_id.clone()),
             metadata: None,
             texts: HashMap::with_capacity(0),
-            status: nucliadb_protos::resource::ResourceStatus::Processed as i32,
+            status: ResourceStatus::Processed as i32,
             labels: vec!["FULL".to_string()],
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],

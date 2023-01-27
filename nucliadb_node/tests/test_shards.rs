@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_protos::{EmptyQuery, ShardId};
+use nucliadb_service_interface::protos::{EmptyQuery, ShardId};
 
 mod common;
 

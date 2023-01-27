@@ -19,9 +19,9 @@
 //
 
 use async_std::sync::RwLock;
-use nucliadb_protos::node_reader_server::NodeReader;
-use nucliadb_protos::*;
-use nucliadb_services::{DocumentIterator, ParagraphIterator};
+use nucliadb_service_interface::prelude::{DocumentIterator, ParagraphIterator};
+use nucliadb_service_interface::protos::node_reader_server::NodeReader;
+use nucliadb_service_interface::protos::*;
 use opentelemetry::global;
 use tracing::{Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;

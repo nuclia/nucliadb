@@ -20,11 +20,13 @@
 
 pub mod grpc_driver;
 use std::collections::HashMap;
-use std::path::Path;
 
-use nucliadb_protos::{Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds};
-use nucliadb_services::*;
-use tracing::*;
+use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::{
+    DeleteGraphNodes, JoinGraph, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId,
+    ShardIds, VectorSetId,
+};
+use nucliadb_service_interface::tracing::{self, *};
 use uuid::Uuid;
 
 use crate::config::Configuration;
@@ -62,7 +64,7 @@ impl NodeWriterService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let shard = ShardWriterService::open(file_name.clone(), &shard_path)?;
+            let shard = ShardWriterService::new(file_name.clone(), &shard_path)?;
             self.cache.insert(file_name, shard);
             info!("Shard loaded: {shard_path:?}");
         }
@@ -81,7 +83,7 @@ impl NodeWriterService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardWriterService::open(shard_name, &shard_path) else {
+        let Ok(shard) = ShardWriterService::new(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };
@@ -101,6 +103,7 @@ impl NodeWriterService {
     pub fn new_shard(&mut self) -> ShardCreated {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = Configuration::shards_path_id(&shard_id);
+        std::fs::create_dir_all(&shard_path).unwrap();
         let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path).unwrap();
         let data = ShardCreated {
             id: new_shard.id.clone(),
@@ -116,8 +119,7 @@ impl NodeWriterService {
     pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
         self.cache.remove(&shard_id.id);
         let shard_path = Configuration::shards_path_id(&shard_id.id);
-        let shard_path = Path::new(&shard_path);
-        if shard_path.is_dir() {
+        if shard_path.exists() {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
         }
@@ -128,6 +130,7 @@ impl NodeWriterService {
         self.delete_shard(shard_id)?;
         let shard_name = shard_id.id.clone();
         let shard_path = Configuration::shards_path_id(&shard_id.id);
+        std::fs::create_dir_all(&shard_path).unwrap();
         let new_shard = ShardWriterService::new(shard_name, &shard_path)?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,

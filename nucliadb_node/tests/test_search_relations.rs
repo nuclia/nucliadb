@@ -24,11 +24,11 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 use common::{node_services, TestNodeWriter};
-use nucliadb_protos::op_status::Status;
-use nucliadb_protos::relation::RelationType;
-use nucliadb_protos::relation_node::NodeType;
-use nucliadb_protos::resource::ResourceStatus;
-use nucliadb_protos::{
+use nucliadb_service_interface::protos::op_status::Status;
+use nucliadb_service_interface::protos::relation::RelationType;
+use nucliadb_service_interface::protos::relation_node::NodeType;
+use nucliadb_service_interface::protos::resource::ResourceStatus;
+use nucliadb_service_interface::protos::{
     EmptyQuery, EntitiesSubgraphRequest, IndexMetadata, Relation, RelationEdgeFilter, RelationNode,
     RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
     Resource, ResourceId,

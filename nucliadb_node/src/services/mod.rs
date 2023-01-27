@@ -18,10 +18,16 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-/// This module is for all services linked to node
-///
-/// Services
-mod config;
+mod versions;
 // Main services
 pub mod reader;
 pub mod writer;
+
+mod shard_disk_structure {
+    pub const VERSION_FILE: &str = "versions.json";
+    pub const VECTORS_DIR: &str = "vectors";
+    pub const VECTORSET_DIR: &str = "vectorset";
+    pub const TEXTS_DIR: &str = "text";
+    pub const PARAGRAPHS_DIR: &str = "paragraph";
+    pub const RELATIONS_DIR: &str = "relations";
+}

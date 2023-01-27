@@ -23,11 +23,12 @@ use std::fs;
 use std::time::*;
 
 use itertools::Itertools;
-use nucliadb_protos::{
+use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
 };
-use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::tracing::{self, *};
 use tantivy::collector::{
     Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
@@ -37,7 +38,6 @@ use tantivy::{
     DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
     ReloadPolicy, Result as TantivyResult, Searcher,
 };
-use tracing::*;
 
 use super::schema::TextSchema;
 use super::search_query;
@@ -580,9 +580,12 @@ mod tests {
     use std::collections::HashMap;
     use std::time::SystemTime;
 
-    use nucliadb_protos::{Faceted, Filter, OrderBy, Resource, ResourceId, Timestamps};
+    use nucliadb_service_interface::protos::prost_types::Timestamp;
+    use nucliadb_service_interface::protos::resource::ResourceStatus;
+    use nucliadb_service_interface::protos::{
+        Faceted, Filter, IndexMetadata, OrderBy, Resource, ResourceId, TextInformation, Timestamps,
+    };
     use nucliadb_service_interface::NodeResult;
-    use prost_types::Timestamp;
     use tempfile::TempDir;
 
     use super::*;
@@ -602,7 +605,7 @@ mod tests {
             nanos: 0,
         };
 
-        let metadata = nucliadb_protos::IndexMetadata {
+        let metadata = IndexMetadata {
             created: Some(timestamp.clone()),
             modified: Some(timestamp),
         };
@@ -612,12 +615,12 @@ mod tests {
         const DOC1_P2: &str = "This should be enough to test the tantivy.";
         const DOC1_P3: &str = "But I wanted to make it three anyway.";
 
-        let ti_title = nucliadb_protos::TextInformation {
+        let ti_title = TextInformation {
             text: DOC1_TI.to_string(),
             labels: vec!["/l/mylabel".to_string(), "/e/myentity".to_string()],
         };
 
-        let ti_body = nucliadb_protos::TextInformation {
+        let ti_body = TextInformation {
             text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
             labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
         };
@@ -630,7 +633,7 @@ mod tests {
             resource: Some(resource_id),
             metadata: Some(metadata),
             texts,
-            status: nucliadb_protos::resource::ResourceStatus::Processed as i32,
+            status: ResourceStatus::Processed as i32,
             labels: vec![],
             paragraphs: HashMap::new(),
             paragraphs_to_delete: vec![],

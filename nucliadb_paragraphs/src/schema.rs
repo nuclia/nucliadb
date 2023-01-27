@@ -17,8 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use nucliadb_service_interface::prelude::nucliadb_protos::ParagraphMetadata;
-use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::prost_types::Timestamp;
+use nucliadb_service_interface::protos::ParagraphMetadata;
 use prost::Message;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
 use tantivy::schema::{
@@ -46,7 +46,7 @@ pub struct ParagraphSchema {
     pub metadata: Field,
 }
 
-pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime<Utc> {
+pub fn timestamp_to_datetime_utc(timestamp: &Timestamp) -> DateTime<Utc> {
     let naive =
         NaiveDateTime::from_timestamp_opt(timestamp.seconds, timestamp.nanos as u32).unwrap();
     DateTime::from_utc(naive, tantivy::chrono::Utc)

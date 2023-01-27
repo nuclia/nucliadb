@@ -28,8 +28,8 @@ use nucliadb_protos::{
     Shard as ShardPB, ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
     VectorSetList,
 };
-use nucliadb_service_interface::texts::DocumentIterator;
 use nucliadb_service_interface::paragraphs::ParagraphIterator;
+use nucliadb_service_interface::texts::DocumentIterator;
 use nucliadb_telemetry::blocking::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use prost::Message;

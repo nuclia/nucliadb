@@ -70,12 +70,14 @@ async-stream = "0.3.2"
 rand = "0.8.4"
 
 # nucliadb dependencies
-nucliadb_services = { path = "../nucliadb_services" }
-nucliadb_service_interface = { path = "../nucliadb_service_interface" }
-nucliadb_protos = { path = "../nucliadb_protos/rust" }
 nucliadb_cluster = { path = "../nucliadb_cluster" }
 nucliadb_telemetry = { path = "../nucliadb_telemetry" }
 nucliadb_ftp = { path = "../nucliadb_ftp" }
+nucliadb_service_interface = { path = "../nucliadb_service_interface" }
+nucliadb_texts= { path = "../nucliadb_texts" }
+nucliadb_paragraphs= { path = "../nucliadb_paragraphs" }
+nucliadb_vectors= { path = "../nucliadb_vectors" }
+nucliadb_relations= { path = "../nucliadb_relations" }
 
 # test
 tempdir = "0.3.7"

@@ -18,10 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 use nucliadb_protos::*;
 
 use crate::prelude::*;
+
+pub type RVectors = Arc<dyn VectorReader>;
+pub type WVectors = Arc<RwLock<dyn VectorWriter>>;
 
 #[derive(Clone)]
 pub struct VectorConfig {

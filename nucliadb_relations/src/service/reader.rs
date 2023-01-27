@@ -22,8 +22,8 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_protos::*;
 use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::*;
 use tracing::*;
 
 use super::bfs::GrpcGuide;

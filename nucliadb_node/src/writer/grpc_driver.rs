@@ -22,8 +22,8 @@ use std::time::Duration;
 
 use async_std::sync::RwLock;
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
-use nucliadb_protos::node_writer_server::NodeWriter;
-use nucliadb_protos::{
+use nucliadb_service_interface::protos::node_writer_server::NodeWriter;
+use nucliadb_service_interface::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
     OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
     VectorSetId, VectorSetList,
@@ -521,8 +521,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
 mod tests {
     use std::net::SocketAddr;
 
-    use nucliadb_protos::node_writer_client::NodeWriterClient;
-    use nucliadb_protos::node_writer_server::NodeWriterServer;
+    use nucliadb_service_interface::protos::node_writer_client::NodeWriterClient;
+    use nucliadb_service_interface::protos::node_writer_server::NodeWriterServer;
     use portpicker::pick_unused_port;
     use tonic::transport::Server;
     use tonic::Request;

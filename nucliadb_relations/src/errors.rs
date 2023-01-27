@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use tantivy::TantivyError;
 use nucliadb_service_interface::fs_state::FsError;
+use tantivy::TantivyError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RelationsErr {

@@ -18,11 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 use nucliadb_protos::*;
 
 use crate::prelude::*;
 
+pub type RTexts = Arc<dyn FieldReader>;
+pub type WTexts = Arc<RwLock<dyn FieldWriter>>;
 pub struct TextConfig {
     pub path: PathBuf,
 }
@@ -30,9 +33,7 @@ pub struct TextConfig {
 pub struct DocumentIterator(Box<dyn Iterator<Item = DocumentItem> + Send>);
 impl DocumentIterator {
     pub fn new<I>(inner: I) -> DocumentIterator
-    where
-        I: Iterator<Item = DocumentItem> + Send + 'static,
-    {
+    where I: Iterator<Item = DocumentItem> + Send + 'static {
         DocumentIterator(Box::new(inner))
     }
 }

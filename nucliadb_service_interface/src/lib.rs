@@ -22,39 +22,43 @@ pub mod paragraphs;
 pub mod relations;
 pub mod texts;
 pub mod vectors;
+use std::sync::{Arc, RwLock};
+
+pub use anyhow::{anyhow as node_error, Context};
 use nucliadb_protos::{Resource, ResourceId};
-pub use anyhow::Context;
-pub use anyhow::anyhow as node_error;
 pub type NodeResult<O> = anyhow::Result<O>;
-
-
-pub mod dependencies {
-    pub extern crate nucliadb_protos;
-    pub extern crate prost_types;
-    pub extern crate tracing;
-}
 
 pub mod protos {
     pub use nucliadb_protos::*;
-    pub use prost_types::*;
+    pub use prost_types;
 }
 
-pub mod trace {
+pub mod tracing {
     pub use tracing::*;
 }
 
 pub mod thread {
+    pub use rayon::prelude::*;
     pub use rayon::*;
 }
 
 pub mod prelude {
-    pub use crate::{node_error, Context};
-    pub use crate::dependencies::*;
-    pub use crate::paragraphs::*;
-    pub use crate::relations::*;
-    pub use crate::texts::*;
-    pub use crate::vectors::*;
-    pub use crate::{NodeResult, ReaderChild, WriterChild};
+    pub use crate::paragraphs::{self, *};
+    pub use crate::relations::{self, *};
+    pub use crate::texts::{self, *};
+    pub use crate::vectors::{self, *};
+    pub use crate::{
+        encapsulate_reader, encapsulate_writer, node_error, Context, NodeResult, ReaderChild,
+        WriterChild,
+    };
+}
+
+pub fn encapsulate_reader<T>(reader: T) -> Arc<T> {
+    Arc::new(reader)
+}
+
+pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
+    Arc::new(RwLock::new(writer))
 }
 
 pub trait WriterChild: std::fmt::Debug + Send + Sync {

@@ -20,11 +20,12 @@
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use nucliadb_protos::{
+use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::protos::{
     DocumentScored, DocumentVectorIdentifier, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_service_interface::prelude::*;
 use tracing::*;
+
 use crate::data_point_provider::*;
 use crate::indexset::IndexSet;
 
@@ -210,7 +211,10 @@ impl VectorReaderService {
 mod tests {
     use std::collections::HashMap;
 
-    use nucliadb_protos::{IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence};
+    use nucliadb_service_interface::protos::resource::ResourceStatus;
+    use nucliadb_service_interface::protos::{
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence,
+    };
     use tempfile::TempDir;
 
     use super::*;
@@ -256,7 +260,7 @@ mod tests {
             resource: Some(resource_id),
             metadata: None,
             texts: HashMap::with_capacity(0),
-            status: nucliadb_protos::resource::ResourceStatus::Processed as i32,
+            status: ResourceStatus::Processed as i32,
             labels: vec!["2".to_string()],
             paragraphs: HashMap::from([("DOC/KEY".to_string(), paragraphs)]),
             paragraphs_to_delete: vec![],

@@ -17,7 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-use nucliadb_service_interface::dependencies::*;
+use nucliadb_service_interface::protos::*;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
 use tantivy::schema::{
     Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,

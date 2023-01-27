@@ -21,7 +21,7 @@
 use std::hash::Hash;
 
 use data_encoding::HEXUPPER;
-use nucliadb_service_interface::prelude::nucliadb_protos::RelationMetadata;
+use nucliadb_service_interface::protos::RelationMetadata;
 use ring::digest::{Context, SHA256};
 use serde::{Deserialize, Serialize};
 

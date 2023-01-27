@@ -23,7 +23,7 @@ use nucliadb_node::config::Configuration;
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_protos::node_reader_server::NodeReaderServer;
+use nucliadb_service_interface::protos::node_reader_server::NodeReaderServer;
 use tonic::transport::Server;
 use tracing::*;
 

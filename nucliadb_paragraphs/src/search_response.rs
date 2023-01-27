@@ -20,14 +20,13 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use nucliadb_protos::{
+use nucliadb_service_interface::protos::{
     FacetResult, FacetResults, ParagraphResult, ParagraphSearchResponse, ResultScore,
 };
-use nucliadb_service_interface::prelude::*;
+use nucliadb_service_interface::tracing::*;
 use tantivy::collector::FacetCounts;
 use tantivy::schema::Value;
 use tantivy::DocAddress;
-use tracing::*;
 
 use crate::reader::ParagraphReaderService;
 use crate::search_query::TermCollector;

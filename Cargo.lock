@@ -1922,10 +1922,12 @@ dependencies = [
  "log",
  "nucliadb_cluster",
  "nucliadb_ftp",
- "nucliadb_protos",
+ "nucliadb_paragraphs",
+ "nucliadb_relations",
  "nucliadb_service_interface",
- "nucliadb_services",
  "nucliadb_telemetry",
+ "nucliadb_texts",
+ "nucliadb_vectors",
  "once_cell",
  "openssl",
  "opentelemetry",
@@ -2048,17 +2050,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tracing",
-]
-
-[[package]]
-name = "nucliadb_services"
-version = "0.1.0"
-dependencies = [
- "nucliadb_paragraphs",
- "nucliadb_relations",
- "nucliadb_service_interface",
- "nucliadb_texts",
- "nucliadb_vectors",
 ]
 
 [[package]]
