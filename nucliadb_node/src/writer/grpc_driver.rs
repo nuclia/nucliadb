@@ -474,8 +474,6 @@ impl NodeWriter for NodeWriterGRPCDriver {
             Ok(_) => {
                 info!("Shard {} received successfully", shard_id.id);
 
-                self.0.write().await.load_shard(&shard_id);
-
                 Ok(tonic::Response::new(EmptyResponse {}))
             }
             Err(e) => {
