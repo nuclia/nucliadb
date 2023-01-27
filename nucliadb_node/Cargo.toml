@@ -74,6 +74,7 @@ nucliadb_services = { path = "../nucliadb_services" }
 nucliadb_protos = { path = "../nucliadb_protos/rust" }
 nucliadb_cluster = { path = "../nucliadb_cluster" }
 nucliadb_telemetry = { path = "../nucliadb_telemetry" }
+nucliadb_ftp = { path = "../nucliadb_ftp" }
 
 # test
 tempdir = "0.3.7"

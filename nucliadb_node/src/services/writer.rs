@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use nucliadb_protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -31,6 +31,7 @@ use crate::telemetry::run_with_telemetry;
 #[derive(Debug)]
 pub struct ShardWriterService {
     pub id: String,
+    pub path: PathBuf,
     field_writer: fields::WFields,
     paragraph_writer: paragraphs::WParagraphs,
     vector_writer: vectors::WVectors,
@@ -130,6 +131,7 @@ impl ShardWriterService {
 
         Ok(ShardWriterService {
             id,
+            path: shard_path.to_path_buf(),
             field_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
@@ -194,6 +196,7 @@ impl ShardWriterService {
 
         Ok(ShardWriterService {
             id,
+            path: shard_path.to_path_buf(),
             field_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
