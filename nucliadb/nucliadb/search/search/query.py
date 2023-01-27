@@ -43,13 +43,13 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
+    sort: SortOptions,
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort: Optional[SortOptions] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     vector: Optional[List[float]] = None,
@@ -70,7 +70,7 @@ async def global_query_to_pb(
 
     # We need to ask for all and cut later
     request.page_number = 0
-    if sort is not None and sort.limit:
+    if sort.limit is not None:
         # As the index can't sort, we have to do it when merging. To
         # have consistent results, we must limit them
         request.result_per_page = sort.limit

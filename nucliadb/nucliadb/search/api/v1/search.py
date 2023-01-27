@@ -42,7 +42,6 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
-    SORTED_RELEVANT_SEARCH_LIMIT,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -101,8 +100,8 @@ async def search_knowledgebox(
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
     sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
+    sort_limit: Optional[int] = Query(default=None, gt=0),
+    sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
     min_score: float = Query(default=0.70),
@@ -265,7 +264,7 @@ async def search(
         if item.sort is None:
             item.sort = SortOptions(
                 field=SortField.CREATED,
-                order=SortOrder.ASC,
+                order=SortOrder.DESC,
                 limit=None,
             )
         elif not valid_index_sort_option(item):
@@ -277,8 +276,17 @@ async def search(
                 ),
             )
     else:
-        if item.sort is not None and item.sort.limit is None:
-            item.sort.limit = SORTED_RELEVANT_SEARCH_LIMIT
+        if item.sort is None:
+            item.sort = SortOptions(
+                field=SortField.SCORE,
+                order=SortOrder.DESC,
+                limit=None,
+            )
+        elif not valid_index_sort_option(item) and item.sort.limit is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
+            )
 
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results

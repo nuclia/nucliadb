@@ -84,12 +84,16 @@ def sort_results_by_score(results: Union[List[ParagraphResult], List[DocumentRes
 
 async def text_score(
     item: Union[DocumentResult, ParagraphResult],
-    sort: Optional[SortOptions],
+    sort_field: SortField,
     kbid: str,
-):
-    score: Any = (item.score.bm25, item.score.booster)
-    if sort is None:
-        return score
+) -> Optional[Score]:
+    """Returns the score for given `item` and `sort_field`. If the resource is being
+    deleted, it might appear on search results but not in maindb. In this
+    specific case, return None.
+
+    """
+    score: Any = None
+
     resource = await get_resource_from_cache(kbid, item.uuid)
     if resource is None:
         return score
@@ -97,11 +101,13 @@ async def text_score(
     if basic is None:
         return score
 
-    if sort.field == SortField.CREATED:
+    if sort_field == SortField.SCORE:
+        score = (item.score.bm25, item.score.booster)
+    elif sort_field == SortField.CREATED:
         score = basic.created.ToDatetime()
-    elif sort.field == SortField.MODIFIED:
+    elif sort_field == SortField.MODIFIED:
         score = basic.modified.ToDatetime()
-    elif sort.field == SortField.TITLE:
+    elif sort_field == SortField.TITLE:
         score = basic.title
 
     return score
@@ -113,7 +119,7 @@ async def merge_documents_results(
     count: int,
     page: int,
     kbid: str,
-    sort: Optional[SortOptions] = None,
+    sort: SortOptions,
 ) -> Resources:
     raw_resource_list: List[Tuple[DocumentResult, Score]] = []
     facets: Dict[str, Any] = {}
@@ -132,11 +138,11 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
-            score = await text_score(result, sort, kbid)
-            raw_resource_list.append((result, score))
+            score = await text_score(result, sort.field, kbid)
+            if score is not None:
+                raw_resource_list.append((result, score))
 
-    sort_order = sort.order if sort is not None else SortOrder.DESC
-    raw_resource_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
+    raw_resource_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
     skip = page * count
     end = skip + count
@@ -310,7 +316,7 @@ async def merge_paragraph_results(
     count: int,
     page: int,
     highlight: bool,
-    sort: Optional[SortOptions] = None,
+    sort: SortOptions,
 ):
     raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
     facets: Dict[str, Any] = {}
@@ -331,11 +337,11 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            score = await text_score(result, sort, kbid)
-            raw_paragraph_list.append((result, score))
+            score = await text_score(result, sort.field, kbid)
+            if score is not None:
+                raw_paragraph_list.append((result, score))
 
-    sort_order = sort.order if sort is not None else SortOrder.DESC
-    raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort_order == SortOrder.DESC))
+    raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
 
     skip = page * count
     end = skip + count
@@ -447,7 +453,7 @@ async def merge_results(
     show: List[ResourceProperties],
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
-    sort: Optional[SortOptions],
+    sort: SortOptions,
     requested_relations: RelationSearchRequest,
     min_score: float = 0.85,
     highlight: bool = False,
