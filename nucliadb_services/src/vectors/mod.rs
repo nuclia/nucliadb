@@ -19,39 +19,39 @@
 //
 
 use crate::*;
-
+use nucliadb_vectors::service as vectors;
 pub const MAX_VERSION: u32 = 1;
 
 pub type RVectors = Arc<dyn VectorReader>;
 pub type WVectors = Arc<RwLock<dyn VectorWriter>>;
 
-pub fn open_reader(config: &VectorConfig, version: u32) -> InternalResult<RVectors> {
+pub fn open_reader(config: &VectorConfig, version: u32) -> NodeResult<RVectors> {
     match version {
-        1 => nucliadb_vectors::vectors::service::VectorReaderService::open(config)
-            .map(|v| Arc::new(v) as RVectors),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        1 => vectors::VectorReaderService::open(config).map(|v| Arc::new(v) as RVectors),
+        v => Err(node_error!("Invalid vectors  version {v}")),
     }
 }
 
-pub fn open_writer(config: &VectorConfig, version: u32) -> InternalResult<WVectors> {
+pub fn open_writer(config: &VectorConfig, version: u32) -> NodeResult<WVectors> {
     match version {
-        1 => nucliadb_vectors::vectors::service::VectorWriterService::open(config)
-            .map(|v| Arc::new(RwLock::new(v)) as WVectors),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        1 => {
+            vectors::VectorWriterService::open(config).map(|v| Arc::new(RwLock::new(v)) as WVectors)
+        }
+        v => Err(node_error!("Invalid vectors  version {v}")),
     }
 }
-pub fn create_reader(config: &VectorConfig, version: u32) -> InternalResult<RVectors> {
+pub fn create_reader(config: &VectorConfig, version: u32) -> NodeResult<RVectors> {
     match version {
-        1 => nucliadb_vectors::vectors::service::VectorReaderService::new(config)
-            .map(|v| Arc::new(v) as RVectors),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        1 => vectors::VectorReaderService::new(config).map(|v| Arc::new(v) as RVectors),
+        v => Err(node_error!("Invalid vectors  version {v}")),
     }
 }
 
-pub fn create_writer(config: &VectorConfig, version: u32) -> InternalResult<WVectors> {
+pub fn create_writer(config: &VectorConfig, version: u32) -> NodeResult<WVectors> {
     match version {
-        1 => nucliadb_vectors::vectors::service::VectorWriterService::new(config)
-            .map(|v| Arc::new(RwLock::new(v)) as WVectors),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        1 => {
+            vectors::VectorWriterService::new(config).map(|v| Arc::new(RwLock::new(v)) as WVectors)
+        }
+        v => Err(node_error!("Invalid vectors  version {v}")),
     }
 }

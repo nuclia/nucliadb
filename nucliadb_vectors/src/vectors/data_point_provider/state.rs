@@ -26,9 +26,9 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use super::merge_worker::Worker;
-use super::{SearchRequest, VectorR};
-use crate::utils::dtrie::DTrie;
-use crate::utils::{merger, DeleteLog};
+use super::{merger, SearchRequest, VectorR};
+use crate::data_types::dtrie_ram::DTrie;
+use crate::data_types::DeleteLog;
 use crate::vectors::data_point::{DataPoint, DpId, Journal};
 const BUFFER_CAP: usize = 5;
 

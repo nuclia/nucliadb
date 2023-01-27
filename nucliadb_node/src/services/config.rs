@@ -44,11 +44,11 @@ impl StoredConfig {
             modifed = true;
         }
         if self.version_fields.is_none() {
-            self.version_fields = Some(fields::MAX_VERSION);
+            self.version_fields = Some(texts::MAX_VERSION);
             modifed = true;
         }
         if self.version_relations.is_none() {
-            self.version_relations = Some(fields::MAX_VERSION);
+            self.version_relations = Some(texts::MAX_VERSION);
             modifed = true;
         }
         modifed
@@ -72,7 +72,7 @@ impl Default for ShardConfig {
     fn default() -> Self {
         ShardConfig {
             version_paragraphs: paragraphs::MAX_VERSION,
-            version_fields: fields::MAX_VERSION,
+            version_fields: texts::MAX_VERSION,
             version_vectors: vectors::MAX_VERSION,
             version_relations: relations::MAX_VERSION,
         }
@@ -128,7 +128,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let config = ShardConfig::new(dir.path()).unwrap();
         assert_eq!(config.version_relations, relations::MAX_VERSION);
-        assert_eq!(config.version_fields, fields::MAX_VERSION);
+        assert_eq!(config.version_fields, texts::MAX_VERSION);
         assert_eq!(config.version_paragraphs, paragraphs::MAX_VERSION);
         assert_eq!(config.version_vectors, vectors::MAX_VERSION);
     }

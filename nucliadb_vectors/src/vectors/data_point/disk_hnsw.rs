@@ -49,7 +49,7 @@ use std::io;
 use super::ops_hnsw::{Hnsw, Layer};
 use super::ram_hnsw::{Edge, EntryPoint, RAMHnsw};
 use super::Address;
-use crate::disk::usize_utils::*;
+use crate::data_types::usize_utils::*;
 
 const EDGE_LEN: usize = 4;
 const NODE_LEN: usize = USIZE_LEN;
@@ -288,10 +288,10 @@ mod tests {
         let ep = DiskHnsw::get_entry_point(&buf).unwrap();
         assert_eq!(ep, entry_point);
         let layer0 = buf.as_slice().get_layer(0);
-        layer_check(layer0, no_nodes, &cnx0);
+        layer_check(&layer0, no_nodes, &cnx0);
         let layer1 = buf.as_slice().get_layer(1);
-        layer_check(layer1, no_nodes, &cnx1);
+        layer_check(&layer1, no_nodes, &cnx1);
         let layer2 = buf.as_slice().get_layer(2);
-        layer_check(layer2, no_nodes, &cnx2);
+        layer_check(&layer2, no_nodes, &cnx2);
     }
 }

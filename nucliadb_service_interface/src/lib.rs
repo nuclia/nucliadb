@@ -17,28 +17,59 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub mod fields_interface;
-pub mod paragraphs_interface;
-pub mod relations_interface;
-pub mod service_interface;
-pub mod vectos_interface;
+pub mod fs_state;
+pub mod paragraphs;
+pub mod relations;
+pub mod texts;
+pub mod vectors;
+use nucliadb_protos::{Resource, ResourceId};
+pub use anyhow::Context;
+pub use anyhow::anyhow as node_error;
+pub type NodeResult<O> = anyhow::Result<O>;
+
 
 pub mod dependencies {
-    pub extern crate anyhow;
-    pub extern crate async_std;
-    pub extern crate async_trait;
     pub extern crate nucliadb_protos;
     pub extern crate prost_types;
-    pub extern crate tempdir;
-    pub extern crate tokio;
     pub extern crate tracing;
 }
 
+pub mod protos {
+    pub use nucliadb_protos::*;
+    pub use prost_types::*;
+}
+
+pub mod trace {
+    pub use tracing::*;
+}
+
+pub mod thread {
+    pub use rayon::*;
+}
+
 pub mod prelude {
+    pub use crate::{node_error, Context};
     pub use crate::dependencies::*;
-    pub use crate::fields_interface::*;
-    pub use crate::paragraphs_interface::*;
-    pub use crate::relations_interface::*;
-    pub use crate::service_interface::*;
-    pub use crate::vectos_interface::*;
+    pub use crate::paragraphs::*;
+    pub use crate::relations::*;
+    pub use crate::texts::*;
+    pub use crate::vectors::*;
+    pub use crate::{NodeResult, ReaderChild, WriterChild};
+}
+
+pub trait WriterChild: std::fmt::Debug + Send + Sync {
+    fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
+    fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
+    fn garbage_collection(&mut self);
+    fn stop(&mut self) -> NodeResult<()>;
+    fn count(&self) -> usize;
+}
+
+pub trait ReaderChild: std::fmt::Debug + Send + Sync {
+    type Request;
+    type Response;
+    fn search(&self, request: &Self::Request) -> NodeResult<Self::Response>;
+    fn reload(&self);
+    fn stored_ids(&self) -> Vec<String>;
+    fn stop(&self) -> NodeResult<()>;
 }

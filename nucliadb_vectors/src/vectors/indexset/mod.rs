@@ -21,9 +21,9 @@ mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
+use nucliadb_std::fs::{self, ELock, Lock, SLock, Version};
 use state::State;
 
-use crate::disk::directory::{self, ELock, Lock, SLock, Version};
 use crate::vectors::data_point_provider::{Index, IndexCheck, VectorR};
 
 pub trait IndexKeyCollector {
@@ -40,10 +40,10 @@ impl IndexSet {
         if !path.exists() {
             std::fs::create_dir_all(path)?;
         }
-        directory::initialize_disk(path, || State::new(path.to_path_buf()))?;
-        let lock = directory::shared_lock(path)?;
-        let state = directory::load_state::<State>(&lock)?;
-        let date = directory::crnt_version(&lock)?;
+        fs::initialize_disk(path, || State::new(path.to_path_buf()))?;
+        let lock = fs::shared_lock(path)?;
+        let state = fs::load_state::<State>(&lock)?;
+        let date = fs::crnt_version(&lock)?;
         if let IndexCheck::Sanity = with_check {
             state.do_sanity_checks()?;
         }
@@ -63,11 +63,11 @@ impl IndexSet {
         let mut write = self.state.write().unwrap();
         write.get_or_create(index)
     }
-    fn update(&self, lock: &directory::Lock) -> VectorR<()> {
-        let disk_v = directory::crnt_version(lock)?;
+    fn update(&self, lock: &fs::Lock) -> VectorR<()> {
+        let disk_v = fs::crnt_version(lock)?;
         let date = *self.date.read().unwrap();
         if disk_v > date {
-            let new_state = directory::load_state(lock)?;
+            let new_state = fs::load_state(lock)?;
             let mut state = self.state.write().unwrap();
             let mut date = self.date.write().unwrap();
             *state = new_state;
@@ -84,12 +84,12 @@ impl IndexSet {
         read.get(index)
     }
     pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = directory::exclusive_lock(&self.location)?;
+        let lock = fs::exclusive_lock(&self.location)?;
         self.update(&lock)?;
         Ok(lock)
     }
     pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = directory::shared_lock(&self.location)?;
+        let lock = fs::shared_lock(&self.location)?;
         self.update(&lock)?;
         Ok(lock)
     }
@@ -99,8 +99,8 @@ impl IndexSet {
     pub fn commit(&self, lock: ELock) -> VectorR<()> {
         let state = self.state.read().unwrap();
         let mut date = self.date.write().unwrap();
-        directory::persist_state::<State>(&lock, &state)?;
-        *date = directory::crnt_version(&lock)?;
+        fs::persist_state::<State>(&lock, &state)?;
+        *date = fs::crnt_version(&lock)?;
         Ok(())
     }
 }

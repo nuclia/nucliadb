@@ -17,11 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_services::{ServiceError, ServiceResult};
+use nucliadb_service_interface::{Context, NodeResult};
 use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
-use tracing::{error, Level, Span};
+use tracing::{Level, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
@@ -32,7 +32,7 @@ use crate::config::Configuration;
 
 const TRACE_ID: &str = "trace-id";
 
-pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
+pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
     let log_levels = Configuration::log_level();
 
     let mut layers = Vec::new();
@@ -62,29 +62,27 @@ pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
     tracing_subscriber::registry()
         .with(layers)
         .try_init()
-        .map_err(|e| {
-            error!("Try init error: {e}");
-            ServiceError::GenericErr(Box::new(e))
-        })?;
+        .with_context(|| "trying to init tracing")?;
     Ok(guard)
 }
 
 pub(crate) fn run_with_telemetry<F, R>(current: Span, f: F) -> R
-where F: FnOnce() -> R {
+where
+    F: FnOnce() -> R,
+{
     let tid = current.context().span().span_context().trace_id();
     sentry::with_scope(|scope| scope.set_tag(TRACE_ID, tid), || current.in_scope(f))
 }
 
 fn init_jaeger(
     log_levels: Vec<(String, Level)>,
-) -> ServiceResult<Box<dyn Layer<Registry> + Send + Sync>> {
+) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
     let agent_endpoint = Configuration::jaeger_agent_endp();
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
         .with_service_name("nucliadb_node")
         .with_auto_split_batch(true)
-        .install_batch(opentelemetry::runtime::Tokio)
-        .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
+        .install_batch(opentelemetry::runtime::Tokio)?;
 
     // This filter is needed because we want to keep logs in stdout and attach logs to jaeger
     // spans in really rare cases So, basically it checks the source of event (allowed

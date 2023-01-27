@@ -55,7 +55,7 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn load_shards(&mut self) -> ServiceResult<()> {
+    pub fn load_shards(&mut self) -> NodeResult<()> {
         let shards_path = Configuration::shards_path();
         info!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
@@ -113,7 +113,7 @@ impl NodeWriterService {
         data
     }
     #[tracing::instrument(skip_all)]
-    pub fn delete_shard(&mut self, shard_id: &ShardId) -> ServiceResult<()> {
+    pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
         self.cache.remove(&shard_id.id);
         let shard_path = Configuration::shards_path_id(&shard_id.id);
         let shard_path = Path::new(&shard_path);
@@ -124,7 +124,7 @@ impl NodeWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
+    pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
         self.delete_shard(shard_id)?;
         let shard_name = shard_id.id.clone();
         let shard_path = Configuration::shards_path_id(&shard_id.id);
@@ -144,7 +144,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &Resource,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -157,7 +157,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -170,7 +170,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -183,7 +183,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         graph: &JoinGraph,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -196,7 +196,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         request: &DeleteGraphNodes,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -209,7 +209,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -217,14 +217,14 @@ impl NodeWriterService {
         Ok(Some(shard.count()))
     }
     #[tracing::instrument(skip_all)]
-    pub fn gc(&mut self, shard_id: &ShardId) -> ServiceResult<Option<()>> {
+    pub fn gc(&mut self, shard_id: &ShardId) -> NodeResult<Option<()>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         Ok(Some(shard.gc()?))
     }
     #[tracing::instrument(skip_all)]
-    pub fn list_vectorsets(&self, shard_id: &ShardId) -> ServiceResult<Option<Vec<String>>> {
+    pub fn list_vectorsets(&self, shard_id: &ShardId) -> NodeResult<Option<Vec<String>>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };

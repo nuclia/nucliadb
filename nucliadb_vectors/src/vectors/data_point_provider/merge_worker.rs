@@ -19,11 +19,11 @@
 
 use std::path::PathBuf;
 
+use nucliadb_std::fs;
 use tracing::*;
 
+use super::merger::{MergeQuery, MergeRequest};
 use super::{State, VectorR};
-use crate::disk::directory;
-use crate::utils::merger::{MergeQuery, MergeRequest};
 use crate::vectors::data_point::{DataPoint, DpId};
 
 pub struct Worker(PathBuf);
@@ -49,8 +49,8 @@ impl Worker {
     }
     fn work(&self) -> VectorR<()> {
         let subscriber = self.0.as_path();
-        let lock = directory::shared_lock(subscriber)?;
-        let state: State = directory::load_state(&lock)?;
+        let lock = fs::shared_lock(subscriber)?;
+        let state: State = fs::load_state(&lock)?;
         std::mem::drop(lock);
 
         let Some(work) = state.current_work_unit().map(|work|
@@ -66,10 +66,10 @@ impl Worker {
 
         let report = self.merge_report(ids.iter().copied(), new_dp.meta().id());
 
-        let lock = directory::exclusive_lock(subscriber)?;
-        let mut state: State = directory::load_state(&lock)?;
+        let lock = fs::exclusive_lock(subscriber)?;
+        let mut state: State = fs::load_state(&lock)?;
         state.replace_work_unit(new_dp);
-        directory::persist_state(&lock, &state)?;
+        fs::persist_state(&lock, &state)?;
         std::mem::drop(lock);
 
         info!("Merge on {subscriber:?}:\n{report}");

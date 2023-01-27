@@ -18,8 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_vectors::vectors::data_point::{DataPoint, Elem, LabelDictionary};
-use nucliadb_vectors::vectors::data_point_provider::*;
+use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
+use nucliadb_vectors::data_point_provider::*;
 
 use super::VectorEngine;
 

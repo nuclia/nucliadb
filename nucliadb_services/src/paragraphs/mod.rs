@@ -24,34 +24,34 @@ pub const MAX_VERSION: u32 = 1;
 pub type RParagraphs = Arc<dyn ParagraphReader>;
 pub type WParagraphs = Arc<RwLock<dyn ParagraphWriter>>;
 
-pub fn open_reader(config: &ParagraphConfig, version: u32) -> InternalResult<RParagraphs> {
+pub fn open_reader(config: &ParagraphConfig, version: u32) -> NodeResult<RParagraphs> {
     match version {
-        1 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::open(config)
+        1 => nucliadb_paragraphs::reader::ParagraphReaderService::open(config)
             .map(|v| Arc::new(v) as RParagraphs),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        v => Err(node_error!("Invalid paragraphs  version {v}")),
     }
 }
 
-pub fn open_writer(config: &ParagraphConfig, version: u32) -> InternalResult<WParagraphs> {
+pub fn open_writer(config: &ParagraphConfig, version: u32) -> NodeResult<WParagraphs> {
     match version {
-        1 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::open(config)
+        1 => nucliadb_paragraphs::writer::ParagraphWriterService::open(config)
             .map(|v| Arc::new(RwLock::new(v)) as WParagraphs),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        v => Err(node_error!("Invalid paragraphs  version {v}")),
     }
 }
 
-pub fn create_reader(config: &ParagraphConfig, version: u32) -> InternalResult<RParagraphs> {
+pub fn create_reader(config: &ParagraphConfig, version: u32) -> NodeResult<RParagraphs> {
     match version {
-        1 => nucliadb_paragraphs_tantivy::reader::ParagraphReaderService::new(config)
+        1 => nucliadb_paragraphs::reader::ParagraphReaderService::new(config)
             .map(|v| Arc::new(v) as RParagraphs),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        v => Err(node_error!("Invalid paragraphs version {v}")),
     }
 }
 
-pub fn create_writer(config: &ParagraphConfig, version: u32) -> InternalResult<WParagraphs> {
+pub fn create_writer(config: &ParagraphConfig, version: u32) -> NodeResult<WParagraphs> {
     match version {
-        1 => nucliadb_paragraphs_tantivy::writer::ParagraphWriterService::new(config)
+        1 => nucliadb_paragraphs::writer::ParagraphWriterService::new(config)
             .map(|v| Arc::new(RwLock::new(v)) as WParagraphs),
-        v => Err(Box::new(ServiceError::InvalidShardVersion(v).to_string())),
+        v => Err(node_error!("Invalid paragraphs  version {v}")),
     }
 }

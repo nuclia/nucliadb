@@ -19,17 +19,17 @@
 //
 
 mod merge_worker;
+mod merger;
 mod state;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use std::time::SystemTime;
 use std::{io, mem};
 
+use nucliadb_std::fs::{self, ELock, FsError, Lock, SLock, Version};
 use state::*;
 use thiserror::Error;
 
-use crate::disk::directory::{ELock, Lock, SLock, Version};
-use crate::disk::{directory, DiskErr};
 use crate::vectors::data_point::{DPError, DataPoint};
 
 pub type TemporalMark = SystemTime;
@@ -48,8 +48,8 @@ pub enum VectorErr {
     IoErr(#[from] io::Error),
     #[error("Error in data point: {0}")]
     Dp(#[from] DPError),
-    #[error("Error in disk: {0}")]
-    Disk(#[from] DiskErr),
+    #[error("Error in fs: {0}")]
+    FsError(#[from] FsError),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;
@@ -66,12 +66,12 @@ pub struct Index {
     location: PathBuf,
 }
 impl Index {
-    fn update(&self, lock: &directory::Lock) -> VectorR<()> {
-        let disk_v = directory::crnt_version(lock)?;
+    fn update(&self, lock: &Lock) -> VectorR<()> {
+        let disk_v = fs::crnt_version(lock)?;
         let date = self.date.read().unwrap();
         if disk_v > *date {
             mem::drop(date);
-            let new_state = directory::load_state(lock)?;
+            let new_state = fs::load_state(lock)?;
             let mut state = self.state.write().unwrap();
             let mut date = self.date.write().unwrap();
             *state = new_state;
@@ -85,10 +85,10 @@ impl Index {
         if !path.exists() {
             std::fs::create_dir_all(path)?;
         }
-        directory::initialize_disk(path, || State::new(path.to_path_buf()))?;
-        let lock = directory::shared_lock(path)?;
-        let state = directory::load_state::<State>(&lock)?;
-        let date = directory::crnt_version(&lock)?;
+        fs::initialize_disk(path, || State::new(path.to_path_buf()))?;
+        let lock = fs::shared_lock(path)?;
+        let state = fs::load_state::<State>(&lock)?;
+        let date = fs::crnt_version(&lock)?;
         if let IndexCheck::Sanity = with_check {
             state.work_sanity_check();
         }
@@ -119,12 +119,12 @@ impl Index {
         state.no_nodes()
     }
     pub fn get_elock(&self) -> VectorR<ELock> {
-        let lock = directory::exclusive_lock(&self.location)?;
+        let lock = fs::exclusive_lock(&self.location)?;
         self.update(&lock)?;
         Ok(lock)
     }
     pub fn get_slock(&self) -> VectorR<SLock> {
-        let lock = directory::shared_lock(&self.location)?;
+        let lock = fs::shared_lock(&self.location)?;
         self.update(&lock)?;
         Ok(lock)
     }
@@ -134,8 +134,8 @@ impl Index {
     pub fn commit(&self, lock: ELock) -> VectorR<()> {
         let state = self.state.read().unwrap();
         let mut date = self.date.write().unwrap();
-        directory::persist_state::<State>(&lock, &state)?;
-        *date = directory::crnt_version(&lock)?;
+        fs::persist_state::<State>(&lock, &state)?;
+        *date = fs::crnt_version(&lock)?;
         Ok(())
     }
 }

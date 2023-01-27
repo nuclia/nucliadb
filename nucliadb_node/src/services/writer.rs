@@ -32,7 +32,7 @@ use crate::telemetry::run_with_telemetry;
 pub struct ShardWriterService {
     pub id: String,
     pub path: PathBuf,
-    field_writer: fields::WFields,
+    text_writer: texts::WTexts,
     paragraph_writer: paragraphs::WParagraphs,
     vector_writer: vectors::WVectors,
     relation_writer: relations::WRelations,
@@ -77,8 +77,8 @@ impl ShardWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(id: String, shard_path: &Path) -> InternalResult<ShardWriterService> {
-        let fsc = FieldConfig {
+    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardWriterService> {
+        let fsc = TextConfig {
             path: shard_path.join("text"),
         };
 
@@ -95,9 +95,8 @@ impl ShardWriterService {
             path: shard_path.join("relations"),
         };
 
-        let config = ShardConfig::new(shard_path)
-            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
-        let text_task = move || Some(fields::create_writer(&fsc, config.version_fields));
+        let config = ShardConfig::new(shard_path)?;
+        let text_task = move || Some(texts::create_writer(&fsc, config.version_fields));
         let paragraph_task =
             move || Some(paragraphs::create_writer(&psc, config.version_paragraphs));
         let vector_task = move || Some(vectors::create_writer(&vsc, config.version_vectors));
@@ -132,7 +131,7 @@ impl ShardWriterService {
         Ok(ShardWriterService {
             id,
             path: shard_path.to_path_buf(),
-            field_writer: fields.unwrap(),
+            text_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
@@ -143,8 +142,8 @@ impl ShardWriterService {
         })
     }
     #[tracing::instrument(skip_all)]
-    pub fn open(id: String, shard_path: &Path) -> InternalResult<ShardWriterService> {
-        let fsc = FieldConfig {
+    pub fn open(id: String, shard_path: &Path) -> NodeResult<ShardWriterService> {
+        let fsc = TextConfig {
             path: shard_path.join("text"),
         };
 
@@ -160,10 +159,9 @@ impl ShardWriterService {
         let rsc = RelationConfig {
             path: shard_path.join("relations"),
         };
-        let config = ShardConfig::new(shard_path)
-            .map_err(|e| Box::new(e.to_string()) as Box<dyn InternalError>)?;
+        let config = ShardConfig::new(shard_path)?;
 
-        let text_task = move || Some(fields::open_writer(&fsc, config.version_fields));
+        let text_task = move || Some(texts::open_writer(&fsc, config.version_fields));
         let paragraph_task = move || Some(paragraphs::open_writer(&psc, config.version_paragraphs));
         let vector_task = move || Some(vectors::open_writer(&vsc, config.version_vectors));
         let relation_task = move || Some(relations::open_writer(&rsc, config.version_relations));
@@ -197,7 +195,7 @@ impl ShardWriterService {
         Ok(ShardWriterService {
             id,
             path: shard_path.to_path_buf(),
-            field_writer: fields.unwrap(),
+            text_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
@@ -210,12 +208,12 @@ impl ShardWriterService {
     #[tracing::instrument(skip_all)]
     pub fn stop(&mut self) {
         info!("Stopping shard {}...", { &self.id });
-        let fields = self.field_writer.clone();
+        let texts = self.text_writer.clone();
         let paragraphs = self.paragraph_writer.clone();
         let vectors = self.vector_writer.clone();
         let relations = self.relation_writer.clone();
 
-        let text_task = move || fields.write().unwrap().stop();
+        let text_task = move || texts.write().unwrap().stop();
         let paragraph_task = move || paragraphs.write().unwrap().stop();
         let vector_task = move || vectors.write().unwrap().stop();
         let relation_task = move || relations.write().unwrap().stop();
@@ -257,8 +255,8 @@ impl ShardWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn set_resource(&mut self, resource: &Resource) -> InternalResult<()> {
-        let field_writer_service = self.field_writer.clone();
+    pub fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
+        let field_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
             info!("Field service starts set_resource");
@@ -326,11 +324,11 @@ impl ShardWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn remove_resource(&mut self, resource: &ResourceId) -> InternalResult<()> {
-        let field_writer_service = self.field_writer.clone();
+    pub fn remove_resource(&mut self, resource: &ResourceId) -> NodeResult<()> {
+        let text_writer_service = self.text_writer.clone();
         let field_resource = resource.clone();
         let text_task = move || {
-            let mut writer = field_writer_service.write().unwrap();
+            let mut writer = text_writer_service.write().unwrap();
             writer.delete_resource(&field_resource)
         };
         let paragraph_resource = resource.clone();
@@ -379,41 +377,41 @@ impl ShardWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn list_vectorsets(&self) -> InternalResult<Vec<String>> {
+    pub fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
         let reader = self.vector_writer.read().unwrap();
         let keys = reader.list_vectorsets()?;
         Ok(keys)
     }
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(&self, setid: &VectorSetId) -> InternalResult<()> {
+    pub fn add_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
         let mut writer = self.vector_writer.write().unwrap();
         writer.add_vectorset(setid)?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn remove_vectorset(&self, setid: &VectorSetId) -> InternalResult<()> {
+    pub fn remove_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
         let mut writer = self.vector_writer.write().unwrap();
         writer.remove_vectorset(setid)?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> InternalResult<()> {
+    pub fn delete_relation_nodes(&self, nodes: &DeleteGraphNodes) -> NodeResult<()> {
         let mut writer = self.relation_writer.write().unwrap();
         writer.delete_nodes(nodes)?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn join_relations_graph(&self, graph: &JoinGraph) -> InternalResult<()> {
+    pub fn join_relations_graph(&self, graph: &JoinGraph) -> NodeResult<()> {
         let mut writer = self.relation_writer.write().unwrap();
         writer.join_graph(graph)?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]
     pub fn count(&self) -> usize {
-        self.field_writer.read().unwrap().count()
+        self.text_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
-    pub fn gc(&self) -> InternalResult<()> {
+    pub fn gc(&self) -> NodeResult<()> {
         let vector_writer_service = self.vector_writer.clone();
         let mut writer = vector_writer_service.write().unwrap();
         writer.garbage_collection();
