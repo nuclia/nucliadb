@@ -29,7 +29,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 use uuid::Uuid;
 
-use crate::config::Configuration;
+use crate::env;
 use crate::services::writer::ShardWriterService;
 
 #[derive(Debug)]
@@ -58,7 +58,7 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> NodeResult<()> {
-        let shards_path = Configuration::shards_path();
+        let shards_path = env::shards_path();
         info!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
@@ -74,7 +74,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
             return;
@@ -102,7 +102,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn new_shard(&mut self) -> ShardCreated {
         let shard_id = Uuid::new_v4().to_string();
-        let shard_path = Configuration::shards_path_id(&shard_id);
+        let shard_path = env::shards_path_id(&shard_id);
         std::fs::create_dir_all(&shard_path).unwrap();
         let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path).unwrap();
         let data = ShardCreated {
@@ -118,7 +118,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
         self.cache.remove(&shard_id.id);
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
         if shard_path.exists() {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
@@ -129,7 +129,7 @@ impl NodeWriterService {
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
         self.delete_shard(shard_id)?;
         let shard_name = shard_id.id.clone();
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
         std::fs::create_dir_all(&shard_path).unwrap();
         let new_shard = ShardWriterService::new(shard_name, &shard_path)?;
         let shard_data = ShardCleaned {

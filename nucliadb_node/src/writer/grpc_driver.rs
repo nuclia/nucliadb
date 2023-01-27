@@ -35,7 +35,7 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::config::Configuration;
+use crate::env;
 use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
@@ -54,7 +54,7 @@ impl NodeWriterGRPCDriver {
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
-        if Configuration::lazy_loading() {
+        if env::lazy_loading() {
             let mut writer = self.0.write().await;
             writer.load_shard(id);
         }
@@ -467,7 +467,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
 
         match Listener::default()
-            .save_at(Configuration::shards_path())
+            .save_at(env::shards_path())
             .listen_once(request.port as u16)
             .await
         {
@@ -528,12 +528,12 @@ mod tests {
     use tonic::Request;
 
     use super::*;
-    use crate::config::Configuration;
+    use crate::env;
     use crate::utils::socket_to_endpoint;
 
     async fn start_test_server(address: SocketAddr) -> anyhow::Result<()> {
         let node_writer = NodeWriterGRPCDriver::from(NodeWriterService::new());
-        std::fs::create_dir_all(Configuration::shards_path())?;
+        std::fs::create_dir_all(env::shards_path())?;
 
         let _ = tokio::spawn(async move {
             let node_writer_server = NodeWriterServer::new(node_writer);

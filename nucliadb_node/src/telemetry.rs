@@ -28,16 +28,16 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
-use crate::config::Configuration;
+use crate::env;
 
 const TRACE_ID: &str = "trace-id";
 
 pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
-    let log_levels = Configuration::log_level();
+    let log_levels = env::log_level();
 
     let mut layers = Vec::new();
 
-    if Configuration::jaeger_enabled() {
+    if env::jaeger_enabled() {
         layers.push(init_jaeger(log_levels.clone())?);
     }
 
@@ -48,9 +48,9 @@ pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
 
     layers.push(stdout_layer);
 
-    let sentry_env = Configuration::get_sentry_env();
+    let sentry_env = env::get_sentry_env();
     let guard = sentry::init((
-        Configuration::sentry_url(),
+        env::sentry_url(),
         sentry::ClientOptions {
             release: sentry::release_name!(),
             environment: Some(sentry_env.into()),
@@ -75,7 +75,7 @@ where F: FnOnce() -> R {
 fn init_jaeger(
     log_levels: Vec<(String, Level)>,
 ) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
-    let agent_endpoint = Configuration::jaeger_agent_endp();
+    let agent_endpoint = env::jaeger_agent_endp();
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
         .with_service_name("nucliadb_node")

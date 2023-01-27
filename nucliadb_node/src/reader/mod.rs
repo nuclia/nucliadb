@@ -31,7 +31,7 @@ use nucliadb_core::protos::{
 use nucliadb_core::thread::*;
 use nucliadb_core::tracing::{self, *};
 
-use crate::config::Configuration;
+use crate::env;
 use crate::services::reader::ShardReaderService;
 
 #[derive(Debug)]
@@ -65,7 +65,7 @@ impl NodeReaderService {
     pub fn iter_shards(
         &mut self,
     ) -> NodeResult<impl Iterator<Item = NodeResult<ShardReaderService>>> {
-        let shards_path = Configuration::shards_path();
+        let shards_path = env::shards_path();
         Ok(std::fs::read_dir(shards_path)?.flatten().map(|entry| {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
@@ -77,7 +77,7 @@ impl NodeReaderService {
     /// Load all shards on the shards memory structure
     #[tracing::instrument(skip_all)]
     pub fn load_shards(&mut self) -> NodeResult<()> {
-        let shards_path = Configuration::shards_path();
+        let shards_path = env::shards_path();
         info!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
@@ -97,7 +97,7 @@ impl NodeReaderService {
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
             return;
