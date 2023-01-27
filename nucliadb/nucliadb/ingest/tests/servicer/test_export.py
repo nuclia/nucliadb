@@ -27,8 +27,10 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldType,
+    FileExtractedData,
     Keyword,
     LargeComputedMetadataWrapper,
+    LinkExtractedData,
     UserVector,
     UserVectorsWrapper,
 )
@@ -97,6 +99,20 @@ async def test_export_resources(grpc_servicer: IngestFixture):
     uvw.vectors.vectors["vectorset1"].vectors["vect1"].CopyFrom(uv)
     bm.user_vectors.append(uvw)
 
+    led = LinkExtractedData()
+    led.metadata["foo"] = "bar"
+    led.field = "link1"
+    led.description = "My link is from wikipedia"
+    led.title = "My Link"
+    bm.link_extracted_data.append(led)
+
+    fed = FileExtractedData()
+    fed.language = "es"
+    fed.metadata["foo"] = "bar"
+    fed.icon = "image/png"
+    fed.field = "file1"
+    bm.file_extracted_data.append(fed)
+
     await stub.ProcessMessage([bm])  # type: ignore
 
     req = ExportRequest()
@@ -109,11 +125,13 @@ async def test_export_resources(grpc_servicer: IngestFixture):
         assert export.basic.title == "My Title"
         assert export.slug == export.basic.slug == "slugtest"
         assert export.extracted_text[0].body.text == "My text"
-
         assert export.field_vectors == bm.field_vectors
         assert export.user_vectors == bm.user_vectors
-
         assert export.field_large_metadata == bm.field_large_metadata
+        assert export.extracted_text == bm.extracted_text
+        assert export.field_metadata == bm.field_metadata
+        assert export.link_extracted_data == bm.link_extracted_data
+        assert export.file_extracted_data == bm.file_extracted_data
     assert found
 
     index_req = IndexResource()

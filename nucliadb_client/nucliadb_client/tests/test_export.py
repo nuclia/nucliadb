@@ -197,12 +197,12 @@ async def test_export_import_e2e(nucliadb_client):
 
     # Paragraphs
     assert len(src_search.paragraphs.results) == len(dst_search.paragraphs.results)
-    src_presults = {
+    src_presults = [
         (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
         for par in src_search.paragraphs.results
-    }
-    dst_presults = {
+    ]
+    dst_presults = [
         (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
         for par in dst_search.paragraphs.results
-    }
+    ]
     assert src_presults == dst_presults
