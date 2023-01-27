@@ -239,7 +239,7 @@ message FieldMetadata {
     string language = 10;
     string summary = 11;
     map<string, Positions> positions = 12;  // Document
-
+    repeated Relations relations = 13;
 }
 
 message FieldComputedMetadata {

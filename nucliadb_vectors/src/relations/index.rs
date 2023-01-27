@@ -26,7 +26,7 @@ use super::errors::*;
 pub use super::graph_db::{Entity, GCnx};
 use super::graph_db::{GraphDB, RoToken, RwToken};
 use super::node_dictionary::{DReader, DWriter, NodeDictionary};
-pub use super::relations_io::{IoEdge, IoNode};
+pub use super::relations_io::{IoEdge, IoEdgeMetadata, IoNode};
 
 pub struct RMode(DReader);
 pub struct WMode(DWriter);
@@ -46,12 +46,14 @@ impl Index {
         from: &IoNode,
         to: &IoNode,
         edge: &IoEdge,
+        edge_metadata: Option<&IoEdgeMetadata>,
     ) -> RResult<bool> {
         self.dictionary.add_node(dict_writer, from)?;
         self.dictionary.add_node(dict_writer, to)?;
         let from = self.graphdb.add_node(graph_txn, from)?;
         let to = self.graphdb.add_node(graph_txn, to)?;
-        self.graphdb.connect(graph_txn, from, edge, to)
+        self.graphdb
+            .connect(graph_txn, from, edge, to, edge_metadata)
     }
     fn graph_search<G: BfsGuide>(
         &self,
@@ -104,6 +106,9 @@ impl Index {
     }
     fn get_edge(&self, txn: &RoToken, id: Entity) -> RResult<IoEdge> {
         self.graphdb.get_edge(txn, id)
+    }
+    fn get_edge_metadata(&self, txn: &RoToken, id: Entity) -> RResult<Option<IoEdgeMetadata>> {
+        self.graphdb.get_edge_metadata(txn, id)
     }
     fn get_node(&self, txn: &RoToken, id: Entity) -> RResult<IoNode> {
         self.graphdb.get_node(txn, id)
@@ -200,6 +205,9 @@ impl<'a> GraphReader<'a> {
     pub fn get_edge(&self, id: Entity) -> RResult<IoEdge> {
         self.index.get_edge(&self.graph_txn, id)
     }
+    pub fn get_edge_metadata(&self, id: Entity) -> RResult<Option<IoEdgeMetadata>> {
+        self.index.get_edge_metadata(&self.graph_txn, id)
+    }
     pub fn get_node(&self, id: Entity) -> RResult<IoNode> {
         self.index.get_node(&self.graph_txn, id)
     }
@@ -256,6 +264,9 @@ impl<'a> GraphWriter<'a> {
     pub fn get_edge(&self, id: Entity) -> RResult<IoEdge> {
         self.index.get_edge(&self.graph_txn, id)
     }
+    pub fn get_edge_metadata(&self, id: Entity) -> RResult<Option<IoEdgeMetadata>> {
+        self.index.get_edge_metadata(&self.graph_txn, id)
+    }
     pub fn get_node(&self, id: Entity) -> RResult<IoNode> {
         self.index.get_node(&self.graph_txn, id)
     }
@@ -271,9 +282,10 @@ impl<'a> GraphWriter<'a> {
         from: &IoNode,
         to: &IoNode,
         edge: &IoEdge,
+        edge_metadata: Option<&IoEdgeMetadata>,
     ) -> RResult<bool> {
         self.index
-            .connect(&mut self.graph_txn, writer, from, to, edge)
+            .connect(&mut self.graph_txn, writer, from, to, edge, edge_metadata)
     }
     pub fn delete_node(
         &mut self,
@@ -295,8 +307,8 @@ mod tests {
         let n2 = IoNode::new("N2".to_string(), "T2".to_string(), None);
         let edge = IoEdge::new("T2".to_string(), None);
         let mut writer = index.start_writing().unwrap();
-        writer.connect(&wmode, &n1, &n2, &edge).unwrap();
-        writer.connect(&wmode, &n2, &n1, &edge).unwrap();
+        writer.connect(&wmode, &n1, &n2, &edge, None).unwrap();
+        writer.connect(&wmode, &n2, &n1, &edge, None).unwrap();
         writer.commit(&mut wmode).unwrap();
         let (index, _rmode) = Index::new_reader(dir.path()).unwrap();
         let reader = index.start_reading().unwrap();

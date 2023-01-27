@@ -22,6 +22,7 @@ from nucliadb_protos.utils_pb2 import (
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
     Relation as Relation,
+    RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
     UserVector as UserVector,
     UserVectorSet as UserVectorSet,
@@ -968,6 +969,7 @@ class FieldMetadata(google.protobuf.message.Message):
     LANGUAGE_FIELD_NUMBER: builtins.int
     SUMMARY_FIELD_NUMBER: builtins.int
     POSITIONS_FIELD_NUMBER: builtins.int
+    RELATIONS_FIELD_NUMBER: builtins.int
     @property
     def links(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
@@ -992,6 +994,8 @@ class FieldMetadata(google.protobuf.message.Message):
     @property
     def positions(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Positions]:
         """Document"""
+    @property
+    def relations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Relations]: ...
     def __init__(
         self,
         *,
@@ -1007,9 +1011,10 @@ class FieldMetadata(google.protobuf.message.Message):
         language: builtins.str = ...,
         summary: builtins.str = ...,
         positions: collections.abc.Mapping[builtins.str, global___Positions] | None = ...,
+        relations: collections.abc.Iterable[global___Relations] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "thumbnail", b"thumbnail"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["classifications", b"classifications", "language", b"language", "last_extract", b"last_extract", "last_index", b"last_index", "last_summary", b"last_summary", "last_understanding", b"last_understanding", "links", b"links", "ner", b"ner", "paragraphs", b"paragraphs", "positions", b"positions", "relations", b"relations", "summary", b"summary", "thumbnail", b"thumbnail"]) -> None: ...
 
 global___FieldMetadata = FieldMetadata
 

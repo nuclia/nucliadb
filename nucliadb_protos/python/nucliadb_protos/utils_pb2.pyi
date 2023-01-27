@@ -20,7 +20,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing_extensions.final
 class Relation(google.protobuf.message.Message):
-    """Relations are connexions between nodes in the relation index. 
+    """Relations are connexions between nodes in the relation index.
     They are tuplets (Source, Relation Type, Relation Label, To).
     """
 
@@ -59,34 +59,70 @@ class Relation(google.protobuf.message.Message):
     OTHER: Relation.RelationType.ValueType  # 5
     """related with something"""
 
-    RELATION_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
     TO_FIELD_NUMBER: builtins.int
+    RELATION_FIELD_NUMBER: builtins.int
     RELATION_LABEL_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    @property
+    def source(self) -> global___RelationNode: ...
+    @property
+    def to(self) -> global___RelationNode: ...
     relation: global___Relation.RelationType.ValueType
-    """relation is the type of the label."""
-    @property
-    def source(self) -> global___RelationNode:
-        """The source of the edge."""
-    @property
-    def to(self) -> global___RelationNode:
-        """The destination of the edge."""
     relation_label: builtins.str
-    """Apart of having types, edges may be valued like
-    in the case of 'OTHER' edges.
-    """
+    @property
+    def metadata(self) -> global___RelationMetadata: ...
     def __init__(
         self,
         *,
-        relation: global___Relation.RelationType.ValueType = ...,
         source: global___RelationNode | None = ...,
         to: global___RelationNode | None = ...,
+        relation: global___Relation.RelationType.ValueType = ...,
         relation_label: builtins.str = ...,
+        metadata: global___RelationMetadata | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["source", b"source", "to", b"to"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["relation", b"relation", "relation_label", b"relation_label", "source", b"source", "to", b"to"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "source", b"source", "to", b"to"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "source", b"source", "to", b"to"]) -> None: ...
 
 global___Relation = Relation
+
+@typing_extensions.final
+class RelationMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PARAGRAPH_ID_FIELD_NUMBER: builtins.int
+    SOURCE_START_FIELD_NUMBER: builtins.int
+    SOURCE_END_FIELD_NUMBER: builtins.int
+    TO_START_FIELD_NUMBER: builtins.int
+    TO_END_FIELD_NUMBER: builtins.int
+    paragraph_id: builtins.str
+    source_start: builtins.int
+    source_end: builtins.int
+    to_start: builtins.int
+    to_end: builtins.int
+    def __init__(
+        self,
+        *,
+        paragraph_id: builtins.str | None = ...,
+        source_start: builtins.int | None = ...,
+        source_end: builtins.int | None = ...,
+        to_start: builtins.int | None = ...,
+        to_end: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_paragraph_id", b"_paragraph_id"]) -> typing_extensions.Literal["paragraph_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_end", b"_source_end"]) -> typing_extensions.Literal["source_end"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_start", b"_source_start"]) -> typing_extensions.Literal["source_start"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_end", b"_to_end"]) -> typing_extensions.Literal["to_end"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_start", b"_to_start"]) -> typing_extensions.Literal["to_start"] | None: ...
+
+global___RelationMetadata = RelationMetadata
 
 @typing_extensions.final
 class RelationNode(google.protobuf.message.Message):
@@ -139,10 +175,13 @@ class JoinGraphCnx(google.protobuf.message.Message):
     TARGET_FIELD_NUMBER: builtins.int
     RTYPE_FIELD_NUMBER: builtins.int
     RSUBTYPE_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
     source: builtins.int
     target: builtins.int
     rtype: global___Relation.RelationType.ValueType
     rsubtype: builtins.str
+    @property
+    def metadata(self) -> global___RelationMetadata: ...
     def __init__(
         self,
         *,
@@ -150,8 +189,10 @@ class JoinGraphCnx(google.protobuf.message.Message):
         target: builtins.int = ...,
         rtype: global___Relation.RelationType.ValueType = ...,
         rsubtype: builtins.str = ...,
+        metadata: global___RelationMetadata | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["rsubtype", b"rsubtype", "rtype", b"rtype", "source", b"source", "target", b"target"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "rsubtype", b"rsubtype", "rtype", b"rtype", "source", b"source", "target", b"target"]) -> None: ...
 
 global___JoinGraphCnx = JoinGraphCnx
 
