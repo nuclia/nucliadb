@@ -1,5 +1,3 @@
-# NucliaDB Vectors
+# NucliaDB Node
 
-HNSW implementation in Rust
-
-Developed by Nuclia
+4 indexs to rule them all!
