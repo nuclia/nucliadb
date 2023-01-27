@@ -205,12 +205,6 @@ async def search(
     audit = get_audit()
     timeit = time()
 
-    if len(item.query) > 0 and len(item.query) < 3:
-        raise HTTPException(
-            status_code=422,
-            detail="Query needs to be bigger than 2 or 0",
-        )
-
     if is_empty_query(item):
         if item.sort is None:
             item.sort = SortOptions(
