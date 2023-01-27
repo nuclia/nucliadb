@@ -145,26 +145,38 @@ fn empty_graph() -> Vec<Relation> {
 }
 
 fn entities(mut edges: Vec<Relation>) -> Vec<Relation> {
+    let metadata = RelationMetadata {
+        paragraph_id: Some("r0".to_string()),
+        ..Default::default()
+    };
     let r0 = Relation {
         relation: RelationType::Child as i32,
         source: Some(E1.clone()),
         to: Some(E2.clone()),
         relation_label: "".to_string(),
-        metadata: None,
+        metadata: Some(metadata),
+    };
+    let metadata = RelationMetadata {
+        paragraph_id: Some("r1".to_string()),
+        ..Default::default()
     };
     let r1 = Relation {
         relation: RelationType::Entity as i32,
         source: Some(E0.clone()),
         to: Some(E2.clone()),
         relation_label: "".to_string(),
-        metadata: None,
+        metadata: Some(metadata),
+    };
+    let metadata = RelationMetadata {
+        paragraph_id: Some("r2".to_string()),
+        ..Default::default()
     };
     let r2 = Relation {
         relation: RelationType::Entity as i32,
         source: Some(E0.clone()),
         to: Some(E1.clone()),
         relation_label: "".to_string(),
-        metadata: None,
+        metadata: Some(metadata),
     };
     edges.append(&mut vec![r0, r1, r2]);
     edges
