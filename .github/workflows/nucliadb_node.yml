@@ -12,7 +12,7 @@ on:
       - "Cargo.lock"
       - "Cargo.toml"
       - "nucliadb_paragraphs/**"
-      - "nucliadb_fields/**"
+      - "nucliadb_texts/**"
       - "nucliadb_core/**"
       - "nucliadb_telemetry/**"
       - "nucliadb_node/**"
