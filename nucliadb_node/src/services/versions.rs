@@ -41,6 +41,14 @@ pub struct Versions {
 }
 
 impl Versions {
+    fn new_from_deprecated() -> Versions {
+        Versions {
+            version_paragraphs: Some(1),
+            version_vectors: Some(1),
+            version_texts: Some(1),
+            version_relations: Some(1),
+        }
+    }
     fn new() -> Versions {
         Versions {
             version_paragraphs: Some(PARAGRAPHS_VERSION),
@@ -170,6 +178,7 @@ impl Versions {
         Ok(versions)
     }
     pub fn load_or_create(versions_file: &Path) -> NodeResult<Versions> {
+        let deprecated_config = versions_file.parent().map(|v| v.join("config.json"));
         if versions_file.exists() {
             let versions_json = std::fs::read_to_string(versions_file)?;
             let mut versions: Versions = serde_json::from_str(&versions_json)?;
@@ -177,6 +186,13 @@ impl Versions {
                 let serialized = serde_json::to_string(&versions)?;
                 std::fs::write(versions_file, serialized)?;
             }
+            Ok(versions)
+        } else if deprecated_config.map(|v| v.exists()).unwrap_or_default() {
+            // In this case is an old index, therefore we create the versions file
+            // with the index versions that where available that moment.
+            let versions = Versions::new_from_deprecated();
+            let serialized = serde_json::to_string(&versions)?;
+            std::fs::write(versions_file, serialized)?;
             Ok(versions)
         } else {
             let versions = Versions::new();
