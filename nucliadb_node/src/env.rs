@@ -30,27 +30,6 @@ use crate::utils::{parse_log_level, reliable_lookup_host};
 const SENTRY_PROD: &str = "prod";
 const SENTRY_DEV: &str = "stage";
 
-/// Vector dimensions
-pub fn vectors_dimension() -> usize {
-    let default: usize = 768;
-    match env::var("VECTORS_DIMENSION") {
-        Ok(var) => match var.parse() {
-            Ok(result) => result,
-            Err(e) => {
-                warn!(
-                    "VECTORS_DIMENSION parsing error: {} defaulting to: {}",
-                    e, default
-                );
-                default
-            }
-        },
-        Err(_) => {
-            warn!("VECTORS_DIMENSION not defined. Defaulting to: {}", default);
-            default
-        }
-    }
-}
-
 /// Where data will be stored
 pub fn data_path() -> PathBuf {
     match env::var("DATA_PATH") {
