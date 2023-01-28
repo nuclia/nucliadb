@@ -34,9 +34,9 @@ pub type FsResult<O> = std::result::Result<O, FsError>;
 #[derive(Debug, Error)]
 pub enum FsError {
     #[error("Serialization error: {0}")]
-    SerErr(#[from] bincode::Error),
+    ParsingError(#[from] bincode::Error),
     #[error("IO error: {0}")]
-    IoErr(#[from] std::io::Error),
+    IoError(#[from] std::io::Error),
 }
 
 mod names {
