@@ -28,114 +28,146 @@ const PARAGRAPHS_VERSION: u32 = 1;
 const RELATIONS_VERSION: u32 = 1;
 const TEXTS_VERSION: u32 = 1;
 
-fn paragraphs_default() -> u32 {
-    PARAGRAPHS_VERSION
-}
-fn vectors_default() -> u32 {
-    VECTORS_VERSION
-}
-fn texts_default() -> u32 {
-    TEXTS_VERSION
-}
-fn relations_default() -> u32 {
-    RELATIONS_VERSION
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct Versions {
-    #[serde(default = "paragraphs_default")]
-    pub version_paragraphs: u32,
-    #[serde(default = "vectors_default")]
-    pub version_vectors: u32,
-    #[serde(default = "texts_default")]
-    pub version_texts: u32,
-    #[serde(default = "relations_default")]
-    pub version_relations: u32,
-}
-
-impl Default for Versions {
-    fn default() -> Self {
-        Versions {
-            version_paragraphs: PARAGRAPHS_VERSION,
-            version_texts: VECTORS_VERSION,
-            version_vectors: TEXTS_VERSION,
-            version_relations: RELATIONS_VERSION,
-        }
-    }
+    #[serde(default)]
+    version_paragraphs: Option<u32>,
+    #[serde(default)]
+    version_vectors: Option<u32>,
+    #[serde(default)]
+    version_texts: Option<u32>,
+    #[serde(default)]
+    version_relations: Option<u32>,
 }
 
 impl Versions {
+    fn new() -> Versions {
+        Versions {
+            version_paragraphs: Some(PARAGRAPHS_VERSION),
+            version_vectors: Some(VECTORS_VERSION),
+            version_texts: Some(TEXTS_VERSION),
+            version_relations: Some(RELATIONS_VERSION),
+        }
+    }
+    fn fill_gaps(&mut self) -> bool {
+        let mut modified = false;
+        if self.version_paragraphs.is_none() {
+            self.version_paragraphs = Some(PARAGRAPHS_VERSION);
+            modified = true;
+        }
+        if self.version_relations.is_none() {
+            self.version_relations = Some(RELATIONS_VERSION);
+            modified = true;
+        }
+        if self.version_texts.is_none() {
+            self.version_texts = Some(TEXTS_VERSION);
+            modified = true;
+        }
+        if self.version_vectors.is_none() {
+            self.version_vectors = Some(VECTORS_VERSION);
+            modified = true;
+        }
+        modified
+    }
+    pub fn version_paragraphs(&self) -> u32 {
+        self.version_paragraphs.unwrap_or(PARAGRAPHS_VERSION)
+    }
+    pub fn version_vectors(&self) -> u32 {
+        self.version_vectors.unwrap_or(VECTORS_VERSION)
+    }
+    pub fn version_texts(&self) -> u32 {
+        self.version_texts.unwrap_or(TEXTS_VERSION)
+    }
+    pub fn version_relations(&self) -> u32 {
+        self.version_relations.unwrap_or(RELATIONS_VERSION)
+    }
     pub fn get_vectors_reader(&self, config: &VectorConfig) -> NodeResult<RVectors> {
         match self.version_vectors {
-            1 => nucliadb_vectors::service::VectorReaderService::open(config)
+            Some(1) => nucliadb_vectors::service::VectorReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RVectors),
-            v => Err(node_error!("Invalid vectors  version {v}")),
+            Some(v) => Err(node_error!("Invalid vectors  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
     pub fn get_paragraphs_reader(&self, config: &ParagraphConfig) -> NodeResult<RParagraphs> {
         match self.version_paragraphs {
-            1 => nucliadb_paragraphs::reader::ParagraphReaderService::open(config)
+            Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RParagraphs),
-            v => Err(node_error!("Invalid paragraphs  version {v}")),
+            Some(v) => Err(node_error!("Invalid paragraphs  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
 
     pub fn get_texts_reader(&self, config: &TextConfig) -> NodeResult<RTexts> {
         match self.version_texts {
-            1 => nucliadb_texts::reader::TextReaderService::open(config)
+            Some(1) => nucliadb_texts::reader::TextReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RTexts),
-            v => Err(node_error!("Invalid text  version {v}")),
+            Some(v) => Err(node_error!("Invalid text  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
 
     pub fn get_relations_reader(&self, config: &RelationConfig) -> NodeResult<RRelations> {
         match self.version_relations {
-            1 => nucliadb_relations::service::RelationsReaderService::open(config)
+            Some(1) => nucliadb_relations::service::RelationsReaderService::start(config)
                 .map(|i| encapsulate_reader(i) as RRelations),
-            v => Err(node_error!("Invalid relations  version {v}")),
+            Some(v) => Err(node_error!("Invalid relations  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
 
     pub fn get_vectors_writer(&self, config: &VectorConfig) -> NodeResult<WVectors> {
         match self.version_vectors {
-            1 => nucliadb_vectors::service::VectorWriterService::start(config)
+            Some(1) => nucliadb_vectors::service::VectorWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as WVectors),
-            v => Err(node_error!("Invalid vectors  version {v}")),
+            Some(v) => Err(node_error!("Invalid vectors  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
     pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<WParagraphs> {
         match self.version_paragraphs {
-            1 => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
+            Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as WParagraphs),
-            v => Err(node_error!("Invalid paragraphs  version {v}")),
+            Some(v) => Err(node_error!("Invalid paragraphs  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
 
     pub fn get_texts_writer(&self, config: &TextConfig) -> NodeResult<WTexts> {
         match self.version_texts {
-            1 => nucliadb_texts::writer::TextWriterService::start(config)
+            Some(1) => nucliadb_texts::writer::TextWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as WTexts),
-            v => Err(node_error!("Invalid text  version {v}")),
+            Some(v) => Err(node_error!("Invalid text  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
 
     pub fn get_relations_writer(&self, config: &RelationConfig) -> NodeResult<WRelations> {
         match self.version_relations {
-            1 => nucliadb_relations::service::RelationsWriterService::start(config)
+            Some(1) => nucliadb_relations::service::RelationsWriterService::start(config)
                 .map(|i| encapsulate_writer(i) as WRelations),
-            v => Err(node_error!("Invalid relations  version {v}")),
+            Some(v) => Err(node_error!("Invalid relations  version {v}")),
+            None => Err(node_error!("Corrupted version file")),
         }
     }
 
     pub fn load(versions_file: &Path) -> NodeResult<Versions> {
         let versions_json = std::fs::read_to_string(versions_file)?;
-        Ok(serde_json::from_str(&versions_json)?)
+        let mut versions: Versions = serde_json::from_str(&versions_json)?;
+        versions.fill_gaps();
+        Ok(versions)
     }
     pub fn load_or_create(versions_file: &Path) -> NodeResult<Versions> {
         if versions_file.exists() {
-            Versions::load(versions_file)
+            let versions_json = std::fs::read_to_string(versions_file)?;
+            let mut versions: Versions = serde_json::from_str(&versions_json)?;
+            if versions.fill_gaps() {
+                let serialized = serde_json::to_string(&versions)?;
+                std::fs::write(versions_file, serialized)?;
+            }
+            Ok(versions)
         } else {
-            let versions = Versions::default();
+            let versions = Versions::new();
             let serialized = serde_json::to_string(&versions)?;
             std::fs::write(versions_file, serialized)?;
             Ok(versions)

@@ -195,10 +195,10 @@ impl ShardReaderService {
             vector_reader: vectors.unwrap(),
             relation_reader: relations.unwrap(),
             creation_time: RwLock::new(SystemTime::now()),
-            document_service_version: versions.version_texts as i32,
-            paragraph_service_version: versions.version_paragraphs as i32,
-            vector_service_version: versions.version_vectors as i32,
-            relation_service_version: versions.version_relations as i32,
+            document_service_version: versions.version_texts() as i32,
+            paragraph_service_version: versions.version_paragraphs() as i32,
+            vector_service_version: versions.version_vectors() as i32,
+            relation_service_version: versions.version_relations() as i32,
         })
     }
 

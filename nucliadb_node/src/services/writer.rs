@@ -135,10 +135,10 @@ impl ShardWriterService {
             paragraph_writer: paragraphs.unwrap(),
             vector_writer: vectors.unwrap(),
             relation_writer: relations.unwrap(),
-            document_service_version: versions.version_texts as i32,
-            paragraph_service_version: versions.version_paragraphs as i32,
-            vector_service_version: versions.version_vectors as i32,
-            relation_service_version: versions.version_relations as i32,
+            document_service_version: versions.version_texts() as i32,
+            paragraph_service_version: versions.version_paragraphs() as i32,
+            vector_service_version: versions.version_vectors() as i32,
+            relation_service_version: versions.version_relations() as i32,
         })
     }
     #[tracing::instrument(skip_all)]
