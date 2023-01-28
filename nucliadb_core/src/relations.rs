@@ -24,8 +24,8 @@ use nucliadb_protos::*;
 
 use crate::prelude::*;
 
-pub type RRelations = Arc<dyn RelationReader>;
-pub type WRelations = Arc<RwLock<dyn RelationWriter>>;
+pub type RelationsReaderPointer = Arc<dyn RelationReader>;
+pub type RelationsWriterPointer = Arc<RwLock<dyn RelationWriter>>;
 
 #[derive(Clone)]
 pub struct RelationConfig {

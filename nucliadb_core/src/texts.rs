@@ -24,8 +24,8 @@ use nucliadb_protos::*;
 
 use crate::prelude::*;
 
-pub type RTexts = Arc<dyn FieldReader>;
-pub type WTexts = Arc<RwLock<dyn FieldWriter>>;
+pub type TextsReaderPointer = Arc<dyn FieldReader>;
+pub type TextsWriterPointer = Arc<RwLock<dyn FieldWriter>>;
 pub struct TextConfig {
     pub path: PathBuf,
 }

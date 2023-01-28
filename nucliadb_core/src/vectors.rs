@@ -24,8 +24,8 @@ use nucliadb_protos::*;
 
 use crate::prelude::*;
 
-pub type RVectors = Arc<dyn VectorReader>;
-pub type WVectors = Arc<RwLock<dyn VectorWriter>>;
+pub type VectorsReaderPointer = Arc<dyn VectorReader>;
+pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
 
 #[derive(Clone)]
 pub struct VectorConfig {

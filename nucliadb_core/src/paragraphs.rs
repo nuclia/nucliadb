@@ -24,8 +24,8 @@ use nucliadb_protos::*;
 
 use crate::prelude::*;
 
-pub type RParagraphs = Arc<dyn ParagraphReader>;
-pub type WParagraphs = Arc<RwLock<dyn ParagraphWriter>>;
+pub type ParagraphsReaderPointer = Arc<dyn ParagraphReader>;
+pub type ParagraphsWriterPointer = Arc<RwLock<dyn ParagraphWriter>>;
 
 pub struct ParagraphConfig {
     pub path: PathBuf,

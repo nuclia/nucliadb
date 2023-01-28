@@ -81,71 +81,71 @@ impl Versions {
     pub fn version_relations(&self) -> u32 {
         self.version_relations.unwrap_or(RELATIONS_VERSION)
     }
-    pub fn get_vectors_reader(&self, config: &VectorConfig) -> NodeResult<RVectors> {
+    pub fn get_vectors_reader(&self, config: &VectorConfig) -> NodeResult<VectorsReaderPointer> {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorReaderService::start(config)
-                .map(|i| encapsulate_reader(i) as RVectors),
+                .map(|i| encapsulate_reader(i) as VectorsReaderPointer),
             Some(v) => Err(node_error!("Invalid vectors  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
-    pub fn get_paragraphs_reader(&self, config: &ParagraphConfig) -> NodeResult<RParagraphs> {
+    pub fn get_paragraphs_reader(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsReaderPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::reader::ParagraphReaderService::start(config)
-                .map(|i| encapsulate_reader(i) as RParagraphs),
+                .map(|i| encapsulate_reader(i) as ParagraphsReaderPointer),
             Some(v) => Err(node_error!("Invalid paragraphs  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
 
-    pub fn get_texts_reader(&self, config: &TextConfig) -> NodeResult<RTexts> {
+    pub fn get_texts_reader(&self, config: &TextConfig) -> NodeResult<TextsReaderPointer> {
         match self.version_texts {
             Some(1) => nucliadb_texts::reader::TextReaderService::start(config)
-                .map(|i| encapsulate_reader(i) as RTexts),
+                .map(|i| encapsulate_reader(i) as TextsReaderPointer),
             Some(v) => Err(node_error!("Invalid text  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
 
-    pub fn get_relations_reader(&self, config: &RelationConfig) -> NodeResult<RRelations> {
+    pub fn get_relations_reader(&self, config: &RelationConfig) -> NodeResult<RelationsReaderPointer> {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsReaderService::start(config)
-                .map(|i| encapsulate_reader(i) as RRelations),
+                .map(|i| encapsulate_reader(i) as RelationsReaderPointer),
             Some(v) => Err(node_error!("Invalid relations  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
 
-    pub fn get_vectors_writer(&self, config: &VectorConfig) -> NodeResult<WVectors> {
+    pub fn get_vectors_writer(&self, config: &VectorConfig) -> NodeResult<VectorsWriterPointer> {
         match self.version_vectors {
             Some(1) => nucliadb_vectors::service::VectorWriterService::start(config)
-                .map(|i| encapsulate_writer(i) as WVectors),
+                .map(|i| encapsulate_writer(i) as VectorsWriterPointer),
             Some(v) => Err(node_error!("Invalid vectors  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
-    pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<WParagraphs> {
+    pub fn get_paragraphs_writer(&self, config: &ParagraphConfig) -> NodeResult<ParagraphsWriterPointer> {
         match self.version_paragraphs {
             Some(1) => nucliadb_paragraphs::writer::ParagraphWriterService::start(config)
-                .map(|i| encapsulate_writer(i) as WParagraphs),
+                .map(|i| encapsulate_writer(i) as ParagraphsWriterPointer),
             Some(v) => Err(node_error!("Invalid paragraphs  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
 
-    pub fn get_texts_writer(&self, config: &TextConfig) -> NodeResult<WTexts> {
+    pub fn get_texts_writer(&self, config: &TextConfig) -> NodeResult<TextsWriterPointer> {
         match self.version_texts {
             Some(1) => nucliadb_texts::writer::TextWriterService::start(config)
-                .map(|i| encapsulate_writer(i) as WTexts),
+                .map(|i| encapsulate_writer(i) as TextsWriterPointer),
             Some(v) => Err(node_error!("Invalid text  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
     }
 
-    pub fn get_relations_writer(&self, config: &RelationConfig) -> NodeResult<WRelations> {
+    pub fn get_relations_writer(&self, config: &RelationConfig) -> NodeResult<RelationsWriterPointer> {
         match self.version_relations {
             Some(1) => nucliadb_relations::service::RelationsWriterService::start(config)
-                .map(|i| encapsulate_writer(i) as WRelations),
+                .map(|i| encapsulate_writer(i) as RelationsWriterPointer),
             Some(v) => Err(node_error!("Invalid relations  version {v}")),
             None => Err(node_error!("Corrupted version file")),
         }
