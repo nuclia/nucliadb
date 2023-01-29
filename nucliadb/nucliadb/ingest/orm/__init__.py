@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from nucliadb.ingest.orm.exceptions import NodeClusterNotFound, NodeClusterSmall
 from nucliadb.ingest.settings import settings
@@ -56,6 +56,14 @@ class ClusterObject:
             return nodes[: settings.node_replicas]
         else:
             raise NodeClusterNotFound()
+
+    def find_least_loaded_nodes(self) -> List[str]:
+        sorted_nodes = [
+            (nodeid, node.load_score) for nodeid, node in NODES.items()
+        ].sort(key=lambda x: x[1])
+        if len(sorted_nodes) < settings.node_replicas:
+            raise NodeClusterSmall()
+        return sorted_nodes[: settings.node_replicas]
 
     def compute(self):
         self.date = datetime.now()

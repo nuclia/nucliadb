@@ -134,7 +134,7 @@ class Node(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
-        nodes = NODE_CLUSTER.find_nodes(kbid)
+        nodes = NODE_CLUSTER.find_least_loaded_nodes()
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
         try:
