@@ -276,6 +276,8 @@ class UserFieldMetadata(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.UserFieldMetadata) -> _T:
+        fix_paragraph_annotations(message)
+
         value = MessageToDict(
             message,
             preserving_proto_field_name=True,
@@ -337,3 +339,14 @@ class Origin(InputOrigin):
 
 class Relations(BaseModel):
     relations: Optional[List[Relation]]
+
+
+def fix_paragraph_annotations(message: resources_pb2.UserMetadata):
+    # Need to ignore paragraph annotations without classifications
+    paragraphs = []
+    for p in message.paragraphs:
+        if len(p.classifications) == 0:
+            continue
+        paragraphs.append(p)
+    message.ClearField("paragraphs")
+    message.paragraphs.extend(paragraphs)
