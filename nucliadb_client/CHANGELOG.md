@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 2.0.0a7
+
+- Simulate writer and processing messages on resource commit while importing
+
 ## 2.0.0a6
 
 - Fix import command

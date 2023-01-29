@@ -195,7 +195,7 @@ class KnowledgeBox:
             pb_bm.ParseFromString(payload)
             res = Resource(rid=pb_bm.uuid, kb=self, slug=pb_bm.basic.slug)
             res._bm = pb_bm
-            await res.commit(processor=False)
+            await res.commit()
         elif type_line == CODEX.ENTITIES:
             pb_er = GetEntitiesResponse()
             pb_er.ParseFromString(payload)

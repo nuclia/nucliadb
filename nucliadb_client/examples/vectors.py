@@ -72,7 +72,7 @@ async def upload(kb: KnowledgeBox):
         for pbline in await pblist.readlines():
             resource = Resource(rid=None, kb=kb)
             resource.parse(base64.b64decode(pbline.strip()))
-            await resource.commit(processor=False)
+            await resource.commit()
             print(f"{datetime.now()}")
 
 
