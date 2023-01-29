@@ -240,7 +240,9 @@ class Resource:
     def writer_bm(self):
         wbm = BrokerMessage()
         wbm.CopyFrom(self.bm)
-        for computed_fields in [
+        # We clear the fields that are typically populated on the
+        # processor's broker message.
+        for computed_field in [
             "link_extracted_data",
             "file_extracted_data",
             "extracted_text",
@@ -249,7 +251,7 @@ class Resource:
             "field_large_metadata",
             "user_vectors",
         ]:
-            wbm.ClearField(computed_fields)
+            wbm.ClearField(computed_field)
         wbm.type = BrokerMessage.MessageType.AUTOCOMMIT
         wbm.source = BrokerMessage.MessageSource.WRITER
         wbm.basic.metadata.useful = True
