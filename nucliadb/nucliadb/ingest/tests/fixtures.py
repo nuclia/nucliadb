@@ -161,6 +161,10 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
     driver: Driver = TiKVDriver(url=[url])
     await driver.initialize()
     yield driver
+    txn = await driver.begin()
+    async for key in txn.keys(""):
+        await txn.delete(key)
+    await txn.commit(resource=False)
     await driver.finalize()
     settings.driver_tikv_url = []
 

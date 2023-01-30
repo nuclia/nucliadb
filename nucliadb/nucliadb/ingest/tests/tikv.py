@@ -180,7 +180,7 @@ def start_tikvd(tikvd: TiKVd):
             time.sleep(0.1)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def tikvd():
     if os.environ.get("TESTING_TIKV_LOCAL", None):
         yield "localhost", "XX", "2379"
