@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.2.2
+
+- Fix headers and payload in export module
+
 ## 1.2.1
 
 - Fix streamer base url
