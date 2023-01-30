@@ -253,17 +253,6 @@ class ParagraphAnnotation(BaseModel):
     classifications: List[Classification] = []
     key: str
 
-    @root_validator()
-    def _validate_classifications(cls, values):
-        classifications = values.get("classifications") or []
-        if len(classifications) == 0:
-            raise ValueError("ensure this value has at least 1 items")
-
-        unique_classifications = {tuple(cf.dict().values()) for cf in classifications}
-        if len(unique_classifications) != len(classifications):
-            raise ValueError("Paragraph classifications need to be unique")
-        return values
-
 
 class UserFieldMetadata(BaseModel):
     """
@@ -276,8 +265,6 @@ class UserFieldMetadata(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.UserFieldMetadata) -> _T:
-        remove_empty_paragraph_annotations(message)
-
         value = MessageToDict(
             message,
             preserving_proto_field_name=True,
@@ -339,9 +326,3 @@ class Origin(InputOrigin):
 
 class Relations(BaseModel):
     relations: Optional[List[Relation]]
-
-
-def remove_empty_paragraph_annotations(message: resources_pb2.UserMetadata):
-    paragraphs = [p for p in message.paragraphs if len(p.classifications) > 0]
-    message.ClearField("paragraphs")
-    message.paragraphs.extend(paragraphs)
