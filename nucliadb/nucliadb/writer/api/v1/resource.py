@@ -138,6 +138,7 @@ async def create_resource(
 
     parse_audit(writer.audit, request)
     parse_basic(writer, item, toprocess)
+
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
 

@@ -19,6 +19,7 @@
 #
 from datetime import datetime
 
+from fastapi import HTTPException
 from nucliadb_protos.resources_pb2 import (
     Basic,
     Classification,
@@ -27,17 +28,20 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     Metadata,
     Paragraph,
-    ParagraphAnnotation,
-    TokenSplit,
-    UserFieldMetadata,
 )
+from nucliadb_protos.resources_pb2 import ParagraphAnnotation as PBParagraphAnnotation
+from nucliadb_protos.resources_pb2 import TokenSplit, UserFieldMetadata
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
-from nucliadb_models.metadata import RelationNodeTypeMap, RelationTypeMap
+from nucliadb_models.metadata import (
+    ParagraphAnnotation,
+    RelationNodeTypeMap,
+    RelationTypeMap,
+)
 from nucliadb_models.text import PushTextFormat, Text
 from nucliadb_models.writer import (
     ComingResourcePayload,
@@ -93,7 +97,8 @@ def parse_basic_modify(
                     )
                 )
             for paragraph in fieldmetadata.paragraphs:
-                paragraphpb = ParagraphAnnotation(key=paragraph.key)
+                validate_classifications(paragraph)
+                paragraphpb = PBParagraphAnnotation(key=paragraph.key)
                 for classification in paragraph.classifications:
                     paragraphpb.classifications.append(
                         Classification(
@@ -188,3 +193,17 @@ def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
     if processing_info.account_seq is not None:
         bm.basic.last_account_seq = processing_info.account_seq
     bm.basic.queue = bm.basic.QueueType.Value(processing_info.queue.name)
+
+
+def validate_classifications(paragraph: ParagraphAnnotation):
+    classifications = paragraph.classifications
+    if len(classifications) == 0:
+        raise HTTPException(
+            status_code=422, detail="ensure classifications has at least 1 items"
+        )
+
+    unique_classifications = {tuple(cf.dict().values()) for cf in classifications}
+    if len(unique_classifications) != len(classifications):
+        raise HTTPException(
+            status_code=422, detail="Paragraph classifications need to be unique"
+        )

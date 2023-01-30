@@ -486,15 +486,36 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         )
         assert resp.status_code == 422
         body = resp.json()
-        assert body["detail"][0]["msg"] == "ensure this value has at least 1 items"
+        assert body["detail"] == "ensure classifications has at least 1 items"
 
-        # Classifications need to be unique
         classification = {"label": "label", "labelset": "ls"}
+
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/resources",
             headers={"X-SYNCHRONOUS": "True"},
             json={
                 "texts": {"text1": TEST_TEXT_PAYLOAD},
+                "fieldmetadata": [
+                    {
+                        "paragraphs": [
+                            {
+                                "key": "paragraph1",
+                                "classifications": [classification],
+                            }
+                        ],
+                        "field": {"field": "text1", "field_type": "text"},
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 201
+        rid = resp.json()["uuid"]
+
+        # Classifications need to be unique
+        resp = await client.patch(
+            f"/{KB_PREFIX}/{kbid}/resource/{rid}",
+            headers={"X-SYNCHRONOUS": "True"},
+            json={
                 "fieldmetadata": [
                     {
                         "paragraphs": [
@@ -510,4 +531,4 @@ async def test_paragraph_annotations(writer_api, knowledgebox_writer):
         )
         assert resp.status_code == 422
         body = resp.json()
-        assert body["detail"][0]["msg"] == "Paragraph classifications need to be unique"
+        assert body["detail"] == "Paragraph classifications need to be unique"

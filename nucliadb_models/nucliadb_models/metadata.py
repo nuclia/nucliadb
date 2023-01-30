@@ -253,17 +253,6 @@ class ParagraphAnnotation(BaseModel):
     classifications: List[Classification] = []
     key: str
 
-    @root_validator()
-    def _validate_classifications(cls, values):
-        classifications = values.get("classifications") or []
-        if len(classifications) == 0:
-            raise ValueError("ensure this value has at least 1 items")
-
-        unique_classifications = {tuple(cf.dict().values()) for cf in classifications}
-        if len(unique_classifications) != len(classifications):
-            raise ValueError("Paragraph classifications need to be unique")
-        return values
-
 
 class UserFieldMetadata(BaseModel):
     """
