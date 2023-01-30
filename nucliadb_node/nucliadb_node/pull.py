@@ -28,10 +28,11 @@ from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
-from nucliadb_protos.nodewriter_pb2 import IndexMessage
+from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus
 from sentry_sdk import capture_exception
 
 from nucliadb_node import SERVICE_NAME, logger
+from nucliadb_node.nucliadb_node.shadow_shards import ShadowShards
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
 from nucliadb_node.settings import settings
@@ -39,6 +40,7 @@ from nucliadb_node.writer import Writer
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import indexing_settings
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
@@ -64,6 +66,7 @@ class Worker:
         self.event = asyncio.Event()
         self.node = node
         self.gc_task = None
+        self.shadow = ShadowShards()
 
     async def finalize(self):
         if self.gc_task:
@@ -94,6 +97,8 @@ class Worker:
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
+        await self.shadow.load()
+
         self.event.clear()
         options = {
             "error_cb": self.error_cb,
@@ -156,6 +161,35 @@ class Worker:
         except FileNotFoundError:
             return None
 
+    async def set_resource(self, pb: IndexMessage, storage: Storage) -> OpStatus:
+        brain: Resource = await storage.get_indexing(pb)
+        is_shadow_shard = self.shadow.exists(pb.shard)
+        logger.info(
+            f"Added [shadow={is_shadow_shard}] {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
+        )
+        if is_shadow_shard:
+            await self.shadow.add_resource(brain, shard_id=pb.shard)
+            # TODO return opstatus depending if error or not
+            status = OpStatus()
+        else:
+            status = await self.writer.set_resource(brain)
+        logger.info(f"...done")
+        del brain
+        return status
+
+    async def delete_resource(self, pb: IndexMessage) -> OpStatus:
+        is_shadow_shard = self.shadow.exists(pb.shard)
+        logger.info(f"Deleting [shadow={is_shadow_shard}] {pb.resource} otx:{pb.txid}")
+        if is_shadow_shard:
+            await self.shadow.delete_resource(uuid=pb.resource, shard_id=pb.shard)
+            # TODO return opstatus depending if error or not
+            status = OpStatus()
+        else:
+            rid = ResourceID(uuid=pb.resource, shard_id=pb.shard)
+            status = await self.writer.delete_resource(rid)
+        logger.info(f"...done")
+        return status
+
     async def subscription_worker(self, msg: Msg):
         subject = msg.subject
         reply = msg.reply
@@ -170,21 +204,10 @@ class Worker:
                 pb = IndexMessage()
                 pb.ParseFromString(msg.data)
                 if pb.typemessage == IndexMessage.TypeMessage.CREATION:
-                    brain: Resource = await storage.get_indexing(pb)
-                    logger.info(
-                        f"Added {brain.resource.uuid} at {brain.shard_id} otx:{pb.txid}"
-                    )
-                    status = await self.writer.set_resource(brain)
-                    logger.info(f"...done")
-
-                    del brain
+                    status = await self.set_resource(pb, storage)
                 elif pb.typemessage == IndexMessage.TypeMessage.DELETION:
-                    rid = ResourceID()
-                    rid.shard_id = pb.shard
-                    rid.uuid = pb.resource
-                    logger.info(f"Deleting {pb.resource} otx:{pb.txid}")
-                    status = await self.writer.delete_resource(rid)
-                    logger.info(f"...done")
+                    status = await self.delete_resource(pb)
+                # TODO Unknown: what is this count status for?
                 self.reader.update(pb.shard, status)
 
             except AioRpcError as grpc_error:

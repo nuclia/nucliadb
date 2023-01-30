@@ -18,14 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from uuid import uuid4
-from nucliadb.ingest.orm.node import Node
 
 import pytest
 from nucliadb_protos.resources_pb2 import ExtractedVectorsWrapper, FieldType
 from nucliadb_protos.utils_pb2 import Vector
-from nucliadb_protos.writer_pb2 import BrokerMessage, IndexResource, ShadowShardCreateRequest
-from nucliadb.ingest.utils import get_driver
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    IndexResource,
+    ShadowShardCreateRequest,
+)
 
+from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.utils import get_driver
 from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
@@ -65,7 +69,7 @@ async def test_create_shadow_shard(grpc_servicer, fake_node):
     txn = await driver.begin()
     shards_object = await Node.get_all_shards(txn, kbid)
     await txn.abort()
-    
+
     found = False
     for shard in shards_object.shards:
         for replica in shard.replicas:

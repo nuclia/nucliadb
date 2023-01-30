@@ -743,7 +743,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         result = FileUploaded()
         return result
 
-    async def ShadowShardCreate(self, request: ShadowShardCreateRequest, context=None) -> ShadowShardCreateResponse:
+    async def ShadowShardCreate(
+        self, request: ShadowShardCreateRequest, context=None
+    ) -> ShadowShardCreateResponse:
         response = ShadowShardCreateResponse(success=False)
         try:
             # TODO
@@ -762,7 +764,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             updated_shards.CopyFrom(all_shards)
 
             shadow = ShardCreated(id=shadow_replica_id)
-            update_shards_with_shadow_replica(updated_shards, request.replica_id, shadow_replica=shadow, shadow_node=request.node)
+            update_shards_with_shadow_replica(
+                updated_shards,
+                request.replica_id,
+                shadow_replica=shadow,
+                shadow_node=request.node,
+            )
 
             key = KB_SHARDS.format(kbid=request.kbid)
             await txn.set(key, updated_shards.SerializeToString())
@@ -771,11 +778,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             event_id: Optional[str] = None
             if SENTRY:
                 event_id = capture_exception(e)
-            logger.error(f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}")
+            logger.error(
+                f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}"
+            )
         else:
             response.success = True
         finally:
             return response
+
 
 def update_shards_with_updated_replica(
     shards: PBShards, replica_id: str, updated_replica: ShardCleaned
@@ -799,8 +809,16 @@ def update_shards_with_shadow_replica(
                 replica.has_shadow = True
                 replica.shadow_replica.node = shadow_node
                 replica.shadow_replica.shard.id = shadow_replica.id
-                replica.shadow_replica.shard.document_service = shadow_replica.document_service
-                replica.shadow_replica.shard.vector_service = shadow_replica.vector_service
-                replica.shadow_replica.shard.paragraph_service = shadow_replica.paragraph_service
-                replica.shadow_replica.shard.relation_service = shadow_replica.relation_service
+                replica.shadow_replica.shard.document_service = (
+                    shadow_replica.document_service
+                )
+                replica.shadow_replica.shard.vector_service = (
+                    shadow_replica.vector_service
+                )
+                replica.shadow_replica.shard.paragraph_service = (
+                    shadow_replica.paragraph_service
+                )
+                replica.shadow_replica.shard.relation_service = (
+                    shadow_replica.relation_service
+                )
                 return
