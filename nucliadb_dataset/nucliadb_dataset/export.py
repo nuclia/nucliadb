@@ -47,7 +47,7 @@ class NucliaDatasetsExport:
         dataset_def = {
             "type": TaskType.Name(self.trainset.type),
             "filter": {"labels": list(self.trainset.filter.labels)},
-            "name": str(self.client.reader_session.base_url)
+            "name": str(self.client.reader_session.base_url),
         }
         response = requests.post(
             f"{self.datasets_url}/datasets",
