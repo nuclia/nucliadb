@@ -262,6 +262,18 @@ class Resource:
     def processor_bm(self):
         pbm = BrokerMessage()
         pbm.CopyFrom(self.bm)
+        # We clear the fields that are typically populated on the
+        # writer's broker message.
+        for writer_field in [
+            "links",
+            "files",
+            "texts",
+            "conversations",
+            "layouts",
+            "keywordsets",
+            "datetimes",
+        ]:
+            pbm.ClearField(writer_field)
         pbm.type = BrokerMessage.MessageType.AUTOCOMMIT
         pbm.source = BrokerMessage.MessageSource.PROCESSOR
         pbm.basic.metadata.useful = True
