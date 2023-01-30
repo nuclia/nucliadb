@@ -22,7 +22,7 @@ class _TaskType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_TaskType.ValueType], builtins.type):
+class _TaskTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_TaskType.ValueType], builtins.type):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     FIELD_CLASSIFICATION: _TaskType.ValueType  # 0
     PARAGRAPH_CLASSIFICATION: _TaskType.ValueType  # 1
@@ -42,7 +42,7 @@ class _LabelFrom:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _LabelFromEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_LabelFrom.ValueType], builtins.type):
+class _LabelFromEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_LabelFrom.ValueType], builtins.type):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARAGRAPH: _LabelFrom.ValueType  # 0
     FIELD: _LabelFrom.ValueType  # 1
@@ -55,11 +55,9 @@ FIELD: LabelFrom.ValueType  # 1
 RESOURCE: LabelFrom.ValueType  # 2
 global___LabelFrom = LabelFrom
 
-@typing_extensions.final
 class TrainSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class Filter(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -92,7 +90,6 @@ class TrainSet(google.protobuf.message.Message):
 
 global___TrainSet = TrainSet
 
-@typing_extensions.final
 class Label(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -113,7 +110,6 @@ class Label(google.protobuf.message.Message):
 
 global___Label = Label
 
-@typing_extensions.final
 class TextLabel(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -132,7 +128,6 @@ class TextLabel(google.protobuf.message.Message):
 
 global___TextLabel = TextLabel
 
-@typing_extensions.final
 class MultipleTextSameLabels(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -152,7 +147,6 @@ class MultipleTextSameLabels(google.protobuf.message.Message):
 
 global___MultipleTextSameLabels = MultipleTextSameLabels
 
-@typing_extensions.final
 class FieldClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -168,7 +162,6 @@ class FieldClassificationBatch(google.protobuf.message.Message):
 
 global___FieldClassificationBatch = FieldClassificationBatch
 
-@typing_extensions.final
 class ParagraphClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -184,7 +177,6 @@ class ParagraphClassificationBatch(google.protobuf.message.Message):
 
 global___ParagraphClassificationBatch = ParagraphClassificationBatch
 
-@typing_extensions.final
 class SentenceClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -200,7 +192,6 @@ class SentenceClassificationBatch(google.protobuf.message.Message):
 
 global___SentenceClassificationBatch = SentenceClassificationBatch
 
-@typing_extensions.final
 class TokensClassification(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -220,7 +211,6 @@ class TokensClassification(google.protobuf.message.Message):
 
 global___TokensClassification = TokensClassification
 
-@typing_extensions.final
 class TokenClassificationBatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
