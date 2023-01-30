@@ -18,8 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
-from fastapi import HTTPException
 
+from fastapi import HTTPException
 from nucliadb_protos.resources_pb2 import (
     Basic,
     Classification,

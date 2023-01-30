@@ -121,7 +121,7 @@ async def test_export_import(nucliadb_client: NucliaDBClient):
 
 
 @pytest.mark.asyncio
-async def test_export_import_e2e(nucliadb_client):
+async def test_export_import_e2e(nucliadb_client: NucliaDBClient):
     nucliadb_client.init_async_grpc()
     for slug in ("src1", "dst1"):
         exists = nucliadb_client.get_kb(slug=slug)
@@ -140,12 +140,12 @@ async def test_export_import_e2e(nucliadb_client):
     file_binary = base64.b64encode(b"Hola")
     title = "My Resource"
     summary = "My long summary of the resource"
-    slug = "myresource"  # type: ignore
+    slug = "myresource"
     payload = CreateResourcePayload()
     payload.icon = "plain/text"
     payload.title = title
     payload.summary = summary
-    payload.slug = slug
+    payload.slug = slug  # type: ignore
     payload.texts[FieldIdString("text1")] = TextField(body="My text")
     payload.files[FieldIdString("file1")] = FileField(
         file=File(
@@ -188,6 +188,8 @@ async def test_export_import_e2e(nucliadb_client):
         assert sresult.icon == dresult.icon
 
     # Fulltext
+    assert src_search.fulltext
+    assert dst_search.fulltext
     assert len(src_search.fulltext.results) > 0
     assert len(src_search.fulltext.results) == len(dst_search.fulltext.results)
     src_fulltext = {
@@ -201,14 +203,18 @@ async def test_export_import_e2e(nucliadb_client):
     assert src_fulltext == dst_fulltext
 
     # Paragraphs
+    assert src_search.paragraphs
+    assert dst_search.paragraphs
     assert len(src_search.paragraphs.results) > 0
     assert len(src_search.paragraphs.results) == len(dst_search.paragraphs.results)
     src_presults = {
         (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
         for par in src_search.paragraphs.results
+        if par.position is not None
     }
     dst_presults = {
         (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
         for par in dst_search.paragraphs.results
+        if par.position is not None
     }
     assert src_presults == dst_presults
