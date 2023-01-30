@@ -226,7 +226,7 @@ def tikvd():
     start_tikvd(server)
     print("Started TiKVd")
 
-    for i in range(70):
+    for i in range(100):
         resp = requests.get(f"http://{server.host}:{server.pd_port}/pd/api/v1/stores")
         if (
             resp.status_code == 200
