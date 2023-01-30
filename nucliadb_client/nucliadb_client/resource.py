@@ -192,14 +192,9 @@ class Resource:
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
         self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
-        self.bm.source = BrokerMessage.MessageSource.PROCESSOR
-        self.bm.basic.metadata.useful = True
-        self.bm.basic.metadata.status = Metadata.Status.PROCESSED
 
-        def iterator():
-            yield self.bm
-
-        self.kb.client.writer_stub.ProcessMessage(iterator())
+        self.kb.client.writer_stub.ProcessMessage(self._iterator())
+        logger.info(f"Commited {self.bm.uuid}")
 
         self.cleanup()
 
@@ -241,7 +236,58 @@ class Resource:
         for sentence in self.kb.client.train_stub.GetSentences(request):
             yield sentence
 
-    async def commit(self, processor: bool = True):
+    @property
+    def writer_bm(self):
+        wbm = BrokerMessage()
+        wbm.CopyFrom(self.bm)
+        # We clear the fields that are typically populated on the
+        # processor's broker message.
+        for computed_field in [
+            "link_extracted_data",
+            "file_extracted_data",
+            "extracted_text",
+            "field_metadata",
+            "field_vectors",
+            "field_large_metadata",
+            "user_vectors",
+        ]:
+            wbm.ClearField(computed_field)
+        wbm.type = BrokerMessage.MessageType.AUTOCOMMIT
+        wbm.source = BrokerMessage.MessageSource.WRITER
+        wbm.basic.metadata.useful = True
+        wbm.basic.metadata.status = Metadata.Status.PENDING
+        return wbm
+
+    @property
+    def processor_bm(self):
+        pbm = BrokerMessage()
+        pbm.CopyFrom(self.bm)
+        # We clear the fields that are typically populated on the
+        # writer's broker message.
+        for writer_field in [
+            "links",
+            "files",
+            "texts",
+            "conversations",
+            "layouts",
+            "keywordsets",
+            "datetimes",
+        ]:
+            pbm.ClearField(writer_field)
+        pbm.type = BrokerMessage.MessageType.AUTOCOMMIT
+        pbm.source = BrokerMessage.MessageSource.PROCESSOR
+        pbm.basic.metadata.useful = True
+        pbm.basic.metadata.status = Metadata.Status.PROCESSED
+        return pbm
+
+    def _iterator(self):
+        # We simulate the regular ingestion process: first a message from the writer
+        # with only the basic metadata. Then a message from processing containing all
+        # computed and extracted metadata
+        yield self.writer_bm
+        yield self.processor_bm
+
+    async def commit(self):
         if self.bm is None:
             raise AttributeError("No Broker Message")
 
@@ -254,15 +300,8 @@ class Resource:
         self.bm.uuid = self.rid
         self.bm.kbid = self.kb.kbid
         self.bm.type = BrokerMessage.MessageType.AUTOCOMMIT
-        if processor:
-            self.bm.source = BrokerMessage.MessageSource.PROCESSOR
-        self.bm.basic.metadata.useful = True
-        self.bm.basic.metadata.status = Metadata.Status.PROCESSED
 
-        def iterator():
-            yield self.bm
-
-        await self.kb.client.writer_stub_async.ProcessMessage(iterator())  # type: ignore
+        await self.kb.client.writer_stub_async.ProcessMessage(self._iterator())
         logger.info(f"Commited {self.bm.uuid}")
 
         self.cleanup()

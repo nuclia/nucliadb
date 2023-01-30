@@ -138,11 +138,14 @@ async def test_export_import_e2e(nucliadb_client):
         raise Exception("Could not create source KB")
 
     file_binary = base64.b64encode(b"Hola")
+    title = "My Resource"
+    summary = "My long summary of the resource"
+    slug = "myresource"  # type: ignore
     payload = CreateResourcePayload()
     payload.icon = "plain/text"
-    payload.title = "My Resource"
-    payload.summary = "My long summary of the resource"
-    payload.slug = "myresource"  # type: ignore
+    payload.title = title
+    payload.summary = summary
+    payload.slug = slug
     payload.texts[FieldIdString("text1")] = TextField(body="My text")
     payload.files[FieldIdString("file1")] = FileField(
         file=File(
@@ -166,8 +169,8 @@ async def test_export_import_e2e(nucliadb_client):
         found = True
         res = resource.get(show=["values", "basic"])
         assert res.id == resource.rid
-        assert res.title == payload.title
-        assert res.slug == payload.slug
+        assert res.title == title
+        assert res.slug == slug
         assert resource.download_file("file1") == file_binary
     assert found
 
@@ -176,6 +179,7 @@ async def test_export_import_e2e(nucliadb_client):
     dst_search = dstkb.search(query="")
 
     # Resources
+    assert len(src_search.resources) > 0
     assert len(src_search.resources) == len(dst_search.resources)
     for rid, sresult in src_search.resources.items():
         dresult = dst_search.resources[rid]
@@ -184,6 +188,7 @@ async def test_export_import_e2e(nucliadb_client):
         assert sresult.icon == dresult.icon
 
     # Fulltext
+    assert len(src_search.fulltext.results) > 0
     assert len(src_search.fulltext.results) == len(dst_search.fulltext.results)
     src_fulltext = {
         (ftr.rid, ftr.field_type, ftr.field, ftr.score)
@@ -196,6 +201,7 @@ async def test_export_import_e2e(nucliadb_client):
     assert src_fulltext == dst_fulltext
 
     # Paragraphs
+    assert len(src_search.paragraphs.results) > 0
     assert len(src_search.paragraphs.results) == len(dst_search.paragraphs.results)
     src_presults = {
         (par.score, par.rid, par.field_type, par.field, par.text, par.position.json())
