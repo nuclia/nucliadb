@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from datetime import datetime
+from fastapi import HTTPException
 
 from nucliadb_protos.resources_pb2 import (
     Basic,
@@ -35,7 +36,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload
-from nucliadb.writer.exceptions import ValidationError
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
@@ -198,8 +198,12 @@ def set_processing_info(bm: BrokerMessage, processing_info: ProcessingInfo):
 def validate_classifications(paragraph: ParagraphAnnotation):
     classifications = paragraph.classifications
     if len(classifications) == 0:
-        raise ValidationError("ensure classifications has at least 1 items")
+        raise HTTPException(
+            status_code=422, detail="ensure classifications has at least 1 items"
+        )
 
     unique_classifications = {tuple(cf.dict().values()) for cf in classifications}
     if len(unique_classifications) != len(classifications):
-        raise ValidationError("Paragraph classifications need to be unique")
+        raise HTTPException(
+            status_code=422, detail="Paragraph classifications need to be unique"
+        )

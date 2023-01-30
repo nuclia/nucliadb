@@ -48,7 +48,7 @@ from nucliadb.writer.api.v1.router import (
     RSLUG_PREFIX,
     api,
 )
-from nucliadb.writer.exceptions import IngestNotAvailable, ValidationError
+from nucliadb.writer.exceptions import IngestNotAvailable
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.basic import (
     parse_basic,
@@ -137,10 +137,8 @@ async def create_resource(
         toprocess.slug = item.slug
 
     parse_audit(writer.audit, request)
-    try:
-        parse_basic(writer, item, toprocess)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+    parse_basic(writer, item, toprocess)
+
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
 
@@ -251,10 +249,7 @@ async def modify_resource(
 
     set_info_on_span({"nuclia.rid": rid, "nuclia.kbid": kbid})
 
-    try:
-        parse_basic_modify(writer, item, toprocess)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+    parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)

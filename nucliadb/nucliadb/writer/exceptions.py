@@ -29,7 +29,3 @@ class ResourceNotFound(Exception):
 
 class IngestNotAvailable(Exception):
     pass
-
-
-class ValidationError(Exception):
-    pass
