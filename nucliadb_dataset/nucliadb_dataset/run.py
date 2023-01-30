@@ -74,7 +74,7 @@ def run():
             datasets_url=nucliadb_args.datasets_url,
             trainset=trainset,
             cache_path=nucliadb_args.download_path,
-            api_key=nucliadb_args.apikey,
+            apikey=nucliadb_args.apikey,
         )
         fse.export()
     elif nucliadb_args.export == ExportType.FILESYSTEM:

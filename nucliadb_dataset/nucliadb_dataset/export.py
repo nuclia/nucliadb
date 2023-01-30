@@ -47,11 +47,12 @@ class NucliaDatasetsExport:
         dataset_def = {
             "type": TaskType.Name(self.trainset.type),
             "filter": {"labels": list(self.trainset.filter.labels)},
+            "name": str(self.client.reader_session.base_url)
         }
         response = requests.post(
             f"{self.datasets_url}/datasets",
             json=dataset_def,
-            headers={"x_stf_nuakey": self.apikey},
+            headers={"x-stf-nuakey": f"Bearer {self.apikey}"},
         )
 
         dataset_id = response.json()["id"]
@@ -63,7 +64,7 @@ class NucliaDatasetsExport:
                 requests.put(
                     f"{self.datasets_url}/dataset/{dataset_id}/partition/{partition_id}",
                     data=partition_fileobj,
-                    headers={"x_stf_nuakey": self.apikey},
+                    headers={"x-stf-nuakey": f"Bearer {self.apikey}"},
                 )
 
 
