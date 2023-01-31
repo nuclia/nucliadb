@@ -20,7 +20,7 @@
 import pytest
 
 from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node, NodeType
+from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
 
 
 def get_cluster_member(

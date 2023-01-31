@@ -25,7 +25,7 @@ import json
 from typing import Dict, List, Optional, Union
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node
+from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
 from nucliadb.ingest.settings import settings
 from nucliadb.sentry import SENTRY
 from nucliadb_utils.utilities import Utility, set_utility

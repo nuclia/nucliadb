@@ -20,16 +20,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 from uuid import uuid4
 
-from enum import Enum
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
-from nucliadb_protos.writer_pb2 import ListMembersRequest
-from nucliadb_protos.writer_pb2 import Member
+from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
