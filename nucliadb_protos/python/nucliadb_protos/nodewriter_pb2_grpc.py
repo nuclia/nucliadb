@@ -543,12 +543,34 @@ class NodeSidecarStub(object):
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.Counter.FromString,
                 )
+        self.ShadowShardCreate = channel.unary_unary(
+                '/nodewriter.NodeSidecar/ShadowShardCreate',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.FromString,
+                )
+        self.ShadowShardDelete = channel.unary_unary(
+                '/nodewriter.NodeSidecar/ShadowShardDelete',
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.FromString,
+                )
 
 
 class NodeSidecarServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def GetCount(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ShadowShardCreate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ShadowShardDelete(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -561,6 +583,16 @@ def add_NodeSidecarServicer_to_server(servicer, server):
                     servicer.GetCount,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.Counter.SerializeToString,
+            ),
+            'ShadowShardCreate': grpc.unary_unary_rpc_method_handler(
+                    servicer.ShadowShardCreate,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.SerializeToString,
+            ),
+            'ShadowShardDelete': grpc.unary_unary_rpc_method_handler(
+                    servicer.ShadowShardDelete,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -586,5 +618,39 @@ class NodeSidecar(object):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeSidecar/GetCount',
             nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.Counter.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ShadowShardCreate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeSidecar/ShadowShardCreate',
+            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ShadowShardDelete(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeSidecar/ShadowShardDelete',
+            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

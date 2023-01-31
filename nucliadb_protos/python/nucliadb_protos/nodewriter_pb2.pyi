@@ -41,7 +41,6 @@ from nucliadb_protos.noderesources_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class OpStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -80,7 +79,6 @@ class OpStatus(google.protobuf.message.Message):
 
 global___OpStatus = OpStatus
 
-@typing_extensions.final
 class IndexMessage(google.protobuf.message.Message):
     """Implemented at nucliadb_object_storage"""
 
@@ -125,7 +123,6 @@ class IndexMessage(google.protobuf.message.Message):
 
 global___IndexMessage = IndexMessage
 
-@typing_extensions.final
 class SetGraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -146,7 +143,6 @@ class SetGraph(google.protobuf.message.Message):
 
 global___SetGraph = SetGraph
 
-@typing_extensions.final
 class DeleteGraphNodes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -167,7 +163,6 @@ class DeleteGraphNodes(google.protobuf.message.Message):
 
 global___DeleteGraphNodes = DeleteGraphNodes
 
-@typing_extensions.final
 class MoveShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -187,7 +182,6 @@ class MoveShardRequest(google.protobuf.message.Message):
 
 global___MoveShardRequest = MoveShardRequest
 
-@typing_extensions.final
 class AcceptShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -210,7 +204,6 @@ class AcceptShardRequest(google.protobuf.message.Message):
 
 global___AcceptShardRequest = AcceptShardRequest
 
-@typing_extensions.final
 class Counter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -224,3 +217,17 @@ class Counter(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["resources", b"resources"]) -> None: ...
 
 global___Counter = Counter
+
+class ShadowShardResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: builtins.int
+    success: builtins.bool
+    def __init__(
+        self,
+        *,
+        success: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["success", b"success"]) -> None: ...
+
+global___ShadowShardResponse = ShadowShardResponse
