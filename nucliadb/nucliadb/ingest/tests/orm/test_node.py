@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
+from nucliadb_protos.writer_pb2 import Member
 
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
-from nucliadb_protos.writer_pb2 import Member
+
 
 def get_cluster_member(
     node_id="foo",
@@ -76,23 +77,25 @@ async def test_chitchat_update_node():
     await chitchat_update_node([])
     assert len(NODES) == 0
 
+
 def test_node_type_from_str():
     for (raw_type, node_type) in [
-            ("Io", NodeType.IO),
-            ("Train", NodeType.TRAIN),
-            ("Ingest", NodeType.INGEST),
-            ("Search", NodeType.SEARCH),
-            ("Blablabla", NodeType.UNKNOWN),
-            ("Cat is everything", NodeType.UNKNOWN)
+        ("Io", NodeType.IO),
+        ("Train", NodeType.TRAIN),
+        ("Ingest", NodeType.INGEST),
+        ("Search", NodeType.SEARCH),
+        ("Blablabla", NodeType.UNKNOWN),
+        ("Cat is everything", NodeType.UNKNOWN),
     ]:
         assert NodeType.from_str(raw_type) == node_type
 
+
 def test_node_type_compat():
     for (node_type, member_type) in [
-            (NodeType.IO, Member.Type.IO),
-            (NodeType.TRAIN, Member.Type.TRAIN),
-            (NodeType.INGEST, Member.Type.INGEST),
-            (NodeType.SEARCH, Member.Type.SEARCH),
-            (NodeType.UNKNOWN, Member.Type.UNKNOWN)
+        (NodeType.IO, Member.Type.IO),
+        (NodeType.TRAIN, Member.Type.TRAIN),
+        (NodeType.INGEST, Member.Type.INGEST),
+        (NodeType.SEARCH, Member.Type.SEARCH),
+        (NodeType.UNKNOWN, Member.Type.UNKNOWN),
     ]:
         assert node_type.compat() == member_type
