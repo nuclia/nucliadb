@@ -84,7 +84,7 @@ class NodeType(Enum):
         elif self == NodeType.INGEST:
             return Member.Type.INGEST
         elif self == NodeType.TRAIN:
-            return Member.Type.Train
+            return Member.Type.TRAIN
         else:
             return Member.Type.UNKNOWN
 
