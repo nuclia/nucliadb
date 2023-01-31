@@ -80,6 +80,11 @@ pub struct Counter {
     #[prost(uint64, tag="1")]
     pub resources: u64,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShadowShardResponse {
+    #[prost(bool, tag="1")]
+    pub success: bool,
+}
 /// Generated client implementations.
 pub mod node_writer_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -536,6 +541,44 @@ pub mod node_sidecar_client {
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/nodewriter.NodeSidecar/GetCount",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn shadow_shard_create(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeSidecar/ShadowShardCreate",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn shadow_shard_delete(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/nodewriter.NodeSidecar/ShadowShardDelete",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -1336,6 +1379,14 @@ pub mod node_sidecar_server {
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::Counter>, tonic::Status>;
+        async fn shadow_shard_create(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status>;
+        async fn shadow_shard_delete(
+            &self,
+            request: tonic::Request<super::super::noderesources::ShardId>,
+        ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct NodeSidecarServer<T: NodeSidecar> {
@@ -1411,6 +1462,86 @@ pub mod node_sidecar_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = GetCountSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeSidecar/ShadowShardCreate" => {
+                    #[allow(non_camel_case_types)]
+                    struct ShadowShardCreateSvc<T: NodeSidecar>(pub Arc<T>);
+                    impl<
+                        T: NodeSidecar,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for ShadowShardCreateSvc<T> {
+                        type Response = super::ShadowShardResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).shadow_shard_create(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ShadowShardCreateSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/nodewriter.NodeSidecar/ShadowShardDelete" => {
+                    #[allow(non_camel_case_types)]
+                    struct ShadowShardDeleteSvc<T: NodeSidecar>(pub Arc<T>);
+                    impl<
+                        T: NodeSidecar,
+                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
+                    for ShadowShardDeleteSvc<T> {
+                        type Response = super::ShadowShardResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::super::noderesources::ShardId>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).shadow_shard_delete(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ShadowShardDeleteSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
