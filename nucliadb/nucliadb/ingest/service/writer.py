@@ -748,16 +748,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> ShadowShardCreateResponse:
         response = ShadowShardCreateResponse(success=False)
         try:
+            node_klass = get_node_klass()
             # TODO
             # Send a grpc request to the node's sidecar to create a new shadow shard
             # Be able to pass which versions you want the shard to be created with
             # Handle any errors on that call
-
             # Get the shard if from the response
             # Update shard object with the new shadow replica
             shadow_replica_id = "foobar"
             txn = await self.proc.driver.begin()
-            node_klass = get_node_klass()
             all_shards = await node_klass.get_all_shards(txn, request.kbid)
 
             updated_shards = PBShards()

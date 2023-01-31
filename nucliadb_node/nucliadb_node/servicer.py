@@ -37,9 +37,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.nodewriter_pb2 import Counter
+from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
 
 from nucliadb_node.reader import Reader
+from nucliadb_node.shadow_shards import SHADOW_SHARDS
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
 
@@ -61,3 +62,27 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         if count is not None:
             response.resources = count
         return response
+
+    async def ShadowShardCreate(self, request: ShardId, context) -> ShadowShardResponse:
+        await SHADOW_SHARDS.load()
+        response = ShadowShardResponse()
+        try:
+            await SHADOW_SHARDS.create(shard_id=request.id)
+            response.success = True
+        except Exception:
+            # TODO
+            pass
+        finally:
+            return response
+
+    async def ShadowShardDelete(self, request: ShardId, context) -> ShadowShardResponse:
+        await SHADOW_SHARDS.load()
+        response = ShadowShardResponse()
+        try:
+            await SHADOW_SHARDS.delete(shard_id=request.id)
+            response.success = True
+        except Exception:
+            # TODO
+            pass
+        finally:
+            return response

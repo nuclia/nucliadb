@@ -77,8 +77,14 @@ message Counter {
     uint64 resources = 1;
 }
 
+message ShadowShardResponse {
+    bool success = 1;
+}
+
+
 
 service NodeSidecar {
-
     rpc GetCount(noderesources.ShardId) returns (Counter) {}
+    rpc ShadowShardCreate(ShardId) returns (ShadowShardResponse) {}
+    rpc ShadowShardDelete(ShardId) returns (ShadowShardResponse) {}
 }

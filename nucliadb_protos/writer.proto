@@ -442,10 +442,6 @@ message ShadowShardCreateRequest {
     string node = 3;
 }
 
-message ShadowShardCreateResponse {
-    bool success = 1;
-}
-
 
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
@@ -498,5 +494,5 @@ service Writer {
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 
     // Shard management
-    rpc ShadowShardCreate(ShadowShardCreateRequest) returns (ShadowShardCreateResponse) {}
+    rpc ShadowShardCreate(ShadowShardCreateRequest) returns (nodewriter.ShadowShardCreateResponse) {}
 }
