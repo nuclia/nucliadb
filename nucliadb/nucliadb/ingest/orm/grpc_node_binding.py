@@ -30,6 +30,8 @@ from nucliadb_protos.nodereader_pb2 import (
     ParagraphItem,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
+    RelationSearchRequest,
+    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     StreamRequest,
@@ -47,7 +49,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetID,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 
 from nucliadb.ingest.settings import settings
 
@@ -85,6 +87,18 @@ class LocalReaderWrapper:
         )
         pb_bytes = bytes(result)
         pb = ParagraphSearchResponse()
+        pb.ParseFromString(pb_bytes)
+        return pb
+
+    async def RelationSearch(
+        self, request: RelationSearchRequest
+    ) -> RelationSearchResponse:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.relation_search, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        pb = RelationSearchResponse()
         pb.ParseFromString(pb_bytes)
         return pb
 
@@ -289,6 +303,16 @@ class LocalWriterWrapper:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
             self.executor, self.writer.remove_resource, request.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        op_status = OpStatus()
+        op_status.ParseFromString(pb_bytes)
+        return op_status
+
+    async def JoinGraph(self, request: SetGraph) -> OpStatus:
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.join_graph, request.SerializeToString()
         )
         pb_bytes = bytes(resp)
         op_status = OpStatus()

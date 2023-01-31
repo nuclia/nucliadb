@@ -29,7 +29,9 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import Counter, OpStatus, ShadowShardResponse
+from nucliadb_protos.nodewriter_pb2 import Counter, OpStatus, SetGraph, ShadowShardResponse
+
+from nucliadb.ingest.orm.shard import Shard
 
 
 class DummyWriterStub:
@@ -82,6 +84,12 @@ class DummyWriterStub:
         result = VectorSetList()
         result.shard.id = data.id
         result.vectorset.append("base")
+        return result
+
+    async def JoinGraph(self, data: SetGraph):
+        self.calls.setdefault("JoinGraph", []).append(data)
+        result = OpStatus()
+        result.count = 1
         return result
 
 
