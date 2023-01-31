@@ -214,10 +214,10 @@ async def fake_node(indexing_utility_ingest):
     uuid1 = str(uuid.uuid4())
     uuid2 = str(uuid.uuid4())
     await Node.set(
-        uuid1, address="nohost:9999", type=NodeType.UNKNOWN, load_score=0.0, dummy=True
+        uuid1, address="nohost:9999", type=NodeType.IO, load_score=0.0, dummy=True
     )
     await Node.set(
-        uuid2, address="nohost:9999", type=NodeType.UNKNOWN, load_score=0.0, dummy=True
+        uuid2, address="nohost:9999", type=NodeType.IO, load_score=0.0, dummy=True
     )
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
