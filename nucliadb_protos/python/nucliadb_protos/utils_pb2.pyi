@@ -18,7 +18,6 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
 class Relation(google.protobuf.message.Message):
     """Relations are connexions between nodes in the relation index.
     They are tuplets (Source, Relation Type, Relation Label, To).
@@ -86,7 +85,6 @@ class Relation(google.protobuf.message.Message):
 
 global___Relation = Relation
 
-@typing_extensions.final
 class RelationMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -124,7 +122,6 @@ class RelationMetadata(google.protobuf.message.Message):
 
 global___RelationMetadata = RelationMetadata
 
-@typing_extensions.final
 class RelationNode(google.protobuf.message.Message):
     """Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index."""
 
@@ -167,7 +164,6 @@ class RelationNode(google.protobuf.message.Message):
 
 global___RelationNode = RelationNode
 
-@typing_extensions.final
 class JoinGraphCnx(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -196,11 +192,9 @@ class JoinGraphCnx(google.protobuf.message.Message):
 
 global___JoinGraphCnx = JoinGraphCnx
 
-@typing_extensions.final
 class JoinGraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class NodesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -234,11 +228,9 @@ class JoinGraph(google.protobuf.message.Message):
 
 global___JoinGraph = JoinGraph
 
-@typing_extensions.final
 class ExtractedText(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class SplitTextEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -273,7 +265,6 @@ class ExtractedText(google.protobuf.message.Message):
 
 global___ExtractedText = ExtractedText
 
-@typing_extensions.final
 class Vector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -301,7 +292,6 @@ class Vector(google.protobuf.message.Message):
 
 global___Vector = Vector
 
-@typing_extensions.final
 class Vectors(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -317,11 +307,9 @@ class Vectors(google.protobuf.message.Message):
 
 global___Vectors = Vectors
 
-@typing_extensions.final
 class VectorObject(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class SplitVectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -360,7 +348,6 @@ class VectorObject(google.protobuf.message.Message):
 
 global___VectorObject = VectorObject
 
-@typing_extensions.final
 class UserVector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -386,11 +373,9 @@ class UserVector(google.protobuf.message.Message):
 
 global___UserVector = UserVector
 
-@typing_extensions.final
 class UserVectors(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -421,11 +406,9 @@ class UserVectors(google.protobuf.message.Message):
 
 global___UserVectors = UserVectors
 
-@typing_extensions.final
 class UserVectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -456,7 +439,6 @@ class UserVectorSet(google.protobuf.message.Message):
 
 global___UserVectorSet = UserVectorSet
 
-@typing_extensions.final
 class UserVectorsList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

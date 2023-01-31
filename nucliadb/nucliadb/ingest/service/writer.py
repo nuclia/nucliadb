@@ -41,7 +41,9 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
+    CreateShadowShardRequest,
     DelEntitiesRequest,
+    DeleteShadowShardRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
     DetWidgetsRequest,
@@ -79,6 +81,7 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorsRequest,
     SetVectorsResponse,
     SetWidgetsRequest,
+    ShadowShardResponse,
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2 import (
@@ -740,6 +743,44 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         await storage.uploaditerator(generate_buffer(storage, request), destination, cf)
         result = FileUploaded()
         return result
+
+    async def CreateShadowShard(  # type: ignore
+        self, request: CreateShadowShardRequest, context=None
+    ) -> ShadowShardResponse:
+        response = ShadowShardResponse(success=False)
+        try:
+            node_klass = get_node_klass()
+            txn = await self.proc.driver.begin()
+            await node_klass.create_shadow_shard(
+                txn, request.kbid, request.node, request.replica.id
+            )
+            response.success = True
+        except Exception as e:
+            event_id: Optional[str] = None
+            if SENTRY:
+                event_id = capture_exception(e)
+            logger.error(
+                f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}"
+            )
+        return response
+
+    async def DeleteShadowShard(  # type: ignore
+        self, request: DeleteShadowShardRequest, context=None
+    ) -> ShadowShardResponse:
+        response = ShadowShardResponse(success=False)
+        try:
+            node_klass = get_node_klass()
+            txn = await self.proc.driver.begin()
+            await node_klass.delete_shadow_shard(txn, request.kbid, request.replica.id)
+            response.success = True
+        except Exception as exc:
+            event_id: Optional[str] = None
+            if SENTRY:
+                event_id = capture_exception(exc)
+            logger.error(
+                f"Error deleting shadow shard. Check sentry for more details. Event id: {event_id}"
+            )
+        return response
 
 
 def update_shards_with_updated_replica(

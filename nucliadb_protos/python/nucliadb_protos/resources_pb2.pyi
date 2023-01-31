@@ -39,7 +39,7 @@ class _FieldType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _FieldTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FieldType.ValueType], builtins.type):
+class _FieldTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_FieldType.ValueType], builtins.type):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     FILE: _FieldType.ValueType  # 0
     LINK: _FieldType.ValueType  # 1
@@ -64,7 +64,6 @@ GENERIC: FieldType.ValueType  # 6
 CONVERSATION: FieldType.ValueType  # 7
 global___FieldType = FieldType
 
-@typing_extensions.final
 class CloudFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -140,7 +139,6 @@ class CloudFile(google.protobuf.message.Message):
 
 global___CloudFile = CloudFile
 
-@typing_extensions.final
 class Basic(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -229,7 +227,6 @@ class Basic(google.protobuf.message.Message):
 
 global___Basic = Basic
 
-@typing_extensions.final
 class Origin(google.protobuf.message.Message):
     """Block behaviors"""
 
@@ -250,7 +247,6 @@ class Origin(google.protobuf.message.Message):
     DESKTOP: Origin.Source.ValueType  # 1
     API: Origin.Source.ValueType  # 2
 
-    @typing_extensions.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -311,7 +307,6 @@ class Origin(google.protobuf.message.Message):
 
 global___Origin = Origin
 
-@typing_extensions.final
 class Relations(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -327,7 +322,6 @@ class Relations(google.protobuf.message.Message):
 
 global___Relations = Relations
 
-@typing_extensions.final
 class MessageContent(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -366,7 +360,6 @@ class MessageContent(google.protobuf.message.Message):
 
 global___MessageContent = MessageContent
 
-@typing_extensions.final
 class Message(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -397,7 +390,6 @@ class Message(google.protobuf.message.Message):
 
 global___Message = Message
 
-@typing_extensions.final
 class Conversation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -413,7 +405,6 @@ class Conversation(google.protobuf.message.Message):
 
 global___Conversation = Conversation
 
-@typing_extensions.final
 class FieldConversation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -431,7 +422,6 @@ class FieldConversation(google.protobuf.message.Message):
 
 global___FieldConversation = FieldConversation
 
-@typing_extensions.final
 class NestedPosition(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -452,7 +442,6 @@ class NestedPosition(google.protobuf.message.Message):
 
 global___NestedPosition = NestedPosition
 
-@typing_extensions.final
 class NestedListPosition(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -468,11 +457,9 @@ class NestedListPosition(google.protobuf.message.Message):
 
 global___NestedListPosition = NestedListPosition
 
-@typing_extensions.final
 class FileExtractedData(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -488,7 +475,6 @@ class FileExtractedData(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class NestedEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -504,7 +490,6 @@ class FileExtractedData(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class FileGeneratedEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -522,7 +507,6 @@ class FileExtractedData(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class FileRowsPreviewsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -540,7 +524,6 @@ class FileExtractedData(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class NestedPositionEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -558,7 +541,6 @@ class FileExtractedData(google.protobuf.message.Message):
         def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class NestedListPositionEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -633,11 +615,9 @@ class FileExtractedData(google.protobuf.message.Message):
 
 global___FileExtractedData = FileExtractedData
 
-@typing_extensions.final
 class LinkExtractedData(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -700,7 +680,6 @@ class LinkExtractedData(google.protobuf.message.Message):
 
 global___LinkExtractedData = LinkExtractedData
 
-@typing_extensions.final
 class ExtractedTextWrapper(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -726,7 +705,6 @@ class ExtractedTextWrapper(google.protobuf.message.Message):
 
 global___ExtractedTextWrapper = ExtractedTextWrapper
 
-@typing_extensions.final
 class ExtractedVectorsWrapper(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -752,11 +730,9 @@ class ExtractedVectorsWrapper(google.protobuf.message.Message):
 
 global___ExtractedVectorsWrapper = ExtractedVectorsWrapper
 
-@typing_extensions.final
 class UserVectorsWrapper(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class VectorsToDeleteEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -796,7 +772,6 @@ class UserVectorsWrapper(google.protobuf.message.Message):
 
 global___UserVectorsWrapper = UserVectorsWrapper
 
-@typing_extensions.final
 class Sentence(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -817,7 +792,6 @@ class Sentence(google.protobuf.message.Message):
 
 global___Sentence = Sentence
 
-@typing_extensions.final
 class Paragraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -882,7 +856,6 @@ class Paragraph(google.protobuf.message.Message):
 
 global___Paragraph = Paragraph
 
-@typing_extensions.final
 class Position(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -900,7 +873,6 @@ class Position(google.protobuf.message.Message):
 
 global___Position = Position
 
-@typing_extensions.final
 class Positions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -919,11 +891,9 @@ class Positions(google.protobuf.message.Message):
 
 global___Positions = Positions
 
-@typing_extensions.final
 class FieldMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class NerEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -939,7 +909,6 @@ class FieldMetadata(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class PositionsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1018,11 +987,9 @@ class FieldMetadata(google.protobuf.message.Message):
 
 global___FieldMetadata = FieldMetadata
 
-@typing_extensions.final
 class FieldComputedMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class SplitMetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1061,7 +1028,6 @@ class FieldComputedMetadata(google.protobuf.message.Message):
 
 global___FieldComputedMetadata = FieldComputedMetadata
 
-@typing_extensions.final
 class FieldComputedMetadataWrapper(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1082,7 +1048,6 @@ class FieldComputedMetadataWrapper(google.protobuf.message.Message):
 
 global___FieldComputedMetadataWrapper = FieldComputedMetadataWrapper
 
-@typing_extensions.final
 class Metadata(google.protobuf.message.Message):
     """Mutable behaviors"""
 
@@ -1107,7 +1072,6 @@ class Metadata(google.protobuf.message.Message):
     BLOCKED: Metadata.Status.ValueType  # 3
     EXPIRED: Metadata.Status.ValueType  # 4
 
-    @typing_extensions.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1148,7 +1112,6 @@ class Metadata(google.protobuf.message.Message):
 
 global___Metadata = Metadata
 
-@typing_extensions.final
 class FieldText(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1186,7 +1149,6 @@ class FieldText(google.protobuf.message.Message):
 
 global___FieldText = FieldText
 
-@typing_extensions.final
 class Block(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1247,11 +1209,9 @@ class Block(google.protobuf.message.Message):
 
 global___Block = Block
 
-@typing_extensions.final
 class LayoutContent(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class BlocksEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1285,7 +1245,6 @@ class LayoutContent(google.protobuf.message.Message):
 
 global___LayoutContent = LayoutContent
 
-@typing_extensions.final
 class FieldLayout(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1316,7 +1275,6 @@ class FieldLayout(google.protobuf.message.Message):
 
 global___FieldLayout = FieldLayout
 
-@typing_extensions.final
 class Classification(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1341,7 +1299,6 @@ class Classification(google.protobuf.message.Message):
 
 global___Classification = Classification
 
-@typing_extensions.final
 class UserMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1361,7 +1318,6 @@ class UserMetadata(google.protobuf.message.Message):
 
 global___UserMetadata = UserMetadata
 
-@typing_extensions.final
 class FieldClassifications(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1382,7 +1338,6 @@ class FieldClassifications(google.protobuf.message.Message):
 
 global___FieldClassifications = FieldClassifications
 
-@typing_extensions.final
 class ComputedMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1398,7 +1353,6 @@ class ComputedMetadata(google.protobuf.message.Message):
 
 global___ComputedMetadata = ComputedMetadata
 
-@typing_extensions.final
 class TokenSplit(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1428,7 +1382,6 @@ class TokenSplit(google.protobuf.message.Message):
 
 global___TokenSplit = TokenSplit
 
-@typing_extensions.final
 class ParagraphAnnotation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1447,7 +1400,6 @@ class ParagraphAnnotation(google.protobuf.message.Message):
 
 global___ParagraphAnnotation = ParagraphAnnotation
 
-@typing_extensions.final
 class UserFieldMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1472,11 +1424,9 @@ class UserFieldMetadata(google.protobuf.message.Message):
 
 global___UserFieldMetadata = UserFieldMetadata
 
-@typing_extensions.final
 class FieldLink(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1492,7 +1442,6 @@ class FieldLink(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class CookiesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1508,7 +1457,6 @@ class FieldLink(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class LocalstorageEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1555,7 +1503,6 @@ class FieldLink(google.protobuf.message.Message):
 
 global___FieldLink = FieldLink
 
-@typing_extensions.final
 class Keyword(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1570,7 +1517,6 @@ class Keyword(google.protobuf.message.Message):
 
 global___Keyword = Keyword
 
-@typing_extensions.final
 class FieldKeywordset(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1586,7 +1532,6 @@ class FieldKeywordset(google.protobuf.message.Message):
 
 global___FieldKeywordset = FieldKeywordset
 
-@typing_extensions.final
 class FieldDatetime(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1603,11 +1548,9 @@ class FieldDatetime(google.protobuf.message.Message):
 
 global___FieldDatetime = FieldDatetime
 
-@typing_extensions.final
 class FieldFile(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1623,7 +1566,6 @@ class FieldFile(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
-    @typing_extensions.final
     class CookiesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1673,7 +1615,6 @@ class FieldFile(google.protobuf.message.Message):
 
 global___FieldFile = FieldFile
 
-@typing_extensions.final
 class Entity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1694,11 +1635,9 @@ class Entity(google.protobuf.message.Message):
 
 global___Entity = Entity
 
-@typing_extensions.final
 class FieldLargeMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class TokensEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1730,11 +1669,9 @@ class FieldLargeMetadata(google.protobuf.message.Message):
 
 global___FieldLargeMetadata = FieldLargeMetadata
 
-@typing_extensions.final
 class LargeComputedMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class SplitMetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1773,7 +1710,6 @@ class LargeComputedMetadata(google.protobuf.message.Message):
 
 global___LargeComputedMetadata = LargeComputedMetadata
 
-@typing_extensions.final
 class LargeComputedMetadataWrapper(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1799,7 +1735,6 @@ class LargeComputedMetadataWrapper(google.protobuf.message.Message):
 
 global___LargeComputedMetadataWrapper = LargeComputedMetadataWrapper
 
-@typing_extensions.final
 class PagePositions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1817,7 +1752,6 @@ class PagePositions(google.protobuf.message.Message):
 
 global___PagePositions = PagePositions
 
-@typing_extensions.final
 class FilePages(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1837,15 +1771,12 @@ class FilePages(google.protobuf.message.Message):
 
 global___FilePages = FilePages
 
-@typing_extensions.final
 class RowsPreview(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
     class Sheet(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
         class Row(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1869,7 +1800,6 @@ class RowsPreview(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["rows", b"rows"]) -> None: ...
 
-    @typing_extensions.final
     class SheetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1899,7 +1829,6 @@ class RowsPreview(google.protobuf.message.Message):
 
 global___RowsPreview = RowsPreview
 
-@typing_extensions.final
 class FieldID(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
