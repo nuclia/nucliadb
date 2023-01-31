@@ -53,7 +53,13 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert resources.fulltext.total == 5
     assert len(resources.resources) == 5
 
+    resources = knowledgebox.search(filter=[Label(labelset="emoji", label="0")])
+
+    assert resources.fulltext.total == 9
+
     resources = knowledgebox.search(filter=["emoji/0"])
+
+    assert resources.fulltext.total == 9
 
     vector_q = encoder.encode([ds["train"][0]["text"]])[0].tolist()
     resources = knowledgebox.search(

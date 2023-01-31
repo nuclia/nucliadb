@@ -35,9 +35,13 @@ class InvalidHost(Exception):
     pass
 
 
+class KnowledgeBoxAlreadyExists(Exception):
+    pass
+
+
 def create_knowledge_box(
-    nucliadb_base_url: Optional[str] = "http://localhost:8080",
     slug: Optional[str] = None,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
 ):
     url_obj = urlparse(nucliadb_base_url)
     if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
@@ -54,6 +58,9 @@ def create_knowledge_box(
         json={"slug": slug},
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
+    if response.status_code == 419:
+        raise KnowledgeBoxAlreadyExists()
+
     assert response.status_code == 201
 
     kb = KnowledgeBoxObj.parse_raw(response.content)
@@ -63,3 +70,39 @@ def create_knowledge_box(
     client = NucliaDBClient(environment=Environment.OSS, url=url)
 
     return KnowledgeBox(client)
+
+
+def get_kb(
+    slug: str,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
+):
+    url_obj = urlparse(nucliadb_base_url)
+    if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
+        raise InvalidHost(
+            "You can not create a Knowledge Box via API, please use https://nuclia.cloud interface"
+        )
+
+    api_path = f"{nucliadb_base_url}/api/v1"
+    response = requests.get(
+        f"{api_path}/kb/s/{slug}",
+        headers={"X-NUCLIADB-ROLES": "READER"},
+    )
+
+    assert response.status_code == 200
+
+    kb = KnowledgeBoxObj.parse_raw(response.content)
+    kbid = kb.uuid
+
+    url = f"{api_path}/kb/{kbid}"
+    client = NucliaDBClient(environment=Environment.OSS, url=url)
+
+    return KnowledgeBox(client)
+
+
+def get_or_create(
+    slug: str, nucliadb_base_url: Optional[str] = "http://localhost:8080"
+):
+    kb = get_kb(slug, nucliadb_base_url)
+    if kb is None:
+        kb = create_knowledge_box(slug, nucliadb_base_url)
+    return kb

@@ -45,7 +45,7 @@ def test_datascientist_tokens(knowledgebox: KnowledgeBox, temp_folder):
     )
 
     arrow_filenames = download_all_partitions(
-        type=TaskType.TOKEN_CLASSIFICATION,
+        task="TOKEN_CLASSIFICATION",
         knowledgebox=knowledgebox,
         path=temp_folder,
     )

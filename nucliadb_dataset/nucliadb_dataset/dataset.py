@@ -59,6 +59,7 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_sdk.utils import get_kb
 
 CHUNK_SIZE = 5 * 1024 * 1024
 
@@ -464,13 +465,22 @@ class NucliaCloudDataset(NucliaDataset):
 
 
 def download_all_partitions(
-    type: TaskValue,  # type: ignore
-    knowledgebox: KnowledgeBox,
+    task: str,  # type: ignore
+    slug: Optional[str] = None,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
     path: Optional[str] = None,
-    labelsets: List[str] = [],
+    knowledgebox: Optional[KnowledgeBox] = None,
+    labels: List[str] = [],
 ):
-    trainset = TrainSet(type=type)
-    trainset.filter.labels.extend(labelsets)
 
-    fse = NucliaDBDataset(client=knowledgebox.client, trainset=trainset, base_path=path)
+    if knowledgebox is None and slug is not None:
+        knowledgebox = get_kb(slug, nucliadb_base_url)
+
+    if knowledgebox is None:
+        raise KeyError("KnowlwedgeBox not found")
+
+    task_obj = Task(task)
+    fse = NucliaDBDataset(
+        client=knowledgebox.client, task=task_obj, labels=labels, base_path=path
+    )
     return fse.read_all_partitions(path=path)
