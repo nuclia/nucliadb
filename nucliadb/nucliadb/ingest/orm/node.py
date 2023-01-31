@@ -29,6 +29,7 @@ from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
 from nucliadb_protos.writer_pb2 import ListMembersRequest
+from nucliadb_protos.writer_pb2 import Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -75,6 +76,20 @@ class NodeType(Enum):
         else:
             logger.warn(f"Unknown '{label}' node type")
             NodeType.UNKNOWN
+
+    def compat(self):
+        if self == NodeType.IO:
+            Member.Type.IO
+        elif self == NodeType.SEARCH:
+            Member.Type.SEARCH
+        elif self == NodeType.INGEST:
+            Member.Type.INGEST
+        elif self == NodeType.TRAIN:
+            Member.Type.Train
+        else:
+            Member.Type.UNKNOWN
+
+
 @dataclass
 class ClusterMember:
     node_id: str

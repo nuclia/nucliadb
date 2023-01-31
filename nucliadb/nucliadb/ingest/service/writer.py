@@ -550,7 +550,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             member = Member(
                 id=str(nodeid),
                 listen_address=node.address,
-                type=node.label,
+                type=node.type.compat(),
                 load_score=node.load_score,
                 dummy=node.dummy,
             )
