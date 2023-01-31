@@ -31,8 +31,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
 )
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
+from nucliadb_protos.noderesources_pb2 import ShardId
+from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import VectorSimilarity
+from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorSimilarity
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
     GetEntitiesResponse,
@@ -40,6 +42,8 @@ from nucliadb_protos.writer_pb2 import (
     GetVectorSetsResponse,
     GetWidgetResponse,
     GetWidgetsResponse,
+    JoinGraph,
+    JoinGraphCnx,
 )
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -295,7 +299,6 @@ class KnowledgeBox:
             await Node.load_active_nodes()
 
         for shard in shards_obj.shards:
-            # Delete the shard on nodes
             for replica in shard.replicas:
                 node_klass = get_node_klass()
                 node: Optional[Union[LocalNode, Node]] = await node_klass.get(
@@ -397,6 +400,34 @@ class KnowledgeBox:
             eg.MergeFrom(entities)
         entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
         await self.txn.set(entities_key, eg.SerializeToString())
+
+        nodes = {}
+        entities_keys = {}
+        for i, (name, entity) in enumerate(entities.entities.items()):
+            node = RelationNode(
+                value=entity.value,
+                ntype=RelationNode.NodeType.ENTITY,
+                subtype=group,
+            )
+            nodes[i] = node
+            entities_keys[name] = i
+
+        edges = []
+        for name, entity in entities.entities.items():
+            for synonym in entity.represents:
+                edges.append(
+                    JoinGraphCnx(
+                        source=entities_keys[name],
+                        target=entities_keys[synonym],
+                        rtype=Relation.RelationType.SYNONYM,
+                    )
+                )
+
+        jg = JoinGraph(nodes=nodes, edges=edges)
+
+        async for node, shard_id in self.iterate_kb_nodes():
+            sg = SetGraph(shard_id=ShardId(id=shard_id), graph=jg)
+            await node.writer.JoinGraph(sg)
 
     async def set_entities_force(self, group: str, entities: EntitiesGroup):
         entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
