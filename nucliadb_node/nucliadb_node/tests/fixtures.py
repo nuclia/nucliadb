@@ -178,6 +178,12 @@ async def sidecar(node_single, gcs_storage, natsd):
 
 
 @pytest.fixture(scope="function")
+async def sidecar_grpc_servicer(sidecar):
+    channel = aio.insecure_channel(settings.sidecar_listen_address)
+    yield channel
+
+
+@pytest.fixture(scope="function")
 async def shard() -> AsyncIterable[str]:
     stub = NodeWriterStub(aio.insecure_channel(settings.writer_listen_address))
     request = EmptyQuery()
