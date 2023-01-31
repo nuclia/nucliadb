@@ -38,7 +38,7 @@ from nucliadb.ingest.maindb.local import LocalDriver
 from nucliadb.ingest.maindb.redis import RedisDriver
 from nucliadb.ingest.maindb.tikv import TiKVDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.orm.node import Node, NodeType
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.ingest.settings import settings
@@ -213,8 +213,8 @@ async def cache(redis):
 async def fake_node(indexing_utility_ingest):
     uuid1 = str(uuid.uuid4())
     uuid2 = str(uuid.uuid4())
-    await Node.set(uuid1, address="nohost:9999", label="N", load_score=0.0, dummy=True)
-    await Node.set(uuid2, address="nohost:9999", label="N", load_score=0.0, dummy=True)
+    await Node.set(uuid1, address="nohost:9999", type=NodeType.UNKNOWN, load_score=0.0, dummy=True)
+    await Node.set(uuid2, address="nohost:9999", type=NodeType.UNKNOWN, load_score=0.0, dummy=True)
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,

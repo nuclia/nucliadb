@@ -20,13 +20,13 @@
 import pytest
 
 from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node
+from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node, NodeType
 
 
 def get_cluster_member(
     node_id="foo",
     listen_addr="192.1.1.1:8080",
-    node_type="Io",
+    type=NodeType.IO,
     online=True,
     is_self=False,
     load_score=0,
@@ -34,7 +34,7 @@ def get_cluster_member(
     return ClusterMember(
         node_id=node_id,
         listen_addr=listen_addr,
-        node_type=node_type,
+        type=type,
         online=online,
         is_self=is_self,
         load_score=load_score,
@@ -52,8 +52,8 @@ async def test_chitchat_update_node():
     await chitchat_update_node([member])
     assert len(NODES) == 0
 
-    # Check that it ignores types other than node_type="Io"
-    member = get_cluster_member(node_type="anythingelse")
+    # Check that it ignores types other than node_type=NodeType.IO
+    member = get_cluster_member(type=NodeType.INGEST)
     await chitchat_update_node([member])
     assert len(NODES) == 0
 
