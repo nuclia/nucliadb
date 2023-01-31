@@ -65,28 +65,28 @@ class NodeType(Enum):
     @staticmethod
     def from_str(label):
         if label in "Io":
-            NodeType.IO
+            return NodeType.IO
         elif label in "Search":
-            NodeType.SEARCH
+            return NodeType.SEARCH
         elif label in "Ingest":
-            NodeType.INGEST
+            return NodeType.INGEST
         elif label in "Train":
-            NodeType.TRAIN
+            return NodeType.TRAIN
         else:
             logger.warn(f"Unknown '{label}' node type")
-            NodeType.UNKNOWN
+            return NodeType.UNKNOWN
 
     def compat(self):
         if self == NodeType.IO:
-            Member.Type.IO
+            return Member.Type.IO
         elif self == NodeType.SEARCH:
-            Member.Type.SEARCH
+            return Member.Type.SEARCH
         elif self == NodeType.INGEST:
-            Member.Type.INGEST
+            return Member.Type.INGEST
         elif self == NodeType.TRAIN:
-            Member.Type.Train
+            return Member.Type.Train
         else:
-            Member.Type.UNKNOWN
+            return Member.Type.UNKNOWN
 
 
 @dataclass
