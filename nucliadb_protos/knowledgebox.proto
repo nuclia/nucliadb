@@ -124,9 +124,17 @@ message Labels {
 
 
 message Entity {
+    enum DiffStatus {
+        NORMAL = 0;
+        DELETED = 1;
+        MERGED = 2;
+    }
+
     string value = 2;
-    bool merged = 3;
     repeated string represents = 4;
+
+    bool merged = 3 [deprecated = true];
+    DiffStatus status = 5;
 }
 
 message EntitiesGroup {
@@ -163,6 +171,10 @@ message Widget {
     repeated string topEntities = 6;
     map<string, string> style = 7;
 }
+
+
+// Vectorsets
+
 
 message VectorSet {
     int32 dimension = 1;

@@ -393,21 +393,39 @@ class Entity(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _DiffStatus:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _DiffStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Entity._DiffStatus.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        NORMAL: Entity._DiffStatus.ValueType  # 0
+        DELETED: Entity._DiffStatus.ValueType  # 1
+        MERGED: Entity._DiffStatus.ValueType  # 2
+
+    class DiffStatus(_DiffStatus, metaclass=_DiffStatusEnumTypeWrapper): ...
+    NORMAL: Entity.DiffStatus.ValueType  # 0
+    DELETED: Entity.DiffStatus.ValueType  # 1
+    MERGED: Entity.DiffStatus.ValueType  # 2
+
     VALUE_FIELD_NUMBER: builtins.int
-    MERGED_FIELD_NUMBER: builtins.int
     REPRESENTS_FIELD_NUMBER: builtins.int
+    MERGED_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
     value: builtins.str
-    merged: builtins.bool
     @property
     def represents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    merged: builtins.bool
+    status: global___Entity.DiffStatus.ValueType
     def __init__(
         self,
         *,
         value: builtins.str = ...,
-        merged: builtins.bool = ...,
         represents: collections.abc.Iterable[builtins.str] | None = ...,
+        merged: builtins.bool = ...,
+        status: global___Entity.DiffStatus.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["merged", b"merged", "represents", b"represents", "value", b"value"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["merged", b"merged", "represents", b"represents", "status", b"status", "value", b"value"]) -> None: ...
 
 global___Entity = Entity
 
@@ -558,6 +576,8 @@ global___Widget = Widget
 
 @typing_extensions.final
 class VectorSet(google.protobuf.message.Message):
+    """Vectorsets"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DIMENSION_FIELD_NUMBER: builtins.int

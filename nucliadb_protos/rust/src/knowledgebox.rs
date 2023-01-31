@@ -144,10 +144,23 @@ pub struct Labels {
 pub struct Entity {
     #[prost(string, tag="2")]
     pub value: ::prost::alloc::string::String,
-    #[prost(bool, tag="3")]
-    pub merged: bool,
     #[prost(string, repeated, tag="4")]
     pub represents: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[deprecated]
+    #[prost(bool, tag="3")]
+    pub merged: bool,
+    #[prost(enumeration="entity::DiffStatus", tag="5")]
+    pub status: i32,
+}
+/// Nested message and enum types in `Entity`.
+pub mod entity {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum DiffStatus {
+        Normal = 0,
+        Deleted = 1,
+        Merged = 2,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EntitiesGroup {
@@ -206,6 +219,8 @@ pub mod widget {
         Form = 2,
     }
 }
+// Vectorsets
+
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSet {
     #[prost(int32, tag="1")]
