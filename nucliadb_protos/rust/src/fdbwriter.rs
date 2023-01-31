@@ -455,14 +455,26 @@ pub struct Member {
     #[prost(bool, tag="3")]
     pub is_self: bool,
     //// Io, Ingest, Search, Train.
-    #[prost(string, tag="4")]
-    pub r#type: ::prost::alloc::string::String,
+    #[prost(enumeration="member::Type", tag="4")]
+    pub r#type: i32,
     //// Dummy Member
     #[prost(bool, tag="5")]
     pub dummy: bool,
     //// The load score of the member.
     #[prost(float, tag="6")]
     pub load_score: f32,
+}
+/// Nested message and enum types in `Member`.
+pub mod member {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Type {
+        Io = 0,
+        Search = 1,
+        Ingest = 2,
+        Train = 3,
+        Unknown = 4,
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListMembersRequest {
