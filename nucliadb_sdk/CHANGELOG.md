@@ -1,6 +1,6 @@
 # nucliadb_sdk
 
-## Unreleased
+## 1.2.5
 
 - Fix get_or_create
 
