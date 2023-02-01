@@ -59,6 +59,7 @@ from nucliadb_models.entities import KnowledgeBoxEntities
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
+from nucliadb_sdk.utils import get_kb
 
 CHUNK_SIZE = 5 * 1024 * 1024
 
@@ -72,9 +73,9 @@ ACTUAL_PARTITION = "actual_partition"
 
 class Task(str, Enum):
     PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
-    FIELD_CLASSIFICATION = "RESOURCE_CLASSIFICATION"
+    FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
     SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
-    TASK_CLASSIFICATION = "TASK_CLASSIFICATION"
+    TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
 
 
 class NucliaDataset(object):
@@ -157,7 +158,7 @@ class NucliaDBDataset(NucliaDataset):
                 trainset = TrainSet(type=TaskType.SENTENCE_CLASSIFICATION)
                 trainset.filter.labels.extend(labels)
 
-            elif Task.TASK_CLASSIFICATION == task:
+            elif Task.TOKEN_CLASSIFICATION == task:
                 trainset = TrainSet(type=TaskType.TOKEN_CLASSIFICATION)
                 trainset.filter.labels.extend(labels)
 
@@ -187,8 +188,6 @@ class NucliaDBDataset(NucliaDataset):
             self._configure_sentence_classification()
 
     def _configure_sentence_classification(self):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to be only on filter labelset to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
@@ -464,13 +463,22 @@ class NucliaCloudDataset(NucliaDataset):
 
 
 def download_all_partitions(
-    type: TaskValue,  # type: ignore
-    knowledgebox: KnowledgeBox,
+    task: str,  # type: ignore
+    slug: Optional[str] = None,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
     path: Optional[str] = None,
-    labelsets: List[str] = [],
+    knowledgebox: Optional[KnowledgeBox] = None,
+    labels: List[str] = [],
 ):
-    trainset = TrainSet(type=type)
-    trainset.filter.labels.extend(labelsets)
 
-    fse = NucliaDBDataset(client=knowledgebox.client, trainset=trainset, base_path=path)
+    if knowledgebox is None and slug is not None:
+        knowledgebox = get_kb(slug, nucliadb_base_url)
+
+    if knowledgebox is None:
+        raise KeyError("KnowlwedgeBox not found")
+
+    task_obj = Task(task)
+    fse = NucliaDBDataset(
+        client=knowledgebox.client, task=task_obj, labels=labels, base_path=path
+    )
     return fse.read_all_partitions(path=path)

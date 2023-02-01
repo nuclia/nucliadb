@@ -40,6 +40,7 @@ from nucliadb_sdk.resource import (
     from_resource_to_payload,
     update_resource,
 )
+from nucliadb_sdk.search import SearchResult
 from nucliadb_sdk.vectors import Vectors, convert_vector
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
@@ -299,6 +300,34 @@ class KnowledgeBox:
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
     ):
+
+        result = self.client.search(
+            self.build_search_request(text, filter, vector, vectorset, min_score)
+        )
+        return SearchResult(result, self.client)
+
+    async def async_search(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ):
+
+        result = await self.client.async_search(
+            self.build_search_request(text, filter, vector, vectorset, min_score)
+        )
+        return SearchResult(result, self.client)
+
+    def build_search_request(
+        self,
+        text: Optional[str] = None,
+        filter: Optional[List[Union[Label, str]]] = None,
+        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vectorset: Optional[str] = None,
+        min_score: Optional[float] = 0.0,
+    ) -> SearchRequest:
         args: Dict[str, Any] = {"features": []}
         if filter is not None:
             new_filter: List[Label] = []
@@ -322,46 +351,15 @@ class KnowledgeBox:
 
         if vector is not None and vectorset is not None:
             vector = convert_vector(vector)
+
             args["vector"] = vector
             args["vectorset"] = vectorset
             args["features"].append(SearchOptions.VECTOR)
 
-        args["min_score"] = min_score
-        request = SearchRequest(**args)
-        return self.client.search(request)
-
-    async def async_search(
-        self,
-        text: Optional[str] = None,
-        filter: Optional[List[Union[Label, str]]] = None,
-        vector: Optional[Union[np.ndarray, List[float]]] = None,
-        vectorset: Optional[str] = None,
-        min_score: Optional[float] = 0.0,
-    ):
-        args: Dict[str, Any] = {"features": []}
-        if filter is not None:
-            new_filter: List[Label] = []
-            for fil in filter:
-                if isinstance(fil, str):
-                    lset, lab = fil.split("/")
-                    new_filter.append(Label(label=lab, labelset=lset))
-                else:
-                    new_filter.append(fil)
-            filter_list = [f"/l/{label.labelset}/{label.label}" for label in new_filter]
-            args["filters"] = filter_list
-
-        if text is not None:
-            args["query"] = text
+        if len(args["features"]) == 0:
             args["features"].append(SearchOptions.DOCUMENT)
             args["features"].append(SearchOptions.PARAGRAPH)
 
-        if vector is not None and vectorset is not None:
-            vector = convert_vector(vector)
-
-            args["vector"] = vector
-            args["vectorset"] = vectorset
-            args["features"].append(SearchOptions.VECTOR)
-
         args["min_score"] = min_score
         request = SearchRequest(**args)
-        return await self.client.async_search(request)
+        return request

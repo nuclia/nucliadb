@@ -142,10 +142,10 @@ def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
     )
 
     arrow_filenames = download_all_partitions(
-        type=TaskType.FIELD_CLASSIFICATION,
+        task="FIELD_CLASSIFICATION",
         knowledgebox=knowledgebox,
         path=temp_folder,
-        labelsets=["labelset"],
+        labels=["labelset"],
     )
 
     for filename in arrow_filenames:
