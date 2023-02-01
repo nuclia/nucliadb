@@ -52,6 +52,10 @@ tracing:
   jaegerCollectorHost: jaeger-collector.observability.svc.cluster.local
   jaegerCollectorGrpcPort: 14250
 
+prometheus:
+  push_timing: "1h"
+  url:
+
 # secret containing NATS user credentials
 ## credential names inside the secret should be consistent with
 ## what's configured on nucliadb_shared
