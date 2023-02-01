@@ -76,6 +76,21 @@ class NodeType(Enum):
             logger.warn(f"Unknown '{label}' node type")
             return NodeType.UNKNOWN
 
+    @staticmethod
+    def from_compat(node_type):
+        if node_type == Member.Type.IO:
+            return NodeType.IO
+        elif node_type == Member.Type.SEARCH:
+            return NodeType.SEARCH
+        elif node_type == Member.Type.INGEST:
+            return NodeType.INGEST
+        elif node_type == Member.Type.TRAIN:
+            return NodeType.TRAIN
+        elif node_type == Member.Type.UNKNOWN:
+            return NodeType.UNKNOWN
+        else:
+            raise ValueError(f"incompatible node type '{node_type}'")
+
     def compat(self):
         if self == NodeType.IO:
             return Member.Type.IO
@@ -197,7 +212,12 @@ class Node(AbstractNode):
         request = ListMembersRequest()
         members = await stub.ListMembers(request)
         for member in members.members:
-            NODES[member.id] = Node(member.listen_address, member.type, member.dummy)
+            NODES[member.id] = Node(
+                member.listen_address,
+                NodeType.from_compat(member.type),
+                member.load_score,
+                member.dummy,
+            )
 
     @property
     def sidecar(self) -> NodeSidecarStub:

@@ -99,3 +99,4 @@ def test_node_type_compat():
         (NodeType.UNKNOWN, Member.Type.UNKNOWN),
     ]:
         assert node_type.compat() == member_type
+        assert NodeType.from_compat(member_type) == node_type
