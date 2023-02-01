@@ -27,6 +27,7 @@ const VECTORS_VERSION: u32 = 1;
 const PARAGRAPHS_VERSION: u32 = 1;
 const RELATIONS_VERSION: u32 = 1;
 const TEXTS_VERSION: u32 = 1;
+const DEPRECATED_CONFIG: &str = "config.json";
 
 #[derive(Serialize, Deserialize)]
 pub struct Versions {
@@ -41,6 +42,13 @@ pub struct Versions {
 }
 
 impl Versions {
+    fn deprecated_versions_exists(versions_file: &Path) -> bool {
+        versions_file
+            .parent()
+            .map(|v| v.join(DEPRECATED_CONFIG))
+            .map(|v| v.exists())
+            .unwrap_or_default()
+    }
     fn new_from_deprecated() -> Versions {
         Versions {
             version_paragraphs: Some(1),
@@ -172,13 +180,12 @@ impl Versions {
     }
 
     pub fn load(versions_file: &Path) -> NodeResult<Versions> {
-        let deprecated_config = versions_file.parent().map(|v| v.join("config.json"));
         if versions_file.exists() {
             let versions_json = std::fs::read_to_string(versions_file)?;
             let mut versions: Versions = serde_json::from_str(&versions_json)?;
             versions.fill_gaps();
             Ok(versions)
-        } else if deprecated_config.map(|v| v.exists()).unwrap_or_default() {
+        } else if Versions::deprecated_versions_exists(versions_file) {
             // In this case is an old index, therefore we create the versions file
             // with the index versions that where available that moment.
             // The writer will create the file at some point
@@ -188,7 +195,6 @@ impl Versions {
         }
     }
     pub fn load_or_create(versions_file: &Path) -> NodeResult<Versions> {
-        let deprecated_config = versions_file.parent().map(|v| v.join("config.json"));
         if versions_file.exists() {
             let versions_json = std::fs::read_to_string(versions_file)?;
             let mut versions: Versions = serde_json::from_str(&versions_json)?;
@@ -197,7 +203,7 @@ impl Versions {
                 std::fs::write(versions_file, serialized)?;
             }
             Ok(versions)
-        } else if deprecated_config.map(|v| v.exists()).unwrap_or_default() {
+        } else if Versions::deprecated_versions_exists(versions_file) {
             // In this case is an old index, therefore we create the versions file
             // with the index versions that where available that moment.
             let versions = Versions::new_from_deprecated();
