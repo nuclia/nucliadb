@@ -75,7 +75,7 @@ def create_knowledge_box(
 def get_kb(
     slug: str,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
-):
+) -> Optional[KnowledgeBox]:
     url_obj = urlparse(nucliadb_base_url)
     if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
         raise InvalidHost(
