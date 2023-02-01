@@ -203,14 +203,26 @@ impl WriterChild for RelationsWriterService {
 
 impl RelationsWriterService {
     pub fn start(config: &RelationConfig) -> NodeResult<Self> {
-        Self::open(config).or_else(|_| Self::new(config))
+        let path = std::path::Path::new(&config.path);
+        if !path.exists() {
+            match RelationsWriterService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
+        } else {
+            Ok(RelationsWriterService::open(config)?)
+        }
     }
     pub fn new(config: &RelationConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            std::fs::create_dir_all(path).unwrap();
+            std::fs::create_dir_all(path)?;
             let (index, wmode) = Index::new_writer(path)?;
             Ok(RelationsWriterService { index, wmode })
         }

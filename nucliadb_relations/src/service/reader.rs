@@ -303,9 +303,16 @@ impl RelationsReaderService {
     pub fn start(config: &RelationConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            Ok(RelationsReaderService::new(config).unwrap())
+            match RelationsReaderService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
         } else {
-            Ok(RelationsReaderService::open(config).unwrap())
+            Ok(RelationsReaderService::open(config)?)
         }
     }
     #[tracing::instrument(skip_all)]
@@ -314,7 +321,7 @@ impl RelationsReaderService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            std::fs::create_dir_all(path).unwrap();
+            std::fs::create_dir_all(path)?;
             let (index, rmode) = Index::new_reader(path)?;
             Ok(RelationsReaderService { index, rmode })
         }

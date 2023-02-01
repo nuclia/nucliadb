@@ -137,17 +137,22 @@ impl WriterChild for ParagraphWriterService {
 impl ParagraphWriterService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> NodeResult<Self> {
-        ParagraphWriterService::open(config).or_else(|_| ParagraphWriterService::new(config))
+        let path = std::path::Path::new(&config.path);
+        if !path.exists() {
+            match ParagraphWriterService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
+        } else {
+            Ok(ParagraphWriterService::open(config)?)
+        }
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
-        Ok(ParagraphWriterService::new_inner(config)?)
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
-        Ok(ParagraphWriterService::open_inner(config)?)
-    }
-    pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::default();
 
         fs::create_dir_all(&config.path)?;
@@ -172,8 +177,8 @@ impl ParagraphWriterService {
             schema: paragraph_schema,
         })
     }
-
-    pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphWriterService> {
+    #[tracing::instrument(skip_all)]
+    pub fn open(config: &ParagraphConfig) -> NodeResult<ParagraphWriterService> {
         let paragraph_schema = ParagraphSchema::default();
 
         let index = Index::open_in_dir(&config.path)?;
@@ -429,7 +434,7 @@ mod tests {
     fn test_new_writer() -> NodeResult<()> {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
-            path: dir.path().to_path_buf(),
+            path: dir.path().join("paragraphs"),
         };
 
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();

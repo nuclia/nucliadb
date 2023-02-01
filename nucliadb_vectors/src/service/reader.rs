@@ -174,7 +174,14 @@ impl VectorReaderService {
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            VectorReaderService::new(config)
+            match VectorReaderService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
         } else {
             VectorReaderService::open(config)
         }
@@ -223,11 +230,10 @@ mod tests {
     #[test]
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
-        let vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
             no_results: Some(3),
-            path: dir.path().to_path_buf(),
-            vectorset: vectorset.path().to_path_buf(),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorset"),
         };
         let sentences: HashMap<String, VectorSentence> = vec![
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),

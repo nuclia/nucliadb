@@ -136,17 +136,22 @@ impl WriterChild for TextWriterService {
 impl TextWriterService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &TextConfig) -> NodeResult<Self> {
-        TextWriterService::open(config).or_else(|_| TextWriterService::new(config))
+        let path = std::path::Path::new(&config.path);
+        if !path.exists() {
+            match TextWriterService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
+        } else {
+            Ok(TextWriterService::open(config)?)
+        }
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &TextConfig) -> NodeResult<Self> {
-        Ok(TextWriterService::new_inner(config)?)
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &TextConfig) -> NodeResult<Self> {
-        Ok(TextWriterService::open_inner(config)?)
-    }
-    pub fn new_inner(config: &TextConfig) -> tantivy::Result<TextWriterService> {
         let field_schema = TextSchema::new();
         fs::create_dir_all(&config.path)?;
         let mut index_builder = Index::builder().schema(field_schema.schema.clone());
@@ -169,8 +174,8 @@ impl TextWriterService {
             schema: field_schema,
         })
     }
-
-    pub fn open_inner(config: &TextConfig) -> tantivy::Result<TextWriterService> {
+    #[tracing::instrument(skip_all)]
+    pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
 
         let index = Index::open_in_dir(&config.path)?;
@@ -295,7 +300,7 @@ mod tests {
     fn test_new_writer() -> NodeResult<()> {
         let dir = TempDir::new().unwrap();
         let fsc = TextConfig {
-            path: dir.path().to_path_buf(),
+            path: dir.path().join("texts"),
         };
 
         let mut field_writer_service = TextWriterService::start(&fsc).unwrap();

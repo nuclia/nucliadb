@@ -204,7 +204,7 @@ fn similatity_edges(mut edges: Vec<Relation>) -> Vec<Relation> {
 
 fn simple_graph(at: &Path) -> (RelationsWriterService, RelationsReaderService) {
     let rsc = RelationConfig {
-        path: at.to_path_buf(),
+        path: at.join("relations"),
     };
     println!("Writer starts");
     let writer = RelationsWriterService::start(&rsc).unwrap();

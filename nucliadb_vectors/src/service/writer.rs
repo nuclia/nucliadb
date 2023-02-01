@@ -254,7 +254,14 @@ impl VectorWriterService {
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);
         if !path.exists() {
-            VectorWriterService::new(config)
+            match VectorWriterService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
         } else {
             VectorWriterService::open(config)
         }
@@ -318,11 +325,10 @@ mod tests {
     #[test]
     fn test_vectorset_functionality() {
         let dir = TempDir::new().unwrap();
-        let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
             no_results: None,
-            path: dir.path().to_path_buf(),
-            vectorset: dir_vectorset.path().to_path_buf(),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorsets"),
         };
         let indexes: HashMap<_, _> = (0..10).map(|i| create_vector_set(i.to_string())).collect();
         let keys: HashSet<_> = indexes.keys().cloned().collect();

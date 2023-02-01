@@ -288,18 +288,22 @@ impl ParagraphReaderService {
     }
     #[tracing::instrument(skip_all)]
     pub fn start(config: &ParagraphConfig) -> NodeResult<Self> {
-        ParagraphReaderService::open(config).or_else(|_| ParagraphReaderService::new(config))
+        let path = std::path::Path::new(&config.path);
+        if !path.exists() {
+            match ParagraphReaderService::new(config) {
+                Err(e) if path.exists() => {
+                    std::fs::remove_dir(path)?;
+                    Err(e)
+                }
+                Err(e) => Err(e),
+                Ok(v) => Ok(v),
+            }
+        } else {
+            Ok(ParagraphReaderService::open(config)?)
+        }
     }
     #[tracing::instrument(skip_all)]
     pub fn new(config: &ParagraphConfig) -> NodeResult<ParagraphReaderService> {
-        Ok(ParagraphReaderService::new_inner(config)?)
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn open(config: &ParagraphConfig) -> NodeResult<ParagraphReaderService> {
-        Ok(ParagraphReaderService::open_inner(config)?)
-    }
-
-    pub fn new_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::default();
         fs::create_dir_all(&config.path)?;
         let mut index_builder = Index::builder().schema(paragraph_schema.schema.clone());
@@ -324,7 +328,8 @@ impl ParagraphReaderService {
         })
     }
 
-    pub fn open_inner(config: &ParagraphConfig) -> tantivy::Result<ParagraphReaderService> {
+    #[tracing::instrument(skip_all)]
+    pub fn open(config: &ParagraphConfig) -> NodeResult<ParagraphReaderService> {
         let paragraph_schema = ParagraphSchema::default();
         let index = Index::open_in_dir(&config.path)?;
 
@@ -711,7 +716,7 @@ mod tests {
     fn test_new_paragraph() -> NodeResult<()> {
         let dir = TempDir::new().unwrap();
         let psc = ParagraphConfig {
-            path: dir.path().to_path_buf(),
+            path: dir.path().join("paragraphs"),
         };
         let mut paragraph_writer_service = ParagraphWriterService::start(&psc).unwrap();
         let resource1 = create_resource("shard1".to_string());
