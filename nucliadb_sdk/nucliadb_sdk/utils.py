@@ -88,6 +88,9 @@ def get_kb(
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
 
+    if response.status_code == 404:
+        return None
+
     assert response.status_code == 200
 
     kb = KnowledgeBoxObj.parse_raw(response.content)
