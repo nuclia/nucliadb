@@ -87,9 +87,9 @@ SHADOW_SHARDS_MANAGER = None
 
 class ShadowShardsManager:
     """
-    This class is responsible for handling the disk operations for shadow shards.
-    Shadow shards is where we temporarily store the operations (set or delete resources)
-    for a shard that is being rebalanced or upgraded.
+    This class is responsible for managing the shadow shards of a particular node.
+    A shadow shard is essentially a temporary file where we store all the operations (set
+    or delete resources) for a shard that is being rebalanced or upgraded.
     """
 
     def __init__(self, folder: str):
