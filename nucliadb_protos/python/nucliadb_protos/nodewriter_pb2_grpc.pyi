@@ -192,7 +192,7 @@ class NodeSidecarStub:
         nucliadb_protos.nodewriter_pb2.Counter,
     ]
     ShadowShardCreate: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardId,
+        nucliadb_protos.noderesources_pb2.EmptyQuery,
         nucliadb_protos.nodewriter_pb2.ShadowShardResponse,
     ]
     ShadowShardDelete: grpc.UnaryUnaryMultiCallable[
@@ -210,7 +210,7 @@ class NodeSidecarServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def ShadowShardCreate(
         self,
-        request: nucliadb_protos.noderesources_pb2.ShardId,
+        request: nucliadb_protos.noderesources_pb2.EmptyQuery,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.ShadowShardResponse: ...
     @abc.abstractmethod

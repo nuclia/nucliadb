@@ -545,7 +545,7 @@ class NodeSidecarStub(object):
                 )
         self.ShadowShardCreate = channel.unary_unary(
                 '/nodewriter.NodeSidecar/ShadowShardCreate',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+                request_serializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.FromString,
                 )
         self.ShadowShardDelete = channel.unary_unary(
@@ -586,7 +586,7 @@ def add_NodeSidecarServicer_to_server(servicer, server):
             ),
             'ShadowShardCreate': grpc.unary_unary_rpc_method_handler(
                     servicer.ShadowShardCreate,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardId.FromString,
+                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.EmptyQuery.FromString,
                     response_serializer=nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.SerializeToString,
             ),
             'ShadowShardDelete': grpc.unary_unary_rpc_method_handler(
@@ -633,7 +633,7 @@ class NodeSidecar(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeSidecar/ShadowShardCreate',
-            nucliadb__protos_dot_noderesources__pb2.ShardId.SerializeToString,
+            nucliadb__protos_dot_noderesources__pb2.EmptyQuery.SerializeToString,
             nucliadb__protos_dot_nodewriter__pb2.ShadowShardResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
