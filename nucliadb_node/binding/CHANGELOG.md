@@ -1,5 +1,10 @@
 # Changelog
 
+
+## 0.5.4
+
+- versions.json fix
+
 ## 0.5.3
 
 - Node refactor
