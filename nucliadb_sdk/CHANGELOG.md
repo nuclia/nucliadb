@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## Unreleased
+
+- Fix get_or_create
+
 ## 1.2.4
 
 - Improve signatures for Datascience use case
