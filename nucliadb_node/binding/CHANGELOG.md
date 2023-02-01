@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- Node refactor
+
 ## 0.5.2
 
 - Telemetry enabled
