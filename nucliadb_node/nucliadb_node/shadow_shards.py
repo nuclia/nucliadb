@@ -170,4 +170,5 @@ class ShadowShards:
                 line = await f.readline()
 
 
-SHADOW_SHARDS = ShadowShards(folder="shadow_shards")
+DATA_PATH = os.environ["DATA_PATH"].rstrip("/")
+SHADOW_SHARDS = ShadowShards(folder=f"{DATA_PATH}/shadow_shards")
