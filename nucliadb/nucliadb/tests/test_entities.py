@@ -21,14 +21,15 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import RelationNode
+from nucliadb_protos.resources_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
+from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
 @pytest.fixture(scope="function")
-async def predict_mock() -> Mock:
+def predict_mock() -> Mock:  # type: ignore
     predict = get_utility(Utility.PREDICT)
     mock = Mock()
     set_utility(Utility.PREDICT, mock)
@@ -41,15 +42,7 @@ async def predict_mock() -> Mock:
         set_utility(Utility.PREDICT, predict)
 
 
-@pytest.fixture(scope="function")
-async def simple_entities_kb(
-    nucliadb_manager: AsyncClient,
-    nucliadb_writer: AsyncClient,
-):
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "entities-simple"})
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-
+async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
     animals = {
         "title": "Animals",
         "entities": {
@@ -87,21 +80,59 @@ async def simple_entities_kb(
     )
     assert resp.status_code == 200
 
-    yield kbid
 
-    resp = await nucliadb_manager.delete(f"/kb/{kbid}")
-    assert resp.status_code == 200
+async def set_test_entities_by_broker_message(kbid: str, nucliadb_grpc: WriterStub):
+    bm = broker_resource(
+        kbid, slug="resource-with-entities", title="Resource with entities"
+    )
+    nodes = {
+        "fly": RelationNode(
+            value="fly", ntype=RelationNode.NodeType.ENTITY, subtype="SUPERPOWERS"
+        ),
+        "invisibility": RelationNode(
+            value="invisibility",
+            ntype=RelationNode.NodeType.ENTITY,
+            subtype="SUPERPOWERS",
+        ),
+        "telepathy": RelationNode(
+            value="telepathy", ntype=RelationNode.NodeType.ENTITY, subtype="SUPERPOWERS"
+        ),
+    }
+    bm.relations.extend(
+        [
+            Relation(
+                relation=Relation.RelationType.ENTITY,
+                source=nodes["fly"],
+                to=nodes["invisibility"],
+                relation_label="",
+            ),
+            Relation(
+                relation=Relation.RelationType.ENTITY,
+                source=nodes["invisibility"],
+                to=nodes["telepathy"],
+                relation_label="",
+            ),
+            Relation(
+                relation=Relation.RelationType.ENTITY,
+                source=nodes["telepathy"],
+                to=nodes["fly"],
+                relation_label="",
+            ),
+        ]
+    )
+    await inject_message(nucliadb_grpc, bm)
 
 
 @pytest.mark.asyncio
 async def test_set_entities_indexes_entities(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    simple_entities_kb,
+    knowledgebox,
     predict_mock,
 ):
-    kbid = simple_entities_kb
+    kbid = knowledgebox
+
+    await set_test_entities_by_api(kbid, nucliadb_writer)
 
     predict_mock.detect_entities = AsyncMock(
         return_value=[
@@ -133,3 +164,37 @@ async def test_set_entities_indexes_entities(
         relation["entity"]
         for relation in body["relations"]["entities"]["cookie"]["related_to"]
     } == {"biscuit"}
+
+
+@pytest.mark.asyncio
+async def test_get_entities_return_indexed_entities(
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+    predict_mock,
+):
+    kbid = knowledgebox
+
+    await set_test_entities_by_broker_message(kbid, nucliadb_grpc)
+
+    predict_mock.detect_entities = AsyncMock(
+        return_value=[
+            RelationNode(
+                value="fly",
+                ntype=RelationNode.NodeType.ENTITY,
+                subtype="SUPERPOWERS",
+            ),
+        ]
+    )
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={"query": "would you like to fly?", "features": "relations"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert {entity for entity in body["relations"]["entities"]} == {"fly"}
+    assert {
+        relation["entity"]
+        for relation in body["relations"]["entities"]["fly"]["related_to"]
+    } == {"invisibility", "telepathy"}
