@@ -158,7 +158,7 @@ class NucliaDBDataset(NucliaDataset):
                 trainset = TrainSet(type=TaskType.SENTENCE_CLASSIFICATION)
                 trainset.filter.labels.extend(labels)
 
-            elif Task.TASK_CLASSIFICATION == task:
+            elif Task.TOKEN_CLASSIFICATION == task:
                 trainset = TrainSet(type=TaskType.TOKEN_CLASSIFICATION)
                 trainset.filter.labels.extend(labels)
 
