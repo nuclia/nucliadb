@@ -255,5 +255,5 @@ def get_shadow_shards() -> ShadowShards:
 
     if SHADOW_SHARDS is None:
         data_path = os.environ["DATA_PATH"]
-        SHADOW_SHARDS = ShadowShards(folder=f"{data_path}/shadow_shards")
+        SHADOW_SHARDS = ShadowShards(folder=f"{data_path}/shadow_shards/")
     return SHADOW_SHARDS

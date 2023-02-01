@@ -33,7 +33,7 @@ from nucliadb_node.shadow_shards import (
 async def test_get_shadow_shards(shadow_folder):
     shadow_shards = get_shadow_shards()
     assert isinstance(shadow_shards, ShadowShards)
-    assert shadow_shards._folder == f"{shadow_folder}/shadow_shards"
+    assert shadow_shards._folder == f"{shadow_folder}/shadow_shards/"
 
 
 @pytest.mark.asyncio
