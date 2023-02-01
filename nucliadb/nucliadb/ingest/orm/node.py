@@ -63,7 +63,7 @@ class NodeType(Enum):
     UNKNOWN = 5
 
     @staticmethod
-    def from_str(label):
+    def from_str(label) -> NodeType:
         if label in "Io":
             return NodeType.IO
         elif label in "Search":
@@ -77,7 +77,7 @@ class NodeType(Enum):
             return NodeType.UNKNOWN
 
     @staticmethod
-    def from_compat(node_type):
+    def from_compat(node_type: Member.Type.ValueType):
         if node_type == Member.Type.IO:
             return NodeType.IO
         elif node_type == Member.Type.SEARCH:
@@ -91,7 +91,7 @@ class NodeType(Enum):
         else:
             raise ValueError(f"incompatible node type '{node_type}'")
 
-    def compat(self):
+    def compat(self) -> Member.Type.ValueType:
         if self == NodeType.IO:
             return Member.Type.IO
         elif self == NodeType.SEARCH:
