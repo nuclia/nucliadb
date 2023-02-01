@@ -112,8 +112,9 @@ class ShadowShards:
             return
 
         # Create shards folder if it doesn't exist
-        path = os.path.dirname(self._folder)
-        await aos.makedirs(path, exist_ok=True)
+        if not self._folder.endswith("/"):
+            self._folder += "/"
+        await aos.makedirs(self._folder, exist_ok=True)
 
         await self.load_metadata()
         await self.load_shards()
@@ -253,6 +254,6 @@ def get_shadow_shards() -> ShadowShards:
     global SHADOW_SHARDS
 
     if SHADOW_SHARDS is None:
-        data_path = os.environ["DATA_PATH"].rstrip("/")
+        data_path = os.environ["DATA_PATH"]
         SHADOW_SHARDS = ShadowShards(folder=f"{data_path}/shadow_shards")
     return SHADOW_SHARDS

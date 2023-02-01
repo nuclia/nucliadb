@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import os
+import tempfile
 import time
 from typing import AsyncIterable
 
@@ -192,3 +194,11 @@ async def shard() -> AsyncIterable[str]:
     sid = ShardId()
     sid.id = shard.id
     await stub.DeleteShard(sid)  # type: ignore
+
+
+@pytest.fixture(scope="function")
+def shadow_folder():
+    with tempfile.TemporaryDirectory() as td:
+        os.environ["DATA_PATH"] = str(td)
+        yield td
+        os.environ.pop("DATA_PATH")

@@ -17,40 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import tempfile
-
 import pytest
-from nucliadb_protos.noderesources_pb2 import ShardId
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub
-
-from nucliadb_node.shadow_shards import SHADOW_SHARDS
-
-
-@pytest.fixture(scope="function")
-def shadow_shards_tmp_folder():
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        previous_folder = SHADOW_SHARDS.folder
-        SHADOW_SHARDS.folder = tmp_dir
-        yield
-        SHADOW_SHARDS.folder = previous_folder
 
 
 @pytest.mark.asyncio
-async def test_create_delete_shadow_shards(
-    sidecar_grpc_servicer, shadow_shards_tmp_folder
-):
+async def test_create_delete_shadow_shards(sidecar_grpc_servicer, shadow_folder):
     stub = NodeSidecarStub(sidecar_grpc_servicer)
-    sipb = ShardId(id="foo")
 
     # Create a shadow shard
-    response = await stub.ShadowShardCreate(sipb)
+    response = await stub.ShadowShardCreate(EmptyQuery())
     assert response.success
 
-    # Creating again should not succeed
-    response = await stub.ShadowShardCreate(sipb)
-    assert not response.success
-
     # Delete now
+    sipb = ShardId(id=response.shard_id.id)
     response = await stub.ShadowShardDelete(sipb)
     assert response.success
 

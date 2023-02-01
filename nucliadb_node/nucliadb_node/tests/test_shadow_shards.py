@@ -17,9 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import tempfile
-
 import pytest
 from nucliadb_protos.noderesources_pb2 import Resource
 
@@ -30,14 +27,6 @@ from nucliadb_node.shadow_shards import (
     ShadowShardsNotLoaded,
     get_shadow_shards,
 )
-
-
-@pytest.fixture(scope="function")
-def shadow_folder():
-    with tempfile.TemporaryDirectory() as td:
-        os.environ["DATA_PATH"] = str(td)
-        yield td
-        os.environ.pop("DATA_PATH")
 
 
 @pytest.mark.asyncio
