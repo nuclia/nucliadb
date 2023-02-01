@@ -44,7 +44,7 @@ def shadow_folder():
 async def test_get_shadow_shards(shadow_folder):
     shadow_shards = get_shadow_shards()
     assert isinstance(shadow_shards, ShadowShards)
-    assert shadow_shards.folder == f"{shadow_folder}/shadow_shards"
+    assert shadow_shards._folder == f"{shadow_folder}/shadow_shards"
 
 
 @pytest.mark.asyncio
@@ -147,3 +147,41 @@ async def test_operations(shadow_folder):
     assert shard2_ops[0][1] == brain_3
     assert shard2_ops[1][0] == OperationCode.DELETE
     assert shard2_ops[1][1] == "resource3"
+
+
+@pytest.mark.asyncio
+async def test_metadata(shadow_folder):
+    shadow = ShadowShards(shadow_folder)
+
+    # Check that error is thrown if not loaded
+    with pytest.raises(ShadowShardsNotLoaded):
+        shadow.metadata
+
+    with pytest.raises(ShadowShardsNotLoaded):
+        await shadow.save_metadata()
+
+    # Check initial value
+    await shadow.load()
+    assert shadow.metadata.shards == {}
+
+    # Check initial shardinfo data
+    shard_1 = await shadow.create()
+
+    assert shadow.metadata.get_info(shard_1).created_at
+    assert shadow.metadata.get_info(shard_1).modified_at
+    assert shadow.metadata.get_info(shard_1).operations == 0
+
+    # Check operations are incremented
+    await shadow.set_resource(Resource(), shard_1)
+    await shadow.delete_resource("foo", shard_1)
+
+    assert shadow.metadata.get_info(shard_1).operations == 2
+
+    # Check that it has been persisted in disk
+    shadow = ShadowShards(shadow_folder)
+    await shadow.load()
+    assert shadow.metadata.get_info(shard_1).operations == 2
+
+    # Check that deleting the shard cleans up the metadata
+    await shadow.delete(shard_1)
+    assert shadow.metadata.get_info(shard_1) is None

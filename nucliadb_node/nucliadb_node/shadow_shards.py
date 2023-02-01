@@ -22,12 +22,48 @@ import base64
 import glob
 import os
 import uuid
+from datetime import datetime
 from enum import Enum
-from typing import AsyncIterator, Set, Tuple, Union
+from typing import AsyncIterator, Dict, Optional, Set, Tuple, Union
 
 import aiofiles
 from aiofiles import os as aos
 from nucliadb_protos.noderesources_pb2 import Resource
+from pydantic import BaseModel
+
+
+class ShadowShardInfo(BaseModel):
+    shard_id: str
+    created_at: datetime = datetime.now()
+    modified_at: datetime = datetime.now()
+    operations: int = 0
+
+
+class ShadowMetadata(BaseModel):
+    file_id: str = "metadata.json"
+    shards: Dict[str, ShadowShardInfo] = {}
+
+    @classmethod
+    async def load(cls, file_path: str) -> "ShadowMetadata":
+        try:
+            async with aiofiles.open(file_path, mode="r") as f:
+                return cls.parse_raw(await f.read())
+        except FileNotFoundError:
+            return cls()
+
+    async def save(self, file_path: str):
+        async with aiofiles.open(file_path, mode="w") as f:
+            await f.write(self.json())
+
+    def get_info(self, shard_id: str) -> Optional[ShadowShardInfo]:
+        return self.shards.get(shard_id)
+
+    def increment_ops(self, shard_id: str):
+        info = self.get_info(shard_id)
+        if info is None:
+            return
+        info.operations += 1
+        info.modified_at = datetime.now()
 
 
 class ShadowShardNotFound(Exception):
@@ -65,26 +101,57 @@ class ShadowShards:
     """
 
     def __init__(self, folder: str):
-        self.folder: str = folder
+        self._folder: str = folder
         self.shards: Set[str] = set()
         self._loaded: bool = False
+        self._metadata_file: str = "metadata.json"
+        self._metadata: ShadowMetadata = ShadowMetadata()
 
     async def load(self) -> None:
         if self.loaded:
             return
-        path = os.path.dirname(self.folder)
+
+        # Create shards folder if it doesn't exist
+        path = os.path.dirname(self._folder)
         await aos.makedirs(path, exist_ok=True)
-        for shard_path in glob.glob(f"{self.folder}/*"):
-            shard_id = shard_path.split(self.folder)[-1].lstrip("/")
-            self.shards.add(shard_id)
+
+        await self.load_metadata()
+        await self.load_shards()
         self._loaded = True
+
+    async def load_shards(self):
+        self.shards = set()
+        for shard_path in glob.glob(f"{self._folder}/*"):
+            shard_id = shard_path.split(self._folder)[-1].lstrip("/")
+            if shard_id != self._metadata_file:
+                self.shards.add(shard_id)
+
+    async def load_metadata(self) -> None:
+        metadata_path = self.shard_path(self._metadata_file)
+        self._metadata = await ShadowMetadata.load(metadata_path)
+
+    async def save_metadata(self) -> None:
+        if not self.loaded:
+            raise ShadowShardsNotLoaded()
+        metadata_path = self.shard_path(self._metadata_file)
+        await self.metadata.save(metadata_path)
+
+    async def increment_ops(self, shard_id: str) -> None:
+        self.metadata.increment_ops(shard_id)
+        await self.save_metadata()
 
     @property
     def loaded(self) -> bool:
         return self._loaded
 
+    @property
+    def metadata(self) -> ShadowMetadata:
+        if not self.loaded:
+            raise ShadowShardsNotLoaded()
+        return self._metadata
+
     def shard_path(self, shard_id: str) -> str:
-        return f"{self.folder}/{shard_id}"
+        return f"{self._folder}/{shard_id}"
 
     async def create(self) -> str:
         if not self.loaded:
@@ -99,6 +166,8 @@ class ShadowShards:
             pass
 
         self.shards.add(shard_id)
+        self.metadata.shards[shard_id] = ShadowShardInfo(shard_id=shard_id)
+        await self.save_metadata()
         return shard_id
 
     async def delete(self, shard_id: str) -> None:
@@ -111,6 +180,9 @@ class ShadowShards:
         shard_path = self.shard_path(shard_id)
         await aiofiles.os.remove(shard_path)
         self.shards.remove(shard_id)
+
+        self.metadata.shards.pop(shard_id)
+        await self.save_metadata()
 
     def exists(self, shard_id: str) -> bool:
         if not self.loaded:
@@ -148,6 +220,8 @@ class ShadowShards:
         async with aiofiles.open(shard_path, mode="ab") as f:
             await f.write(encoded)
 
+        await self.increment_ops(shard_id)
+
     async def delete_resource(self, uuid: str, shard_id: str) -> None:
         if not self.loaded:
             raise ShadowShardsNotLoaded()
@@ -158,6 +232,8 @@ class ShadowShards:
         shard_path = self.shard_path(shard_id)
         async with aiofiles.open(shard_path, mode="ab") as f:
             await f.write(encoded)
+
+        await self.increment_ops(shard_id)
 
     async def iter_operations(self, shard_id: str) -> AsyncIterator[NodeOperation]:
         if not self.loaded:
