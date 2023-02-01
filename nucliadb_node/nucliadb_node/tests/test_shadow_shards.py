@@ -17,24 +17,34 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import tempfile
 
 import pytest
 from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb_node.shadow_shards import (
-    AlreadyExistingShadowShard,
     OperationCode,
     ShadowShardNotFound,
     ShadowShards,
     ShadowShardsNotLoaded,
+    get_shadow_shards,
 )
 
 
 @pytest.fixture(scope="function")
 def shadow_folder():
     with tempfile.TemporaryDirectory() as td:
+        os.environ["DATA_PATH"] = str(td)
         yield td
+        os.environ.pop("DATA_PATH")
+
+
+@pytest.mark.asyncio
+async def test_get_shadow_shards(shadow_folder):
+    shadow_shards = get_shadow_shards()
+    assert isinstance(shadow_shards, ShadowShards)
+    assert shadow_shards.folder == f"{shadow_folder}/shadow_shards"
 
 
 @pytest.mark.asyncio
@@ -46,7 +56,8 @@ async def test_load(shadow_folder):
     assert len(shadow.shards) == 0
 
     # Create a new shadow shard and make sure it's loaded
-    await shadow.create("shard1")
+    shard_id = await shadow.create()
+    assert shard_id
     await shadow.load()
     assert len(shadow.shards) == 1
 
@@ -55,16 +66,14 @@ async def test_load(shadow_folder):
 async def test_create(shadow_folder):
     shadow = ShadowShards(shadow_folder)
     with pytest.raises(ShadowShardsNotLoaded):
-        await shadow.create("foo")
+        await shadow.create()
 
     await shadow.load()
     assert len(shadow.shards) == 0
-    await shadow.create("shard1")
-    assert len(shadow.shards) == 1
-    assert shadow.exists("shard1")
 
-    with pytest.raises(AlreadyExistingShadowShard):
-        await shadow.create("shard1")
+    shard_id = await shadow.create()
+    assert len(shadow.shards) == 1
+    assert shadow.exists(shard_id)
 
 
 @pytest.mark.asyncio
@@ -77,13 +86,13 @@ async def test_delete(shadow_folder):
     with pytest.raises(ShadowShardNotFound):
         await shadow.delete("not-there")
 
-    await shadow.create("shard1")
+    shard_id = await shadow.create()
     assert len(shadow.shards) == 1
-    assert shadow.exists("shard1")
+    assert shadow.exists(shard_id)
 
-    await shadow.delete("shard1")
+    await shadow.delete(shard_id)
     assert len(shadow.shards) == 0
-    assert not shadow.exists("shard1")
+    assert not shadow.exists(shard_id)
 
 
 @pytest.mark.asyncio
@@ -93,8 +102,8 @@ async def test_exists(shadow_folder):
         shadow.exists("foo")
     await shadow.load()
     assert not shadow.exists("foo")
-    await shadow.create("foo")
-    assert shadow.exists("foo")
+    shard_id = await shadow.create()
+    assert shadow.exists(shard_id)
 
 
 def get_brain(uuid: str) -> Resource:
@@ -106,38 +115,35 @@ def get_brain(uuid: str) -> Resource:
 @pytest.mark.asyncio
 async def test_operations(shadow_folder):
     shadow = ShadowShards(shadow_folder)
-    shard1 = "shard1"
-    shard2 = "shard2"
-    shard3 = "shard3"
 
     await shadow.load()
-    await shadow.create(shard1)
-    await shadow.create(shard2)
-    await shadow.create(shard3)
+    shard_1 = await shadow.create()
+    shard_2 = await shadow.create()
+    shard_3 = await shadow.create()
 
-    brain1 = get_brain("resource1")
-    brain2 = get_brain("resource2")
-    brain3 = get_brain("resource3")
+    brain_1 = get_brain("resource1")
+    brain_2 = get_brain("resource2")
+    brain_3 = get_brain("resource3")
 
-    await shadow.set_resource(brain1, shard1)
-    await shadow.set_resource(brain2, shard1)
+    await shadow.set_resource(brain_1, shard_1)
+    await shadow.set_resource(brain_2, shard_1)
 
-    await shadow.set_resource(brain3, shard2)
-    await shadow.delete_resource("resource3", shard2)
+    await shadow.set_resource(brain_3, shard_2)
+    await shadow.delete_resource("resource3", shard_2)
 
-    shard1_ops = [op async for op in shadow.iter_operations(shard1)]
-    shard2_ops = [op async for op in shadow.iter_operations(shard2)]
-    shard3_ops = [op async for op in shadow.iter_operations(shard3)]
+    shard1_ops = [op async for op in shadow.iter_operations(shard_1)]
+    shard2_ops = [op async for op in shadow.iter_operations(shard_2)]
+    shard3_ops = [op async for op in shadow.iter_operations(shard_3)]
 
     assert len(shard1_ops) == 2
     assert len(shard2_ops) == 2
     assert len(shard3_ops) == 0
 
     assert shard1_ops[0][0] == OperationCode.SET
-    assert shard1_ops[0][1] == brain1
+    assert shard1_ops[0][1] == brain_1
     assert shard1_ops[1][0] == OperationCode.SET
-    assert shard1_ops[1][1] == brain2
+    assert shard1_ops[1][1] == brain_2
     assert shard2_ops[0][0] == OperationCode.SET
-    assert shard2_ops[0][1] == brain3
+    assert shard2_ops[0][1] == brain_3
     assert shard2_ops[1][0] == OperationCode.DELETE
     assert shard2_ops[1][1] == "resource3"
