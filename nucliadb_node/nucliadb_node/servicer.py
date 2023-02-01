@@ -43,7 +43,11 @@ from sentry_sdk import capture_exception
 from nucliadb_node import logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
-from nucliadb_node.shadow_shards import ShadowShardNotFound, get_shadow_shards
+from nucliadb_node.shadow_shards import (
+    ShadowShardNotFound,
+    ShadowShardsManager,
+    get_shadow_shards_manager,
+)
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
 
@@ -66,14 +70,14 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
             response.resources = count
         return response
 
-    async def ShadowShardCreate(self, request: EmptyQuery, context) -> ShadowShardResponse:  # type: ignore
-        sshards = get_shadow_shards()
-        await sshards.load()
+    async def CreateShadowShard(self, request: EmptyQuery, context) -> ShadowShardResponse:  # type: ignore
+        ssm: ShadowShardsManager = get_shadow_shards_manager()
+        await ssm.load()
         response = ShadowShardResponse()
         try:
-            shard_id = await sshards.create()
+            shard_id = await ssm.create()
             response.success = True
-            response.shard_id.id = shard_id
+            response.shard.id = shard_id
         except Exception as exc:
             if SENTRY:
                 capture_exception(exc)
@@ -81,14 +85,15 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         finally:
             return response
 
-    async def ShadowShardDelete(self, request: ShardId, context) -> ShadowShardResponse:  # type: ignore
-        sshards = get_shadow_shards()
-        await sshards.load()
+    async def DeleteShadowShard(self, request: ShardId, context) -> ShadowShardResponse:  # type: ignore
+        ssm = get_shadow_shards_manager()
+        await ssm.load()
         response = ShadowShardResponse()
         shard_id = request.id
         try:
-            await sshards.delete(shard_id=shard_id)
+            await ssm.delete(shard_id=shard_id)
             response.success = True
+            response.shard.id = shard_id
         except ShadowShardNotFound:
             logger.warning(
                 f"Attempting to delete a shadow shard that does not exist: {shard_id}"

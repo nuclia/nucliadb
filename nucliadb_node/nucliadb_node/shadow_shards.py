@@ -78,22 +78,14 @@ class OperationCode(str, Enum):
     SET = "SET:"
     DELETE = "DEL:"
 
-    @classmethod
-    def from_str(cls, opcode_str):
-        if opcode_str == cls.SET.value:
-            return cls.SET
-        elif opcode_str == cls.DELETE.value:
-            return cls.DELETE
-        raise ValueError(f"Unknown opcode: {opcode_str}")
-
 
 NodeOperation = Tuple[OperationCode, Union[Resource, str]]
 
 # singleton
-SHADOW_SHARDS = None
+SHADOW_SHARDS_MANAGER = None
 
 
-class ShadowShards:
+class ShadowShardsManager:
     """
     This class is responsible for handling the disk operations for shadow shards.
     Shadow shards is where we temporarily store the operations (set or delete resources)
@@ -202,7 +194,7 @@ class ShadowShards:
         return (opcode + encoded + "\n").encode()
 
     def decode_operation(self, encoded: str) -> NodeOperation:
-        opcode = OperationCode.from_str(encoded[:4])
+        opcode = OperationCode(encoded[:4])
         decoded_payload = base64.b64decode(encoded[4:])
         if opcode == OperationCode.SET:
             return (opcode, Resource.FromString(decoded_payload))
@@ -250,10 +242,12 @@ class ShadowShards:
                 line = await f.readline()
 
 
-def get_shadow_shards() -> ShadowShards:
-    global SHADOW_SHARDS
+def get_shadow_shards_manager() -> ShadowShardsManager:
+    global SHADOW_SHARDS_MANAGER
 
-    if SHADOW_SHARDS is None:
+    if SHADOW_SHARDS_MANAGER is None:
         data_path = os.environ["DATA_PATH"]
-        SHADOW_SHARDS = ShadowShards(folder=f"{data_path}/shadow_shards/")
-    return SHADOW_SHARDS
+        SHADOW_SHARDS_MANAGER = ShadowShardsManager(
+            folder=f"{data_path}/shadow_shards/"
+        )
+    return SHADOW_SHARDS_MANAGER

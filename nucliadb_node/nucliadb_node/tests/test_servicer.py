@@ -27,14 +27,14 @@ async def test_create_delete_shadow_shards(sidecar_grpc_servicer, shadow_folder)
     stub = NodeSidecarStub(sidecar_grpc_servicer)
 
     # Create a shadow shard
-    response = await stub.ShadowShardCreate(EmptyQuery())
+    response = await stub.CreateShadowShard(EmptyQuery())
     assert response.success
 
     # Delete now
     sipb = ShardId(id=response.shard_id.id)
-    response = await stub.ShadowShardDelete(sipb)
+    response = await stub.DeleteShadowShard(sipb)
     assert response.success
 
     # Deleting again should succed (not found)
-    response = await stub.ShadowShardDelete(sipb)
+    response = await stub.DeleteShadowShard(sipb)
     assert response.success

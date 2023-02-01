@@ -85,7 +85,7 @@ pub struct ShadowShardResponse {
     #[prost(bool, tag="1")]
     pub success: bool,
     #[prost(message, optional, tag="2")]
-    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
+    pub shard: ::core::option::Option<super::noderesources::ShardId>,
 }
 /// Generated client implementations.
 pub mod node_writer_client {

@@ -79,7 +79,7 @@ message Counter {
 
 message ShadowShardResponse {
     bool success = 1;
-    noderesources.ShardId shard_id = 2;
+    noderesources.ShardId shard = 2;
 }
 
 service NodeSidecar {

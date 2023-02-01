@@ -199,6 +199,12 @@ async def shard() -> AsyncIterable[str]:
 @pytest.fixture(scope="function")
 def shadow_folder():
     with tempfile.TemporaryDirectory() as td:
+        previous = os.environ.get("DATA_PATH")
         os.environ["DATA_PATH"] = str(td)
+
         yield td
-        os.environ.pop("DATA_PATH")
+
+        if previous is None:
+            os.environ.pop("DATA_PATH")
+        else:
+            os.environ["DATA_PATH"] = previous

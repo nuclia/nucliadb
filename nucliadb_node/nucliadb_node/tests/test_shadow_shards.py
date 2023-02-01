@@ -23,76 +23,76 @@ from nucliadb_protos.noderesources_pb2 import Resource
 from nucliadb_node.shadow_shards import (
     OperationCode,
     ShadowShardNotFound,
-    ShadowShards,
+    ShadowShardsManager,
     ShadowShardsNotLoaded,
-    get_shadow_shards,
+    get_shadow_shards_manager,
 )
 
 
 @pytest.mark.asyncio
-async def test_get_shadow_shards(shadow_folder):
-    shadow_shards = get_shadow_shards()
-    assert isinstance(shadow_shards, ShadowShards)
-    assert shadow_shards._folder == f"{shadow_folder}/shadow_shards/"
+async def test_get_shadow_shards_manager(shadow_folder):
+    shadow_shards = get_shadow_shards_manager()
+    assert isinstance(shadow_shards, ShadowShardsManager)
+    assert shadow_shards._folder.endswith("/shadow_shards/")
 
 
 @pytest.mark.asyncio
 async def test_load(shadow_folder):
-    shadow = ShadowShards(shadow_folder)
-    assert not shadow.loaded
-    await shadow.load()
-    assert shadow.loaded
-    assert len(shadow.shards) == 0
+    ssm = ShadowShardsManager(shadow_folder)
+    assert not ssm.loaded
+    await ssm.load()
+    assert ssm.loaded
+    assert len(ssm.shards) == 0
 
     # Create a new shadow shard and make sure it's loaded
-    shard_id = await shadow.create()
+    shard_id = await ssm.create()
     assert shard_id
-    await shadow.load()
-    assert len(shadow.shards) == 1
+    await ssm.load()
+    assert len(ssm.shards) == 1
 
 
 @pytest.mark.asyncio
 async def test_create(shadow_folder):
-    shadow = ShadowShards(shadow_folder)
+    ssm = ShadowShardsManager(shadow_folder)
     with pytest.raises(ShadowShardsNotLoaded):
-        await shadow.create()
+        await ssm.create()
 
-    await shadow.load()
-    assert len(shadow.shards) == 0
+    await ssm.load()
+    assert len(ssm.shards) == 0
 
-    shard_id = await shadow.create()
-    assert len(shadow.shards) == 1
-    assert shadow.exists(shard_id)
+    shard_id = await ssm.create()
+    assert len(ssm.shards) == 1
+    assert ssm.exists(shard_id)
 
 
 @pytest.mark.asyncio
 async def test_delete(shadow_folder):
-    shadow = ShadowShards(shadow_folder)
+    ssm = ShadowShardsManager(shadow_folder)
     with pytest.raises(ShadowShardsNotLoaded):
-        await shadow.delete("foo")
+        await ssm.delete("foo")
 
-    await shadow.load()
+    await ssm.load()
     with pytest.raises(ShadowShardNotFound):
-        await shadow.delete("not-there")
+        await ssm.delete("not-there")
 
-    shard_id = await shadow.create()
-    assert len(shadow.shards) == 1
-    assert shadow.exists(shard_id)
+    shard_id = await ssm.create()
+    assert len(ssm.shards) == 1
+    assert ssm.exists(shard_id)
 
-    await shadow.delete(shard_id)
-    assert len(shadow.shards) == 0
-    assert not shadow.exists(shard_id)
+    await ssm.delete(shard_id)
+    assert len(ssm.shards) == 0
+    assert not ssm.exists(shard_id)
 
 
 @pytest.mark.asyncio
 async def test_exists(shadow_folder):
-    shadow = ShadowShards(shadow_folder)
+    ssm = ShadowShardsManager(shadow_folder)
     with pytest.raises(ShadowShardsNotLoaded):
-        shadow.exists("foo")
-    await shadow.load()
-    assert not shadow.exists("foo")
-    shard_id = await shadow.create()
-    assert shadow.exists(shard_id)
+        ssm.exists("foo")
+    await ssm.load()
+    assert not ssm.exists("foo")
+    shard_id = await ssm.create()
+    assert ssm.exists(shard_id)
 
 
 def get_brain(uuid: str) -> Resource:
@@ -103,26 +103,26 @@ def get_brain(uuid: str) -> Resource:
 
 @pytest.mark.asyncio
 async def test_operations(shadow_folder):
-    shadow = ShadowShards(shadow_folder)
+    ssm = ShadowShardsManager(shadow_folder)
 
-    await shadow.load()
-    shard_1 = await shadow.create()
-    shard_2 = await shadow.create()
-    shard_3 = await shadow.create()
+    await ssm.load()
+    shard_1 = await ssm.create()
+    shard_2 = await ssm.create()
+    shard_3 = await ssm.create()
 
     brain_1 = get_brain("resource1")
     brain_2 = get_brain("resource2")
     brain_3 = get_brain("resource3")
 
-    await shadow.set_resource(brain_1, shard_1)
-    await shadow.set_resource(brain_2, shard_1)
+    await ssm.set_resource(brain_1, shard_1)
+    await ssm.set_resource(brain_2, shard_1)
 
-    await shadow.set_resource(brain_3, shard_2)
-    await shadow.delete_resource("resource3", shard_2)
+    await ssm.set_resource(brain_3, shard_2)
+    await ssm.delete_resource("resource3", shard_2)
 
-    shard1_ops = [op async for op in shadow.iter_operations(shard_1)]
-    shard2_ops = [op async for op in shadow.iter_operations(shard_2)]
-    shard3_ops = [op async for op in shadow.iter_operations(shard_3)]
+    shard1_ops = [op async for op in ssm.iter_operations(shard_1)]
+    shard2_ops = [op async for op in ssm.iter_operations(shard_2)]
+    shard3_ops = [op async for op in ssm.iter_operations(shard_3)]
 
     assert len(shard1_ops) == 2
     assert len(shard2_ops) == 2
@@ -140,37 +140,37 @@ async def test_operations(shadow_folder):
 
 @pytest.mark.asyncio
 async def test_metadata(shadow_folder):
-    shadow = ShadowShards(shadow_folder)
+    ssm = ShadowShardsManager(shadow_folder)
 
     # Check that error is thrown if not loaded
     with pytest.raises(ShadowShardsNotLoaded):
-        shadow.metadata
+        ssm.metadata
 
     with pytest.raises(ShadowShardsNotLoaded):
-        await shadow.save_metadata()
+        await ssm.save_metadata()
 
     # Check initial value
-    await shadow.load()
-    assert shadow.metadata.shards == {}
+    await ssm.load()
+    assert ssm.metadata.shards == {}
 
     # Check initial shardinfo data
-    shard_1 = await shadow.create()
+    shard_1 = await ssm.create()
 
-    assert shadow.metadata.get_info(shard_1).created_at
-    assert shadow.metadata.get_info(shard_1).modified_at
-    assert shadow.metadata.get_info(shard_1).operations == 0
+    assert ssm.metadata.get_info(shard_1).created_at
+    assert ssm.metadata.get_info(shard_1).modified_at
+    assert ssm.metadata.get_info(shard_1).operations == 0
 
     # Check operations are incremented
-    await shadow.set_resource(Resource(), shard_1)
-    await shadow.delete_resource("foo", shard_1)
+    await ssm.set_resource(Resource(), shard_1)
+    await ssm.delete_resource("foo", shard_1)
 
-    assert shadow.metadata.get_info(shard_1).operations == 2
+    assert ssm.metadata.get_info(shard_1).operations == 2
 
     # Check that it has been persisted in disk
-    shadow = ShadowShards(shadow_folder)
-    await shadow.load()
-    assert shadow.metadata.get_info(shard_1).operations == 2
+    ssm = ShadowShardsManager(shadow_folder)
+    await ssm.load()
+    assert ssm.metadata.get_info(shard_1).operations == 2
 
     # Check that deleting the shard cleans up the metadata
-    await shadow.delete(shard_1)
-    assert shadow.metadata.get_info(shard_1) is None
+    await ssm.delete(shard_1)
+    assert ssm.metadata.get_info(shard_1) is None
