@@ -36,18 +36,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_protos.noderesources_pb2 import ShardId, EmptyQuery
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
 from sentry_sdk import capture_exception
 
 from nucliadb_node import logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
-from nucliadb_node.shadow_shards import (
-    SHADOW_SHARDS,
-    AlreadyExistingShadowShard,
-    ShadowShardNotFound,
-)
+from nucliadb_node.shadow_shards import ShadowShardNotFound, get_shadow_shards
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
 
@@ -71,15 +67,13 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         return response
 
     async def ShadowShardCreate(self, request: EmptyQuery, context) -> ShadowShardResponse:  # type: ignore
-        await SHADOW_SHARDS.load()
+        sshards = get_shadow_shards()
+        await sshards.load()
         response = ShadowShardResponse()
-        shard_id = request.id
         try:
-            shard_id = await SHADOW_SHARDS.create()
+            shard_id = await sshards.create()
             response.success = True
             response.shard_id.id = shard_id
-        except AlreadyExistingShadowShard:
-            logger.warning(f"Conflict creating shadow shard: already exists {shard_id}")
         except Exception as exc:
             if SENTRY:
                 capture_exception(exc)
@@ -88,11 +82,12 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
             return response
 
     async def ShadowShardDelete(self, request: ShardId, context) -> ShadowShardResponse:  # type: ignore
-        await SHADOW_SHARDS.load()
+        sshards = get_shadow_shards()
+        await sshards.load()
         response = ShadowShardResponse()
         shard_id = request.id
         try:
-            await SHADOW_SHARDS.delete(shard_id=shard_id)
+            await sshards.delete(shard_id=shard_id)
             response.success = True
         except ShadowShardNotFound:
             logger.warning(

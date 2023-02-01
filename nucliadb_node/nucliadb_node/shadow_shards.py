@@ -21,16 +21,13 @@
 import base64
 import glob
 import os
+import uuid
 from enum import Enum
 from typing import AsyncIterator, Set, Tuple, Union
 
 import aiofiles
 from aiofiles import os as aos
 from nucliadb_protos.noderesources_pb2 import Resource
-
-
-class AlreadyExistingShadowShard(Exception):
-    pass
 
 
 class ShadowShardNotFound(Exception):
@@ -55,6 +52,9 @@ class OperationCode(str, Enum):
 
 
 NodeOperation = Tuple[OperationCode, Union[Resource, str]]
+
+# singleton
+SHADOW_SHARDS = None
 
 
 class ShadowShards:
@@ -86,17 +86,20 @@ class ShadowShards:
     def shard_path(self, shard_id: str) -> str:
         return f"{self.folder}/{shard_id}"
 
-    async def create(self, shard_id: str) -> None:
+    async def create(self) -> str:
         if not self.loaded:
             raise ShadowShardsNotLoaded()
 
-        if shard_id in self.shards:
-            raise AlreadyExistingShadowShard()
+        # Get a unique shard id
+        shard_id = uuid.uuid4().hex
+        while shard_id in self.shards:
+            shard_id = uuid.uuid4().hex
 
         async with aiofiles.open(self.shard_path(shard_id), mode="x"):
             pass
 
         self.shards.add(shard_id)
+        return shard_id
 
     async def delete(self, shard_id: str) -> None:
         if not self.loaded:
@@ -170,5 +173,10 @@ class ShadowShards:
                 line = await f.readline()
 
 
-DATA_PATH = os.environ["DATA_PATH"].rstrip("/")
-SHADOW_SHARDS = ShadowShards(folder=f"{DATA_PATH}/shadow_shards")
+def get_shadow_shards() -> ShadowShards:
+    global SHADOW_SHARDS
+
+    if SHADOW_SHARDS is None:
+        data_path = os.environ["DATA_PATH"].rstrip("/")
+        SHADOW_SHARDS = ShadowShards(folder=f"{data_path}/shadow_shards")
+    return SHADOW_SHARDS
