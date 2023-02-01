@@ -228,7 +228,7 @@ impl ParagraphWriterService {
                 let lower_bound = std::cmp::min(start_pos as usize, chars.len());
                 let upper_bound = std::cmp::min(end_pos as usize, chars.len());
                 let text: String = chars[lower_bound..upper_bound].iter().collect();
-                let facet_field = format!("/{}", field);
+                let facet_field = format!("/{field}");
                 let paragraph_labels = p
                     .labels
                     .iter()
