@@ -24,6 +24,7 @@ use std::time::*;
 
 use itertools::Itertools;
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::order_by::OrderField;
 use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
@@ -239,11 +240,10 @@ impl TextReaderService {
         })
     }
 
-    fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
-        match order.as_ref().map(|o| o.field.as_str()) {
-            Some("created") => Some(self.schema.created),
-            Some("modified") => Some(self.schema.modified),
-            _ => None,
+    fn get_order_field(&self, order: &OrderBy) -> Field {
+        match order.field() {
+            OrderField::Created => self.schema.created,
+            OrderField::Modified => self.schema.modified,
         }
     }
 
@@ -418,7 +418,10 @@ impl TextReaderService {
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
         let extra_result = results + 1;
-        let order_field = self.get_order_field(&request.order);
+        let order_field = request
+            .order
+            .as_ref()
+            .map(|order| self.get_order_field(order));
         let valid_facet_iter = request.faceted.iter().flat_map(|v| {
             v.tags
                 .iter()
@@ -456,6 +459,7 @@ impl TextReaderService {
                 let facet_handler = multicollector.add_collector(facet_collector);
                 let topdocs_collector = TopDocs::with_limit(extra_result)
                     .and_offset(offset)
+                    // We can not use fast because created and modified are of type Date
                     .order_by_u64_field(order_field);
                 let topdocs_handler = multicollector.add_collector(topdocs_collector);
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
@@ -703,7 +707,7 @@ mod tests {
         };
 
         let order = OrderBy {
-            field: "created".to_string(),
+            field: OrderField::Created as i32,
             r#type: 0,
         };
         let search = DocumentSearchRequest {

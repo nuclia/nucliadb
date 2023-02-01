@@ -289,7 +289,7 @@ pub fn suggest_query(
     request
         .fields
         .iter()
-        .map(|value| format!("/{}", value))
+        .map(|value| format!("/{value}"))
         .flat_map(|facet_key| Facet::from_text(&facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.field, &facet);
@@ -360,7 +360,7 @@ pub fn search_query(
     search
         .fields
         .iter()
-        .map(|value| format!("/{}", value))
+        .map(|value| format!("/{value}"))
         .flat_map(|facet_key| Facet::from_text(&facet_key).ok().into_iter())
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.field, &facet);

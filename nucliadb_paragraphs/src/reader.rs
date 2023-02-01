@@ -24,6 +24,7 @@ use std::fs;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::order_by::OrderField;
 use nucliadb_core::protos::{
     OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
     StreamRequest, SuggestRequest,
@@ -158,7 +159,10 @@ impl ReaderChild for ParagraphReaderService {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-        let order_field = self.get_order_field(&request.order);
+        let order_field = request
+            .order
+            .as_ref()
+            .map(|order| self.get_order_field(order));
         let facets: Vec<_> = request
             .faceted
             .as_ref()
@@ -377,11 +381,10 @@ impl ParagraphReaderService {
         Facet::from_text(maybe_facet).is_ok()
     }
 
-    fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
-        match order.as_ref().map(|o| o.field.as_str()) {
-            Some("created") => Some(self.schema.created),
-            Some("modified") => Some(self.schema.modified),
-            _ => None,
+    fn get_order_field(&self, order: &OrderBy) -> Field {
+        match order.field() {
+            OrderField::Created => self.schema.created,
+            OrderField::Modified => self.schema.modified,
         }
     }
 }
@@ -474,6 +477,7 @@ impl<'a> Searcher<'a> {
                 Some(order_field) => {
                     let topdocs = TopDocs::with_limit(extra_result)
                         .and_offset(self.offset)
+                        // We can not use fast because created and modified are of type Date
                         .order_by_u64_field(order_field);
                     let top_docs = searcher.search(&query, &topdocs).unwrap();
                     ParagraphSearchResponse::from(SearchIntResponse {
@@ -782,7 +786,7 @@ mod tests {
         };
 
         let order = OrderBy {
-            field: "created".to_string(),
+            field: OrderField::Created as i32,
             r#type: 0,
         };
 

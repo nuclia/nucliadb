@@ -10,8 +10,8 @@ pub struct Faceted {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OrderBy {
-    #[prost(string, tag="1")]
-    pub field: ::prost::alloc::string::String,
+    #[prost(enumeration="order_by::OrderField", tag="1")]
+    pub field: i32,
     #[prost(enumeration="order_by::OrderType", tag="2")]
     pub r#type: i32,
 }
@@ -22,6 +22,12 @@ pub mod order_by {
     pub enum OrderType {
         Desc = 0,
         Asc = 1,
+    }
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum OrderField {
+        Created = 0,
+        Modified = 1,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
