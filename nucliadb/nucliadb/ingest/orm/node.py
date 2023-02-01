@@ -109,6 +109,7 @@ class Node(AbstractNode):
     ):
         self.address = address
         self.type = type
+        self.label = type.name
         self.load_score = load_score
         self.dummy = dummy
 
