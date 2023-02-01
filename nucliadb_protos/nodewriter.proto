@@ -84,6 +84,6 @@ message ShadowShardResponse {
 
 service NodeSidecar {
     rpc GetCount(noderesources.ShardId) returns (Counter) {}
-    rpc ShadowShardCreate(noderesources.EmptyQuery) returns (ShadowShardResponse) {}
-    rpc ShadowShardDelete(noderesources.ShardId) returns (ShadowShardResponse) {}
+    rpc CreateShadowShard(noderesources.EmptyQuery) returns (ShadowShardResponse) {}
+    rpc DeleteShadowShard(noderesources.ShardId) returns (ShadowShardResponse) {}
 }

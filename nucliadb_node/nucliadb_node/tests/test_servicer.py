@@ -31,7 +31,7 @@ async def test_create_delete_shadow_shards(sidecar_grpc_servicer, shadow_folder)
     assert response.success
 
     # Delete now
-    sipb = ShardId(id=response.shard_id.id)
+    sipb = ShardId(id=response.shard.id)
     response = await stub.DeleteShadowShard(sipb)
     assert response.success
 

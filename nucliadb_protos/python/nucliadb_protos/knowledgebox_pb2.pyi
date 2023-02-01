@@ -3,33 +3,26 @@
 isort:skip_file
 """
 import builtins
-import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
-import sys
 import typing
-
-if sys.version_info >= (3, 10):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class _KnowledgeBoxResponseStatus:
-    ValueType = typing.NewType("ValueType", builtins.int)
+    ValueType = typing.NewType('ValueType', builtins.int)
     V: typing_extensions.TypeAlias = ValueType
-
-class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_KnowledgeBoxResponseStatus.ValueType], builtins.type):  # noqa: F821
+class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_KnowledgeBoxResponseStatus.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     OK: _KnowledgeBoxResponseStatus.ValueType  # 0
     CONFLICT: _KnowledgeBoxResponseStatus.ValueType  # 1
     NOTFOUND: _KnowledgeBoxResponseStatus.ValueType  # 2
     ERROR: _KnowledgeBoxResponseStatus.ValueType  # 3
-
-class KnowledgeBoxResponseStatus(_KnowledgeBoxResponseStatus, metaclass=_KnowledgeBoxResponseStatusEnumTypeWrapper): ...
+class KnowledgeBoxResponseStatus(_KnowledgeBoxResponseStatus, metaclass=_KnowledgeBoxResponseStatusEnumTypeWrapper):
+    pass
 
 OK: KnowledgeBoxResponseStatus.ValueType  # 0
 CONFLICT: KnowledgeBoxResponseStatus.ValueType  # 1
@@ -37,258 +30,231 @@ NOTFOUND: KnowledgeBoxResponseStatus.ValueType  # 2
 ERROR: KnowledgeBoxResponseStatus.ValueType  # 3
 global___KnowledgeBoxResponseStatus = KnowledgeBoxResponseStatus
 
+
 class KnowledgeBoxID(google.protobuf.message.Message):
-    """ID"""
+    """ID
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     SLUG_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
-    slug: builtins.str
-    uuid: builtins.str
-    def __init__(
-        self,
+    slug: typing.Text
+    uuid: typing.Text
+    def __init__(self,
         *,
-        slug: builtins.str = ...,
-        uuid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["slug", b"slug", "uuid", b"uuid"]) -> None: ...
-
+        slug: typing.Text = ...,
+        uuid: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["slug",b"slug","uuid",b"uuid"]) -> None: ...
 global___KnowledgeBoxID = KnowledgeBoxID
 
 class KnowledgeBox(google.protobuf.message.Message):
-    """GET"""
+    """GET
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     SLUG_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     STATUS_FIELD_NUMBER: builtins.int
     CONFIG_FIELD_NUMBER: builtins.int
-    slug: builtins.str
-    uuid: builtins.str
+    slug: typing.Text
+    uuid: typing.Text
     status: global___KnowledgeBoxResponseStatus.ValueType
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        slug: builtins.str = ...,
-        uuid: builtins.str = ...,
+        slug: typing.Text = ...,
+        uuid: typing.Text = ...,
         status: global___KnowledgeBoxResponseStatus.ValueType = ...,
-        config: global___KnowledgeBoxConfig | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "slug", b"slug", "status", b"status", "uuid", b"uuid"]) -> None: ...
-
+        config: typing.Optional[global___KnowledgeBoxConfig] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["config",b"config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config",b"config","slug",b"slug","status",b"status","uuid",b"uuid"]) -> None: ...
 global___KnowledgeBox = KnowledgeBox
 
 class KnowledgeBoxConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     TITLE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     ENABLED_FILTERS_FIELD_NUMBER: builtins.int
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
-    title: builtins.str
-    description: builtins.str
+    title: typing.Text
+    description: typing.Text
     @property
-    def enabled_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def enabled_filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     @property
-    def enabled_insights(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    slug: builtins.str
+    def enabled_insights(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    slug: typing.Text
     disable_vectors: builtins.bool
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        title: builtins.str = ...,
-        description: builtins.str = ...,
-        enabled_filters: collections.abc.Iterable[builtins.str] | None = ...,
-        enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
-        slug: builtins.str = ...,
+        title: typing.Text = ...,
+        description: typing.Text = ...,
+        enabled_filters: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        enabled_insights: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        slug: typing.Text = ...,
         disable_vectors: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "slug", b"slug", "title", b"title"]) -> None: ...
-
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description",b"description","disable_vectors",b"disable_vectors","enabled_filters",b"enabled_filters","enabled_insights",b"enabled_insights","slug",b"slug","title",b"title"]) -> None: ...
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 
 class KnowledgeBoxNew(google.protobuf.message.Message):
-    """NEW"""
+    """NEW
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     SLUG_FIELD_NUMBER: builtins.int
     CONFIG_FIELD_NUMBER: builtins.int
     FORCEUUID_FIELD_NUMBER: builtins.int
-    slug: builtins.str
+    slug: typing.Text
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
-    forceuuid: builtins.str
-    def __init__(
-        self,
+    forceuuid: typing.Text
+    def __init__(self,
         *,
-        slug: builtins.str = ...,
-        config: global___KnowledgeBoxConfig | None = ...,
-        forceuuid: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "forceuuid", b"forceuuid", "slug", b"slug"]) -> None: ...
-
+        slug: typing.Text = ...,
+        config: typing.Optional[global___KnowledgeBoxConfig] = ...,
+        forceuuid: typing.Text = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["config",b"config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config",b"config","forceuuid",b"forceuuid","slug",b"slug"]) -> None: ...
 global___KnowledgeBoxNew = KnowledgeBoxNew
 
 class NewKnowledgeBoxResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     STATUS_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     status: global___KnowledgeBoxResponseStatus.ValueType
-    uuid: builtins.str
-    def __init__(
-        self,
+    uuid: typing.Text
+    def __init__(self,
         *,
         status: global___KnowledgeBoxResponseStatus.ValueType = ...,
-        uuid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["status", b"status", "uuid", b"uuid"]) -> None: ...
-
+        uuid: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["status",b"status","uuid",b"uuid"]) -> None: ...
 global___NewKnowledgeBoxResponse = NewKnowledgeBoxResponse
 
 class KnowledgeBoxPrefix(google.protobuf.message.Message):
-    """SEARCH / LIST"""
+    """SEARCH / LIST
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     PREFIX_FIELD_NUMBER: builtins.int
-    prefix: builtins.str
-    def __init__(
-        self,
+    prefix: typing.Text
+    def __init__(self,
         *,
-        prefix: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["prefix", b"prefix"]) -> None: ...
-
+        prefix: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["prefix",b"prefix"]) -> None: ...
 global___KnowledgeBoxPrefix = KnowledgeBoxPrefix
 
 class KnowledgeBoxUpdate(google.protobuf.message.Message):
-    """UPDATE"""
+    """UPDATE
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     SLUG_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     CONFIG_FIELD_NUMBER: builtins.int
-    slug: builtins.str
-    uuid: builtins.str
+    slug: typing.Text
+    uuid: typing.Text
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        slug: builtins.str = ...,
-        uuid: builtins.str = ...,
-        config: global___KnowledgeBoxConfig | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "slug", b"slug", "uuid", b"uuid"]) -> None: ...
-
+        slug: typing.Text = ...,
+        uuid: typing.Text = ...,
+        config: typing.Optional[global___KnowledgeBoxConfig] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["config",b"config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config",b"config","slug",b"slug","uuid",b"uuid"]) -> None: ...
 global___KnowledgeBoxUpdate = KnowledgeBoxUpdate
 
 class UpdateKnowledgeBoxResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     STATUS_FIELD_NUMBER: builtins.int
     UUID_FIELD_NUMBER: builtins.int
     status: global___KnowledgeBoxResponseStatus.ValueType
-    uuid: builtins.str
-    def __init__(
-        self,
+    uuid: typing.Text
+    def __init__(self,
         *,
         status: global___KnowledgeBoxResponseStatus.ValueType = ...,
-        uuid: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["status", b"status", "uuid", b"uuid"]) -> None: ...
-
+        uuid: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["status",b"status","uuid",b"uuid"]) -> None: ...
 global___UpdateKnowledgeBoxResponse = UpdateKnowledgeBoxResponse
 
 class GCKnowledgeBoxResponse(google.protobuf.message.Message):
-    """GC"""
+    """GC
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
+    def __init__(self,
+        ) -> None: ...
 global___GCKnowledgeBoxResponse = GCKnowledgeBoxResponse
 
 class DeleteKnowledgeBoxResponse(google.protobuf.message.Message):
-    """DELETE"""
+    """DELETE
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     STATUS_FIELD_NUMBER: builtins.int
     status: global___KnowledgeBoxResponseStatus.ValueType
-    def __init__(
-        self,
+    def __init__(self,
         *,
         status: global___KnowledgeBoxResponseStatus.ValueType = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["status", b"status"]) -> None: ...
-
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["status",b"status"]) -> None: ...
 global___DeleteKnowledgeBoxResponse = DeleteKnowledgeBoxResponse
 
 class CleanedKnowledgeBoxResponse(google.protobuf.message.Message):
-    """Clean Index"""
+    """Clean Index
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
+    def __init__(self,
+        ) -> None: ...
 global___CleanedKnowledgeBoxResponse = CleanedKnowledgeBoxResponse
 
 class Label(google.protobuf.message.Message):
-    """Labels on a Knowledge Box"""
+    """Labels on a Knowledge Box
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     TITLE_FIELD_NUMBER: builtins.int
     RELATED_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
     URI_FIELD_NUMBER: builtins.int
-    title: builtins.str
-    related: builtins.str
-    text: builtins.str
-    uri: builtins.str
-    def __init__(
-        self,
+    title: typing.Text
+    related: typing.Text
+    text: typing.Text
+    uri: typing.Text
+    def __init__(self,
         *,
-        title: builtins.str = ...,
-        related: builtins.str = ...,
-        text: builtins.str = ...,
-        uri: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["related", b"related", "text", b"text", "title", b"title", "uri", b"uri"]) -> None: ...
-
+        title: typing.Text = ...,
+        related: typing.Text = ...,
+        text: typing.Text = ...,
+        uri: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["related",b"related","text",b"text","title",b"title","uri",b"uri"]) -> None: ...
 global___Label = Label
 
 class LabelSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class _LabelSetKind:
-        ValueType = typing.NewType("ValueType", builtins.int)
+        ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
-
-    class _LabelSetKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[LabelSet._LabelSetKind.ValueType], builtins.type):  # noqa: F821
+    class _LabelSetKindEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[LabelSet._LabelSetKind.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         RESOURCES: LabelSet._LabelSetKind.ValueType  # 0
         PARAGRAPHS: LabelSet._LabelSetKind.ValueType  # 1
         SENTENCES: LabelSet._LabelSetKind.ValueType  # 2
+    class LabelSetKind(_LabelSetKind, metaclass=_LabelSetKindEnumTypeWrapper):
+        pass
 
-    class LabelSetKind(_LabelSetKind, metaclass=_LabelSetKindEnumTypeWrapper): ...
     RESOURCES: LabelSet.LabelSetKind.ValueType  # 0
     PARAGRAPHS: LabelSet.LabelSetKind.ValueType  # 1
     SENTENCES: LabelSet.LabelSetKind.ValueType  # 2
@@ -298,143 +264,127 @@ class LabelSet(google.protobuf.message.Message):
     LABELS_FIELD_NUMBER: builtins.int
     MULTIPLE_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
-    title: builtins.str
-    color: builtins.str
+    title: typing.Text
+    color: typing.Text
     @property
     def labels(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Label]: ...
     multiple: builtins.bool
     @property
     def kind(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[global___LabelSet.LabelSetKind.ValueType]: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        title: builtins.str = ...,
-        color: builtins.str = ...,
-        labels: collections.abc.Iterable[global___Label] | None = ...,
+        title: typing.Text = ...,
+        color: typing.Text = ...,
+        labels: typing.Optional[typing.Iterable[global___Label]] = ...,
         multiple: builtins.bool = ...,
-        kind: collections.abc.Iterable[global___LabelSet.LabelSetKind.ValueType] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["color", b"color", "kind", b"kind", "labels", b"labels", "multiple", b"multiple", "title", b"title"]) -> None: ...
-
+        kind: typing.Optional[typing.Iterable[global___LabelSet.LabelSetKind.ValueType]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","kind",b"kind","labels",b"labels","multiple",b"multiple","title",b"title"]) -> None: ...
 global___LabelSet = LabelSet
 
 class Labels(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class LabelsetEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
+        key: typing.Text
         @property
         def value(self) -> global___LabelSet: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: global___LabelSet | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Optional[global___LabelSet] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     LABELSET_FIELD_NUMBER: builtins.int
     @property
-    def labelset(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___LabelSet]: ...
-    def __init__(
-        self,
+    def labelset(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___LabelSet]: ...
+    def __init__(self,
         *,
-        labelset: collections.abc.Mapping[builtins.str, global___LabelSet] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["labelset", b"labelset"]) -> None: ...
-
+        labelset: typing.Optional[typing.Mapping[typing.Text, global___LabelSet]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["labelset",b"labelset"]) -> None: ...
 global___Labels = Labels
 
 class Entity(google.protobuf.message.Message):
-    """Entities on a Knowledge Box"""
+    """Entities on a Knowledge Box
 
+    """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     VALUE_FIELD_NUMBER: builtins.int
     MERGED_FIELD_NUMBER: builtins.int
     REPRESENTS_FIELD_NUMBER: builtins.int
-    value: builtins.str
+    value: typing.Text
     merged: builtins.bool
     @property
-    def represents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    def __init__(
-        self,
+    def represents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def __init__(self,
         *,
-        value: builtins.str = ...,
+        value: typing.Text = ...,
         merged: builtins.bool = ...,
-        represents: collections.abc.Iterable[builtins.str] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["merged", b"merged", "represents", b"represents", "value", b"value"]) -> None: ...
-
+        represents: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["merged",b"merged","represents",b"represents","value",b"value"]) -> None: ...
 global___Entity = Entity
 
 class EntitiesGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class EntitiesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
+        key: typing.Text
         @property
         def value(self) -> global___Entity: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: global___Entity | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Optional[global___Entity] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     ENTITIES_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     COLOR_FIELD_NUMBER: builtins.int
     CUSTOM_FIELD_NUMBER: builtins.int
     @property
-    def entities(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Entity]: ...
-    title: builtins.str
-    color: builtins.str
+    def entities(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___Entity]: ...
+    title: typing.Text
+    color: typing.Text
     custom: builtins.bool
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        entities: collections.abc.Mapping[builtins.str, global___Entity] | None = ...,
-        title: builtins.str = ...,
-        color: builtins.str = ...,
+        entities: typing.Optional[typing.Mapping[typing.Text, global___Entity]] = ...,
+        title: typing.Text = ...,
+        color: typing.Text = ...,
         custom: builtins.bool = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["color", b"color", "custom", b"custom", "entities", b"entities", "title", b"title"]) -> None: ...
-
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color",b"color","custom",b"custom","entities",b"entities","title",b"title"]) -> None: ...
 global___EntitiesGroup = EntitiesGroup
 
 class Widget(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class _WidgetMode:
-        ValueType = typing.NewType("ValueType", builtins.int)
+        ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
-
-    class _WidgetModeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Widget._WidgetMode.ValueType], builtins.type):  # noqa: F821
+    class _WidgetModeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Widget._WidgetMode.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         BUTTON: Widget._WidgetMode.ValueType  # 0
         INPUT: Widget._WidgetMode.ValueType  # 1
         FORM: Widget._WidgetMode.ValueType  # 2
+    class WidgetMode(_WidgetMode, metaclass=_WidgetModeEnumTypeWrapper):
+        pass
 
-    class WidgetMode(_WidgetMode, metaclass=_WidgetModeEnumTypeWrapper): ...
     BUTTON: Widget.WidgetMode.ValueType  # 0
     INPUT: Widget.WidgetMode.ValueType  # 1
     FORM: Widget.WidgetMode.ValueType  # 2
 
     class WidgetFeatures(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         USEFILTERS_FIELD_NUMBER: builtins.int
         SUGGESTENTITIES_FIELD_NUMBER: builtins.int
         SUGGESTSENTENCES_FIELD_NUMBER: builtins.int
@@ -449,8 +399,7 @@ class Widget(google.protobuf.message.Message):
         suggestLabels: builtins.bool
         editLabels: builtins.bool
         entityAnnotation: builtins.bool
-        def __init__(
-            self,
+        def __init__(self,
             *,
             useFilters: builtins.bool = ...,
             suggestEntities: builtins.bool = ...,
@@ -459,23 +408,21 @@ class Widget(google.protobuf.message.Message):
             suggestLabels: builtins.bool = ...,
             editLabels: builtins.bool = ...,
             entityAnnotation: builtins.bool = ...,
-        ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["editLabels", b"editLabels", "entityAnnotation", b"entityAnnotation", "suggestEntities", b"suggestEntities", "suggestLabels", b"suggestLabels", "suggestParagraphs", b"suggestParagraphs", "suggestSentences", b"suggestSentences", "useFilters", b"useFilters"]) -> None: ...
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["editLabels",b"editLabels","entityAnnotation",b"entityAnnotation","suggestEntities",b"suggestEntities","suggestLabels",b"suggestLabels","suggestParagraphs",b"suggestParagraphs","suggestSentences",b"suggestSentences","useFilters",b"useFilters"]) -> None: ...
 
     class StyleEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        value: builtins.str
-        def __init__(
-            self,
+        key: typing.Text
+        value: typing.Text
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: builtins.str = ...,
-        ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Text = ...,
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     ID_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
@@ -484,75 +431,65 @@ class Widget(google.protobuf.message.Message):
     FILTERS_FIELD_NUMBER: builtins.int
     TOPENTITIES_FIELD_NUMBER: builtins.int
     STYLE_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    description: builtins.str
+    id: typing.Text
+    description: typing.Text
     mode: global___Widget.WidgetMode.ValueType
     @property
     def features(self) -> global___Widget.WidgetFeatures: ...
     @property
-    def filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def filters(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     @property
-    def topEntities(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def topEntities(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     @property
-    def style(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
-    def __init__(
-        self,
+    def style(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]: ...
+    def __init__(self,
         *,
-        id: builtins.str = ...,
-        description: builtins.str = ...,
+        id: typing.Text = ...,
+        description: typing.Text = ...,
         mode: global___Widget.WidgetMode.ValueType = ...,
-        features: global___Widget.WidgetFeatures | None = ...,
-        filters: collections.abc.Iterable[builtins.str] | None = ...,
-        topEntities: collections.abc.Iterable[builtins.str] | None = ...,
-        style: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["features", b"features"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "features", b"features", "filters", b"filters", "id", b"id", "mode", b"mode", "style", b"style", "topEntities", b"topEntities"]) -> None: ...
-
+        features: typing.Optional[global___Widget.WidgetFeatures] = ...,
+        filters: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        topEntities: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        style: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["features",b"features"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description",b"description","features",b"features","filters",b"filters","id",b"id","mode",b"mode","style",b"style","topEntities",b"topEntities"]) -> None: ...
 global___Widget = Widget
 
 class VectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     DIMENSION_FIELD_NUMBER: builtins.int
     dimension: builtins.int
-    def __init__(
-        self,
+    def __init__(self,
         *,
         dimension: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension"]) -> None: ...
-
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dimension",b"dimension"]) -> None: ...
 global___VectorSet = VectorSet
 
 class VectorSets(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class VectorsetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
+        key: typing.Text
         @property
         def value(self) -> global___VectorSet: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: global___VectorSet | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Optional[global___VectorSet] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     VECTORSETS_FIELD_NUMBER: builtins.int
     @property
-    def vectorsets(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___VectorSet]: ...
-    def __init__(
-        self,
+    def vectorsets(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___VectorSet]: ...
+    def __init__(self,
         *,
-        vectorsets: collections.abc.Mapping[builtins.str, global___VectorSet] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["vectorsets", b"vectorsets"]) -> None: ...
-
+        vectorsets: typing.Optional[typing.Mapping[typing.Text, global___VectorSet]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectorsets",b"vectorsets"]) -> None: ...
 global___VectorSets = VectorSets

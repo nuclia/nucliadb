@@ -546,7 +546,7 @@ pub mod node_sidecar_client {
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn shadow_shard_create(
+        pub async fn create_shadow_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status> {
@@ -561,11 +561,11 @@ pub mod node_sidecar_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeSidecar/ShadowShardCreate",
+                "/nodewriter.NodeSidecar/CreateShadowShard",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn shadow_shard_delete(
+        pub async fn delete_shadow_shard(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status> {
@@ -580,7 +580,7 @@ pub mod node_sidecar_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/nodewriter.NodeSidecar/ShadowShardDelete",
+                "/nodewriter.NodeSidecar/DeleteShadowShard",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
@@ -1381,11 +1381,11 @@ pub mod node_sidecar_server {
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::Counter>, tonic::Status>;
-        async fn shadow_shard_create(
+        async fn create_shadow_shard(
             &self,
             request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status>;
-        async fn shadow_shard_delete(
+        async fn delete_shadow_shard(
             &self,
             request: tonic::Request<super::super::noderesources::ShardId>,
         ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status>;
@@ -1475,14 +1475,14 @@ pub mod node_sidecar_server {
                     };
                     Box::pin(fut)
                 }
-                "/nodewriter.NodeSidecar/ShadowShardCreate" => {
+                "/nodewriter.NodeSidecar/CreateShadowShard" => {
                     #[allow(non_camel_case_types)]
-                    struct ShadowShardCreateSvc<T: NodeSidecar>(pub Arc<T>);
+                    struct CreateShadowShardSvc<T: NodeSidecar>(pub Arc<T>);
                     impl<
                         T: NodeSidecar,
                     > tonic::server::UnaryService<
                         super::super::noderesources::EmptyQuery,
-                    > for ShadowShardCreateSvc<T> {
+                    > for CreateShadowShardSvc<T> {
                         type Response = super::ShadowShardResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -1496,7 +1496,7 @@ pub mod node_sidecar_server {
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {
-                                (*inner).shadow_shard_create(request).await
+                                (*inner).create_shadow_shard(request).await
                             };
                             Box::pin(fut)
                         }
@@ -1506,7 +1506,7 @@ pub mod node_sidecar_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = ShadowShardCreateSvc(inner);
+                        let method = CreateShadowShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -1518,13 +1518,13 @@ pub mod node_sidecar_server {
                     };
                     Box::pin(fut)
                 }
-                "/nodewriter.NodeSidecar/ShadowShardDelete" => {
+                "/nodewriter.NodeSidecar/DeleteShadowShard" => {
                     #[allow(non_camel_case_types)]
-                    struct ShadowShardDeleteSvc<T: NodeSidecar>(pub Arc<T>);
+                    struct DeleteShadowShardSvc<T: NodeSidecar>(pub Arc<T>);
                     impl<
                         T: NodeSidecar,
                     > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for ShadowShardDeleteSvc<T> {
+                    for DeleteShadowShardSvc<T> {
                         type Response = super::ShadowShardResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -1536,7 +1536,7 @@ pub mod node_sidecar_server {
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {
-                                (*inner).shadow_shard_delete(request).await
+                                (*inner).delete_shadow_shard(request).await
                             };
                             Box::pin(fut)
                         }
@@ -1546,7 +1546,7 @@ pub mod node_sidecar_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = ShadowShardDeleteSvc(inner);
+                        let method = DeleteShadowShardSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
