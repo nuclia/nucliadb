@@ -36,7 +36,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_protos.noderesources_pb2 import ShardId
+from nucliadb_protos.noderesources_pb2 import ShardId, EmptyQuery
 from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
 from sentry_sdk import capture_exception
 
@@ -70,13 +70,14 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
             response.resources = count
         return response
 
-    async def ShadowShardCreate(self, request: ShardId, context) -> ShadowShardResponse:  # type: ignore
+    async def ShadowShardCreate(self, request: EmptyQuery, context) -> ShadowShardResponse:  # type: ignore
         await SHADOW_SHARDS.load()
         response = ShadowShardResponse()
         shard_id = request.id
         try:
-            await SHADOW_SHARDS.create(shard_id=shard_id)
+            shard_id = await SHADOW_SHARDS.create()
             response.success = True
+            response.shard_id.id = shard_id
         except AlreadyExistingShadowShard:
             logger.warning(f"Conflict creating shadow shard: already exists {shard_id}")
         except Exception as exc:

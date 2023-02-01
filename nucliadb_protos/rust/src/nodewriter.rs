@@ -84,6 +84,8 @@ pub struct Counter {
 pub struct ShadowShardResponse {
     #[prost(bool, tag="1")]
     pub success: bool,
+    #[prost(message, optional, tag="2")]
+    pub shard_id: ::core::option::Option<super::noderesources::ShardId>,
 }
 /// Generated client implementations.
 pub mod node_writer_client {
@@ -546,7 +548,7 @@ pub mod node_sidecar_client {
         }
         pub async fn shadow_shard_create(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardId>,
+            request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
         ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status> {
             self.inner
                 .ready()
@@ -1381,7 +1383,7 @@ pub mod node_sidecar_server {
         ) -> Result<tonic::Response<super::Counter>, tonic::Status>;
         async fn shadow_shard_create(
             &self,
-            request: tonic::Request<super::super::noderesources::ShardId>,
+            request: tonic::Request<super::super::noderesources::EmptyQuery>,
         ) -> Result<tonic::Response<super::ShadowShardResponse>, tonic::Status>;
         async fn shadow_shard_delete(
             &self,
@@ -1478,8 +1480,9 @@ pub mod node_sidecar_server {
                     struct ShadowShardCreateSvc<T: NodeSidecar>(pub Arc<T>);
                     impl<
                         T: NodeSidecar,
-                    > tonic::server::UnaryService<super::super::noderesources::ShardId>
-                    for ShadowShardCreateSvc<T> {
+                    > tonic::server::UnaryService<
+                        super::super::noderesources::EmptyQuery,
+                    > for ShadowShardCreateSvc<T> {
                         type Response = super::ShadowShardResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -1487,7 +1490,9 @@ pub mod node_sidecar_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::super::noderesources::ShardId>,
+                            request: tonic::Request<
+                                super::super::noderesources::EmptyQuery,
+                            >,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {

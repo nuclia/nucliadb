@@ -222,12 +222,17 @@ class ShadowShardResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SUCCESS_FIELD_NUMBER: builtins.int
+    SHARD_ID_FIELD_NUMBER: builtins.int
     success: builtins.bool
+    @property
+    def shard_id(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
     def __init__(
         self,
         *,
         success: builtins.bool = ...,
+        shard_id: nucliadb_protos.noderesources_pb2.ShardId | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["success", b"success"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["shard_id", b"shard_id", "success", b"success"]) -> None: ...
 
 global___ShadowShardResponse = ShadowShardResponse
