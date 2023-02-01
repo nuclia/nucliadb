@@ -19,13 +19,10 @@
 #
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List
 
-from nucliadb.ingest.orm.exceptions import NodeClusterNotFound, NodeClusterSmall
+from nucliadb.ingest.orm.exceptions import NodeClusterSmall
 from nucliadb.ingest.settings import settings
-from nucliadb_utils.clandestined import Cluster  # type: ignore
-from nucliadb_utils.settings import nuclia_settings
 
 if TYPE_CHECKING:
     from nucliadb.ingest.orm.node import Node
@@ -34,57 +31,20 @@ NODES: Dict[str, Node] = {}
 
 
 class ClusterObject:
-    date: datetime
-    cluster: Optional[Cluster] = None
     local_node: Any
 
     def __init__(self):
         self.local_node = None
-        self.date = datetime.now()
 
     def get_local_node(self):
         return self.local_node
 
-    def find_nodes(self, kbid: str):
-        if self.cluster is not None:
-            nodes = self.cluster.find_nodes(kbid)
-            if len(nodes) != len(set(nodes)):
-                raise NodeClusterSmall()
-            if len(nodes) < settings.node_replicas:
-                raise NodeClusterSmall()
-
-            return nodes[: settings.node_replicas]
-        else:
-            raise NodeClusterNotFound()
-
-    def find_least_loaded_nodes(self) -> List[str]:
-        sorted_nodes = [
-            (nodeid, node.load_score) for nodeid, node in NODES.items()
-        ].sort(key=lambda x: x[1])
+    def find_nodes(self) -> List[str]:
+        sorted_nodes = [(nodeid, node.load_score) for nodeid, node in NODES.items()]
+        sorted_nodes.sort(key=lambda x: x[1])
         if len(sorted_nodes) < settings.node_replicas:
             raise NodeClusterSmall()
-        return sorted_nodes[: settings.node_replicas]
-
-    def compute(self):
-        self.date = datetime.now()
-        if len(NODES) == 0:
-            self.cluster = None
-            return
-
-        cluster_info = {}
-        for count, (id, node) in enumerate(NODES.items()):
-            cluster_info[id] = {
-                "name": node.address,
-                "type": node.type,
-                "zone": f"z{count % settings.node_replicas}",
-            }
-            count += 1
-
-        self.cluster = Cluster(
-            cluster_info,
-            replicas=settings.node_replicas,
-            seed=nuclia_settings.nuclia_hash_seed,
-        )
+        return [nodeid for nodeid, _ in sorted_nodes][: settings.node_replicas]
 
 
 NODE_CLUSTER = ClusterObject()
