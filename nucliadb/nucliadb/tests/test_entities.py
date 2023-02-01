@@ -124,6 +124,19 @@ async def set_test_entities_by_broker_message(kbid: str, nucliadb_grpc: WriterSt
 
 
 @pytest.mark.asyncio
+@pytest.fixture(scope="function")
+async def kb_with_entities(
+    nucliadb_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    await set_test_entities_by_api(knowledgebox, nucliadb_writer)
+    await set_test_entities_by_broker_message(knowledgebox, nucliadb_grpc)
+
+    yield knowledgebox
+
+
+@pytest.mark.asyncio
 async def test_set_entities_indexes_entities(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
@@ -167,7 +180,7 @@ async def test_set_entities_indexes_entities(
 
 
 @pytest.mark.asyncio
-async def test_get_entities_return_indexed_entities(
+async def test_broker_message_entities_are_indexed(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
@@ -198,3 +211,30 @@ async def test_get_entities_return_indexed_entities(
         relation["entity"]
         for relation in body["relations"]["entities"]["fly"]["related_to"]
     } == {"invisibility", "telepathy"}
+
+
+@pytest.mark.asyncio
+async def test_get_entities_through_api(
+    nucliadb_reader: AsyncClient,
+    kb_with_entities,
+    predict_mock,
+):
+    kbid = kb_with_entities
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    entities = {entity for entity in body["entities"]}
+    assert entities == {"cat", "domestic-cat", "house-cat", "dog", "bird"}
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/entitiesgroup/SUPERPOWERS"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    entities = {entity for entity in body["entities"]}
+    assert entities == {"fly", "invisibility", "telepathy"}
