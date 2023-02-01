@@ -22,14 +22,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use nucliadb_core::protos::node_reader_client::NodeReaderClient;
+use nucliadb_core::protos::node_reader_server::NodeReaderServer;
+use nucliadb_core::protos::node_writer_client::NodeWriterClient;
+use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
-use nucliadb_protos::node_reader_client::NodeReaderClient;
-use nucliadb_protos::node_reader_server::NodeReaderServer;
-use nucliadb_protos::node_writer_client::NodeWriterClient;
-use nucliadb_protos::node_writer_server::NodeWriterServer;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Server};

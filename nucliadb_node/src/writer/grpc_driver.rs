@@ -21,21 +21,21 @@
 use std::time::Duration;
 
 use async_std::sync::RwLock;
-use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
-use nucliadb_protos::node_writer_server::NodeWriter;
-use nucliadb_protos::{
+use nucliadb_core::protos::node_writer_server::NodeWriter;
+use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
     OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
     VectorSetId, VectorSetList,
 };
+use nucliadb_core::tracing::{self, *};
+use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
-use tracing::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::config::Configuration;
+use crate::env;
 use crate::utils::MetadataMap;
 use crate::writer::NodeWriterService;
 
@@ -54,7 +54,7 @@ impl NodeWriterGRPCDriver {
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
-        if Configuration::lazy_loading() {
+        if env::lazy_loading() {
             let mut writer = self.0.write().await;
             writer.load_shard(id);
         }
@@ -467,7 +467,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         }
 
         match Listener::default()
-            .save_at(Configuration::shards_path())
+            .save_at(env::shards_path())
             .listen_once(request.port as u16)
             .await
         {
@@ -521,19 +521,19 @@ impl NodeWriter for NodeWriterGRPCDriver {
 mod tests {
     use std::net::SocketAddr;
 
-    use nucliadb_protos::node_writer_client::NodeWriterClient;
-    use nucliadb_protos::node_writer_server::NodeWriterServer;
+    use nucliadb_core::protos::node_writer_client::NodeWriterClient;
+    use nucliadb_core::protos::node_writer_server::NodeWriterServer;
     use portpicker::pick_unused_port;
     use tonic::transport::Server;
     use tonic::Request;
 
     use super::*;
-    use crate::config::Configuration;
+    use crate::env;
     use crate::utils::socket_to_endpoint;
 
     async fn start_test_server(address: SocketAddr) -> anyhow::Result<()> {
         let node_writer = NodeWriterGRPCDriver::from(NodeWriterService::new());
-        std::fs::create_dir_all(Configuration::shards_path())?;
+        std::fs::create_dir_all(env::shards_path())?;
 
         let _ = tokio::spawn(async move {
             let node_writer_server = NodeWriterServer::new(node_writer);

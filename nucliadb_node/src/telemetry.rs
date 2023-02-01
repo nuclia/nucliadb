@@ -17,27 +17,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use nucliadb_services::{ServiceError, ServiceResult};
+use nucliadb_core::tracing::{Level, Span};
+use nucliadb_core::{Context, NodeResult};
 use opentelemetry::global;
 use opentelemetry::trace::TraceContextExt;
 use sentry::ClientInitGuard;
-use tracing::{error, Level, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::filter::{FilterFn, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, Registry};
 
-use crate::config::Configuration;
+use crate::env;
 
 const TRACE_ID: &str = "trace-id";
 
-pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
-    let log_levels = Configuration::log_level();
+pub fn init_telemetry() -> NodeResult<ClientInitGuard> {
+    let log_levels = env::log_level();
 
     let mut layers = Vec::new();
 
-    if Configuration::jaeger_enabled() {
+    if env::jaeger_enabled() {
         layers.push(init_jaeger(log_levels.clone())?);
     }
 
@@ -48,9 +48,9 @@ pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
 
     layers.push(stdout_layer);
 
-    let sentry_env = Configuration::get_sentry_env();
+    let sentry_env = env::get_sentry_env();
     let guard = sentry::init((
-        Configuration::sentry_url(),
+        env::sentry_url(),
         sentry::ClientOptions {
             release: sentry::release_name!(),
             environment: Some(sentry_env.into()),
@@ -62,10 +62,7 @@ pub fn init_telemetry() -> ServiceResult<ClientInitGuard> {
     tracing_subscriber::registry()
         .with(layers)
         .try_init()
-        .map_err(|e| {
-            error!("Try init error: {e}");
-            ServiceError::GenericErr(Box::new(e))
-        })?;
+        .with_context(|| "trying to init tracing")?;
     Ok(guard)
 }
 
@@ -77,14 +74,13 @@ where F: FnOnce() -> R {
 
 fn init_jaeger(
     log_levels: Vec<(String, Level)>,
-) -> ServiceResult<Box<dyn Layer<Registry> + Send + Sync>> {
-    let agent_endpoint = Configuration::jaeger_agent_endp();
+) -> NodeResult<Box<dyn Layer<Registry> + Send + Sync>> {
+    let agent_endpoint = env::jaeger_agent_endp();
     let tracer = opentelemetry_jaeger::new_pipeline()
         .with_agent_endpoint(agent_endpoint)
         .with_service_name("nucliadb_node")
         .with_auto_split_batch(true)
-        .install_batch(opentelemetry::runtime::Tokio)
-        .map_err(|e| ServiceError::GenericErr(Box::new(e)))?;
+        .install_batch(opentelemetry::runtime::Tokio)?;
 
     // This filter is needed because we want to keep logs in stdout and attach logs to jaeger
     // spans in really rare cases So, basically it checks the source of event (allowed

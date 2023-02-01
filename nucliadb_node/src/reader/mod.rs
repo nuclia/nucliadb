@@ -21,17 +21,17 @@
 pub mod grpc_driver;
 use std::collections::HashMap;
 
-use nucliadb_protos::{
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, IdCollection, ParagraphSearchRequest,
-    ParagraphSearchResponse, SearchRequest, SearchResponse, Shard as ShardPB, ShardId, ShardList,
-    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
-    VectorSearchResponse,
+    ParagraphSearchResponse, RelationSearchRequest, RelationSearchResponse, SearchRequest,
+    SearchResponse, Shard as ShardPB, ShardId, ShardList, StreamRequest, SuggestRequest,
+    SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
 };
-use nucliadb_services::*;
-use rayon::prelude::*;
-use tracing::*;
+use nucliadb_core::thread::*;
+use nucliadb_core::tracing::{self, *};
 
-use crate::config::Configuration;
+use crate::env;
 use crate::services::reader::ShardReaderService;
 
 #[derive(Debug)]
@@ -64,26 +64,26 @@ impl NodeReaderService {
     #[tracing::instrument(skip_all)]
     pub fn iter_shards(
         &mut self,
-    ) -> ServiceResult<impl Iterator<Item = InternalResult<ShardReaderService>>> {
-        let shards_path = Configuration::shards_path();
+    ) -> NodeResult<impl Iterator<Item = NodeResult<ShardReaderService>>> {
+        let shards_path = env::shards_path();
         Ok(std::fs::read_dir(shards_path)?.flatten().map(|entry| {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
             info!("Opening {shard_path:?}");
-            ShardReaderService::open(file_name, &shard_path)
+            ShardReaderService::new(file_name, &shard_path)
         }))
     }
 
     /// Load all shards on the shards memory structure
     #[tracing::instrument(skip_all)]
-    pub fn load_shards(&mut self) -> ServiceResult<()> {
-        let shards_path = Configuration::shards_path();
+    pub fn load_shards(&mut self) -> NodeResult<()> {
+        let shards_path = env::shards_path();
         info!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            match ShardReaderService::open(file_name.clone(), &shard_path) {
+            match ShardReaderService::new(file_name.clone(), &shard_path) {
                 Err(err) => error!("Loading {shard_path:?} raised {err}"),
                 Ok(shard) => {
                     info!("Shard loaded: {shard_path:?}");
@@ -97,7 +97,7 @@ impl NodeReaderService {
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
             return;
@@ -106,7 +106,7 @@ impl NodeReaderService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardReaderService::open(shard_name, &shard_path) else {
+        let Ok(shard) = ShardReaderService::new(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };
@@ -119,7 +119,7 @@ impl NodeReaderService {
         self.cache.get(&shard_id.id)
     }
     #[tracing::instrument(skip_all)]
-    pub fn get_shards(&self) -> ServiceResult<ShardList> {
+    pub fn get_shards(&self) -> NodeResult<ShardList> {
         use crate::telemetry::run_with_telemetry;
         let span = tracing::Span::current();
         let task = move |shard_id: &str, shard: &ShardReaderService| {
@@ -144,7 +144,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: SuggestRequest,
-    ) -> ServiceResult<Option<SuggestResponse>> {
+    ) -> NodeResult<Option<SuggestResponse>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -156,7 +156,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: SearchRequest,
-    ) -> ServiceResult<Option<SearchResponse>> {
+    ) -> NodeResult<Option<SearchResponse>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -168,7 +168,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: RelationSearchRequest,
-    ) -> ServiceResult<Option<RelationSearchResponse>> {
+    ) -> NodeResult<Option<RelationSearchResponse>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -180,7 +180,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: VectorSearchRequest,
-    ) -> ServiceResult<Option<VectorSearchResponse>> {
+    ) -> NodeResult<Option<VectorSearchResponse>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -192,7 +192,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: ParagraphSearchRequest,
-    ) -> ServiceResult<Option<ParagraphSearchResponse>> {
+    ) -> NodeResult<Option<ParagraphSearchResponse>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -204,7 +204,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: StreamRequest,
-    ) -> ServiceResult<Option<ParagraphIterator>> {
+    ) -> NodeResult<Option<ParagraphIterator>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -215,7 +215,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: StreamRequest,
-    ) -> ServiceResult<Option<DocumentIterator>> {
+    ) -> NodeResult<Option<DocumentIterator>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -226,7 +226,7 @@ impl NodeReaderService {
         &self,
         shard_id: &ShardId,
         request: DocumentSearchRequest,
-    ) -> ServiceResult<Option<DocumentSearchResponse>> {
+    ) -> NodeResult<Option<DocumentSearchResponse>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
@@ -238,7 +238,7 @@ impl NodeReaderService {
         let Some(shard) = self.get_shard(shard_id) else {
             return None;
         };
-        let ids = shard.get_field_keys();
+        let ids = shard.get_text_keys();
         Some(IdCollection { ids })
     }
     #[tracing::instrument(skip_all)]
@@ -266,14 +266,14 @@ impl NodeReaderService {
         Some(IdCollection { ids })
     }
     #[tracing::instrument(skip_all)]
-    pub fn relation_edges(&self, shard_id: &ShardId) -> ServiceResult<Option<EdgeList>> {
+    pub fn relation_edges(&self, shard_id: &ShardId) -> NodeResult<Option<EdgeList>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };
         Ok(Some(shard.get_relations_edges()?))
     }
     #[tracing::instrument(skip_all)]
-    pub fn relation_types(&self, shard_id: &ShardId) -> ServiceResult<Option<TypeList>> {
+    pub fn relation_types(&self, shard_id: &ShardId) -> NodeResult<Option<TypeList>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };

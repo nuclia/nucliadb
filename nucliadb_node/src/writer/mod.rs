@@ -20,14 +20,16 @@
 
 pub mod grpc_driver;
 use std::collections::HashMap;
-use std::path::Path;
 
-use nucliadb_protos::{Resource, ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds};
-use nucliadb_services::*;
-use tracing::*;
+use nucliadb_core::prelude::*;
+use nucliadb_core::protos::{
+    DeleteGraphNodes, JoinGraph, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId,
+    ShardIds, VectorSetId,
+};
+use nucliadb_core::tracing::{self, *};
 use uuid::Uuid;
 
-use crate::config::Configuration;
+use crate::env;
 use crate::services::writer::ShardWriterService;
 
 #[derive(Debug)]
@@ -55,14 +57,14 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn load_shards(&mut self) -> ServiceResult<()> {
-        let shards_path = Configuration::shards_path();
+    pub fn load_shards(&mut self) -> NodeResult<()> {
+        let shards_path = env::shards_path();
         info!("Recovering shards from {shards_path:?}...");
         for entry in std::fs::read_dir(&shards_path)? {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let shard = ShardWriterService::open(file_name.clone(), &shard_path)?;
+            let shard = ShardWriterService::new(file_name.clone(), &shard_path)?;
             self.cache.insert(file_name, shard);
             info!("Shard loaded: {shard_path:?}");
         }
@@ -72,7 +74,7 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
             return;
@@ -81,7 +83,7 @@ impl NodeWriterService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardWriterService::open(shard_name, &shard_path) else {
+        let Ok(shard) = ShardWriterService::new(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };
@@ -100,7 +102,8 @@ impl NodeWriterService {
     #[tracing::instrument(skip_all)]
     pub fn new_shard(&mut self) -> ShardCreated {
         let shard_id = Uuid::new_v4().to_string();
-        let shard_path = Configuration::shards_path_id(&shard_id);
+        let shard_path = env::shards_path_id(&shard_id);
+        std::fs::create_dir_all(&shard_path).unwrap();
         let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path).unwrap();
         let data = ShardCreated {
             id: new_shard.id.clone(),
@@ -113,21 +116,21 @@ impl NodeWriterService {
         data
     }
     #[tracing::instrument(skip_all)]
-    pub fn delete_shard(&mut self, shard_id: &ShardId) -> ServiceResult<()> {
+    pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
         self.cache.remove(&shard_id.id);
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
-        let shard_path = Path::new(&shard_path);
-        if shard_path.is_dir() {
+        let shard_path = env::shards_path_id(&shard_id.id);
+        if shard_path.exists() {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
         }
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> ServiceResult<ShardCleaned> {
+    pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
         self.delete_shard(shard_id)?;
         let shard_name = shard_id.id.clone();
-        let shard_path = Configuration::shards_path_id(&shard_id.id);
+        let shard_path = env::shards_path_id(&shard_id.id);
+        std::fs::create_dir_all(&shard_path).unwrap();
         let new_shard = ShardWriterService::new(shard_name, &shard_path)?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,
@@ -144,7 +147,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &Resource,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -157,7 +160,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -170,7 +173,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -183,7 +186,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         graph: &JoinGraph,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -196,7 +199,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         request: &DeleteGraphNodes,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -209,7 +212,7 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
-    ) -> ServiceResult<Option<usize>> {
+    ) -> NodeResult<Option<usize>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
@@ -217,14 +220,14 @@ impl NodeWriterService {
         Ok(Some(shard.count()))
     }
     #[tracing::instrument(skip_all)]
-    pub fn gc(&mut self, shard_id: &ShardId) -> ServiceResult<Option<()>> {
+    pub fn gc(&mut self, shard_id: &ShardId) -> NodeResult<Option<()>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         Ok(Some(shard.gc()?))
     }
     #[tracing::instrument(skip_all)]
-    pub fn list_vectorsets(&self, shard_id: &ShardId) -> ServiceResult<Option<Vec<String>>> {
+    pub fn list_vectorsets(&self, shard_id: &ShardId) -> NodeResult<Option<Vec<String>>> {
         let Some(shard) = self.get_shard(shard_id) else {
             return Ok(None);
         };

@@ -25,7 +25,7 @@
 pub mod services;
 
 /// Global configuration enviromental variables
-pub mod config;
+pub mod env;
 
 /// Global stats struct
 pub mod stats;

@@ -22,11 +22,11 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use http::Uri;
+use nucliadb_core::tracing::Level;
 use opentelemetry::propagation::Extractor;
 use tokio::net;
 use tokio::time::sleep;
 use tonic::transport::Endpoint;
-use tracing::Level;
 
 /// Prepares a socket addr for a grpc endpoint to connect to
 pub fn socket_to_endpoint(grpc_addr: SocketAddr) -> anyhow::Result<Endpoint> {

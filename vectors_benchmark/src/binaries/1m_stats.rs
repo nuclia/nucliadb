@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
-use nucliadb_vectors::vectors::data_point::{DataPoint, Elem, LabelDictionary};
-use nucliadb_vectors::vectors::data_point_provider::*;
+use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
+use nucliadb_vectors::data_point_provider::*;
 use vectors_benchmark::random_vectors::RandomVectors;
 use vectors_benchmark::stats::Stats;
 

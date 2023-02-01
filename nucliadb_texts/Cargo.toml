@@ -1,0 +1,12 @@
+[package]
+name = "nucliadb_texts"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tempfile = "3"
+tantivy = "0.17.0"
+nucliadb_core = { path = "../nucliadb_core" }
+itertools = "0.10.5"

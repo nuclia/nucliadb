@@ -19,7 +19,9 @@
 
 use std::io::Cursor;
 
-use nucliadb_node::config::Configuration;
+use nucliadb_core::paragraphs::ParagraphIterator;
+use nucliadb_core::texts::DocumentIterator;
+use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
@@ -28,8 +30,6 @@ use nucliadb_protos::{
     Shard as ShardPB, ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
     VectorSetList,
 };
-use nucliadb_service_interface::fields_interface::DocumentIterator;
-use nucliadb_service_interface::paragraphs_interface::ParagraphIterator;
 use nucliadb_telemetry::blocking::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
 use prost::Message;
@@ -583,7 +583,7 @@ impl NodeWriter {
 
 #[pymodule]
 fn nucliadb_node_binding(_py: Python, m: &PyModule) -> PyResult<()> {
-    let log_levels = Configuration::log_level();
+    let log_levels = env::log_level();
 
     let mut layers = Vec::new();
     let stdout_layer = tracing_subscriber::fmt::layer()

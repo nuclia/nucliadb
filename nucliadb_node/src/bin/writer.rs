@@ -24,18 +24,18 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use nucliadb_cluster::{node, Key, Node, NodeType};
-use nucliadb_node::config::Configuration;
+use nucliadb_core::protos::node_writer_server::NodeWriterServer;
+use nucliadb_core::protos::GetShardRequest;
+use nucliadb_core::tracing::*;
+use nucliadb_node::env;
 use nucliadb_node::metrics::report::NodeReport;
 use nucliadb_node::metrics::Publisher;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
 use nucliadb_node::writer::NodeWriterService;
-use nucliadb_protos::node_writer_server::NodeWriterServer;
-use nucliadb_protos::GetShardRequest;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
-use tracing::*;
 use uuid::Uuid;
 
 const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
@@ -49,16 +49,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut node_writer_service = NodeWriterService::new();
 
-    std::fs::create_dir_all(Configuration::shards_path())?;
-    if !Configuration::lazy_loading() {
+    std::fs::create_dir_all(env::shards_path())?;
+    if !env::lazy_loading() {
         node_writer_service.load_shards()?;
     }
 
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service);
-    let host_key_path = Configuration::host_key_path();
-    let public_ip = Configuration::public_ip().await;
-    let chitchat_port = Configuration::chitchat_port();
-    let seed_nodes = Configuration::seed_nodes();
+    let host_key_path = env::host_key_path();
+    let public_ip = env::public_ip().await;
+    let chitchat_port = env::chitchat_port();
+    let seed_nodes = env::seed_nodes();
 
     let chitchat_addr = SocketAddr::from_str(&format!("{}:{}", public_ip, chitchat_port))?;
 
@@ -76,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node = node.start().await?;
 
     let writer_task = tokio::spawn(async move {
-        let addr = Configuration::writer_listen_address();
+        let addr = env::writer_listen_address();
         info!("Writer listening for gRPC requests at: {:?}", addr);
         let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
         health_reporter
@@ -113,11 +113,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metrics_task = tokio::spawn(async move {
         info!("Start metrics task");
 
-        let metrics_publisher = Configuration::get_prometheus_url().map(|url| {
+        let metrics_publisher = env::get_prometheus_url().map(|url| {
             let mut metrics_publisher = Publisher::new("node_metrics", url);
 
-            if let Some((username, password)) = Configuration::get_prometheus_username()
-                .zip(Configuration::get_prometheus_password())
+            if let Some((username, password)) =
+                env::get_prometheus_username().zip(env::get_prometheus_password())
             {
                 metrics_publisher = metrics_publisher.with_credentials(username, password);
             }
@@ -126,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
         let mut node_reader = NodeReaderService::new();
-        let mut interval = tokio::time::interval(Configuration::get_prometheus_push_timing());
+        let mut interval = tokio::time::interval(env::get_prometheus_push_timing());
 
         loop {
             interval.tick().await;

@@ -19,15 +19,15 @@
 //
 
 use async_std::sync::RwLock;
-use nucliadb_protos::node_reader_server::NodeReader;
-use nucliadb_protos::*;
-use nucliadb_services::{DocumentIterator, ParagraphIterator};
+use nucliadb_core::prelude::{DocumentIterator, ParagraphIterator};
+use nucliadb_core::protos::node_reader_server::NodeReader;
+use nucliadb_core::protos::*;
+use nucliadb_core::tracing::{self, *};
 use opentelemetry::global;
-use tracing::{Span, *};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use Shard as ShardPB;
 
-use crate::config::Configuration;
+use crate::env;
 use crate::reader::NodeReaderService;
 use crate::utils::MetadataMap;
 
@@ -43,7 +43,7 @@ impl NodeReaderGRPCDriver {
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
-        if Configuration::lazy_loading() {
+        if env::lazy_loading() {
             let mut writer = self.0.write().await;
             writer.load_shard(id);
         }

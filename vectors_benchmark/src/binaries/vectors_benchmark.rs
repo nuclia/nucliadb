@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use nucliadb_vectors::vectors::data_point_provider::{Index, IndexCheck};
+use nucliadb_vectors::data_point_provider::{Index, IndexCheck};
 use vectors_benchmark::cli_interface::*;
 fn main() {
     let args = Args::new();
