@@ -90,7 +90,7 @@ def test_node_type_from_str():
         assert NodeType.from_str(raw_type) == node_type
 
 
-def test_node_type_compat():
+def test_node_type_pb_conversion():
     for (node_type, member_type) in [
         (NodeType.IO, Member.Type.IO),
         (NodeType.TRAIN, Member.Type.TRAIN),
@@ -98,5 +98,5 @@ def test_node_type_compat():
         (NodeType.SEARCH, Member.Type.SEARCH),
         (NodeType.UNKNOWN, Member.Type.UNKNOWN),
     ]:
-        assert node_type.compat() == member_type
-        assert NodeType.from_compat(member_type) == node_type
+        assert node_type.to_pb() == member_type
+        assert NodeType.from_pb(member_type) == node_type

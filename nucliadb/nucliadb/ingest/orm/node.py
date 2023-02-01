@@ -77,7 +77,7 @@ class NodeType(Enum):
             return NodeType.UNKNOWN
 
     @staticmethod
-    def from_compat(node_type: Member.Type.ValueType):
+    def from_pb(node_type: Member.Type.ValueType):
         if node_type == Member.Type.IO:
             return NodeType.IO
         elif node_type == Member.Type.SEARCH:
@@ -91,7 +91,7 @@ class NodeType(Enum):
         else:
             raise ValueError(f"incompatible node type '{node_type}'")
 
-    def compat(self) -> Member.Type.ValueType:
+    def to_pb(self) -> Member.Type.ValueType:
         if self == NodeType.IO:
             return Member.Type.IO
         elif self == NodeType.SEARCH:
@@ -214,7 +214,7 @@ class Node(AbstractNode):
         for member in members.members:
             NODES[member.id] = Node(
                 member.listen_address,
-                NodeType.from_compat(member.type),
+                NodeType.from_pb(member.type),
                 member.load_score,
                 member.dummy,
             )
