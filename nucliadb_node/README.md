@@ -1,7 +1,7 @@
 # NucliaDB Node
 
 <p align="center">
-  <img src="docs/assets/images/node_scheme.png" alt="nucliadb_node"  width="500px" style="background-color: #fff">
+  <img src="../docs/assets/images/node_scheme.png" alt="nucliadb_node"  width="500px" style="background-color: #fff">
 </p>
 
 The node is nucliadb's own indexing system, used for storing and retrieving complex AI data like vector embeddings or relations.
