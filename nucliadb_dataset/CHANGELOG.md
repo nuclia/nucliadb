@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.2.3
+
+- Improve signatures for Datascience use case
+
 ## 1.2.2
 
 - Fix headers and payload in export module

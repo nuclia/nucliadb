@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.2.4
+
+- Improve signatures for Datascience use case
+
 ## 1.2.3
 
 - Simplify creation of KBs and vector indexing
