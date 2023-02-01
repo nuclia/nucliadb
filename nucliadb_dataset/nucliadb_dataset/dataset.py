@@ -188,8 +188,6 @@ class NucliaDBDataset(NucliaDataset):
             self._configure_sentence_classification()
 
     def _configure_sentence_classification(self):
-        if len(self.trainset.filter.labels) != 1:
-            raise Exception("Needs to be only on filter labelset to train")
         self.labels = self.client.get_labels()
         labelset = self.trainset.filter.labels[0]
         if labelset not in self.labels.labelsets:
