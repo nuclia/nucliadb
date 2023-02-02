@@ -303,6 +303,7 @@ class PullWorker:
     async def _loop(self):
 
         headers = {}
+        data = None
         if self.creds is not None:
             headers["X-STF-NUAKEY"] = f"Bearer {self.creds}"
 
@@ -399,6 +400,13 @@ class PullWorker:
                         f"Could not connect to {url}, verify your internet connection"
                     )
                     await asyncio.sleep(self.pull_time)
+
+                except nats.errors.MaxPayloadError as e:
+                    if data is not None:
+                        logger.error(
+                            f"Message too big to transaction: {len(data['payload'])}"
+                        )
+                    raise e
 
                 except Exception:
                     logger.exception("Gathering changes")
