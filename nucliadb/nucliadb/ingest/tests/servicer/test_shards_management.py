@@ -20,7 +20,10 @@
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.writer_pb2 import CreateShadowShardRequest
+from nucliadb_protos.writer_pb2 import (
+    CreateShadowShardRequest,
+    DeleteShadowShardRequest,
+)
 
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.utils import get_driver
@@ -28,7 +31,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_create_shadow_shard(grpc_servicer, fake_node):
+async def test_create_and_delete_shadow_shard(grpc_servicer, fake_node):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     # Create a KB
@@ -76,5 +79,25 @@ async def test_create_shadow_shard(grpc_servicer, fake_node):
                 assert replica.shadow_replica.shard.id
                 assert replica.shadow_replica.node == rep2_node
             else:
+                assert not replica.has_shadow
+    assert found
+
+    # Now delete it
+    req = DeleteShadowShardRequest()
+    req.kbid = kbid
+    req.replica.id = replica1.shard.id
+    resp = await stub.DeleteShadowShard(req)
+    assert resp.success
+
+    # Check that the shadow replica has been cleaned from the shard object
+    txn = await driver.begin()
+    shards_object = await Node.get_all_shards(txn, kbid)
+    await txn.abort()
+
+    found = False
+    for shard in shards_object.shards:
+        for replica in shard.replicas:
+            if replica.shard.id == rep1_id and replica.node == rep1_node:
+                found = True
                 assert not replica.has_shadow
     assert found

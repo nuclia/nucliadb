@@ -1489,6 +1489,8 @@ class CreateShadowShardRequest(google.protobuf.message.Message):
     @property
     def replica(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
     node: typing.Text
+    """node where the shadow shard is created"""
+
     def __init__(self,
         *,
         kbid: typing.Text = ...,
@@ -1499,7 +1501,23 @@ class CreateShadowShardRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid","node",b"node","replica",b"replica"]) -> None: ...
 global___CreateShadowShardRequest = CreateShadowShardRequest
 
-class CreateShadowShardResponse(google.protobuf.message.Message):
+class DeleteShadowShardRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    KBID_FIELD_NUMBER: builtins.int
+    REPLICA_FIELD_NUMBER: builtins.int
+    kbid: typing.Text
+    @property
+    def replica(self) -> nucliadb_protos.noderesources_pb2.ShardId: ...
+    def __init__(self,
+        *,
+        kbid: typing.Text = ...,
+        replica: typing.Optional[nucliadb_protos.noderesources_pb2.ShardId] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["replica",b"replica"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid",b"kbid","replica",b"replica"]) -> None: ...
+global___DeleteShadowShardRequest = DeleteShadowShardRequest
+
+class ShadowShardResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     SHADOW_SHARD_FIELD_NUMBER: builtins.int
     SUCCESS_FIELD_NUMBER: builtins.int
@@ -1513,4 +1531,4 @@ class CreateShadowShardResponse(google.protobuf.message.Message):
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["shadow_shard",b"shadow_shard"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["shadow_shard",b"shadow_shard","success",b"success"]) -> None: ...
-global___CreateShadowShardResponse = CreateShadowShardResponse
+global___ShadowShardResponse = ShadowShardResponse

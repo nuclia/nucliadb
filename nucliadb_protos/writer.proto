@@ -447,11 +447,16 @@ message FileUploaded {
 message CreateShadowShardRequest {
     string kbid = 1;
     noderesources.ShardId replica = 2;
+    // node where the shadow shard is created
     string node = 3;
 }
 
+message DeleteShadowShardRequest {
+    string kbid = 1;
+    noderesources.ShardId replica = 2;
+}
 
-message CreateShadowShardResponse {
+message ShadowShardResponse {
     ShadowShard shadow_shard = 1;
     bool success = 2;
 }
@@ -508,5 +513,6 @@ service Writer {
     rpc UploadFile(stream UploadBinaryData) returns (FileUploaded) {}
 
     // Shard management
-    rpc CreateShadowShard(CreateShadowShardRequest) returns (CreateShadowShardResponse) {}
+    rpc CreateShadowShard(CreateShadowShardRequest) returns (ShadowShardResponse) {}
+    rpc DeleteShadowShard(DeleteShadowShardRequest) returns (ShadowShardResponse) {}
 }

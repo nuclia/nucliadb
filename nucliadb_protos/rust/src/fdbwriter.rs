@@ -632,11 +632,19 @@ pub struct CreateShadowShardRequest {
     pub kbid: ::prost::alloc::string::String,
     #[prost(message, optional, tag="2")]
     pub replica: ::core::option::Option<super::noderesources::ShardId>,
+    /// node where the shadow shard is created
     #[prost(string, tag="3")]
     pub node: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CreateShadowShardResponse {
+pub struct DeleteShadowShardRequest {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="2")]
+    pub replica: ::core::option::Option<super::noderesources::ShardId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShadowShardResponse {
     #[prost(message, optional, tag="1")]
     pub shadow_shard: ::core::option::Option<ShadowShard>,
     #[prost(bool, tag="2")]

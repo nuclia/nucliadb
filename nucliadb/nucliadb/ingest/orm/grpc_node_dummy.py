@@ -19,8 +19,9 @@
 #
 from __future__ import annotations
 
-from typing import Any, Dict, List
 import uuid
+from typing import Any, Dict, List
+
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,

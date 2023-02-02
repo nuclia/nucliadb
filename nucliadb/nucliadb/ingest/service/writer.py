@@ -36,19 +36,14 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
-from nucliadb_protos.noderesources_pb2 import (
-    EmptyQuery,
-    ShardCleaned,
-    ShardId,
-)
-from nucliadb_protos.nodewriter_pb2 import ShadowShardResponse
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCleaned, ShardId
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
     CreateShadowShardRequest,
-    CreateShadowShardResponse,
     DelEntitiesRequest,
+    DeleteShadowShardRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
     DetWidgetsRequest,
@@ -86,6 +81,8 @@ from nucliadb_protos.writer_pb2 import (
     SetVectorsRequest,
     SetVectorsResponse,
     SetWidgetsRequest,
+    ShadowShard,
+    ShadowShardResponse,
 )
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2 import (
@@ -750,29 +747,26 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def CreateShadowShard(
         self, request: CreateShadowShardRequest, context=None
-    ) -> CreateShadowShardResponse:
-        response = CreateShadowShardResponse(success=False)
+    ) -> ShadowShardResponse:
+        response = ShadowShardResponse(success=False)
         try:
+            # Create the shadow shard file in the specified node
             shadow_created: Optional[ShardId] = None
             node = NODES.get(request.node)
             if node is None:
                 raise ValueError(f"Node {request.node} not found")
 
-            sidecar_stub = node.sidecar
-            ssresp: ShadowShardResponse = await sidecar_stub.CreateShadowShard(
-                EmptyQuery()
-            )
+            ssresp = await node.sidecar.CreateShadowShard(EmptyQuery())
             if not ssresp.success:
                 raise SidecarCreateShadowShardError()
             shadow_created = ssresp.shard
 
+            # Update shards object in maindb
             txn = await self.proc.driver.begin()
             node_klass = get_node_klass()
             all_shards: PBShards = await node_klass.get_all_shards(txn, request.kbid)
-
             updated_shards = PBShards()
             updated_shards.CopyFrom(all_shards)
-
             updated: bool = update_shards_with_shadow_replica(
                 updated_shards,
                 request.replica,
@@ -780,10 +774,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 shadow_node=request.node,
             )
             if not updated:
-                # TODO: Need to delete shadow shard in this case!
-                raise Exception()
-                pass
-
+                # The requested shard id is not found in the shards object
+                raise UpdatingShardsError()
             key = KB_SHARDS.format(kbid=request.kbid)
             await txn.set(key, updated_shards.SerializeToString())
             await txn.commit(resource=False)
@@ -797,7 +789,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if shadow_created is not None:
                 # Attempt to delete shadow shard
                 try:
-                    resp = await sidecar_stub.DeleteShadowShard(shadow_created)
+                    resp = await node.sidecar.DeleteShadowShard(shadow_created)
                     assert resp.success
                 except Exception:
                     logger.error(
@@ -808,6 +800,65 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.success = True
         finally:
             return response
+
+    async def DeleteShadowShard(
+        self, request: DeleteShadowShardRequest, context=None
+    ) -> ShadowShardResponse:
+        response = ShadowShardResponse(success=False)
+        try:
+            import pdb
+
+            pdb.set_trace()
+            # Find if requested replica indeed has a shadow shard to delete
+            txn = await self.proc.driver.begin()
+            node_klass = get_node_klass()
+            all_shards: PBShards = await node_klass.get_all_shards(txn, request.kbid)
+            to_delete: Optional[ShadowShard] = None
+            for logic_shard in all_shards.shards:
+                for replica_shard in logic_shard.replicas:
+                    if replica_shard.shard.id == request.replica.id:
+                        if replica_shard.has_shadow:
+                            to_delete = replica_shard.shadow_replica
+                            break
+            if to_delete is None:
+                response.success = True
+                return response
+
+            # Shadow shard found. Delete it
+            node = NODES.get(to_delete.node)
+            if node is None:
+                raise ValueError(f"Node {request.node} not found")
+
+            ssresp = await node.sidecar.DeleteShadowShard(to_delete.shard)
+            if not ssresp.success:
+                raise SidecarDeleteShadowShardError()
+            response.shadow_shard.node = to_delete.node
+            response.shadow_shard.shard.CopyFrom(to_delete.shard)
+
+            # Now update the Shards pb object from maindb
+            updated_shards = PBShards()
+            updated_shards.CopyFrom(all_shards)
+            cleaned: bool = cleanup_shadow_replica_from_shards(
+                updated_shards,
+                request.replica,
+            )
+            if not cleaned:
+                raise UpdatingShardsError()
+
+            key = KB_SHARDS.format(kbid=request.kbid)
+            await txn.set(key, updated_shards.SerializeToString())
+            await txn.commit(resource=False)
+        except Exception as exc:
+            response.success = False
+            event_id: Optional[str] = None
+            if SENTRY:
+                event_id = capture_exception(exc)
+            logger.error(
+                f"Error deleting shadow shard. Check sentry for more details. Event id: {event_id}"
+            )
+        else:
+            response.success = True
+        return response
 
 
 def update_shards_with_updated_replica(
@@ -839,5 +890,26 @@ def update_shards_with_shadow_replica(
     return False
 
 
+def cleanup_shadow_replica_from_shards(shards: PBShards, replica: ShardId) -> bool:
+    """
+    Returns whether it found the replica to cleanup in the shards proto message
+    """
+    for logic_shard in shards.shards:
+        for replica_shard in logic_shard.replicas:
+            if replica_shard.shard.id == replica.id:
+                replica_shard.has_shadow = False
+                replica_shard.ClearField("shadow_replica")
+                return True
+    return False
+
+
 class SidecarCreateShadowShardError(Exception):
+    pass
+
+
+class SidecarDeleteShadowShardError(Exception):
+    pass
+
+
+class UpdatingShardsError(Exception):
     pass
