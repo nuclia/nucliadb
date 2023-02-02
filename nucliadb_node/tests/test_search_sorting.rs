@@ -34,7 +34,7 @@ use uuid::Uuid;
 async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id: String) {
     for i in 0..total {
         let rid = Uuid::new_v4();
-        let field = format!("dummy-{i}");
+        let field = format!("dummy-{i:0>3}");
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -44,12 +44,12 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
             nanos: 0,
         };
 
-        let labels = vec![format!("/dummy{i}")];
+        let labels = vec![format!("/dummy{i:0>3}")];
         let mut texts = HashMap::new();
         texts.insert(
             field,
             nucliadb_protos::TextInformation {
-                text: format!("Dummy text {i}"),
+                text: format!("Dummy text {i:0>3}"),
                 labels: vec![],
             },
         );
