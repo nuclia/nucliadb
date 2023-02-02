@@ -109,12 +109,12 @@ class OrderBy(google.protobuf.message.Message):
 
     class _OrderFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderField.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        Created: OrderBy._OrderField.ValueType  # 0
-        Modified: OrderBy._OrderField.ValueType  # 1
+        CREATED: OrderBy._OrderField.ValueType  # 0
+        MODIFIED: OrderBy._OrderField.ValueType  # 1
 
     class OrderField(_OrderField, metaclass=_OrderFieldEnumTypeWrapper): ...
-    Created: OrderBy.OrderField.ValueType  # 0
-    Modified: OrderBy.OrderField.ValueType  # 1
+    CREATED: OrderBy.OrderField.ValueType  # 0
+    MODIFIED: OrderBy.OrderField.ValueType  # 1
 
     FIELD_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int

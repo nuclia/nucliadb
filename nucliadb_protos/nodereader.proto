@@ -20,8 +20,8 @@ message OrderBy {
       ASC = 1;
     }
     enum OrderField {
-        Created = 0;
-        Modified = 1;   
+        CREATED = 0;
+        MODIFIED = 1;
     }
     string field = 1 [deprecated = true];
     OrderType type = 2;
