@@ -23,7 +23,7 @@ mod common;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use common::{node_services, TestNodeWriter};
+use common::{node_services, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::resource::ResourceStatus;
@@ -85,34 +85,49 @@ async fn test_search_sorting() -> Result<(), Box<dyn std::error::Error>> {
 
     create_dummy_resources(20, &mut writer, shard_id.clone()).await;
 
+    async fn paginated_search(
+        reader: &mut TestNodeReader,
+        shard_id: String,
+        order: Option<nucliadb_protos::OrderBy>,
+        page_size: i32,
+    ) -> Vec<String> {
+        let mut fields = Vec::new();
+        let mut page = 0;
+        let mut next_page = true;
+
+        while next_page {
+            let response = reader
+                .search(SearchRequest {
+                    shard: shard_id.clone(),
+                    order: order.clone(),
+                    document: true,
+                    page_number: page,
+                    result_per_page: page_size,
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+
+            let document_response = response.get_ref().document.as_ref().unwrap();
+            fields.extend(document_response.results.iter().cloned().map(|r| r.field));
+
+            next_page = document_response.next_page;
+            page += 1;
+        }
+
+        fields
+    }
+
     // --------------------------------------------------------------
-    // Test: sort by creation date in descending order
+    // Test: sort by creation date in ascending order
     // --------------------------------------------------------------
 
-    let response = reader
-        .search(SearchRequest {
-            shard: shard_id.clone(),
-            order: Some(nucliadb_protos::OrderBy {
-                sort_by: nucliadb_protos::order_by::OrderField::Created.into(),
-                r#type: nucliadb_protos::order_by::OrderType::Desc.into(),
-                ..Default::default()
-            }),
-            document: true,
-            result_per_page: 20,
-            ..Default::default()
-        })
-        .await?;
-
-    let fields = response
-        .get_ref()
-        .document
-        .as_ref()
-        .unwrap()
-        .results
-        .iter()
-        .cloned()
-        .map(|r| r.field)
-        .collect::<Vec<String>>();
+    let order = Some(nucliadb_protos::OrderBy {
+        sort_by: nucliadb_protos::order_by::OrderField::Created.into(),
+        r#type: nucliadb_protos::order_by::OrderType::Asc.into(),
+        ..Default::default()
+    });
+    let fields = paginated_search(&mut reader, shard_id.clone(), order, 5).await;
 
     let mut sorted_fields = fields.clone();
     sorted_fields.sort();
