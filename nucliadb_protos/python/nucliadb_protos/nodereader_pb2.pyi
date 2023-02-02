@@ -121,15 +121,18 @@ class OrderBy(google.protobuf.message.Message):
 
     FIELD_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
-    field: global___OrderBy.OrderField.ValueType
+    SORT_BY_FIELD_NUMBER: builtins.int
+    field: builtins.str
     type: global___OrderBy.OrderType.ValueType
+    sort_by: global___OrderBy.OrderField.ValueType
     def __init__(
         self,
         *,
-        field: global___OrderBy.OrderField.ValueType = ...,
+        field: builtins.str = ...,
         type: global___OrderBy.OrderType.ValueType = ...,
+        sort_by: global___OrderBy.OrderField.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "sort_by", b"sort_by", "type", b"type"]) -> None: ...
 
 global___OrderBy = OrderBy
 

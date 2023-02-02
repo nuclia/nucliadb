@@ -10,10 +10,13 @@ pub struct Faceted {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OrderBy {
-    #[prost(enumeration="order_by::OrderField", tag="1")]
-    pub field: i32,
+    #[deprecated]
+    #[prost(string, tag="1")]
+    pub field: ::prost::alloc::string::String,
     #[prost(enumeration="order_by::OrderType", tag="2")]
     pub r#type: i32,
+    #[prost(enumeration="order_by::OrderField", tag="3")]
+    pub sort_by: i32,
 }
 /// Nested message and enum types in `OrderBy`.
 pub mod order_by {
