@@ -310,6 +310,13 @@ message Notification {
 
 /// The member information.
 message Member {
+    enum Type {
+        IO = 0;
+        SEARCH = 1;
+        INGEST = 2;
+        TRAIN = 3;
+        UNKNOWN = 4;
+    }
     /// Member ID.　A string of the UUID.
     string id = 1;
 
@@ -321,7 +328,7 @@ message Member {
     bool is_self = 3;
 
     /// Io, Ingest, Search, Train.
-    string type = 4;
+    Type type = 4;
 
     /// Dummy Member
     bool dummy = 5;
