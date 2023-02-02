@@ -229,9 +229,18 @@ class KnowledgeboxCounters(BaseModel):
 
 class SortField(str, Enum):
     SCORE = "score"
-    MODIFIED = "modified"
     CREATED = "created"
+    MODIFIED = "modified"
     TITLE = "title"
+
+
+# SortFieldMap: Dict[SortField, Optional[OrderBy.OrderField]] = {
+SortFieldMap = {
+    SortField.SCORE: None,
+    SortField.CREATED: OrderBy.OrderField.CREATED,
+    SortField.MODIFIED: OrderBy.OrderField.MODIFIED,
+    SortField.TITLE: None,
+}
 
 
 class SortOrder(str, Enum):
