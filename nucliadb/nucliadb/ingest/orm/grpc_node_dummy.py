@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-
+import uuid
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
@@ -43,7 +43,8 @@ class DummyWriterStub:
 
     async def NewShard(self, data):
         self.calls.setdefault("NewShard", []).append(data)
-        return ShardCreated(id="shard")
+        shard_id = str(uuid.uuid4())
+        return ShardCreated(id=shard_id)
 
     async def DeleteShard(self, data):
         self.calls.setdefault("DeleteShard", []).append(data)
