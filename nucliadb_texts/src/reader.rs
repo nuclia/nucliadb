@@ -24,7 +24,7 @@ use std::time::*;
 
 use itertools::Itertools;
 use nucliadb_core::prelude::*;
-use nucliadb_core::protos::order_by::OrderField;
+use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
     DocumentItem, DocumentResult, DocumentSearchRequest, DocumentSearchResponse, FacetResult,
     FacetResults, OrderBy, ResourceId, ResultScore, StreamRequest,
@@ -36,8 +36,8 @@ use tantivy::collector::{
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
-    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
-    ReloadPolicy, Result as TantivyResult, Searcher,
+    collector::Collector, DocAddress, Index, IndexReader, IndexSettings, IndexSortByField,
+    LeasedItem, Order, ReloadPolicy, Result as TantivyResult, Searcher,
 };
 
 use super::schema::TextSchema;
@@ -141,21 +141,40 @@ impl ReaderChild for TextReaderService {
 }
 
 impl TextReaderService {
+    fn custom_order_collector(
+        &self,
+        order: OrderBy,
+        limit: usize,
+        offset: usize,
+    ) -> impl Collector<Fruit = Vec<(u64, DocAddress)>> {
+        use tantivy::fastfield::{FastFieldReader, FastValue};
+        use tantivy::{DocId, Score, SegmentReader};
+        let created = self.schema.created;
+        let modified = self.schema.modified;
+        let sorter = match order.r#type() {
+            OrderType::Desc => |t: u64| t,
+            OrderType::Asc => |t: u64| u64::MAX - t,
+        };
+        TopDocs::with_limit(limit).and_offset(offset).tweak_score(
+            move |segment_reader: &SegmentReader| {
+                let reader = match order.sort_by() {
+                    OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
+                    OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
+                };
+                move |doc: DocId, _: Score| sorter(reader.get(doc).to_u64())
+            },
+        )
+    }
+
     pub fn find_one(&self, resource_id: &ResourceId) -> tantivy::Result<Option<Document>> {
         let uuid_term = Term::from_field_text(self.schema.uuid, &resource_id.uuid);
         let uuid_query = TermQuery::new(uuid_term, IndexRecordOption::Basic);
-
         let searcher = self.reader.searcher();
-
-        let top_docs = searcher.search(&uuid_query, &TopDocs::with_limit(1))?;
-        match top_docs
+        searcher
+            .search(&uuid_query, &TopDocs::with_limit(1))?
             .first()
             .map(|(_, doc_address)| searcher.doc(*doc_address))
-        {
-            Some(Ok(a)) => Ok(Some(a)),
-            Some(Err(e)) => Err(e),
-            None => Ok(None),
-        }
+            .transpose()
     }
 
     pub fn find_resource(&self, resource_id: &ResourceId) -> tantivy::Result<Vec<Document>> {
@@ -238,13 +257,6 @@ impl TextReaderService {
             reader,
             schema: field_schema,
         })
-    }
-
-    fn get_order_field(&self, order: &OrderBy) -> Field {
-        match order.sort_by() {
-            OrderField::Created => self.schema.created,
-            OrderField::Modified => self.schema.modified,
-        }
     }
 
     fn convert_int_order(
@@ -418,10 +430,7 @@ impl TextReaderService {
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
         let extra_result = results + 1;
-        let order_field = request
-            .order
-            .as_ref()
-            .map(|order| self.get_order_field(order));
+        let maybe_order = request.order.clone();
         let valid_facet_iter = request.faceted.iter().flat_map(|v| {
             v.tags
                 .iter()
@@ -445,7 +454,7 @@ impl TextReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Searching: ends at {v} ms");
         }
-        match order_field {
+        match maybe_order {
             _ if request.only_faceted => {
                 // Just a facet search
                 let facets_count = searcher.search(&query, &facet_collector).unwrap();
@@ -454,13 +463,10 @@ impl TextReaderService {
                     ..Default::default()
                 })
             }
-            Some(order_field) => {
+            Some(order_by) => {
                 let mut multicollector = MultiCollector::new();
                 let facet_handler = multicollector.add_collector(facet_collector);
-                let topdocs_collector = TopDocs::with_limit(extra_result)
-                    .and_offset(offset)
-                    // We can not use fast because created and modified are of type Date
-                    .order_by_u64_field(order_field);
+                let topdocs_collector = self.custom_order_collector(order_by, extra_result, offset);
                 let topdocs_handler = multicollector.add_collector(topdocs_collector);
                 let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                 let facets_count = facet_handler.extract(&mut multi_fruit);
