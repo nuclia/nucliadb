@@ -382,7 +382,7 @@ impl ParagraphReaderService {
     }
 
     fn get_order_field(&self, order: &OrderBy) -> Field {
-        match order.field() {
+        match order.sort_by() {
             OrderField::Created => self.schema.created,
             OrderField::Modified => self.schema.modified,
         }
@@ -786,8 +786,9 @@ mod tests {
         };
 
         let order = OrderBy {
-            field: OrderField::Created as i32,
+            sort_by: OrderField::Created as i32,
             r#type: 0,
+            ..Default::default()
         };
 
         // Search on all paragraphs faceted
