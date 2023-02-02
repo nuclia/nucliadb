@@ -24,7 +24,7 @@ import pytest
 
 from nucliadb.ingest import orm
 from nucliadb.ingest.orm.exceptions import NodeClusterSmall
-from nucliadb.ingest.orm.node import Node
+from nucliadb.ingest.orm.node import Node, NodeType
 from nucliadb.ingest.settings import settings
 
 
@@ -33,7 +33,7 @@ def nodes():
     nodes = {}
     for index, load_score in enumerate(range(10)):
         node_id = f"node-{index}"
-        nodes[node_id] = Node(node_id, "local", load_score, dummy=True)
+        nodes[node_id] = Node(node_id, NodeType.IO, load_score, dummy=True)
 
     with mock.patch.object(orm, "NODES", new=nodes):
         yield
