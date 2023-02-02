@@ -42,7 +42,7 @@ def predict_mock() -> Mock:  # type: ignore
         set_utility(Utility.PREDICT, predict)
 
 
-async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
+async def set_animals_entities(kbid: str, nucliadb_writer: AsyncClient):
     animals = {
         "title": "Animals",
         "entities": {
@@ -55,6 +55,17 @@ async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
         "color": "black",
     }
 
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS",
+        headers={"X-Synchronous": "true"},
+        json=animals,
+    )
+    assert resp.status_code == 200
+
+    return animals
+
+
+async def set_desserts_entities(kbid: str, nucliadb_writer: AsyncClient):
     desserts = {
         "title": "Desserts",
         "entities": {
@@ -67,13 +78,6 @@ async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
     }
 
     resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/entitiesgroup/ANIMALS",
-        headers={"X-Synchronous": "true"},
-        json=animals,
-    )
-    assert resp.status_code == 200
-
-    resp = await nucliadb_writer.post(
         f"/kb/{kbid}/entitiesgroup/DESSERTS",
         headers={"X-Synchronous": "true"},
         json=desserts,
@@ -81,7 +85,7 @@ async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
     assert resp.status_code == 200
 
 
-async def set_test_entities_by_broker_message(kbid: str, nucliadb_grpc: WriterStub):
+async def set_superpowers_entities(kbid: str, nucliadb_grpc: WriterStub):
     bm = broker_resource(
         kbid, slug="resource-with-entities", title="Resource with entities"
     )
@@ -123,6 +127,15 @@ async def set_test_entities_by_broker_message(kbid: str, nucliadb_grpc: WriterSt
     await inject_message(nucliadb_grpc, bm)
 
 
+async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
+    await set_animals_entities(kbid, nucliadb_writer)
+    await set_desserts_entities(kbid, nucliadb_writer)
+
+
+async def set_test_entities_by_broker_message(kbid: str, nucliadb_grpc: WriterStub):
+    await set_superpowers_entities(kbid, nucliadb_grpc)
+
+
 @pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def kb_with_entities(
@@ -130,8 +143,9 @@ async def kb_with_entities(
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
-    await set_test_entities_by_api(knowledgebox, nucliadb_writer)
-    await set_test_entities_by_broker_message(knowledgebox, nucliadb_grpc)
+    await set_animals_entities(knowledgebox, nucliadb_writer)
+    await set_desserts_entities(knowledgebox, nucliadb_writer)
+    await set_superpowers_entities(knowledgebox, nucliadb_grpc)
 
     yield knowledgebox
 
@@ -221,20 +235,58 @@ async def test_get_entities_through_api(
 ):
     kbid = kb_with_entities
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/entitiesgroup/ANIMALS"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
 
     entities = {entity for entity in body["entities"]}
     assert entities == {"cat", "domestic-cat", "house-cat", "dog", "bird"}
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/entitiesgroup/SUPERPOWERS"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/SUPERPOWERS")
     assert resp.status_code == 200
     body = resp.json()
 
     entities = {entity for entity in body["entities"]}
     assert entities == {"fly", "invisibility", "telepathy"}
+
+
+@pytest.mark.asyncio
+async def test_delete_nonexistent_entitiesgroup(
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/nonexistent")
+    assert resp.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "entitiesgroup",
+    [
+        "ANIMALS",  # added with set entities
+        "SUPERPOWERS",  # added with BrokerMessage
+    ],
+)
+@pytest.mark.asyncio
+async def test_delete_entitiesgroup(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entities,
+    predict_mock,
+    entitiesgroup,
+):
+    kbid = kb_with_entities
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["entities"]) > 0
+
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["entities"]) == 0
