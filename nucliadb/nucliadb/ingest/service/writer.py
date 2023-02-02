@@ -36,11 +36,18 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NewKnowledgeBoxResponse,
     UpdateKnowledgeBoxResponse,
 )
-from nucliadb_protos.noderesources_pb2 import ShardCleaned
+from nucliadb_protos.noderesources_pb2 import (
+    EmptyQuery,
+    ShardCleaned,
+    ShardId,
+)
+from nucliadb_protos.nodewriter_pb2 import ShadowShardResponse
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import (
     BinaryData,
     BrokerMessage,
+    CreateShadowShardRequest,
+    CreateShadowShardResponse,
     DelEntitiesRequest,
     DelLabelsRequest,
     DelVectorSetRequest,
@@ -741,6 +748,67 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         result = FileUploaded()
         return result
 
+    async def CreateShadowShard(
+        self, request: CreateShadowShardRequest, context=None
+    ) -> CreateShadowShardResponse:
+        response = CreateShadowShardResponse(success=False)
+        try:
+            shadow_created: Optional[ShardId] = None
+            node = NODES.get(request.node)
+            if node is None:
+                raise ValueError(f"Node {request.node} not found")
+
+            sidecar_stub = node.sidecar
+            ssresp: ShadowShardResponse = await sidecar_stub.CreateShadowShard(
+                EmptyQuery()
+            )
+            if not ssresp.success:
+                raise SidecarCreateShadowShardError()
+            shadow_created = ssresp.shard
+
+            txn = await self.proc.driver.begin()
+            node_klass = get_node_klass()
+            all_shards: PBShards = await node_klass.get_all_shards(txn, request.kbid)
+
+            updated_shards = PBShards()
+            updated_shards.CopyFrom(all_shards)
+
+            updated: bool = update_shards_with_shadow_replica(
+                updated_shards,
+                request.replica,
+                shadow_replica=ssresp.shard,
+                shadow_node=request.node,
+            )
+            if not updated:
+                # TODO: Need to delete shadow shard in this case!
+                raise Exception()
+                pass
+
+            key = KB_SHARDS.format(kbid=request.kbid)
+            await txn.set(key, updated_shards.SerializeToString())
+            await txn.commit(resource=False)
+        except Exception as e:
+            event_id: Optional[str] = None
+            if SENTRY:
+                event_id = capture_exception(e)
+            logger.error(
+                f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}"
+            )
+            if shadow_created is not None:
+                # Attempt to delete shadow shard
+                try:
+                    resp = await sidecar_stub.DeleteShadowShard(shadow_created)
+                    assert resp.success
+                except Exception:
+                    logger.error(
+                        f"Could not clean stale shadow shard: {shadow_created.id}"
+                    )
+                    pass
+        else:
+            response.success = True
+        finally:
+            return response
+
 
 def update_shards_with_updated_replica(
     shards: PBShards, replica_id: str, updated_replica: ShardCleaned
@@ -753,3 +821,23 @@ def update_shards_with_updated_replica(
                 replica.shard.paragraph_service = updated_replica.paragraph_service
                 replica.shard.relation_service = updated_replica.relation_service
                 return
+
+
+def update_shards_with_shadow_replica(
+    shards: PBShards, replica: ShardId, shadow_replica: ShardId, shadow_node: str
+) -> bool:
+    """
+    Returns whether it found the replica to update in the shards proto message
+    """
+    for logic_shard in shards.shards:
+        for replica_shard in logic_shard.replicas:
+            if replica_shard.shard.id == replica.id:
+                replica_shard.has_shadow = True
+                replica_shard.shadow_replica.node = shadow_node
+                replica_shard.shadow_replica.shard.CopyFrom(shadow_replica)
+                return True
+    return False
+
+
+class SidecarCreateShadowShardError(Exception):
+    pass

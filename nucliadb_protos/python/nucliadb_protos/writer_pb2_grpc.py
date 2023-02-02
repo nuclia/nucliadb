@@ -180,6 +180,11 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
                 )
+        self.CreateShadowShard = channel.unary_unary(
+                '/fdbwriter.Writer/CreateShadowShard',
+                request_serializer=nucliadb__protos_dot_writer__pb2.CreateShadowShardRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.CreateShadowShardResponse.FromString,
+                )
 
 
 class WriterServicer(object):
@@ -387,6 +392,13 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateShadowShard(self, request, context):
+        """Shard management
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_WriterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -554,6 +566,11 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.UploadFile,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.UploadBinaryData.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.FileUploaded.SerializeToString,
+            ),
+            'CreateShadowShard': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateShadowShard,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.CreateShadowShardRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.CreateShadowShardResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1123,5 +1140,22 @@ class Writer(object):
         return grpc.experimental.stream_unary(request_iterator, target, '/fdbwriter.Writer/UploadFile',
             nucliadb__protos_dot_writer__pb2.UploadBinaryData.SerializeToString,
             nucliadb__protos_dot_writer__pb2.FileUploaded.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def CreateShadowShard(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/CreateShadowShard',
+            nucliadb__protos_dot_writer__pb2.CreateShadowShardRequest.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.CreateShadowShardResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

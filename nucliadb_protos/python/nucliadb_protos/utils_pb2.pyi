@@ -3,18 +3,12 @@
 isort:skip_file
 """
 import builtins
-import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
-import sys
 import typing
-
-if sys.version_info >= (3, 10):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -22,41 +16,51 @@ class Relation(google.protobuf.message.Message):
     """Relations are connexions between nodes in the relation index.
     They are tuplets (Source, Relation Type, Relation Label, To).
     """
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class _RelationType:
-        ValueType = typing.NewType("ValueType", builtins.int)
+        ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
-
-    class _RelationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Relation._RelationType.ValueType], builtins.type):  # noqa: F821
+    class _RelationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Relation._RelationType.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CHILD: Relation._RelationType.ValueType  # 0
         """Child resource"""
+
         ABOUT: Relation._RelationType.ValueType  # 1
         """related with label (GENERATED)"""
+
         ENTITY: Relation._RelationType.ValueType  # 2
         """related with an entity (GENERATED)"""
+
         COLAB: Relation._RelationType.ValueType  # 3
         """related with user (GENERATED)"""
+
         SYNONYM: Relation._RelationType.ValueType  # 4
         """Synonym relation"""
+
         OTHER: Relation._RelationType.ValueType  # 5
         """related with something"""
 
-    class RelationType(_RelationType, metaclass=_RelationTypeEnumTypeWrapper): ...
+    class RelationType(_RelationType, metaclass=_RelationTypeEnumTypeWrapper):
+        pass
+
     CHILD: Relation.RelationType.ValueType  # 0
     """Child resource"""
+
     ABOUT: Relation.RelationType.ValueType  # 1
     """related with label (GENERATED)"""
+
     ENTITY: Relation.RelationType.ValueType  # 2
     """related with an entity (GENERATED)"""
+
     COLAB: Relation.RelationType.ValueType  # 3
     """related with user (GENERATED)"""
+
     SYNONYM: Relation.RelationType.ValueType  # 4
     """Synonym relation"""
+
     OTHER: Relation.RelationType.ValueType  # 5
     """related with something"""
+
 
     SOURCE_FIELD_NUMBER: builtins.int
     TO_FIELD_NUMBER: builtins.int
@@ -68,77 +72,70 @@ class Relation(google.protobuf.message.Message):
     @property
     def to(self) -> global___RelationNode: ...
     relation: global___Relation.RelationType.ValueType
-    relation_label: builtins.str
+    relation_label: typing.Text
     @property
     def metadata(self) -> global___RelationMetadata: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        source: global___RelationNode | None = ...,
-        to: global___RelationNode | None = ...,
+        source: typing.Optional[global___RelationNode] = ...,
+        to: typing.Optional[global___RelationNode] = ...,
         relation: global___Relation.RelationType.ValueType = ...,
-        relation_label: builtins.str = ...,
-        metadata: global___RelationMetadata | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "source", b"source", "to", b"to"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "relation", b"relation", "relation_label", b"relation_label", "source", b"source", "to", b"to"]) -> None: ...
-
+        relation_label: typing.Text = ...,
+        metadata: typing.Optional[global___RelationMetadata] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata","source",b"source","to",b"to"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata",b"metadata","relation",b"relation","relation_label",b"relation_label","source",b"source","to",b"to"]) -> None: ...
 global___Relation = Relation
 
 class RelationMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     PARAGRAPH_ID_FIELD_NUMBER: builtins.int
     SOURCE_START_FIELD_NUMBER: builtins.int
     SOURCE_END_FIELD_NUMBER: builtins.int
     TO_START_FIELD_NUMBER: builtins.int
     TO_END_FIELD_NUMBER: builtins.int
-    paragraph_id: builtins.str
+    paragraph_id: typing.Text
     source_start: builtins.int
     source_end: builtins.int
     to_start: builtins.int
     to_end: builtins.int
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        paragraph_id: builtins.str | None = ...,
-        source_start: builtins.int | None = ...,
-        source_end: builtins.int | None = ...,
-        to_start: builtins.int | None = ...,
-        to_end: builtins.int | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["_paragraph_id", b"_paragraph_id", "_source_end", b"_source_end", "_source_start", b"_source_start", "_to_end", b"_to_end", "_to_start", b"_to_start", "paragraph_id", b"paragraph_id", "source_end", b"source_end", "source_start", b"source_start", "to_end", b"to_end", "to_start", b"to_start"]) -> None: ...
+        paragraph_id: typing.Optional[typing.Text] = ...,
+        source_start: typing.Optional[builtins.int] = ...,
+        source_end: typing.Optional[builtins.int] = ...,
+        to_start: typing.Optional[builtins.int] = ...,
+        to_end: typing.Optional[builtins.int] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_paragraph_id",b"_paragraph_id","_source_end",b"_source_end","_source_start",b"_source_start","_to_end",b"_to_end","_to_start",b"_to_start","paragraph_id",b"paragraph_id","source_end",b"source_end","source_start",b"source_start","to_end",b"to_end","to_start",b"to_start"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_paragraph_id",b"_paragraph_id","_source_end",b"_source_end","_source_start",b"_source_start","_to_end",b"_to_end","_to_start",b"_to_start","paragraph_id",b"paragraph_id","source_end",b"source_end","source_start",b"source_start","to_end",b"to_end","to_start",b"to_start"]) -> None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_paragraph_id", b"_paragraph_id"]) -> typing_extensions.Literal["paragraph_id"] | None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_paragraph_id",b"_paragraph_id"]) -> typing.Optional[typing_extensions.Literal["paragraph_id"]]: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_end", b"_source_end"]) -> typing_extensions.Literal["source_end"] | None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_end",b"_source_end"]) -> typing.Optional[typing_extensions.Literal["source_end"]]: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_start", b"_source_start"]) -> typing_extensions.Literal["source_start"] | None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_source_start",b"_source_start"]) -> typing.Optional[typing_extensions.Literal["source_start"]]: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_end", b"_to_end"]) -> typing_extensions.Literal["to_end"] | None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_end",b"_to_end"]) -> typing.Optional[typing_extensions.Literal["to_end"]]: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_start", b"_to_start"]) -> typing_extensions.Literal["to_start"] | None: ...
-
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_to_start",b"_to_start"]) -> typing.Optional[typing_extensions.Literal["to_start"]]: ...
 global___RelationMetadata = RelationMetadata
 
 class RelationNode(google.protobuf.message.Message):
     """Nodes are tuplets (Value, Type, Subtype) and they are the main element in the relation index."""
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class _NodeType:
-        ValueType = typing.NewType("ValueType", builtins.int)
+        ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
-
-    class _NodeTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RelationNode._NodeType.ValueType], builtins.type):  # noqa: F821
+    class _NodeTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RelationNode._NodeType.ValueType], builtins.type):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         ENTITY: RelationNode._NodeType.ValueType  # 0
         LABEL: RelationNode._NodeType.ValueType  # 1
         RESOURCE: RelationNode._NodeType.ValueType  # 2
         USER: RelationNode._NodeType.ValueType  # 3
+    class NodeType(_NodeType, metaclass=_NodeTypeEnumTypeWrapper):
+        pass
 
-    class NodeType(_NodeType, metaclass=_NodeTypeEnumTypeWrapper): ...
     ENTITY: RelationNode.NodeType.ValueType  # 0
     LABEL: RelationNode.NodeType.ValueType  # 1
     RESOURCE: RelationNode.NodeType.ValueType  # 2
@@ -147,26 +144,26 @@ class RelationNode(google.protobuf.message.Message):
     VALUE_FIELD_NUMBER: builtins.int
     NTYPE_FIELD_NUMBER: builtins.int
     SUBTYPE_FIELD_NUMBER: builtins.int
-    value: builtins.str
+    value: typing.Text
     """Value of the node."""
+
     ntype: global___RelationNode.NodeType.ValueType
     """The type of the node."""
-    subtype: builtins.str
-    """A node may have a subtype (the string should be empty in case it does not)."""
-    def __init__(
-        self,
-        *,
-        value: builtins.str = ...,
-        ntype: global___RelationNode.NodeType.ValueType = ...,
-        subtype: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["ntype", b"ntype", "subtype", b"subtype", "value", b"value"]) -> None: ...
 
+    subtype: typing.Text
+    """A node may have a subtype (the string should be empty in case it does not)."""
+
+    def __init__(self,
+        *,
+        value: typing.Text = ...,
+        ntype: global___RelationNode.NodeType.ValueType = ...,
+        subtype: typing.Text = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["ntype",b"ntype","subtype",b"subtype","value",b"value"]) -> None: ...
 global___RelationNode = RelationNode
 
 class JoinGraphCnx(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     SOURCE_FIELD_NUMBER: builtins.int
     TARGET_FIELD_NUMBER: builtins.int
     RTYPE_FIELD_NUMBER: builtins.int
@@ -175,42 +172,37 @@ class JoinGraphCnx(google.protobuf.message.Message):
     source: builtins.int
     target: builtins.int
     rtype: global___Relation.RelationType.ValueType
-    rsubtype: builtins.str
+    rsubtype: typing.Text
     @property
     def metadata(self) -> global___RelationMetadata: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
         source: builtins.int = ...,
         target: builtins.int = ...,
         rtype: global___Relation.RelationType.ValueType = ...,
-        rsubtype: builtins.str = ...,
-        metadata: global___RelationMetadata | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "rsubtype", b"rsubtype", "rtype", b"rtype", "source", b"source", "target", b"target"]) -> None: ...
-
+        rsubtype: typing.Text = ...,
+        metadata: typing.Optional[global___RelationMetadata] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata",b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata",b"metadata","rsubtype",b"rsubtype","rtype",b"rtype","source",b"source","target",b"target"]) -> None: ...
 global___JoinGraphCnx = JoinGraphCnx
 
 class JoinGraph(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class NodesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.int
         @property
         def value(self) -> global___RelationNode: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
             key: builtins.int = ...,
-            value: global___RelationNode | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            value: typing.Optional[global___RelationNode] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     NODES_FIELD_NUMBER: builtins.int
     EDGES_FIELD_NUMBER: builtins.int
@@ -218,56 +210,48 @@ class JoinGraph(google.protobuf.message.Message):
     def nodes(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___RelationNode]: ...
     @property
     def edges(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___JoinGraphCnx]: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        nodes: collections.abc.Mapping[builtins.int, global___RelationNode] | None = ...,
-        edges: collections.abc.Iterable[global___JoinGraphCnx] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["edges", b"edges", "nodes", b"nodes"]) -> None: ...
-
+        nodes: typing.Optional[typing.Mapping[builtins.int, global___RelationNode]] = ...,
+        edges: typing.Optional[typing.Iterable[global___JoinGraphCnx]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["edges",b"edges","nodes",b"nodes"]) -> None: ...
 global___JoinGraph = JoinGraph
 
 class ExtractedText(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class SplitTextEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        value: builtins.str
-        def __init__(
-            self,
+        key: typing.Text
+        value: typing.Text
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: builtins.str = ...,
-        ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Text = ...,
+            ) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     TEXT_FIELD_NUMBER: builtins.int
     SPLIT_TEXT_FIELD_NUMBER: builtins.int
     DELETED_SPLITS_FIELD_NUMBER: builtins.int
-    text: builtins.str
+    text: typing.Text
     @property
-    def split_text(self) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    def split_text(self) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]: ...
     @property
-    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    def __init__(
-        self,
+    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def __init__(self,
         *,
-        text: builtins.str = ...,
-        split_text: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
-        deleted_splits: collections.abc.Iterable[builtins.str] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["deleted_splits", b"deleted_splits", "split_text", b"split_text", "text", b"text"]) -> None: ...
-
+        text: typing.Text = ...,
+        split_text: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
+        deleted_splits: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["deleted_splits",b"deleted_splits","split_text",b"split_text","text",b"text"]) -> None: ...
 global___ExtractedText = ExtractedText
 
 class Vector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     START_FIELD_NUMBER: builtins.int
     END_FIELD_NUMBER: builtins.int
     START_PARAGRAPH_FIELD_NUMBER: builtins.int
@@ -279,53 +263,45 @@ class Vector(google.protobuf.message.Message):
     end_paragraph: builtins.int
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
         start: builtins.int = ...,
         end: builtins.int = ...,
         start_paragraph: builtins.int = ...,
         end_paragraph: builtins.int = ...,
-        vector: collections.abc.Iterable[builtins.float] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "end_paragraph", b"end_paragraph", "start", b"start", "start_paragraph", b"start_paragraph", "vector", b"vector"]) -> None: ...
-
+        vector: typing.Optional[typing.Iterable[builtins.float]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","end_paragraph",b"end_paragraph","start",b"start","start_paragraph",b"start_paragraph","vector",b"vector"]) -> None: ...
 global___Vector = Vector
 
 class Vectors(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     VECTORS_FIELD_NUMBER: builtins.int
     @property
     def vectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Vector]: ...
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        vectors: collections.abc.Iterable[global___Vector] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
-
+        vectors: typing.Optional[typing.Iterable[global___Vector]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors",b"vectors"]) -> None: ...
 global___Vectors = Vectors
 
 class VectorObject(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class SplitVectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
+        key: typing.Text
         @property
         def value(self) -> global___Vectors: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: global___Vectors | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Optional[global___Vectors] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     VECTORS_FIELD_NUMBER: builtins.int
     SPLIT_VECTORS_FIELD_NUMBER: builtins.int
@@ -333,24 +309,21 @@ class VectorObject(google.protobuf.message.Message):
     @property
     def vectors(self) -> global___Vectors: ...
     @property
-    def split_vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___Vectors]: ...
+    def split_vectors(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___Vectors]: ...
     @property
-    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    def __init__(
-        self,
+    def deleted_splits(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def __init__(self,
         *,
-        vectors: global___Vectors | None = ...,
-        split_vectors: collections.abc.Mapping[builtins.str, global___Vectors] | None = ...,
-        deleted_splits: collections.abc.Iterable[builtins.str] | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["deleted_splits", b"deleted_splits", "split_vectors", b"split_vectors", "vectors", b"vectors"]) -> None: ...
-
+        vectors: typing.Optional[global___Vectors] = ...,
+        split_vectors: typing.Optional[typing.Mapping[typing.Text, global___Vectors]] = ...,
+        deleted_splits: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["vectors",b"vectors"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["deleted_splits",b"deleted_splits","split_vectors",b"split_vectors","vectors",b"vectors"]) -> None: ...
 global___VectorObject = VectorObject
 
 class UserVector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     VECTOR_FIELD_NUMBER: builtins.int
     LABELS_FIELD_NUMBER: builtins.int
     START_FIELD_NUMBER: builtins.int
@@ -358,98 +331,85 @@ class UserVector(google.protobuf.message.Message):
     @property
     def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
     @property
-    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def labels(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     start: builtins.int
     end: builtins.int
-    def __init__(
-        self,
+    def __init__(self,
         *,
-        vector: collections.abc.Iterable[builtins.float] | None = ...,
-        labels: collections.abc.Iterable[builtins.str] | None = ...,
+        vector: typing.Optional[typing.Iterable[builtins.float]] = ...,
+        labels: typing.Optional[typing.Iterable[typing.Text]] = ...,
         start: builtins.int = ...,
         end: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "labels", b"labels", "start", b"start", "vector", b"vector"]) -> None: ...
-
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["end",b"end","labels",b"labels","start",b"start","vector",b"vector"]) -> None: ...
 global___UserVector = UserVector
 
 class UserVectors(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
+        key: typing.Text
         @property
         def value(self) -> global___UserVector: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: global___UserVector | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Optional[global___UserVector] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     VECTORS_FIELD_NUMBER: builtins.int
     @property
-    def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___UserVector]:
+    def vectors(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___UserVector]:
         """vector's id"""
-    def __init__(
-        self,
+        pass
+    def __init__(self,
         *,
-        vectors: collections.abc.Mapping[builtins.str, global___UserVector] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
-
+        vectors: typing.Optional[typing.Mapping[typing.Text, global___UserVector]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors",b"vectors"]) -> None: ...
 global___UserVectors = UserVectors
 
 class UserVectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     class VectorsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
+        key: typing.Text
         @property
         def value(self) -> global___UserVectors: ...
-        def __init__(
-            self,
+        def __init__(self,
             *,
-            key: builtins.str = ...,
-            value: global___UserVectors | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+            key: typing.Text = ...,
+            value: typing.Optional[global___UserVectors] = ...,
+            ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value",b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key",b"key","value",b"value"]) -> None: ...
 
     VECTORS_FIELD_NUMBER: builtins.int
     @property
-    def vectors(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___UserVectors]:
+    def vectors(self) -> google.protobuf.internal.containers.MessageMap[typing.Text, global___UserVectors]:
         """vectorsets"""
-    def __init__(
-        self,
+        pass
+    def __init__(self,
         *,
-        vectors: collections.abc.Mapping[builtins.str, global___UserVectors] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
-
+        vectors: typing.Optional[typing.Mapping[typing.Text, global___UserVectors]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors",b"vectors"]) -> None: ...
 global___UserVectorSet = UserVectorSet
 
 class UserVectorsList(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     VECTORS_FIELD_NUMBER: builtins.int
     @property
-    def vectors(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    def __init__(
-        self,
+    def vectors(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def __init__(self,
         *,
-        vectors: collections.abc.Iterable[builtins.str] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["vectors", b"vectors"]) -> None: ...
-
+        vectors: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["vectors",b"vectors"]) -> None: ...
 global___UserVectorsList = UserVectorsList
