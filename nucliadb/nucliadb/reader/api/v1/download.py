@@ -198,7 +198,7 @@ async def download_api(sf: StorageField, headers: Headers):
         range_request = headers["range"]
         try:
             start, end, range_size = parse_media_range(range_request, file_size)
-        except NotImplementedError as err:
+        except NotImplementedError:
             raise HTTPException(
                 detail={
                     "reason": "rangeNotSupported",
