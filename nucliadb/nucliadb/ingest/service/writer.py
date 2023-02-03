@@ -745,7 +745,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         result = FileUploaded()
         return result
 
-    async def CreateShadowShard(
+    async def CreateShadowShard(  # type: ignore
         self, request: CreateShadowShardRequest, context=None
     ) -> ShadowShardResponse:
         response = ShadowShardResponse(success=False)
@@ -756,7 +756,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if node is None:
                 raise ValueError(f"Node {request.node} not found")
 
-            ssresp = await node.sidecar.CreateShadowShard(EmptyQuery())
+            ssresp = await node.sidecar.CreateShadowShard(EmptyQuery())  # type: ignore
             if not ssresp.success:
                 raise SidecarCreateShadowShardError()
             shadow_created = ssresp.shard
@@ -789,7 +789,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if shadow_created is not None:
                 # Attempt to delete shadow shard
                 try:
-                    resp = await node.sidecar.DeleteShadowShard(shadow_created)
+                    resp = await node.sidecar.DeleteShadowShard(shadow_created)  # type: ignore
                     assert resp.success
                 except Exception:
                     logger.error(
@@ -801,14 +801,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         finally:
             return response
 
-    async def DeleteShadowShard(
+    async def DeleteShadowShard(  # type: ignore
         self, request: DeleteShadowShardRequest, context=None
     ) -> ShadowShardResponse:
         response = ShadowShardResponse(success=False)
         try:
-            import pdb
-
-            pdb.set_trace()
             # Find if requested replica indeed has a shadow shard to delete
             txn = await self.proc.driver.begin()
             node_klass = get_node_klass()
@@ -827,9 +824,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             # Shadow shard found. Delete it
             node = NODES.get(to_delete.node)
             if node is None:
-                raise ValueError(f"Node {request.node} not found")
+                raise ValueError(f"Node {to_delete.node} not found")
 
-            ssresp = await node.sidecar.DeleteShadowShard(to_delete.shard)
+            ssresp = await node.sidecar.DeleteShadowShard(to_delete.shard)  # type: ignore
             if not ssresp.success:
                 raise SidecarDeleteShadowShardError()
             response.shadow_shard.node = to_delete.node
