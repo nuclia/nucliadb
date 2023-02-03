@@ -273,7 +273,7 @@ impl TextReaderService {
             next_page = false;
         }
         let mut results = Vec::with_capacity(total);
-        for (id, (_, doc_address)) in response.top_docs.into_iter().enumerate() {
+        for (id, (_, doc_address)) in response.top_docs.into_iter().dedup().enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = Some(ResultScore {

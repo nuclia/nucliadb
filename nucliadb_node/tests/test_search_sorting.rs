@@ -32,6 +32,7 @@ use tonic::Request;
 use uuid::Uuid;
 
 async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id: String) {
+    let sleep_time = std::time::Duration::from_secs(1);
     for i in 0..total {
         let rid = Uuid::new_v4();
         let field = format!("dummy-{i:0>3}");
@@ -73,6 +74,7 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
             .unwrap();
 
         assert_eq!(result.get_ref().status(), Status::Ok);
+        std::thread::sleep(sleep_time);
     }
 }
 
