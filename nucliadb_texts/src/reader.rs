@@ -148,20 +148,20 @@ impl TextReaderService {
         offset: usize,
     ) -> impl Collector<Fruit = Vec<(u64, DocAddress)>> {
         use tantivy::fastfield::{FastFieldReader, FastValue};
-        use tantivy::{DocId, Score, SegmentReader};
+        use tantivy::{DocId, SegmentReader};
         let created = self.schema.created;
         let modified = self.schema.modified;
         let sorter = match order.r#type() {
             OrderType::Desc => |t: u64| t,
             OrderType::Asc => |t: u64| u64::MAX - t,
         };
-        TopDocs::with_limit(limit).and_offset(offset).tweak_score(
+        TopDocs::with_limit(limit).and_offset(offset).custom_score(
             move |segment_reader: &SegmentReader| {
                 let reader = match order.sort_by() {
                     OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
                     OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
                 };
-                move |doc: DocId, _: Score| sorter(reader.get(doc).to_u64())
+                move |doc: DocId| sorter(reader.get(doc).to_u64())
             },
         )
     }
@@ -273,7 +273,7 @@ impl TextReaderService {
             next_page = false;
         }
         let mut results = Vec::with_capacity(total);
-        for (id, (_, doc_address)) in response.top_docs.into_iter().dedup().enumerate() {
+        for (id, (_, doc_address)) in response.top_docs.into_iter().enumerate() {
             match searcher.doc(doc_address) {
                 Ok(doc) => {
                     let score = Some(ResultScore {
