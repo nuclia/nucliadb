@@ -218,6 +218,8 @@ FILE_SIZE = 10
         (f"bytes=0-{FILE_SIZE}", FILE_SIZE, 0, FILE_SIZE - 1, FILE_SIZE, None),
         # End range < file size
         (f"bytes=0-5", FILE_SIZE, 0, 5, 6, None),
+        # End range > file size
+        (f"bytes=0-{FILE_SIZE + 1}", FILE_SIZE, 0, FILE_SIZE - 1, FILE_SIZE, None),
         # Invalid range
         ("bytes=something", FILE_SIZE, None, None, None, ValueError),
     ],
