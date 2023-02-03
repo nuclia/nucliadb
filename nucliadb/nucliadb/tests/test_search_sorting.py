@@ -151,20 +151,20 @@ async def test_limited_sorted_search_of_most_relevant_results(
 async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    twenty_dummy_resources_kb,
+    ten_dummy_resources_kb,
 ):
     """An empty query without sort options returns all resources sorted by
     descendent creation date.
 
     """
-    kbid = twenty_dummy_resources_kb
+    kbid = ten_dummy_resources_kb
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/search")
     assert resp.status_code == 200
 
     body = resp.json()
     for results in [body["fulltext"]["results"], body["paragraphs"]["results"]]:
-        assert len(results) > 0
+        assert len(results) > 1
 
         creation_dates = [
             datetime.fromisoformat(body["resources"][result["rid"]]["created"])
@@ -173,70 +173,65 @@ async def test_empty_query_search_for_ordered_resources_by_creation_date_desc(
         assert creation_dates == sorted(creation_dates, reverse=True)
 
 
-@pytest.mark.skip(reason="Wait rust-side development")
-@pytest.mark.parametrize(
-    "sort_options",
-    [
-        ("created", "asc", sorted),
-        ("created", "desc", sorted),
-        ("modified", "asc", lambda x: list(reversed(sorted(x)))),
-        ("modified", "desc", lambda x: list(reversed(sorted(x)))),
-    ],
-)
 @pytest.mark.asyncio
 async def test_list_all_resources_by_creation_and_modification_dates_with_empty_queries(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    twenty_dummy_resources_kb,
-    sort_options,
+    ten_dummy_resources_kb,
 ):
     """Using a sort by creation date without limit we can get a list of resources
     ordered by this.
 
     """
-    kbid = twenty_dummy_resources_kb
+    kbid = ten_dummy_resources_kb
 
-    sort_field, sort_order, sort_function = sort_options
+    sort_options = [
+        ("created", "asc", sorted),
+        ("created", "desc", lambda x: list(reversed(sorted(x)))),
+        ("modified", "asc", sorted),
+        ("modified", "desc", lambda x: list(reversed(sorted(x)))),
+    ]
 
-    resources = {}
-    fulltext = []
+    for sort_field, sort_order, sort_function in sort_options:
+        resources = {}
+        fulltext = []
 
-    page_number = 0
-    page_size = 5
-    next_page = True
+        page_number = 0
+        page_size = 2
+        next_page = True
 
-    while next_page:
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
-            params={
-                "query": "",
-                "features": ["document"],
-                "fields": ["a/title"],
-                "page_number": page_number,
-                "page_size": page_size,
-                "sort_field": sort_field,
-                "sort_order": sort_order,
-            },
-        )
-        assert resp.status_code == 200
+        while next_page:
+            resp = await nucliadb_reader.get(
+                f"/kb/{kbid}/search",
+                params={
+                    "query": "",
+                    "features": ["document"],
+                    "fields": ["a/title"],
+                    "page_number": page_number,
+                    "page_size": page_size,
+                    "sort_field": sort_field,
+                    "sort_order": sort_order,
+                },
+            )
+            assert resp.status_code == 200
 
-        body = resp.json()
+            body = resp.json()
 
-        resources.update(body["resources"])
-        fulltext.extend(body["fulltext"]["results"])
+            resources.update(body["resources"])
+            fulltext.extend(body["fulltext"]["results"])
 
-        next_page = body["fulltext"]["next_page"] or body["paragraphs"]["next_page"]
-        page_number += 1
+            next_page = body["fulltext"]["next_page"] or body["paragraphs"]["next_page"]
+            page_number += 1
 
-    assert len(fulltext) == 20
-    assert len(resources) == 20
+        assert len(fulltext) == 10
+        assert len(resources) == 10
 
-    for results in [fulltext]:
-        sort_fields = [
-            datetime.fromisoformat(resources[result["rid"]][sort_field])
-            for result in results
-        ]
-        assert sort_fields == sort_function(sort_fields)
+        for results in [fulltext]:
+            sort_fields = [
+                datetime.fromisoformat(resources[result["rid"]][sort_field])
+                for result in results
+            ]
+            assert sort_fields == sort_function(sort_fields)  # type: ignore
 
 
 @pytest.mark.asyncio

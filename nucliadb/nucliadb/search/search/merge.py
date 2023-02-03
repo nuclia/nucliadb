@@ -520,7 +520,17 @@ async def merge_paragraphs_results(
 
     resources: List[str] = list()
     api_results.paragraphs = await merge_paragraph_results(
-        paragraphs, resources, kbid, count, page, highlight=highlight_split
+        paragraphs,
+        resources,
+        kbid,
+        count,
+        page,
+        highlight=highlight_split,
+        sort=SortOptions(
+            field=SortField.SCORE,
+            order=SortOrder.DESC,
+            limit=None,
+        ),
     )
     return api_results
 

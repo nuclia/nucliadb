@@ -19,4 +19,4 @@
 #
 
 from .philosophy_books import *  # noqa
-from .twenty_dummy_resources import *  # noqa
+from .ten_dummy_resources import *  # noqa

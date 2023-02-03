@@ -32,7 +32,7 @@ use tonic::Request;
 use uuid::Uuid;
 
 async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id: String) {
-    let sleep_time = std::time::Duration::from_secs(1);
+    let resource_creation_delay = std::time::Duration::from_secs(1);
     for i in 0..total {
         let rid = Uuid::new_v4();
         let field = format!("dummy-{i:0>3}");
@@ -74,7 +74,7 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
             .unwrap();
 
         assert_eq!(result.get_ref().status(), Status::Ok);
-        std::thread::sleep(sleep_time);
+        std::thread::sleep(resource_creation_delay);
     }
 }
 
@@ -130,9 +130,55 @@ async fn test_search_sorting() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     });
     let fields = paginated_search(&mut reader, shard_id.clone(), order, 5).await;
+    let mut sorted_fields = fields.clone();
+    sorted_fields.sort();
+    assert_eq!(fields, sorted_fields);
+
+    // --------------------------------------------------------------
+    // Test: sort by modified date in ascending order
+    // --------------------------------------------------------------
+
+    let order = Some(nucliadb_protos::OrderBy {
+        sort_by: nucliadb_protos::order_by::OrderField::Modified.into(),
+        r#type: nucliadb_protos::order_by::OrderType::Asc.into(),
+        ..Default::default()
+    });
+    let fields = paginated_search(&mut reader, shard_id.clone(), order, 5).await;
 
     let mut sorted_fields = fields.clone();
     sorted_fields.sort();
+    assert_eq!(fields, sorted_fields);
+
+    // --------------------------------------------------------------
+    // Test: sort by creation date in descending order
+    // --------------------------------------------------------------
+
+    let order = Some(nucliadb_protos::OrderBy {
+        sort_by: nucliadb_protos::order_by::OrderField::Created.into(),
+        r#type: nucliadb_protos::order_by::OrderType::Desc.into(),
+        ..Default::default()
+    });
+    let fields = paginated_search(&mut reader, shard_id.clone(), order, 5).await;
+
+    let mut sorted_fields = fields.clone();
+    sorted_fields.sort();
+    sorted_fields.reverse();
+    assert_eq!(fields, sorted_fields);
+
+    // --------------------------------------------------------------
+    // Test: sort by modified date in descending order
+    // --------------------------------------------------------------
+
+    let order = Some(nucliadb_protos::OrderBy {
+        sort_by: nucliadb_protos::order_by::OrderField::Modified.into(),
+        r#type: nucliadb_protos::order_by::OrderType::Desc.into(),
+        ..Default::default()
+    });
+    let fields = paginated_search(&mut reader, shard_id.clone(), order, 5).await;
+
+    let mut sorted_fields = fields.clone();
+    sorted_fields.sort();
+    sorted_fields.reverse();
     assert_eq!(fields, sorted_fields);
 
     Ok(())

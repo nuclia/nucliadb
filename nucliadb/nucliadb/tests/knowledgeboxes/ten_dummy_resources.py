@@ -17,26 +17,30 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+
 import pytest
 from httpx import AsyncClient
 
 
 @pytest.fixture(scope="function")
-async def twenty_dummy_resources_kb(
+async def ten_dummy_resources_kb(
     nucliadb_manager: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
 ):
+    N_RESOURCES = 10
+
     payloads = [
         {
             "slug": f"dummy-resource-{i}",
             "title": f"Dummy resource {i}",
             "summary": f"Dummy resource {i} summary",
         }
-        for i in range(20)
+        for i in range(N_RESOURCES)
     ]
 
-    resp = await nucliadb_manager.post("/kbs", json={"slug": "twenty-dummy-resources"})
+    resp = await nucliadb_manager.post("/kbs", json={"slug": "ten-dummy-resources"})
     assert resp.status_code == 201
     kbid = resp.json().get("uuid")
 
@@ -48,12 +52,14 @@ async def twenty_dummy_resources_kb(
         )
         assert resp.status_code == 201
 
+        await asyncio.sleep(1)
+
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/resources",
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["resources"]) == 20
+    assert len(body["resources"]) == N_RESOURCES
 
     yield kbid
 

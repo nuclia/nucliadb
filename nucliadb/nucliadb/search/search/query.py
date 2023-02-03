@@ -30,7 +30,13 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.search import SearchOptions, Sort, SortOptions, SuggestOptions, SortFieldMap
+from nucliadb_models.search import (
+    SearchOptions,
+    Sort,
+    SortFieldMap,
+    SortOptions,
+    SuggestOptions,
+)
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
@@ -99,7 +105,7 @@ async def global_query_to_pb(
         sort_field = SortFieldMap[sort.field]
         if sort_field is not None:
             request.order.sort_by = sort_field
-            request.order.type = sort_ord
+            request.order.type = sort_ord  # type: ignore
 
         request.fields.extend(fields)
 

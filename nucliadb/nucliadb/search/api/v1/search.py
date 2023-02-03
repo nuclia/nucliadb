@@ -47,12 +47,11 @@ from nucliadb_models.search import (
     ResourceProperties,
     SearchOptions,
     SearchRequest,
-    Sort,
     SortField,
+    SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
-    SortFieldMap,
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -391,7 +390,6 @@ async def search(
 
 
 def parse_sort_options(item: SearchRequest) -> SortOptions:
-    sort_options = item.sort
     if is_empty_query(item):
         if item.sort is None:
             sort_options = SortOptions(
@@ -407,6 +405,8 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                     f" '{SortField.MODIFIED}' and sort limit won't be applied"
                 ),
             )
+        else:
+            sort_options = item.sort
     else:
         if item.sort is None:
             sort_options = SortOptions(
@@ -419,6 +419,8 @@ def parse_sort_options(item: SearchRequest) -> SortOptions:
                 status_code=422,
                 detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
             )
+        else:
+            sort_options = item.sort
 
     return sort_options
 
