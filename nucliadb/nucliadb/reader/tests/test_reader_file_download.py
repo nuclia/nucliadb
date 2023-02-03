@@ -84,6 +84,14 @@ async def test_resource_download_field_file(
         assert resp.status_code == 416
         assert resp.json()["detail"]["reason"] == "rangeNotParsable"
 
+        # Check that multipart ranges not implemented is handled
+        resp = await client.get(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
+            headers={"range": "bytes=0-50, 100-150"},
+        )
+        assert resp.status_code == 416
+        assert resp.json()["detail"]["reason"] == "rangeNotSupported"
+
         resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/download/field",
             headers={"range": "bytes=0-"},
@@ -222,6 +230,8 @@ FILE_SIZE = 10
         (f"bytes=0-{FILE_SIZE + 1}", FILE_SIZE, 0, FILE_SIZE - 1, FILE_SIZE, None),
         # Invalid range
         ("bytes=something", FILE_SIZE, None, None, None, ValueError),
+        # Multi-part ranges not supported yet
+        ("bytes=0-50, 100-150", FILE_SIZE, None, None, None, NotImplementedError),
     ],
 )
 def test_parse_media_range(range_request, filesize, start, end, range_size, exception):

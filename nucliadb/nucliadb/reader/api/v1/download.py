@@ -198,6 +198,16 @@ async def download_api(sf: StorageField, headers: Headers):
         range_request = headers["range"]
         try:
             start, end, range_size = parse_media_range(range_request, file_size)
+        except NotImplementedError as err:
+            raise HTTPException(
+                detail={
+                    "reason": "rangeNotSupported",
+                    "range": range_request,
+                    "message": "Multipart ranges are not supported yet",
+                },
+                headers={"Content-Range": f"bytes */{file_size}"},
+                status_code=416,
+            )
         except (IndexError, ValueError):
             # range errors fallback to full download
             raise HTTPException(
@@ -256,7 +266,10 @@ async def _get_resource_uuid_from_params(
 
 def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int, int]:
     # Implemented following this docpage: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
-    start_str, _, end_str = range_request.split("bytes=")[-1].partition("-")
+    ranges = range_request.split("bytes=")[-1].split(", ")
+    if len(ranges) > 1:
+        raise NotImplementedError()
+    start_str, _, end_str = ranges[0].partition("-")
     start = int(start_str)
     max_range_size = file_size - 1
     if len(end_str) == 0:
