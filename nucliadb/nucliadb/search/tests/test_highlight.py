@@ -40,7 +40,7 @@ from nucliadb.search.search.fetch import highlight_paragraph as highlight
 #     assert res == "bu <mark>kimlik</mark> belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında <mark>kimlik</mark> değişimine erişebilenleri onaylar. <mark>sistem</mark>"  # noqa
 
 
-def test_highligh_error(benchmark):
+def test_highligh_error():
     text = "bu kimlik belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında kimlik değişimine erişebilenleri onaylar. sistem"  # noqa
     ematch = ["kimlik", "sistem"]
     res: str = highlight(text, [], ematch)
