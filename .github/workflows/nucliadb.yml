@@ -141,6 +141,7 @@ jobs:
           tool: 'pytest'
           output-file-path: output.json
           external-data-json-path: ./cache/benchmark-data.json
+          auto-push: true
           gh-repository: nucliadb_performance
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
