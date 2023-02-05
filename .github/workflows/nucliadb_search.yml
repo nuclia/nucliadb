@@ -141,24 +141,18 @@ jobs:
           file: ./coverage.xml
           flags: search
 
-      - name: Download previous benchmark data
-        uses: actions/cache@v1
-        with:
-          path: ./cache
-          key: ${{ runner.os }}-search-benchmark
-
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'pytest'
           output-file-path: output.json
-          external-data-json-path: ./cache/benchmark-data.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          gh-repository: nucliadb_performance
           comment-on-alert: true
           fail-on-alert: true
           alert-comment-cc-users: '@nuclia/nuclia-db'
+          auto-push: true
+          gh-repository: nucliadb_performance
+          comment-always: true
 
       - name: Extract docs
         run: |

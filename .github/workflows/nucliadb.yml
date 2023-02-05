@@ -129,20 +129,14 @@ jobs:
           file: ./coverage.xml
           flags: nucliadb
 
-      - name: Download previous benchmark data
-        uses: actions/cache@v1
-        with:
-          path: ./cache
-          key: ${{ runner.os }}-nucliadb-benchmark
-
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'pytest'
           output-file-path: output.json
-          external-data-json-path: ./cache/benchmark-data.json
           auto-push: true
           gh-repository: nucliadb_performance
+          comment-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
