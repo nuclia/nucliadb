@@ -26,6 +26,7 @@ async def test_counters(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
+    asyncbenchmark
 ):
     # PUBLIC API
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
@@ -54,7 +55,7 @@ async def test_counters(
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/counters")
+    resp = await asyncbenchmark(nucliadb_reader.get, f"/kb/{knowledgebox}/counters")
 
     assert resp.status_code == 200
     assert resp.json()["resources"] == 3

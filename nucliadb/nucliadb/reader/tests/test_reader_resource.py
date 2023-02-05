@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import time
 from typing import Callable
 
 import pytest
@@ -112,16 +113,26 @@ async def test_get_resource_sequence_ids_are_set_on_resource(
         assert resource["queue"] == "private"
 
 
+@pytest.mark.benchmark(
+    group="highlight",
+    min_time=0.1,
+    max_time=0.5,
+    min_rounds=5,
+    timer=time.time,
+    disable_gc=True,
+    warmup=False,
+)
 @pytest.mark.asyncio
 async def test_get_resource_all(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    reader_api: Callable[..., AsyncClient], test_resource: Resource, asyncbenchmark
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(
+        resp = await asyncbenchmark(
+            client.get,
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={
                 "show": ["basic", "origin", "relations", "values", "extracted"],

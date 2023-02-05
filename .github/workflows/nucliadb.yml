@@ -121,13 +121,19 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append nucliadb/nucliadb/tests
+          pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json output.json nucliadb/nucliadb/tests
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
           flags: nucliadb
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'pytest'
+          output-file-path: output.json
 
   build:
     name: Validate docker build

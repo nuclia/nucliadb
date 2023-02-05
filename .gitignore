@@ -86,3 +86,4 @@ test.export.tar.bz2
 # project configuration
 .env
 .envrc
+output.json
