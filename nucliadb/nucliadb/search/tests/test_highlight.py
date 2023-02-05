@@ -17,28 +17,38 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import time
+# import time
 
-import pytest
+# import pytest
 
 from nucliadb.search.search.fetch import highlight_paragraph as highlight
 
+# @pytest.mark.benchmark(
+#     group="highlight",
+#     min_time=0.1,
+#     max_time=0.5,
+#     min_rounds=5,
+#     timer=time.time,
+#     disable_gc=True,
+#     warmup=False,
+# )
+# def test_highligh_error(benchmark):
+#     text = "bu kimlik belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında kimlik değişimine erişebilenleri onaylar. sistem"  # noqa
+#     ematch = ["kimlik", "sistem"]
+#     res: str = benchmark(highlight, text, [], ematch)
+#     assert res.count("mark") == 6
+#     assert res == "bu <mark>kimlik</mark> belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında <mark>kimlik</mark> değişimine erişebilenleri onaylar. <mark>sistem</mark>"  # noqa
 
-@pytest.mark.benchmark(
-    group="highlight",
-    min_time=0.1,
-    max_time=0.5,
-    min_rounds=5,
-    timer=time.time,
-    disable_gc=True,
-    warmup=False,
-)
+
 def test_highligh_error(benchmark):
     text = "bu kimlik belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında kimlik değişimine erişebilenleri onaylar. sistem"  # noqa
     ematch = ["kimlik", "sistem"]
-    res: str = benchmark(highlight, text, [], ematch)
+    res: str = highlight(text, [], ematch)
     assert res.count("mark") == 6
-    assert res == "bu <mark>kimlik</mark> belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında <mark>kimlik</mark> değişimine erişebilenleri onaylar. <mark>sistem</mark>"  # noqa
+    assert (
+        res
+        == "bu <mark>kimlik</mark> belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında <mark>kimlik</mark> değişimine erişebilenleri onaylar. <mark>sistem</mark>"  # noqa
+    )
 
 
 def test_highlight():
