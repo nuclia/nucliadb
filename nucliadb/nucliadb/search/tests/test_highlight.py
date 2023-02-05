@@ -19,6 +19,14 @@
 
 from nucliadb.search.search.fetch import highlight_paragraph as highlight
 
+def test_highligh_error():
+    text = '     kimlik belgesi geçerlilik süresinin bu türden kimlik belgelerinin sahip \n     olduğu standartlara aykırı olmadığını, kimlik belgesinin yakın alan \n     iletişimi yongasında, MRZ’sinde ve sair basılı alanlarında yer alan \n     fotoğraf da dâhil bilgilerin tutarlı ve geçerli olduğunu doğrular ve \n     İçişleri Bakanlığı Nüfus ve Vatandaşlık İşleri Genel Müdürlüğü kimlik \n     paylaşımı sisteminden imkân tanınanları teyit eder. \n'
+    ematch = [
+        'kimlik',
+        'eder'
+    ]
+    res = highlight(text, [], ematch)
+    assert res.count('mark') == 10
 
 def test_highlight():
 
