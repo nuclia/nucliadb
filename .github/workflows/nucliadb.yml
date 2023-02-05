@@ -136,6 +136,7 @@ jobs:
           output-file-path: output.json
           auto-push: true
           gh-repository: github.com/nuclia/nucliadb_performance
+          gh-branch: main
           comment-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true

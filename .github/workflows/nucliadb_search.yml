@@ -152,6 +152,7 @@ jobs:
           alert-comment-cc-users: '@nuclia/nuclia-db'
           auto-push: true
           gh-repository: github.com/nuclia/nucliadb_performance
+          gh-branch: main
           comment-always: true
 
       - name: Extract docs
