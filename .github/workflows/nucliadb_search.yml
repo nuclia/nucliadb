@@ -145,7 +145,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ./cache
-          key: ${{ runner.os }}-benchmark
+          key: ${{ runner.os }}-search-benchmark
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
@@ -153,8 +153,10 @@ jobs:
           tool: 'pytest'
           output-file-path: output.json
           external-data-json-path: ./cache/benchmark-data.json
+          gh-repository: nucliadb_performance
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
+          fail-on-alert: true
           alert-comment-cc-users: '@nuclia/nuclia-db'
 
       - name: Extract docs
