@@ -175,10 +175,9 @@ async def test_creation(
 
 @pytest.mark.asyncio
 async def test_can_create_knowledgebox_with_colon_in_slug(
-    nucliadb_manager: AsyncClient, asyncbenchmark
+    nucliadb_manager: AsyncClient
 ):
-    resp = await asyncbenchmark(
-        nucliadb_manager.post,
+    resp = await nucliadb_manager.post(
         f"/kbs",
         json={"slug": "something:else"},
     )
