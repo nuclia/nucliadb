@@ -204,7 +204,7 @@ def highlight_paragraph(
 ) -> str:
     text_lower = text.lower()
 
-    marks = [0] * (len(text) + 1)
+    marks = [0] * (len(text_lower) + 1)
     if ematches is not None:
         for quote in ematches:
             quote_regex = get_regex(quote.lower())
@@ -235,19 +235,25 @@ def highlight_paragraph(
     new_text = ""
     actual = 0
     mod = 0
+    skip = False
 
     length = len(text)
 
     for index, pos in enumerate(marks):
-        if index >= length:
+        if skip:
+            skip = False
+            continue
+        if (index - mod) >= length:
             char_pos = ""
         else:
             begining = True
             if index > 0 and text[index - mod - 1] not in PRE_WORD:
                 begining = False
             char_pos = text[index - mod]
-            if text[index].lower() != text_lower[index + mod]:
+            if text[index - mod].lower() != text_lower[index]:
+                # May be incorrect positioning due to unicode lower
                 mod += 1
+                skip = True
         if pos == 1 and actual == 0 and begining:
             new_text += "<mark>"
             new_text += char_pos

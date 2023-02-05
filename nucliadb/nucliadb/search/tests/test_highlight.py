@@ -17,16 +17,29 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import time
+
+import pytest
+
 from nucliadb.search.search.fetch import highlight_paragraph as highlight
 
-def test_highligh_error():
-    text = '     kimlik belgesi geçerlilik süresinin bu türden kimlik belgelerinin sahip \n     olduğu standartlara aykırı olmadığını, kimlik belgesinin yakın alan \n     iletişimi yongasında, MRZ’sinde ve sair basılı alanlarında yer alan \n     fotoğraf da dâhil bilgilerin tutarlı ve geçerli olduğunu doğrular ve \n     İçişleri Bakanlığı Nüfus ve Vatandaşlık İşleri Genel Müdürlüğü kimlik \n     paylaşımı sisteminden imkân tanınanları teyit eder. \n'
-    ematch = [
-        'kimlik',
-        'eder'
-    ]
-    res = highlight(text, [], ematch)
-    assert res.count('mark') == 10
+
+@pytest.mark.benchmark(
+    group="highlight",
+    min_time=0.1,
+    max_time=0.5,
+    min_rounds=5,
+    timer=time.time,
+    disable_gc=True,
+    warmup=False,
+)
+def test_highligh_error(benchmark):
+    text = "bu kimlik belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında kimlik değişimine erişebilenleri onaylar. sistem"  # noqa
+    ematch = ["kimlik", "sistem"]
+    res: str = benchmark(highlight, text, [], ematch)
+    assert res.count("mark") == 6
+    assert res == "bu <mark>kimlik</mark> belgelerinin geçerlilik sürelerinin standartlara aykırı olmadığını, fotoğraftaki yakın alan iletişim çipindeki bilgilerin tutarlı ve geçerli olmadığını ve İçişleri Bakanlığı'nın ortasında <mark>kimlik</mark> değişimine erişebilenleri onaylar. <mark>sistem</mark>"  # noqa
+
 
 def test_highlight():
 
