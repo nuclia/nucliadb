@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
+import time
 from typing import Callable
 
-import asyncio
 import pytest
-import time
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
@@ -40,7 +40,9 @@ from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 )
 @pytest.mark.asyncio
 async def test_multiple_fuzzy_search_resource_all(
-    search_api: Callable[..., AsyncClient], multiple_search_resource: str, asyncbenchmark: AsyncBenchmarkFixture
+    search_api: Callable[..., AsyncClient],
+    multiple_search_resource: str,
+    asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
     kbid = multiple_search_resource
 
@@ -50,6 +52,7 @@ async def test_multiple_fuzzy_search_resource_all(
             f'/{KB_PREFIX}/{kbid}/search?query=own+test+"This is great"&highlight=true&page_number=0&page_size=20',
         )
         assert resp.status_code == 200
+
 
 @pytest.mark.benchmark(
     group="search",
@@ -62,7 +65,9 @@ async def test_multiple_fuzzy_search_resource_all(
 )
 @pytest.mark.asyncio
 async def test_search_resource_all(
-    search_api: Callable[..., AsyncClient], test_search_resource: str, asyncbenchmark: AsyncBenchmarkFixture
+    search_api: Callable[..., AsyncClient],
+    test_search_resource: str,
+    asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
     kbid = test_search_resource
 

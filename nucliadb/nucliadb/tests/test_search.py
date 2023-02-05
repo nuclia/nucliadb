@@ -58,9 +58,7 @@ async def test_search_sc_2062(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=title"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=title")
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
@@ -174,9 +172,7 @@ async def test_search_returns_paragraph_positions(
     await create_resource_with_duplicates(
         knowledgebox, nucliadb_grpc, sentence=sentence
     )
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Ramon"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=Ramon")
     assert resp.status_code == 200
     content = resp.json()
     position = content["paragraphs"]["results"][0]["position"]

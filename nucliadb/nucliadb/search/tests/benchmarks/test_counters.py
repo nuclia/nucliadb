@@ -17,15 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import time
 from typing import Callable
 
 import pytest
-import time
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
+
 
 @pytest.mark.benchmark(
     group="search",
@@ -38,7 +39,9 @@ from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 )
 @pytest.mark.asyncio
 async def test_bm_counters(
-    search_api: Callable[..., AsyncClient], test_search_resource: str, asyncbenchmark: AsyncBenchmarkFixture
+    search_api: Callable[..., AsyncClient],
+    test_search_resource: str,
+    asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
     kbid = test_search_resource
 

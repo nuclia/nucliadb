@@ -19,13 +19,13 @@
 #
 import time
 from typing import Callable
-from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 
 
 @pytest.mark.benchmark(
@@ -39,7 +39,9 @@ from nucliadb_models.resource import NucliaDBRoles
 )
 @pytest.mark.asyncio
 async def test_suggest_resource_all(
-    search_api: Callable[..., AsyncClient], test_search_resource: str, asyncbenchmark: AsyncBenchmarkFixture
+    search_api: Callable[..., AsyncClient],
+    test_search_resource: str,
+    asyncbenchmark: AsyncBenchmarkFixture,
 ) -> None:
     kbid = test_search_resource
 

@@ -18,17 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import time
-from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
+
+#
+from unittest.mock import AsyncMock, Mock
+
 import pytest
 from httpx import AsyncClient
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
-from nucliadb.tests.utils import inject_message
 from nucliadb.tests.test_search import broker_resource_with_classifications
-#
-from unittest.mock import AsyncMock, Mock
-
+from nucliadb.tests.utils import inject_message
+from nucliadb_utils.tests.asyncbenchmark import AsyncBenchmarkFixture
 from nucliadb_utils.utilities import Utility, set_utility
+
 
 @pytest.mark.benchmark(
     group="search",
@@ -45,7 +47,7 @@ async def test_search_returns_labels(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
-    asyncbenchmark: AsyncBenchmarkFixture
+    asyncbenchmark: AsyncBenchmarkFixture,
 ):
     bm = broker_resource_with_classifications(knowledgebox)
     await inject_message(nucliadb_grpc, bm)
@@ -55,6 +57,7 @@ async def test_search_returns_labels(
         f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
     )
     assert resp.status_code == 200
+
 
 @pytest.mark.benchmark(
     group="search",
@@ -72,7 +75,7 @@ async def test_search_relations(
     nucliadb_grpc: WriterStub,
     knowledgebox,
     knowledge_graph,
-    asyncbenchmark: AsyncBenchmarkFixture
+    asyncbenchmark: AsyncBenchmarkFixture,
 ):
     relation_nodes, relation_edges = knowledge_graph
 
