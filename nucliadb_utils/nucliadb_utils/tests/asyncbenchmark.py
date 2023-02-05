@@ -25,7 +25,7 @@ import gc
 import sys
 import time
 from math import ceil
-from typing import Awaitable, Callable, Dict, TypeVar
+from typing import Any, Awaitable, Callable, Coroutine, Dict, TypeVar
 
 import pytest
 from pytest_benchmark.session import BenchmarkSession  # type: ignore
@@ -156,7 +156,10 @@ class AsyncBenchmarkFixture(object):
         return bench_stats
 
     async def __call__(
-        self, function_to_benchmark: Callable[..., Awaitable[T]], *args, **kwargs
+        self,
+        function_to_benchmark: Callable[..., Coroutine[Any, Any, T]],
+        *args,
+        **kwargs
     ) -> T:
         if self._mode:
             self.has_error = True
@@ -171,7 +174,12 @@ class AsyncBenchmarkFixture(object):
             self.has_error = True
             raise
 
-    async def _raw(self, function_to_benchmark, *args, **kwargs):
+    async def _raw(
+        self,
+        function_to_benchmark: Callable[..., Coroutine[Any, Any, T]],
+        *args,
+        **kwargs
+    ) -> T:
         if self.enabled:
             runner = await self._make_runner(function_to_benchmark, args, kwargs)
 
@@ -205,7 +213,7 @@ class AsyncBenchmarkFixture(object):
                 yellow=True,
                 bold=True,
             )
-        function_result = await function_to_benchmark(*args, **kwargs)
+        function_result: T = await function_to_benchmark(*args, **kwargs)
         return function_result
 
     def _cleanup(self):
@@ -280,7 +288,7 @@ class AsyncBenchmarkFixture(object):
 
 @pytest.fixture(scope="function")
 async def asyncbenchmark(request: pytest.FixtureRequest):
-    bs: BenchmarkSession = request.config._benchmarksession
+    bs: BenchmarkSession = request.config._benchmarksession  # type: ignore
 
     if bs.skip:
         pytest.skip("Benchmarks are skipped (--benchmark-skip was used).")

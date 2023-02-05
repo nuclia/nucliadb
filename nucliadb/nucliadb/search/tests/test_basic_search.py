@@ -44,11 +44,10 @@ RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 @pytest.mark.asyncio
 async def test_search_kb_not_found(
-    search_api: Callable[..., AsyncClient], asyncbenchmark
+    search_api: Callable[..., AsyncClient]
 ) -> None:
     async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await asyncbenchmark(
-            client.get,
+        resp = await client.get(
             f"/{KB_PREFIX}/00000000000000/search?query=own+text",
         )
         assert resp.status_code == 404

@@ -113,26 +113,17 @@ async def test_get_resource_sequence_ids_are_set_on_resource(
         assert resource["queue"] == "private"
 
 
-@pytest.mark.benchmark(
-    group="highlight",
-    min_time=0.1,
-    max_time=0.5,
-    min_rounds=5,
-    timer=time.time,
-    disable_gc=True,
-    warmup=False,
-)
 @pytest.mark.asyncio
 async def test_get_resource_all(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource, asyncbenchmark
+    reader_api: Callable[..., AsyncClient],
+    test_resource: Resource,
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid
     rid = rsc.uuid
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await asyncbenchmark(
-            client.get,
+        resp = await client.get(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
             params={
                 "show": ["basic", "origin", "relations", "values", "extracted"],

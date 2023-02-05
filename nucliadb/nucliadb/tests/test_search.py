@@ -39,7 +39,6 @@ async def test_search_sc_2062(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
-    asyncbenchmark
 ):
     # PUBLIC API
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
@@ -59,7 +58,9 @@ async def test_search_sc_2062(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
     assert resp.status_code == 200
 
-    resp = await asyncbenchmark(nucliadb_reader.get, f"/kb/{knowledgebox}/search?query=title")
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?query=title"
+    )
     assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/search?query=summary")
@@ -168,13 +169,14 @@ async def test_search_returns_paragraph_positions(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
-    asyncbenchmark
 ):
     sentence = "My own text Ramon."
     await create_resource_with_duplicates(
         knowledgebox, nucliadb_grpc, sentence=sentence
     )
-    resp = await asyncbenchmark(nucliadb_reader.get, f"/kb/{knowledgebox}/search?query=Ramon")
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?query=Ramon"
+    )
     assert resp.status_code == 200
     content = resp.json()
     position = content["paragraphs"]["results"][0]["position"]
@@ -243,14 +245,12 @@ async def test_search_returns_labels(
     nucliadb_writer: AsyncClient,
     nucliadb_grpc: WriterStub,
     knowledgebox,
-    asyncbenchmark
 ):
     bm = broker_resource_with_classifications(knowledgebox)
     await inject_message(nucliadb_grpc, bm)
 
-    resp = await asyncbenchmark(
-        nucliadb_reader.get,
-        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata"
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
     )
     assert resp.status_code == 200
     content = resp.json()

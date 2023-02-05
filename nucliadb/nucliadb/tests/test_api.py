@@ -39,15 +39,6 @@ from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 
 
-@pytest.mark.benchmark(
-    group="api",
-    min_time=0.1,
-    max_time=0.5,
-    min_rounds=5,
-    timer=time.time,
-    disable_gc=True,
-    warmup=False,
-)
 @pytest.mark.asyncio
 async def test_creation(
     nucliadb_reader: AsyncClient,
@@ -55,7 +46,6 @@ async def test_creation(
     nucliadb_grpc: WriterStub,
     nucliadb_train: TrainStub,
     knowledgebox,
-    asyncbenchmark,
 ):
     # PUBLIC API
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}")
@@ -104,9 +94,8 @@ async def test_creation(
 
     await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
-    resp = await asyncbenchmark(
-        nucliadb_reader.get,
-        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata"
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata",
     )
     assert resp.status_code == 200
     assert (
@@ -175,7 +164,7 @@ async def test_creation(
 
 @pytest.mark.asyncio
 async def test_can_create_knowledgebox_with_colon_in_slug(
-    nucliadb_manager: AsyncClient
+    nucliadb_manager: AsyncClient,
 ):
     resp = await nucliadb_manager.post(
         f"/kbs",

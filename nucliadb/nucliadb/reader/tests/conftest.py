@@ -24,4 +24,5 @@ pytest_plugins = [
     "nucliadb_utils.tests.nats",
     "nucliadb_utils.tests.gcs",
     "nucliadb_utils.tests.s3",
+    "nucliadb_utils.tests.asyncbenchmark",
 ]
