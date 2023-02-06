@@ -757,13 +757,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.commit(resource=False)
             response.success = True
         except Exception as e:
-            await txn.abort()
             event_id: Optional[str] = None
             if SENTRY:
                 event_id = capture_exception(e)
             logger.error(
                 f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}"
             )
+            await txn.abort()
         return response
 
     async def DeleteShadowShard(  # type: ignore
@@ -777,13 +777,13 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.commit(resource=False)
             response.success = True
         except Exception as exc:
-            await txn.abort()
             event_id: Optional[str] = None
             if SENTRY:
                 event_id = capture_exception(exc)
             logger.error(
                 f"Error deleting shadow shard. Check sentry for more details. Event id: {event_id}"
             )
+            await txn.abort()
         return response
 
 
