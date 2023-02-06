@@ -27,6 +27,7 @@ target
 .egg-info
 *.so
 venv/
+nucliadb/.mypy_cache
 
 # Coverage
 .coverage
@@ -81,3 +82,7 @@ nucliadb_client/examples/*.export
 dist/**
 test.export.pb
 test.export.tar.bz2
+
+# project configuration
+.env
+.envrc

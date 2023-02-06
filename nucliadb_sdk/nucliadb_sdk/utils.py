@@ -75,7 +75,7 @@ def create_knowledge_box(
 def get_kb(
     slug: str,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
-):
+) -> Optional[KnowledgeBox]:
     url_obj = urlparse(nucliadb_base_url)
     if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
         raise InvalidHost(
@@ -87,6 +87,9 @@ def get_kb(
         f"{api_path}/kb/s/{slug}",
         headers={"X-NUCLIADB-ROLES": "READER"},
     )
+
+    if response.status_code == 404:
+        return None
 
     assert response.status_code == 200
 

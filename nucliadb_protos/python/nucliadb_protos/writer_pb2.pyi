@@ -1275,6 +1275,25 @@ class Member(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _Type:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _TypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[Member._Type.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        IO: Member._Type.ValueType  # 0
+        SEARCH: Member._Type.ValueType  # 1
+        INGEST: Member._Type.ValueType  # 2
+        TRAIN: Member._Type.ValueType  # 3
+        UNKNOWN: Member._Type.ValueType  # 4
+
+    class Type(_Type, metaclass=_TypeEnumTypeWrapper): ...
+    IO: Member.Type.ValueType  # 0
+    SEARCH: Member.Type.ValueType  # 1
+    INGEST: Member.Type.ValueType  # 2
+    TRAIN: Member.Type.ValueType  # 3
+    UNKNOWN: Member.Type.ValueType  # 4
+
     ID_FIELD_NUMBER: builtins.int
     LISTEN_ADDRESS_FIELD_NUMBER: builtins.int
     IS_SELF_FIELD_NUMBER: builtins.int
@@ -1289,7 +1308,7 @@ class Member(google.protobuf.message.Message):
     """
     is_self: builtins.bool
     """/ If true, it means self."""
-    type: builtins.str
+    type: global___Member.Type.ValueType
     """/ Io, Ingest, Search, Train."""
     dummy: builtins.bool
     """/ Dummy Member"""
@@ -1301,7 +1320,7 @@ class Member(google.protobuf.message.Message):
         id: builtins.str = ...,
         listen_address: builtins.str = ...,
         is_self: builtins.bool = ...,
-        type: builtins.str = ...,
+        type: global___Member.Type.ValueType = ...,
         dummy: builtins.bool = ...,
         load_score: builtins.float = ...,
     ) -> None: ...

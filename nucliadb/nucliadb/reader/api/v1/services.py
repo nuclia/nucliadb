@@ -58,7 +58,9 @@ from nucliadb_utils.utilities import get_ingest
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_entities(request: Request, kbid: str) -> KnowledgeBoxEntities:
+async def get_entities(
+    request: Request, kbid: str, show_entities: bool = True
+) -> KnowledgeBoxEntities:
     ingest = get_ingest()
     e_request: GetEntitiesRequest = GetEntitiesRequest()
     e_request.kb.uuid = kbid
@@ -72,7 +74,8 @@ async def get_entities(request: Request, kbid: str) -> KnowledgeBoxEntities:
             if "" in group_dict["entities"]:
                 del group_dict["entities"][""]
             response.groups[key] = EntitiesGroup(**group_dict)
-
+            if not show_entities:
+                response.groups[key].entities = {}
         return response
     elif kbobj.status == GetEntitiesResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

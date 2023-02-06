@@ -67,7 +67,7 @@ class ClusterObject:
         for count, (id, node) in enumerate(NODES.items()):
             cluster_info[id] = {
                 "name": node.address,
-                "label": node.label,
+                "type": node.type,
                 "zone": f"z{count % settings.node_replicas}",
             }
             count += 1

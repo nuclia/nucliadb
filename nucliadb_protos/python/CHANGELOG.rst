@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.46
+------
+- Turn member type into an enumeration
+
 0.0.45
 ------
 - Add protos to moving and accepting shards
