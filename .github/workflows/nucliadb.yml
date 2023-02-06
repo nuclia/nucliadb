@@ -2,6 +2,8 @@ name: nucliadb (py)
 env:
   API_VERSION: 1
   COMPONENT: nucliadb
+permissions:
+  contents: write
 on:
   pull_request:
     branches:
@@ -121,7 +123,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json output.json nucliadb/nucliadb/tests
+          pytest -rfE --cov=nucliadb -s --tb=native -v --cov-report xml --cov-append --benchmark-json benchmarks.json nucliadb/nucliadb/tests
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -129,20 +131,50 @@ jobs:
           file: ./coverage.xml
           flags: nucliadb
 
-      - name: Store benchmark result
+      - name: Download previous benchmark data
+        uses: actions/cache@v1
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-nucliadb-benchmark
+
+      - name: Comment and Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push'
         with:
           tool: 'pytest'
-          output-file-path: output.json
-          auto-push: true
-          gh-repository: github.com/nuclia/nucliadb_performance
-          gh-pages-branch: main
+          output-file-path: benchmarks.json
+          external-data-json-path: ./cache/benchmark-data.json
+          save-data-file: true
           comment-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
           alert-comment-cc-users: '@nuclia/nuclia-db'
 
+      - name: Comment benchmark result based on main
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name != 'push'
+        with:
+          tool: 'pytest'
+          output-file-path: benchmarks.json
+          external-data-json-path: ./cache/benchmark-data.json
+          save-data-file: false
+          comment-always: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@nuclia/nuclia-db'
+
+      - name: Store on GH Pages
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push'
+        with:
+          tool: 'pytest'
+          output-file-path: benchmarks.json
+          auto-push: true
+          gh-repository: github.com/nuclia/nucliadb_performance
+          gh-pages-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
   build:
     name: Validate docker build
     runs-on: ubuntu-latest
