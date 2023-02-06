@@ -29,7 +29,6 @@ async def test_last_seqid_is_stored_in_resource(
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
-
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
         headers={"X-SYNCHRONOUS": "True"},

@@ -56,7 +56,6 @@ class TiKVd(object):
         self.proc2 = None
 
     def start(self):
-
         self.tmpfolder = tempfile.TemporaryDirectory()
 
         cmd = [

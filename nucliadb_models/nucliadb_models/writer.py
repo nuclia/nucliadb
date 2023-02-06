@@ -67,7 +67,6 @@ class CreateResourcePayload(BaseModel):
 
     @validator("icon")
     def icon_check(cls, v):
-
         if "/" not in v:
             raise ValueError("Icon should be a MIME string")
 

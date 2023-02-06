@@ -35,7 +35,6 @@ from nucliadb_telemetry.common import set_span_exception
 
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
-
     attributes = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
         SpanAttributes.MESSAGING_MESSAGE_PAYLOAD_SIZE_BYTES: len(msg.data),
@@ -56,7 +55,6 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
 
 
 def start_span_message_publisher(tracer: Tracer, subject: str):
-
     attributes = {
         SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
         SpanAttributes.MESSAGING_DESTINATION: subject,

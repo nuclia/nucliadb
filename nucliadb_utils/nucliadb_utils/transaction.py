@@ -65,7 +65,6 @@ class LocalTransactionUtility:
 
 
 class TransactionUtility:
-
     nc: Optional[Client] = None
     js: Optional[Union[JetStreamContext, JetStreamContextTelemetry]] = None
 

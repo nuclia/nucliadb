@@ -23,7 +23,6 @@ from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-
     host_key_path: str = "node.key"
     force_host_id: Optional[str] = None
 

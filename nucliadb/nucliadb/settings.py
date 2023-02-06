@@ -47,5 +47,5 @@ class Settings(pydantic.BaseSettings):
     grpc: int = pydantic.Field(8030, description="GRPC Port int")
     train: int = pydantic.Field(8031, description="Train GRPC Port int")
     log: LogLevel = pydantic.Field(
-        LogLevel.ERROR, description="Log level [DEBUG,INFO,ERROR] string"
+        LogLevel.INFO, description="Log level [DEBUG,INFO,ERROR] string"
     )

@@ -64,7 +64,6 @@ class BatchSpanProcessor(SpanProcessor):
         max_export_batch_size: int = 512,
         export_timeout_millis: int = 30000,
     ):
-
         if max_queue_size <= 0:
             raise ValueError("max_queue_size must be a positive integer.")
 
@@ -261,7 +260,7 @@ class BatchSpanProcessor(SpanProcessor):
             # Ignore type b/c the Optional[None]+slicing is too "clever"
             # for mypy
             await self.span_exporter.async_export(self.spans_list[:idx])  # type: ignore
-        except (asyncio.CancelledError):
+        except asyncio.CancelledError:
             logger.exception("Task was canceled while exporting Span batch")
         except Exception:  # pylint: disable=broad-except
             logger.exception("Exception while exporting Span batch)")
@@ -281,7 +280,6 @@ class BatchSpanProcessor(SpanProcessor):
             await self._export_batch()
 
     async def async_force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-
         if timeout_millis is None:
             timeout_millis = self.export_timeout_millis
 

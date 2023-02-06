@@ -31,7 +31,6 @@ from nucliadb_utils.settings import running_settings
 
 
 def arg_parse():
-
     parser = argparse.ArgumentParser(description="Upload data to Nuclia Learning API.")
 
     parser.add_argument(
@@ -42,7 +41,6 @@ def arg_parse():
 
 
 async def main() -> List[Callable]:
-
     parser = arg_parse()
 
     await start_upload(parser.request, parser.kb)

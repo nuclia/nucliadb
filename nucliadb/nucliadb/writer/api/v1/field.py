@@ -74,7 +74,6 @@ FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
 def prepare_field_put(
     kbid: str, rid: str, request: Request
 ) -> Tuple[BrokerMessage, PushPayload, int]:
-
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
 
@@ -142,7 +141,6 @@ async def add_resource_field_text(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
@@ -180,7 +178,6 @@ async def add_resource_field_link(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
@@ -218,7 +215,6 @@ async def add_resource_field_keywordset(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
@@ -256,7 +252,6 @@ async def add_resource_field_datetime(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
@@ -294,7 +289,6 @@ async def add_resource_field_layout(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
@@ -332,7 +326,6 @@ async def add_resource_field_conversation(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)
@@ -373,7 +366,6 @@ async def add_resource_field_file(
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
 ) -> ResourceFieldAdded:
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     writer, toprocess, partition = prepare_field_put(kbid, rid, request)

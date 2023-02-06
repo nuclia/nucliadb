@@ -44,7 +44,6 @@ _sym_db.RegisterMessage(HelloReply)
 
 _GREETER = DESCRIPTOR.services_by_name["Greeter"]
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = (
         b"\n\033io.grpc.examples.helloworldB\017HelloWorldProtoP\001\242\002\003HLW"

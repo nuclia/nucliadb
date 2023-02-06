@@ -194,7 +194,6 @@ async def test_resource_endpoints_by_slug(reader_api, test_resource):
     non_existent_slug = "foobar"
 
     async with reader_api(roles=[NucliaDBRoles.READER]) as client:
-
         # Regular GET
 
         resp = await client.get(

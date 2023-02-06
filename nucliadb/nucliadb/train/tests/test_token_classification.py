@@ -209,7 +209,6 @@ async def inject_resource_with_token_classification(knowledgebox, writer):
 async def test_generator_token_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
-
     # Create Entities
     ser = SetEntitiesRequest()
     ser.kb.uuid = knowledgebox
@@ -249,7 +248,6 @@ async def test_generator_token_classification(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
     ) as response:
-
         assert response.status == 200
         batches: List[TokenClassificationBatch] = []
         async for batch in get_token_classification_batch_from_response(response):

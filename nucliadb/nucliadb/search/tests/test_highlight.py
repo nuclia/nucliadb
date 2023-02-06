@@ -46,7 +46,6 @@ def test_highligh_error(benchmark: BenchmarkFixture):
 
 
 def test_highlight():
-
     res = highlight(
         "Query whatever you want my to make it work my query with this",
         ["this", "is", "my", "query"],

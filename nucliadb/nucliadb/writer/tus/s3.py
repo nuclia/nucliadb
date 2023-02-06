@@ -111,7 +111,6 @@ class S3FileStorageManager(FileStorageManager):
 
     @backoff.on_exception(backoff.expo, RETRIABLE_EXCEPTIONS, max_tries=3)
     async def _complete_multipart_upload(self, dm: FileDataMangaer):
-
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
         if dm.get("block") == 1:

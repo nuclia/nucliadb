@@ -39,7 +39,6 @@ def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:
 
 
 def get_shard(node: Node, shard_id: str, vectorset: Optional[str] = None) -> Shard:
-
     req = GetShardRequest()
     req.shard_id.id = shard_id
     if vectorset is not None:

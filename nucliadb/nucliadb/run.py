@@ -33,7 +33,6 @@ def run():
     if os.environ.get("NUCLIADB_ENV"):
         nucliadb_args = Settings()
     else:
-
         parser = pydantic_argparse.ArgumentParser(
             model=Settings,
             prog="NucliaDB",

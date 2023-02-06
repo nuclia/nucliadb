@@ -68,7 +68,6 @@ async def download_extract_file(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> Response:
-
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -102,7 +101,6 @@ async def download_field_file(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> Response:
-
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -134,7 +132,6 @@ async def download_field_layout(
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
 ) -> Response:
-
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -177,7 +174,6 @@ async def download_field_conversation(
 
 
 async def download_api(sf: StorageField, headers: Headers):
-
     metadata = await sf.exists()
     if metadata is None:
         raise HTTPException(status_code=404, detail="Specified file doesn't exist")

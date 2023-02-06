@@ -35,7 +35,6 @@ from nucliadb.train.generators.utils import get_resource_from_cache
 
 
 async def get_sentences(kbid: str, result: str) -> List[str]:
-
     if result.count("/") == 4:
         rid, field_type, field, split_str, _ = result.split("/")
         split = int(split_str)
@@ -92,7 +91,6 @@ async def generate_sentence_classification_payloads(
     node: Node,
     shard_replica_id: str,
 ) -> AsyncIterator[SentenceClassificationBatch]:
-
     labelsets = []
     # Query how many paragraphs has each label
     request = StreamRequest()

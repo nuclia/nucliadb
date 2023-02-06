@@ -65,7 +65,6 @@ async def generate_field_classification_payloads(
     node: Node,
     shard_replica_id: str,
 ) -> AsyncIterator[FieldClassificationBatch]:
-
     labelset = f"/l/{trainset.filter.labels[0]}"
 
     # Query how many resources has each label

@@ -88,7 +88,6 @@ async def suggest_knowledgebox(
     debug: bool = Query(False),
     highlight: bool = Query(False),
 ) -> KnowledgeboxSuggestResults:
-
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
 

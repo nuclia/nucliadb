@@ -61,7 +61,6 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield payload
 
     if trainset.type == TaskType.FIELD_CLASSIFICATION:
-
         if len(trainset.filter.labels) != 1:
             raise HTTPException(
                 status_code=422,
@@ -76,7 +75,6 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield payload
 
     if trainset.type == TaskType.TOKEN_CLASSIFICATION:
-
         async for token_data in generate_token_classification_payloads(
             kbid, trainset, node, shard_replica_id
         ):
@@ -85,7 +83,6 @@ async def generate_train_data(kbid: str, shard: str, trainset: TrainSet):
             yield payload
 
     if trainset.type == TaskType.SENTENCE_CLASSIFICATION:
-
         if len(trainset.filter.labels) == 0:
             raise HTTPException(
                 status_code=422,

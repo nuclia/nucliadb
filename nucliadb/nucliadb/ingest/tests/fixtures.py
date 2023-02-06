@@ -193,7 +193,6 @@ async def txn(redis_driver):
 
 @pytest.fixture(scope="function")
 async def cache(redis):
-
     pubsub = get_utility(Utility.PUBSUB)
     if pubsub is None:
         url = f"redis://{redis[0]}:{redis[1]}"

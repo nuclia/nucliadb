@@ -276,7 +276,6 @@ def parse_link_field(
     writer: BrokerMessage,
     toprocess: PushPayload,
 ) -> None:
-
     writer.links[key].added.FromDatetime(datetime.now())
 
     writer.links[key].uri = link_field.uri
@@ -345,7 +344,6 @@ async def parse_layout_field(
 
     toprocess_blocks = {}
     for blockid, block in layout_field.body.blocks.items():
-
         sf_conv_field: StorageField = storage.layout_field(
             kbid, uuid, field=key, ident=block.ident
         )

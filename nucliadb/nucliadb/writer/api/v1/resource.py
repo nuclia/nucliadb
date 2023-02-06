@@ -382,7 +382,6 @@ async def delete_resource(
     rslug: Optional[str] = None,
     x_synchronous: bool = SYNC_CALL,
 ):
-
     transaction = get_transaction()
     partitioning = get_partitioning()
 
@@ -426,7 +425,6 @@ async def reindex_resource(
     rslug: Optional[str] = None,
     reindex_vectors: bool = Query(False),
 ):
-
     rid = await get_rid_from_params_or_raise_error(kbid, rid, rslug)
 
     ingest = get_ingest()

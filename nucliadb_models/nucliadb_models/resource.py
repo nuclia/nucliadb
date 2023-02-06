@@ -84,7 +84,6 @@ class KnowledgeBoxConfig(BaseModel):
 
     @validator("slug")
     def id_check(cls, v: str) -> str:
-
         for char in v:
             if char in string.ascii_uppercase:
                 raise ValueError("No uppercase ID")

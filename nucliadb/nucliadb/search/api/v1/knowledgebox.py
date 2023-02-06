@@ -87,7 +87,6 @@ async def knowledgebox_counters(
     vectorset: str = Query(None),
     debug: bool = Query(False),
 ) -> KnowledgeboxCounters:
-
     cache = await get_cache()
 
     if cache is not None:

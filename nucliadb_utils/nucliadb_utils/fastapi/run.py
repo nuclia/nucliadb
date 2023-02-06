@@ -33,7 +33,6 @@ STARTUP_FAILURE = 3
 
 
 def run_fastapi_with_metrics(application):
-
     loop_setup = "auto"
     log_level = running_settings.log_level.lower()
     if log_level == "warn":

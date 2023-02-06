@@ -70,7 +70,11 @@ async def get_entities(
     if kbobj.status == GetEntitiesResponse.Status.OK:
         response = KnowledgeBoxEntities(uuid=kbid)
         for key, group in kbobj.groups.items():
-            group_dict = MessageToDict(group)
+            group_dict = MessageToDict(
+                group,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
             if "" in group_dict["entities"]:
                 del group_dict["entities"][""]
             response.groups[key] = EntitiesGroup(**group_dict)
@@ -101,7 +105,13 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
-        response = EntitiesGroup(**MessageToDict(kbobj.group))
+        response = EntitiesGroup(
+            **MessageToDict(
+                kbobj.group,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
         return response
     elif kbobj.status == GetEntitiesGroupResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -128,7 +138,13 @@ async def get_labels(request: Request, kbid: str) -> KnowledgeBoxLabels:
     if kbobj.status == GetLabelsResponse.Status.OK:
         response = KnowledgeBoxLabels(uuid=kbid)
         for labelset, labelset_data in kbobj.labels.labelset.items():
-            labelset_response = LabelSet(**MessageToDict(labelset_data))
+            labelset_response = LabelSet(
+                **MessageToDict(
+                    labelset_data,
+                    preserving_proto_field_name=True,
+                    including_default_value_fields=True,
+                )
+            )
             response.labelsets[labelset] = labelset_response
         return response
     elif kbobj.status == GetLabelsResponse.Status.NOTFOUND:
@@ -155,7 +171,13 @@ async def get_label(request: Request, kbid: str, labelset: str) -> LabelSet:
 
     kbobj: GetLabelSetResponse = await ingest.GetLabelSet(l_request)  # type: ignore
     if kbobj.status == GetLabelSetResponse.Status.OK:
-        response = LabelSet(**MessageToDict(kbobj.labelset))
+        response = LabelSet(
+            **MessageToDict(
+                kbobj.labelset,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
         return response
     elif kbobj.status == GetLabelSetResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -195,7 +217,11 @@ async def get_widgets(request: Request, kbid: str) -> KnowledgeBoxWidgets:
             elif widget_obj.mode == 2:
                 widget_mode = WidgetMode.FORM
             widget.mode = widget_mode
-            widget.features = MessageToDict(widget_obj.features)  # type: ignore
+            widget.features = MessageToDict(
+                widget_obj.features,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )  # type: ignore
             widget.filters = [x for x in widget_obj.filters]
             widget.topEntities = [x for x in widget_obj.topEntities]
             widget.style = {x: y for x, y in widget_obj.style.items()}
@@ -234,7 +260,11 @@ async def get_widget(request: Request, kbid: str, widget: str) -> Widget:
         elif kbobj.widget.mode == 2:
             widget_mode = WidgetMode.FORM
         response.mode = widget_mode
-        response.features = MessageToDict(kbobj.widget.features)  # type: ignore
+        response.features = MessageToDict(
+            kbobj.widget.features,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )  # type: ignore
         response.filters = [x for x in kbobj.widget.filters]
         response.topEntities = [x for x in kbobj.widget.topEntities]
         response.style = {x: y for x, y in kbobj.widget.style.items()}

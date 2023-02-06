@@ -165,7 +165,6 @@ def parse_basic_modify(
 
 
 def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushPayload):
-
     bm.basic.created.FromDatetime(datetime.now())
 
     if item.metadata is not None:

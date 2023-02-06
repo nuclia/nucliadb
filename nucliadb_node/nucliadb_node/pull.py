@@ -227,7 +227,6 @@ class Worker:
             raise e
 
     async def subscribe(self):
-
         last_seqid = self.load_seqid()
         logger.info(f"Last seqid {last_seqid}")
         if last_seqid is None:
