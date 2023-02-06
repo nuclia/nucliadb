@@ -23,7 +23,7 @@ import os
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import AsyncIterator, Dict, Optional, Set, Tuple, Union
+from typing import Any, AsyncIterator, Dict, Optional, Set, Tuple, Union
 
 import aiofiles
 from aiofiles import os as aos
@@ -33,6 +33,8 @@ from pydantic import BaseModel
 from nucliadb_node import logger
 
 SHADOW_SHARDS_FOLDER = "{data_path}/shadow_shards/"
+
+MAIN: Dict[str, Any] = {}
 
 
 class ShadowShardInfo(BaseModel):
@@ -74,9 +76,6 @@ class OperationCode(str, Enum):
 
 
 NodeOperation = Tuple[OperationCode, Union[Resource, str]]
-
-# singleton
-SHADOW_SHARDS_MANAGER = None
 
 
 class ShadowShardsManager:
@@ -237,16 +236,20 @@ class ShadowShardsManager:
                 yield opcode, uuid
 
 
+def get_data_path() -> str:
+    data_path = os.environ.get("DATA_PATH")
+    if not data_path:
+        logger.warning(f"DATA_PATH not configured. Defaulting to: /data")
+        data_path = "/data"
+    data_path.rstrip("/")
+    return data_path
+
+
 def get_shadow_shards_manager() -> ShadowShardsManager:
-    global SHADOW_SHARDS_MANAGER
-
-    if SHADOW_SHARDS_MANAGER is None:
-        data_path = os.environ.get("DATA_PATH")
-        if data_path is None:
-            logger.warning(f"DATA_PATH not configured. Defaulting to: /data")
-            data_path = "/data"
-
-        SHADOW_SHARDS_FOLDER.format(data_path=data_path.rstrip("/"))
-        SHADOW_SHARDS_MANAGER = ShadowShardsManager(folder=SHADOW_SHARDS_FOLDER)
-
-    return SHADOW_SHARDS_MANAGER
+    if "manager" not in MAIN:
+        SHADOW_SHARDS_FOLDER.format(data_path=get_data_path())
+        MAIN["manager"] = ShadowShardsManager(folder=SHADOW_SHARDS_FOLDER)
+    manager = MAIN.get("manager")
+    if manager is None:
+        raise AttributeError()
+    return manager
