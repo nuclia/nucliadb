@@ -39,6 +39,7 @@ use tonic::transport::Server;
 use uuid::Uuid;
 
 const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
+const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -71,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_id(host_key.to_string())
         .with_seed_nodes(seed_nodes)
         .insert_to_initial_state(LOAD_SCORE_KEY, 0.0)
+        .insert_to_initial_state(SHARD_COUNT_KEY, 0)
         .build()?;
 
     let node = node.start().await?;
@@ -163,9 +165,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             report.shard_count.set(shard_count);
             report.paragraph_count.set(paragraph_count as i64);
 
-            let load_score = report.score();
-            info!("Update node state: load_score = {load_score}");
-            node.update_state(LOAD_SCORE_KEY, load_score).await;
+            info!("Update node state: load_score = {paragraph_count}");
+            node.update_state(LOAD_SCORE_KEY, paragraph_count as f32)
+                .await;
+            info!("Update node state: shard_count = {shard_count}");
+            node.update_state(SHARD_COUNT_KEY, shard_count as u64).await;
 
             if let Some(ref metrics_publisher) = metrics_publisher {
                 if let Err(e) = metrics_publisher.publish(&report).await {
