@@ -335,6 +335,9 @@ message Member {
 
     /// The load score of the member.
     float load_score = 6;
+
+    /// The number of shards in the node.
+    uint32 shard_count = 7;
 }
 
 message ListMembersRequest {

@@ -1258,6 +1258,7 @@ class Member(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     DUMMY_FIELD_NUMBER: builtins.int
     LOAD_SCORE_FIELD_NUMBER: builtins.int
+    SHARD_COUNT_FIELD_NUMBER: builtins.int
     id: builtins.str
     """/ Member ID.　A string of the UUID."""
     listen_address: builtins.str
@@ -1272,6 +1273,8 @@ class Member(google.protobuf.message.Message):
     """/ Dummy Member"""
     load_score: builtins.float
     """/ The load score of the member."""
+    shard_count: builtins.int
+    """/ The number of shards in the node."""
     def __init__(
         self,
         *,
@@ -1281,8 +1284,9 @@ class Member(google.protobuf.message.Message):
         type: global___Member.Type.ValueType = ...,
         dummy: builtins.bool = ...,
         load_score: builtins.float = ...,
+        shard_count: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["dummy", b"dummy", "id", b"id", "is_self", b"is_self", "listen_address", b"listen_address", "load_score", b"load_score", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dummy", b"dummy", "id", b"id", "is_self", b"is_self", "listen_address", b"listen_address", "load_score", b"load_score", "shard_count", b"shard_count", "type", b"type"]) -> None: ...
 
 global___Member = Member
 
