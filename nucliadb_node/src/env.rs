@@ -227,8 +227,8 @@ pub fn get_sentry_env() -> &'static str {
 
 /// Retuns the Promethus push timing, defaulted to 1h if not defined.
 pub fn get_metrics_update_interval() -> Duration {
-    const DEFAULT_INTERVAL_PLACEHOLDER: &str = "5min";
-    const DEFAULT_INTERVAL: Duration = Duration::from_secs(60 * 5);
+    const DEFAULT_INTERVAL_PLACEHOLDER: &str = "1h";
+    const DEFAULT_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
     match env::var("METRICS_UPDATE_INTERVAL") {
         Ok(value) => {
