@@ -347,6 +347,10 @@ impl ShardWriterService {
         self.text_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
+    pub fn paragraph_count(&self) -> usize {
+        self.paragraph_writer.read().unwrap().count()
+    }
+    #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
         let vector_writer_service = self.vector_writer.clone();
         let mut writer = vector_writer_service.write().unwrap();
