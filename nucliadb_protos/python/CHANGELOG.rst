@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.47
+------
+- Add `shard_count` attribute in `Member`
+
 0.0.46
 ------
 - Turn member type into an enumeration
