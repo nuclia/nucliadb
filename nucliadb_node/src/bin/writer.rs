@@ -1,4 +1,3 @@
-use std::fs;
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
 // nucliadb is offered under the AGPL v3.0 and as commercial software.
@@ -17,9 +16,13 @@ use std::fs;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+//
+
+use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 use anyhow::{Context, Result};
@@ -31,7 +34,7 @@ use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
-use nucliadb_node::writer::NodeWriterService;
+use nucliadb_node::writer::{NodeWriterMetadata, NodeWriterService};
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use uuid::Uuid;
@@ -46,7 +49,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start_bootstrap = Instant::now();
 
-    let mut node_writer_service = NodeWriterService::new();
+    let node_metadata = get_node_metadata();
+    let (initial_load_score, initial_shard_count) = (
+        node_metadata.paragraph_count as f32,
+        node_metadata.shard_count,
+    );
+    let node_metadata = Arc::new(Mutex::new(node_metadata));
+    let mut node_writer_service = NodeWriterService::with_metadata(Arc::clone(&node_metadata));
 
     std::fs::create_dir_all(env::shards_path())?;
     if !env::lazy_loading() {
@@ -69,8 +78,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .on_local_network(chitchat_addr)
         .with_id(host_key.to_string())
         .with_seed_nodes(seed_nodes)
-        .insert_to_initial_state(LOAD_SCORE_KEY, 0.0)
-        .insert_to_initial_state(SHARD_COUNT_KEY, 0)
+        .insert_to_initial_state(LOAD_SCORE_KEY, initial_load_score)
+        .insert_to_initial_state(SHARD_COUNT_KEY, initial_shard_count)
         .build()?;
 
     let node = node.start().await?;
@@ -111,46 +120,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metrics_task = tokio::spawn(async move {
         info!("Start metrics task");
 
-        let mut node_reader = NodeReaderService::new();
         let mut interval = tokio::time::interval(env::get_metrics_update_interval());
 
         loop {
             interval.tick().await;
 
-            let mut shard_count = 0;
-            let mut paragraph_count = 0;
+            let (load_score, shard_count) = {
+                let node_metadata = node_metadata.lock().unwrap_or_else(PoisonError::into_inner);
 
-            let shards = match node_reader.iter_shards() {
-                Ok(shards) => shards,
-                Err(e) => {
-                    error!("Cannot read shards folder: {e}");
-                    continue;
-                }
+                (
+                    node_metadata.paragraph_count as f32,
+                    node_metadata.shard_count,
+                )
             };
 
-            for shard in shards {
-                let shard = match shard {
-                    Ok(shard) => shard,
-                    Err(e) => {
-                        error!("Cannot load shard: {e}");
-                        continue;
-                    }
-                };
+            info!("Update node state: load_score = {load_score}");
+            node.update_state(LOAD_SCORE_KEY, load_score).await;
 
-                match shard.get_info(&GetShardRequest::default()) {
-                    Ok(count) => {
-                        shard_count += 1;
-                        paragraph_count += count.paragraphs;
-                    }
-                    Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
-                }
-            }
-
-            info!("Update node state: load_score = {paragraph_count}");
-            node.update_state(LOAD_SCORE_KEY, paragraph_count as f32)
-                .await;
             info!("Update node state: shard_count = {shard_count}");
-            node.update_state(SHARD_COUNT_KEY, shard_count as u64).await;
+            node.update_state(SHARD_COUNT_KEY, shard_count).await;
         }
     });
 
@@ -199,4 +187,39 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
     }
 
     Ok(host_key)
+}
+
+pub fn get_node_metadata() -> NodeWriterMetadata {
+    let mut node_reader = NodeReaderService::new();
+
+    let shards = match node_reader.iter_shards() {
+        Ok(shards) => shards,
+        Err(e) => {
+            error!("Cannot read shards folder: {e}");
+
+            return NodeWriterMetadata::default();
+        }
+    };
+
+    let mut node_metadata = NodeWriterMetadata::default();
+
+    for shard in shards {
+        let shard = match shard {
+            Ok(shard) => shard,
+            Err(e) => {
+                error!("Cannot load shard: {e}");
+                continue;
+            }
+        };
+
+        match shard.get_info(&GetShardRequest::default()) {
+            Ok(count) => {
+                node_metadata.shard_count += 1;
+                node_metadata.paragraph_count += count.paragraphs as u64;
+            }
+            Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
+        }
+    }
+
+    node_metadata
 }
