@@ -35,7 +35,6 @@ UPLOAD = "upload"
 
 
 async def initialize():
-
     if storage_settings.file_backend == "gcs":
         storage_backend = GCloudBlobStore()
 
@@ -52,7 +51,6 @@ async def initialize():
         DRIVER["StorageManager"] = GCloudFileStorageManager(storage_backend)
 
     if storage_settings.file_backend == "s3":
-
         storage_backend = S3BlobStore()
 
         DRIVER["StorageBackend"] = storage_backend
@@ -71,7 +69,6 @@ async def initialize():
         DRIVER["StorageManager"] = S3FileStorageManager(storage_backend)
 
     if storage_settings.file_backend == "local":
-
         storage_backend = LocalBlobStore(storage_settings.local_files)
 
         DRIVER["StorageBackend"] = storage_backend
@@ -82,7 +79,6 @@ async def initialize():
 
 
 async def finalize():
-
     if DRIVER.get("StorageBackend"):
         await DRIVER["StorageBackend"].finalize()
         DRIVER["StorageBackend"] = None

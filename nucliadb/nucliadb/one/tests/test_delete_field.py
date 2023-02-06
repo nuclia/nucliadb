@@ -31,7 +31,6 @@ from nucliadb_models.resource import NucliaDBRoles
 async def test_delete_field(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_one}/resources",

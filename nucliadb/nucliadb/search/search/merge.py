@@ -147,7 +147,6 @@ async def merge_documents_results(
 
     result_resource_list: List[ResourceResult] = []
     for result, _ in raw_resource_list[min(skip, length) : min(end, length)]:
-
         # /f/file
 
         labels = await get_labels_resource(result, kbid)
@@ -183,7 +182,6 @@ async def merge_suggest_paragraph_results(
     kbid: str,
     highlight: bool,
 ):
-
     raw_paragraph_list: List[ParagraphResult] = []
     query = None
     ematches = None
@@ -263,7 +261,6 @@ async def merge_vectors_results(
 
     result_sentence_list: List[Sentence] = []
     for result in raw_vectors_list[min(skip, length) : min(end_element, length)]:
-
         id_count = result.doc_id.id.count("/")
         if id_count == 4:
             rid, field_type, field, index, position = result.doc_id.id.split("/")
@@ -315,7 +312,6 @@ async def merge_paragraph_results(
     highlight: bool,
     sort: Optional[SortOptions] = None,
 ):
-
     raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
     facets: Dict[str, Any] = {}
     query = None
@@ -542,7 +538,6 @@ async def merge_suggest_results(
     field_type_filter: List[FieldTypeName],
     highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
-
     api_results = KnowledgeboxSuggestResults()
 
     api_results.paragraphs = await merge_suggest_paragraph_results(

@@ -63,7 +63,6 @@ async def set_resource_field_extracted_data(
     field_type_name: FieldTypeName,
     wanted_extracted_data: List[ExtractedDataTypeName],
 ) -> None:
-
     if field_data is None:
         return
 
@@ -123,7 +122,6 @@ async def serialize(
     service_name: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> Optional[Resource]:
-
     driver = await get_driver()
     txn = await driver.begin()
 
@@ -146,7 +144,6 @@ async def serialize(
         await orm_resource.get_basic()
 
         if orm_resource.basic is not None:
-
             resource.slug = orm_resource.basic.slug
             resource.title = orm_resource.basic.title
             resource.summary = orm_resource.basic.summary
@@ -408,7 +405,6 @@ async def get_orm_resource(
     slug: Optional[str] = None,
     service_name: Optional[str] = None,
 ) -> Optional[ORMResource]:
-
     storage = await get_storage(service_name=service_name)
     cache = await get_cache()
 

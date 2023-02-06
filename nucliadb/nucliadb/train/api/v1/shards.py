@@ -43,7 +43,6 @@ async def object_get_response(
     kbid: str,
     shard: str,
 ) -> StreamingResponse:
-
     item: bytes = await request.body()
     trainset = get_train(item)
     all_keys = await get_kb_partitions(kbid, shard)

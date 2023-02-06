@@ -464,7 +464,6 @@ async def test_reindex(writer_api, test_resource):
 async def test_paragraph_annotations(writer_api, knowledgebox_writer):
     kbid = knowledgebox_writer
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         # Must have at least one classification
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/resources",

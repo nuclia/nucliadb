@@ -79,7 +79,7 @@ async def test_chitchat_update_node():
 
 
 def test_node_type_from_str():
-    for (raw_type, node_type) in [
+    for raw_type, node_type in [
         ("Io", NodeType.IO),
         ("Train", NodeType.TRAIN),
         ("Ingest", NodeType.INGEST),
@@ -91,7 +91,7 @@ def test_node_type_from_str():
 
 
 def test_node_type_pb_conversion():
-    for (node_type, member_type) in [
+    for node_type, member_type in [
         (NodeType.IO, Member.Type.IO),
         (NodeType.TRAIN, Member.Type.TRAIN),
         (NodeType.INGEST, Member.Type.INGEST),

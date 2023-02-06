@@ -85,7 +85,6 @@ def requires(
     status_code: int = 403,
     redirect: Optional[str] = None,
 ) -> typing.Callable:
-
     # As a fastapi requirement, custom Enum classes have to inherit also from
     # string, so we MUST check for Enum before str
     if isinstance(scopes, Enum):
@@ -170,7 +169,6 @@ def requires_one(
     status_code: int = 403,
     redirect: Optional[str] = None,
 ) -> typing.Callable:
-
     # As a fastapi requirement, custom Enum classes have to inherit also from
     # string, so we MUST check for Enum before str
     if isinstance(scopes, Enum):

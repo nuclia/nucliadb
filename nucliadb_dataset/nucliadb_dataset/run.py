@@ -53,7 +53,6 @@ def run():
         DatasetType.PARAGRAPH_CLASSIFICATION,
         DatasetType.SENTENCE_CLASSIFICATION,
     ):
-
         if nucliadb_args.labelset is not None:
             trainset.filter.labels.append(nucliadb_args.labelset)
     elif nucliadb_args.type in (DatasetType.TOKEN_CLASSIFICATION):

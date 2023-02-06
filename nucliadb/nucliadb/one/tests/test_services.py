@@ -30,9 +30,7 @@ from nucliadb_models.resource import NucliaDBRoles
 async def test_widget_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         widget = {
             "id": "widget1",
             "description": "description",
@@ -77,9 +75,7 @@ async def test_widget_service(
 async def test_disable_vectors_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
     async with nucliadb_api(roles=[NucliaDBRoles.MANAGER]) as client:
-
         data = {"disable_vectors": True}
         resp = await client.patch(f"/{KB_PREFIX}/{knowledgebox_one}", json=data)
         assert resp.status_code == 200
@@ -93,9 +89,7 @@ async def test_disable_vectors_service(
 async def test_entities_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         entitygroup = {
             "title": "Kitchen",
             "custom": True,
@@ -138,9 +132,7 @@ async def test_entities_service(
 async def test_labelsets_service(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         widget = {
             "title": "labelset1",
             "labels": [{"title": "Label 1", "related": "related 1", "text": "My Text"}],

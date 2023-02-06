@@ -125,7 +125,6 @@ def test_live_field_classification(
 
 
 def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
-
     knowledgebox.upload(
         text="I'm Ramon",
         labels=["labelset/positive"],

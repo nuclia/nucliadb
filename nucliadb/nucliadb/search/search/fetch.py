@@ -164,7 +164,6 @@ async def get_text_paragraph(
     highlight: bool = False,
     ematches: Optional[List[str]] = None,
 ) -> str:
-
     orm_resource = await get_resource_from_cache(kbid, result.uuid)
 
     if orm_resource is None:

@@ -41,7 +41,6 @@ class FileDataMangaer:
     _ttl = 60 * 50 * 5  # 5 minutes should be plenty of time between activity
 
     async def load(self, key):
-
         # preload data
         self.key = key
         if self._data is None:
@@ -121,7 +120,6 @@ class RedisFileDataManager(FileDataMangaer):
         self.redis = aioredis.from_url(redis_url)
 
     async def load(self, key):
-
         # preload data
         self.key = key
         if self._data is None:

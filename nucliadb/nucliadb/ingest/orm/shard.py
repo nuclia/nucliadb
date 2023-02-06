@@ -45,7 +45,6 @@ class Shard(AbstractShard):
         self.node = node
 
     async def delete_resource(self, uuid: str, txid: int):
-
         indexing = get_indexing()
 
         for shardreplica in self.shard.replicas:
@@ -60,7 +59,6 @@ class Shard(AbstractShard):
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> int:
-
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
             # outside of a transaction. We need to treat this as a reindex operation.

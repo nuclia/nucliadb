@@ -70,7 +70,6 @@ class StreamAuditStorage(AuditStorage):
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
-
         options = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
@@ -98,7 +97,6 @@ class StreamAuditStorage(AuditStorage):
             self.nc = None
 
     async def run(self):
-
         while True:
             audit = await self.queue.get()
             try:
@@ -143,7 +141,6 @@ class StreamAuditStorage(AuditStorage):
         await self.send(auditrequest)
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
-
         auditrequest = AuditRequest()
         auditrequest.origin = origin
         auditrequest.userid = user

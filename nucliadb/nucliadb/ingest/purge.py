@@ -38,7 +38,6 @@ from nucliadb_utils.utilities import get_storage
 
 
 async def main():
-
     logger.info("START PURGING KB")
     # Clean up all kb marked to delete
     driver = await get_driver()

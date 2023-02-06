@@ -69,7 +69,6 @@ class Post:
 
 
 class StreamHandler(xml.sax.handler.ContentHandler):
-
     lastEntry = None
     lastName = None
     count = 0
@@ -80,7 +79,6 @@ class StreamHandler(xml.sax.handler.ContentHandler):
         super(StreamHandler, self).__init__()
 
     def upload_post(self, question: Post, answer: Post) -> Resource:
-
         payload = CreateResourcePayload()
         payload.title = question.title
         payload.origin = Origin()
@@ -190,7 +188,6 @@ class StreamHandler(xml.sax.handler.ContentHandler):
 
     def endElement(self, name):
         if name == "row":
-
             post_id = self.lastEntry.get("Id")
             post = Post(id=post_id)
             post.title = self.lastEntry.get("Title")

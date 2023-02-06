@@ -262,7 +262,6 @@ async def test_search_pagination(
         shards = None
 
         for request_n in range(expected_requests):
-
             url = f"/{KB_PREFIX}/{kbid}/search?query=own+text&highlight=true&page_number={request_n}&page_size={page_size}"  # noqa
 
             if shards is not None and len(shards):

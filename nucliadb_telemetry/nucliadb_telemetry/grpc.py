@@ -75,7 +75,6 @@ def start_span_client(
     client_call_details: grpc.ClientCallDetails,
     set_status_on_exception=False,
 ):
-
     if isinstance(client_call_details.method, bytes):
         service, meth = client_call_details.method.decode().lstrip("/").split("/", 1)
         method_name = client_call_details.method.decode()
@@ -128,7 +127,6 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         context: grpc.ServicerContext,
         set_status_on_exception=False,
     ):
-
         service, meth = handler_call_details.method.lstrip("/").split("/", 1)  # type: ignore
 
         attributes = {
@@ -175,12 +173,10 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
     async def _intercept_server_stream(
         self, behavior, handler_call_details, request_or_iterator, context
     ):
-
         with self._set_remote_context(context):
             with self.start_span_server(
                 handler_call_details, context, set_status_on_exception=False
             ) as span:
-
                 try:
                     async for response in behavior(request_or_iterator, context):
                         yield response
@@ -212,7 +208,6 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         ],
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
-
         handler = await continuation(handler_call_details)
         if handler and (
             handler.request_streaming or handler.response_streaming
@@ -228,7 +223,6 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
                         context,
                         set_status_on_exception=False,
                     ) as span:
-
                         # And now we run the actual RPC.
                         try:
                             value = await behavior(request, context)

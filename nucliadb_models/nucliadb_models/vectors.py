@@ -23,7 +23,6 @@ class UserVectorList(BaseModel):
 
 
 class UserVectorWrapper(BaseModel):
-
     vectors: Optional[Dict[str, Dict[str, UserVector]]] = None  # vectorsets
     vectors_to_delete: Optional[Dict[str, UserVectorList]] = None
     field: FieldID

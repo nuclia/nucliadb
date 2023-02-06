@@ -77,7 +77,6 @@ async def test_knowledgebox_file_tus_options(
 @pytest.mark.asyncio
 async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         language = base64.b64encode(b"ca").decode()
         filename = base64.b64encode(b"image.jpg").decode()
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
@@ -155,7 +154,6 @@ async def test_knowledgebox_file_tus_upload_root(writer_api, knowledgebox_writer
     await asyncio.sleep(1)
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_writer}/{TUSUPLOAD}",
             headers={
@@ -173,7 +171,6 @@ async def test_knowledgebox_file_upload_root(
     writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:
-
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
@@ -215,7 +212,6 @@ async def test_knowledgebox_file_upload_root(
     await asyncio.sleep(1)
 
     async with writer_api([NucliaDBRoles.WRITER]) as client:
-
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
                 f"/{KB_PREFIX}/{knowledgebox_writer}/{UPLOAD}",
@@ -233,7 +229,6 @@ async def test_knowledgebox_file_upload_root_headers(
     writer_api: Callable[[List[NucliaDBRoles]], AsyncClient], knowledgebox_writer: str
 ):
     async with writer_api([NucliaDBRoles.WRITER]) as client:
-
         filename = base64.b64encode(b"image.jpg").decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
@@ -284,7 +279,6 @@ async def test_knowledgebox_file_tus_upload_field(
     writer_api, knowledgebox_writer, resource
 ):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         language = base64.b64encode(b"ca").decode()
         filename = base64.b64encode(b"image.jpg").decode()
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
@@ -380,7 +374,6 @@ async def test_knowledgebox_file_upload_field_headers(
     writer_api, knowledgebox_writer, resource
 ):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         filename = "image.jpg"
         encoded_filename = base64.b64encode(filename.encode()).decode()
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
@@ -432,7 +425,6 @@ async def test_knowledgebox_file_upload_field_sync(
     writer_api, knowledgebox_writer, resource
 ):
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         filename = "image.jpg"
         with open(f"{ASSETS_PATH}/image001.jpg", "rb") as f:
             resp = await client.post(
@@ -465,7 +457,6 @@ async def test_file_tus_upload_field_by_slug(writer_api, knowledgebox_writer, re
     rslug = "resource1"
 
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
-
         language = base64.b64encode(b"ca").decode()
         filename = base64.b64encode(b"image.jpg").decode()
         md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()

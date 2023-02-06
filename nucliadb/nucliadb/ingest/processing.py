@@ -343,7 +343,6 @@ class ProcessingEngine:
             else:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")
         else:
-
             headers.update({"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"})
             # Upload the payload
             resp = await self.session.post(

@@ -24,7 +24,6 @@ from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-
     gcs_deadletter_bucket: Optional[str] = None
     gcs_indexing_bucket: Optional[str] = None
 

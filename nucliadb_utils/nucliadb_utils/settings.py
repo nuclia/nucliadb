@@ -116,7 +116,6 @@ transaction_settings = TransactionSettings()
 
 
 class IndexingSettings(BaseSettings):
-
     index_jetstream_target: Optional[str] = "node.{node}"
     index_jetstream_group: Optional[str] = "node-{node}"
     index_jetstream_stream: Optional[str] = "node"
