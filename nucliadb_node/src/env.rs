@@ -225,63 +225,30 @@ pub fn get_sentry_env() -> &'static str {
     }
 }
 
-/// Returns the Prometheus endpoint, if any.
-pub fn get_prometheus_url() -> Option<String> {
-    let error = match env::var("PROMETHEUS_URL") {
-        Ok(value) if !value.is_empty() => return Some(value),
-        Ok(_) => "PROMETHEUS_URL defined incorrectly. No defaulted",
-        Err(_) => "PROMETHEUS_URL not defined. No defaulted",
-    };
-
-    error!(error);
-
-    None
-}
-
-/// Returns the Prometheus username, if any.
-pub fn get_prometheus_username() -> Option<String> {
-    match env::var("PROMETHEUS_USERNAME") {
-        Ok(value) => Some(value),
-        Err(_) => {
-            warn!("PROMETHEUS_USERNAME not defined. No defaulted");
-            None
-        }
-    }
-}
-
-/// Returns the Prometheus password, if any.
-pub fn get_prometheus_password() -> Option<String> {
-    match env::var("PROMETHEUS_PASSWORD") {
-        Ok(value) => Some(value),
-        Err(_) => {
-            warn!("PROMETHEUS_PASSWORD not defined. No defaulted");
-            None
-        }
-    }
-}
-
 /// Retuns the Promethus push timing, defaulted to 1h if not defined.
-pub fn get_prometheus_push_timing() -> Duration {
-    const DEFAULT_TIMING_PLACEHOLDER: &str = "1h";
-    const DEFAULT_TIMING: Duration = Duration::from_secs(60 * 60);
+pub fn get_metrics_update_interval() -> Duration {
+    const DEFAULT_INTERVAL_PLACEHOLDER: &str = "5min";
+    const DEFAULT_INTERVAL: Duration = Duration::from_secs(60 * 5);
 
-    match env::var("PROMETHEUS_PUSH_TIMING") {
+    match env::var("METRICS_UPDATE_INTERVAL") {
         Ok(value) => {
             if let Ok(duration) = parse_duration::parse(&value) {
                 duration
             } else {
                 error!(
-                    "PROMETHEUS_PUSH_TIMING defined incorrectly. Defaulting to \
-                     {DEFAULT_TIMING_PLACEHOLDER}"
+                    "METRICS_UPDATE_INTERVAL defined incorrectly. Defaulting to \
+                     {DEFAULT_INTERVAL_PLACEHOLDER}"
                 );
 
-                DEFAULT_TIMING
+                DEFAULT_INTERVAL
             }
         }
         Err(_) => {
-            warn!("PROMETHEUS_PUSH_TIMING not defined. Defaulting to {DEFAULT_TIMING_PLACEHOLDER}");
+            warn!(
+                "METRICS_UPDATE_INTERVAL not defined. Defaulting to {DEFAULT_INTERVAL_PLACEHOLDER}"
+            );
 
-            DEFAULT_TIMING
+            DEFAULT_INTERVAL
         }
     }
 }

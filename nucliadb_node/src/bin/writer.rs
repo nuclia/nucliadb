@@ -28,8 +28,6 @@ use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
 use nucliadb_node::env;
-use nucliadb_node::metrics::report::NodeReport;
-use nucliadb_node::metrics::Publisher;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
@@ -110,25 +108,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let report = NodeReport::new(host_key.to_string())?;
-
     let metrics_task = tokio::spawn(async move {
         info!("Start metrics task");
 
-        let metrics_publisher = env::get_prometheus_url().map(|url| {
-            let mut metrics_publisher = Publisher::new("node_metrics", url);
-
-            if let Some((username, password)) =
-                env::get_prometheus_username().zip(env::get_prometheus_password())
-            {
-                metrics_publisher = metrics_publisher.with_credentials(username, password);
-            }
-
-            metrics_publisher
-        });
-
         let mut node_reader = NodeReaderService::new();
-        let mut interval = tokio::time::interval(env::get_prometheus_push_timing());
+        let mut interval = tokio::time::interval(env::get_metrics_update_interval());
 
         loop {
             interval.tick().await;
@@ -162,25 +146,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            report.shard_count.set(shard_count);
-            report.paragraph_count.set(paragraph_count as i64);
-
             info!("Update node state: load_score = {paragraph_count}");
             node.update_state(LOAD_SCORE_KEY, paragraph_count as f32)
                 .await;
             info!("Update node state: shard_count = {shard_count}");
             node.update_state(SHARD_COUNT_KEY, shard_count as u64).await;
-
-            if let Some(ref metrics_publisher) = metrics_publisher {
-                if let Err(e) = metrics_publisher.publish(&report).await {
-                    error!("Cannot publish Node metrics: {e}");
-                } else {
-                    info!(
-                        "Publish Node metrics: shard_count {shard_count}, paragraph_count \
-                         {paragraph_count}",
-                    )
-                }
-            }
         }
     });
 
