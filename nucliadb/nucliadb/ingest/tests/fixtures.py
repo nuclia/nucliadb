@@ -213,10 +213,20 @@ async def fake_node(indexing_utility_ingest):
     uuid1 = str(uuid.uuid4())
     uuid2 = str(uuid.uuid4())
     await Node.set(
-        uuid1, address="nohost:9999", type=NodeType.IO, load_score=0.0, dummy=True
+        uuid1,
+        address="nohost:9999",
+        type=NodeType.IO,
+        load_score=0.0,
+        shard_count=0,
+        dummy=True,
     )
     await Node.set(
-        uuid2, address="nohost:9999", type=NodeType.IO, load_score=0.0, dummy=True
+        uuid2,
+        address="nohost:9999",
+        type=NodeType.IO,
+        load_score=0.0,
+        shard_count=0,
+        dummy=True,
     )
     indexing_utility = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
@@ -723,3 +733,14 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
 
     await txn.commit(resource=False)
     return test_resource
+
+
+@pytest.fixture(scope="function")
+def metrics_registry():
+    import prometheus_client.registry  # type: ignore
+
+    for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
+        if not hasattr(collector, "_metrics"):
+            continue
+        collector._metrics.clear()
+    yield prometheus_client.registry.REGISTRY

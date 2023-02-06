@@ -463,6 +463,9 @@ pub struct Member {
     //// The load score of the member.
     #[prost(float, tag="6")]
     pub load_score: f32,
+    //// The number of shards in the node.
+    #[prost(uint32, tag="7")]
+    pub shard_count: u32,
 }
 /// Nested message and enum types in `Member`.
 pub mod member {
