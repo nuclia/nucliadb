@@ -64,6 +64,7 @@ prometheus:
 nats:
   secretName: nats-creds
   regionalSecretName: regional-nats-creds
+  port: 4222
 
 indexing:
   index_jetstream_auth:

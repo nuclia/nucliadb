@@ -24,6 +24,8 @@ spec:
       app.kubernetes.io/managed-by: {{ .Release.Service }}
   template:
     metadata:
+      annotations:
+        traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.nats.port }}"
       name: node
       labels:
         app: node
