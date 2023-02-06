@@ -20,6 +20,7 @@
 
 pub mod grpc_driver;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
@@ -32,9 +33,16 @@ use uuid::Uuid;
 use crate::env;
 use crate::services::writer::ShardWriterService;
 
+#[derive(Debug, Copy, Clone, Default)]
+pub struct NodeWriterMetadata {
+    pub paragraph_count: u64,
+    pub shard_count: u64,
+}
+
 #[derive(Debug)]
 pub struct NodeWriterService {
     pub cache: HashMap<String, ShardWriterService>,
+    metadata: Arc<Mutex<NodeWriterMetadata>>,
 }
 
 impl Default for NodeWriterService {
@@ -43,11 +51,16 @@ impl Default for NodeWriterService {
     }
 }
 impl NodeWriterService {
-    pub fn new() -> NodeWriterService {
-        NodeWriterService {
+    pub fn new() -> Self {
+        Self::with_metadata(Arc::new(Mutex::new(NodeWriterMetadata::default())))
+    }
+    pub fn with_metadata(metadata: Arc<Mutex<NodeWriterMetadata>>) -> Self {
+        Self {
             cache: HashMap::new(),
+            metadata,
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn shutdown(&mut self) {
         for (shard_id, shard) in self.cache.iter_mut() {
@@ -113,6 +126,10 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id, new_shard);
+        self.metadata
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .shard_count += 1;
         data
     }
     #[tracing::instrument(skip_all)]
@@ -123,6 +140,10 @@ impl NodeWriterService {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
         }
+        self.metadata
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .shard_count -= 1;
         Ok(())
     }
     #[tracing::instrument(skip_all)]
@@ -139,6 +160,10 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id.id.clone(), new_shard);
+        self.metadata
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .shard_count += 1;
         Ok(shard_data)
     }
 
@@ -148,10 +173,19 @@ impl NodeWriterService {
         shard_id: &ShardId,
         resource: &Resource,
     ) -> NodeResult<Option<usize>> {
+        let metadata = Arc::clone(&self.metadata);
+
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
+
         shard.set_resource(resource)?;
+
+        metadata
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .paragraph_count = shard.paragraph_count() as u64;
+
         Ok(Some(shard.count()))
     }
 
@@ -213,10 +247,19 @@ impl NodeWriterService {
         shard_id: &ShardId,
         resource: &ResourceId,
     ) -> NodeResult<Option<usize>> {
+        let metadata = Arc::clone(&self.metadata);
+
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
+
         shard.remove_resource(resource)?;
+
+        metadata
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .paragraph_count = shard.paragraph_count() as u64;
+
         Ok(Some(shard.count()))
     }
     #[tracing::instrument(skip_all)]
