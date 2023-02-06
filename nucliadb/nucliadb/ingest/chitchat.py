@@ -133,7 +133,7 @@ JsonArray = List[JsonValue]
 JsonObject = Dict[str, JsonValue]
 
 
-def build_member_from_json(member_serial: JsonObject):
+def parse_load_score(member_serial: JsonObject) -> float:
     try:
         load_score = float(member_serial.get("load_score"))  # type: ignore
     except TypeError:
@@ -142,14 +142,34 @@ def build_member_from_json(member_serial: JsonObject):
         logger.debug("Missing load score: Defaulted to 0")
         load_score = 0.0
     except ValueError:
-        logger.warn("Cannot convert load score. Defaulted to 0")
+        logger.warning("Cannot convert load score. Defaulted to 0")
         load_score = 0.0
+    return load_score
 
+
+def parse_shard_count(member_serial: JsonObject) -> int:
+    shard_count_str = member_serial.get("shard_count")
+    if not shard_count_str:
+        # shard_count is only set for type.IO nodes
+        logger.debug("Missing shard_count: Defaulted to 0")
+        return 0
+    try:
+        shard_count = int(shard_count_str)  # type: ignore
+    except ValueError:
+        logger.warning(
+            f"Cannot convert shard_count ({shard_count_str}). Defaulted to 0"
+        )
+        shard_count = 0
+    return shard_count
+
+
+def build_member_from_json(member_serial: JsonObject):
     return ClusterMember(
         node_id=str(member_serial["id"]),
         listen_addr=str(member_serial["address"]),
         type=NodeType.from_str(member_serial["type"]),
         is_self=bool(member_serial["is_self"]),
-        load_score=load_score,
+        load_score=parse_load_score(member_serial),
+        shard_count=parse_shard_count(member_serial),
         online=True,
     )

@@ -74,7 +74,7 @@ class NodeType(Enum):
         elif label in "Train":
             return NodeType.TRAIN
         else:
-            logger.warn(f"Unknown '{label}' node type")
+            logger.warning(f"Unknown '{label}' node type")
             return NodeType.UNKNOWN
 
     @staticmethod
@@ -113,6 +113,7 @@ class ClusterMember:
     online: bool
     is_self: bool
     load_score: float
+    shard_count: int
 
 
 class Node(AbstractNode):
@@ -121,12 +122,18 @@ class Node(AbstractNode):
     _sidecar: Optional[NodeSidecarStub] = None
 
     def __init__(
-        self, address: str, type: NodeType, load_score: float, dummy: bool = False
+        self,
+        address: str,
+        type: NodeType,
+        load_score: float,
+        shard_count: int,
+        dummy: bool = False,
     ):
         self.address = address
         self.type = type
         self.label = type.name
         self.load_score = load_score
+        self.shard_count = shard_count
         self.dummy = dummy
 
     @classmethod
@@ -275,9 +282,10 @@ class Node(AbstractNode):
         address: str,
         type: NodeType,
         load_score: float,
+        shard_count: int,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, type, load_score, dummy)
+        NODES[ident] = Node(address, type, load_score, shard_count, dummy)
         # Compute cluster
         NODE_CLUSTER.compute()
 
@@ -302,6 +310,7 @@ class Node(AbstractNode):
                 member.listen_address,
                 NodeType.from_pb(member.type),
                 member.load_score,
+                member.shard_count,
                 member.dummy,
             )
 
@@ -424,11 +433,13 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
                     address=member.listen_addr,
                     type=member.type,
                     load_score=member.load_score,
+                    shard_count=member.shard_count,
                 )
                 logger.debug("Node added")
             else:
                 logger.debug(f"{member.node_id}/{member.type} update")
                 node.load_score = member.load_score
+                node.shard_count = member.shard_count
                 logger.debug("Node updated")
     node_ids = [x for x in NODES.keys()]
     for key in node_ids:

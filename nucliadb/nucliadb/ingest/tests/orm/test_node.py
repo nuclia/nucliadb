@@ -31,6 +31,7 @@ def get_cluster_member(
     online=True,
     is_self=False,
     load_score=0,
+    shard_count=0,
 ) -> ClusterMember:
     return ClusterMember(
         node_id=node_id,
@@ -39,6 +40,7 @@ def get_cluster_member(
         online=online,
         is_self=is_self,
         load_score=load_score,
+        shard_count=shard_count,
     )
 
 
@@ -65,13 +67,16 @@ async def test_chitchat_update_node():
     node = NODES["node1"]
     assert node.address == member.listen_addr
     assert node.load_score == member.load_score
+    assert node.shard_count == member.shard_count
 
     # Check that it updates loads score for registered members
     member.load_score = 30
+    member.shard_count = 2
     await chitchat_update_node([member])
     assert len(NODES) == 1
     node = NODES["node1"]
     assert node.load_score == 30
+    assert node.shard_count == 2
 
     # Check that it removes members that are no longer reported
     await chitchat_update_node([])
