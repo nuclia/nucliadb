@@ -754,8 +754,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await node_klass.create_shadow_shard(
                 txn, request.kbid, request.node, request.replica.id
             )
+            await txn.commit(resource=False)
             response.success = True
         except Exception as e:
+            await txn.abort()
             event_id: Optional[str] = None
             if SENTRY:
                 event_id = capture_exception(e)
@@ -772,8 +774,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             node_klass = get_node_klass()
             txn = await self.proc.driver.begin()
             await node_klass.delete_shadow_shard(txn, request.kbid, request.replica.id)
+            await txn.commit(resource=False)
             response.success = True
         except Exception as exc:
+            await txn.abort()
             event_id: Optional[str] = None
             if SENTRY:
                 event_id = capture_exception(exc)

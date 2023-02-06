@@ -208,10 +208,8 @@ class Node(AbstractNode):
                 raise UpdatingShardsError(f"Replica id not found: {replica_id}")
             key = KB_SHARDS.format(kbid=kbid)
             await txn.set(key, updated_shards.SerializeToString())
-            await txn.commit(resource=False)
         except Exception as ex:
             logger.error(f"Error creating shadow shard. {ex}")
-            await txn.abort()
             if shadow_created:
                 # Attempt to delete shadow shard
                 try:
@@ -225,43 +223,38 @@ class Node(AbstractNode):
 
     @classmethod
     async def delete_shadow_shard(cls, txn: Transaction, kbid: str, replica_id: str):
-        try:
-            # Check if requested replica has a shadow shard to delete
-            all_shards = await cls.get_all_shards(txn, kbid)
-            if all_shards is None:
-                raise KBNotFoundError()
-            replica = get_replica(all_shards, replica_id)
-            if replica is None:
-                raise ReplicaShardNotFound()
-            if not replica.has_shadow:
-                raise ShadowShardNotFound()
+        # Check if requested replica has a shadow shard to delete
+        all_shards = await cls.get_all_shards(txn, kbid)
+        if all_shards is None:
+            raise KBNotFoundError()
+        replica = get_replica(all_shards, replica_id)
+        if replica is None:
+            raise ReplicaShardNotFound()
+        if not replica.has_shadow:
+            raise ShadowShardNotFound()
 
-            # Shadow shard found. Delete it
-            to_delete = replica.shadow_replica
-            node = NODES.get(to_delete.node)
-            if node is None:
-                raise ValueError(f"Node {to_delete.node} not found")
+        # Shadow shard found. Delete it
+        to_delete = replica.shadow_replica
+        node = NODES.get(to_delete.node)
+        if node is None:
+            raise ValueError(f"Node {to_delete.node} not found")
 
-            ssresp = await node.sidecar.DeleteShadowShard(to_delete.shard)  # type: ignore
-            if not ssresp.success:
-                raise SidecarDeleteShadowShardError("Sidecar error")
+        ssresp = await node.sidecar.DeleteShadowShard(to_delete.shard)  # type: ignore
+        if not ssresp.success:
+            raise SidecarDeleteShadowShardError("Sidecar error")
 
-            # Now update the Shards pb object from maindb
-            updated_shards = PBShards()
-            updated_shards.CopyFrom(all_shards)
-            cleaned = cleanup_shadow_replica_from_shards(
-                updated_shards,
-                replica_id,
-            )
-            if not cleaned:
-                raise UpdatingShardsError()
+        # Now update the Shards pb object from maindb
+        updated_shards = PBShards()
+        updated_shards.CopyFrom(all_shards)
+        cleaned = cleanup_shadow_replica_from_shards(
+            updated_shards,
+            replica_id,
+        )
+        if not cleaned:
+            raise UpdatingShardsError()
 
-            key = KB_SHARDS.format(kbid=kbid)
-            await txn.set(key, updated_shards.SerializeToString())
-            await txn.commit(resource=False)
-        except Exception:
-            await txn.abort()
-            raise
+        key = KB_SHARDS.format(kbid=kbid)
+        await txn.set(key, updated_shards.SerializeToString())
 
     @classmethod
     async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[Shard]:
