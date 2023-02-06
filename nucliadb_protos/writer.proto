@@ -354,8 +354,7 @@ message ShardReplica {
     noderesources.ShardCreated shard = 1;
     string node = 2;
 
-    bool has_shadow = 3;
-    ShadowShard shadow_replica = 4;
+    ShadowShard shadow_replica = 3;
 }
 
 message ShardObject {

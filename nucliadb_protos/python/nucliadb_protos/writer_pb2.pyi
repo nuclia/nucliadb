@@ -1334,12 +1334,10 @@ class ShardReplica(google.protobuf.message.Message):
 
     SHARD_FIELD_NUMBER: builtins.int
     NODE_FIELD_NUMBER: builtins.int
-    HAS_SHADOW_FIELD_NUMBER: builtins.int
     SHADOW_REPLICA_FIELD_NUMBER: builtins.int
     @property
     def shard(self) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
     node: builtins.str
-    has_shadow: builtins.bool
     @property
     def shadow_replica(self) -> global___ShadowShard: ...
     def __init__(
@@ -1347,11 +1345,10 @@ class ShardReplica(google.protobuf.message.Message):
         *,
         shard: nucliadb_protos.noderesources_pb2.ShardCreated | None = ...,
         node: builtins.str = ...,
-        has_shadow: builtins.bool = ...,
         shadow_replica: global___ShadowShard | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["shadow_replica", b"shadow_replica", "shard", b"shard"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["has_shadow", b"has_shadow", "node", b"node", "shadow_replica", b"shadow_replica", "shard", b"shard"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["node", b"node", "shadow_replica", b"shadow_replica", "shard", b"shard"]) -> None: ...
 
 global___ShardReplica = ShardReplica
 

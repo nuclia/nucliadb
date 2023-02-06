@@ -53,8 +53,8 @@ async def test_create_and_delete_shadow_shard(grpc_servicer, fake_node):
     replica1 = shards_object.shards[0].replicas[0]
     replica2 = shards_object.shards[0].replicas[1]
     # There should not be shadow replicas by default
-    assert not replica1.has_shadow
-    assert not replica2.has_shadow
+    assert not replica1.HasField("shadow_replica")
+    assert not replica2.HasField("shadow_replica")
     rep1_id, rep1_node = replica1.shard.id, replica1.node
     _, rep2_node = replica2.shard.id, replica2.node
 
@@ -77,11 +77,11 @@ async def test_create_and_delete_shadow_shard(grpc_servicer, fake_node):
         for replica in shard.replicas:
             if replica.shard.id == rep1_id and replica.node == rep1_node:
                 found = True
-                assert replica.has_shadow
+                assert replica.HasField("shadow_replica")
                 assert replica.shadow_replica.shard.id
                 assert replica.shadow_replica.node == rep2_node
             else:
-                assert not replica.has_shadow
+                assert not replica.HasField("shadow_replica")
     assert found
 
     # Now delete it
@@ -101,7 +101,7 @@ async def test_create_and_delete_shadow_shard(grpc_servicer, fake_node):
         for replica in shard.replicas:
             if replica.shard.id == rep1_id and replica.node == rep1_node:
                 found = True
-                assert not replica.has_shadow
+                assert not replica.HasField("shadow_replica")
     assert found
 
 

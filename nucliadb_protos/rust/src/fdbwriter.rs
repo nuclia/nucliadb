@@ -497,9 +497,7 @@ pub struct ShardReplica {
     pub shard: ::core::option::Option<super::noderesources::ShardCreated>,
     #[prost(string, tag="2")]
     pub node: ::prost::alloc::string::String,
-    #[prost(bool, tag="3")]
-    pub has_shadow: bool,
-    #[prost(message, optional, tag="4")]
+    #[prost(message, optional, tag="3")]
     pub shadow_replica: ::core::option::Option<ShadowShard>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

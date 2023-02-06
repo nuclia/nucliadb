@@ -230,7 +230,7 @@ class Node(AbstractNode):
         replica = get_replica(all_shards, replica_id)
         if replica is None:
             raise ReplicaShardNotFound()
-        if not replica.has_shadow:
+        if not replica.HasField("shadow_replica"):
             raise ShadowShardNotFound()
 
         # Shadow shard found. Delete it
@@ -448,7 +448,6 @@ def update_shards_with_shadow_replica(
     replica = get_replica(shards, replica_id)
     if replica is None:
         return False
-    replica.has_shadow = True
     replica.shadow_replica.node = shadow_node
     replica.shadow_replica.shard.CopyFrom(shadow_replica)
     return True
@@ -461,7 +460,6 @@ def cleanup_shadow_replica_from_shards(shards: PBShards, replica_id: str) -> boo
     replica = get_replica(shards, replica_id)
     if replica is None:
         return False
-    replica.has_shadow = False
     replica.ClearField("shadow_replica")
     return True
 
