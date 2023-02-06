@@ -237,7 +237,6 @@ impl NodeWriterService {
         shard_id: &ShardId,
         resource: &ResourceId,
     ) -> NodeResult<Option<usize>> {
-
         let (paragraph_count, count) = {
             let Some(shard) = self.get_mut_shard(shard_id) else {
                 return Ok(None);
