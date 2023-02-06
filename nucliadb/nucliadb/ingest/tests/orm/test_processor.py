@@ -26,7 +26,6 @@ from nucliadb.ingest.tests.fixtures import IngestFixture
 
 @pytest.mark.asyncio
 async def test_create_knowledgebox(grpc_servicer: IngestFixture):
-
     count = 0
     async for key in grpc_servicer.servicer.proc.list_kb(""):
         count += 1

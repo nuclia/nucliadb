@@ -132,7 +132,6 @@ async def search_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
-
     item = SearchRequest(
         query=query,
         advanced_query=advanced_query,

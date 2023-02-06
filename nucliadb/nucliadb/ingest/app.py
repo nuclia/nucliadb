@@ -166,7 +166,6 @@ def _cancel_all_tasks(loop):
 
 
 def set_logging():
-
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)-18s | %(levelname)-7s | %(name)-16s | %(message)s",

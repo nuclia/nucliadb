@@ -125,7 +125,7 @@ async def get_field_text(
                         )
 
     for split, invalid_tokens in invalid_tokens_split.items():
-        for (token.klass, token.token, token.start, token.end) in invalid_tokens:
+        for token.klass, token.token, token.start, token.end in invalid_tokens:
             if token.klass in split_ners.get(split, {}):
                 if token.token in split_ners.get(split, {}).get(token.klass, {}):
                     if (token.start, token.end) in split_ners[split][token.klass][
@@ -171,7 +171,6 @@ async def get_field_text(
 
 
 def compute_segments(field_text: str, ners: POSITION_DICT, start: int, end: int):
-
     segments = []
     for position, ner in ners.items():
         if position[0] < start or position[1] > end:
@@ -218,7 +217,6 @@ async def generate_token_classification_payloads(
     node: Node,
     shard_replica_id: str,
 ) -> AsyncIterator[TokenClassificationBatch]:
-
     # Query how many paragraphs has each label
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
@@ -228,7 +226,11 @@ async def generate_token_classification_payloads(
     batch = TokenClassificationBatch()
     async for field_item in node.stream_get_fields(request):
         _, field_type, field = field_item.field.split("/")
-        (split_text, ordered_positions, split_paragaphs,) = await get_field_text(
+        (
+            split_text,
+            ordered_positions,
+            split_paragaphs,
+        ) = await get_field_text(
             kbid,
             field_item.uuid,
             field,

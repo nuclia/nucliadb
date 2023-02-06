@@ -219,7 +219,6 @@ class Resource:
                     )
                     field_metadata = await field_obj.get_field_metadata()
                     if field_metadata is not None:
-
                         page_positions: Optional[FilePagePositions] = None
                         if isinstance(field_obj, File):
                             page_positions = await get_file_page_positions(field_obj)
@@ -296,14 +295,13 @@ class Resource:
         if basic is not None:
             brain.set_global_tags(basic, self.uuid, origin)
         fields = await self.get_fields(force=True)
-        for ((type_id, field_id), field) in fields.items():
+        for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             await self.compute_global_text_field(fieldid, brain)
 
             field_metadata = await field.get_field_metadata()
             field_key = self.generate_field_id(fieldid)
             if field_metadata is not None:
-
                 page_positions: Optional[FilePagePositions] = None
                 if type_id == FieldType.FILE and isinstance(field, File):
                     page_positions = await get_file_page_positions(field)
@@ -456,7 +454,7 @@ class Resource:
                 bm.relations.append(relation)
 
         fields = await self.get_fields(force=True)
-        for ((type_id, field_id), field) in fields.items():
+        for (type_id, field_id), field in fields.items():
             # Value
             await self.generate_field(bm, type_id, field_id, field)
 
@@ -847,7 +845,6 @@ class Resource:
     async def iterate_sentences(
         self, enabled_metadata: EnabledMetadata
     ) -> AsyncIterator[TrainSentence]:
-
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
@@ -863,7 +860,7 @@ class Resource:
                             annotationparagraph.key
                         ] = annotationparagraph
 
-        for ((type_id, field_id), field) in fields.items():
+        for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             field_key = self.generate_field_id(fieldid)
             fm = await field.get_field_metadata()
@@ -962,7 +959,6 @@ class Resource:
     async def iterate_paragraphs(
         self, enabled_metadata: EnabledMetadata
     ) -> AsyncIterator[TrainParagraph]:
-
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}
@@ -978,7 +974,7 @@ class Resource:
                             annotationparagraph.key
                         ] = annotationparagraph
 
-        for ((type_id, field_id), field) in fields.items():
+        for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             field_key = self.generate_field_id(fieldid)
             fm = await field.get_field_metadata()
@@ -997,7 +993,6 @@ class Resource:
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
             for subfield, field_metadata in field_metadatas:
-
                 if enabled_metadata.labels:
                     metadata.labels.ClearField("field")
                     metadata.labels.field.extend(field_metadata.classifications)
@@ -1057,7 +1052,7 @@ class Resource:
             if self.basic is not None:
                 metadata.labels.resource.extend(self.basic.usermetadata.classifications)
 
-        for ((type_id, field_id), field) in fields.items():
+        for (type_id, field_id), field in fields.items():
             fieldid = FieldID(field_type=type_id, field=field_id)  # type: ignore
             fm = await field.get_field_metadata()
             extracted_text = None
@@ -1075,7 +1070,6 @@ class Resource:
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
             for subfield, splitted_metadata in field_metadatas:
-
                 if enabled_metadata.labels:
                     metadata.labels.ClearField("field")
                     metadata.labels.field.extend(splitted_metadata.classifications)
@@ -1108,7 +1102,7 @@ class Resource:
         metadata.labels.ClearField("field")
         metadata.ClearField("entities")
 
-        for ((_, _), field) in fields.items():
+        for (_, _), field in fields.items():
             extracted_text = None
             fm = await field.get_field_metadata()
 
@@ -1130,7 +1124,6 @@ class Resource:
                 field_metadatas.append((subfield_metadata, splitted_metadata))
 
             for _, splitted_metadata in field_metadatas:
-
                 if enabled_metadata.labels:
                     metadata.labels.field.extend(splitted_metadata.classifications)
 

@@ -107,7 +107,6 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
 
 @pytest.mark.asyncio
 async def test_search_resource_async(knowledgebox: KnowledgeBox):
-
     knowledgebox.new_vectorset("all-MiniLM-L6-v2", 384)
 
     ds: Dict[str, Any] = load_dataset("tweet_eval", "emoji")  # type: ignore

@@ -35,7 +35,6 @@ from nucliadb.train.generators.utils import get_resource_from_cache
 
 
 async def get_paragraph(kbid: str, result: str) -> str:
-
     if result.count("/") == 5:
         rid, field_type, field, split_str, start_end = result.split("/")
         split = int(split_str)
@@ -77,7 +76,6 @@ async def generate_paragraph_classification_payloads(
     node: Node,
     shard_replica_id: str,
 ) -> AsyncIterator[ParagraphClassificationBatch]:
-
     labelset = f"/l/{trainset.filter.labels[0]}"
 
     # Query how many paragraphs has each label

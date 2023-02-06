@@ -33,7 +33,6 @@ from nucliadb_telemetry.utils import get_telemetry
 
 
 async def start_grpc(writer: Writer, reader: Reader):
-
     aio.init_grpc_aio()
 
     tracer_provider = get_telemetry(SERVICE_NAME)

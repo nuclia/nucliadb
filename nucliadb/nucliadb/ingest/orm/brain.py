@@ -183,7 +183,6 @@ class ResourceBrain:
             key = f"{self.rid}/{field_key}/{paragraph.start}-{paragraph.end}"
             denied_classifications = []
             if key in paragraphs:
-
                 denied_classifications = [
                     f"/l/{classification.labelset}/{classification.label}"
                     for classification in paragraphs[key].classifications
@@ -326,7 +325,6 @@ class ResourceBrain:
         return METADATA_STATUS_PB_TYPE_TO_NAME_MAP[metadata.status]
 
     def set_global_tags(self, basic: Basic, uuid: str, origin: Optional[Origin]):
-
         self.brain.metadata.created.CopyFrom(basic.created)
         self.brain.metadata.modified.CopyFrom(basic.modified)
 

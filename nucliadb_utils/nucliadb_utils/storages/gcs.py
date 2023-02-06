@@ -134,7 +134,6 @@ class GCSStorageField(StorageField):
                 assert data["resource"]["name"] == destination_uri
 
     async def iter_data(self, headers=None):
-
         if headers is None:
             headers = {}
 
@@ -558,7 +557,6 @@ class GCSStorage(Storage):
         await self._create_bucket(url, headers, bucket_name, labels)
 
     async def _create_bucket(self, url, headers, bucket_name, labels):
-
         async with self.session.post(
             url,
             headers=headers,

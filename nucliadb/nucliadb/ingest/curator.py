@@ -59,7 +59,6 @@ CACHE = LRU(200)
 
 
 class Entities:
-
     data: Optional[GetEntitiesResponse] = None
 
     def __init__(self, cache: str, kbid: str):
@@ -130,7 +129,6 @@ class Consumer:
         os.makedirs(self.cache, exist_ok=True)
 
     async def initialize(self):
-
         last_curator_key = CURATOR_ID.format(worker=self.partition)
         txn = await self.driver.begin()
         last_curator_seq = await txn.get(last_curator_key)
@@ -299,7 +297,6 @@ class Nats:
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
-
         options = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,

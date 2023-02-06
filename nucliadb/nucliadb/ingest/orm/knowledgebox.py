@@ -193,7 +193,6 @@ class KnowledgeBox:
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
     ) -> Tuple[str, bool]:
-
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
         if exist:
@@ -513,7 +512,6 @@ class KnowledgeBox:
                 await txn.commit(resource=False)
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
-
         key = KB_SHARDS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
         if payload is None:

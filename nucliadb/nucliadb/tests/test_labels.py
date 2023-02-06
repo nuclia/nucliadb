@@ -168,6 +168,7 @@ async def test_labels_global(
         f"/kb/{knowledgebox}/labelset/label1",
         json={
             "title": "mylabel",
+            "multiple": False,
             "labels": [{"title": "label1", "uri": "http://"}],
         },
     )
@@ -176,6 +177,7 @@ async def test_labels_global(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/labelsets")
     assert resp.status_code == 200
     assert len(resp.json()["labelsets"]) == 1
+    assert resp.json()["labelsets"]["label1"]["multiple"] is False
 
     rid = await inject_resource_with_paragraph_labels(knowledgebox, nucliadb_grpc)
 

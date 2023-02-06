@@ -116,7 +116,6 @@ class PullWorker:
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
-
         await self.processor.initialize()
 
         if self.nats_subscriber:
@@ -301,7 +300,6 @@ class PullWorker:
                 await asyncio.sleep(10)
 
     async def _loop(self):
-
         headers = {}
         data = None
         if self.creds is not None:
@@ -329,7 +327,6 @@ class PullWorker:
                         url,
                         headers=headers,
                     ) as resp:
-
                         if resp.status != 200:
                             text = await resp.text()
                             logger.exception(f"Wrong status {resp.status}:{text}")

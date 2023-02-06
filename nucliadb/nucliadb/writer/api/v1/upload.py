@@ -492,7 +492,6 @@ async def upload(
     x_md5: Optional[List[str]] = Header(None),  # type: ignore
     x_synchronous: bool = Header(False),  # type: ignore
 ) -> ResourceFileUploaded:
-
     if rslug:
         path_rid = await get_rid_from_params_or_raise_error(kbid, slug=rslug)
 

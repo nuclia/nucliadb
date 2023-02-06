@@ -28,7 +28,6 @@ async def test_metadata_tokens_cancelled_by_the_user_sc_3775(
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
-
     token = {
         "token": "DRAG",
         "start": 340,

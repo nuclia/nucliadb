@@ -214,7 +214,7 @@ async def test_ingest_error_message(
 
 def add_filefields(message, items=None):
     items = items or []
-    for (fieldid, filename) in items:
+    for fieldid, filename in items:
         file_path = f"{dirname(__file__)}/assets/{filename}"
         cf1 = CloudFile(
             uri=filename,

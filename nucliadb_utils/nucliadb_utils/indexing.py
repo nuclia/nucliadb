@@ -30,7 +30,6 @@ from nucliadb_utils import logger
 
 
 class IndexingUtility:
-
     nc: Optional[Client] = None
     js: Optional[Union[JetStreamContext, JetStreamContextTelemetry]] = None
 

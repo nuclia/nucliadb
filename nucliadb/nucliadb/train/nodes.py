@@ -130,7 +130,6 @@ class TrainNodesManager:
         return node_obj, shard_id, node_id
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> Optional[KnowledgeBox]:
-
         if kbid is None:
             return None
 

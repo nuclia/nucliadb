@@ -28,7 +28,6 @@ from nucliadb_sdk.knowledgebox import KnowledgeBox
 
 
 def test_datascientist_tokens(knowledgebox: KnowledgeBox, temp_folder):
-
     knowledgebox.upload(
         text="I'm Ramon",
         entities=[Entity(type="NAME", value="Ramon", positions=[(5, 9)])],

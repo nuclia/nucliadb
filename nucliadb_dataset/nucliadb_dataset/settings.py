@@ -29,7 +29,6 @@ from nucliadb_sdk.client import Environment
 
 
 class Settings(BaseSettings):
-
     train_grpc_address: str = "train.nucliadb.svc:8080"
 
 

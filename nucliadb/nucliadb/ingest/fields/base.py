@@ -107,7 +107,6 @@ class Field:
 
     async def db_get_value(self):
         if self.value is None:
-
             payload = await self.resource.txn.get(
                 KB_RESOURCE_FIELD.format(
                     kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
@@ -313,7 +312,6 @@ class Field:
     async def set_user_vectors(
         self, user_vectors: UserVectorsWrapper
     ) -> Tuple[UserVectorSet, Dict[str, UserVectorsList]]:
-
         try:
             actual_payload: Optional[UserVectorSet] = await self.get_user_vectors(
                 force=True

@@ -30,7 +30,6 @@ from nucliadb_models.resource import NucliaDBRoles
 async def test_basic_patch_thumbnail_sc_2390(
     nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
 ) -> None:
-
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{knowledgebox_one}/resources",

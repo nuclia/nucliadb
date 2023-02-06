@@ -121,7 +121,6 @@ async def start_upload(request: str, kb: str):
             "X-NUCLIA-LEARNING-REQUEST": request,
         }
     ) as sess:
-
         req = await sess.get(f"{url}/request")
         request_data = RequestData.parse_raw(await req.read())
 

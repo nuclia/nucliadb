@@ -131,7 +131,6 @@ class Resource:
         vectors: List[Vector],
         split: Optional[str] = None,
     ):
-
         evw = ExtractedVectorsWrapper()
         evw.field.field = field
         evw.field.field_type = field_type  # type: ignore
@@ -150,7 +149,6 @@ class Resource:
         text: str,
         split: Optional[str] = None,
     ):
-
         etw = ExtractedTextWrapper()
         etw.field.field = field
         etw.field.field_type = field_type  # type: ignore

@@ -234,7 +234,6 @@ class KnowledgeBox:
     def process_uploaded_labels_from_search(
         self, search_result: KnowledgeboxSearchResults
     ) -> Dict[str, LabelSet]:
-
         response: Dict[str, LabelSet] = {}
         if search_result.fulltext is None or search_result.fulltext.facets is None:
             return response
@@ -300,7 +299,6 @@ class KnowledgeBox:
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
     ):
-
         result = self.client.search(
             self.build_search_request(text, filter, vector, vectorset, min_score)
         )
@@ -314,7 +312,6 @@ class KnowledgeBox:
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
     ):
-
         result = await self.client.async_search(
             self.build_search_request(text, filter, vector, vectorset, min_score)
         )

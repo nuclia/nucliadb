@@ -149,7 +149,6 @@ class LocalReaderWrapper:
     async def Paragraphs(
         self, stream_request: StreamRequest
     ) -> AsyncIterator[ParagraphItem]:
-
         loop = asyncio.get_running_loop()
         q: asyncio.Queue[ParagraphItem] = asyncio.Queue(1)
         exception = None

@@ -115,7 +115,6 @@ class LocalStorageField(StorageField):
                 data = await resp.read(CHUNK_SIZE)
 
     async def start(self, cf: CloudFile) -> CloudFile:
-
         if self.field is not None and self.field.upload_uri != "":
             # If there is a temporal url
             await self.storage.delete_upload(

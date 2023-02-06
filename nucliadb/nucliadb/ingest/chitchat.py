@@ -35,7 +35,6 @@ if SENTRY:
 
 
 async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
-
     if settings.chitchat_enabled is False:
         logger.info(f"Chitchat not enabled - {service_name}")
         return None
@@ -81,7 +80,6 @@ class ChitchatNucliaDB:
     async def socket_reader(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
-
         logger.info("new connection accepted")
         while True:
             try:

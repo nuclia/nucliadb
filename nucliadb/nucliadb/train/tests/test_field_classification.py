@@ -200,7 +200,6 @@ async def inject_resource_with_field_labels(knowledgebox, writer):
 async def test_generator_field_classification(
     train_rest_api: aiohttp.ClientSession, knowledgebox: str, nucliadb_grpc: WriterStub
 ):
-
     slr = SetLabelsRequest()
     slr.kb.uuid = knowledgebox
     slr.id = "labelset_paragraphs"
@@ -239,7 +238,6 @@ async def test_generator_field_classification(
         f"/{API_PREFIX}/v1/{KB_PREFIX}/{knowledgebox}/trainset/{partition_id}",
         data=trainset.SerializeToString(),
     ) as response:
-
         assert response.status == 200
         batches = []
         total = 0
