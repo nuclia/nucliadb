@@ -60,13 +60,6 @@ impl NodeReport {
             paragraph_count,
         })
     }
-
-    pub fn score(&self) -> f32 {
-        self.shard_count
-            .get()
-            .saturating_mul(self.paragraph_count.get()) as f32
-            / 100.0
-    }
 }
 
 impl Report for NodeReport {
