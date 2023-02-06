@@ -204,10 +204,10 @@ def highlight_paragraph(
 ) -> str:
     text_lower = text.lower()
 
-    marks = [0] * (len(text) + 1)
+    marks = [0] * (len(text_lower) + 1)
     if ematches is not None:
         for quote in ematches:
-            quote_regex = get_regex(quote)
+            quote_regex = get_regex(quote.lower())
             try:
                 for match in re.finditer(quote_regex, text_lower):
                     start, end = match.span()
@@ -221,7 +221,7 @@ def highlight_paragraph(
 
     words = words or []
     for word in words:
-        word_regex = get_regex(word)
+        word_regex = get_regex(word.lower())
         try:
             for match in re.finditer(word_regex, text_lower):
                 start, end = match.span()
@@ -234,17 +234,26 @@ def highlight_paragraph(
 
     new_text = ""
     actual = 0
+    mod = 0
+    skip = False
 
-    length = len(text_lower)
+    length = len(text)
 
     for index, pos in enumerate(marks):
-        if index >= length:
+        if skip:
+            skip = False
+            continue
+        if (index - mod) >= length:
             char_pos = ""
         else:
             begining = True
-            if index > 0 and text[index - 1] not in PRE_WORD:
+            if index > 0 and text[index - mod - 1] not in PRE_WORD:
                 begining = False
-            char_pos = text[index]
+            char_pos = text[index - mod]
+            if text[index - mod].lower() != text_lower[index]:
+                # May be incorrect positioning due to unicode lower
+                mod += 1
+                skip = True
         if pos == 1 and actual == 0 and begining:
             new_text += "<mark>"
             new_text += char_pos

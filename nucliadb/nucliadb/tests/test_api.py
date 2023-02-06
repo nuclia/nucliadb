@@ -261,3 +261,48 @@ async def test_serialize_errors(
     for _, fid, ftypestring in fields_to_test:
         assert resp_json["data"][ftypestring][fid]["error"]["body"] == "Failed"
         assert resp_json["data"][ftypestring][fid]["error"]["code"] == 1
+
+
+@pytest.mark.asyncio
+async def test_entitygroups(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    entitygroup = {
+        "title": "Kitchen",
+        "custom": True,
+        "color": "blue",
+        "entities": {
+            "cupboard": {"value": "Cupboard"},
+            "fork": {"value": "Fork"},
+            "fridge": {"value": "Fridge"},
+            "knife": {"value": "Knife"},
+            "sink": {"value": "Sink"},
+            "spoon": {"value": "Spoon"},
+        },
+    }
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/entitiesgroup/group1", json=entitygroup
+    )
+    assert resp.status_code == 200
+
+    # Entities are returned by default
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/entitiesgroups")
+    groups = resp.json()["groups"]
+    assert len(groups) == 1
+    assert groups["group1"]["entities"] != {}
+    assert groups["group1"]["title"] == "Kitchen"
+    assert groups["group1"]["color"] == "blue"
+    assert groups["group1"]["custom"] is True
+
+    # But they can be ommited with show_entities=false
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/entitiesgroups?show_entities=false"
+    )
+    groups = resp.json()["groups"]
+    assert groups["group1"]["entities"] == {}
+    assert groups["group1"]["title"] == "Kitchen"
+    assert groups["group1"]["color"] == "blue"
+    assert groups["group1"]["custom"] is True

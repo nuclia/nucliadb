@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 from uuid import uuid4
 
@@ -27,7 +28,7 @@ from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
-from nucliadb_protos.writer_pb2 import ListMembersRequest
+from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -54,11 +55,60 @@ WRITE_CONNECTIONS = LRU(50)
 SIDECAR_CONNECTIONS = LRU(50)
 
 
+class NodeType(Enum):
+    IO = 1
+    SEARCH = 2
+    INGEST = 3
+    TRAIN = 4
+    UNKNOWN = 5
+
+    @staticmethod
+    def from_str(label) -> NodeType:
+        if label in "Io":
+            return NodeType.IO
+        elif label in "Search":
+            return NodeType.SEARCH
+        elif label in "Ingest":
+            return NodeType.INGEST
+        elif label in "Train":
+            return NodeType.TRAIN
+        else:
+            logger.warn(f"Unknown '{label}' node type")
+            return NodeType.UNKNOWN
+
+    @staticmethod
+    def from_pb(node_type: Member.Type.ValueType):
+        if node_type == Member.Type.IO:
+            return NodeType.IO
+        elif node_type == Member.Type.SEARCH:
+            return NodeType.SEARCH
+        elif node_type == Member.Type.INGEST:
+            return NodeType.INGEST
+        elif node_type == Member.Type.TRAIN:
+            return NodeType.TRAIN
+        elif node_type == Member.Type.UNKNOWN:
+            return NodeType.UNKNOWN
+        else:
+            raise ValueError(f"incompatible node type '{node_type}'")
+
+    def to_pb(self) -> Member.Type.ValueType:
+        if self == NodeType.IO:
+            return Member.Type.IO
+        elif self == NodeType.SEARCH:
+            return Member.Type.SEARCH
+        elif self == NodeType.INGEST:
+            return Member.Type.INGEST
+        elif self == NodeType.TRAIN:
+            return Member.Type.TRAIN
+        else:
+            return Member.Type.UNKNOWN
+
+
 @dataclass
 class ClusterMember:
     node_id: str
     listen_addr: str
-    node_type: str
+    type: NodeType
     online: bool
     is_self: bool
     load_score: float
@@ -70,10 +120,11 @@ class Node(AbstractNode):
     _sidecar: Optional[NodeSidecarStub] = None
 
     def __init__(
-        self, address: str, label: str, load_score: float, dummy: bool = False
+        self, address: str, type: NodeType, load_score: float, dummy: bool = False
     ):
         self.address = address
-        self.label = label
+        self.type = type
+        self.label = type.name
         self.load_score = load_score
         self.dummy = dummy
 
@@ -136,11 +187,11 @@ class Node(AbstractNode):
         cls,
         ident: str,
         address: str,
-        label: str,
+        type: NodeType,
         load_score: float,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, label, load_score, dummy)
+        NODES[ident] = Node(address, type, load_score, dummy)
         # Compute cluster
         NODE_CLUSTER.compute()
 
@@ -161,7 +212,12 @@ class Node(AbstractNode):
         request = ListMembersRequest()
         members = await stub.ListMembers(request)
         for member in members.members:
-            NODES[member.id] = Node(member.listen_address, member.type, member.dummy)
+            NODES[member.id] = Node(
+                member.listen_address,
+                NodeType.from_pb(member.type),
+                member.load_score,
+                member.dummy,
+            )
 
     @property
     def sidecar(self) -> NodeSidecarStub:
@@ -273,21 +329,19 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
     valid_ids = []
     for member in members:
         valid_ids.append(member.node_id)
-        if member.is_self is False and member.node_type == "Io":
+        if member.is_self is False and member.type == NodeType.IO:
             node = NODES.get(member.node_id)
             if node is None:
-                logger.debug(
-                    f"{member.node_id}/{member.node_type} add {member.listen_addr}"
-                )
+                logger.debug(f"{member.node_id}/{member.type} add {member.listen_addr}")
                 await Node.set(
                     member.node_id,
                     address=member.listen_addr,
-                    label=member.node_type,
+                    type=member.type,
                     load_score=member.load_score,
                 )
                 logger.debug("Node added")
             else:
-                logger.debug(f"{member.node_id}/{member.node_type} update")
+                logger.debug(f"{member.node_id}/{member.type} update")
                 node.load_score = member.load_score
                 logger.debug("Node updated")
     node_ids = [x for x in NODES.keys()]
@@ -295,5 +349,5 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
         if key not in valid_ids:
             node = NODES.get(key)
             if node is not None:
-                logger.info(f"{key}/{node.label} remove {node.address}")
+                logger.info(f"{key}/{node.type} remove {node.address}")
                 await Node.destroy(key)

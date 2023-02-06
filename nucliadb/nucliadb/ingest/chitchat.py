@@ -25,7 +25,7 @@ import json
 from typing import Dict, List, Optional, Union
 
 from nucliadb.ingest import logger
-from nucliadb.ingest.orm.node import ClusterMember, chitchat_update_node
+from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
 from nucliadb.ingest.settings import settings
 from nucliadb.sentry import SENTRY
 from nucliadb_utils.utilities import Utility, set_utility
@@ -150,7 +150,7 @@ def build_member_from_json(member_serial: JsonObject):
     return ClusterMember(
         node_id=str(member_serial["id"]),
         listen_addr=str(member_serial["address"]),
-        node_type=str(member_serial["type"]),
+        type=NodeType.from_str(member_serial["type"]),
         is_self=bool(member_serial["is_self"]),
         load_score=load_score,
         online=True,

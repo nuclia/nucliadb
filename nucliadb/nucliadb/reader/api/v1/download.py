@@ -197,7 +197,17 @@ async def download_api(sf: StorageField, headers: Headers):
     if "range" in headers and file_size > -1:
         range_request = headers["range"]
         try:
-            start, end = parse_media_range(range_request, file_size)
+            start, end, range_size = parse_media_range(range_request, file_size)
+        except NotImplementedError:
+            raise HTTPException(
+                detail={
+                    "reason": "rangeNotSupported",
+                    "range": range_request,
+                    "message": "Multipart ranges are not supported yet",
+                },
+                headers={"Content-Range": f"bytes */{file_size}"},
+                status_code=416,
+            )
         except (IndexError, ValueError):
             # range errors fallback to full download
             raise HTTPException(
@@ -227,7 +237,7 @@ async def download_api(sf: StorageField, headers: Headers):
             )
         status_code = 206
         logger.debug(f"Range request: {range_request}")
-        extra_headers["Content-Length"] = f"{end - start}"
+        extra_headers["Content-Length"] = f"{range_size}"
         extra_headers["Content-Range"] = f"bytes {start}-{end - 1}/{file_size}"
         download_headers["Range"] = range_request
 
@@ -254,12 +264,20 @@ async def _get_resource_uuid_from_params(
     return rid
 
 
-def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int]:
-    start_str, _, end_str = range_request.split("bytes=")[-1].partition("-")
+def parse_media_range(range_request: str, file_size: int) -> Tuple[int, int, int]:
+    # Implemented following this docpage: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+    ranges = range_request.split("bytes=")[-1].split(", ")
+    if len(ranges) > 1:
+        raise NotImplementedError()
+    start_str, _, end_str = ranges[0].partition("-")
     start = int(start_str)
+    max_range_size = file_size - 1
     if len(end_str) == 0:
         # bytes=0- is valid
-        end = file_size - 1
+        end = max_range_size
+        range_size = file_size
     else:
-        end = int(end_str) + 1  # python is inclusive, http is exclusive
-    return start, end
+        end = int(end_str)
+        end = min(end, max_range_size)
+        range_size = (end - start) + 1
+    return start, end, range_size
