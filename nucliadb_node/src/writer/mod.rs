@@ -148,13 +148,16 @@ impl NodeWriterService {
             warn!("Shard id is empty");
             return Ok(());
         }
+
         self.cache.remove(&shard_id.id);
+
         let shard_path = env::shards_path_id(&shard_id.id);
         if shard_path.exists() {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
+            self.emit_event(NodeWriterEvent::ShardDeletion);
         }
-        self.emit_event(NodeWriterEvent::ShardDeletion);
+
         Ok(())
     }
 
