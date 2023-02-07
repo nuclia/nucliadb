@@ -20,7 +20,6 @@
 
 pub mod grpc_driver;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
@@ -28,10 +27,18 @@ use nucliadb_core::protos::{
     ShardIds, VectorSetId,
 };
 use nucliadb_core::tracing::{self, *};
+use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
 use crate::env;
 use crate::services::writer::ShardWriterService;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum NodeWriterEvent {
+    ShardCreation,
+    ShardDeletion,
+    ParagraphCount(u64),
+}
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct NodeWriterMetadata {
@@ -42,7 +49,7 @@ pub struct NodeWriterMetadata {
 #[derive(Debug)]
 pub struct NodeWriterService {
     pub cache: HashMap<String, ShardWriterService>,
-    metadata: Arc<Mutex<NodeWriterMetadata>>,
+    sender: Option<UnboundedSender<NodeWriterEvent>>,
 }
 
 impl Default for NodeWriterService {
@@ -52,12 +59,16 @@ impl Default for NodeWriterService {
 }
 impl NodeWriterService {
     pub fn new() -> Self {
-        Self::with_metadata(Arc::new(Mutex::new(NodeWriterMetadata::default())))
-    }
-    pub fn with_metadata(metadata: Arc<Mutex<NodeWriterMetadata>>) -> Self {
         Self {
             cache: HashMap::new(),
-            metadata,
+            sender: None,
+        }
+    }
+
+    pub fn with_sender(sender: UnboundedSender<NodeWriterEvent>) -> Self {
+        Self {
+            cache: HashMap::new(),
+            sender: Some(sender),
         }
     }
 
@@ -126,9 +137,11 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id, new_shard);
-        self.metadata().shard_count += 1;
+        self.emit_event(NodeWriterEvent::ShardCreation);
+
         data
     }
+
     #[tracing::instrument(skip_all)]
     pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
         self.cache.remove(&shard_id.id);
@@ -137,9 +150,10 @@ impl NodeWriterService {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
         }
-        self.metadata().shard_count -= 1;
+        self.emit_event(NodeWriterEvent::ShardDeletion);
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
         self.delete_shard(shard_id)?;
@@ -154,7 +168,8 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id.id.clone(), new_shard);
-        self.metadata().shard_count += 1;
+        self.emit_event(NodeWriterEvent::ShardCreation);
+
         Ok(shard_data)
     }
 
@@ -174,7 +189,7 @@ impl NodeWriterService {
             (shard.paragraph_count() as u64, shard.count())
         };
 
-        self.metadata().paragraph_count = paragraph_count;
+        self.emit_event(NodeWriterEvent::ParagraphCount(paragraph_count));
 
         Ok(Some(count))
     }
@@ -247,7 +262,7 @@ impl NodeWriterService {
             (shard.paragraph_count() as u64, shard.count())
         };
 
-        self.metadata().paragraph_count = paragraph_count;
+        self.emit_event(NodeWriterEvent::ParagraphCount(paragraph_count));
         Ok(Some(count))
     }
 
@@ -278,7 +293,9 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn metadata(&self) -> MutexGuard<'_, NodeWriterMetadata> {
-        self.metadata.lock().unwrap_or_else(PoisonError::into_inner)
+    pub fn emit_event(&mut self, event: NodeWriterEvent) {
+        if let Some(sender) = &self.sender {
+            let _ = sender.send(event);
+        }
     }
 }

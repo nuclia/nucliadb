@@ -22,11 +22,10 @@ use std::fs;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use nucliadb_cluster::{node, Key, Node, NodeType};
+use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
@@ -34,7 +33,8 @@ use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::NodeWriterGRPCDriver;
-use nucliadb_node::writer::{NodeWriterMetadata, NodeWriterService};
+use nucliadb_node::writer::{NodeWriterEvent, NodeWriterMetadata, NodeWriterService};
+use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use uuid::Uuid;
@@ -49,13 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start_bootstrap = Instant::now();
 
+    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
     let node_metadata = get_node_metadata();
-    let (initial_load_score, initial_shard_count) = (
-        node_metadata.paragraph_count as f32,
-        node_metadata.shard_count,
-    );
-    let node_metadata = Arc::new(Mutex::new(node_metadata));
-    let mut node_writer_service = NodeWriterService::with_metadata(Arc::clone(&node_metadata));
+    let mut node_writer_service = NodeWriterService::with_sender(sender);
 
     std::fs::create_dir_all(env::shards_path())?;
     if !env::lazy_loading() {
@@ -78,8 +74,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .on_local_network(chitchat_addr)
         .with_id(host_key.to_string())
         .with_seed_nodes(seed_nodes)
-        .insert_to_initial_state(LOAD_SCORE_KEY, initial_load_score)
-        .insert_to_initial_state(SHARD_COUNT_KEY, initial_shard_count)
+        .insert_to_initial_state(LOAD_SCORE_KEY, node_metadata.paragraph_count as f32)
+        .insert_to_initial_state(SHARD_COUNT_KEY, node_metadata.shard_count)
         .build()?;
 
     let node = node.start().await?;
@@ -117,39 +113,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let metrics_task = tokio::spawn(async move {
-        info!("Start metrics task");
-
-        let mut interval = tokio::time::interval(env::get_metrics_update_interval());
-
-        loop {
-            interval.tick().await;
-
-            let (load_score, shard_count) = {
-                let node_metadata = node_metadata.lock().unwrap_or_else(PoisonError::into_inner);
-
-                (
-                    node_metadata.paragraph_count as f32,
-                    node_metadata.shard_count,
-                )
-            };
-
-            info!("Update node state: load_score = {load_score}");
-            node.update_state(LOAD_SCORE_KEY, load_score).await;
-
-            info!("Update node state: shard_count = {shard_count}");
-            node.update_state(SHARD_COUNT_KEY, shard_count).await;
-        }
-    });
+    let update_task = tokio::spawn(watch_node_update(node, receiver, node_metadata));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    tokio::try_join!(writer_task, monitor_task, metrics_task)?;
+    tokio::try_join!(writer_task, monitor_task, update_task)?;
     telemetry_handle.terminate_telemetry().await;
     // node_writer_service.shutdown().await;
 
     Ok(())
+}
+
+pub async fn watch_node_update(
+    node: NodeHandle,
+    mut receiver: UnboundedReceiver<NodeWriterEvent>,
+    mut metadata: NodeWriterMetadata,
+) {
+    info!("Start node update task");
+
+    while let Some(event) = receiver.recv().await {
+        match event {
+            NodeWriterEvent::ShardCreation => {
+                metadata.shard_count += 1;
+                info!("Update node state: shard_count = {}", metadata.shard_count);
+                node.update_state(SHARD_COUNT_KEY, metadata.shard_count)
+                    .await;
+            }
+            NodeWriterEvent::ShardDeletion => {
+                metadata.shard_count -= 1;
+                info!("Update node state: shard_count = {}", metadata.shard_count);
+                node.update_state(SHARD_COUNT_KEY, metadata.shard_count)
+                    .await;
+            }
+            NodeWriterEvent::ParagraphCount(paragraph_count) => {
+                metadata.paragraph_count = paragraph_count;
+                info!("Update node state: load_score = {paragraph_count}");
+                node.update_state(LOAD_SCORE_KEY, paragraph_count as f32)
+                    .await;
+            }
+        }
+    }
+
+    info!("Node update task stopped");
 }
 
 pub fn read_host_key(host_key_path: &Path) -> Result<Uuid> {
