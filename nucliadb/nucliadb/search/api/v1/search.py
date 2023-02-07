@@ -166,7 +166,7 @@ async def search_knowledgebox(
     )
 
 
-@api.post(
+@api.get(
     f"/{KB_PREFIX}/{{kbid}}/catalog",
     status_code=200,
     name="List resources of a Knowledge Box",
@@ -181,13 +181,34 @@ async def catalog(
     request: Request,
     response: Response,
     kbid: str,
-    item: SearchRequest,
+    query: str = Query(default=""),
+    faceted: List[str] = Query(default=[]),
+    sort_field: Optional[SortField] = Query(default=None),
+    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
+    sort_order: SortOrder = Query(default=SortOrder.ASC),
+    page_number: int = Query(default=0),
+    page_size: int = Query(default=20),
+    shards: List[str] = Query([]),
+    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
-    item.fields = ["a/title"]
-    item.features = [SearchOptions.DOCUMENT]
+    sort = None
+    if sort_field:
+        sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
+    item = SearchRequest(
+        query=query,
+        fields=["a/title"],
+        faceted=faceted,
+        sort=sort,
+        page_number=page_number,
+        page_size=page_size,
+        features=[SearchOptions.DOCUMENT],
+        show=[ResourceProperties.BASIC],
+        shards=shards,
+        with_status=with_status,
+    )
     return await search(
         response,
         kbid,

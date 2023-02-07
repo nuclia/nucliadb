@@ -313,9 +313,9 @@ async def test_catalog_can_filter_by_processing_status(
         await inject_message(nucliadb_grpc, bm)
         created += 1
 
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
         },
     )
@@ -323,9 +323,9 @@ async def test_catalog_can_filter_by_processing_status(
     assert len(resp.json()["resources"]) == created
 
     # Two should be PROCESSED (the ERROR is counted as processed)
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
             "with_status": "PROCESSED",
         },
@@ -334,9 +334,9 @@ async def test_catalog_can_filter_by_processing_status(
     assert len(resp.json()["resources"]) == 2
 
     # One should be PENDING
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
             "with_status": "PENDING",
         },
@@ -345,9 +345,9 @@ async def test_catalog_can_filter_by_processing_status(
     assert len(resp.json()["resources"]) == 1
 
     # Check facets by processing status
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
             "faceted": ["/n/s"],
         },
@@ -563,9 +563,9 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     await inject_message(nucliadb_grpc, bm)
 
     # Check that search for resource list shows it
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
             "with_status": "PROCESSED",
         },
@@ -589,9 +589,9 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     await asyncio.sleep(1)
 
     # Check that search for resource list still shows it
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
             "with_status": "PROCESSED",
         },
@@ -600,9 +600,9 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     assert len(resp.json()["resources"]) == 1
 
     # Check that facets count it as PENDING though
-    resp = await nucliadb_reader.post(
+    resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
-        json={
+        params={
             "query": "",
             "faceted": ["/n/s"],
         },
@@ -1231,7 +1231,7 @@ async def test_only_search_calls_audit(nucliadb_reader, knowledgebox):
     audit = get_audit()
     audit.search = AsyncMock()
 
-    resp = await nucliadb_reader.post(f"/kb/{kbid}/catalog", json={"query": ""})
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
     assert resp.status_code == 200
 
     audit.search.assert_not_awaited()
