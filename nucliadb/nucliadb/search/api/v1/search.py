@@ -166,6 +166,50 @@ async def search_knowledgebox(
     )
 
 
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/catalog",
+    status_code=200,
+    name="List resources of a Knowledge Box",
+    description="List resources of a Knowledge Box",
+    response_model=KnowledgeboxSearchResults,
+    response_model_exclude_unset=True,
+    tags=["Search"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def catalog(
+    request: Request,
+    response: Response,
+    kbid: str,
+    sort_field: Optional[SortField] = Query(default=SortField.CREATED),
+    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
+    sort_order: SortOrder = Query(default=SortOrder.ASC),
+    page_number: int = Query(default=0),
+    page_size: int = Query(default=20),
+    shards: List[str] = Query([]),
+    faceted: List[str] = Query(default=[]),
+    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
+    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
+) -> KnowledgeboxSearchResults:
+    item = SearchRequest(
+        query="",
+        fields=["a/title"],
+        sort=SortOptions(
+            field=sort_field,
+            limit=sort_limit,
+            order=sort_order,
+        ),
+        page_number=page_number,
+        page_size=page_size,
+        features=[SearchOptions.DOCUMENT],
+        show=[ResourceProperties.BASIC],
+        faceted=faceted,
+        shards=shards,
+        with_status=with_status,
+    )
+    return await search(response, kbid, item, x_ndb_client, "", "", do_audit=False)
+
+
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/search",
     status_code=200,
@@ -199,6 +243,7 @@ async def search(
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
+    do_audit: bool = True,
 ) -> KnowledgeboxSearchResults:
     nodemanager = get_nodes()
     audit = get_audit()
@@ -333,7 +378,7 @@ async def search(
 
     get_counter()[f"{kbid}_-_search_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
-    if audit is not None:
+    if audit is not None and do_audit:
         await audit.search(
             kbid,
             x_nucliadb_user,
