@@ -144,6 +144,10 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
+        if shard_id.id.is_empty() {
+            warn!("Shard id is empty");
+            return Ok(());
+        }
         self.cache.remove(&shard_id.id);
         let shard_path = env::shards_path_id(&shard_id.id);
         if shard_path.exists() {
