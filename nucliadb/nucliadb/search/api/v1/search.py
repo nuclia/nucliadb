@@ -166,7 +166,7 @@ async def search_knowledgebox(
     )
 
 
-@api.get(
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/catalog",
     status_code=200,
     name="List resources of a Knowledge Box",
@@ -181,64 +181,21 @@ async def catalog(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    advanced_query: Optional[str] = Query(default=None),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    range_creation_start: Optional[datetime] = Query(default=None),
-    range_creation_end: Optional[datetime] = Query(default=None),
-    range_modification_start: Optional[datetime] = Query(default=None),
-    range_modification_end: Optional[datetime] = Query(default=None),
-    reload: bool = Query(default=True),
-    debug: bool = Query(False),
-    highlight: bool = Query(default=False),
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
-    ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = Query([]),
-    with_duplicates: bool = Query(default=False),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
+    item: SearchRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
-    item = SearchRequest(
-        query=query,
-        advanced_query=advanced_query,
-        fields=["a/title"],
-        filters=filters,
-        faceted=faceted,
-        sort=(
-            SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-            if sort_field is not None
-            else None
-        ),
-        page_number=page_number,
-        page_size=page_size,
-        range_creation_end=range_creation_end,
-        range_creation_start=range_creation_start,
-        range_modification_end=range_modification_end,
-        range_modification_start=range_modification_start,
-        features=[SearchOptions.DOCUMENT],
-        reload=reload,
-        debug=debug,
-        highlight=highlight,
-        show=show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
-        shards=shards,
-        with_duplicates=with_duplicates,
-        with_status=with_status,
-    )
+    item.fields = ["a/title"]
+    item.features = [SearchOptions.DOCUMENT]
     return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, do_audit=False
+        response,
+        kbid,
+        item,
+        x_ndb_client,
+        x_nucliadb_user,
+        x_forwarded_for,
+        do_audit=False,
     )
 
 

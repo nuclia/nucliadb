@@ -313,16 +313,20 @@ async def test_catalog_can_filter_by_processing_status(
         await inject_message(nucliadb_grpc, bm)
         created += 1
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
+        json={
+            "query": "",
+        },
     )
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == created
 
     # Two should be PROCESSED (the ERROR is counted as processed)
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
-        params={
+        json={
+            "query": "",
             "with_status": "PROCESSED",
         },
     )
@@ -330,9 +334,10 @@ async def test_catalog_can_filter_by_processing_status(
     assert len(resp.json()["resources"]) == 2
 
     # One should be PENDING
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
-        params={
+        json={
+            "query": "",
             "with_status": "PENDING",
         },
     )
@@ -340,9 +345,10 @@ async def test_catalog_can_filter_by_processing_status(
     assert len(resp.json()["resources"]) == 1
 
     # Check facets by processing status
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
-        params={
+        json={
+            "query": "",
             "faceted": ["/n/s"],
         },
     )
@@ -1222,7 +1228,7 @@ async def test_only_search_calls_audit(nucliadb_reader, knowledgebox):
     audit = get_audit()
     audit.search = AsyncMock()
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog")
+    resp = await nucliadb_reader.post(f"/kb/{kbid}/catalog", json={"query": ""})
     assert resp.status_code == 200
 
     audit.search.assert_not_awaited()
