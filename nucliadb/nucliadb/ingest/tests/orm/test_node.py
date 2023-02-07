@@ -150,3 +150,5 @@ async def test_update_node_metrics(metrics_registry):
         metrics_registry.get_sample_value("nucliadb_node_load_score", {"node": node1})
         is None
     )
+
+    NODES.clear()
