@@ -563,9 +563,10 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     await inject_message(nucliadb_grpc, bm)
 
     # Check that search for resource list shows it
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
-        params={
+        json={
+            "query": "",
             "with_status": "PROCESSED",
         },
     )
@@ -588,9 +589,10 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     await asyncio.sleep(1)
 
     # Check that search for resource list still shows it
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
-        params={
+        json={
+            "query": "",
             "with_status": "PROCESSED",
         },
     )
@@ -598,9 +600,10 @@ async def test_processing_status_doesnt_change_on_search_after_processed(
     assert len(resp.json()["resources"]) == 1
 
     # Check that facets count it as PENDING though
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_reader.post(
         f"/kb/{knowledgebox}/catalog",
-        params={
+        json={
+            "query": "",
             "faceted": ["/n/s"],
         },
     )
