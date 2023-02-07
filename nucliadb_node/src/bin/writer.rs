@@ -25,6 +25,7 @@ use std::str::FromStr;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
+use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::protos::GetShardRequest;
@@ -80,38 +81,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let node = node.start().await?;
 
-    let writer_task = tokio::spawn(async move {
-        let addr = env::writer_listen_address();
-        info!("Writer listening for gRPC requests at: {:?}", addr);
-        let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-        health_reporter
-            .set_serving::<NodeWriterServer<NodeWriterGRPCDriver>>()
-            .await;
-
-        Server::builder()
-            .add_service(health_service)
-            .add_service(NodeWriterServer::new(grpc_driver))
-            .serve(addr)
-            .await
-            .expect("Error starting gRPC writer");
-    });
+    let writer_task = tokio::spawn(start_grpc_service(grpc_driver));
 
     let telemetry_handle = nucliadb_telemetry::sync::start_telemetry_loop();
-    let mut cluster_watcher = node.cluster_watcher().await;
-    let monitor_task = tokio::task::spawn(async move {
-        loop {
-            debug!("node writer wait updates");
-            if let Some(live_nodes) = cluster_watcher.next().await {
-                let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
-                if let Ok(json_update) = serde_json::to_string(&cluster_snapshot) {
-                    info!("Chitchat cluster updated: {json_update}");
-                };
-            } else {
-                error!("Chitchat cluster updated monitor fail");
-            }
-        }
-    });
+    let cluster_watcher = node.cluster_watcher().await;
+    let monitor_task = tokio::task::spawn(monitor_cluster(cluster_watcher));
 
     let update_task = tokio::spawn(watch_node_update(node, receiver, node_metadata));
 
@@ -125,6 +100,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
+    let addr = env::writer_listen_address();
+
+    info!("Listening for gRPC requests at: {:?}", addr);
+
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<NodeWriterServer<NodeWriterGRPCDriver>>()
+        .await;
+
+    Server::builder()
+        .add_service(health_service)
+        .add_service(NodeWriterServer::new(grpc_driver))
+        .serve(addr)
+        .await
+        .expect("Error starting gRPC service");
+}
+
+pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>>) {
+    info!("Start cluster monitoring");
+
+    let mut cluster_watcher = Box::pin(cluster_watcher);
+
+    loop {
+        debug!("Wait for cluster update");
+        if let Some(live_nodes) = cluster_watcher.next().await {
+            let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
+
+            if let Ok(snapshot) = serde_json::to_string(&cluster_snapshot) {
+                info!("Cluster update: {snapshot}");
+            };
+        } else {
+            error!("Cluster snapshot cannot be serialized");
+        }
+    }
+}
+
 pub async fn watch_node_update(
     node: NodeHandle,
     mut receiver: UnboundedReceiver<NodeWriterEvent>,
@@ -135,13 +147,13 @@ pub async fn watch_node_update(
     while let Some(event) = receiver.recv().await {
         match event {
             NodeWriterEvent::ShardCreation => {
-                metadata.shard_count += 1;
+                metadata.shard_count = metadata.shard_count.saturating_add(1);
                 info!("Update node state: shard_count = {}", metadata.shard_count);
                 node.update_state(SHARD_COUNT_KEY, metadata.shard_count)
                     .await;
             }
             NodeWriterEvent::ShardDeletion => {
-                metadata.shard_count -= 1;
+                metadata.shard_count = metadata.shard_count.saturating_sub(1);
                 info!("Update node state: shard_count = {}", metadata.shard_count);
                 node.update_state(SHARD_COUNT_KEY, metadata.shard_count)
                     .await;
