@@ -40,11 +40,35 @@ class ClusterObject:
         return self.local_node
 
     def find_nodes(self) -> List[str]:
-        sorted_nodes = [(nodeid, node.load_score) for nodeid, node in NODES.items()]
-        sorted_nodes.sort(key=lambda x: x[1])
-        if len(sorted_nodes) < settings.node_replicas:
-            raise NodeClusterSmall()
-        return [nodeid for nodeid, _ in sorted_nodes][: settings.node_replicas]
+        return self.find_nodes_greedy()
+
+    def find_nodes_greedy(self) -> List[str]:
+        node_replicas = settings.node_replicas
+        total_nodes = len(NODES)
+        if total_nodes < node_replicas:
+            raise NodeClusterSmall(
+                f"Not enough nodes available reported by chitchat: {total_nodes} vs {node_replicas}"
+            )
+
+        # Filter out those over max node shards
+        available_nodes = {
+            nid: node
+            for (nid, node) in NODES.items()
+            if node.shard_count < settings.max_node_shards
+        }
+        if len(available_nodes) < node_replicas:
+            raise NodeClusterSmall(
+                f"Could not find enough nodes with available shards: {len(available_nodes)} vs {node_replicas}"
+            )
+
+        # Sort available nodes by shard_count and load_scode
+        sorted_nodes = [
+            (nid, node.shard_count, node.load_score)
+            for nid, node in available_nodes.items()
+        ]
+        sorted_nodes = sorted(sorted_nodes, key=lambda x: (x[1], x[2]))
+
+        return [nodeid for nodeid, _, _ in sorted_nodes][:node_replicas]
 
 
 NODE_CLUSTER = ClusterObject()

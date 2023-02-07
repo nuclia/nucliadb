@@ -723,3 +723,14 @@ async def create_resource(storage, driver: Driver, cache, knowledgebox_ingest: s
 
     await txn.commit(resource=False)
     return test_resource
+
+
+@pytest.fixture(scope="function")
+def metrics_registry():
+    import prometheus_client.registry  # type: ignore
+
+    for collector in prometheus_client.registry.REGISTRY._names_to_collectors.values():
+        if not hasattr(collector, "_metrics"):
+            continue
+        collector._metrics.clear()
+    yield prometheus_client.registry.REGISTRY

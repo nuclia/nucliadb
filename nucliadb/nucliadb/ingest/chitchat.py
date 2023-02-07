@@ -151,5 +151,6 @@ def build_member_from_json(member_serial: JsonObject):
         type=NodeType.from_str(member_serial["type"]),
         is_self=bool(member_serial["is_self"]),
         load_score=load_score,
+        shard_count=30,
         online=True,
     )

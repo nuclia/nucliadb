@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     sidecar_port_map: Dict[int, int] = {}
     max_node_fields: int = 200000
 
+    max_node_shards: int = 200  # TODO: discuss value
+
     local_reader_threads = 5
     local_writer_threads = 5
 
