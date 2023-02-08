@@ -344,6 +344,17 @@ async def test_catalog_can_filter_by_processing_status(
     assert resp.status_code == 200
     assert len(resp.json()["resources"]) == 1
 
+    # Get the list of PENDING
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/catalog",
+        params={
+            "query": "",
+            "filters": ["/n/s/PENDING"],
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["resources"]) == 1
+
     # Check facets by processing status
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/catalog",
