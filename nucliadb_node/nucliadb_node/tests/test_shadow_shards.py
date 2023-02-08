@@ -33,6 +33,7 @@ from nucliadb_node.shadow_shards import (
 async def test_get_shadow_shards_manager(shadow_folder):
     shadow_shards = get_shadow_shards_manager()
     assert isinstance(shadow_shards, ShadowShardsManager)
+    assert not shadow_shards._folder.endswith("{data_path}")
     assert shadow_shards._folder.endswith("/shadow_shards/")
 
 

@@ -247,8 +247,8 @@ def get_data_path() -> str:
 
 def get_shadow_shards_manager() -> ShadowShardsManager:
     if "manager" not in MAIN:
-        SHADOW_SHARDS_FOLDER.format(data_path=get_data_path())
-        MAIN["manager"] = ShadowShardsManager(folder=SHADOW_SHARDS_FOLDER)
+        folder = SHADOW_SHARDS_FOLDER.format(data_path=get_data_path())
+        MAIN["manager"] = ShadowShardsManager(folder=folder)
     manager = MAIN.get("manager")
     if manager is None:
         raise AttributeError()

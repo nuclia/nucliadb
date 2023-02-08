@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+2.0.5
+-----
+- Add relations to extracted field metadata
+
 2.0.4
 -----
 - Add cancelled_by_user to TokenSplit
