@@ -20,6 +20,7 @@
 from enum import Enum
 from typing import Optional
 
+import base64
 import httpx
 import requests
 
@@ -49,6 +50,7 @@ SEARCH_URL = "/search"
 LABELS_URL = "/labelsets"
 ENTITIES_URL = "/entitiesgroups"
 DOWNLOAD_URL = "/{uri}"
+TUS_UPLOAD_URL = "/resources/{rid}/file/{field}/tusupload"
 
 
 class HTTPError(Exception):
@@ -364,5 +366,38 @@ class NucliaDBClient:
         response: httpx.Response = self.reader_session.get(url)
         if response.status_code == 200:
             return response.content
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def start_tus_upload(
+        self,
+        rid: str,
+        field: str,
+        filename: Optional[str] = None,
+        content_type: str = "application/octet-stream",
+    ):
+        url = TUS_UPLOAD_URL.format(rid=rid, field=field)
+        headers = {
+            "upload-defer-length": "1",
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {base64.b64encode(filename)}",
+            "content-type": content_type,
+        }
+        response: httpx.Response = self.writer_session.post(url, headers=headers)
+        if response.status_code == 201:
+            return response.headers.get("Location")
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def patch_tus_upload(self, upload_url: str, data: bytes, offset: str):
+        headers = {
+            "upload-length": len(data),
+            "upload-offset": offset,
+        }
+        response: httpx.Response = self.writer_session.patch(
+            upload_url, headers=headers, content=data
+        )
+        if response.status_code == 200:
+            return response.headers.get("Upload-Offset")
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")

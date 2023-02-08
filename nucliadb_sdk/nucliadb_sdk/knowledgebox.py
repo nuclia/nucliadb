@@ -22,7 +22,7 @@ from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
 
 import numpy as np
 
-from nucliadb_models.labels import Label as NDBLabel
+from nucliadb_models.labels import KnowledgeBoxLabels, Label as NDBLabel
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
@@ -94,6 +94,7 @@ class KnowledgeBox:
         resource = self.get(key)
         if resource is None:
             item.id = key
+            item.slug = key
             self.client.create_resource(
                 from_resource_to_payload(item, download=self.download)
             )
@@ -280,6 +281,10 @@ class KnowledgeBox:
             },
         )
         assert resp.status_code == 200
+
+    def get_labels(self) -> KnowledgeBoxLabels:
+        resp = self.client.get_labels()
+        return resp
 
     def set_entities(self, entity_group: str, entities: List[str]):
         resp = self.client.writer_session.post(
