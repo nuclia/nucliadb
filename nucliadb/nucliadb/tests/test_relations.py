@@ -24,7 +24,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldType,
     Relations,
 )
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -80,6 +80,13 @@ async def test_broker_message_relations(
         source=mickey,
         to=minnie,
         relation_label="love",
+        metadata=RelationMetadata(
+            paragraph_id="foo",
+            source_start=1,
+            source_end=2,
+            to_start=10,
+            to_end=11,
+        ),
     )
     bm = BrokerMessage()
     bm.uuid = rid
@@ -117,6 +124,11 @@ async def test_broker_message_relations(
     # Field level relations
     extracted_metadata = body["data"]["texts"]["text1"]["extracted"]["metadata"]
     assert len(extracted_metadata["metadata"]["relations"]) == 1
+    relation = extracted_metadata["metadata"]["relations"][0]
+    assert relation["label"] == "love"
+    assert relation["metadata"] == dict(
+        paragraph_id="foo", source_start=1, source_end=2, to_start=10, to_end=11
+    )
 
 
 @pytest.mark.asyncio
