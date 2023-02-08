@@ -19,6 +19,11 @@
 #
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.resources_pb2 import (
+    FieldComputedMetadataWrapper,
+    FieldType,
+    Relations,
+)
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -42,7 +47,7 @@ async def test_broker_message_relations(
         f"/kb/{knowledgebox}/resources",
         json={
             "slug": "myresource",
-            "texts": {"text1": {"body": "My text"}},
+            "texts": {"text1": {"body": "Mickey loves Minnie"}},
         },
     )
     assert resp.status_code == 201
@@ -64,11 +69,33 @@ async def test_broker_message_relations(
     r2 = Relation(
         relation=Relation.RelationType.CHILD, source=e2, to=e0, relation_label="R2"
     )
-
+    mickey = RelationNode(
+        value="Mickey", ntype=RelationNode.NodeType.ENTITY, subtype=""
+    )
+    minnie = RelationNode(
+        value="Minnie", ntype=RelationNode.NodeType.ENTITY, subtype="Official"
+    )
+    love_relation = Relation(
+        relation=Relation.RelationType.CHILD,
+        source=mickey,
+        to=minnie,
+        relation_label="love",
+    )
     bm = BrokerMessage()
     bm.uuid = rid
     bm.kbid = knowledgebox
+
+    # Add relations at the resource level
     bm.relations.extend([r0, r1, r2])
+
+    # Add relations at the field level
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.field_type = FieldType.TEXT
+    fcmw.field.field = "text1"
+    relations = Relations()
+    relations.relations.extend([love_relation])
+    fcmw.metadata.metadata.relations.append(relations)
+    bm.field_metadata.append(fcmw)
 
     async def iterate(value: BrokerMessage):
         yield value
@@ -76,11 +103,20 @@ async def test_broker_message_relations(
     await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=relations"
+        f"/kb/{knowledgebox}/resource/{rid}",
+        params=dict(
+            show=["relations", "extracted"],
+            extracted=["metadata"],
+        ),
     )
     assert resp.status_code == 200
     body = resp.json()
+    # Resource level relations
     assert len(body["relations"]) == 3
+
+    # Field level relations
+    extracted_metadata = body["data"]["texts"]["text1"]["extracted"]["metadata"]
+    assert len(extracted_metadata["metadata"]["relations"]) == 1
 
 
 @pytest.mark.asyncio

@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from nucliadb_protos import resources_pb2
 
 from .common import Classification, CloudFile, CloudLink, FieldID, Paragraph
+from .metadata import Relation, convert_pb_relation_to_api
 
 _T = TypeVar("_T")
 
@@ -109,6 +110,7 @@ class FieldMetadata(BaseModel):
     language: Optional[str]
     summary: Optional[str]
     positions: Dict[str, Positions]
+    relations: Optional[List[Relation]]
 
 
 class FieldComputedMetadata(BaseModel):
@@ -118,13 +120,17 @@ class FieldComputedMetadata(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.FieldComputedMetadata) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        value = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        value["metadata"]["relations"] = [
+            convert_pb_relation_to_api(relation)
+            for relations in message.metadata.relations
+            for relation in relations.relations
+        ]
+        return cls(**value)
 
 
 class FieldComputedMetadataWrapper(BaseModel):

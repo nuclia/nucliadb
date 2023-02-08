@@ -23,7 +23,7 @@ from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub
 
 
 @pytest.mark.asyncio
-async def test_create_delete_shadow_shards(sidecar_grpc_servicer, shadow_folder):
+async def test_create_delete_shadow_shards(shadow_folder, sidecar_grpc_servicer):
     stub = NodeSidecarStub(sidecar_grpc_servicer)
 
     # Create a shadow shard
