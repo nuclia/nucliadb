@@ -21,6 +21,7 @@ serde_json = "1.0.82"
 nucliadb_core = { path = "../nucliadb_core" }
 lazy_static = "1.4.0"
 itertools = "0.10.5"
+wide = {version = "0.7.6", features = ["std"] }
 
 [lib]
 name = "nucliadb_vectors"

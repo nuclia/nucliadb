@@ -41,6 +41,52 @@ pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
         .fold(encode_length(vec![], vec), encode_unit)
 }
 
+#[allow(unused)]
+pub fn simd_consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
+    use wide::f32x8;
+    const N: usize = 8;
+    let mut buff_x = [0; 8];
+    let mut buff_y = [0; 8];
+    x.read_exact(&mut buff_x).unwrap();
+    y.read_exact(&mut buff_y).unwrap();
+    let len_x = Len::from_le_bytes(buff_x);
+    let len_y = Len::from_le_bytes(buff_y);
+    assert_eq!(len_x, len_y);
+    let len = len_x;
+    let mut buff_x = [0; 4];
+    let mut buff_y = [0; 4];
+    let mut sum = 0.0;
+    let mut dem_x = 0.0;
+    let mut dem_y = 0.0;
+    let mut i = 0;
+    let mut x_simd_buffer = [0.0; N];
+    let mut y_simd_buffer = [0.0; N];
+    let mut free_in_buffer = 0;
+    while i < len {
+        i += 1;
+        x.read_exact(&mut buff_x).unwrap();
+        y.read_exact(&mut buff_y).unwrap();
+        x_simd_buffer[free_in_buffer] = Unit::from_le_bytes(buff_x);
+        y_simd_buffer[free_in_buffer] = Unit::from_le_bytes(buff_y);
+        free_in_buffer += 1;
+        if free_in_buffer == N || (i == len && free_in_buffer > 0) {
+            let partial_simd_x = f32x8::new(x_simd_buffer);
+            let partial_simd_y = f32x8::new(y_simd_buffer);
+            let partial_dot_product = partial_simd_x * partial_simd_y;
+            let partial_power_x = partial_simd_x * partial_simd_x;
+            let partial_power_y = partial_simd_y * partial_simd_y;
+            dem_x += partial_power_x.reduce_add();
+            dem_y += partial_power_y.reduce_add();
+            sum += partial_dot_product.reduce_add();
+            x_simd_buffer = [0.0; N];
+            y_simd_buffer = [0.0; N];
+            free_in_buffer = 0;
+        }
+    }
+    sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))
+}
+
+#[allow(unused)]
 pub fn consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
@@ -94,6 +140,21 @@ mod test {
         assert_eq!(
             naive_cosine_similatiry(&v0, &v0),
             consine_similarity(&v0_r, &v0_r)
+        );
+    }
+    #[test]
+    fn naive_equivalence_simd() {
+        let v0: Vec<_> = (0..4).map(|i| i as f32).collect();
+        let v1: Vec<_> = (0..4).map(|i| i as f32).collect();
+        let v0_r = encode_vector(&v0);
+        let v1_r = encode_vector(&v1);
+        assert_eq!(
+            naive_cosine_similatiry(&v0, &v1),
+            simd_consine_similarity(&v0_r, &v1_r)
+        );
+        assert_eq!(
+            naive_cosine_similatiry(&v0, &v0),
+            simd_consine_similarity(&v0_r, &v0_r)
         );
     }
 }
