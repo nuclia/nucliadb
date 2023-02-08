@@ -1040,3 +1040,30 @@ async def test_search_and_suggest_sent_audit(
         assert False, "Invalid trace ID"
 
     clean_utility(Utility.AUDIT)
+
+
+@pytest.mark.asyncio
+async def test_fulltext_search_with_accents(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "myresource",
+            "title": "Canigó - Mossen Jacinto Verdaguer",
+            "summary": "Canigó és un poema èpic de 1886 escrit per Jacint Verdaguer.",
+            "icon": "text/plain",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Check that searching with and without the accent returns the resource as result
+    for query in ("Canigó", "Canigo"):
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query={query}")
+        assert resp.status_code == 200
+        results = resp.json()
+        assert results["resources"][rid]
