@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import os
+import tempfile
 import time
 from typing import AsyncIterable
 
@@ -33,6 +35,7 @@ from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_node.app import main
 from nucliadb_node.settings import settings
+from nucliadb_node.shadow_shards import SHADOW_SHARDS_FOLDER
 
 images.settings["nucliadb_node_reader"] = {
     "image": "eu.gcr.io/stashify-218417/node",
@@ -178,6 +181,12 @@ async def sidecar(node_single, gcs_storage, natsd):
 
 
 @pytest.fixture(scope="function")
+async def sidecar_grpc_servicer(sidecar):
+    channel = aio.insecure_channel(settings.sidecar_listen_address)
+    yield channel
+
+
+@pytest.fixture(scope="function")
 async def shard() -> AsyncIterable[str]:
     stub = NodeWriterStub(aio.insecure_channel(settings.writer_listen_address))
     request = EmptyQuery()
@@ -186,3 +195,17 @@ async def shard() -> AsyncIterable[str]:
     sid = ShardId()
     sid.id = shard.id
     await stub.DeleteShard(sid)  # type: ignore
+
+
+@pytest.fixture(scope="function")
+def shadow_folder():
+    with tempfile.TemporaryDirectory() as td:
+        previous = os.environ.get("DATA_PATH")
+        os.environ["DATA_PATH"] = str(td)
+
+        yield SHADOW_SHARDS_FOLDER.format(data_path=td)
+
+        if previous is None:
+            os.environ.pop("DATA_PATH")
+        else:
+            os.environ["DATA_PATH"] = previous

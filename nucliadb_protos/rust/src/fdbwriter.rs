@@ -485,11 +485,20 @@ pub struct ListMembersResponse {
     pub members: ::prost::alloc::vec::Vec<Member>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShadowShard {
+    #[prost(message, optional, tag="1")]
+    pub shard: ::core::option::Option<super::noderesources::ShardId>,
+    #[prost(string, tag="2")]
+    pub node: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardReplica {
     #[prost(message, optional, tag="1")]
     pub shard: ::core::option::Option<super::noderesources::ShardCreated>,
     #[prost(string, tag="2")]
     pub node: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="3")]
+    pub shadow_replica: ::core::option::Option<ShadowShard>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardObject {
@@ -614,4 +623,28 @@ pub mod upload_binary_data {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileUploaded {
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreateShadowShardRequest {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="2")]
+    pub replica: ::core::option::Option<super::noderesources::ShardId>,
+    /// node where the shadow shard is created
+    #[prost(string, tag="3")]
+    pub node: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteShadowShardRequest {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="2")]
+    pub replica: ::core::option::Option<super::noderesources::ShardId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShadowShardResponse {
+    #[prost(message, optional, tag="1")]
+    pub shadow_shard: ::core::option::Option<ShadowShard>,
+    #[prost(bool, tag="2")]
+    pub success: bool,
 }

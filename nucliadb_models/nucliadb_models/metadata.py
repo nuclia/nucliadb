@@ -107,9 +107,28 @@ class RelationEntity(BaseModel):
         return values
 
 
+class RelationMetadata(BaseModel):
+    paragraph_id: Optional[str]
+    source_start: Optional[int]
+    source_end: Optional[int]
+    to_start: Optional[int]
+    to_end: Optional[int]
+
+    @classmethod
+    def from_message(cls: Type[_T], message: utils_pb2.RelationMetadata) -> _T:
+        return cls(
+            **MessageToDict(
+                message,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
+
+
 class Relation(BaseModel):
     relation: RelationType
     label: Optional[str] = None
+    metadata: Optional[RelationMetadata]
 
     from_: Optional[RelationEntity]
     to: RelationEntity
@@ -189,6 +208,8 @@ def convert_pb_relation_to_api(relation: utils_pb2.Relation) -> Dict[str, Any]:
         "relation": RelationTypePbMap[relation.relation],
         "from": convert_pb_relation_node_to_api(relation.source),
         "to": convert_pb_relation_node_to_api(relation.to),
+        "label": relation.relation_label,
+        "metadata": RelationMetadata.from_message(relation.metadata),
     }
 
 

@@ -215,6 +215,10 @@ class ResourceBrain:
 
             self.brain.paragraphs[field_key].paragraphs[key].CopyFrom(p)
 
+        for relations in metadata.metadata.relations:
+            for relation in relations.relations:
+                self.brain.relations.append(relation)
+
         for split, sentences in replace_splits.items():
             for sentence in sentences:
                 self.brain.paragraphs_to_delete.append(
