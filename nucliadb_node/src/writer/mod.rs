@@ -27,29 +27,14 @@ use nucliadb_core::protos::{
     ShardIds, VectorSetId,
 };
 use nucliadb_core::tracing::{self, *};
-use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
 use crate::env;
 use crate::services::writer::ShardWriterService;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum NodeWriterEvent {
-    ShardCreation,
-    ShardDeletion,
-    ParagraphCount(u64),
-}
-
-#[derive(Debug, Copy, Clone, Default)]
-pub struct NodeWriterMetadata {
-    pub paragraph_count: u64,
-    pub shard_count: u64,
-}
-
 #[derive(Debug)]
 pub struct NodeWriterService {
     pub cache: HashMap<String, ShardWriterService>,
-    sender: Option<UnboundedSender<NodeWriterEvent>>,
 }
 
 impl Default for NodeWriterService {
@@ -61,14 +46,6 @@ impl NodeWriterService {
     pub fn new() -> Self {
         Self {
             cache: HashMap::new(),
-            sender: None,
-        }
-    }
-
-    pub fn with_sender(sender: UnboundedSender<NodeWriterEvent>) -> Self {
-        Self {
-            cache: HashMap::new(),
-            sender: Some(sender),
         }
     }
 
@@ -137,7 +114,6 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id, new_shard);
-        self.emit_event(NodeWriterEvent::ShardCreation);
 
         data
     }
@@ -155,7 +131,6 @@ impl NodeWriterService {
         if shard_path.exists() {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
-            self.emit_event(NodeWriterEvent::ShardDeletion);
         }
 
         Ok(())
@@ -175,7 +150,6 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id.id.clone(), new_shard);
-        self.emit_event(NodeWriterEvent::ShardCreation);
 
         Ok(shard_data)
     }
@@ -186,19 +160,13 @@ impl NodeWriterService {
         shard_id: &ShardId,
         resource: &Resource,
     ) -> NodeResult<Option<usize>> {
-        let (paragraph_count, count) = {
-            let Some(shard) = self.get_mut_shard(shard_id) else {
-                return Ok(None);
-            };
-
-            shard.set_resource(resource)?;
-
-            (shard.paragraph_count() as u64, shard.count())
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
         };
 
-        self.emit_event(NodeWriterEvent::ParagraphCount(paragraph_count));
+        shard.set_resource(resource)?;
 
-        Ok(Some(count))
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -259,18 +227,13 @@ impl NodeWriterService {
         shard_id: &ShardId,
         resource: &ResourceId,
     ) -> NodeResult<Option<usize>> {
-        let (paragraph_count, count) = {
-            let Some(shard) = self.get_mut_shard(shard_id) else {
-                return Ok(None);
-            };
-
-            shard.remove_resource(resource)?;
-
-            (shard.paragraph_count() as u64, shard.count())
+        let Some(shard) = self.get_mut_shard(shard_id) else {
+            return Ok(None);
         };
 
-        self.emit_event(NodeWriterEvent::ParagraphCount(paragraph_count));
-        Ok(Some(count))
+        shard.remove_resource(resource)?;
+
+        Ok(Some(shard.count()))
     }
 
     #[tracing::instrument(skip_all)]
@@ -300,9 +263,7 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn emit_event(&mut self, event: NodeWriterEvent) {
-        if let Some(sender) = &self.sender {
-            let _ = sender.send(event);
-        }
+    pub fn paragraph_count(&self) -> u64 {
+        self.paragraph_count()
     }
 }

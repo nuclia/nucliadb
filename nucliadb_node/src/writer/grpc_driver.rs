@@ -32,6 +32,7 @@ use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
 use opentelemetry::global;
+use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -42,20 +43,47 @@ use crate::writer::NodeWriterService;
 /// Indicates the maximum duration used to move one shard from one node to another on failure only.
 const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
-pub struct NodeWriterGRPCDriver(RwLock<NodeWriterService>);
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum NodeWriterEvent {
+    ShardCreation,
+    ShardDeletion,
+    ParagraphCount(u64),
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+pub struct NodeWriterMetadata {
+    pub paragraph_count: u64,
+    pub shard_count: u64,
+}
+
+pub struct NodeWriterGRPCDriver {
+    inner: RwLock<NodeWriterService>,
+    sender: Option<UnboundedSender<NodeWriterEvent>>,
+}
+
 impl From<NodeWriterService> for NodeWriterGRPCDriver {
     fn from(node: NodeWriterService) -> NodeWriterGRPCDriver {
-        NodeWriterGRPCDriver(RwLock::new(node))
+        NodeWriterGRPCDriver {
+            inner: RwLock::new(node),
+            sender: None,
+        }
     }
 }
+
 impl NodeWriterGRPCDriver {
+    pub fn with_sender(self, sender: UnboundedSender<NodeWriterEvent>) -> Self {
+        Self {
+            sender: Some(sender),
+            ..self
+        }
+    }
     // The GRPC writer will only request the writer to bring a shard
     // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
     async fn shard_loading(&self, id: &ShardId) {
         if env::lazy_loading() {
-            let mut writer = self.0.write().await;
+            let mut writer = self.inner.write().await;
             writer.load_shard(id);
         }
     }
@@ -66,7 +94,15 @@ impl NodeWriterGRPCDriver {
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(request.metadata())));
         Span::current().set_parent(parent_cx);
     }
+
+    #[tracing::instrument(skip_all)]
+    fn emit_event(&self, event: NodeWriterEvent) {
+        if let Some(sender) = &self.sender {
+            let _ = sender.send(event);
+        }
+    }
 }
+
 #[tonic::async_trait]
 impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(skip_all)]
@@ -76,7 +112,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         let result = reader.get_shard(&shard_id).is_some();
         std::mem::drop(reader);
         match result {
@@ -100,9 +136,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         info!("Creating new shard");
         send_telemetry_event(TelemetryEvent::Create).await;
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         let result = writer.new_shard();
         std::mem::drop(writer);
+        self.emit_event(NodeWriterEvent::ShardCreation);
         Ok(tonic::Response::new(result))
     }
 
@@ -115,11 +152,15 @@ impl NodeWriter for NodeWriterGRPCDriver {
         // Deletion does not require for the shard
         // to be loaded.
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         let result = writer.delete_shard(&shard_id);
         std::mem::drop(writer);
         match result {
-            Ok(_) => Ok(tonic::Response::new(shard_id)),
+            Ok(_) => {
+                self.emit_event(NodeWriterEvent::ShardDeletion);
+
+                Ok(tonic::Response::new(shard_id))
+            }
             Err(e) => {
                 let error_msg = format!("Error deleting shard {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
@@ -140,7 +181,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         // Deletion and upgrade do not require for the shard
         // to be loaded.
         let shard_id = request.into_inner();
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         let result = writer.clean_and_upgrade_shard(&shard_id);
         std::mem::drop(writer);
         match result {
@@ -159,7 +200,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         request: Request<EmptyQuery>,
     ) -> Result<Response<ShardIds>, Status> {
         self.instrument(&request);
-        let ids = self.0.read().await.get_shard_ids();
+        let ids = self.inner.read().await.get_shard_ids();
         Ok(tonic::Response::new(ids))
     }
 
@@ -172,18 +213,20 @@ impl NodeWriter for NodeWriterGRPCDriver {
             id: resource.shard_id.clone(),
         };
         self.shard_loading(&shard_id).await;
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         let result = writer.set_resource(&shard_id, &resource);
-        std::mem::drop(writer);
         match result.transpose() {
             Some(Ok(count)) => {
                 info!("Set resource ends correctly");
+
                 let status = OpStatus {
                     status: 0,
                     detail: "Success!".to_string(),
                     count: count as u64,
                     shard_id: shard_id.id.clone(),
                 };
+
+                self.emit_event(NodeWriterEvent::ParagraphCount(writer.paragraph_count()));
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
@@ -212,7 +255,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         match writer.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
@@ -242,7 +285,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         match writer.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
@@ -278,9 +321,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
         };
 
         self.shard_loading(&shard_id).await;
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         let result = writer.remove_resource(&shard_id, &resource);
-        std::mem::drop(writer);
 
         match result.transpose() {
             Some(Ok(count)) => {
@@ -291,6 +333,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
                     count: count as u64,
                     shard_id: shard_id.id.clone(),
                 };
+                self.emit_event(NodeWriterEvent::ParagraphCount(writer.paragraph_count()));
+
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
@@ -318,7 +362,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         match writer.add_vectorset(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("add_vector_set ends correctly");
@@ -349,7 +393,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         match writer.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(count)) => {
                 info!("remove_vector_set ends correctly");
@@ -379,7 +423,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<VectorSetList>, Status> {
         self.instrument(&request);
         let shard_id = request.into_inner();
-        let reader = self.0.read().await;
+        let reader = self.inner.read().await;
         match reader.list_vectorsets(&shard_id).transpose() {
             Some(Ok(list)) => {
                 info!("list_vectorset ends correctly");
@@ -411,7 +455,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
 
-        let service = self.0.read().await;
+        let service = self.inner.read().await;
 
         let Some(shard) = service.get_shard(&shard_id) else {
             return Err(tonic::Status::not_found(format!(
@@ -459,7 +503,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
 
-        if !request.override_shard && self.0.read().await.get_shard(&shard_id).is_some() {
+        if !request.override_shard && self.inner.read().await.get_shard(&shard_id).is_some() {
             return Err(tonic::Status::already_exists(format!(
                 "Shard {} already exists",
                 shard_id.id
@@ -494,7 +538,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.into_inner();
         info!("Running garbage collection at {}", shard_id.id);
         self.shard_loading(&shard_id).await;
-        let mut writer = self.0.write().await;
+        let mut writer = self.inner.write().await;
         let result = writer.gc(&shard_id);
         std::mem::drop(writer);
         match result.transpose() {
