@@ -114,7 +114,8 @@ async def test_get_resource_sequence_ids_are_set_on_resource(
 
 @pytest.mark.asyncio
 async def test_get_resource_all(
-    reader_api: Callable[..., AsyncClient], test_resource: Resource
+    reader_api: Callable[..., AsyncClient],
+    test_resource: Resource,
 ) -> None:
     rsc = test_resource
     kbid = rsc.kb.kbid

@@ -133,7 +133,7 @@ build-node:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node .
 
 # Not use the base image
-build-base-node-image:
+build-base-node-image-scratch:
 	docker build -t eu.gcr.io/stashify-218417/node:main -f Dockerfile.node_local .
 
 build-local-cluster-manager:

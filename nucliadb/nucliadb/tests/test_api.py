@@ -94,7 +94,7 @@ async def test_creation(
     await nucliadb_grpc.ProcessMessage(iterate(bm))  # type: ignore
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata"
+        f"/kb/{knowledgebox}/resource/{rid}?show=extracted&show=values&extracted=text&extracted=metadata",
     )
     assert resp.status_code == 200
     assert (

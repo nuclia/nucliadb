@@ -246,7 +246,7 @@ async def test_search_returns_labels(
     await inject_message(nucliadb_grpc, bm)
 
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata"
+        f"/kb/{knowledgebox}/search?query=Some&show=extracted&extracted=metadata",
     )
     assert resp.status_code == 200
     content = resp.json()
