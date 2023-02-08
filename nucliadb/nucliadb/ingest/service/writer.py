@@ -663,10 +663,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             if shard is not None:
                 logger.info("Calling shard.add_resource")
-                count = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
+                counter = await shard.add_resource(brain.brain, 0, uuid.uuid4().hex)
                 logger.info("Finished shard.add_resource")
 
-                if count > settings.max_node_fields:
+                if counter is not None and counter.fields > settings.max_node_fields:
                     shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
 
             response = IndexStatus()

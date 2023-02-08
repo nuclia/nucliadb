@@ -26,7 +26,7 @@ from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
-from nucliadb.ingest.orm.abc import AbstractShard
+from nucliadb.ingest.orm.abc import AbstractShard, ShardCounter
 
 if TYPE_CHECKING:
     from nucliadb.ingest.orm.local_node import LocalNode
@@ -48,11 +48,13 @@ class LocalShard(AbstractShard):
 
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
-    ) -> int:
+    ) -> Optional[ShardCounter]:
         for shardreplica in self.shard.replicas:
             resource.shard_id = resource.resource.shard_id = shardreplica.shard.id
             res = await self.node.add_resource(resource)
-        return res.count
+        # We don't have paragraphs returned from the writer SetResource, and
+        # we also don't need them here, as they are used for auditing purposes
+        return ShardCounter(shard=self.sharduuid, fields=res.count, paragraphs=0)
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
         shards_cleaned: Dict[str, PBShardCleaned] = {}

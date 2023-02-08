@@ -50,12 +50,12 @@ class Reader:
             self.channel = aio.insecure_channel(grpc_reader_address)
         self.stub = NodeReaderStub(self.channel)
 
-    async def get_count(self, pb: ShardId) -> Optional[int]:
+    async def get_shard(self, pb: ShardId) -> Optional[Shard]:
         if pb.id not in CACHE:
             req = GetShardRequest()
             req.shard_id.id = pb.id
             shard: Shard = await self.stub.GetShard(req)  # type: ignore
-            CACHE[pb.id] = shard.resources
+            CACHE[pb.id] = shard
             return CACHE[pb.id]
         else:
             return CACHE[pb.id]

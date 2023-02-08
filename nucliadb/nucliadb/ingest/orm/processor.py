@@ -20,7 +20,7 @@
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBox as KnowledgeBoxPB
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
@@ -29,6 +29,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     Widget,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
+from pydantic import BaseModel
 from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -36,7 +37,7 @@ from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.exceptions import DeadletteredError, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
-from nucliadb.ingest.orm.shard import Shard
+from nucliadb.ingest.orm.shard import Shard, ShardCounter
 from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb.ingest.settings import settings
 from nucliadb.sentry import SENTRY
@@ -55,14 +56,19 @@ DEFAULT_WIDGET.features.editLabels = True
 DEFAULT_WIDGET.features.entityAnnotation = True
 
 
-class TxnResult(Enum):
+class TxnAction(Enum):
     RESOURCE_CREATED = 0
     RESOURCE_MODIFIED = 1
 
 
-AUDIT_TYPES: Dict[TxnResult, int] = {
-    TxnResult.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
-    TxnResult.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED,
+class TxnResult(BaseModel):
+    action: TxnAction
+    counter: Optional[ShardCounter]
+
+
+AUDIT_TYPES: Dict[TxnAction, int] = {
+    TxnAction.RESOURCE_CREATED: AuditRequest.AuditType.NEW,
+    TxnAction.RESOURCE_MODIFIED: AuditRequest.AuditType.MODIFIED,
 }
 
 
@@ -249,6 +255,8 @@ class Processor:
 
         audit_type: Optional[int] = None
         audit_fields = None
+        audit_shard_counter: Optional[AuditShardCounter] = None
+
         if message.type == BrokerMessage.MessageType.DELETE:
             audit_fields = await self.collect_audit_fields(message)
             await self.delete_resource(message, seqid, partition)
@@ -256,13 +264,32 @@ class Processor:
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
             audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.autocommit(message, seqid, partition)
-            audit_type = AUDIT_TYPES.get(txn_result)
+            audit_type = AUDIT_TYPES.get(txn_result.action)
+            audit_shard_counter = (
+                AuditShardCounter(
+                    shard=txn_result.counter.shard,
+                    paragraphs=txn_result.counter.paragraphs,
+                    fields=txn_result.counter.fields,
+                )
+                if txn_result.counter is not None
+                else None
+            )
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
             audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.commit(message, seqid, partition)
-            audit_type = AUDIT_TYPES.get(txn_result)
+            audit_type = AUDIT_TYPES.get(txn_result.action)
+            audit_shard_counter = (
+                AuditShardCounter(
+                    shard=txn_result.counter.shard,
+                    paragraphs=txn_result.counter.paragraphs,
+                    fields=txn_result.counter.fields,
+                )
+                if txn_result.counter is not None
+                else None
+            )
+
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
 
@@ -270,11 +297,16 @@ class Processor:
         # like rollback or multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
-            await self.audit.report(message, audit_type, audit_fields=audit_fields)
+            await self.audit.report(
+                message,
+                audit_type,
+                audit_fields=audit_fields,
+                counter=audit_shard_counter,
+            )
         elif self.audit is None:
             logger.warning("No audit defined")
         elif audit_type is None:
-            logger.warning(f"Audit type empty txn_result: {txn_result}")
+            logger.warning(f"Audit type empty txn_result: {txn_result.action}")
         return True
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:
@@ -334,7 +366,7 @@ class Processor:
         resource: Optional[Resource] = None
         handled_exception = None
         origin_txn = seqid
-
+        counter = None
         created = False
 
         try:
@@ -370,8 +402,11 @@ class Processor:
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
-                    count = await shard.add_resource(resource.indexer.brain, seqid)
-                    if count > settings.max_node_fields:
+                    counter = await shard.add_resource(resource.indexer.brain, seqid)
+                    if (
+                        counter is not None
+                        and counter.fields > settings.max_node_fields
+                    ):
                         shard = await node_klass.create_shard_by_kbid(txn, kbid)
 
                 else:
@@ -412,7 +447,12 @@ class Processor:
             else:
                 raise DeadletteredError() from handled_exception
 
-        return TxnResult.RESOURCE_CREATED if created else TxnResult.RESOURCE_MODIFIED
+        return TxnResult(
+            action=TxnAction.RESOURCE_CREATED
+            if created
+            else TxnAction.RESOURCE_MODIFIED,
+            counter=counter,
+        )
 
     async def autocommit(self, message: BrokerMessage, seqid: int, partition: str):
         return await self.txn([message], seqid, partition)

@@ -29,9 +29,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus, ShadowShardResponse
-
-from nucliadb.ingest.orm.shard import Shard
+from nucliadb_protos.nodewriter_pb2 import Counter, OpStatus, ShadowShardResponse
 
 
 class DummyWriterStub:
@@ -39,7 +37,9 @@ class DummyWriterStub:
 
     async def GetShard(self, data):
         self.calls.setdefault("GetShard", []).append(data)
-        return Shard(shard_id="shard", resources=2)
+        return NodeResourcesShard(
+            shard_id="shard", resources=2, paragraphs=2, sentences=2
+        )
 
     async def NewShard(self, data):
         self.calls.setdefault("NewShard", []).append(data)
@@ -90,7 +90,9 @@ class DummyReaderStub:
 
     async def GetShard(self, data):
         self.calls.setdefault("GetShard", []).append(data)
-        return Shard(shard_id="shard", resources=2)
+        return NodeResourcesShard(
+            shard_id="shard", resources=2, paragraphs=2, sentences=2
+        )
 
 
 class DummySidecarStub:
@@ -98,7 +100,7 @@ class DummySidecarStub:
 
     async def GetCount(self, data):
         self.calls.setdefault("GetCount", []).append(data)
-        return Shard(shard_id="shard", resources=2)
+        return Counter(paragraphs=2, resources=2)
 
     async def CreateShadowShard(self, data):
         self.calls.setdefault("CreateShadowShard", []).append(data)

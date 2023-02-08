@@ -22,6 +22,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, Optional
 
+import sentry_sdk
 from lru import LRU  # type: ignore
 from nucliadb_protos.noderesources_pb2 import (
     Resource as PBBrainResource,  # type: ignore
@@ -32,7 +33,8 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb.ingest import SERVICE_NAME  # type: ignore
 from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.abc import AbstractShard
+from nucliadb.ingest.orm.abc import AbstractShard, ShardCounter
+from nucliadb.sentry import SENTRY
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 SHARDS = LRU(100)
@@ -56,9 +58,19 @@ class Shard(AbstractShard):
             indexpb.typemessage = IndexMessage.TypeMessage.DELETION
             await indexing.index(indexpb, shardreplica.node)
 
+    @staticmethod
+    def counters_are_different(
+        replica1_counters: ShardCounter,
+        replica2_counters: ShardCounter,
+    ) -> bool:
+        return not (
+            replica1_counters.paragraphs == replica2_counters.paragraphs
+            and replica1_counters.fields == replica2_counters.fields
+        )
+
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
-    ) -> int:
+    ) -> Optional[ShardCounter]:
         if txid == -1 and reindex_id is None:
             # This means we are injecting a complete resource via ingest gRPC
             # outside of a transaction. We need to treat this as a reindex operation.
@@ -67,8 +79,9 @@ class Shard(AbstractShard):
         storage = await get_storage(service_name=SERVICE_NAME)
         indexing = get_indexing()
 
-        count: int = -1
         indexpb: IndexMessage
+
+        last_counter: Optional[ShardCounter] = None
 
         for shardreplica in self.shard.replicas:
             resource.shard_id = (
@@ -86,13 +99,36 @@ class Shard(AbstractShard):
             await indexing.index(indexpb, shardreplica.node)
 
             try:
-                res: Counter = await NODES[shardreplica.node].sidecar.GetCount(shardreplica.shard)  # type: ignore
-                if count < res.resources:
-                    count = res.resources
-            except Exception:
-                pass
+                counter: Counter = await NODES[shardreplica.node].sidecar.GetCount(shardreplica.shard)  # type: ignore
+                shard_counter = ShardCounter(
+                    shard=self.sharduuid,
+                    fields=counter.resources,
+                    paragraphs=counter.paragraphs,
+                )
+                if (
+                    SENTRY
+                    and last_counter is not None
+                    and self.counters_are_different(last_counter, shard_counter)
+                ):
+                    with sentry_sdk.push_scope() as scope:
+                        scope.set_extra("shard", [self.sharduuid])
+                        scope.set_extra(
+                            "paragraphs",
+                            [shard_counter.paragraphs, last_counter.paragraphs],
+                        )
+                        scope.set_extra(
+                            "fields", [shard_counter.fields, last_counter.fields]
+                        )
+                        sentry_sdk.capture_message(
+                            f"Detected shard replicas out of sync"
+                        )
 
-        return count
+                last_counter = shard_counter
+            except Exception as exc:
+                if SENTRY:
+                    sentry_sdk.capture_exception(exc)
+
+        return last_counter
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
         replicas_cleaned: Dict[str, PBShardCleaned] = {}

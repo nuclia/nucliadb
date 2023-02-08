@@ -69,6 +69,7 @@ _PARAGRAPHITEM = DESCRIPTOR.message_types_by_name['ParagraphItem']
 _DOCUMENTITEM = DESCRIPTOR.message_types_by_name['DocumentItem']
 _STREAMREQUEST = DESCRIPTOR.message_types_by_name['StreamRequest']
 _ORDERBY_ORDERTYPE = _ORDERBY.enum_types_by_name['OrderType']
+_ORDERBY_ORDERFIELD = _ORDERBY.enum_types_by_name['OrderField']
 Filter = _reflection.GeneratedProtocolMessageType('Filter', (_message.Message,), {
   'DESCRIPTOR' : _FILTER,
   '__module__' : 'nucliadb_protos.nodereader_pb2'

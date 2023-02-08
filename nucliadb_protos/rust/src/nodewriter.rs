@@ -79,6 +79,8 @@ pub struct AcceptShardRequest {
 pub struct Counter {
     #[prost(uint64, tag="1")]
     pub resources: u64,
+    #[prost(uint64, tag="2")]
+    pub paragraphs: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShadowShardResponse {
