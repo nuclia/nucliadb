@@ -184,7 +184,7 @@ async def catalog(
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
     sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
+    sort_limit: int = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.ASC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
@@ -355,7 +355,6 @@ async def search(
             )
 
     # We need to merge
-    print(f"Results: {results}")
     search_results = await merge_results(
         results,
         count=item.page_size,

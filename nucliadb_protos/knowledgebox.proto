@@ -160,7 +160,7 @@ message Widget {
 }
 
 message VectorSet {
-    int32 dimension = 1;   
+    int32 dimension = 1;
 }
 
 message VectorSets {
