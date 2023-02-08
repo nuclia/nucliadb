@@ -1067,3 +1067,4 @@ async def test_fulltext_search_with_accents(
         assert resp.status_code == 200
         results = resp.json()
         assert results["resources"][rid]
+        assert results["fulltext"]["total"] == 2
