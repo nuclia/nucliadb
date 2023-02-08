@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.5
+
+- sort by creation/modification date
 
 ## 0.5.4
 
