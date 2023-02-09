@@ -21,9 +21,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import uuid4
 
+import prometheus_client  # type: ignore
 from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
@@ -56,6 +57,24 @@ WRITE_CONNECTIONS = LRU(50)
 SIDECAR_CONNECTIONS = LRU(50)
 
 
+AVAILABLE_NODES = prometheus_client.Gauge(
+    "nucliadb_nodes_available",
+    "Current number of nodes available",
+)
+
+SHARD_COUNT = prometheus_client.Gauge(
+    "nucliadb_node_shard_count",
+    "Current number of shards reported by nodes via chitchat",
+    labelnames=["node"],
+)
+
+LOAD_SCORE = prometheus_client.Gauge(
+    "nucliadb_node_load_score",
+    "Current load score reported by nodes via chitchat",
+    labelnames=["node"],
+)
+
+
 class NodeType(Enum):
     IO = 1
     SEARCH = 2
@@ -74,7 +93,7 @@ class NodeType(Enum):
         elif label in "Train":
             return NodeType.TRAIN
         else:
-            logger.warn(f"Unknown '{label}' node type")
+            logger.warning(f"Unknown '{label}' node type")
             return NodeType.UNKNOWN
 
     @staticmethod
@@ -113,6 +132,7 @@ class ClusterMember:
     online: bool
     is_self: bool
     load_score: float
+    shard_count: int
 
 
 class Node(AbstractNode):
@@ -121,12 +141,18 @@ class Node(AbstractNode):
     _sidecar: Optional[NodeSidecarStub] = None
 
     def __init__(
-        self, address: str, type: NodeType, load_score: float, dummy: bool = False
+        self,
+        address: str,
+        type: NodeType,
+        load_score: float,
+        shard_count: int,
+        dummy: bool = False,
     ):
         self.address = address
         self.type = type
         self.label = type.name
         self.load_score = load_score
+        self.shard_count = shard_count
         self.dummy = dummy
 
     @classmethod
@@ -275,9 +301,10 @@ class Node(AbstractNode):
         address: str,
         type: NodeType,
         load_score: float,
+        shard_count: int,
         dummy: bool = False,
     ):
-        NODES[ident] = Node(address, type, load_score, dummy)
+        NODES[ident] = Node(address, type, load_score, shard_count, dummy)
         # Compute cluster
         NODE_CLUSTER.compute()
 
@@ -302,6 +329,7 @@ class Node(AbstractNode):
                 member.listen_address,
                 NodeType.from_pb(member.type),
                 member.load_score,
+                member.shard_count,
                 member.dummy,
             )
 
@@ -424,19 +452,24 @@ async def chitchat_update_node(members: List[ClusterMember]) -> None:
                     address=member.listen_addr,
                     type=member.type,
                     load_score=member.load_score,
+                    shard_count=member.shard_count,
                 )
                 logger.debug("Node added")
             else:
                 logger.debug(f"{member.node_id}/{member.type} update")
                 node.load_score = member.load_score
+                node.shard_count = member.shard_count
                 logger.debug("Node updated")
     node_ids = [x for x in NODES.keys()]
+    destroyed_node_ids = []
     for key in node_ids:
         if key not in valid_ids:
             node = NODES.get(key)
             if node is not None:
+                destroyed_node_ids.append(key)
                 logger.info(f"{key}/{node.type} remove {node.address}")
                 await Node.destroy(key)
+    update_node_metrics(NODES, destroyed_node_ids)
 
 
 def update_shards_with_shadow_replica(
@@ -494,3 +527,20 @@ class ReplicaShardNotFound(Exception):
 
 class KBNotFoundError(Exception):
     pass
+
+
+def update_node_metrics(nodes: Dict[str, Node], destroyed_node_ids: List[str]):
+    AVAILABLE_NODES.set(len(nodes))
+
+    for node_id, node in nodes.items():
+        SHARD_COUNT.labels(node=node_id).set(node.shard_count)
+        LOAD_SCORE.labels(node=node_id).set(node.load_score)
+
+    for node_id in destroyed_node_ids:
+        for gauge in (SHARD_COUNT, LOAD_SCORE):
+            try:
+                gauge.remove(node_id)
+            except KeyError:
+                # Be resilient if there were no previous
+                # samples for this node_id
+                pass

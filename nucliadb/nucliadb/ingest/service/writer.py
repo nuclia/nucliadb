@@ -555,6 +555,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 listen_address=node.address,
                 type=node.type.to_pb(),
                 load_score=node.load_score,
+                shard_count=node.shard_count,
                 dummy=node.dummy,
             )
             response.members.append(member)

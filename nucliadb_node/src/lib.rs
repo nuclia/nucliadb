@@ -41,6 +41,3 @@ pub mod telemetry;
 
 /// GRPC writing service
 pub mod writer;
-
-/// Prometheus publishing
-pub mod metrics;
