@@ -145,17 +145,17 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
         if a0 == self.no_nodes {
             let y = self.find_node(y);
             let y = Node::vector(y);
-            vector::consine_similarity(self.temp, y)
+            vector::simd_cosine_similarity(self.temp, y)
         } else if a1 == self.no_nodes {
             let x = self.find_node(x);
             let x = Node::vector(x);
-            vector::consine_similarity(self.temp, x)
+            vector::simd_cosine_similarity(self.temp, x)
         } else {
             let x = self.find_node(x);
             let y = self.find_node(y);
             let x = Node::vector(x);
             let y = Node::vector(y);
-            vector::consine_similarity(x, y)
+            vector::simd_cosine_similarity(x, y)
         }
     }
 }
@@ -256,9 +256,7 @@ impl DataPoint {
             .collect()
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> DPResult<DataPoint>
-    where
-        Dlog: DeleteLog,
-    {
+    where Dlog: DeleteLog {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
