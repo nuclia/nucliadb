@@ -41,8 +41,8 @@ pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
         .fold(encode_length(vec![], vec), encode_unit)
 }
 
-#[allow(unused)]
 #[inline]
+#[allow(unused)]
 pub fn simd_consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     use wide::f32x8;
     const N: usize = 8;
@@ -87,8 +87,8 @@ pub fn simd_consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))
 }
 
-#[allow(unused)]
 #[inline]
+#[allow(unused)]
 pub fn consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
