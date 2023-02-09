@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 from enum import Enum
 from typing import Optional
 
-import base64
 import httpx
 import requests
 
@@ -386,7 +386,7 @@ class NucliaDBClient:
         rid: str,
         field: str,
         size: int,
-        filename: Optional[str] = None,
+        filename: str,
         content_type: str = "application/octet-stream",
     ):
         url = TUS_UPLOAD_URL.format(rid=rid, field=field)

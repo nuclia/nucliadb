@@ -22,7 +22,8 @@ from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
 
 import numpy as np
 
-from nucliadb_models.labels import KnowledgeBoxLabels, Label as NDBLabel
+from nucliadb_models.labels import KnowledgeBoxLabels
+from nucliadb_models.labels import Label as NDBLabel
 from nucliadb_models.resource import Resource
 from nucliadb_models.search import (
     KnowledgeboxSearchResults,
