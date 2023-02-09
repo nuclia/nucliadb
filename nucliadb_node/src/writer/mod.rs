@@ -263,7 +263,8 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn paragraph_count(&self) -> u64 {
-        self.paragraph_count()
+    pub fn paragraph_count(&self, shard_id: &ShardId) -> Option<u64> {
+        self.get_shard(shard_id)
+            .map(|shard| shard.paragraph_count() as u64)
     }
 }

@@ -226,7 +226,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
                     shard_id: shard_id.id.clone(),
                 };
 
-                self.emit_event(NodeWriterEvent::ParagraphCount(writer.paragraph_count()));
+                self.emit_event(NodeWriterEvent::ParagraphCount(
+                    writer.paragraph_count(&shard_id).unwrap_or_default(),
+                ));
+
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
@@ -333,7 +336,9 @@ impl NodeWriter for NodeWriterGRPCDriver {
                     count: count as u64,
                     shard_id: shard_id.id.clone(),
                 };
-                self.emit_event(NodeWriterEvent::ParagraphCount(writer.paragraph_count()));
+                self.emit_event(NodeWriterEvent::ParagraphCount(
+                    writer.paragraph_count(&shard_id).unwrap_or_default(),
+                ));
 
                 Ok(tonic::Response::new(status))
             }
