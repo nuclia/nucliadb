@@ -33,7 +33,9 @@ use nucliadb_core::tracing::*;
 use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::writer::grpc_driver::{NodeWriterGRPCDriver, NodeWriterEvent, NodeWriterMetadata};
+use nucliadb_node::writer::grpc_driver::{
+    NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
+};
 use nucliadb_node::writer::NodeWriterService;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
