@@ -22,7 +22,7 @@ class _KnowledgeBoxResponseStatus:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_KnowledgeBoxResponseStatus.ValueType], builtins.type):  # noqa: F821
+class _KnowledgeBoxResponseStatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_KnowledgeBoxResponseStatus.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     OK: _KnowledgeBoxResponseStatus.ValueType  # 0
     CONFLICT: _KnowledgeBoxResponseStatus.ValueType  # 1
@@ -37,6 +37,7 @@ NOTFOUND: KnowledgeBoxResponseStatus.ValueType  # 2
 ERROR: KnowledgeBoxResponseStatus.ValueType  # 3
 global___KnowledgeBoxResponseStatus = KnowledgeBoxResponseStatus
 
+@typing_extensions.final
 class KnowledgeBoxID(google.protobuf.message.Message):
     """ID"""
 
@@ -56,6 +57,7 @@ class KnowledgeBoxID(google.protobuf.message.Message):
 
 global___KnowledgeBoxID = KnowledgeBoxID
 
+@typing_extensions.final
 class KnowledgeBox(google.protobuf.message.Message):
     """GET"""
 
@@ -83,6 +85,7 @@ class KnowledgeBox(google.protobuf.message.Message):
 
 global___KnowledgeBox = KnowledgeBox
 
+@typing_extensions.final
 class KnowledgeBoxConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -114,6 +117,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 
+@typing_extensions.final
 class KnowledgeBoxNew(google.protobuf.message.Message):
     """NEW"""
 
@@ -138,6 +142,7 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
 
 global___KnowledgeBoxNew = KnowledgeBoxNew
 
+@typing_extensions.final
 class NewKnowledgeBoxResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -155,6 +160,7 @@ class NewKnowledgeBoxResponse(google.protobuf.message.Message):
 
 global___NewKnowledgeBoxResponse = NewKnowledgeBoxResponse
 
+@typing_extensions.final
 class KnowledgeBoxPrefix(google.protobuf.message.Message):
     """SEARCH / LIST"""
 
@@ -171,6 +177,7 @@ class KnowledgeBoxPrefix(google.protobuf.message.Message):
 
 global___KnowledgeBoxPrefix = KnowledgeBoxPrefix
 
+@typing_extensions.final
 class KnowledgeBoxUpdate(google.protobuf.message.Message):
     """UPDATE"""
 
@@ -195,6 +202,7 @@ class KnowledgeBoxUpdate(google.protobuf.message.Message):
 
 global___KnowledgeBoxUpdate = KnowledgeBoxUpdate
 
+@typing_extensions.final
 class UpdateKnowledgeBoxResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -212,6 +220,7 @@ class UpdateKnowledgeBoxResponse(google.protobuf.message.Message):
 
 global___UpdateKnowledgeBoxResponse = UpdateKnowledgeBoxResponse
 
+@typing_extensions.final
 class GCKnowledgeBoxResponse(google.protobuf.message.Message):
     """GC"""
 
@@ -223,6 +232,7 @@ class GCKnowledgeBoxResponse(google.protobuf.message.Message):
 
 global___GCKnowledgeBoxResponse = GCKnowledgeBoxResponse
 
+@typing_extensions.final
 class DeleteKnowledgeBoxResponse(google.protobuf.message.Message):
     """DELETE"""
 
@@ -239,6 +249,7 @@ class DeleteKnowledgeBoxResponse(google.protobuf.message.Message):
 
 global___DeleteKnowledgeBoxResponse = DeleteKnowledgeBoxResponse
 
+@typing_extensions.final
 class CleanedKnowledgeBoxResponse(google.protobuf.message.Message):
     """Clean Index"""
 
@@ -250,6 +261,7 @@ class CleanedKnowledgeBoxResponse(google.protobuf.message.Message):
 
 global___CleanedKnowledgeBoxResponse = CleanedKnowledgeBoxResponse
 
+@typing_extensions.final
 class Label(google.protobuf.message.Message):
     """Labels on a Knowledge Box"""
 
@@ -275,6 +287,7 @@ class Label(google.protobuf.message.Message):
 
 global___Label = Label
 
+@typing_extensions.final
 class LabelSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -318,9 +331,11 @@ class LabelSet(google.protobuf.message.Message):
 
 global___LabelSet = LabelSet
 
+@typing_extensions.final
 class Labels(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class LabelsetEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -350,6 +365,7 @@ class Labels(google.protobuf.message.Message):
 
 global___Labels = Labels
 
+@typing_extensions.final
 class Entity(google.protobuf.message.Message):
     """Entities on a Knowledge Box"""
 
@@ -373,9 +389,11 @@ class Entity(google.protobuf.message.Message):
 
 global___Entity = Entity
 
+@typing_extensions.final
 class EntitiesGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class EntitiesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -414,6 +432,7 @@ class EntitiesGroup(google.protobuf.message.Message):
 
 global___EntitiesGroup = EntitiesGroup
 
+@typing_extensions.final
 class Widget(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -432,6 +451,7 @@ class Widget(google.protobuf.message.Message):
     INPUT: Widget.WidgetMode.ValueType  # 1
     FORM: Widget.WidgetMode.ValueType  # 2
 
+    @typing_extensions.final
     class WidgetFeatures(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -462,6 +482,7 @@ class Widget(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(self, field_name: typing_extensions.Literal["editLabels", b"editLabels", "entityAnnotation", b"entityAnnotation", "suggestEntities", b"suggestEntities", "suggestLabels", b"suggestLabels", "suggestParagraphs", b"suggestParagraphs", "suggestSentences", b"suggestSentences", "useFilters", b"useFilters"]) -> None: ...
 
+    @typing_extensions.final
     class StyleEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -511,6 +532,7 @@ class Widget(google.protobuf.message.Message):
 
 global___Widget = Widget
 
+@typing_extensions.final
 class VectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -525,9 +547,11 @@ class VectorSet(google.protobuf.message.Message):
 
 global___VectorSet = VectorSet
 
+@typing_extensions.final
 class VectorSets(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class VectorsetsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

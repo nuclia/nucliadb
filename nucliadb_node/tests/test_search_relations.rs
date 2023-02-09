@@ -344,6 +344,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "".to_string(),
+                ..Default::default()
             }),
             ..Default::default()
         })
@@ -364,6 +365,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
+                ..Default::default()
             }),
             ..Default::default()
         })
@@ -388,6 +390,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "zzz".to_string(),
+                ..Default::default()
             }),
             ..Default::default()
         })

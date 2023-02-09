@@ -152,6 +152,7 @@ impl RelationsReaderService {
         &self,
         request: &RelationSearchRequest,
     ) -> NodeResult<Option<RelationPrefixSearchResponse>> {
+        use crate::bfs_engine::BfsGuide;
         let Some(prefix_request) = request.prefix.as_ref() else {
             return Ok(None);
         };
@@ -175,13 +176,35 @@ impl RelationsReaderService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - generating results: starts {v} ms");
         }
-        let nodes = prefixes.into_iter().map(|id| {
-            reader.get_node(id).map(|node| RelationNode {
-                value: node.name().to_string(),
-                subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
-                ntype: string_to_node_type(node.xtype()) as i32,
-            })
+
+        let mut node_filters = HashSet::new();
+        prefix_request.node_filters.iter().for_each(|filter| {
+            let node_type = filter.node_type();
+            let node_subtype = filter
+                .node_subtype
+                .as_ref()
+                .map_or_else(|| "", |subtype| subtype);
+            let type_info = node_type_parsing(node_type, node_subtype);
+            node_filters.insert(type_info);
         });
+
+        let guide = GrpcGuide {
+            node_filters,
+            edge_filters: HashSet::new(),
+            reader: &reader,
+            jump_always: dictionary::SYNONYM,
+        };
+
+        let nodes = prefixes
+            .into_iter()
+            .filter(|n| guide.node_allowed(*n))
+            .map(|id| {
+                reader.get_node(id).map(|node| RelationNode {
+                    value: node.name().to_string(),
+                    subtype: node.subtype().map(|s| s.to_string()).unwrap_or_default(),
+                    ntype: string_to_node_type(node.xtype()) as i32,
+                })
+            });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - generating results: ends {v} ms");
         }
