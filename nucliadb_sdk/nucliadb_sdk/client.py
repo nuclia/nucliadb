@@ -50,7 +50,7 @@ SEARCH_URL = "/search"
 LABELS_URL = "/labelsets"
 ENTITIES_URL = "/entitiesgroups"
 DOWNLOAD_URL = "/{uri}"
-TUS_UPLOAD_URL = "/resources/{rid}/file/{field}/tusupload"
+TUS_UPLOAD_URL = "/resource/{rid}/file/{field}/tusupload"
 
 
 class HTTPError(Exception):
@@ -89,13 +89,25 @@ class NucliaDBClient:
             raise AttributeError("Either url or nucliadb services hosts must be set")
 
         if environment == Environment.CLOUD and api_key is not None:
-            reader_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
-            writer_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
+            reader_headers = {
+                "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
+                "X-SYNCHRONOUS": "TRUE",
+            }
+            writer_headers = {
+                "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
+                "X-SYNCHRONOUS": "TRUE",
+            }
         elif environment == Environment.CLOUD and api_key is None:
             raise AttributeError("On Cloud you need to provide API Key")
         else:
-            reader_headers = {"X-NUCLIADB-ROLES": f"READER"}
-            writer_headers = {"X-NUCLIADB-ROLES": f"WRITER"}
+            reader_headers = {
+                "X-NUCLIADB-ROLES": f"READER",
+                "X-SYNCHRONOUS": "TRUE",
+            }
+            writer_headers = {
+                "X-NUCLIADB-ROLES": f"WRITER",
+                "X-SYNCHRONOUS": "TRUE",
+            }
 
         self.reader_session = httpx.Client(
             headers=reader_headers, base_url=reader_host or url  # type: ignore
@@ -373,14 +385,16 @@ class NucliaDBClient:
         self,
         rid: str,
         field: str,
+        size: int,
         filename: Optional[str] = None,
         content_type: str = "application/octet-stream",
     ):
         url = TUS_UPLOAD_URL.format(rid=rid, field=field)
+        encoded_filename = base64.b64encode(filename.encode()).decode()
         headers = {
-            "upload-defer-length": "1",
+            "upload-length": str(size),
             "tus-resumable": "1.0.0",
-            "upload-metadata": f"filename {base64.b64encode(filename)}",
+            "upload-metadata": f"filename {encoded_filename}",
             "content-type": content_type,
         }
         response: httpx.Response = self.writer_session.post(url, headers=headers)
@@ -389,15 +403,16 @@ class NucliaDBClient:
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
 
-    def patch_tus_upload(self, upload_url: str, data: bytes, offset: str):
+    def patch_tus_upload(self, upload_url: str, data: bytes, offset: int) -> int:
         headers = {
-            "upload-length": len(data),
-            "upload-offset": offset,
+            "upload-offset": str(offset),
         }
+        # upload url has all path, we should remove /kb/kbid/
+        upload_url = "/" + "/".join(upload_url.split("/")[3:])
         response: httpx.Response = self.writer_session.patch(
             upload_url, headers=headers, content=data
         )
         if response.status_code == 200:
-            return response.headers.get("Upload-Offset")
+            return int(response.headers.get("Upload-Offset"))
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")

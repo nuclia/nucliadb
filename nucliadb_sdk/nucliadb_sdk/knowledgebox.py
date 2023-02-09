@@ -93,14 +93,14 @@ class KnowledgeBox:
     def __setitem__(self, key: str, item: Resource):
         resource = self.get(key)
         if resource is None:
-            item.id = key
             item.slug = key
             self.client.create_resource(
                 from_resource_to_payload(item, download=self.download)
             )
         else:
             self.client.update_resource(
-                key, from_resource_to_payload(item, download=self.download, update=True)
+                resource.id,
+                from_resource_to_payload(item, download=self.download, update=True),
             )
 
     def __delitem__(self, key):
