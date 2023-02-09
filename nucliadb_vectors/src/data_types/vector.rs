@@ -43,7 +43,7 @@ pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
 
 #[inline]
 #[allow(unused)]
-pub fn simd_consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
+pub fn simd_cosine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     use wide::f32x8;
     const N: usize = 8;
     let mut buff_x = [0; 8];
@@ -152,11 +152,11 @@ mod test {
         let v1_r = encode_vector(&v1);
         assert_eq!(
             naive_cosine_similatiry(&v0, &v1),
-            simd_consine_similarity(&v0_r, &v1_r)
+            simd_cosine_similarity(&v0_r, &v1_r)
         );
         assert_eq!(
             naive_cosine_similatiry(&v0, &v0),
-            simd_consine_similarity(&v0_r, &v0_r)
+            simd_cosine_similarity(&v0_r, &v0_r)
         );
     }
 }
