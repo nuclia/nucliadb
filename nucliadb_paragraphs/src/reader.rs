@@ -24,17 +24,21 @@ use std::fs;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::order_by::{OrderField, OrderType};
 use nucliadb_core::protos::{
     OrderBy, ParagraphItem, ParagraphSearchRequest, ParagraphSearchResponse, ResourceId,
     StreamRequest, SuggestRequest,
 };
 use nucliadb_core::tracing::{self, *};
 use search_query::{search_query, suggest_query};
-use tantivy::collector::{Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs};
+use tantivy::collector::{
+    Collector, Count, DocSetCollector, FacetCollector, MultiCollector, TopDocs,
+};
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
-    Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order, ReloadPolicy,
+    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
+    ReloadPolicy,
 };
 
 use super::schema::ParagraphSchema;
@@ -158,7 +162,6 @@ impl ReaderChild for ParagraphReaderService {
         let parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
         let results = request.result_per_page as usize;
         let offset = results * request.page_number as usize;
-        let order_field = self.get_order_field(&request.order);
         let facets: Vec<_> = request
             .faceted
             .as_ref()
@@ -192,8 +195,8 @@ impl ReaderChild for ParagraphReaderService {
             request,
             results,
             offset,
+            schema: &self.schema,
             facets: &facets,
-            order_field,
             text: &text,
             only_faceted: request.only_faceted,
         };
@@ -376,14 +379,6 @@ impl ParagraphReaderService {
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()
     }
-
-    fn get_order_field(&self, order: &Option<OrderBy>) -> Option<Field> {
-        match order.as_ref().map(|o| o.field.as_str()) {
-            Some("created") => Some(self.schema.created),
-            Some("modified") => Some(self.schema.modified),
-            _ => None,
-        }
-    }
 }
 
 pub struct BatchProducer {
@@ -440,11 +435,35 @@ struct Searcher<'a> {
     results: usize,
     offset: usize,
     facets: &'a [String],
-    order_field: Option<Field>,
+    schema: &'a ParagraphSchema,
     text: &'a str,
     only_faceted: bool,
 }
 impl<'a> Searcher<'a> {
+    fn custom_order_collector(
+        &self,
+        order: OrderBy,
+        limit: usize,
+        offset: usize,
+    ) -> impl Collector<Fruit = Vec<(u64, DocAddress)>> {
+        use tantivy::fastfield::{FastFieldReader, FastValue};
+        use tantivy::{DocId, SegmentReader};
+        let created = self.schema.created;
+        let modified = self.schema.modified;
+        let sorter = match order.r#type() {
+            OrderType::Desc => |t: u64| t,
+            OrderType::Asc => |t: u64| u64::MAX - t,
+        };
+        TopDocs::with_limit(limit).and_offset(offset).custom_score(
+            move |segment_reader: &SegmentReader| {
+                let reader = match order.sort_by() {
+                    OrderField::Created => segment_reader.fast_fields().date(created).unwrap(),
+                    OrderField::Modified => segment_reader.fast_fields().date(modified).unwrap(),
+                };
+                move |doc: DocId| sorter(reader.get(doc).to_u64())
+            },
+        )
+    }
     fn do_search(
         &self,
         termc: SharedTermC,
@@ -470,12 +489,10 @@ impl<'a> Searcher<'a> {
         } else if self.facets.is_empty() {
             // Only query no facets
             let extra_result = self.results + 1;
-            match self.order_field {
-                Some(order_field) => {
-                    let topdocs = TopDocs::with_limit(extra_result)
-                        .and_offset(self.offset)
-                        .order_by_u64_field(order_field);
-                    let top_docs = searcher.search(&query, &topdocs).unwrap();
+            match self.request.order.clone() {
+                Some(order) => {
+                    let collector = self.custom_order_collector(order, extra_result, self.offset);
+                    let top_docs = searcher.search(&query, &collector).unwrap();
                     ParagraphSearchResponse::from(SearchIntResponse {
                         facets_count: None,
                         facets: self.facets.to_vec(),
@@ -505,14 +522,13 @@ impl<'a> Searcher<'a> {
         } else {
             let extra_result = self.results + 1;
 
-            match self.order_field {
-                Some(order_field) => {
-                    let topdocs = TopDocs::with_limit(extra_result)
-                        .and_offset(self.offset)
-                        .order_by_u64_field(order_field);
+            match self.request.order.clone() {
+                Some(order) => {
+                    let custom_collector =
+                        self.custom_order_collector(order, extra_result, self.offset);
                     let mut multicollector = MultiCollector::new();
                     let facet_handler = multicollector.add_collector(facet_collector);
-                    let topdocs_handler = multicollector.add_collector(topdocs);
+                    let topdocs_handler = multicollector.add_collector(custom_collector);
                     let mut multi_fruit = searcher.search(&query, &multicollector).unwrap();
                     let facets_count = facet_handler.extract(&mut multi_fruit);
                     let top_docs = topdocs_handler.extract(&mut multi_fruit);
@@ -782,8 +798,9 @@ mod tests {
         };
 
         let order = OrderBy {
-            field: "created".to_string(),
+            sort_by: OrderField::Created as i32,
             r#type: 0,
+            ..Default::default()
         };
 
         // Search on all paragraphs faceted

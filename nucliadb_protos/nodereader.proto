@@ -19,8 +19,13 @@ message OrderBy {
       DESC = 0;
       ASC = 1;
     }
-    string field = 1;
+    enum OrderField {
+        CREATED = 0;
+        MODIFIED = 1;
+    }
+    string field = 1 [deprecated = true];
     OrderType type = 2;
+    OrderField sort_by = 3;
 }
 
 message Timestamps {

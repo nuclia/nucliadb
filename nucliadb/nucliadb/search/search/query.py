@@ -30,7 +30,13 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.search import SearchOptions, Sort, SortOptions, SuggestOptions
+from nucliadb_models.search import (
+    SearchOptions,
+    Sort,
+    SortFieldMap,
+    SortOptions,
+    SuggestOptions,
+)
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
@@ -43,13 +49,13 @@ async def global_query_to_pb(
     faceted: List[str],
     page_number: int,
     page_size: int,
+    sort: SortOptions,
     advanced_query: Optional[str] = None,
     range_creation_start: Optional[datetime] = None,
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
     fields: Optional[List[str]] = None,
-    sort: Optional[SortOptions] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     vector: Optional[List[float]] = None,
@@ -70,7 +76,7 @@ async def global_query_to_pb(
 
     # We need to ask for all and cut later
     request.page_number = 0
-    if sort is not None and sort.limit:
+    if sort.limit is not None:
         # As the index can't sort, we have to do it when merging. To
         # have consistent results, we must limit them
         request.result_per_page = sort.limit
@@ -95,9 +101,12 @@ async def global_query_to_pb(
             request.advanced_query = advanced_query
         request.filter.tags.extend(filters)
         request.faceted.tags.extend(faceted)
-        if sort:
-            request.order.field = sort.field
+
+        sort_field = SortFieldMap[sort.field]
+        if sort_field is not None:
+            request.order.sort_by = sort_field
             request.order.type = sort_ord  # type: ignore
+
         request.fields.extend(fields)
 
     request.document = SearchOptions.DOCUMENT in features

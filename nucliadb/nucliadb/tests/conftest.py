@@ -19,6 +19,6 @@
 #
 pytest_plugins = [
     "nucliadb.tests.fixtures",
-    "nucliadb.tests.knowledgeboxes.philosophy_books",
+    "nucliadb.tests.knowledgeboxes",
     "nucliadb_utils.tests.asyncbenchmark",
 ]

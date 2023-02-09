@@ -25,7 +25,7 @@ from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
@@ -37,9 +37,6 @@ else:
     SortValue = int
 
 _T = TypeVar("_T")
-
-
-SORTED_RELEVANT_SEARCH_LIMIT = 100
 
 
 class ResourceProperties(str, Enum):
@@ -231,9 +228,19 @@ class KnowledgeboxCounters(BaseModel):
 
 
 class SortField(str, Enum):
-    MODIFIED = "modified"
+    SCORE = "score"
     CREATED = "created"
+    MODIFIED = "modified"
     TITLE = "title"
+
+
+# SortFieldMap: Dict[SortField, Optional[OrderBy.OrderField]] = {
+SortFieldMap = {
+    SortField.SCORE: None,
+    SortField.CREATED: OrderBy.OrderField.CREATED,
+    SortField.MODIFIED: OrderBy.OrderField.MODIFIED,
+    SortField.TITLE: None,
+}
 
 
 class SortOrder(str, Enum):
@@ -249,8 +256,8 @@ SortOrderMap = {
 
 class SortOptions(BaseModel):
     field: SortField
-    limit: Optional[int] = SORTED_RELEVANT_SEARCH_LIMIT
-    order: SortOrder = SortOrder.ASC
+    limit: Optional[int] = Field(None, gt=0)
+    order: SortOrder = SortOrder.DESC
 
 
 class KnowledgeBoxCount(BaseModel):

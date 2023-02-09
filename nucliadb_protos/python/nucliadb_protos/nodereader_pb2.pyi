@@ -103,17 +103,33 @@ class OrderBy(google.protobuf.message.Message):
     DESC: OrderBy.OrderType.ValueType  # 0
     ASC: OrderBy.OrderType.ValueType  # 1
 
+    class _OrderField:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _OrderFieldEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[OrderBy._OrderField.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        CREATED: OrderBy._OrderField.ValueType  # 0
+        MODIFIED: OrderBy._OrderField.ValueType  # 1
+
+    class OrderField(_OrderField, metaclass=_OrderFieldEnumTypeWrapper): ...
+    CREATED: OrderBy.OrderField.ValueType  # 0
+    MODIFIED: OrderBy.OrderField.ValueType  # 1
+
     FIELD_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
+    SORT_BY_FIELD_NUMBER: builtins.int
     field: builtins.str
     type: global___OrderBy.OrderType.ValueType
+    sort_by: global___OrderBy.OrderField.ValueType
     def __init__(
         self,
         *,
         field: builtins.str = ...,
         type: global___OrderBy.OrderType.ValueType = ...,
+        sort_by: global___OrderBy.OrderField.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["field", b"field", "sort_by", b"sort_by", "type", b"type"]) -> None: ...
 
 global___OrderBy = OrderBy
 

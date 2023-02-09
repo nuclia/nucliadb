@@ -356,6 +356,7 @@ class ProcessingEngine:
                 account_seq = data.get("account_seq")
                 queue_type = data.get("queue")
             elif resp.status == 402:
+                data = await resp.json()
                 raise LimitsExceededError(data["detail"])
             else:
                 raise SendToProcessError(f"{resp.status}: {await resp.text()}")

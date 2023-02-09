@@ -1941,6 +1941,7 @@ dependencies = [
  "nucliadb_core",
  "nucliadb_ftp",
  "nucliadb_paragraphs",
+ "nucliadb_protos",
  "nucliadb_relations",
  "nucliadb_telemetry",
  "nucliadb_texts",
@@ -1977,7 +1978,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "bincode",
  "log",

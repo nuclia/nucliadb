@@ -42,14 +42,13 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
-    SORTED_RELEVANT_SEARCH_LIMIT,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
     SearchRequest,
-    Sort,
     SortField,
+    SortFieldMap,
     SortOptions,
     SortOrder,
     SortOrderMap,
@@ -101,8 +100,8 @@ async def search_knowledgebox(
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
     sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
+    sort_limit: Optional[int] = Query(default=None, gt=0),
+    sort_order: SortOrder = Query(default=SortOrder.DESC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
     min_score: float = Query(default=0.70),
@@ -185,7 +184,7 @@ async def catalog(
     filters: List[str] = Query(default=[]),
     faceted: List[str] = Query(default=[]),
     sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=SORTED_RELEVANT_SEARCH_LIMIT),
+    sort_limit: int = Query(default=None, gt=0),
     sort_order: SortOrder = Query(default=SortOrder.ASC),
     page_number: int = Query(default=0),
     page_size: int = Query(default=20),
@@ -261,24 +260,7 @@ async def search(
     audit = get_audit()
     timeit = time()
 
-    if is_empty_query(item):
-        if item.sort is None:
-            item.sort = SortOptions(
-                field=SortField.CREATED,
-                order=SortOrder.ASC,
-                limit=None,
-            )
-        elif not valid_index_sort_option(item):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
-                ),
-            )
-    else:
-        if item.sort is not None and item.sort.limit is None:
-            item.sort.limit = SORTED_RELEVANT_SEARCH_LIMIT
+    sort_options = parse_sort_options(item)
 
     if item.query == "" and (item.vector is None or len(item.vector) == 0):
         # If query is not defined we force to not return vector results
@@ -302,8 +284,8 @@ async def search(
         advanced_query=item.advanced_query,
         filters=item.filters,
         faceted=item.faceted,
-        sort=item.sort,
-        sort_ord=SortOrderMap[item.sort.order] if item.sort is not None else Sort.ASC,
+        sort=sort_options,
+        sort_ord=SortOrderMap[sort_options.order],
         page_number=item.page_number,
         page_size=item.page_size,
         range_creation_start=item.range_creation_start,
@@ -381,7 +363,7 @@ async def search(
         show=item.show,
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
-        sort=item.sort,
+        sort=sort_options,
         requested_relations=pb_query.relations,
         min_score=item.min_score,
         highlight=item.highlight,
@@ -406,14 +388,47 @@ async def search(
     return search_results
 
 
+def parse_sort_options(item: SearchRequest) -> SortOptions:
+    if is_empty_query(item):
+        if item.sort is None:
+            sort_options = SortOptions(
+                field=SortField.CREATED,
+                order=SortOrder.DESC,
+                limit=None,
+            )
+        elif not is_valid_index_sort_field(item.sort.field):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
+                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
+                ),
+            )
+        else:
+            sort_options = item.sort
+    else:
+        if item.sort is None:
+            sort_options = SortOptions(
+                field=SortField.SCORE,
+                order=SortOrder.DESC,
+                limit=None,
+            )
+        elif not is_valid_index_sort_field(item.sort.field) and item.sort.limit is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
+            )
+        else:
+            sort_options = item.sort
+
+    return sort_options
+
+
 def is_empty_query(request: SearchRequest) -> bool:
     return len(request.query) == 0 and (
         request.advanced_query is None or len(request.advanced_query) == 0
     )
 
 
-def valid_index_sort_option(request: SearchRequest) -> bool:
-    return request.sort is not None and (
-        request.sort.field == SortField.CREATED
-        or request.sort.field == SortField.MODIFIED
-    )
+def is_valid_index_sort_field(field: SortField) -> bool:
+    return SortFieldMap[field] is not None
