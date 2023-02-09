@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -26,6 +27,83 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
+
+
+TEST_API_ENTITIES_GROUPS = {
+    "ANIMALS": {
+        "title": "Animals",
+        "entities": {
+            "cat": {"value": "cat", "represents": ["domestic-cat"]},
+            "domestic-cat": {"value": "domestic cat", "merged": True},
+            "dog": {"value": "dog"},
+            "bird": {"value": "bird"},
+        },
+        "color": "black",
+        "custom": True,
+    },
+    "DESSERTS": {
+        "title": "Desserts",
+        "entities": {
+            "cookie": {"value": "cookie", "represents": ["biscuit"]},
+            "biscuit": {"value": "biscuit", "merged": True},
+            "brownie": {"value": "brownie"},
+            "souffle": {"value": "souffle"},
+        },
+        "color": "pink",
+    },
+}
+
+TEST_BM_ENTITIES_GROUPS = {
+    "ANIMALS": {
+        "entities": {
+            "cat": {"value": "cat"},
+            "dolphin": {"value": "dolphin"},
+        }
+    },
+    "SUPERPOWERS": {
+        "entities": {
+            "fly": {"value": "fly"},
+            "invisibility": {"value": "invisibility"},
+            "telepathy": {"value": "telepathy"},
+        }
+    }
+}
+
+
+async def create_entities_group_by_api(kbid: str, group: str, nucliadb_writer: AsyncClient):
+    entities_group = TEST_API_ENTITIES_GROUPS[group]
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/entitiesgroup/{group}",
+        headers={"X-Synchronous": "true"},
+        json=entities_group,
+    )
+    assert resp.status_code == 200
+    return entities_group
+
+
+async def create_entities_group_by_bm(kbid: str, group: str, nucliadb_grpc: WriterStub):
+    entities_group = TEST_BM_ENTITIES_GROUPS[group]["entities"]
+    bm = broker_resource(
+        kbid, slug=f"resource-with-{group}-entities", title=f"Resource with {group} entities"
+    )
+    relations = []
+    for entity in entities_group.values():
+        node = RelationNode(
+            value=entity["value"],
+            ntype=RelationNode.NodeType.ENTITY,
+            subtype=group,
+        )
+        relations.append(
+            Relation(
+                relation=Relation.RelationType.ENTITY,
+                source=node,
+                to=node,
+                relation_label="itself"
+            )
+        )
+    bm.relations.extend(relations)
+    await inject_message(nucliadb_grpc, bm)
+    return entities_group
 
 
 @pytest.fixture(scope="function")
@@ -42,124 +120,60 @@ def predict_mock() -> Mock:  # type: ignore
         set_utility(Utility.PREDICT, predict)
 
 
-async def set_animals_entities(kbid: str, nucliadb_writer: AsyncClient):
-    animals = {
-        "title": "Animals",
-        "entities": {
-            "cat": {"value": "cat", "represents": ["domestic-cat", "house-cat"]},
-            "domestic-cat": {"value": "domestic cat", "merged": True},
-            "house-cat": {"value": "house cat", "merged": True},
-            "dog": {"value": "dog"},
-            "bird": {"value": "bird"},
-        },
-        "color": "black",
-    }
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/entitiesgroup/ANIMALS",
-        headers={"X-Synchronous": "true"},
-        json=animals,
-    )
-    assert resp.status_code == 200
-
-    return animals
-
-
-async def set_desserts_entities(kbid: str, nucliadb_writer: AsyncClient):
-    desserts = {
-        "title": "Desserts",
-        "entities": {
-            "cookie": {"value": "cookie", "represents": ["biscuit"]},
-            "biscuit": {"value": "biscuit", "merged": True},
-            "brownie": {"value": "brownie"},
-            "souffle": {"value": "souffle"},
-        },
-        "color": "pink",
-    }
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/entitiesgroup/DESSERTS",
-        headers={"X-Synchronous": "true"},
-        json=desserts,
-    )
-    assert resp.status_code == 200
-
-
-async def set_superpowers_entities(kbid: str, nucliadb_grpc: WriterStub):
-    bm = broker_resource(
-        kbid, slug="resource-with-entities", title="Resource with entities"
-    )
-    nodes = {
-        "fly": RelationNode(
-            value="fly", ntype=RelationNode.NodeType.ENTITY, subtype="SUPERPOWERS"
-        ),
-        "invisibility": RelationNode(
-            value="invisibility",
-            ntype=RelationNode.NodeType.ENTITY,
-            subtype="SUPERPOWERS",
-        ),
-        "telepathy": RelationNode(
-            value="telepathy", ntype=RelationNode.NodeType.ENTITY, subtype="SUPERPOWERS"
-        ),
-    }
-    bm.relations.extend(
-        [
-            Relation(
-                relation=Relation.RelationType.ENTITY,
-                source=nodes["fly"],
-                to=nodes["invisibility"],
-                relation_label="",
-            ),
-            Relation(
-                relation=Relation.RelationType.ENTITY,
-                source=nodes["invisibility"],
-                to=nodes["telepathy"],
-                relation_label="",
-            ),
-            Relation(
-                relation=Relation.RelationType.ENTITY,
-                source=nodes["telepathy"],
-                to=nodes["fly"],
-                relation_label="",
-            ),
-        ]
-    )
-    await inject_message(nucliadb_grpc, bm)
-
-
-async def set_test_entities_by_api(kbid: str, nucliadb_writer: AsyncClient):
-    await set_animals_entities(kbid, nucliadb_writer)
-    await set_desserts_entities(kbid, nucliadb_writer)
-
-
-async def set_test_entities_by_broker_message(kbid: str, nucliadb_grpc: WriterStub):
-    await set_superpowers_entities(kbid, nucliadb_grpc)
-
-
 @pytest.mark.asyncio
 @pytest.fixture(scope="function")
 async def kb_with_entities(
     nucliadb_grpc: WriterStub,
+    nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
 ):
-    await set_animals_entities(knowledgebox, nucliadb_writer)
-    await set_desserts_entities(knowledgebox, nucliadb_writer)
-    await set_superpowers_entities(knowledgebox, nucliadb_grpc)
+    await create_entities_group_by_api(knowledgebox, "ANIMALS", nucliadb_writer)
+    await create_entities_group_by_api(knowledgebox, "DESSERTS", nucliadb_writer)
+    await create_entities_group_by_bm(knowledgebox, "ANIMALS", nucliadb_grpc)
+    await create_entities_group_by_bm(knowledgebox, "SUPERPOWERS", nucliadb_grpc)
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        headers={"X-SYNCHRONOUS": "true"},
+        json={
+            "title": "Wait all is processed",
+            "slug": "wait-all-is-processed",
+            "summary": "Dummy resource with x-synchronous enabled to wait BM indexing",
+        },
+    )
+    assert resp.status_code == 201
+
+    bm_indexed = False
+    while not bm_indexed:
+        resp = await nucliadb_reader.get(
+            f"/kb/{knowledgebox}/suggest",
+            params={
+                "query": "invisibility",
+            }
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        bm_indexed = len(body["entities"]["entities"]) > 0
+        # small sleep to give time for indexing
+        await asyncio.sleep(0.1)
 
     yield knowledgebox
 
 
 @pytest.mark.asyncio
-async def test_set_entities_indexes_entities(
+async def test_entities_store_and_indexing(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    knowledgebox,
+    kb_with_entities,
     predict_mock,
 ):
-    kbid = knowledgebox
+    kbid = kb_with_entities
 
-    await set_test_entities_by_api(kbid, nucliadb_writer)
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body["groups"].keys()) == {"ANIMALS", "DESSERTS", "SUPERPOWERS"}
 
     predict_mock.detect_entities = AsyncMock(
         return_value=[
@@ -173,41 +187,8 @@ async def test_set_entities_indexes_entities(
                 ntype=RelationNode.NodeType.ENTITY,
                 subtype="DESSERTS",
             ),
-        ]
-    )
-
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/search",
-        params={"query": "does your cat like cookies?", "features": "relations"},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert {entity for entity in body["relations"]["entities"]} == {"cat", "cookie"}
-    assert {
-        relation["entity"]
-        for relation in body["relations"]["entities"]["cat"]["related_to"]
-    } == {"domestic cat", "house cat"}
-    assert {
-        relation["entity"]
-        for relation in body["relations"]["entities"]["cookie"]["related_to"]
-    } == {"biscuit"}
-
-
-@pytest.mark.asyncio
-async def test_broker_message_entities_are_indexed(
-    nucliadb_reader: AsyncClient,
-    nucliadb_grpc: WriterStub,
-    knowledgebox,
-    predict_mock,
-):
-    kbid = knowledgebox
-
-    await set_test_entities_by_broker_message(kbid, nucliadb_grpc)
-
-    predict_mock.detect_entities = AsyncMock(
-        return_value=[
             RelationNode(
-                value="fly",
+                value="invisibility",
                 ntype=RelationNode.NodeType.ENTITY,
                 subtype="SUPERPOWERS",
             ),
@@ -216,20 +197,123 @@ async def test_broker_message_entities_are_indexed(
 
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/search",
-        params={"query": "would you like to fly?", "features": "relations"},
+        params={
+            "query": "does your cat prefer eat cookies or have invisibility?",
+            "features": "relations"
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert {entity for entity in body["relations"]["entities"]} == {"fly"}
-    assert {
-        relation["entity"]
-        for relation in body["relations"]["entities"]["fly"]["related_to"]
-    } == {"invisibility", "telepathy"}
+    entities = {
+        related_entity["entity"]
+        for entity in body["relations"]["entities"]
+        for related_entity in body["relations"]["entities"][entity]["related_to"]
+    }
+    # "cookie" is not found because don't have relation with anything. Relations
+    # by BM have a fake relations with themselves for sake of testing
+    assert entities == {"cat", "invisibility"}
 
 
 @pytest.mark.asyncio
-async def test_get_entities_through_api(
+async def test_get_entities(
     nucliadb_reader: AsyncClient,
+    kb_with_entities,
+):
+    kbid = kb_with_entities
+
+    expected = {
+        "ANIMALS": {"cat", "domestic-cat", "dog", "bird", "dolphin"},
+        "DESSERTS": {"cookie", "biscuit", "brownie", "souffle"},
+        "SUPERPOWERS": {"fly", "invisibility", "telepathy"},
+    }
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    assert resp.status_code == 200
+    entitiesgroups = resp.json()
+    assert len(entitiesgroups["groups"]) == len(expected)
+    for group in entitiesgroups["groups"]:
+        eg = entitiesgroups["groups"][group]
+        assert set(eg["entities"].keys()) == expected[group]
+
+    for group in expected:
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/{group}")
+        assert resp.status_code == 200
+        body = resp.json()
+        entities = {entity for entity in body["entities"]}
+        assert entities == expected[group]
+
+
+@pytest.mark.asyncio
+async def test_set_entities(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entities,
+):
+    """We'll modify ANIMALS entities group which is set by API and BM to test
+    setting entities by API "overwrites" whatever is stored
+
+    """
+    kbid = kb_with_entities
+
+    animals = {
+        "title": "Animals",
+        "entities": {
+            "bear": {"value": "bear", "represents": [], "merged": False},
+            "hamster": {"value": "hamster", "represents": [], "merged": False},
+            "seal": {"value": "seal", "represents": [], "merged": False},
+        },
+        "color": "pink",
+        "custom": True,
+    }
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS",
+        json=animals
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == animals
+
+
+@pytest.mark.asyncio
+async def test_delete_entitiesgroups(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    kb_with_entities,
+):
+    kbid = kb_with_entities
+
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/nonexistent")
+    assert resp.status_code == 200
+
+    entitiesgroups = [
+        "DESSERTS",             # added with API
+        "SUPERPOWERS",          # added with broker message
+        "ANIMALS",              # added with API and broker message
+    ]
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    body = resp.json()
+    assert set(entitiesgroups) == set(body["groups"])
+
+    for entitiesgroup in entitiesgroups:
+        resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
+        assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    body = resp.json()
+    assert len(body["groups"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_entities(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
     kb_with_entities,
     predict_mock,
 ):
@@ -238,55 +322,39 @@ async def test_get_entities_through_api(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
+    assert set(body["entities"].keys()) == {"cat", "domestic-cat", "dog", "bird", "dolphin"}
 
-    entities = {entity for entity in body["entities"]}
-    assert entities == {"cat", "domestic-cat", "house-cat", "dog", "bird"}
+    # Delete 'cat', an entity that is both stored and indexed
+    entities = body
+    entities["entities"].pop("cat")
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/SUPERPOWERS")
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS", json=entities
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")
     assert resp.status_code == 200
     body = resp.json()
+    assert "cat" not in body["entities"]
 
-    entities = {entity for entity in body["entities"]}
-    assert entities == {"fly", "invisibility", "telepathy"}
-
-
-@pytest.mark.asyncio
-async def test_delete_nonexistent_entitiesgroup(
-    nucliadb_writer: AsyncClient,
-    knowledgebox,
-):
-    kbid = knowledgebox
-
-    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/nonexistent")
-    assert resp.status_code == 200
-
-
-@pytest.mark.parametrize(
-    "entitiesgroup",
-    [
-        "ANIMALS",  # added with set entities
-        "SUPERPOWERS",  # added with BrokerMessage
-    ],
-)
-@pytest.mark.asyncio
-async def test_delete_entitiesgroup(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    kb_with_entities,
-    predict_mock,
-    entitiesgroup,
-):
-    kbid = kb_with_entities
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
+    # but in fact, it's still stored
+    predict_mock.detect_entities = AsyncMock(
+        return_value=[
+            RelationNode(
+                value="cat",
+                ntype=RelationNode.NodeType.ENTITY,
+                subtype="ANIMALS",
+            ),
+        ]
+    )
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search",
+        params={
+            "query": "do you like cats?",
+            "features": "relations"
+        },
+    )
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body["entities"]) > 0
-
-    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
-    assert resp.status_code == 200
-
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert len(body["entities"]) == 0
+    assert "cat" in body["relations"]["entities"]
