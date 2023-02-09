@@ -225,34 +225,6 @@ pub fn get_sentry_env() -> &'static str {
     }
 }
 
-/// Retuns the Promethus push timing, defaulted to 1h if not defined.
-pub fn get_metrics_update_interval() -> Duration {
-    const DEFAULT_INTERVAL_PLACEHOLDER: &str = "1h";
-    const DEFAULT_INTERVAL: Duration = Duration::from_secs(60 * 60);
-
-    match env::var("METRICS_UPDATE_INTERVAL") {
-        Ok(value) => {
-            if let Ok(duration) = parse_duration::parse(&value) {
-                duration
-            } else {
-                error!(
-                    "METRICS_UPDATE_INTERVAL defined incorrectly. Defaulting to \
-                     {DEFAULT_INTERVAL_PLACEHOLDER}"
-                );
-
-                DEFAULT_INTERVAL
-            }
-        }
-        Err(_) => {
-            warn!(
-                "METRICS_UPDATE_INTERVAL not defined. Defaulting to {DEFAULT_INTERVAL_PLACEHOLDER}"
-            );
-
-            DEFAULT_INTERVAL
-        }
-    }
-}
-
 /// Retuns the liveliness interval update used by cluster node.
 pub fn get_cluster_liveliness_interval_update() -> Duration {
     const DEFAULT_INTERVAL_UPDATE_PLACEHOLDER: &str = "500ms";

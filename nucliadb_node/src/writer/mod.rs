@@ -43,11 +43,12 @@ impl Default for NodeWriterService {
     }
 }
 impl NodeWriterService {
-    pub fn new() -> NodeWriterService {
-        NodeWriterService {
+    pub fn new() -> Self {
+        Self {
             cache: HashMap::new(),
         }
     }
+
     #[tracing::instrument(skip_all)]
     pub fn shutdown(&mut self) {
         for (shard_id, shard) in self.cache.iter_mut() {
@@ -113,18 +114,28 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id, new_shard);
+
         data
     }
+
     #[tracing::instrument(skip_all)]
     pub fn delete_shard(&mut self, shard_id: &ShardId) -> NodeResult<()> {
+        if shard_id.id.is_empty() {
+            warn!("Shard id is empty");
+            return Ok(());
+        }
+
         self.cache.remove(&shard_id.id);
+
         let shard_path = env::shards_path_id(&shard_id.id);
         if shard_path.exists() {
             info!("Deleting {:?}", shard_path);
             std::fs::remove_dir_all(shard_path)?;
         }
+
         Ok(())
     }
+
     #[tracing::instrument(skip_all)]
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
         self.delete_shard(shard_id)?;
@@ -139,6 +150,7 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id.id.clone(), new_shard);
+
         Ok(shard_data)
     }
 
@@ -151,7 +163,9 @@ impl NodeWriterService {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
+
         shard.set_resource(resource)?;
+
         Ok(Some(shard.count()))
     }
 
@@ -216,9 +230,12 @@ impl NodeWriterService {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
+
         shard.remove_resource(resource)?;
+
         Ok(Some(shard.count()))
     }
+
     #[tracing::instrument(skip_all)]
     pub fn gc(&mut self, shard_id: &ShardId) -> NodeResult<Option<()>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
@@ -243,5 +260,11 @@ impl NodeWriterService {
             .map(|id| ShardId { id })
             .collect();
         ShardIds { ids }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn paragraph_count(&self, shard_id: &ShardId) -> Option<u64> {
+        self.get_shard(shard_id)
+            .map(|shard| shard.paragraph_count() as u64)
     }
 }

@@ -31,13 +31,13 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::tracing::{self, *};
 use tantivy::collector::{
-    Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
+    Collector, Count, DocSetCollector, FacetCollector, FacetCounts, MultiCollector, TopDocs,
 };
 use tantivy::query::{AllQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{
-    collector::Collector, DocAddress, Index, IndexReader, IndexSettings, IndexSortByField,
-    LeasedItem, Order, ReloadPolicy, Result as TantivyResult, Searcher,
+    DocAddress, Index, IndexReader, IndexSettings, IndexSortByField, LeasedItem, Order,
+    ReloadPolicy, Result as TantivyResult, Searcher,
 };
 
 use super::schema::TextSchema;
