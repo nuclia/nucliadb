@@ -22,11 +22,12 @@ use std::sync::Mutex;
 
 use nucliadb_core::thread;
 
+use crate::VectorR;
 pub type MergeRequest = Box<dyn MergeQuery>;
 pub type MergeTxn = Sender<MergeRequest>;
 
 pub trait MergeQuery: Send {
-    fn do_work(&self) -> Result<(), String>;
+    fn do_work(&self) -> VectorR<()>;
 }
 
 struct Updater {
@@ -60,5 +61,5 @@ lazy_static::lazy_static! {
 }
 
 pub fn get_notifier() -> MergeTxn {
-    MERGER.lock().unwrap().clone()
+    MERGER.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }

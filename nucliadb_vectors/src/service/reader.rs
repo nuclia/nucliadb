@@ -154,17 +154,14 @@ impl ReaderChild for VectorReaderService {
         })
     }
     #[tracing::instrument(skip_all)]
-    fn stored_ids(&self) -> Vec<String> {
+    fn stored_ids(&self) -> NodeResult<Vec<String>> {
         let time = SystemTime::now();
         let lock = self.index.get_slock().unwrap();
-        let result = self.index.get_keys(&lock).unwrap_or_else(|err| {
-            error!("Error while getting keys {err}");
-            vec![]
-        });
+        let result = self.index.get_keys(&lock)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("Ending at {v} ms")
         }
-        result
+        Ok(result)
     }
     fn reload(&self) {}
 }

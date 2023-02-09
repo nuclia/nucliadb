@@ -165,7 +165,6 @@ impl NodeWriterService {
         };
 
         shard.set_resource(resource)?;
-
         Ok(Some(shard.count()))
     }
 
@@ -179,7 +178,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.add_vectorset(setid)?;
-        Ok(Some(shard.count()))
+        shard.count().map(Some)
     }
 
     #[tracing::instrument(skip_all)]
@@ -192,7 +191,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.remove_vectorset(setid)?;
-        Ok(Some(shard.count()))
+        shard.count().map(Some)
     }
 
     #[tracing::instrument(skip_all)]
@@ -205,7 +204,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.join_relations_graph(graph)?;
-        Ok(Some(shard.count()))
+        shard.count().map(Some)
     }
 
     #[tracing::instrument(skip_all)]
@@ -218,7 +217,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.delete_relation_nodes(request)?;
-        Ok(Some(shard.count()))
+        shard.count().map(Some)
     }
 
     #[tracing::instrument(skip_all)]
@@ -230,10 +229,8 @@ impl NodeWriterService {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
-
         shard.remove_resource(resource)?;
-
-        Ok(Some(shard.count()))
+        shard.count().map(Some)
     }
 
     #[tracing::instrument(skip_all)]

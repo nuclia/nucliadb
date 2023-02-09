@@ -18,25 +18,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod data_point;
-pub mod data_point_provider;
-mod data_types;
-pub mod indexset;
-pub mod service;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
-use thiserror::Error;
-#[derive(Debug, Error)]
-pub enum VectorErr {
-    #[error("json error: {0}")]
-    SJ(#[from] serde_json::Error),
-    #[error("IO error: {0}")]
-    IoErr(#[from] std::io::Error),
-    #[error("Error in fs: {0}")]
-    FsError(#[from] nucliadb_core::fs_state::FsError),
-    #[error("Garbage collection delayed")]
-    WorkDelayed,
-    #[error("Several writers are open at the same time ")]
-    MultipleWriters,
+use crate::{VectorErr, VectorR};
+
+#[derive(Clone)]
+pub struct MergerWriterSync(Arc<AtomicBool>);
+impl MergerWriterSync {
+    pub fn new() -> MergerWriterSync {
+        MergerWriterSync(Arc::new(AtomicBool::new(true)))
+    }
+    pub fn try_to_start_working(&self) -> VectorR<()> {
+        self.0
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+            .map(|_| ())
+            .map_err(|_| VectorErr::WorkDelayed)
+    }
+    pub fn stop_working(&self) {
+        let _ = self
+            .0
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst);
+    }
 }
-
-pub type VectorR<O> = Result<O, VectorErr>;

@@ -63,16 +63,16 @@ impl WriterChild for ParagraphWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    fn count(&self) -> usize {
+    fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
         let time = SystemTime::now();
-        let reader = self.index.reader().unwrap();
+        let reader = self.index.reader()?;
         let searcher = reader.searcher();
-        let count = searcher.search(&AllQuery, &Count).unwrap_or(0);
+        let count = searcher.search(&AllQuery, &Count)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at: {v} ms");
         }
-        count
+        Ok(count)
     }
     #[tracing::instrument(skip_all)]
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()> {
@@ -131,7 +131,9 @@ impl WriterChild for ParagraphWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    fn garbage_collection(&mut self) {}
+    fn garbage_collection(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
 }
 
 impl ParagraphWriterService {

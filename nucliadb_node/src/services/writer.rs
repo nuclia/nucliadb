@@ -343,18 +343,17 @@ impl ShardWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn count(&self) -> usize {
+    pub fn count(&self) -> NodeResult<usize> {
         self.text_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
-    pub fn paragraph_count(&self) -> usize {
+    pub fn paragraph_count(&self) -> NodeResult<usize> {
         self.paragraph_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
         let vector_writer_service = self.vector_writer.clone();
         let mut writer = vector_writer_service.write().unwrap();
-        writer.garbage_collection();
-        Ok(())
+        writer.garbage_collection()
     }
 }

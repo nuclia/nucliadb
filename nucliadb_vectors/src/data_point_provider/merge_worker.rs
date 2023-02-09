@@ -23,19 +23,20 @@ use nucliadb_core::fs_state;
 use tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::{State, VectorR};
+use super::work_flag::MergerWriterSync;
+use super::State;
 use crate::data_point::{DataPoint, DpId};
+use crate::VectorR;
 
-pub struct Worker(PathBuf);
+pub struct Worker(PathBuf, MergerWriterSync);
 impl MergeQuery for Worker {
-    fn do_work(&self) -> Result<(), String> {
+    fn do_work(&self) -> VectorR<()> {
         self.work()
-            .map_err(|e| format!("Error in vectors worker {e}"))
     }
 }
 impl Worker {
-    pub fn request(at: PathBuf) -> MergeRequest {
-        Box::new(Worker(at))
+    pub fn request(at: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+        Box::new(Worker(at, work_flag))
     }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
     where It: Iterator<Item = DpId> {
@@ -47,7 +48,16 @@ impl Worker {
         write!(msg, "==> {new}").unwrap();
         msg
     }
+    fn notify_merger(&self) {
+        use crate::data_point_provider::merger;
+        let notifier = merger::get_notifier();
+        let worker = Worker::request(self.0.clone(), self.1.clone());
+        if let Err(e) = notifier.send(worker) {
+            tracing::info!("Could not request merge: {}", e);
+        }
+    }
     fn work(&self) -> VectorR<()> {
+        while self.1.try_to_start_working().is_err() {}
         let subscriber = self.0.as_path();
         let lock = fs_state::shared_lock(subscriber)?;
         let state: State = fs_state::load_state(&lock)?;
@@ -68,16 +78,14 @@ impl Worker {
 
         let lock = fs_state::exclusive_lock(subscriber)?;
         let mut state: State = fs_state::load_state(&lock)?;
-        state.replace_work_unit(new_dp);
+        let creates_work = state.replace_work_unit(new_dp);
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
-
         info!("Merge on {subscriber:?}:\n{report}");
-        ids.into_iter()
-            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
-            .filter(|(.., r)| r.is_err())
-            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
-
+        self.1.stop_working();
+        if creates_work {
+            self.notify_merger();
+        }
         Ok(())
     }
 }

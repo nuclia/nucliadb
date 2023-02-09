@@ -384,8 +384,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.document_ids(&shard_id) {
-            Some(ids) => Ok(tonic::Response::new(ids)),
+        match reader.document_ids(&shard_id).transpose() {
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
                 shard_id
@@ -403,8 +404,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.paragraph_ids(&shard_id) {
-            Some(ids) => Ok(tonic::Response::new(ids)),
+        match reader.paragraph_ids(&shard_id).transpose() {
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
                 shard_id
@@ -422,8 +424,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.vector_ids(&shard_id) {
-            Some(ids) => Ok(tonic::Response::new(ids)),
+        match reader.vector_ids(&shard_id).transpose() {
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
                 shard_id
@@ -440,8 +443,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         let shard_id = request.into_inner();
         self.shard_loading(&shard_id).await;
         let reader = self.0.read().await;
-        match reader.relation_ids(&shard_id) {
-            Some(ids) => Ok(tonic::Response::new(ids)),
+        match reader.relation_ids(&shard_id).transpose() {
+            Some(Ok(ids)) => Ok(tonic::Response::new(ids)),
+            Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
             None => Err(tonic::Status::not_found(format!(
                 "Shard not found {:?}",
                 shard_id

@@ -64,9 +64,9 @@ pub fn encapsulate_writer<T>(writer: T) -> Arc<RwLock<T>> {
 pub trait WriterChild: std::fmt::Debug + Send + Sync {
     fn set_resource(&mut self, resource: &Resource) -> NodeResult<()>;
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()>;
-    fn garbage_collection(&mut self);
+    fn garbage_collection(&mut self) -> NodeResult<()>;
     fn stop(&mut self) -> NodeResult<()>;
-    fn count(&self) -> usize;
+    fn count(&self) -> NodeResult<usize>;
 }
 
 pub trait ReaderChild: std::fmt::Debug + Send + Sync {
@@ -74,6 +74,6 @@ pub trait ReaderChild: std::fmt::Debug + Send + Sync {
     type Response;
     fn search(&self, request: &Self::Request) -> NodeResult<Self::Response>;
     fn reload(&self);
-    fn stored_ids(&self) -> Vec<String>;
+    fn stored_ids(&self) -> NodeResult<Vec<String>>;
     fn stop(&self) -> NodeResult<()>;
 }

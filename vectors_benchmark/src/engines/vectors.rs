@@ -48,10 +48,10 @@ impl VectorEngine for Index {
             let elem = Elem::new(key, vector, LabelDictionary::new(vec![]));
             elems.push(elem);
         }
-        let new_dp = DataPoint::new(self.get_location(), elems, Some(temporal_mark)).unwrap();
+        let new_dp = DataPoint::new(self.location(), elems, Some(temporal_mark)).unwrap();
         let lock = self.get_elock().unwrap();
         self.add(new_dp, &lock);
-        self.delete(&batch_id, temporal_mark, &lock);
+        self.delete(batch_id, temporal_mark, &lock);
         self.commit(lock).unwrap();
     }
 

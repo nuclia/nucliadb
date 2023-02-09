@@ -135,8 +135,17 @@ impl ReaderChild for TextReaderService {
         self.reader.reload().unwrap();
     }
     #[tracing::instrument(skip_all)]
-    fn stored_ids(&self) -> Vec<String> {
-        self.keys()
+    fn stored_ids(&self) -> NodeResult<Vec<String>> {
+        let mut keys = vec![];
+        let searcher = self.reader.searcher();
+        for addr in searcher.search(&AllQuery, &DocSetCollector)? {
+            let Some(key) = searcher
+                .doc(addr)?
+                .get_first(self.schema.uuid)
+                .and_then(|i| i.as_text().map(String::from)) else { continue };
+            keys.push(key);
+        }
+        Ok(keys)
     }
 }
 
@@ -508,24 +517,6 @@ impl TextReaderService {
                 Ok(result)
             }
         }
-    }
-    fn keys(&self) -> Vec<String> {
-        let searcher = self.reader.searcher();
-        searcher
-            .search(&AllQuery, &DocSetCollector)
-            .unwrap()
-            .into_iter()
-            .map(|addr| {
-                searcher
-                    .doc(addr)
-                    .unwrap()
-                    .get_first(self.schema.uuid)
-                    .expect("document doesn't appear to have uuid.")
-                    .as_text()
-                    .unwrap()
-                    .to_string()
-            })
-            .collect()
     }
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()

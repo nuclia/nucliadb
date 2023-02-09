@@ -24,8 +24,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::IndexKeyCollector;
-use crate::data_point_provider::{Index, IndexCheck, VectorR};
-
+use crate::data_point_provider::{Index, IndexCheck};
+use crate::VectorR;
 #[derive(Serialize, Deserialize)]
 pub struct State {
     location: PathBuf,
