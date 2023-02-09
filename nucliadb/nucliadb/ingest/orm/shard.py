@@ -58,16 +58,6 @@ class Shard(AbstractShard):
             indexpb.typemessage = IndexMessage.TypeMessage.DELETION
             await indexing.index(indexpb, shardreplica.node)
 
-    @staticmethod
-    def counters_are_different(
-        replica1_counters: ShardCounter,
-        replica2_counters: ShardCounter,
-    ) -> bool:
-        return not (
-            replica1_counters.paragraphs == replica2_counters.paragraphs
-            and replica1_counters.fields == replica2_counters.fields
-        )
-
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
     ) -> Optional[ShardCounter]:
@@ -105,10 +95,11 @@ class Shard(AbstractShard):
                     fields=counter.resources,
                     paragraphs=counter.paragraphs,
                 )
+
                 if (
                     SENTRY
                     and last_counter is not None
-                    and self.counters_are_different(last_counter, shard_counter)
+                    and shard_counter != last_counter
                 ):
                     with sentry_sdk.push_scope() as scope:
                         scope.set_extra("shard", [self.sharduuid])
