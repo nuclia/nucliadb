@@ -28,15 +28,21 @@ use super::State;
 use crate::data_point::{DataPoint, DpId};
 use crate::VectorR;
 
-pub struct Worker(PathBuf, MergerWriterSync);
+pub struct Worker {
+    location: PathBuf,
+    work_flag: MergerWriterSync,
+}
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
         self.work()
     }
 }
 impl Worker {
-    pub fn request(at: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
-        Box::new(Worker(at, work_flag))
+    pub fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+        Box::new(Worker {
+            location,
+            work_flag,
+        })
     }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
     where It: Iterator<Item = DpId> {
@@ -51,14 +57,14 @@ impl Worker {
     fn notify_merger(&self) {
         use crate::data_point_provider::merger;
         let notifier = merger::get_notifier();
-        let worker = Worker::request(self.0.clone(), self.1.clone());
+        let worker = Worker::request(self.location.clone(), self.work_flag.clone());
         if let Err(e) = notifier.send(worker) {
             tracing::info!("Could not request merge: {}", e);
         }
     }
     fn work(&self) -> VectorR<()> {
-        while self.1.try_to_start_working().is_err() {}
-        let subscriber = self.0.as_path();
+        while self.work_flag.try_to_start_working().is_err() {}
+        let subscriber = self.location.as_path();
         let lock = fs_state::shared_lock(subscriber)?;
         let state: State = fs_state::load_state(&lock)?;
         std::mem::drop(lock);
@@ -82,7 +88,7 @@ impl Worker {
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
         info!("Merge on {subscriber:?}:\n{report}");
-        self.1.stop_working();
+        self.work_flag.stop_working();
         if creates_work {
             self.notify_merger();
         }
