@@ -128,7 +128,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                         if !self.tracker.is_deleted(n)
                         // A score may be invalid if the index contains zero vectors 
                         && !score.is_nan()
-                        // The vector is blocked, meaning that it is part of the current version of the solution
+                        // The vector is blocked, meaning that its key is part of the current version of the solution
                         && !blocked_addresses.contains(&n)
                         // The number of times this vector appears is 0
                         && vec_counter.get(self.tracker.get_vector(n)) == 0
