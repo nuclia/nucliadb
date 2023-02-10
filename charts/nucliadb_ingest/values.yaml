@@ -25,8 +25,9 @@ resources: {}
 serving:
   grpc: 8030
   monitor: 50101
-  metrics: 8081
-
+  metricsPort: 8081
+serviceMonitor:
+    enabled: false
 chitchat:
   cluster_manager:
     port: 31337
