@@ -28,7 +28,7 @@ spec:
     metadata:
       name: ingest
       annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.monitor }},{{.Values.serving.metrics }}"
+        traffic.sidecar.istio.io/excludeInboundPorts: "{{.Values.serving.monitor }},{{.Values.serving.metricsPort }}"
         traffic.sidecar.istio.io/excludeOutboundPorts: "{{.Values.services.maindb }},{{.Values.services.nats }},20160,2380"
       labels:
         app: ingest
@@ -73,7 +73,7 @@ spec:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}
         - containerPort: {{ .Values.serving.monitor }}
-        - containerPort: {{ .Values.serving.metrics }}
+        - containerPort: {{ .Values.serving.metricsPort }}
         - name: cluster-monitor
           containerPort: {{ .Values.chitchat.cluster_manager.port }}
         resources:
