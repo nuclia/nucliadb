@@ -358,6 +358,7 @@ fn just_prefix_querying() -> NodeResult<()> {
     let mut request = REQUEST_BONES.clone();
     request.prefix = Some(RelationPrefixSearchRequest {
         prefix: "E".to_string(),
+        ..Default::default()
     });
     let got = reader.search(&request).unwrap();
     let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
@@ -369,6 +370,7 @@ fn just_prefix_querying() -> NodeResult<()> {
 
     request.prefix = Some(RelationPrefixSearchRequest {
         prefix: "e".to_string(),
+        ..Default::default()
     });
     let got = reader.search(&request).unwrap();
     let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };
@@ -380,6 +382,7 @@ fn just_prefix_querying() -> NodeResult<()> {
 
     request.prefix = Some(RelationPrefixSearchRequest {
         prefix: "not".to_string(),
+        ..Default::default()
     });
     let got = reader.search(&request).unwrap();
     let Some(prefix_response) = got.prefix else { unreachable!("Wrong variant") };

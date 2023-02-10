@@ -292,6 +292,7 @@ impl ShardReaderService {
                 shard_id: String::default(),
                 prefix: Some(RelationPrefixSearchRequest {
                     prefix: prefix.clone(),
+                    ..Default::default()
                 }),
                 ..Default::default()
             };

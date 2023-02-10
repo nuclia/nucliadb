@@ -81,7 +81,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Cat".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: "animal".to_string(),
         },
     );
     relation_nodes.insert(
@@ -89,7 +89,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Catwoman".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: "superhero".to_string(),
         },
     );
     relation_nodes.insert(
@@ -344,6 +344,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "".to_string(),
+                ..Default::default()
             }),
             ..Default::default()
         })
@@ -364,12 +365,65 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "cat".to_string(),
+                ..Default::default()
             }),
             ..Default::default()
         })
         .await?;
 
     let expected = HashSet::from_iter(vec!["Cat".to_string(), "Catwoman".to_string()]);
+    assert!(response.get_ref().prefix.is_some());
+    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
+    assert_eq!(results, expected);
+
+    // --------------------------------------------------------------
+    // Test: prefixed search with "cat" and filters
+    // --------------------------------------------------------------
+
+    let response = reader
+        .relation_search(RelationSearchRequest {
+            shard_id: shard_id.clone(),
+            prefix: Some(RelationPrefixSearchRequest {
+                prefix: "cat".to_string(),
+                node_filters: vec![RelationNodeFilter {
+                    node_subtype: Some("animal".to_string()),
+                    node_type: NodeType::Entity as i32,
+                }],
+            }),
+            ..Default::default()
+        })
+        .await?;
+
+    let expected = HashSet::from_iter(vec!["Cat".to_string()]);
+    assert!(response.get_ref().prefix.is_some());
+    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
+    assert_eq!(results, expected);
+
+    let response = reader
+        .relation_search(RelationSearchRequest {
+            shard_id: shard_id.clone(),
+            prefix: Some(RelationPrefixSearchRequest {
+                prefix: "cat".to_string(),
+                node_filters: vec![RelationNodeFilter {
+                    node_subtype: Some("superhero".to_string()),
+                    node_type: NodeType::Entity as i32,
+                }],
+            }),
+            ..Default::default()
+        })
+        .await?;
+
+    let expected = HashSet::from_iter(vec!["Catwoman".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = prefix_response
@@ -388,6 +442,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
                 prefix: "zzz".to_string(),
+                ..Default::default()
             }),
             ..Default::default()
         })
