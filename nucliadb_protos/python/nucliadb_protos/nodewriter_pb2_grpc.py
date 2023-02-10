@@ -63,7 +63,7 @@ class NodeWriterStub(object):
         self.RemoveResource = channel.unary_unary(
                 '/nodewriter.NodeWriter/RemoveResource',
                 request_serializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.SerializeToString,
-                response_deserializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
+                response_deserializer=nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
                 )
         self.AddVectorSet = channel.unary_unary(
                 '/nodewriter.NodeWriter/AddVectorSet',
@@ -236,7 +236,7 @@ def add_NodeWriterServicer_to_server(servicer, server):
             'RemoveResource': grpc.unary_unary_rpc_method_handler(
                     servicer.RemoveResource,
                     request_deserializer=nucliadb__protos_dot_noderesources__pb2.ResourceID.FromString,
-                    response_serializer=nucliadb__protos_dot_nodewriter__pb2.OpStatus.SerializeToString,
+                    response_serializer=nucliadb__protos_dot_noderesources__pb2.Shard.SerializeToString,
             ),
             'AddVectorSet': grpc.unary_unary_rpc_method_handler(
                     servicer.AddVectorSet,
@@ -439,7 +439,7 @@ class NodeWriter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/RemoveResource',
             nucliadb__protos_dot_noderesources__pb2.ResourceID.SerializeToString,
-            nucliadb__protos_dot_nodewriter__pb2.OpStatus.FromString,
+            nucliadb__protos_dot_noderesources__pb2.Shard.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

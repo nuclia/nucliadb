@@ -24,7 +24,7 @@ use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
+    OpStatus, Resource, ResourceId, SetGraph, Shard, ShardCleaned, ShardCreated, ShardId, ShardIds,
     VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
@@ -316,7 +316,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     async fn remove_resource(
         &self,
         request: Request<ResourceId>,
-    ) -> Result<Response<OpStatus>, Status> {
+    ) -> Result<Response<Shard>, Status> {
         self.instrument(&request);
         let resource = request.into_inner();
         let shard_id = ShardId {
@@ -328,30 +328,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let result = writer.remove_resource(&shard_id, &resource);
 
         match result.transpose() {
+            Some(Err(e)) => Err(tonic::Status::internal(e.to_string())),
             Some(Ok(count)) => {
                 info!("Remove resource ends correctly");
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
                 self.emit_event(NodeWriterEvent::ParagraphCount(
                     writer.paragraph_count(&shard_id).unwrap_or_default(),
                 ));
 
-                Ok(tonic::Response::new(status))
-            }
-            Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
-                let op_status = OpStatus {
-                    status,
-                    detail,
-                    count: 0_u64,
-                    shard_id: shard_id.id.clone(),
-                };
-                Ok(tonic::Response::new(op_status))
+                Ok(tonic::Response::new(count))
             }
             None => {
                 let message = format!("Error loading shard {:?}", shard_id);

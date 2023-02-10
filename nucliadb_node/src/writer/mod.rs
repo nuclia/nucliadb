@@ -23,7 +23,7 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId,
+    DeleteGraphNodes, JoinGraph, Resource, ResourceId, Shard, ShardCleaned, ShardCreated, ShardId,
     ShardIds, VectorSetId,
 };
 use nucliadb_core::tracing::{self, *};
@@ -226,14 +226,18 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<Shard>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
 
         shard.remove_resource(resource)?;
-
-        Ok(Some(shard.count()))
+        Ok(Some(Shard {
+            shard_id: shard_id.id.clone(),
+            resources: shard.text_count() as u64,
+            paragraphs: shard.paragraph_count() as u64,
+            sentences: shard.vector_count() as u64,
+        }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -260,6 +264,16 @@ impl NodeWriterService {
             .map(|id| ShardId { id })
             .collect();
         ShardIds { ids }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn shard_count(&self, shard_id: &ShardId) -> Option<Shard> {
+        self.get_shard(shard_id).map(|shard| Shard {
+            shard_id: shard_id.id.clone(),
+            resources: shard.text_count() as u64,
+            paragraphs: shard.paragraph_count() as u64,
+            sentences: shard.vector_count() as u64,
+        })
     }
 
     #[tracing::instrument(skip_all)]
