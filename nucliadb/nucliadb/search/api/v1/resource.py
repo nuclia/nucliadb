@@ -99,7 +99,7 @@ async def search(
     extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = Query(False),
-    shards: Optional[List[str]] = None,
+    shards: List[str] = Query(default=[]),
 ) -> ResourceSearchResults:
     if not rid:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
