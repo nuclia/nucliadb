@@ -219,6 +219,7 @@ message RelationEdgeFilter {
 
 message RelationPrefixSearchRequest {
     string prefix = 1;
+    repeated RelationNodeFilter node_filters = 2;
 }
 
 message RelationPrefixSearchResponse {

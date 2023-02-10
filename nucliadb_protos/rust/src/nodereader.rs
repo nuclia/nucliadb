@@ -283,6 +283,8 @@ pub struct RelationEdgeFilter {
 pub struct RelationPrefixSearchRequest {
     #[prost(string, tag="1")]
     pub prefix: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag="2")]
+    pub node_filters: ::prost::alloc::vec::Vec<RelationNodeFilter>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RelationPrefixSearchResponse {
