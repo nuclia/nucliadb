@@ -74,9 +74,9 @@ async def search(
     query: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
-    fields: Optional[List[str]] = None,
-    filters: Optional[List[str]] = None,
-    faceted: Optional[List[str]] = None,
+    fields: List[str] = Query(default=[]),
+    filters: List[str] = Query(default=[]),
+    faceted: List[str] = Query(default=[]),
     sort: Optional[SortField] = None,
     page_number: int = 0,
     page_size: int = 20,
@@ -106,9 +106,6 @@ async def search(
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
-    filters = filters or []
-    faceted = faceted or []
-
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
 
@@ -125,6 +122,7 @@ async def search(
         features,
         rid,
         query,
+        fields,
         filters,
         faceted,
         page_number,
@@ -133,7 +131,6 @@ async def search(
         range_creation_end,
         range_modification_start,
         range_modification_end,
-        fields=fields,
         reload=reload,
         sort=sort.value if sort else None,
     )
