@@ -56,12 +56,6 @@ pub struct Index {
     location: PathBuf,
 }
 impl Index {
-    fn take_work_flag(&self) -> VectorR<()> {
-        self.work_flag.try_to_start_working()
-    }
-    fn release_work_flag(&self) {
-        self.work_flag.stop_working()
-    }
     fn read_state(&self) -> RwLockReadGuard<'_, State> {
         self.state.read().unwrap_or_else(|e| e.into_inner())
     }
@@ -133,7 +127,7 @@ impl Index {
     }
     pub fn collect_garbage(&self, _: &Lock) -> VectorR<()> {
         use std::collections::HashSet;
-        self.take_work_flag()?;
+        let work_flag = self.work_flag.try_to_start_working()?;
         let state = self.read_state();
         let non_garbage_dp: HashSet<_> = state.dpid_iter().map(|s| s.to_string()).collect();
         for dir_entry in std::fs::read_dir(&self.location)? {
@@ -150,7 +144,7 @@ impl Index {
                 info!("{name} is garbage and could not be deleted because of {err}");
             }
         }
-        self.release_work_flag();
+        std::mem::drop(work_flag);
         Ok(())
     }
     pub fn add(&self, dp: DataPoint, _: &ELock) {

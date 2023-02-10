@@ -18,26 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
 use crate::{VectorErr, VectorR};
 
 #[derive(Clone)]
-pub struct MergerWriterSync(Arc<AtomicBool>);
+pub struct MergerWriterSync(Arc<Mutex<()>>);
 impl MergerWriterSync {
     pub fn new() -> MergerWriterSync {
-        MergerWriterSync(Arc::new(AtomicBool::new(true)))
+        MergerWriterSync(Arc::new(Mutex::new(())))
     }
-    pub fn try_to_start_working(&self) -> VectorR<()> {
-        self.0
-            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
-            .map(|_| ())
-            .map_err(|_| VectorErr::WorkDelayed)
-    }
-    pub fn stop_working(&self) {
-        let _ = self
-            .0
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst);
+    pub fn try_to_start_working(&self) -> VectorR<MutexGuard<'_, ()>> {
+        match self.0.try_lock() {
+            Ok(lock) => Ok(lock),
+            Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
+            Err(TryLockError::WouldBlock) => Err(VectorErr::WorkDelayed),
+        }
     }
 }

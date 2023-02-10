@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use nucliadb_core::fs_state;
 use tracing::*;
@@ -28,6 +29,7 @@ use super::State;
 use crate::data_point::{DataPoint, DpId};
 use crate::VectorR;
 
+const SLEEP_TIME: Duration = Duration::from_millis(100);
 pub struct Worker {
     location: PathBuf,
     work_flag: MergerWriterSync,
@@ -64,6 +66,13 @@ impl Worker {
     }
     fn work(&self) -> VectorR<()> {
         while self.work_flag.try_to_start_working().is_err() {}
+        let work_flag = loop {
+            if let Ok(lock) = self.work_flag.try_to_start_working() {
+                break lock;
+            }
+            tracing::info!("Merge delayed at: {:?}", self.location);
+            std::thread::sleep(SLEEP_TIME);
+        };
         let subscriber = self.location.as_path();
         let lock = fs_state::shared_lock(subscriber)?;
         let state: State = fs_state::load_state(&lock)?;
@@ -87,8 +96,8 @@ impl Worker {
         let creates_work = state.replace_work_unit(new_dp);
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
+        std::mem::drop(work_flag);
         info!("Merge on {subscriber:?}:\n{report}");
-        self.work_flag.stop_working();
         if creates_work {
             self.notify_merger();
         }
