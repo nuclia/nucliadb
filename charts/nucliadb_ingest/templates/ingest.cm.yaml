@@ -11,7 +11,7 @@ metadata:
 data:
   GRPC_PORT: {{ .Values.serving.grpc | quote }}
   INNER_METRICS_HOST: "0.0.0.0"
-  INNER_METRICS_PORT: {{ .Values.serving.metrics | quote }}
+  INNER_METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
 
   PULL_TIME: {{ .Values.config.pull_time | quote }}
   NODE_REPLICAS: {{ .Values.config.node_replicas | quote }}
