@@ -360,26 +360,8 @@ impl NodeWriter {
             .remove_resource(&shard_id, &resource)
             .transpose()
         {
-            Some(Ok(count)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
-                Ok(PyList::new(py, status.encode_to_vec()))
-            }
-            Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
-                let op_status = OpStatus {
-                    status,
-                    detail,
-                    count: 0_u64,
-                    shard_id: shard_id.id.clone(),
-                };
-                Ok(PyList::new(py, op_status.encode_to_vec()))
-            }
+            Some(Ok(shard)) => Ok(PyList::new(py, shard.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => {
                 let message = format!("Error loading shard {:?}", shard_id);
                 Err(exceptions::PyTypeError::new_err(message))
