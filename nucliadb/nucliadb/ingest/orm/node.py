@@ -214,7 +214,7 @@ class Node(AbstractNode):
             if replica is None:
                 raise ReplicaShardNotFound()
 
-            # Call sidecar's grpc
+            # Call sidecar's gRPC
             ssresp = await node.sidecar.CreateShadowShard(EmptyQuery())  # type: ignore
             if not ssresp.success:
                 raise SidecarCreateShadowShardError("Sidecar error")
