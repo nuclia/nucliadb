@@ -63,12 +63,11 @@ NucliaDB. Using a running NucliaDB, download the script and test it
 with:
 
 ```bash
-pip install nucliadb_client
+pip install nucliadb_client sentence_transformers
 python simple.py \
        --host=localhost \
        --http=8080 \
        --grpc=8060 \
-       --train=8040 \
        --kb ${KB_SLUG}
 ```
 
