@@ -1,5 +1,9 @@
 # nucliadb_client
 
+## 2.0.1
+
+- Come out of alpha
+
 ## 2.0.0a7
 
 - Simulate writer and processing messages on resource commit while importing
