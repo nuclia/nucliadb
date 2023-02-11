@@ -50,16 +50,38 @@ export KB_SLUG=<YOUR-KB-SLUG>
 export KB_UUID=<YOUR-KB-UUID>
 ```
 
-### Manually uploading some data
 
-NucliaDB has a simple Python client which provides an easy way to
+### Nuclia client
+
+NucliaDB has a simple Python client which provides a way to
 import and export content. We have some examples
 [here](../../nucliadb_client/examples/).
 
+You install the client with `pip`. Beforehand, make sure to update
+to the latest version of `pip`:
+
+```bash
+pip install --upgrade pip
+```
+
+Then, install the client with:
+
+```bash
+pip install nucliadb_client
+```
+
+### Manually uploading some data
 
 The [simple.py](../../nucliadb_client/examples/simple.py) shows how to
 extract vectors from text and to insert them all inside a
-NucliaDB. Using a running NucliaDB, download the script and test it
+NucliaDB. In order to use the sample `simple.py` script, you'll also
+need to install the `sentence_transformers` python package:
+
+```bash
+pip install sentence_transformers
+```
+
+Then, using a running NucliaDB, download the script and test it
 with:
 
 ```bash
@@ -77,8 +99,8 @@ This will upload text and vectors to the specified Knowledge Box.
 
 #### Text search
 
-Once we have knowledge inside our running NucliaDB you have it, it's
-time to search. Uploaded texts can be found
+Once we have knowledge inside our running NucliaDB, you are able
+to run search queries on it. Uploaded texts can be found
 [here](../../nucliadb_client/examples/articles.json) and are parts of
 Wikipedia articles.
 
@@ -114,11 +136,11 @@ can search semantically using a POST request and passing an exact or a
 similar vector:
 
 ```bash
-VECTOR=$(python simple.py --host=localhost --http=8080 --grpc=8060 --train=8040 --kb ${KB_SLUG} --print-random-vector) \
+VECTOR=$(python simple.py --host=localhost --http=8080 --grpc=8060 --kb ${KB_SLUG} --print-random-vector) \
 && curl "http://localhost:8080/api/v1/kb/${KB_UUID}/search" \
      -X POST \
-     -H "X-NUCLIADB-ROLES: READER" \
-     --data-raw "{
+     -H "X-NUCLIADB-ROLES: READER" -H "Content-Type: application/json" \
+     --data "{
   \"query\": \"whatever\",
   \"vector\": ${VECTOR}
 }"
