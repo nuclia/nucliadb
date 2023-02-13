@@ -21,6 +21,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from nucliadb_protos.nodereader_pb2 import (
+    EdgeList,
+    RelationEdge,
+    RelationTypeListMember,
+    TypeList,
+)
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
@@ -30,6 +36,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList,
 )
 from nucliadb_protos.nodewriter_pb2 import Counter, OpStatus, SetGraph, ShadowShardResponse
+from nucliadb_protos.utils_pb2 import Relation
 
 from nucliadb.ingest.orm.shard import Shard
 
@@ -101,6 +108,25 @@ class DummyReaderStub:
         return NodeResourcesShard(
             shard_id="shard", resources=2, paragraphs=2, sentences=2
         )
+
+    async def RelationEdges(self, data):
+        self.calls.setdefault("RelationEdges", []).append(data)
+        result = EdgeList()
+        result.list.append(
+            RelationEdge(edge_type=Relation.RelationType.ENTITY, property="dummy")
+        )
+        return result
+
+    async def RelationTypes(self, data):
+        self.calls.setdefault("RelationTypes", []).append(data)
+        result = EdgeList()
+        result.list.append(
+            RelationTypeListMember(
+                with_type=NodeType.ENTITY,
+                with_subtype="DUMMY",
+            )
+        )
+        return result
 
 
 class DummySidecarStub:

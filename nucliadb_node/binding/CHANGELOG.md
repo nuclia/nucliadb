@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+
+- Add `relation_types` and `relation_edges`
+
 ## 0.6.0
 
 - Be able to set vector similarity on shards and vectorsets
@@ -10,7 +14,7 @@
 
 ## 0.5.8
 
-- Store node metadata 
+- Store node metadata
 ## 0.5.7
 
 - move merger out of the rayon threadpool

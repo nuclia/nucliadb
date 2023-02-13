@@ -26,17 +26,21 @@ from typing import AsyncIterator
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentItem,
+    EdgeList,
     GetShardRequest,
     ParagraphItem,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
+    RelationEdge,
     RelationSearchRequest,
     RelationSearchResponse,
+    RelationTypeListMember,
     SearchRequest,
     SearchResponse,
     StreamRequest,
     SuggestRequest,
     SuggestResponse,
+    TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, Resource, ResourceID
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
@@ -198,6 +202,26 @@ class LocalReaderWrapper:
         if exception is not None:
             raise exception
         await loop.run_in_executor(self.executor, t1.join)
+
+    async def RelationEdges(self, request: ShardId):
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.relation_edges, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        type_list = TypeList()
+        type_list.ParseFromString(pb_bytes)
+        return type_list
+
+    async def RelationTypes(self, request: ShardId):
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.relation_types, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        type_list = TypeList()
+        type_list.ParseFromString(pb_bytes)
+        return type_list
 
 
 class LocalWriterWrapper:
