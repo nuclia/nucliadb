@@ -161,6 +161,7 @@ async def paragraph_query_to_pb(
     features: List[SearchOptions],
     rid: str,
     query: str,
+    fields: List[str],
     filters: List[str],
     faceted: List[str],
     page_number: int,
@@ -169,14 +170,11 @@ async def paragraph_query_to_pb(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    fields: Optional[List[str]] = None,
     sort: Optional[str] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     with_duplicates: bool = False,
 ) -> ParagraphSearchRequest:
-    fields = fields or []
-
     request = ParagraphSearchRequest()
     request.reload = reload
     request.with_duplicates = with_duplicates

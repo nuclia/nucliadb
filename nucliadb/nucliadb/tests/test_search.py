@@ -290,6 +290,46 @@ async def test_search_with_filters(
 
 
 @pytest.mark.asyncio
+async def test_paragraph_search_with_filters(
+    nucliadb_writer,
+    nucliadb_reader,
+    nucliadb_grpc,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    # Create a resource with two fields (title and summary)
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Mushrooms",
+            "summary": "A very good book about mushrooms (aka funghi)",
+        },
+        headers={"X-SYNCHRONOUS": "True"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/search?query=mushrooms"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    paragraph_results = body["paragraphs"]["results"]
+    assert len(paragraph_results) == 2
+
+    # Check that you can filter results by field
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/search",
+        params={"query": "mushrooms", "fields": ["a/summary"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    paragraph_results = body["paragraphs"]["results"]
+    assert len(paragraph_results) == 1
+    assert paragraph_results[0]["field"] == "summary"
+
+
+@pytest.mark.asyncio
 async def test_catalog_can_filter_by_processing_status(
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,

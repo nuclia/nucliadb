@@ -32,7 +32,7 @@ except ImportError:
 async def handler(request):
     if PROMETHEUS:
         output = prometheus_client.exposition.generate_latest()
-        return output.decode("utf8")
+        return web.Response(content_type="text/plain", body=output.decode("utf8"))
     else:
         return web.Response(text=f"OK")
 
