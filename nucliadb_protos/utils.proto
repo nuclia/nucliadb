@@ -47,16 +47,17 @@ message RelationNode {
     string subtype = 6;
 }
 
-message JoinGraphCnx {
+message JoinGraphEdge {
     int32 source = 4;
     int32 target = 1;
     Relation.RelationType rtype = 2;
     string rsubtype = 3;
     RelationMetadata metadata = 5;
 }
+
 message JoinGraph {
     map<int32, RelationNode> nodes = 1; 
-    repeated JoinGraphCnx edges = 2;
+    repeated JoinGraphEdge edges = 2;
 }
 
 

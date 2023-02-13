@@ -251,21 +251,21 @@ fn join_graph_test() -> NodeResult<()> {
     let graph = JoinGraph {
         nodes: HashMap::from([(0i32, E0.clone()), (1i32, E1.clone()), (2i32, E2.clone())]),
         edges: vec![
-            JoinGraphCnx {
+            JoinGraphEdge {
                 source: 2,
                 target: 1,
                 rtype: RelationType::Child as i32,
                 rsubtype: "".to_string(),
                 metadata: None,
             },
-            JoinGraphCnx {
+            JoinGraphEdge {
                 source: 0,
                 target: 2,
                 rtype: RelationType::Entity as i32,
                 rsubtype: "".to_string(),
                 metadata: None,
             },
-            JoinGraphCnx {
+            JoinGraphEdge {
                 source: 0,
                 target: 1,
                 rtype: RelationType::Entity as i32,
