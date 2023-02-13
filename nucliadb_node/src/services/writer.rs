@@ -352,11 +352,11 @@ impl ShardWriterService {
     }
     #[tracing::instrument(skip_all)]
     pub fn vector_count(&self) -> usize {
-        self.paragraph_writer.read().unwrap().count()
+        self.vector_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
     pub fn text_count(&self) -> usize {
-        self.paragraph_writer.read().unwrap().count()
+        self.text_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
     pub fn gc(&self) -> NodeResult<()> {
