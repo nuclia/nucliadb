@@ -49,7 +49,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: rid.to_string(),
             ntype: NodeType::Resource as i32,
-            subtype: String::new(),
+            subtype: "".to_string(),
         },
     );
     relation_nodes.insert(
@@ -426,6 +426,34 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         .await?;
 
     let expected = HashSet::from_iter(vec!["Catwoman".to_string()]);
+    assert!(response.get_ref().prefix.is_some());
+    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
+    assert_eq!(results, expected);
+
+    // --------------------------------------------------------------
+    // Test: prefixed search with node filters and empty query
+    // --------------------------------------------------------------
+
+    let response = reader
+        .relation_search(RelationSearchRequest {
+            shard_id: shard_id.clone(),
+            prefix: Some(RelationPrefixSearchRequest {
+                prefix: "".to_string(),
+                node_filters: vec![RelationNodeFilter {
+                    node_type: NodeType::Entity as i32,
+                    node_subtype: Some("animal".to_string()),
+                }],
+            }),
+            ..Default::default()
+        })
+        .await?;
+
+    let expected = HashSet::from_iter(vec!["Cat".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = prefix_response
