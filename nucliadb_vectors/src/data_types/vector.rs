@@ -40,12 +40,6 @@ pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
         .cloned()
         .fold(encode_length(vec![], vec), encode_unit)
 }
-#[inline]
-fn read_len(mut x: &[u8]) -> Len {
-    let mut buff_x = [0; 8];
-    x.read_exact(&mut buff_x).unwrap();
-    Len::from_le_bytes(buff_x)
-}
 
 #[inline]
 fn remove_len(x: &[u8]) -> &[u8] {
@@ -57,11 +51,11 @@ fn remove_len(x: &[u8]) -> &[u8] {
 pub fn simd_cosine_similarity(left: &[u8], right: &[u8]) -> f32 {
     use wide::f32x8;
     const NUM_LANES: usize = 8;
-    let dim = read_len(left) as usize;
-    let slots = dim / NUM_LANES;
-    let used_bytes = slots * NUM_LANES * 4;
     let left = remove_len(left);
     let right = remove_len(right);
+    let dim = left.len()/4;
+    let slots = dim / NUM_LANES;
+    let used_bytes = slots * NUM_LANES * 4;
     assert_eq!(left.len(), dim * 4);
     assert_eq!(right.len(), dim * 4);
     let mut left_ptr = left.as_ptr() as *const f32x8;
