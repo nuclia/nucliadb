@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.48
+------
+- Extend audit with counter data
+
 0.0.47
 ------
 - Add `shard_count` attribute in `Member`

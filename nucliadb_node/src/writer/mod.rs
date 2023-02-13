@@ -23,8 +23,8 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId,
-    ShardIds, VectorSetId,
+    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
+    ShardId, ShardIds, VectorSetId,
 };
 use nucliadb_core::tracing::{self, *};
 use uuid::Uuid;
@@ -159,13 +159,19 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &Resource,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
 
         shard.set_resource(resource)?;
-        shard.count().map(Some)
+        Ok(Some(OpStatus {
+            shard_id: shard_id.id.clone(),
+            count: shard.text_count()? as u64,
+            count_paragraphs: shard.paragraph_count()? as u64,
+            count_sentences: shard.vector_count()? as u64,
+            ..Default::default()
+        }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -173,12 +179,18 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.add_vectorset(setid)?;
-        shard.count().map(Some)
+        Ok(Some(OpStatus {
+            shard_id: shard_id.id.clone(),
+            count: shard.text_count()? as u64,
+            count_paragraphs: shard.paragraph_count()? as u64,
+            count_sentences: shard.vector_count()? as u64,
+            ..Default::default()
+        }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -186,12 +198,18 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.remove_vectorset(setid)?;
-        shard.count().map(Some)
+        Ok(Some(OpStatus {
+            shard_id: shard_id.id.clone(),
+            count: shard.text_count()? as u64,
+            count_paragraphs: shard.paragraph_count()? as u64,
+            count_sentences: shard.vector_count()? as u64,
+            ..Default::default()
+        }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -199,12 +217,18 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         graph: &JoinGraph,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.join_relations_graph(graph)?;
-        shard.count().map(Some)
+        Ok(Some(OpStatus {
+            shard_id: shard_id.id.clone(),
+            count: shard.text_count()? as u64,
+            count_paragraphs: shard.paragraph_count()? as u64,
+            count_sentences: shard.vector_count()? as u64,
+            ..Default::default()
+        }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -212,12 +236,18 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         request: &DeleteGraphNodes,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.delete_relation_nodes(request)?;
-        shard.count().map(Some)
+        Ok(Some(OpStatus {
+            shard_id: shard_id.id.clone(),
+            count: shard.text_count()? as u64,
+            count_paragraphs: shard.paragraph_count()? as u64,
+            count_sentences: shard.vector_count()? as u64,
+            ..Default::default()
+        }))
     }
 
     #[tracing::instrument(skip_all)]
@@ -225,12 +255,18 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.remove_resource(resource)?;
-        shard.count().map(Some)
+        Ok(Some(OpStatus {
+            shard_id: shard_id.id.clone(),
+            count: shard.text_count()? as u64,
+            count_paragraphs: shard.paragraph_count()? as u64,
+            count_sentences: shard.vector_count()? as u64,
+            ..Default::default()
+        }))
     }
 
     #[tracing::instrument(skip_all)]

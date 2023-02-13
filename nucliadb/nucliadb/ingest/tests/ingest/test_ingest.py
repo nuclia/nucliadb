@@ -310,6 +310,15 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
+
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
+
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
@@ -336,6 +345,14 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
 
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
+
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
@@ -354,6 +371,14 @@ async def test_ingest_audit_stream_files_only(
 
     await stream_processor.process(message=message, seqid=3)
     auditreq = await get_audit_messages(psub)
+
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -380,6 +405,9 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
+    # Currently where not updating audit counters on delete operations
+    assert not auditreq.HasField("counter")
+
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.DELETED
     assert audit_by_fieldid["file_2"].size == 0
@@ -399,6 +427,9 @@ async def test_ingest_audit_stream_files_only(
     auditreq = await get_audit_messages(psub)
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.type == AuditRequest.AuditType.KB_DELETED
+
+    # Currently where not updating audit counters on delete operations
+    assert not auditreq.HasField("counter")
 
     await txn.abort()
 
@@ -449,6 +480,15 @@ async def test_ingest_audit_stream_mixed(
     await stream_processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
+
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
+
     assert auditreq.kbid == kbid
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
@@ -466,6 +506,9 @@ async def test_ingest_audit_stream_mixed(
     message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
     await stream_processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
+
+    # Currently where not updating audit counters on delete operations
+    assert not auditreq.HasField("counter")
 
     # We know what should be in the resource and all must me delete actions
     audit_actions_by_fieldid = {
