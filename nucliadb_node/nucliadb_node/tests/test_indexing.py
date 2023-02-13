@@ -19,10 +19,11 @@
 
 import asyncio
 from datetime import datetime
+from typing import Optional
 
 import pytest
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.noderesources_pb2 import Resource, ShardId
+from nucliadb_protos.noderesources_pb2 import Resource, Shard, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 
 from nucliadb_node import SERVICE_NAME
@@ -69,21 +70,22 @@ async def test_indexing(sidecar: App, shard: str):
     sipb = ShardId()
     sipb.id = shard
 
-    response = await sidecar.reader.get_count(sipb)
-    if response is not None and response > 0:
+    pbshard: Optional[Shard] = await sidecar.reader.get_shard(sipb)
+    if pbshard is not None and pbshard.resources > 0:
         processed = True
     else:
         processed = False
 
     while processed is False:
         await asyncio.sleep(1)
-        response = await sidecar.reader.get_count(sipb)
-        if response is not None and response > 0:
+        pbshard = await sidecar.reader.get_shard(sipb)
+        if pbshard is not None and pbshard.resources > 0:
             processed = True
         else:
             processed = False
 
-    assert response == 2
+    assert pbshard is not None
+    assert pbshard.resources == 2
     await asyncio.sleep(1)
 
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -129,4 +131,4 @@ async def test_indexing_not_found(sidecar: App):
     sipb.id = "shard"
 
     with pytest.raises(AioRpcError):
-        await sidecar.reader.get_count(sipb)
+        await sidecar.reader.get_shard(sipb)

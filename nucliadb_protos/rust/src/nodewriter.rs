@@ -6,6 +6,10 @@ pub struct OpStatus {
     pub detail: ::prost::alloc::string::String,
     #[prost(uint64, tag="3")]
     pub count: u64,
+    #[prost(uint64, tag="5")]
+    pub count_paragraphs: u64,
+    #[prost(uint64, tag="6")]
+    pub count_sentences: u64,
     #[prost(string, tag="4")]
     pub shard_id: ::prost::alloc::string::String,
 }
@@ -79,6 +83,8 @@ pub struct AcceptShardRequest {
 pub struct Counter {
     #[prost(uint64, tag="1")]
     pub resources: u64,
+    #[prost(uint64, tag="2")]
+    pub paragraphs: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShadowShardResponse {

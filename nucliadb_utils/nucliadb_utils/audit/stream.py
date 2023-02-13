@@ -23,7 +23,7 @@ from typing import List, Optional
 
 import mmh3  # type: ignore
 import nats
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
@@ -122,7 +122,7 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None, counter: Optional[AuditShardCounter] = None):  # type: ignore
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
         auditrequest.kbid = message.kbid
@@ -137,6 +137,9 @@ class StreamAuditStorage(AuditStorage):
 
         if audit_fields:
             auditrequest.fields_audit.extend(audit_fields)
+
+        if counter:
+            auditrequest.counter.CopyFrom(counter)
 
         await self.send(auditrequest)
 
