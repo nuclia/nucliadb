@@ -256,13 +256,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.inner.write().await;
         match writer.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
-                info!("Remove resource ends correctly");
+                info!("Delete relations ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error joining graph {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -282,13 +282,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.inner.write().await;
         match writer.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(mut status)) => {
-                info!("Remove resource ends correctly");
+                info!("Join graph ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error joining graph {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -360,7 +360,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error adding vector set {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -387,7 +387,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error removing vector set {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -415,7 +415,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 Ok(tonic::Response::new(list))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error listing sets {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
