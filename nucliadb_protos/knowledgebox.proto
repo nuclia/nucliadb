@@ -144,7 +144,12 @@ message EntitiesGroup {
     bool custom = 4;
 }
 
+message DeletedEntitiesGroups {
+    repeated string entities_groups = 1;
+}
+
 // Widgets of the Knowledge Box
+
 
 message Widget {
     string id = 1;

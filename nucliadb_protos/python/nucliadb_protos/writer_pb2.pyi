@@ -24,6 +24,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
     CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
+    DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
     EntitiesGroup as EntitiesGroup,
     Entity as Entity,

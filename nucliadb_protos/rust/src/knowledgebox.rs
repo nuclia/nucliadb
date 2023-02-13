@@ -173,6 +173,11 @@ pub struct EntitiesGroup {
     #[prost(bool, tag="4")]
     pub custom: bool,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeletedEntitiesGroups {
+    #[prost(string, repeated, tag="1")]
+    pub entities_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 // Widgets of the Knowledge Box
 
 #[derive(Clone, PartialEq, ::prost::Message)]

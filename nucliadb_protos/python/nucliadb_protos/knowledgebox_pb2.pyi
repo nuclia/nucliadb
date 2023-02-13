@@ -473,6 +473,22 @@ class EntitiesGroup(google.protobuf.message.Message):
 global___EntitiesGroup = EntitiesGroup
 
 @typing_extensions.final
+class DeletedEntitiesGroups(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTITIES_GROUPS_FIELD_NUMBER: builtins.int
+    @property
+    def entities_groups(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        entities_groups: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entities_groups", b"entities_groups"]) -> None: ...
+
+global___DeletedEntitiesGroups = DeletedEntitiesGroups
+
+@typing_extensions.final
 class Widget(google.protobuf.message.Message):
     """Widgets of the Knowledge Box"""
 
