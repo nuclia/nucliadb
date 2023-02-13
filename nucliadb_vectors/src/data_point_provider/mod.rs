@@ -141,7 +141,7 @@ impl Index {
             if !non_garbage_dp.contains(&name) {
                 info!("found garbage {name}");
                 let Err(err)  = DataPoint::delete(&self.location, dpid) else { continue };
-                info!("{name} is garbage and could not be deleted because of {err}");
+                warn!("{name} is garbage and could not be deleted because of {err}");
             }
         }
         std::mem::drop(work_flag);

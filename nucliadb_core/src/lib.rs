@@ -22,11 +22,59 @@ pub mod paragraphs;
 pub mod relations;
 pub mod texts;
 pub mod vectors;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use anyhow::{anyhow as node_error, Context};
 use nucliadb_protos::{Resource, ResourceId};
 pub type NodeResult<O> = anyhow::Result<O>;
+
+pub fn paragraph_write(
+    x: &paragraphs::ParagraphsWriterPointer,
+) -> RwLockWriteGuard<'_, dyn paragraphs::ParagraphWriter + 'static> {
+    x.write().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn text_write(
+    x: &texts::TextsWriterPointer,
+) -> RwLockWriteGuard<'_, dyn texts::FieldWriter + 'static> {
+    x.write().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn vector_write(
+    x: &vectors::VectorsWriterPointer,
+) -> RwLockWriteGuard<'_, dyn vectors::VectorWriter + 'static> {
+    x.write().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn relation_write(
+    x: &relations::RelationsWriterPointer,
+) -> RwLockWriteGuard<'_, dyn relations::RelationWriter + 'static> {
+    x.write().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn paragraph_read(
+    x: &paragraphs::ParagraphsWriterPointer,
+) -> RwLockReadGuard<'_, dyn paragraphs::ParagraphWriter + 'static> {
+    x.read().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn text_read(
+    x: &texts::TextsWriterPointer,
+) -> RwLockReadGuard<'_, dyn texts::FieldWriter + 'static> {
+    x.read().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn vector_read(
+    x: &vectors::VectorsWriterPointer,
+) -> RwLockReadGuard<'_, dyn vectors::VectorWriter + 'static> {
+    x.read().unwrap_or_else(|l| l.into_inner())
+}
+
+pub fn relation_read(
+    x: &relations::RelationsWriterPointer,
+) -> RwLockReadGuard<'_, dyn relations::RelationWriter + 'static> {
+    x.read().unwrap_or_else(|l| l.into_inner())
+}
 
 pub mod protos {
     pub use nucliadb_protos::*;
@@ -48,8 +96,9 @@ pub mod prelude {
     pub use crate::texts::{self, *};
     pub use crate::vectors::{self, *};
     pub use crate::{
-        encapsulate_reader, encapsulate_writer, node_error, Context, NodeResult, ReaderChild,
-        WriterChild,
+        encapsulate_reader, encapsulate_writer, node_error, paragraph_read, paragraph_write,
+        relation_read, relation_write, text_read, text_write, vector_read, vector_write, Context,
+        NodeResult, ReaderChild, WriterChild,
     };
 }
 
