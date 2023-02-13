@@ -6,6 +6,10 @@ pub struct OpStatus {
     pub detail: ::prost::alloc::string::String,
     #[prost(uint64, tag="3")]
     pub count: u64,
+    #[prost(uint64, tag="5")]
+    pub count_paragraphs: u64,
+    #[prost(uint64, tag="6")]
+    pub count_sentences: u64,
     #[prost(string, tag="4")]
     pub shard_id: ::prost::alloc::string::String,
 }
@@ -343,7 +347,7 @@ pub mod node_writer_client {
         pub async fn remove_resource(
             &mut self,
             request: impl tonic::IntoRequest<super::super::noderesources::ResourceId>,
-        ) -> Result<tonic::Response<super::super::noderesources::Shard>, tonic::Status> {
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -652,7 +656,7 @@ pub mod node_writer_server {
         async fn remove_resource(
             &self,
             request: tonic::Request<super::super::noderesources::ResourceId>,
-        ) -> Result<tonic::Response<super::super::noderesources::Shard>, tonic::Status>;
+        ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
         async fn add_vector_set(
             &self,
             request: tonic::Request<super::super::noderesources::VectorSetId>,
@@ -1094,7 +1098,7 @@ pub mod node_writer_server {
                     > tonic::server::UnaryService<
                         super::super::noderesources::ResourceId,
                     > for RemoveResourceSvc<T> {
-                        type Response = super::super::noderesources::Shard;
+                        type Response = super::OpStatus;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,

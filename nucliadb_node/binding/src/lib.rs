@@ -318,25 +318,21 @@ impl NodeWriter {
         };
         self.writer.load_shard(&shard_id);
         match self.writer.set_resource(&shard_id, &resource).transpose() {
-            Some(Ok(count)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                info!("Set resource ends correctly");
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
             Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
-                let op_status = OpStatus {
-                    status,
-                    detail,
+                let status = OpStatus {
+                    status: op_status::Status::Error as i32,
+                    detail: format!("Error: {}", e),
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
-                Ok(PyList::new(py, op_status.encode_to_vec()))
+                Ok(PyList::new(py, status.encode_to_vec()))
             }
             None => {
                 let message = format!("Error loading shard {:?}", shard_id);
@@ -379,23 +375,19 @@ impl NodeWriter {
             .join_relations_graph(&shard_id, &graph)
             .transpose()
         {
-            Some(Ok(count)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                info!("Remove resource ends correctly");
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
             Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
                 let op_status = OpStatus {
-                    status,
-                    detail,
+                    status: op_status::Status::Error as i32,
+                    detail: format!("Error: {}", e),
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(PyList::new(py, op_status.encode_to_vec()))
             }
@@ -419,23 +411,19 @@ impl NodeWriter {
             .delete_relation_nodes(shard_id, &nodes)
             .transpose()
         {
-            Some(Ok(count)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                info!("Remove resource ends correctly");
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
             Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
                 let op_status = OpStatus {
-                    status,
-                    detail,
+                    status: op_status::Status::Error as i32,
+                    detail: format!("Error: {}", e),
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(PyList::new(py, op_status.encode_to_vec()))
             }
@@ -467,23 +455,18 @@ impl NodeWriter {
         let shard_id = vectorset.shard.as_ref().unwrap();
         self.writer.load_shard(shard_id);
         match self.writer.add_vectorset(shard_id, &vectorset).transpose() {
-            Some(Ok(count)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
             Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
                 let op_status = OpStatus {
-                    status,
-                    detail,
+                    status: op_status::Status::Error as i32,
+                    detail: format!("Error: {}", e),
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(PyList::new(py, op_status.encode_to_vec()))
             }
@@ -503,23 +486,19 @@ impl NodeWriter {
             .remove_vectorset(shard_id, &vectorset)
             .transpose()
         {
-            Some(Ok(count)) => {
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                info!("remove_vector_set ends correctly");
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
             Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
                 let op_status = OpStatus {
-                    status,
-                    detail,
+                    status: op_status::Status::Error as i32,
+                    detail: format!("Error: {}", e),
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(PyList::new(py, op_status.encode_to_vec()))
             }
@@ -541,17 +520,17 @@ impl NodeWriter {
                     detail: "Success!".to_string(),
                     count: 0,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(PyList::new(py, status.encode_to_vec()))
             }
             Some(Err(e)) => {
-                let status = op_status::Status::Error as i32;
-                let detail = format!("Error: {}", e);
                 let op_status = OpStatus {
-                    status,
-                    detail,
+                    status: op_status::Status::Error as i32,
+                    detail: format!("Error: {}", e),
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(PyList::new(py, op_status.encode_to_vec()))
             }

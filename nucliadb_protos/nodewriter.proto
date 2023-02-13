@@ -13,6 +13,8 @@ message OpStatus {
     Status status = 1;
     string detail = 2;
     uint64 count = 3;
+    uint64 count_paragraphs = 5;
+    uint64 count_sentences = 6;
     string shard_id = 4;
 }
 
@@ -63,7 +65,7 @@ service NodeWriter {
     rpc SetResource(noderesources.Resource) returns (OpStatus) {}
     rpc DeleteRelationNodes(DeleteGraphNodes) returns (OpStatus) {}
     rpc JoinGraph(SetGraph) returns (OpStatus) {}
-    rpc RemoveResource(noderesources.ResourceID) returns (noderesources.Shard) {}
+    rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
     rpc AddVectorSet(noderesources.VectorSetID) returns (OpStatus) {}  // New
     rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
