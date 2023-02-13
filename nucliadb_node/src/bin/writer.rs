@@ -147,31 +147,32 @@ pub async fn watch_node_update(
     info!("Start node update task");
 
     while let Some(event) = receiver.recv().await {
-        match event {
+        let (load_score, shard_count) = match event {
             NodeWriterEvent::ShardCreation(id) => {
                 metadata.new_empty_shard(id);
 
-                let shard_count = metadata.shard_count();
-                info!("Update node state: shard_count = {shard_count}");
-
-                node.update_state(SHARD_COUNT_KEY, shard_count).await;
+                (None, Some(metadata.shard_count()))
             }
             NodeWriterEvent::ShardDeletion(id) => {
                 metadata.delete_shard(id);
 
-                let shard_count = metadata.shard_count();
-                info!("Update node state: shard_count = {shard_count}",);
-
-                node.update_state(SHARD_COUNT_KEY, shard_count).await;
+                (Some(metadata.load_score()), Some(metadata.shard_count()))
             }
             NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
                 metadata.update_shard(id, paragraph_count);
 
-                let load_score = metadata.load_score();
-                info!("Update node state: load_score = {load_score}");
-
-                node.update_state(LOAD_SCORE_KEY, load_score).await;
+                (Some(metadata.load_score()), None)
             }
+        };
+
+        if let Some(load_score) = load_score {
+            info!("Update node state: load_score = {load_score}");
+            node.update_state(LOAD_SCORE_KEY, load_score).await;
+        }
+
+        if let Some(shard_count) = shard_count {
+            info!("Update node state: shard_count = {shard_count}");
+            node.update_state(SHARD_COUNT_KEY, shard_count).await;
         }
     }
 
