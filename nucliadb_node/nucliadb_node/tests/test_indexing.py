@@ -25,9 +25,10 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Resource, ShardId
 from nucliadb_protos.nodewriter_pb2 import IndexMessage
 
-from nucliadb_node import SERVICE_NAME
+from nucliadb_node import SERVICE_NAME, shadow_shards
 from nucliadb_node.app import App
 from nucliadb_node.settings import settings
+from nucliadb_node.shadow_shards import OperationCode
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.utilities import get_storage
 
@@ -130,3 +131,72 @@ async def test_indexing_not_found(sidecar: App):
 
     with pytest.raises(AioRpcError):
         await sidecar.reader.get_count(sipb)
+
+
+@pytest.mark.asyncio
+async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str):
+    node_id = settings.force_host_id
+    # Upload a payload
+    pb = Resource()
+    pb.shard_id = shadow_shard
+    pb.resource.shard_id = shadow_shard
+    pb.resource.uuid = "1"
+    pb.metadata.modified.FromDatetime(datetime.now())
+    pb.metadata.created.FromDatetime(datetime.now())
+    pb.texts["title"].text = "My title"
+    pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
+    pb.texts["description"].text = "My description is amazing"
+    pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
+    pb.status = Resource.ResourceStatus.PROCESSED
+    pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
+    pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
+    pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
+    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
+        "title/0-10/0-10"
+    ].vector.extend([1.0] * 768)
+
+    # Add a set resource operation
+    storage = await get_storage(service_name=SERVICE_NAME)
+    assert settings.force_host_id is not None
+    index: IndexMessage = await storage.indexing(pb, node_id, shadow_shard, 1)  # type: ignore
+
+    # Add a delete operation
+    deletepb: IndexMessage = IndexMessage()
+    deletepb.node = node_id  # type: ignore
+    deletepb.shard = shadow_shard
+    deletepb.txid = 123
+    deletepb.resource = "bar"
+    deletepb.typemessage = IndexMessage.TypeMessage.DELETION
+
+    # Push them on stream
+    assert indexing_settings.index_jetstream_target is not None
+    await sidecar.worker.js.publish(
+        indexing_settings.index_jetstream_target.format(node=node_id),
+        index.SerializeToString(),
+    )
+    await sidecar.worker.js.publish(
+        indexing_settings.index_jetstream_target.format(node=node_id),
+        deletepb.SerializeToString(),
+    )
+
+    ssm = shadow_shards.get_manager()
+
+    ops = []
+    for _ in range(10):
+        print("Waiting for sidecar to consume messages...")
+        await asyncio.sleep(1)
+        ops = [op async for op in ssm.iter_operations(shadow_shard)]
+        if len(ops) == 2:
+            break
+    assert len(ops) == 2
+    assert ops[0][0] == OperationCode.SET
+    assert ops[0][1] == pb
+    assert ops[1][0] == OperationCode.DELETE
+    assert ops[1][1] == "bar"
+
+    await asyncio.sleep(1)
+
+    # Check that indexing messages have been deleted from storage
+    storage = await get_storage(service_name=SERVICE_NAME)
+    with pytest.raises(KeyError):
+        await storage.get_indexing(index)

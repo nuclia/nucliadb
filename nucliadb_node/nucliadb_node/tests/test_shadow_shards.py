@@ -25,13 +25,13 @@ from nucliadb_node.shadow_shards import (
     ShadowShardNotFound,
     ShadowShardsManager,
     ShadowShardsNotLoaded,
-    get_shadow_shards_manager,
+    get_manager,
 )
 
 
 @pytest.mark.asyncio
-async def test_get_shadow_shards_manager(shadow_folder):
-    shadow_shards = get_shadow_shards_manager()
+async def test_get_manager(shadow_folder):
+    shadow_shards = get_manager()
     assert isinstance(shadow_shards, ShadowShardsManager)
     assert not shadow_shards._folder.endswith("{data_path}")
     assert shadow_shards._folder.endswith("/shadow_shards/")

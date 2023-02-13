@@ -175,14 +175,14 @@ class ShadowShardsManager:
             raise ShadowShardsNotLoaded()
         return shard_id in self.shards
 
-    def get_op_id(self, txid: str, opcode: OperationCode, uuid: str) -> str:
+    def get_op_id(self, txid: int, opcode: OperationCode, uuid: str) -> str:
         return f"{txid}_{opcode}_{uuid}"
 
-    def parse_op_id(self, op_id: str) -> Tuple[str, OperationCode, str]:
+    def parse_op_id(self, op_id: str) -> Tuple[int, OperationCode, str]:
         txid, opcode, uuid = op_id.split("_")
-        return txid, OperationCode(opcode), uuid
+        return int(txid), OperationCode(opcode), uuid
 
-    async def set_resource(self, brain: Resource, shard_id: str, txid: str) -> None:
+    async def set_resource(self, brain: Resource, shard_id: str, txid: int) -> None:
         if not self.loaded:
             raise ShadowShardsNotLoaded()
         if not self.exists(shard_id):
@@ -193,7 +193,7 @@ class ShadowShardsManager:
         async with aiofiles.open(f"{shard_path}/{op_id}", mode="wb") as f:
             await f.write(brain.SerializeToString())
 
-    async def delete_resource(self, uuid: str, shard_id: str, txid: str) -> None:
+    async def delete_resource(self, uuid: str, shard_id: str, txid: int) -> None:
         if not self.loaded:
             raise ShadowShardsNotLoaded()
         if not self.exists(shard_id):
@@ -245,7 +245,7 @@ def get_data_path() -> str:
     return data_path
 
 
-def get_shadow_shards_manager() -> ShadowShardsManager:
+def get_manager() -> ShadowShardsManager:
     if "manager" not in MAIN:
         folder = SHADOW_SHARDS_FOLDER.format(data_path=get_data_path())
         MAIN["manager"] = ShadowShardsManager(folder=folder)
