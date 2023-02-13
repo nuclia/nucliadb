@@ -8,6 +8,6 @@ members = [
   "nucliadb_node/binding",
   "nucliadb_core",
   "nucliadb_ftp",
-  "vectors_benchmark",
-  "nucliadb_ftp",
+  "nucliadb_shard_balancer",
+  "vectors_benchmark"
 ]
