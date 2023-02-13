@@ -62,4 +62,9 @@ class Reader:
 
     def update(self, shard: str, status: OpStatus):
         if status.status == 0:
-            CACHE[shard] = status.count
+            cached_shard = Shard()
+            cached_shard.shard_id = shard
+            cached_shard.resources = status.count
+            cached_shard.paragraphs = status.count_paragraphs
+            cached_shard.sentences = status.count_sentences
+            CACHE[shard] = cached_shard
