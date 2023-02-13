@@ -3,10 +3,10 @@
 isort:skip_file
 """
 import abc
+import collections.abc
 import grpc
 import nucliadb_protos.knowledgebox_pb2
 import nucliadb_protos.writer_pb2
-import typing
 from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
     CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
@@ -33,7 +33,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
     VectorSets as VectorSets,
     Widget as Widget,
 )
-
 from nucliadb_protos.noderesources_pb2 import (
     EmptyQuery as EmptyQuery,
     EmptyResponse as EmptyResponse,
@@ -55,7 +54,6 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetID as VectorSetID,
     VectorSetList as VectorSetList,
 )
-
 from nucliadb_protos.resources_pb2 import (
     Basic as Basic,
     Block as Block,
@@ -115,375 +113,369 @@ from nucliadb_protos.resources_pb2 import (
     UserVectorsWrapper as UserVectorsWrapper,
 )
 
-
 class WriterStub:
     def __init__(self, channel: grpc.Channel) -> None: ...
     GetKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBox]
-
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBox,
+    ]
     NewKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
-        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse]
-
+        nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse,
+    ]
     DeleteKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse]
-
+        nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse,
+    ]
     UpdateKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
-        nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse]
-
+        nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse,
+    ]
     CleanAndUpgradeKnowledgeBoxIndex: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.CleanedKnowledgeBoxResponse]
-
+        nucliadb_protos.knowledgebox_pb2.CleanedKnowledgeBoxResponse,
+    ]
     ListKnowledgeBox: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxPrefix,
-        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID]
-
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+    ]
     GCKnowledgeBox: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
-        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse]
-
+        nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse,
+    ]
     SetVectors: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetVectorsRequest,
-        nucliadb_protos.writer_pb2.SetVectorsResponse]
-
+        nucliadb_protos.writer_pb2.SetVectorsResponse,
+    ]
     ResourceFieldExists: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.ResourceFieldId,
-        nucliadb_protos.writer_pb2.ResourceFieldExistsResponse]
-
+        nucliadb_protos.writer_pb2.ResourceFieldExistsResponse,
+    ]
     GetResourceId: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.ResourceIdRequest,
-        nucliadb_protos.writer_pb2.ResourceIdResponse]
-
+        nucliadb_protos.writer_pb2.ResourceIdResponse,
+    ]
     ProcessMessage: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.BrokerMessage,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     GetLabels: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetLabelsRequest,
-        nucliadb_protos.writer_pb2.GetLabelsResponse]
+        nucliadb_protos.writer_pb2.GetLabelsResponse,
+    ]
     """Labels"""
-
     GetLabelSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetLabelSetRequest,
-        nucliadb_protos.writer_pb2.GetLabelSetResponse]
-
+        nucliadb_protos.writer_pb2.GetLabelSetResponse,
+    ]
     SetLabels: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     DelLabels: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelLabelsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     GetVectorSets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetVectorSetsRequest,
-        nucliadb_protos.writer_pb2.GetVectorSetsResponse]
+        nucliadb_protos.writer_pb2.GetVectorSetsResponse,
+    ]
     """VectorSets"""
-
     DelVectorSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelVectorSetRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     SetVectorSet: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetVectorSetRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     GetEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetEntitiesRequest,
-        nucliadb_protos.writer_pb2.GetEntitiesResponse]
+        nucliadb_protos.writer_pb2.GetEntitiesResponse,
+    ]
     """Entities"""
-
     GetEntitiesGroup: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetEntitiesGroupRequest,
-        nucliadb_protos.writer_pb2.GetEntitiesGroupResponse]
-
+        nucliadb_protos.writer_pb2.GetEntitiesGroupResponse,
+    ]
     SetEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetEntitiesRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     DelEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DelEntitiesRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     GetWidget: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetWidgetRequest,
-        nucliadb_protos.writer_pb2.GetWidgetResponse]
+        nucliadb_protos.writer_pb2.GetWidgetResponse,
+    ]
     """Widgets"""
-
     GetWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetWidgetsRequest,
-        nucliadb_protos.writer_pb2.GetWidgetsResponse]
-
+        nucliadb_protos.writer_pb2.GetWidgetsResponse,
+    ]
     SetWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.SetWidgetsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     DelWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DetWidgetsRequest,
-        nucliadb_protos.writer_pb2.OpStatusWriter]
-
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
     Status: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.WriterStatusRequest,
-        nucliadb_protos.writer_pb2.WriterStatusResponse]
-
+        nucliadb_protos.writer_pb2.WriterStatusResponse,
+    ]
     ListMembers: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.ListMembersRequest,
-        nucliadb_protos.writer_pb2.ListMembersResponse]
-
+        nucliadb_protos.writer_pb2.ListMembersResponse,
+    ]
     Index: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
-        nucliadb_protos.writer_pb2.IndexStatus]
-
+        nucliadb_protos.writer_pb2.IndexStatus,
+    ]
     ReIndex: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.IndexResource,
-        nucliadb_protos.writer_pb2.IndexStatus]
-
+        nucliadb_protos.writer_pb2.IndexStatus,
+    ]
     Export: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.writer_pb2.ExportRequest,
-        nucliadb_protos.writer_pb2.BrokerMessage]
-
+        nucliadb_protos.writer_pb2.BrokerMessage,
+    ]
     DownloadFile: grpc.UnaryStreamMultiCallable[
         nucliadb_protos.writer_pb2.FileRequest,
-        nucliadb_protos.writer_pb2.BinaryData]
-
+        nucliadb_protos.writer_pb2.BinaryData,
+    ]
     UploadFile: grpc.StreamUnaryMultiCallable[
         nucliadb_protos.writer_pb2.UploadBinaryData,
-        nucliadb_protos.writer_pb2.FileUploaded]
-
+        nucliadb_protos.writer_pb2.FileUploaded,
+    ]
     CreateShadowShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.CreateShadowShardRequest,
-        nucliadb_protos.writer_pb2.ShadowShardResponse]
+        nucliadb_protos.writer_pb2.ShadowShardResponse,
+    ]
     """Shard management"""
-
     DeleteShadowShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DeleteShadowShardRequest,
-        nucliadb_protos.writer_pb2.ShadowShardResponse]
-
+        nucliadb_protos.writer_pb2.ShadowShardResponse,
+    ]
 
 class WriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def GetKnowledgeBox(self,
+    def GetKnowledgeBox(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBox: ...
-
     @abc.abstractmethod
-    def NewKnowledgeBox(self,
+    def NewKnowledgeBox(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxNew,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.NewKnowledgeBoxResponse: ...
-
     @abc.abstractmethod
-    def DeleteKnowledgeBox(self,
+    def DeleteKnowledgeBox(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.DeleteKnowledgeBoxResponse: ...
-
     @abc.abstractmethod
-    def UpdateKnowledgeBox(self,
+    def UpdateKnowledgeBox(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxUpdate,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.UpdateKnowledgeBoxResponse: ...
-
     @abc.abstractmethod
-    def CleanAndUpgradeKnowledgeBoxIndex(self,
+    def CleanAndUpgradeKnowledgeBoxIndex(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.CleanedKnowledgeBoxResponse: ...
-
     @abc.abstractmethod
-    def ListKnowledgeBox(self,
+    def ListKnowledgeBox(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxPrefix,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID]: ...
-
+    ) -> collections.abc.Iterator[nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID]: ...
     @abc.abstractmethod
-    def GCKnowledgeBox(self,
+    def GCKnowledgeBox(
+        self,
         request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.knowledgebox_pb2.GCKnowledgeBoxResponse: ...
-
     @abc.abstractmethod
-    def SetVectors(self,
+    def SetVectors(
+        self,
         request: nucliadb_protos.writer_pb2.SetVectorsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.SetVectorsResponse: ...
-
     @abc.abstractmethod
-    def ResourceFieldExists(self,
+    def ResourceFieldExists(
+        self,
         request: nucliadb_protos.writer_pb2.ResourceFieldId,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.ResourceFieldExistsResponse: ...
-
     @abc.abstractmethod
-    def GetResourceId(self,
+    def GetResourceId(
+        self,
         request: nucliadb_protos.writer_pb2.ResourceIdRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.ResourceIdResponse: ...
-
     @abc.abstractmethod
-    def ProcessMessage(self,
-        request_iterator: typing.Iterator[nucliadb_protos.writer_pb2.BrokerMessage],
+    def ProcessMessage(
+        self,
+        request_iterator: collections.abc.Iterator[nucliadb_protos.writer_pb2.BrokerMessage],
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def GetLabels(self,
+    def GetLabels(
+        self,
         request: nucliadb_protos.writer_pb2.GetLabelsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetLabelsResponse:
         """Labels"""
-        pass
-
     @abc.abstractmethod
-    def GetLabelSet(self,
+    def GetLabelSet(
+        self,
         request: nucliadb_protos.writer_pb2.GetLabelSetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetLabelSetResponse: ...
-
     @abc.abstractmethod
-    def SetLabels(self,
+    def SetLabels(
+        self,
         request: nucliadb_protos.writer_pb2.SetLabelsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def DelLabels(self,
+    def DelLabels(
+        self,
         request: nucliadb_protos.writer_pb2.DelLabelsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def GetVectorSets(self,
+    def GetVectorSets(
+        self,
         request: nucliadb_protos.writer_pb2.GetVectorSetsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetVectorSetsResponse:
         """VectorSets"""
-        pass
-
     @abc.abstractmethod
-    def DelVectorSet(self,
+    def DelVectorSet(
+        self,
         request: nucliadb_protos.writer_pb2.DelVectorSetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def SetVectorSet(self,
+    def SetVectorSet(
+        self,
         request: nucliadb_protos.writer_pb2.SetVectorSetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def GetEntities(self,
+    def GetEntities(
+        self,
         request: nucliadb_protos.writer_pb2.GetEntitiesRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetEntitiesResponse:
         """Entities"""
-        pass
-
     @abc.abstractmethod
-    def GetEntitiesGroup(self,
+    def GetEntitiesGroup(
+        self,
         request: nucliadb_protos.writer_pb2.GetEntitiesGroupRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetEntitiesGroupResponse: ...
-
     @abc.abstractmethod
-    def SetEntities(self,
+    def SetEntities(
+        self,
         request: nucliadb_protos.writer_pb2.SetEntitiesRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def DelEntities(self,
+    def DelEntities(
+        self,
         request: nucliadb_protos.writer_pb2.DelEntitiesRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def GetWidget(self,
+    def GetWidget(
+        self,
         request: nucliadb_protos.writer_pb2.GetWidgetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetWidgetResponse:
         """Widgets"""
-        pass
-
     @abc.abstractmethod
-    def GetWidgets(self,
+    def GetWidgets(
+        self,
         request: nucliadb_protos.writer_pb2.GetWidgetsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.GetWidgetsResponse: ...
-
     @abc.abstractmethod
-    def SetWidgets(self,
+    def SetWidgets(
+        self,
         request: nucliadb_protos.writer_pb2.SetWidgetsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def DelWidgets(self,
+    def DelWidgets(
+        self,
         request: nucliadb_protos.writer_pb2.DetWidgetsRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
-
     @abc.abstractmethod
-    def Status(self,
+    def Status(
+        self,
         request: nucliadb_protos.writer_pb2.WriterStatusRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.WriterStatusResponse: ...
-
     @abc.abstractmethod
-    def ListMembers(self,
+    def ListMembers(
+        self,
         request: nucliadb_protos.writer_pb2.ListMembersRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.ListMembersResponse: ...
-
     @abc.abstractmethod
-    def Index(self,
+    def Index(
+        self,
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.IndexStatus: ...
-
     @abc.abstractmethod
-    def ReIndex(self,
+    def ReIndex(
+        self,
         request: nucliadb_protos.writer_pb2.IndexResource,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.IndexStatus: ...
-
     @abc.abstractmethod
-    def Export(self,
+    def Export(
+        self,
         request: nucliadb_protos.writer_pb2.ExportRequest,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.writer_pb2.BrokerMessage]: ...
-
+    ) -> collections.abc.Iterator[nucliadb_protos.writer_pb2.BrokerMessage]: ...
     @abc.abstractmethod
-    def DownloadFile(self,
+    def DownloadFile(
+        self,
         request: nucliadb_protos.writer_pb2.FileRequest,
         context: grpc.ServicerContext,
-    ) -> typing.Iterator[nucliadb_protos.writer_pb2.BinaryData]: ...
-
+    ) -> collections.abc.Iterator[nucliadb_protos.writer_pb2.BinaryData]: ...
     @abc.abstractmethod
-    def UploadFile(self,
-        request_iterator: typing.Iterator[nucliadb_protos.writer_pb2.UploadBinaryData],
+    def UploadFile(
+        self,
+        request_iterator: collections.abc.Iterator[nucliadb_protos.writer_pb2.UploadBinaryData],
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.FileUploaded: ...
-
     @abc.abstractmethod
-    def CreateShadowShard(self,
+    def CreateShadowShard(
+        self,
         request: nucliadb_protos.writer_pb2.CreateShadowShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.ShadowShardResponse:
         """Shard management"""
-        pass
-
     @abc.abstractmethod
-    def DeleteShadowShard(self,
+    def DeleteShadowShard(
+        self,
         request: nucliadb_protos.writer_pb2.DeleteShadowShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.ShadowShardResponse: ...
-
 
 def add_WriterServicer_to_server(servicer: WriterServicer, server: grpc.Server) -> None: ...
