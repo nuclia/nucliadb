@@ -18,6 +18,9 @@
 
 use std::path::{Path, PathBuf};
 
+use super::shard_disk_structure::*;
+use crate::services::versions::Versions;
+use crate::telemetry::run_with_telemetry;
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
@@ -25,10 +28,6 @@ use nucliadb_core::protos::shard_created::{
 use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId, VectorSetId};
 use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
-
-use super::shard_disk_structure::*;
-use crate::services::versions::Versions;
-use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug)]
 pub struct ShardWriterService {
@@ -343,19 +342,15 @@ impl ShardWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    pub fn count(&self) -> NodeResult<usize> {
-        self.text_writer.read().unwrap().count()
-    }
-    #[tracing::instrument(skip_all)]
     pub fn paragraph_count(&self) -> NodeResult<usize> {
         self.paragraph_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
-    pub fn vector_count(&self) -> usize {
+    pub fn vector_count(&self) -> NodeResult<usize> {
         self.vector_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
-    pub fn text_count(&self) -> usize {
+    pub fn text_count(&self) -> NodeResult<usize> {
         self.text_writer.read().unwrap().count()
     }
     #[tracing::instrument(skip_all)]
