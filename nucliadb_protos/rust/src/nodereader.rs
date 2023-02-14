@@ -122,7 +122,7 @@ pub struct ParagraphSearchRequest {
 pub struct ResultScore {
     #[prost(float, tag="1")]
     pub bm25: f32,
-    /// In the case of two equal bm25 scores, booster
+    /// In the case of two equal bm25 scores, booster 
     /// decides
     #[prost(float, tag="2")]
     pub booster: f32,
@@ -191,7 +191,7 @@ pub struct ParagraphSearchResponse {
     pub fuzzy_distance: i32,
     #[prost(int32, tag="1")]
     pub total: i32,
-    ///
+    /// 
     #[prost(message, repeated, tag="2")]
     pub results: ::prost::alloc::vec::Vec<ParagraphResult>,
     /// For each field what facets are.

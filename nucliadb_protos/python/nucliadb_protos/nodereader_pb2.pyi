@@ -295,7 +295,7 @@ class ResultScore(google.protobuf.message.Message):
     BOOSTER_FIELD_NUMBER: builtins.int
     bm25: builtins.float
     booster: builtins.float
-    """In the case of two equal bm25 scores, booster
+    """In the case of two equal bm25 scores, booster 
     decides
     """
 
