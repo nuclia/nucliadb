@@ -19,6 +19,7 @@
 #
 import asyncio
 from datetime import datetime
+from time import time
 from typing import List, Optional
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -47,6 +48,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
+from nucliadb_utils.utilities import get_audit
 
 
 @api.get(
@@ -90,6 +92,8 @@ async def suggest_knowledgebox(
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
+    audit = get_audit()
+    timeit = time()
 
     try:
         shard_groups: List[ShardObject] = await nodemanager.get_shards_by_kbid(kbid)
@@ -179,4 +183,14 @@ async def suggest_knowledgebox(
     response.status_code = 206 if incomplete_results else 200
     if debug:
         search_results.shards = queried_shards
+
+    if audit is not None:
+        await audit.suggest(
+            kbid,
+            x_nucliadb_user,
+            x_ndb_client,
+            x_forwarded_for,
+            timeit - time(),
+        )
+
     return search_results

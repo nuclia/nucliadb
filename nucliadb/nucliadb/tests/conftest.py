@@ -21,4 +21,5 @@ pytest_plugins = [
     "nucliadb.tests.fixtures",
     "nucliadb.tests.knowledgeboxes",
     "nucliadb_utils.tests.asyncbenchmark",
+    "nucliadb_utils.tests.nats",
 ]

@@ -23,6 +23,7 @@ from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounte
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 
@@ -41,12 +42,23 @@ class BasicAuditStorage(AuditStorage):
         self,
         kbid: str,
         user: str,
+        client: NucliaDBClientType,
         origin: str,
         search: SearchRequest,
         timeit: float,
         resources: int,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
+
+    async def suggest(
+        self,
+        kbid: str,
+        user: str,
+        client: NucliaDBClientType,
+        origin: str,
+        timeit: float,
+    ):
+        logger.debug(f"SEARCH {kbid} {user} {origin} {timeit}")
 
     async def delete_kb(self, kbid):
         logger.debug(f"KB DELETED {kbid}")

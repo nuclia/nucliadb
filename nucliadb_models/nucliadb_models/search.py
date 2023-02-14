@@ -17,11 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
+from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
@@ -30,11 +33,6 @@ from pydantic import BaseModel, Field
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
-
-if TYPE_CHECKING:
-    SortValue = OrderBy.OrderType.V
-else:
-    SortValue = int
 
 _T = TypeVar("_T")
 
@@ -68,6 +66,9 @@ class NucliaDBClientType(str, Enum):
     DASHBOARD = "dashboard"
     DESKTOP = "desktop"
     CHROME_EXTENSION = "chrome_extension"
+
+    def to_proto(self) -> ClientType.V:
+        return ClientType.Value(self.name)
 
 
 class Sort(int, Enum):

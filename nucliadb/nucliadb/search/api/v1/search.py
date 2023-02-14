@@ -376,6 +376,7 @@ async def search(
         await audit.search(
             kbid,
             x_nucliadb_user,
+            x_ndb_client,
             x_forwarded_for,
             pb_query,
             timeit - time(),
