@@ -165,13 +165,7 @@ impl NodeWriterService {
         };
 
         shard.set_resource(resource)?;
-        Ok(Some(OpStatus {
-            shard_id: shard_id.id.clone(),
-            count: shard.text_count()? as u64,
-            count_paragraphs: shard.paragraph_count()? as u64,
-            count_sentences: shard.vector_count()? as u64,
-            ..Default::default()
-        }))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -184,13 +178,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.add_vectorset(setid)?;
-        Ok(Some(OpStatus {
-            shard_id: shard_id.id.clone(),
-            count: shard.text_count()? as u64,
-            count_paragraphs: shard.paragraph_count()? as u64,
-            count_sentences: shard.vector_count()? as u64,
-            ..Default::default()
-        }))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -203,13 +191,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.remove_vectorset(setid)?;
-        Ok(Some(OpStatus {
-            shard_id: shard_id.id.clone(),
-            count: shard.text_count()? as u64,
-            count_paragraphs: shard.paragraph_count()? as u64,
-            count_sentences: shard.vector_count()? as u64,
-            ..Default::default()
-        }))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -222,13 +204,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.join_relations_graph(graph)?;
-        Ok(Some(OpStatus {
-            shard_id: shard_id.id.clone(),
-            count: shard.text_count()? as u64,
-            count_paragraphs: shard.paragraph_count()? as u64,
-            count_sentences: shard.vector_count()? as u64,
-            ..Default::default()
-        }))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -241,13 +217,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.delete_relation_nodes(request)?;
-        Ok(Some(OpStatus {
-            shard_id: shard_id.id.clone(),
-            count: shard.text_count()? as u64,
-            count_paragraphs: shard.paragraph_count()? as u64,
-            count_sentences: shard.vector_count()? as u64,
-            ..Default::default()
-        }))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -260,13 +230,7 @@ impl NodeWriterService {
             return Ok(None);
         };
         shard.remove_resource(resource)?;
-        Ok(Some(OpStatus {
-            shard_id: shard_id.id.clone(),
-            count: shard.text_count()? as u64,
-            count_paragraphs: shard.paragraph_count()? as u64,
-            count_sentences: shard.vector_count()? as u64,
-            ..Default::default()
-        }))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]

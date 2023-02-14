@@ -22,7 +22,9 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
-use nucliadb_core::protos::{DeleteGraphNodes, JoinGraph, Resource, ResourceId, VectorSetId};
+use nucliadb_core::protos::{
+    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId,
+};
 use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
 
@@ -312,6 +314,38 @@ impl ShardWriterService {
         relation_result?;
         Ok(())
     }
+
+    #[tracing::instrument(skip_all)]
+    pub fn get_opstatus(&self) -> NodeResult<OpStatus> {
+        let paragraphs = self.paragraph_writer.clone();
+        let vectors = self.vector_writer.clone();
+        let texts = self.text_writer.clone();
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text count");
+        let text_task = || run_with_telemetry(info, move || text_read(&texts).count());
+        let info = info_span!(parent: &span, "paragraph count");
+        let paragraph_task =
+            || run_with_telemetry(info, move || paragraph_read(&paragraphs).count());
+        let info = info_span!(parent: &span, "vector count");
+        let vector_task = || run_with_telemetry(info, move || vector_read(&vectors).count());
+
+        let mut text_result = Ok(0);
+        let mut paragraph_result = Ok(0);
+        let mut vector_result = Ok(0);
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+        });
+        Ok(OpStatus {
+            shard_id: self.id.clone(),
+            count: text_result? as u64,
+            count_paragraphs: paragraph_result? as u64,
+            count_sentences: vector_result? as u64,
+            ..Default::default()
+        })
+    }
+
     #[tracing::instrument(skip_all)]
     pub fn list_vectorsets(&self) -> NodeResult<Vec<String>> {
         let reader = vector_read(&self.vector_writer);
