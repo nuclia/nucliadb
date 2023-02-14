@@ -100,6 +100,9 @@ impl WriterChild for VectorWriterService {
     fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
         let time = SystemTime::now();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Count starting at {v} ms");
+        }
         let lock = self.index.get_slock()?;
         let no_nodes = self.index.no_nodes(&lock);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
