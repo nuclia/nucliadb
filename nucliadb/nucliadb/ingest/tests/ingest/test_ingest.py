@@ -21,6 +21,7 @@ import base64
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from uuid import uuid4
 
 import nats
 import pytest
@@ -559,5 +560,35 @@ async def test_ingest_account_seq_stored(
     assert basic is not None
     assert basic.last_account_seq == 2
     assert basic.queue == 0
+
+    await txn.abort()
+
+
+@pytest.mark.asyncio
+async def test_ingest_txn_no_messages(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    stream_processor,
+    redis_driver,
+    test_resource: Resource,
+):
+    kbid = str(uuid4())
+    rid = str(uuid4())
+    message = make_message(kbid, rid)
+    message.account_seq = 1
+    await stream_processor.process(message=message, seqid=1)
+
+    # kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
+
+    # r = await kb_obj.get(message.uuid)
+    # assert r is not None
+
+    # basic = await r.get_basic()
+    # assert basic is not None
+    # assert basic.last_account_seq == 2
+    # assert basic.queue == 0
 
     await txn.abort()
