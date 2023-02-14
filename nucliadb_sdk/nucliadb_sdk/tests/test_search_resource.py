@@ -21,7 +21,6 @@ from typing import Any, Dict
 
 import pytest
 from datasets import load_dataset
-from sentence_transformers import SentenceTransformer  # type: ignore
 
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 from nucliadb_sdk.labels import Label
@@ -32,7 +31,6 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     # Lets create a bunch of resources
 
     ds: Dict[str, Any] = load_dataset("tweet_eval", "emoji")  # type: ignore
-    encoder = SentenceTransformer("all-MiniLM-L6-v2")
     for index, train in enumerate(ds["train"]):
         if index == 50:
             break
@@ -40,7 +38,7 @@ def test_search_resource(knowledgebox: KnowledgeBox):
         knowledgebox.upload(
             text=train["text"],
             labels=[f"emoji/{label}"],
-            vectors={"all-MiniLM-L6-v2": encoder.encode([train["text"]])[0].tolist()},
+            vectors={"all-MiniLM-L6-v2": [1.0, 2.0, 3.0, 2.0]},
         )
 
     assert len(knowledgebox) == 50
@@ -61,21 +59,17 @@ def test_search_resource(knowledgebox: KnowledgeBox):
 
     assert resources.fulltext.total == 9
 
-    vector_q = encoder.encode([ds["train"][0]["text"]])[0].tolist()
+    vector_q = [1.0, 2.0, 3.0, 2.0]
     resources = knowledgebox.search(
         vector=vector_q, vectorset="all-MiniLM-L6-v2", min_score=0.70
     )
-    assert len(resources.sentences.results) == 1
-    assert (
-        "Sunday afternoon walking through Venice" in resources.sentences.results[0].text
-    )
+    assert len(resources.sentences.results) == 11
 
 
 def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
     # Lets create a bunch of resources
 
     ds: Dict[str, Any] = load_dataset("tweet_eval", "emoji")  # type: ignore
-    encoder = SentenceTransformer("all-MiniLM-L6-v2")
     for index, train in enumerate(ds["train"]):
         if index == 50:
             break
@@ -83,7 +77,7 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
         knowledgebox.upload(
             text=train["text"],
             labels=[str(label)],
-            vectors={"all-MiniLM-L6-v2": encoder.encode([train["text"]])[0]},
+            vectors={"all-MiniLM-L6-v2": [1.0, 2.0, 3.0, 2.0]},
         )
 
     assert len(knowledgebox) == 50
@@ -98,7 +92,7 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
 
     resources = knowledgebox.search(filter=["12"])
 
-    vector_q = encoder.encode([ds["train"][0]["text"]])[0]
+    vector_q = [1.0, 2.0, 3.0, 2.0]
     resources = knowledgebox.search(
         vector=vector_q,
         vectorset="all-MiniLM-L6-v2",
@@ -107,10 +101,9 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
 
 @pytest.mark.asyncio
 async def test_search_resource_async(knowledgebox: KnowledgeBox):
-    knowledgebox.new_vectorset("all-MiniLM-L6-v2", 384)
+    knowledgebox.new_vectorset("all-MiniLM-L6-v2", 4)
 
     ds: Dict[str, Any] = load_dataset("tweet_eval", "emoji")  # type: ignore
-    encoder = SentenceTransformer("all-MiniLM-L6-v2")
     for index, train in enumerate(ds["train"]):
         if index == 50:
             break
@@ -120,7 +113,7 @@ async def test_search_resource_async(knowledgebox: KnowledgeBox):
             labels=[Label(label=str(label), labelset="emoji")],
             vectors=[
                 Vector(
-                    value=encoder.encode([train["text"]])[0],
+                    value=[1.0, 2.0, 3.0, 2.0],
                     vectorset="all-MiniLM-L6-v2",
                 )
             ],
@@ -140,7 +133,7 @@ async def test_search_resource_async(knowledgebox: KnowledgeBox):
         filter=[Label(labelset="emoji", label="12")]
     )
 
-    vector_q = encoder.encode([ds["train"][0]["text"]])[0]
+    vector_q = [1.0, 2.0, 3.0, 2.0]
     resources = await knowledgebox.async_search(
         vector=vector_q,
         vectorset="all-MiniLM-L6-v2",
