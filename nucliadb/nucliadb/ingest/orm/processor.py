@@ -264,17 +264,42 @@ class Processor:
         elif message.type == BrokerMessage.MessageType.AUTOCOMMIT:
             audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.autocommit(message, seqid, partition)
-            audit_type = (
-                AUDIT_TYPES.get(txn_result.action) if txn_result is not None else None
-            )
+            if txn_result:
+                audit_type = (
+                    AUDIT_TYPES.get(txn_result.action)
+                    if txn_result is not None
+                    else None
+                )
+                audit_shard_counter = (
+                    AuditShardCounter(
+                        shard=txn_result.counter.shard,
+                        paragraphs=txn_result.counter.paragraphs,
+                        fields=txn_result.counter.fields,
+                    )
+                    if txn_result.counter is not None
+                    else None
+                )
+
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
             audit_fields = await self.collect_audit_fields(message)
             txn_result = await self.commit(message, seqid, partition)
-            audit_type = (
-                AUDIT_TYPES.get(txn_result.action) if txn_result is not None else None
-            )
+            if txn_result:
+                audit_type = (
+                    AUDIT_TYPES.get(txn_result.action)
+                    if txn_result is not None
+                    else None
+                )
+                audit_shard_counter = (
+                    AuditShardCounter(
+                        shard=txn_result.counter.shard,
+                        paragraphs=txn_result.counter.paragraphs,
+                        fields=txn_result.counter.fields,
+                    )
+                    if txn_result.counter is not None
+                    else None
+                )
 
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
@@ -283,15 +308,6 @@ class Processor:
         # like rollback or multi and others because there was no action executed for
         # some reason. This is signaled as audit_type == None
         if self.audit is not None and audit_type is not None:
-            audit_shard_counter = (
-                AuditShardCounter(
-                    shard=txn_result.counter.shard,
-                    paragraphs=txn_result.counter.paragraphs,
-                    fields=txn_result.counter.fields,
-                )
-                if txn_result.counter is not None
-                else None
-            )
             await self.audit.report(
                 message,
                 audit_type,
