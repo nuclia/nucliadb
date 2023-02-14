@@ -23,7 +23,6 @@ from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounte
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
-from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 
@@ -42,7 +41,7 @@ class BasicAuditStorage(AuditStorage):
         self,
         kbid: str,
         user: str,
-        client: NucliaDBClientType,
+        client: int,
         origin: str,
         search: SearchRequest,
         timeit: float,
@@ -54,7 +53,7 @@ class BasicAuditStorage(AuditStorage):
         self,
         kbid: str,
         user: str,
-        client: NucliaDBClientType,
+        client: int,
         origin: str,
         timeit: float,
     ):

@@ -28,7 +28,6 @@ from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from opentelemetry.trace import get_current_span
 
-from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
 
@@ -172,7 +171,7 @@ class StreamAuditStorage(AuditStorage):
         self,
         kbid: str,
         user: str,
-        client_type: NucliaDBClientType,
+        client_type: int,
         origin: str,
         search: SearchRequest,
         timeit: float,
@@ -181,7 +180,7 @@ class StreamAuditStorage(AuditStorage):
         # Search is a base64 encoded search
         auditrequest = AuditRequest()
         auditrequest.origin = origin
-        auditrequest.client_type = client_type.to_proto()
+        auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
         auditrequest.search.CopyFrom(search)
@@ -196,14 +195,14 @@ class StreamAuditStorage(AuditStorage):
         self,
         kbid: str,
         user: str,
-        client_type: NucliaDBClientType,
+        client_type: int,
         origin: str,
         timeit: float,
     ):
         # Search is a base64 encoded search
         auditrequest = AuditRequest()
         auditrequest.origin = origin
-        auditrequest.client_type = client_type.to_proto()
+        auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
         auditrequest.timeit = timeit

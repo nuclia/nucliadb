@@ -188,7 +188,7 @@ async def suggest_knowledgebox(
         await audit.suggest(
             kbid,
             x_nucliadb_user,
-            x_ndb_client,
+            x_ndb_client.to_proto(),
             x_forwarded_for,
             timeit - time(),
         )

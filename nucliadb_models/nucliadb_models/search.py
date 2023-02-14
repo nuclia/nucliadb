@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from __future__ import annotations
-
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
@@ -33,6 +31,11 @@ from pydantic import BaseModel, Field
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
+
+# if TYPE_CHECKING:
+#     ClientTypeValue = ClientType.V
+# else:
+#     ClientTypeValue = int
 
 _T = TypeVar("_T")
 
@@ -67,7 +70,7 @@ class NucliaDBClientType(str, Enum):
     DESKTOP = "desktop"
     CHROME_EXTENSION = "chrome_extension"
 
-    def to_proto(self) -> ClientType.V:
+    def to_proto(self) -> int:
         return ClientType.Value(self.name)
 
 
