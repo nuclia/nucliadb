@@ -91,22 +91,18 @@ class NucliaDBClient:
         if environment == Environment.CLOUD and api_key is not None:
             reader_headers = {
                 "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
-                "X-SYNCHRONOUS": "TRUE",
             }
             writer_headers = {
                 "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
-                "X-SYNCHRONOUS": "TRUE",
             }
         elif environment == Environment.CLOUD and api_key is None:
             raise AttributeError("On Cloud you need to provide API Key")
         else:
             reader_headers = {
                 "X-NUCLIADB-ROLES": f"READER",
-                "X-SYNCHRONOUS": "TRUE",
             }
             writer_headers = {
                 "X-NUCLIADB-ROLES": f"WRITER",
-                "X-SYNCHRONOUS": "TRUE",
             }
 
         self.reader_session = httpx.Client(
