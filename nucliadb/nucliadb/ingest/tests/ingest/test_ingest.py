@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import traceback
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from uuid import uuid4
 
 import nats
 import pytest
@@ -559,5 +561,30 @@ async def test_ingest_account_seq_stored(
     assert basic is not None
     assert basic.last_account_seq == 2
     assert basic.queue == 0
+
+    await txn.abort()
+
+
+@pytest.mark.asyncio
+async def test_ingest_txn_missing_kb(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    stream_processor,
+    redis_driver,
+    test_resource: Resource,
+):
+    kbid = str(uuid4())
+    rid = str(uuid4())
+    message = make_message(kbid, rid)
+    message.account_seq = 1
+    try:
+        await stream_processor.process(message=message, seqid=1)
+    except Exception:
+        assert (
+            False
+        ), f"Processing should not fail due to a missing Knowledgebox:\n\n{str(traceback.format_exc())}"
 
     await txn.abort()
