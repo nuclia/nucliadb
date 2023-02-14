@@ -264,6 +264,7 @@ impl WriterChild for VectorWriterService {
 
 impl VectorWriterService {
     fn collect_garbage_for(&self, index: &Index) -> NodeResult<()> {
+        info!("Collecting garbage for index: {:?}", index.location());
         let slock = index.get_slock()?;
         match index.collect_garbage(&slock) {
             Ok(_) => info!("Garbage collected for main index"),
