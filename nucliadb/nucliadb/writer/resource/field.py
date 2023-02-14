@@ -282,14 +282,17 @@ def parse_link_field(
     if link_field.language:
         writer.links[key].language = link_field.language
 
-    for header, value in link_field.headers.items():
-        writer.links[key].headers[header] = value
+    if link_field.headers is not None:
+        for header, value in link_field.headers.items():
+            writer.links[key].headers[header] = value
 
-    for cookie, value in link_field.cookies.items():
-        writer.links[key].headers[cookie] = value
+    if link_field.cookies is not None:
+        for cookie, value in link_field.cookies.items():
+            writer.links[key].headers[cookie] = value
 
-    for local, value in link_field.localstorage.items():
-        writer.links[key].localstorage[local] = value
+    if link_field.localstorage is not None:
+        for local, value in link_field.localstorage.items():
+            writer.links[key].localstorage[local] = value
 
     toprocess.linkfield[key] = models.LinkUpload(
         link=link_field.uri,
