@@ -9,6 +9,7 @@ metadata:
     release: "{{ .Release.Name }}"
     heritage: "{{ .Release.Service }}"
 data:
+  RUST_LOG: "nucliadb_node=DEBUG,nucliadb_vectors=DEBUG"
   DM_REDIS_HOST: {{ .Values.config.dm_redis_host }}
   DM_REDIS_PORT: {{ .Values.config.dm_redis_port | quote }}
   SENTRY_URL: {{ .Values.running.sentry_url }}
