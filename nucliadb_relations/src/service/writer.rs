@@ -130,6 +130,9 @@ impl WriterChild for RelationsWriterService {
     #[tracing::instrument(skip_all)]
     fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Count starting at {v} ms");
+        }
         let count = self
             .index
             .start_reading()
