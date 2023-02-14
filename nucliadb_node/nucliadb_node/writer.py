@@ -40,7 +40,8 @@ class Writer:
     _stub: Optional[NodeWriterStub] = None
     lock: asyncio.Lock
 
-    def __init__(self, grpc_writer_address: str):
+    def __init__(self, grpc_writer_address: str, timeout: int):
+        self.timeout = timeout
         self.lock = asyncio.Lock()
         tracer_provider = get_telemetry(SERVICE_NAME)
         if tracer_provider is not None:
@@ -55,13 +56,17 @@ class Writer:
         self.stub = NodeWriterStub(self.channel)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
-        return await self.stub.SetResource(pb)  # type: ignore
+        return await self.stub.SetResource(pb, timeout=self.timeout)  # type: ignore
 
     async def delete_resource(self, pb: ResourceID) -> OpStatus:
-        return await self.stub.RemoveResource(pb)  # type: ignore
+        return await self.stub.RemoveResource(pb, timeout=self.timeout)  # type: ignore
 
     async def garbage_collector(self, pb: ShardId):
         await self.stub.GC(pb)  # type: ignore
+
+    async def restart(self):
+        pb = EmptyQuery()
+        await self.stub.Restart(pb, timeout=self.timeout)  # type: ignore
 
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()

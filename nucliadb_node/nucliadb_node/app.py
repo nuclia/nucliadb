@@ -51,7 +51,7 @@ class App:
 
 
 async def main() -> App:
-    writer = Writer(settings.writer_listen_address)
+    writer = Writer(settings.writer_listen_address, timeout=settings.writer_timeout)
     reader = Reader(settings.reader_listen_address)
 
     if settings.force_host_id is None:
