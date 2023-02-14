@@ -317,9 +317,9 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreqcounter.paragraphs == 2
-    assert auditreqcounter.fields == 2
-    assert auditreqcounter.shard != ""
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -351,9 +351,9 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreqcounter.paragraphs == 2
-    assert auditreqcounter.fields == 2
-    assert auditreqcounter.shard != ""
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -378,9 +378,9 @@ async def test_ingest_audit_stream_files_only(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreqcounter.paragraphs == 2
-    assert auditreqcounter.fields == 2
-    assert auditreqcounter.shard != ""
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -487,9 +487,9 @@ async def test_ingest_audit_stream_mixed(
     # gets from the sidecar to the audit report when adding or modifying a resource
     # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
 
-    assert auditreqcounter.paragraphs == 2
-    assert auditreqcounter.fields == 2
-    assert auditreqcounter.shard != ""
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
 
     assert auditreq.kbid == kbid
     assert auditreq.rid == rid

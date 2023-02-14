@@ -141,7 +141,7 @@ class StreamAuditStorage(AuditStorage):
             auditrequest.fields_audit.extend(audit_fields)
 
         if counter:
-            auditrequestcounter.CopyFrom(counter)
+            auditrequest.counter.CopyFrom(counter)
 
         auditrequest.trace_id = get_current_span().get_span_context().trace_id
 
