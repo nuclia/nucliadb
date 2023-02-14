@@ -18,16 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use std::sync::MutexGuard;
 use std::time::Duration;
+
+use nucliadb_core::fs_state;
+use tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
 use super::work_flag::MergerWriterSync;
 use super::State;
 use crate::data_point::{DataPoint, DpId};
 use crate::VectorR;
-use nucliadb_core::fs_state;
-use std::sync::MutexGuard;
-use tracing::*;
 
 const SLEEP_TIME: Duration = Duration::from_millis(100);
 pub struct Worker {
@@ -47,9 +48,7 @@ impl Worker {
         })
     }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
-    where
-        It: Iterator<Item = DpId>,
-    {
+    where It: Iterator<Item = DpId> {
         use std::fmt::Write;
         let mut msg = String::new();
         for (id, dp_id) in old.enumerate() {
