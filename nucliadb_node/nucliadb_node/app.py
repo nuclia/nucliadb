@@ -51,7 +51,11 @@ class App:
 
 
 async def main() -> App:
-    writer = Writer(settings.writer_listen_address, timeout=settings.writer_timeout)
+    writer = Writer(
+        settings.writer_listen_address,
+        settings.writer_handler_listen_address,
+        timeout=settings.writer_timeout
+    )
     reader = Reader(settings.reader_listen_address)
 
     if settings.force_host_id is None:
@@ -80,7 +84,9 @@ async def main() -> App:
 
     logger.info(f"Node ID : {node}")
 
-    worker = Worker(writer=writer, reader=reader, node=node)
+    worker = Worker(
+        writer=writer, reader=reader, node=node
+    )
     await worker.initialize()
 
     grpc_finalizer = await start_grpc(reader=reader, writer=writer)

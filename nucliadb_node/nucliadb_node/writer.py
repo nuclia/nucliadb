@@ -40,7 +40,7 @@ class Writer:
     _stub: Optional[NodeWriterStub] = None
     lock: asyncio.Lock
 
-    def __init__(self, grpc_writer_address: str, timeout: int):
+    def __init__(self, grpc_writer_address: str, grpc_writer_handler_address: str, timeout: int):
         self.timeout = timeout
         self.lock = asyncio.Lock()
         tracer_provider = get_telemetry(SERVICE_NAME)
@@ -54,6 +54,7 @@ class Writer:
         else:
             self.channel = aio.insecure_channel(grpc_writer_address)
         self.stub = NodeWriterStub(self.channel)
+        self.handler = WriterHandler(grpc_writer_handler_address)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb, timeout=self.timeout)  # type: ignore
@@ -64,10 +65,30 @@ class Writer:
     async def garbage_collector(self, pb: ShardId):
         await self.stub.GC(pb)  # type: ignore
 
-    async def restart(self):
-        pb = EmptyQuery()
-        await self.stub.Restart(pb, timeout=self.timeout)  # type: ignore
-
     async def shards(self) -> ShardIds:
         pb = EmptyQuery()
         return await self.stub.ListShards(pb)  # type: ignore
+
+    async def restart(self):
+        await self.handler.restart()
+
+
+class WriterHandler:
+    _stub: Optional[NodeWriterHandlerStub] = None
+
+    def __init__(self, grpc_writer_handler_address: str):
+        tracer_provider = get_telemetry(SERVICE_NAME)
+        if tracer_provider is not None:
+            telemetry_grpc = OpenTelemetryGRPC(
+                f"{SERVICE_NAME}_grpc_writer_handler", tracer_provider
+            )
+            self.channel = telemetry_grpc.init_client(
+                grpc_writer_handler_address, max_send_message=250
+            )
+        else:
+            self.channel = aio.insecure_channel(grpc_writer_handler_address)
+        self.stub = NodeWriterHandlerStub(self.channel)
+
+    async def restart(self, pb: ShardId):
+        pb = EmptyQuery()
+        await self.stub.Restart(pb, timeout=10)  # type: ignore

@@ -35,7 +35,7 @@ from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
 from nucliadb_node.settings import settings
-from nucliadb_node.writer import Writer
+from nucliadb_node.writer import Writer, WriterHandler
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import indexing_settings
