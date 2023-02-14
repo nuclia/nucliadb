@@ -18,24 +18,33 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use nucliadb_core::fs_state;
 use tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::{State, VectorR};
+use super::work_flag::MergerWriterSync;
+use super::State;
 use crate::data_point::{DataPoint, DpId};
+use crate::VectorR;
 
-pub struct Worker(PathBuf);
+const SLEEP_TIME: Duration = Duration::from_millis(100);
+pub struct Worker {
+    location: PathBuf,
+    work_flag: MergerWriterSync,
+}
 impl MergeQuery for Worker {
-    fn do_work(&self) -> Result<(), String> {
+    fn do_work(&self) -> VectorR<()> {
         self.work()
-            .map_err(|e| format!("Error in vectors worker {e}"))
     }
 }
 impl Worker {
-    pub fn request(at: PathBuf) -> MergeRequest {
-        Box::new(Worker(at))
+    pub fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+        Box::new(Worker {
+            location,
+            work_flag,
+        })
     }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
     where It: Iterator<Item = DpId> {
@@ -47,8 +56,24 @@ impl Worker {
         write!(msg, "==> {new}").unwrap();
         msg
     }
+    fn notify_merger(&self) {
+        use crate::data_point_provider::merger;
+        let notifier = merger::get_notifier();
+        let worker = Worker::request(self.location.clone(), self.work_flag.clone());
+        if let Err(e) = notifier.send(worker) {
+            tracing::info!("Could not request merge: {}", e);
+        }
+    }
     fn work(&self) -> VectorR<()> {
-        let subscriber = self.0.as_path();
+        while self.work_flag.try_to_start_working().is_err() {}
+        let work_flag = loop {
+            if let Ok(lock) = self.work_flag.try_to_start_working() {
+                break lock;
+            }
+            tracing::info!("Merge delayed at: {:?}", self.location);
+            std::thread::sleep(SLEEP_TIME);
+        };
+        let subscriber = self.location.as_path();
         let lock = fs_state::shared_lock(subscriber)?;
         let state: State = fs_state::load_state(&lock)?;
         std::mem::drop(lock);
@@ -68,16 +93,14 @@ impl Worker {
 
         let lock = fs_state::exclusive_lock(subscriber)?;
         let mut state: State = fs_state::load_state(&lock)?;
-        state.replace_work_unit(new_dp);
+        let creates_work = state.replace_work_unit(new_dp);
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
-
+        std::mem::drop(work_flag);
         info!("Merge on {subscriber:?}:\n{report}");
-        ids.into_iter()
-            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
-            .filter(|(.., r)| r.is_err())
-            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
-
+        if creates_work {
+            self.notify_merger();
+        }
         Ok(())
     }
 }

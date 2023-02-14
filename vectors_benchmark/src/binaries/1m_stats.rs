@@ -46,7 +46,7 @@ fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<Str
         .into_iter()
         .map(|(key, vector)| Elem::new(key, vector, labels.clone()))
         .collect();
-    let new_dp = DataPoint::new(writer.get_location(), elems, Some(temporal_mark)).unwrap();
+    let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark)).unwrap();
     let lock = writer.get_elock().unwrap();
     writer.add(new_dp, &lock);
     writer.commit(lock).unwrap();
@@ -98,6 +98,8 @@ fn main() {
     let now = SystemTime::now();
     reader.search(&request, &lock).unwrap();
     stats.tagged_time += now.elapsed().unwrap().as_millis();
-
+    println!("Cleaning garbage..");
+    writer.collect_garbage(&lock).unwrap();
+    println!("Garbage cleaned");
     println!("{stats}");
 }

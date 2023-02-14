@@ -220,10 +220,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 info!("Set resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
-                self.emit_event(NodeWriterEvent::ParagraphCount(
-                    writer.paragraph_count(&shard_id).unwrap_or_default(),
-                ));
-
+                self.emit_event(NodeWriterEvent::ParagraphCount(status.count_paragraphs));
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
@@ -319,10 +316,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 info!("Remove resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
-                self.emit_event(NodeWriterEvent::ParagraphCount(
-                    writer.paragraph_count(&shard_id).unwrap_or_default(),
-                ));
-
+                self.emit_event(NodeWriterEvent::ParagraphCount(status.count_paragraphs));
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {

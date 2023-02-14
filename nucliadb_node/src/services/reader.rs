@@ -104,22 +104,22 @@ impl ShardReaderService {
         })
     }
     #[tracing::instrument(skip_all)]
-    pub fn get_text_keys(&self) -> Vec<String> {
+    pub fn get_text_keys(&self) -> NodeResult<Vec<String>> {
         self.reload_policy(true);
         self.text_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
-    pub fn get_paragraphs_keys(&self) -> Vec<String> {
+    pub fn get_paragraphs_keys(&self) -> NodeResult<Vec<String>> {
         self.reload_policy(true);
         self.paragraph_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
-    pub fn get_vectors_keys(&self) -> Vec<String> {
+    pub fn get_vectors_keys(&self) -> NodeResult<Vec<String>> {
         self.reload_policy(true);
         self.vector_reader.stored_ids()
     }
     #[tracing::instrument(skip_all)]
-    pub fn get_relations_keys(&self) -> Vec<String> {
+    pub fn get_relations_keys(&self) -> NodeResult<Vec<String>> {
         self.reload_policy(true);
         self.relation_reader.stored_ids()
     }

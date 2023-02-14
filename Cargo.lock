@@ -2077,7 +2077,6 @@ dependencies = [
 name = "nucliadb_vectors"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "fs2",
  "itertools",
  "lazy_static",

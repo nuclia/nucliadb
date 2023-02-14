@@ -24,8 +24,8 @@ use std::sync::RwLock;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use state::State;
 
-use crate::data_point_provider::{Index, IndexCheck, VectorR};
-
+use crate::data_point_provider::{Index, IndexCheck};
+use crate::VectorR;
 pub trait IndexKeyCollector {
     fn add_key(&mut self, key: String);
 }

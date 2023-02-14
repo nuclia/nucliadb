@@ -20,13 +20,12 @@
 
 use std::collections::{HashMap, LinkedList};
 use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
-use super::merge_worker::Worker;
-use super::{merger, SearchRequest, VectorR};
+use super::{SearchRequest, VectorR};
 use crate::data_point::{DataPoint, DpId, Journal};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
@@ -113,6 +112,10 @@ impl Fssc {
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
+    // Deprecated, location must be passed as an argument.
+    // WARNING: Can not use serde::skip nor move this field due to a bug in serde.
+    #[allow(unused)]
+    #[deprecated]
     location: PathBuf,
 
     // Total number of nodes stored. Some
@@ -139,6 +142,7 @@ pub struct State {
     // identified by a resource.
     #[serde(skip)]
     #[allow(unused)]
+    #[deprecated]
     resources: HashMap<String, usize>,
 }
 impl State {
@@ -151,10 +155,6 @@ impl State {
     fn close_work_unit(&mut self) {
         let prev = mem::replace(&mut self.current, WorkUnit::new());
         self.work_stack.push_front(prev);
-        let notifier = merger::get_notifier();
-        if let Err(e) = notifier.send(Worker::request(self.location.clone())) {
-            tracing::info!("Could not request merge: {}", e);
-        }
     }
     fn creation_time(&self, journal: Journal) -> SystemTime {
         self.data_points
@@ -167,9 +167,10 @@ impl State {
             // Is safe to use the journal time.
             .unwrap_or_else(|| journal.time())
     }
-    pub fn new(at: PathBuf) -> State {
+    #[allow(deprecated)]
+    pub fn new() -> State {
         State {
-            location: at,
+            location: PathBuf::default(),
             no_nodes: usize::default(),
             current: WorkUnit::default(),
             delete_log: DTrie::default(),
@@ -178,19 +179,15 @@ impl State {
             resources: HashMap::default(),
         }
     }
-    pub fn work_sanity_check(&self) {
-        for _ in self.work_stack.iter() {
-            let notifier = merger::get_notifier();
-            if let Err(e) = notifier.send(Worker::request(self.location.clone())) {
-                tracing::info!("Could not request merge: {}", e);
-            }
-        }
-    }
-    pub fn search(&self, request: &dyn SearchRequest) -> VectorR<Vec<(String, f32)>> {
+    pub fn search(
+        &self,
+        location: &Path,
+        request: &dyn SearchRequest,
+    ) -> VectorR<Vec<(String, f32)>> {
         let mut ffsv = Fssc::new(request.no_results());
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
-            let data_point = DataPoint::open(&self.location, journal.id())?;
+            let data_point = DataPoint::open(location, journal.id())?;
             let results = data_point.search(
                 &delete_log,
                 request.get_query(),
@@ -207,54 +204,64 @@ impl State {
     pub fn remove(&mut self, id: &str, deleted_since: SystemTime) {
         self.delete_log.insert(id.as_bytes(), deleted_since);
     }
-    pub fn add(&mut self, dp: DataPoint) {
+    #[must_use]
+    pub fn add(&mut self, dp: DataPoint) -> bool {
         let meta = dp.meta();
         self.no_nodes += meta.no_nodes();
         self.current.add_unit(meta);
         if self.current.size() == BUFFER_CAP {
             self.close_work_unit();
         }
+        self.current.size() == 0
     }
-    pub fn replace_work_unit(&mut self, new: DataPoint) {
-        if let Some(unit) = self.work_stack.pop_back() {
-            let age_cap = self
-                .work_stack
-                .back()
-                .and_then(|v| v.load.last().map(|l| l.time()));
-            let older = self
-                .delete_log
-                .iter()
-                .filter(|(_, age)| age_cap.map(|cap| **age <= cap).unwrap_or_default())
-                .map(|(key, _)| key)
-                .collect::<Vec<_>>();
-            older.iter().for_each(|v| self.delete_log.delete(v));
-            unit.load.iter().cloned().for_each(|dp| {
-                // The data_point may be older that the refactor
-                self.data_points.remove(&dp.id());
-                self.no_nodes -= dp.no_nodes();
-            });
-            self.add(new);
-        }
+    #[must_use]
+    pub fn replace_work_unit(&mut self, new: DataPoint) -> bool {
+        let Some(unit) = self.work_stack.pop_back() else { return false };
+        let age_cap = self
+            .work_stack
+            .back()
+            .and_then(|v| v.load.last().map(|l| l.time()));
+        let older = self
+            .delete_log
+            .iter()
+            .filter(|(_, age)| age_cap.map(|cap| **age <= cap).unwrap_or_default())
+            .map(|(key, _)| key)
+            .collect::<Vec<_>>();
+        older.iter().for_each(|v| self.delete_log.delete(v));
+        unit.load.iter().cloned().for_each(|dp| {
+            // The data_point may be older that the refactor
+            self.data_points.remove(&dp.id());
+            self.no_nodes -= dp.no_nodes();
+        });
+        self.add(new)
     }
-    pub fn keys(&self) -> VectorR<Vec<String>> {
+    pub fn dpid_iter(&self) -> impl Iterator<Item = DpId> + '_ {
+        self.data_point_iterator()
+            .copied()
+            .map(|journal| journal.id())
+    }
+    pub fn keys(&self, location: &Path) -> VectorR<Vec<String>> {
         let mut keys = vec![];
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let dp_id = journal.id();
-            let data_point = DataPoint::open(&self.location, dp_id)?;
+            let data_point = DataPoint::open(location, dp_id)?;
             let mut results = data_point.get_keys(&delete_log);
             keys.append(&mut results);
         }
         Ok(keys)
-    }
-    pub fn no_nodes(&self) -> usize {
-        self.no_nodes
     }
     pub fn delete_log(&self, journal: Journal) -> impl DeleteLog + '_ {
         TimeSensitiveDLog {
             time: self.creation_time(journal),
             dlog: &self.delete_log,
         }
+    }
+    pub fn no_nodes(&self) -> usize {
+        self.no_nodes
+    }
+    pub fn work_stack_len(&mut self) -> usize {
+        self.work_stack.len()
     }
     pub fn current_work_unit(&self) -> Option<&[Journal]> {
         self.work_stack.back().map(|wu| wu.load.as_slice())
@@ -325,12 +332,12 @@ mod test {
     #[test]
     fn state_test() {
         let dir = tempfile::TempDir::new().unwrap();
-        let mut state = State::new(dir.path().to_path_buf());
+        let mut state = State::new();
         let no_nodes = DataPointProducer::new(dir.path())
             .take(5)
             .map(|dp| {
                 let no_nodes = dp.meta().no_nodes();
-                state.add(dp);
+                let _ = state.add(dp);
                 no_nodes
             })
             .sum::<usize>();
@@ -344,7 +351,7 @@ mod test {
             .collect::<Vec<_>>();
         let new = DataPoint::merge(dir.path(), &work).unwrap();
         std::mem::drop(work);
-        state.replace_work_unit(new);
+        let _ = state.replace_work_unit(new);
         assert!(state.current_work_unit().is_none());
         assert_eq!(state.work_stack.len(), 0);
         assert_eq!(state.current.size(), 1);

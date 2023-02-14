@@ -81,24 +81,15 @@ fn accuracy_test() {
     }
     let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let query = create_query();
-    println!("QUERY 0: {:?}", query);
     let no_results = 10;
     let result_0 = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
     let mut result_0: Vec<_> = result_0.into_iter().map(|(k, _)| k).collect();
     result_0.sort();
-    let query = loop {
-        let v = create_query();
-        if query != v {
-            break v;
-        }
-    };
-    println!("QUERY 1: {:?}", query);
+    let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
     let result_1 = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
     let mut result_1: Vec<_> = result_1.into_iter().map(|(k, _)| k).collect();
     result_1.sort();
-    println!("RESULT0: {:?}", result_0);
-    println!("RESULT1: {:?}", result_1);
     assert_ne!(result_0, result_1)
 }
 

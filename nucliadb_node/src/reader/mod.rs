@@ -234,36 +234,36 @@ impl NodeReaderService {
         Ok(Some(search_response))
     }
     #[tracing::instrument(skip_all)]
-    pub fn document_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
+    pub fn document_ids(&self, shard_id: &ShardId) -> NodeResult<Option<IdCollection>> {
         let Some(shard) = self.get_shard(shard_id) else {
-            return None;
+            return Ok(None);
         };
-        let ids = shard.get_text_keys();
-        Some(IdCollection { ids })
+        let ids = shard.get_text_keys()?;
+        Ok(Some(IdCollection { ids }))
     }
     #[tracing::instrument(skip_all)]
-    pub fn paragraph_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
+    pub fn paragraph_ids(&self, shard_id: &ShardId) -> NodeResult<Option<IdCollection>> {
         let Some(shard) = self.get_shard(shard_id) else {
-            return None;
+            return Ok(None);
         };
-        let ids = shard.get_paragraphs_keys();
-        Some(IdCollection { ids })
+        let ids = shard.get_paragraphs_keys()?;
+        Ok(Some(IdCollection { ids }))
     }
     #[tracing::instrument(skip_all)]
-    pub fn vector_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
+    pub fn vector_ids(&self, shard_id: &ShardId) -> NodeResult<Option<IdCollection>> {
         let Some(shard) = self.get_shard(shard_id) else {
-            return None;
+            return Ok(None);
         };
-        let ids = shard.get_vectors_keys();
-        Some(IdCollection { ids })
+        let ids = shard.get_vectors_keys()?;
+        Ok(Some(IdCollection { ids }))
     }
     #[tracing::instrument(skip_all)]
-    pub fn relation_ids(&self, shard_id: &ShardId) -> Option<IdCollection> {
+    pub fn relation_ids(&self, shard_id: &ShardId) -> NodeResult<Option<IdCollection>> {
         let Some(shard) = self.get_shard(shard_id) else {
-            return None;
+            return Ok(None);
         };
-        let ids = shard.get_relations_keys();
-        Some(IdCollection { ids })
+        let ids = shard.get_relations_keys()?;
+        Ok(Some(IdCollection { ids }))
     }
     #[tracing::instrument(skip_all)]
     pub fn relation_edges(&self, shard_id: &ShardId) -> NodeResult<Option<EdgeList>> {

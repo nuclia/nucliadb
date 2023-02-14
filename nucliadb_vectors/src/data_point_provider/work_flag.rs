@@ -18,25 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-pub mod data_point;
-pub mod data_point_provider;
-mod data_types;
-pub mod indexset;
-pub mod service;
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
-use thiserror::Error;
-#[derive(Debug, Error)]
-pub enum VectorErr {
-    #[error("json error: {0}")]
-    SJ(#[from] serde_json::Error),
-    #[error("IO error: {0}")]
-    IoErr(#[from] std::io::Error),
-    #[error("Error in fs: {0}")]
-    FsError(#[from] nucliadb_core::fs_state::FsError),
-    #[error("Garbage collection delayed")]
-    WorkDelayed,
-    #[error("Several writers are open at the same time ")]
-    MultipleWriters,
+use crate::{VectorErr, VectorR};
+
+#[derive(Clone)]
+pub struct MergerWriterSync(Arc<Mutex<()>>);
+impl MergerWriterSync {
+    pub fn new() -> MergerWriterSync {
+        MergerWriterSync(Arc::new(Mutex::new(())))
+    }
+    pub fn try_to_start_working(&self) -> VectorR<MutexGuard<'_, ()>> {
+        match self.0.try_lock() {
+            Ok(lock) => Ok(lock),
+            Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
+            Err(TryLockError::WouldBlock) => Err(VectorErr::WorkDelayed),
+        }
+    }
 }
-
-pub type VectorR<O> = Result<O, VectorErr>;

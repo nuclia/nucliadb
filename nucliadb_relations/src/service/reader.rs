@@ -300,16 +300,15 @@ impl ReaderChild for RelationsReaderService {
         })
     }
     #[tracing::instrument(skip_all)]
-    fn stored_ids(&self) -> Vec<String> {
-        let mut list = vec![];
-        if let Ok(reader) = self.index.start_reading() {
-            if let Ok(iter) = reader.iter_node_ids() {
-                iter.filter_map(|node| node.ok())
-                    .filter_map(|id| reader.get_node(id).ok())
-                    .for_each(|s| list.push(format!("{s:?}")));
-            }
-        }
-        list
+    fn stored_ids(&self) -> NodeResult<Vec<String>> {
+        let reader = self.index.start_reading()?;
+        let ids = reader
+            .iter_node_ids()?
+            .filter_map(|node| node.ok())
+            .filter_map(|id| reader.get_node(id).ok())
+            .map(|s| format!("{s:?}"))
+            .collect();
+        Ok(ids)
     }
     #[tracing::instrument(skip_all)]
     fn reload(&self) {
