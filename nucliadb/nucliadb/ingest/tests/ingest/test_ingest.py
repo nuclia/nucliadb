@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import traceback
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
@@ -565,7 +566,7 @@ async def test_ingest_account_seq_stored(
 
 
 @pytest.mark.asyncio
-async def test_ingest_txn_no_messages(
+async def test_ingest_txn_missing_kb(
     local_files,
     gcs_storage: Storage,
     txn,
@@ -579,16 +580,11 @@ async def test_ingest_txn_no_messages(
     rid = str(uuid4())
     message = make_message(kbid, rid)
     message.account_seq = 1
-    await stream_processor.process(message=message, seqid=1)
-
-    # kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=kbid)
-
-    # r = await kb_obj.get(message.uuid)
-    # assert r is not None
-
-    # basic = await r.get_basic()
-    # assert basic is not None
-    # assert basic.last_account_seq == 2
-    # assert basic.queue == 0
+    try:
+        await stream_processor.process(message=message, seqid=1)
+    except Exception:
+        assert (
+            False
+        ), f"Processing should not fail due to a missing Knowledgebox:\n\n{str(traceback.format_exc())}"
 
     await txn.abort()
