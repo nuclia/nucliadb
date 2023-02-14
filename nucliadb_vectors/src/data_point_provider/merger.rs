@@ -20,13 +20,10 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
 
 use crate::VectorR;
 pub type MergeRequest = Box<dyn MergeQuery>;
 pub type MergeTxn = Sender<MergeRequest>;
-
-const STALL_TIME: Duration = Duration::from_secs(10);
 
 pub trait MergeQuery: Send {
     fn do_work(&self) -> VectorR<()>;
@@ -49,7 +46,6 @@ impl Updater {
                     Err(err) => tracing::info!("error merging: {err}"),
                 },
             }
-            thread::sleep(STALL_TIME);
         }
     }
 }
