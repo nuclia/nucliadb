@@ -6,4 +6,3 @@ numpy
 datasets
 requests
 types-requests
-sentence_transformers

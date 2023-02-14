@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 from enum import Enum
 from typing import Optional
 
@@ -49,6 +50,7 @@ SEARCH_URL = "/search"
 LABELS_URL = "/labelsets"
 ENTITIES_URL = "/entitiesgroups"
 DOWNLOAD_URL = "/{uri}"
+TUS_UPLOAD_URL = "/resource/{rid}/file/{field}/tusupload"
 
 
 class HTTPError(Exception):
@@ -87,13 +89,21 @@ class NucliaDBClient:
             raise AttributeError("Either url or nucliadb services hosts must be set")
 
         if environment == Environment.CLOUD and api_key is not None:
-            reader_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
-            writer_headers = {"X-STF-SERVICEACCOUNT": f"Bearer {api_key}"}
+            reader_headers = {
+                "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
+            }
+            writer_headers = {
+                "X-STF-SERVICEACCOUNT": f"Bearer {api_key}",
+            }
         elif environment == Environment.CLOUD and api_key is None:
             raise AttributeError("On Cloud you need to provide API Key")
         else:
-            reader_headers = {"X-NUCLIADB-ROLES": f"READER"}
-            writer_headers = {"X-NUCLIADB-ROLES": f"WRITER"}
+            reader_headers = {
+                "X-NUCLIADB-ROLES": f"READER",
+            }
+            writer_headers = {
+                "X-NUCLIADB-ROLES": f"WRITER",
+            }
 
         self.reader_session = httpx.Client(
             headers=reader_headers, base_url=reader_host or url  # type: ignore
@@ -364,5 +374,41 @@ class NucliaDBClient:
         response: httpx.Response = self.reader_session.get(url)
         if response.status_code == 200:
             return response.content
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def start_tus_upload(
+        self,
+        rid: str,
+        field: str,
+        size: int,
+        filename: str,
+        content_type: str = "application/octet-stream",
+    ):
+        url = TUS_UPLOAD_URL.format(rid=rid, field=field)
+        encoded_filename = base64.b64encode(filename.encode()).decode()
+        headers = {
+            "upload-length": str(size),
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {encoded_filename}",
+            "content-type": content_type,
+        }
+        response: httpx.Response = self.writer_session.post(url, headers=headers)
+        if response.status_code == 201:
+            return response.headers.get("Location")
+        else:
+            raise HTTPError(f"Status code {response.status_code}: {response.text}")
+
+    def patch_tus_upload(self, upload_url: str, data: bytes, offset: int) -> int:
+        headers = {
+            "upload-offset": str(offset),
+        }
+        # upload url has all path, we should remove /kb/kbid/
+        upload_url = "/" + "/".join(upload_url.split("/")[3:])
+        response: httpx.Response = self.writer_session.patch(
+            upload_url, headers=headers, content=data
+        )
+        if response.status_code == 200:
+            return int(response.headers.get("Upload-Offset"))
         else:
             raise HTTPError(f"Status code {response.status_code}: {response.text}")
