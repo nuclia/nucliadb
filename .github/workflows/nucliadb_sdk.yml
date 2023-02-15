@@ -95,9 +95,6 @@ jobs:
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
       - name: Run tests
         run: |
           pytest -rfE --cov=nucliadb_sdk -s --tb=native -v --cov-report xml --cov-append nucliadb_sdk/nucliadb_sdk
