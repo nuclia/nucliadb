@@ -1063,7 +1063,9 @@ async def test_fulltext_search_with_accents(
 
     # Check that searching with and without the accent returns the resource as result
     for query in ("Canigó", "Canigo"):
-        resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query={query}&features=document")
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search?query={query}&features=document"
+        )
         assert resp.status_code == 200
         results = resp.json()
         assert results["resources"][rid]
