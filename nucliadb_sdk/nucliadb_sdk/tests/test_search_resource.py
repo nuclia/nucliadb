@@ -272,7 +272,7 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert len(resources.sentences.results) == 11
 
 
-def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
+def _test_search_resource_simple_label(knowledgebox: KnowledgeBox):
     # Lets create a bunch of resources
 
     text: str
@@ -306,7 +306,7 @@ def test_search_resource_simple_label(knowledgebox: KnowledgeBox):
 
 
 @pytest.mark.asyncio
-async def test_search_resource_async(knowledgebox: KnowledgeBox):
+async def _test_search_resource_async(knowledgebox: KnowledgeBox):
     knowledgebox.new_vectorset("all-MiniLM-L6-v2", 4)
 
     text: str

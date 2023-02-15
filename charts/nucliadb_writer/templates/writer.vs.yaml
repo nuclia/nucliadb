@@ -21,7 +21,7 @@ spec:
       route:
         - destination:
             port:
-              number: { { .Values.serving.port } }
+              number: {{ .Values.serving.port }}
             host: "writer.{{ .Release.Namespace }}.svc.cluster.local"
       corsPolicy:
         allowOrigins:
