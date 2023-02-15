@@ -85,9 +85,6 @@ jobs:
               - 'nucliadb_vectors/**'
               - 'nucliadb_relations/**'
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
       - name: Build local NucliaDB for testing
         if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'false'
         run: |
@@ -97,6 +94,9 @@ jobs:
         if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'true'
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
 
       - name: Run tests
         run: |
