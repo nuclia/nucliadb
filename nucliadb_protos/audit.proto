@@ -24,6 +24,15 @@ message AuditShardCounter {
   int64 fields = 3;
 }
 
+enum ClientType {
+  API = 0;
+  WEB = 1;
+  WIDGET = 2;
+  DESKTOP = 3;
+  DASHBOARD = 4;
+  CHROME_EXTENSION = 5;
+}
+
 message AuditRequest {
   enum AuditType {
     VISITED = 0;
@@ -55,4 +64,6 @@ message AuditRequest {
   repeated resources.FieldID field_metadata = 13;
   repeated AuditField fields_audit = 14;
   AuditShardCounter counter = 15;
+  ClientType client_type = 16;
+  int64 trace_id = 17;
 }

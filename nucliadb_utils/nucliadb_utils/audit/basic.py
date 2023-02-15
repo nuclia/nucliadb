@@ -41,12 +41,23 @@ class BasicAuditStorage(AuditStorage):
         self,
         kbid: str,
         user: str,
+        client: int,
         origin: str,
         search: SearchRequest,
         timeit: float,
         resources: int,
     ):
         logger.debug(f"SEARCH {kbid} {user} {origin} ''{search}'' {timeit} {resources}")
+
+    async def suggest(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        timeit: float,
+    ):
+        logger.debug(f"SEARCH {kbid} {user} {origin} {timeit}")
 
     async def delete_kb(self, kbid):
         logger.debug(f"KB DELETED {kbid}")

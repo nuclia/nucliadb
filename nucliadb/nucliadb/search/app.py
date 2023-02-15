@@ -39,7 +39,6 @@ from nucliadb.ingest.orm import NODES
 from nucliadb.search import API_PREFIX, SERVICE_NAME
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import finalize, initialize
-from nucliadb.search.utilities import get_counter
 from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
@@ -140,18 +139,10 @@ async def chitchat_members(request: Request) -> JSONResponse:
     )
 
 
-async def accounting(request: Request) -> JSONResponse:
-    search_counter = get_counter()
-    response = dict(search_counter)
-    search_counter.clear()
-    return JSONResponse(response)
-
-
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
 application.add_route("/metrics", metrics)
 application.add_route("/chitchat/members", chitchat_members)
-application.add_route("/accounting", accounting)
 
 # Enable forwarding of B3 headers to responses and external requests
 # to both inner applications

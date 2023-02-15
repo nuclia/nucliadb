@@ -36,7 +36,7 @@ class EndpointFilter(logging.Filter):
         return (
             record.args is not None
             and len(record.args) >= 3
-            and record.args[2] not in ("/", "/metrics", "/accounting")  # type: ignore
+            and record.args[2] not in ("/", "/metrics")  # type: ignore
         )
 
 

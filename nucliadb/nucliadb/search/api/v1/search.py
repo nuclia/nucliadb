@@ -37,7 +37,7 @@ from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_counter, get_nodes
+from nucliadb.search.utilities import get_nodes
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -258,7 +258,7 @@ async def search(
 ) -> KnowledgeboxSearchResults:
     nodemanager = get_nodes()
     audit = get_audit()
-    timeit = time()
+    start_time = time()
 
     sort_options = parse_sort_options(item)
 
@@ -370,15 +370,15 @@ async def search(
     )
     await abort_transaction()
 
-    get_counter()[f"{kbid}_-_search_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
     if audit is not None and do_audit:
         await audit.search(
             kbid,
             x_nucliadb_user,
+            x_ndb_client.to_proto(),
             x_forwarded_for,
             pb_query,
-            timeit - time(),
+            time() - start_time,
             len(search_results.resources),
         )
     if item.debug:
