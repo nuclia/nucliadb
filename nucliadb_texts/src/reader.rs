@@ -427,7 +427,8 @@ impl TextReaderService {
             query_parser.set_conjunction_by_default();
             query_parser
         };
-        let text = TextReaderService::adapt_text(&query_parser, &request.body);
+        let body = deunicode::deunicode(&request.body);
+        let text = TextReaderService::adapt_text(&query_parser, &body);
         let advanced_query = request
             .advanced_query
             .as_ref()

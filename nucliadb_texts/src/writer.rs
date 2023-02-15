@@ -215,12 +215,13 @@ impl TextWriterService {
         }
 
         for (field, text_info) in &resource.texts {
+            let text = deunicode::deunicode(&text_info.text);
             let mut subdoc = doc.clone();
             let mut facet_key: String = "/".to_owned();
             facet_key.push_str(field.as_str());
             let facet_field = Facet::from(facet_key.as_str());
             subdoc.add_facet(self.schema.field, facet_field);
-            subdoc.add_text(self.schema.text, &text_info.text);
+            subdoc.add_text(self.schema.text, &text);
 
             #[allow(clippy::iter_cloned_collect)]
             let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
