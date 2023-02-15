@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.6
+
+- deunicade on full text
+
 ## 0.5.5
 
 - sort by creation/modification date
