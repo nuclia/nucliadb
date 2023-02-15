@@ -109,3 +109,10 @@ def get_or_create(
     if kb is None:
         kb = create_knowledge_box(slug, nucliadb_base_url)
     return kb
+
+
+def delete_kb(kb: KnowledgeBox):
+    if kb.client.url is None:
+        raise AttributeError("URL should not be none")
+    response = requests.delete(kb.client.url, headers={"X-NUCLIADB-ROLES": f"MANAGER"})
+    assert response.status_code == 200

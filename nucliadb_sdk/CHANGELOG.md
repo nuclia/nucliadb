@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.2.6
+
+- Allow to delete a KB on local deployment
+
 ## 1.2.5
 
 - Fix get_or_create

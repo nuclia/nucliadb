@@ -81,12 +81,18 @@ class NucliaDBClient:
     ):
         self.api_key = api_key
         self.environment = environment
+        self.url = url
 
         internal_hosts_set = all((writer_host, reader_host, search_host, train_host))
         url_set = bool(url)
 
         if not (url_set or internal_hosts_set):
             raise AttributeError("Either url or nucliadb services hosts must be set")
+
+        if url_set:
+            self.url = url
+        elif internal_hosts_set:
+            self.url = writer_host
 
         if environment == Environment.CLOUD and api_key is not None:
             reader_headers = {
