@@ -21,8 +21,12 @@ import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, Mock
 
+import nats
 import pytest
 from httpx import AsyncClient
+from nats.aio.client import Client
+from nats.js import JetStreamContext
+from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
@@ -30,7 +34,8 @@ from nucliadb.ingest.tests.vectors import V1
 from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
-from nucliadb_utils.utilities import Utility, get_audit, set_utility
+from nucliadb_utils.audit.stream import StreamAuditStorage
+from nucliadb_utils.utilities import Utility, clean_utility, get_audit, set_utility
 
 
 @pytest.mark.asyncio
@@ -937,11 +942,12 @@ async def test_search_automatic_relations(
 
 
 @pytest.mark.asyncio
-async def test_only_search_calls_audit(nucliadb_reader, knowledgebox):
+async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox):
     kbid = knowledgebox
 
     audit = get_audit()
     audit.search = AsyncMock()
+    audit.suggest = AsyncMock()
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
     assert resp.status_code == 200
@@ -952,3 +958,76 @@ async def test_only_search_calls_audit(nucliadb_reader, knowledgebox):
     assert resp.status_code == 200
 
     audit.search.assert_awaited_once()
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
+
+    assert resp.status_code == 200
+
+    audit.suggest.assert_awaited_once()
+
+
+async def get_audit_messages(sub):
+    msg = await sub.fetch(1)
+    auditreq = AuditRequest()
+    auditreq.ParseFromString(msg[0].data)
+    return auditreq
+
+
+@pytest.mark.asyncio
+async def test_search_and_suggest_sent_audit(
+    nucliadb_reader,
+    knowledgebox,
+    stream_audit: StreamAuditStorage,
+):
+    from nucliadb_utils.settings import audit_settings
+
+    kbid = knowledgebox
+
+    # Prepare a test audit stream to receive our messages
+    partition = stream_audit.get_partition(kbid)
+    client: Client = await nats.connect(stream_audit.nats_servers)
+    jetstream: JetStreamContext = client.jetstream()
+    if audit_settings.audit_jetstream_target is None:
+        assert False, "Missing jetstream target in audit settings"
+    subject = audit_settings.audit_jetstream_target.format(
+        partition=partition, type="*"
+    )
+
+    set_utility(Utility.AUDIT, stream_audit)
+    try:
+        await jetstream.delete_stream(name=audit_settings.audit_stream)
+    except nats.js.errors.NotFoundError:
+        pass
+
+    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+    psub = await jetstream.pull_subscribe(subject, "psub")
+
+    # Test search sends audit
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"}
+    )
+    assert resp.status_code == 200
+
+    auditreq = await get_audit_messages(psub)
+
+    assert auditreq.kbid == kbid
+    assert auditreq.type == AuditRequest.AuditType.SEARCH
+    assert (
+        auditreq.client_type == ClientType.CHROME_EXTENSION
+    )  # Just to use other that the enum default
+
+    # Test suggest sends audit
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
+    )
+    assert resp.status_code == 200
+
+    auditreq = await get_audit_messages(psub)
+
+    assert auditreq.kbid == kbid
+    assert auditreq.type == AuditRequest.AuditType.SUGGEST
+    assert (
+        auditreq.client_type == ClientType.CHROME_EXTENSION
+    )  # Just to use other that the enum default
+
+    clean_utility(Utility.AUDIT)

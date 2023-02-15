@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import prometheus_client  # type: ignore
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
@@ -26,7 +26,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from starlette.responses import HTMLResponse, PlainTextResponse
 from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
@@ -34,7 +34,6 @@ from nucliadb.one.lifecycle import finalize, initialize
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
-from nucliadb.search.utilities import get_counter
 from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
@@ -109,17 +108,9 @@ async def metrics(request):
     return PlainTextResponse(output.decode("utf8"))
 
 
-async def accounting(request: Request) -> JSONResponse:
-    search_counter = get_counter()
-    response = dict(search_counter)
-    search_counter.clear()
-    return JSONResponse(response)
-
-
 # Use raw starlette routes to avoid unnecessary overhead
 application.add_route("/", homepage)
 application.add_route("/metrics", metrics)
-application.add_route("/accounting", accounting)
 
 
 # Enable forwarding of B3 headers to responses and external requests

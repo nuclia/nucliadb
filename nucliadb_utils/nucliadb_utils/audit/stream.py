@@ -26,6 +26,7 @@ import nats
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from opentelemetry.trace import get_current_span
 
 from nucliadb_utils import logger
 from nucliadb_utils.audit.audit import AuditStorage
@@ -141,6 +142,8 @@ class StreamAuditStorage(AuditStorage):
         if counter:
             auditrequest.counter.CopyFrom(counter)
 
+        auditrequest.trace_id = get_current_span().get_span_context().trace_id
+
         await self.send(auditrequest)
 
     async def visited(self, kbid: str, uuid: str, user: str, origin: str):
@@ -151,6 +154,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.VISITED
         auditrequest.time.FromDatetime(datetime.now())
+        auditrequest.trace_id = get_current_span().get_span_context().trace_id
 
         await self.send(auditrequest)
 
@@ -160,13 +164,14 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.kbid = kbid
         auditrequest.type = AuditRequest.KB_DELETED
         auditrequest.time.FromDatetime(datetime.now())
-
+        auditrequest.trace_id = get_current_span().get_span_context().trace_id
         await self.send(auditrequest)
 
     async def search(
         self,
         kbid: str,
         user: str,
+        client_type: int,
         origin: str,
         search: SearchRequest,
         timeit: float,
@@ -175,6 +180,7 @@ class StreamAuditStorage(AuditStorage):
         # Search is a base64 encoded search
         auditrequest = AuditRequest()
         auditrequest.origin = origin
+        auditrequest.client_type = client_type  # type: ignore
         auditrequest.userid = user
         auditrequest.kbid = kbid
         auditrequest.search.CopyFrom(search)
@@ -182,5 +188,25 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.resources = resources
         auditrequest.type = AuditRequest.SEARCH
         auditrequest.time.FromDatetime(datetime.now())
+        auditrequest.trace_id = get_current_span().get_span_context().trace_id
+        await self.send(auditrequest)
+
+    async def suggest(
+        self,
+        kbid: str,
+        user: str,
+        client_type: int,
+        origin: str,
+        timeit: float,
+    ):
+        auditrequest = AuditRequest()
+        auditrequest.origin = origin
+        auditrequest.client_type = client_type  # type: ignore
+        auditrequest.userid = user
+        auditrequest.kbid = kbid
+        auditrequest.timeit = timeit
+        auditrequest.type = AuditRequest.SUGGEST
+        auditrequest.time.FromDatetime(datetime.now())
+        auditrequest.trace_id = get_current_span().get_span_context().trace_id
 
         await self.send(auditrequest)

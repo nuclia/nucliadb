@@ -42,10 +42,21 @@ class AuditStorage:
         self,
         kbid: str,
         user: str,
+        client: int,
         origin: str,
         search: SearchRequest,
         timeit: float,
         resources: int,
+    ):
+        raise NotImplementedError
+
+    async def suggest(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        timeit: float,
     ):
         raise NotImplementedError
 

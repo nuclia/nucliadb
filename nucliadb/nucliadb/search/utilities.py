@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from collections import Counter
-
 from nucliadb.ingest.utils import get_driver  # noqa
 from nucliadb.search.nodes import NodesManager
 from nucliadb.search.predict import PredictEngine
@@ -31,7 +29,3 @@ def get_predict() -> PredictEngine:
 
 def get_nodes() -> NodesManager:
     return get_utility(Utility.NODES)  # type: ignore
-
-
-def get_counter() -> Counter:
-    return get_utility(Utility.COUNTER)  # type: ignore
