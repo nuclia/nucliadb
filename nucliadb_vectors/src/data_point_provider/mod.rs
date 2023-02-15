@@ -129,16 +129,19 @@ impl Index {
         use std::collections::HashSet;
         let work_flag = self.work_flag.try_to_start_working()?;
         let state = self.read_state();
-        let non_garbage_dp: HashSet<_> = state.dpid_iter().map(|s| s.to_string()).collect();
+        let in_use_dp: HashSet<_> = state.dpid_iter().collect();
         for dir_entry in std::fs::read_dir(&self.location)? {
             let entry = dir_entry?;
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_file() {
+                continue;
+            }
             let Ok(dpid) = DpId::parse_str(&name) else {
                 info!("Unknown item {path:?} found");
                 continue;
             };
-            if !non_garbage_dp.contains(&name) {
+            if !in_use_dp.contains(&dpid) {
                 info!("found garbage {name}");
                 let Err(err)  = DataPoint::delete(&self.location, dpid) else { continue };
                 warn!("{name} is garbage and could not be deleted because of {err}");

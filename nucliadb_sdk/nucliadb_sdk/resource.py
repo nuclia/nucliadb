@@ -301,11 +301,10 @@ def from_resource_to_payload(
         payload: Union[
             UpdateResourcePayload, CreateResourcePayload
         ] = UpdateResourcePayload()
-        payload.slug = item.slug  # type: ignore
     else:
         payload = CreateResourcePayload()
-        payload.slug = item.id  # type: ignore
 
+    payload.slug = item.slug  # type: ignore
     payload.title = item.title
     payload.summary = item.summary
     if item.icon is not None:

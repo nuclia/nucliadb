@@ -100,6 +100,9 @@ impl WriterChild for VectorWriterService {
     fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
         let time = SystemTime::now();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Count starting at {v} ms");
+        }
         let lock = self.index.get_slock()?;
         let no_nodes = self.index.no_nodes(&lock);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -264,6 +267,7 @@ impl WriterChild for VectorWriterService {
 
 impl VectorWriterService {
     fn collect_garbage_for(&self, index: &Index) -> NodeResult<()> {
+        info!("Collecting garbage for index: {:?}", index.location());
         let slock = index.get_slock()?;
         match index.collect_garbage(&slock) {
             Ok(_) => info!("Garbage collected for main index"),

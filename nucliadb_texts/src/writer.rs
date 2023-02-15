@@ -61,6 +61,9 @@ impl WriterChild for TextWriterService {
     fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
         let time = SystemTime::now();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Count starting at {v} ms");
+        }
         let reader = self.index.reader()?;
         let searcher = reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
