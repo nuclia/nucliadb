@@ -164,7 +164,7 @@ class AuditRequest(google.protobuf.message.Message):
     @property
     def counter(self) -> global___AuditShardCounter: ...
     client_type: global___ClientType.ValueType
-    trace_id: builtins.int
+    trace_id: typing.Text
     def __init__(self,
         *,
         type: global___AuditRequest.AuditType.ValueType = ...,
@@ -182,7 +182,7 @@ class AuditRequest(google.protobuf.message.Message):
         fields_audit: typing.Optional[typing.Iterable[global___AuditField]] = ...,
         counter: typing.Optional[global___AuditShardCounter] = ...,
         client_type: global___ClientType.ValueType = ...,
-        trace_id: builtins.int = ...,
+        trace_id: typing.Text = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["counter",b"counter","search",b"search","time",b"time"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["client_type",b"client_type","counter",b"counter","field_metadata",b"field_metadata","fields",b"fields","fields_audit",b"fields_audit","kbid",b"kbid","origin",b"origin","resources",b"resources","rid",b"rid","search",b"search","task",b"task","time",b"time","timeit",b"timeit","trace_id",b"trace_id","type",b"type","userid",b"userid"]) -> None: ...
