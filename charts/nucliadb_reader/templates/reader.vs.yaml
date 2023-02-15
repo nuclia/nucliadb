@@ -37,7 +37,7 @@ spec:
       route:
         - destination:
             port:
-              number: { { .Values.serving.port } }
+              number: {{ .Values.serving.port }}
             host: "reader.{{ .Release.Namespace }}.svc.cluster.local"
       corsPolicy:
         allowOrigins:
