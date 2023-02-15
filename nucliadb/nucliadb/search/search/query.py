@@ -193,12 +193,6 @@ async def paragraph_query_to_pb(
             request.order.type = sort_ord  # type: ignore
         request.fields.extend(fields)
 
-    # if SearchOptions.VECTOR in features:
-    #     request.vector = await predict.convert_sentence_to_vector(query)
-
-    if SearchOptions.RELATIONS in features:
-        pass
-
     return request
 
 

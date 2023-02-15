@@ -86,8 +86,6 @@ async def search(
     range_modification_end: Optional[datetime] = None,
     features: List[SearchOptions] = [
         SearchOptions.PARAGRAPH,
-        SearchOptions.VECTOR,
-        SearchOptions.RELATIONS,
     ],
     reload: bool = Query(False),
     highlight: bool = Query(False),
