@@ -19,6 +19,7 @@
 //
 
 use std::fs;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::str::FromStr;
@@ -28,16 +29,18 @@ use anyhow::{Context, Result};
 use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
+use nucliadb_core::protos::shutdown_handler_server::ShutdownHandlerServer;
 use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
 use nucliadb_node::env;
+use nucliadb_node::grpc_shutdown::GrpcShutdown;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
 use nucliadb_node::writer::grpc_driver::{
     NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
 };
 use nucliadb_node::writer::NodeWriterService;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{self, UnboundedReceiver};
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use uuid::Uuid;
@@ -62,6 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(sender);
+    let writer_server = NodeWriterServer::new(grpc_driver);
     let host_key_path = env::host_key_path();
     let public_ip = env::public_ip().await;
     let chitchat_port = env::chitchat_port();
@@ -83,8 +87,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let node = node.start().await?;
 
-    let writer_task = tokio::spawn(start_grpc_service(grpc_driver));
-
     let telemetry_handle = nucliadb_telemetry::sync::start_telemetry_loop();
 
     let cluster_watcher = node.cluster_watcher().await;
@@ -92,17 +94,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let update_task = tokio::spawn(watch_node_update(node, receiver, node_metadata));
 
+    let (sender, mut receiver) = mpsc::channel::<()>(1);
+    let grpc_shutdown = GrpcShutdown::new(sender);
+    let shutdown_task = async move {
+        let Some(()) = receiver.recv().await else {
+            warn!("Sender was dropped, writer may have panicked");
+            return;
+        };
+        info!("Gracefully shutting down");
+        update_task.abort();
+        monitor_task.abort();
+        telemetry_handle.terminate_telemetry().await;
+        info!("All task have been terminated");
+    };
+    let service = tokio::spawn(start_grpc_service(
+        grpc_shutdown,
+        writer_server,
+        shutdown_task,
+    ));
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    tokio::try_join!(writer_task, monitor_task, update_task)?;
-    telemetry_handle.terminate_telemetry().await;
-    // node_writer_service.shutdown().await;
+    match service.await {
+        Ok(_) => info!("The execution was successful"),
+        Err(_) => warn!("Something went wrong during execution"),
+    }
 
     Ok(())
 }
 
-pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
+pub async fn start_grpc_service(
+    shutdown_handler: ShutdownHandlerServer<GrpcShutdown>,
+    grpc_driver: NodeWriterServer<NodeWriterGRPCDriver>,
+    shutdown_task: impl Future<Output = ()>,
+) {
     let addr = env::writer_listen_address();
 
     info!("Listening for gRPC requests at: {:?}", addr);
@@ -114,8 +139,9 @@ pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
 
     Server::builder()
         .add_service(health_service)
-        .add_service(NodeWriterServer::new(grpc_driver))
-        .serve(addr)
+        .add_service(shutdown_handler)
+        .add_service(grpc_driver)
+        .serve_with_shutdown(addr, shutdown_task)
         .await
         .expect("Error starting gRPC service");
 }

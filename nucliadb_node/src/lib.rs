@@ -41,3 +41,6 @@ pub mod telemetry;
 
 /// GRPC writing service
 pub mod writer;
+
+/// GRPC shutdown service
+pub mod grpc_shutdown;
