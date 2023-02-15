@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 from typing import Optional
 
 from grpc import aio
@@ -37,11 +36,10 @@ from nucliadb_telemetry.utils import get_telemetry
 
 
 class Writer:
-    _stub: Optional[NodeWriterStub] = None
-    lock: asyncio.Lock
+    stub: Optional[NodeWriterStub] = None
 
-    def __init__(self, grpc_writer_address: str):
-        self.lock = asyncio.Lock()
+    def __init__(self, grpc_writer_address: str, timeout: int):
+        self.timeout = timeout
         tracer_provider = get_telemetry(SERVICE_NAME)
         if tracer_provider is not None:
             telemetry_grpc = OpenTelemetryGRPC(
@@ -55,10 +53,10 @@ class Writer:
         self.stub = NodeWriterStub(self.channel)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
-        return await self.stub.SetResource(pb)  # type: ignore
+        return await self.stub.SetResource(pb, timeout=self.timeout)  # type: ignore
 
     async def delete_resource(self, pb: ResourceID) -> OpStatus:
-        return await self.stub.RemoveResource(pb)  # type: ignore
+        return await self.stub.RemoveResource(pb, timeout=self.timeout)  # type: ignore
 
     async def garbage_collector(self, pb: ShardId):
         await self.stub.GC(pb)  # type: ignore

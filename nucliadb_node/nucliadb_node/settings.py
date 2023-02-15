@@ -32,5 +32,7 @@ class Settings(BaseSettings):
 
     data_path: Optional[str] = None
 
+    writer_timeout: int = 3 * 60  # 3 minutes
+
 
 settings = Settings()

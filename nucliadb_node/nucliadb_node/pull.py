@@ -23,7 +23,7 @@ import asyncio
 from typing import List, Optional
 
 import nats
-from grpc import StatusCode
+from grpc import FutureTimeoutError, StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
@@ -124,6 +124,10 @@ class Worker:
         self.gc_task = asyncio.create_task(self.garbage())
 
     async def garbage(self) -> None:
+        """
+        During the lifetime of the node, this will run only once per day, and only
+        after a message has been consumed.
+        """
         while True:
             await self.event.wait()
             await asyncio.sleep(10)
@@ -186,7 +190,11 @@ class Worker:
                     status = await self.writer.delete_resource(rid)
                     logger.info(f"...done")
                 self.reader.update(pb.shard, status)
-
+            except FutureTimeoutError as e:
+                if SENTRY:
+                    capture_exception(e)
+                logger.error("Node writer timed out")
+                raise e
             except AioRpcError as grpc_error:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exit {pb.shard}")
@@ -198,7 +206,6 @@ class Worker:
                         f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                     )
                     raise grpc_error
-
             except KeyError as storage_error:
                 if SENTRY:
                     capture_exception(storage_error)
