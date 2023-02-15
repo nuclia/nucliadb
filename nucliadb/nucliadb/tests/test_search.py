@@ -1015,6 +1015,10 @@ async def test_search_and_suggest_sent_audit(
     assert (
         auditreq.client_type == ClientType.CHROME_EXTENSION
     )  # Just to use other that the enum default
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
 
     # Test suggest sends audit
     resp = await nucliadb_reader.get(
@@ -1029,5 +1033,10 @@ async def test_search_and_suggest_sent_audit(
     assert (
         auditreq.client_type == ClientType.CHROME_EXTENSION
     )  # Just to use other that the enum default
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
 
     clean_utility(Utility.AUDIT)

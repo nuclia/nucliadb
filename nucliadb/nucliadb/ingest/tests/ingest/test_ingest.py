@@ -325,6 +325,11 @@ async def test_ingest_audit_stream_files_only(
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
 
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
+
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.ADDED
     assert audit_by_fieldid["file_1"].size == test_png_size
@@ -358,6 +363,12 @@ async def test_ingest_audit_stream_files_only(
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
+
     assert auditreq.fields_audit[0].action == AuditField.FieldAction.DELETED
     assert auditreq.fields_audit[0].size == 0
     assert auditreq.fields_audit[0].size_delta == -test_png_size
@@ -429,6 +440,11 @@ async def test_ingest_audit_stream_files_only(
     auditreq = await get_audit_messages(psub)
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.type == AuditRequest.AuditType.KB_DELETED
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
 
     # Currently where not updating audit counters on delete operations
     assert not auditreq.HasField("counter")
@@ -511,6 +527,11 @@ async def test_ingest_audit_stream_mixed(
 
     # Currently where not updating audit counters on delete operations
     assert not auditreq.HasField("counter")
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
 
     # We know what should be in the resource and all must me delete actions
     audit_actions_by_fieldid = {

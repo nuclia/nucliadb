@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.50
+------
+- Fix trace_id type
+
 0.0.49
 ------
 - Extend AuditRequest with client type and trace_id
