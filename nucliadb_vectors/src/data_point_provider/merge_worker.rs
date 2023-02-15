@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use std::sync::MutexGuard;
 use std::time::Duration;
 
 use nucliadb_core::fs_state;
@@ -64,16 +65,22 @@ impl Worker {
             tracing::info!("Could not request merge: {}", e);
         }
     }
-    fn work(&self) -> VectorR<()> {
-        while self.work_flag.try_to_start_working().is_err() {}
-        let work_flag = loop {
-            if let Ok(lock) = self.work_flag.try_to_start_working() {
-                break lock;
+    fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
+        loop {
+            match self.work_flag.try_to_start_working() {
+                Ok(lock) => break lock,
+                Err(_) => {
+                    tracing::info!("Merge delayed at: {:?}", self.location);
+                    std::thread::sleep(SLEEP_TIME);
+                }
             }
-            tracing::info!("Merge delayed at: {:?}", self.location);
-            std::thread::sleep(SLEEP_TIME);
-        };
+        }
+    }
+    fn work(&self) -> VectorR<()> {
+        let work_flag = self.try_to_work_or_delay();
+
         let subscriber = self.location.as_path();
+        info!("{subscriber:?} is ready to perform a merge");
         let lock = fs_state::shared_lock(subscriber)?;
         let state: State = fs_state::load_state(&lock)?;
         std::mem::drop(lock);
@@ -96,11 +103,19 @@ impl Worker {
         let creates_work = state.replace_work_unit(new_dp);
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
-        std::mem::drop(work_flag);
         info!("Merge on {subscriber:?}:\n{report}");
         if creates_work {
             self.notify_merger();
         }
+
+        info!("Removing deprecated datapoints");
+        ids.into_iter()
+            .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
+            .filter(|(.., r)| r.is_err())
+            .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
+        std::mem::drop(work_flag);
+
+        tracing::info!("Merge request completed");
         Ok(())
     }
 }
