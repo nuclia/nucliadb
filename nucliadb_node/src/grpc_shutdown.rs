@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
 use nucliadb_core::protos::shutdown_handler_server::{ShutdownHandler, ShutdownHandlerServer};
 use nucliadb_core::protos::*;
 use nucliadb_core::tracing::*;
