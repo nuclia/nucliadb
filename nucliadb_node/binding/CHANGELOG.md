@@ -1,5 +1,10 @@
 # Changelog
 
+
+## 0.5.5
+
+- increase rayon number of threads
+
 ## 0.5.5
 
 - sort by creation/modification date

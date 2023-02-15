@@ -19,7 +19,8 @@
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
-use std::thread;
+
+use nucliadb_core::thread;
 
 use crate::VectorR;
 pub type MergeRequest = Box<dyn MergeQuery>;

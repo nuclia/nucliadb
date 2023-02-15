@@ -26,6 +26,7 @@ use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
     ShardId, ShardIds, VectorSetId,
 };
+use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_core::tracing::{self, *};
 use uuid::Uuid;
 
@@ -44,6 +45,10 @@ impl Default for NodeWriterService {
 }
 impl NodeWriterService {
     pub fn new() -> Self {
+        ThreadPoolBuilder::new()
+            .num_threads(10)
+            .build_global()
+            .expect("Can not initialize a threadpool for the writer");
         Self {
             cache: HashMap::new(),
         }

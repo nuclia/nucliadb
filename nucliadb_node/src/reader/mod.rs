@@ -47,7 +47,11 @@ impl Default for NodeReaderService {
 
 impl NodeReaderService {
     pub fn new() -> NodeReaderService {
-        NodeReaderService {
+        ThreadPoolBuilder::new()
+            .num_threads(10)
+            .build_global()
+            .expect("Can not initialize a threadpool for the reader");
+        Self {
             cache: HashMap::new(),
         }
     }
