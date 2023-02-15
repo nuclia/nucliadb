@@ -258,7 +258,7 @@ async def search(
 ) -> KnowledgeboxSearchResults:
     nodemanager = get_nodes()
     audit = get_audit()
-    timeit = time()
+    start_time = time()
 
     sort_options = parse_sort_options(item)
 
@@ -379,7 +379,7 @@ async def search(
             x_ndb_client.to_proto(),
             x_forwarded_for,
             pb_query,
-            timeit - time(),
+            time() - start_time,
             len(search_results.resources),
         )
     if item.debug:

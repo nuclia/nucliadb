@@ -93,7 +93,7 @@ async def suggest_knowledgebox(
     # We need the nodes/shards that are connected to the KB
     nodemanager = get_nodes()
     audit = get_audit()
-    timeit = time()
+    start_time = time()
 
     try:
         shard_groups: List[ShardObject] = await nodemanager.get_shards_by_kbid(kbid)
@@ -190,7 +190,7 @@ async def suggest_knowledgebox(
             x_nucliadb_user,
             x_ndb_client.to_proto(),
             x_forwarded_for,
-            timeit - time(),
+            time() - start_time,
         )
 
     return search_results

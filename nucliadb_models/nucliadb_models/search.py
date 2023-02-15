@@ -32,11 +32,6 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 
-# if TYPE_CHECKING:
-#     ClientTypeValue = ClientType.V
-# else:
-#     ClientTypeValue = int
-
 _T = TypeVar("_T")
 
 

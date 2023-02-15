@@ -199,7 +199,6 @@ class StreamAuditStorage(AuditStorage):
         origin: str,
         timeit: float,
     ):
-        # Search is a base64 encoded search
         auditrequest = AuditRequest()
         auditrequest.origin = origin
         auditrequest.client_type = client_type  # type: ignore
