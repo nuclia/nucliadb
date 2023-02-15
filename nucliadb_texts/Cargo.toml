@@ -10,4 +10,3 @@ tempfile = "3"
 tantivy = "0.17.0"
 nucliadb_core = { path = "../nucliadb_core" }
 itertools = "0.10.5"
-deunicode = "1.3.3"

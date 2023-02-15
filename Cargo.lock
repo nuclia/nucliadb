@@ -2067,7 +2067,6 @@ dependencies = [
 name = "nucliadb_texts"
 version = "0.1.0"
 dependencies = [
- "deunicode",
  "itertools",
  "nucliadb_core",
  "tantivy",

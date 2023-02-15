@@ -40,7 +40,7 @@ use tantivy::{
     ReloadPolicy, Result as TantivyResult, Searcher,
 };
 
-use super::schema::TextSchema;
+use super::schema::{register_tokenizers, TextSchema};
 use super::search_query;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
@@ -226,7 +226,6 @@ impl TextReaderService {
 
         fs::create_dir_all(&config.path)?;
 
-        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
                 field: "created".to_string(),
@@ -234,10 +233,12 @@ impl TextReaderService {
             }),
             ..Default::default()
         };
-
-        index_builder = index_builder.settings(settings);
-
-        let index = index_builder.create_in_dir(&config.path).unwrap();
+        let index = register_tokenizers(
+            Index::builder()
+                .schema(field_schema.schema.clone())
+                .settings(settings)
+                .create_in_dir(&config.path)?,
+        );
 
         let reader = index
             .reader_builder()
@@ -254,7 +255,7 @@ impl TextReaderService {
     #[tracing::instrument(skip_all)]
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
-        let index = Index::open_in_dir(&config.path)?;
+        let index = register_tokenizers(Index::open_in_dir(&config.path)?);
 
         let reader = index
             .reader_builder()
@@ -427,8 +428,7 @@ impl TextReaderService {
             query_parser.set_conjunction_by_default();
             query_parser
         };
-        let body = deunicode::deunicode(&request.body);
-        let text = TextReaderService::adapt_text(&query_parser, &body);
+        let text = TextReaderService::adapt_text(&query_parser, &request.body);
         let advanced_query = request
             .advanced_query
             .as_ref()
@@ -622,7 +622,7 @@ mod tests {
         const DOC1_TI: &str = "This is the first document";
         const DOC1_P1: &str = "This is the text of the second paragraph.";
         const DOC1_P2: &str = "This should be enough to test the tantivy.";
-        const DOC1_P3: &str = "But I wanted to make it three anyway.";
+        const DOC1_P3: &str = "But I wanted to make it three anyway. Somé ünícòde";
 
         let ti_title = TextInformation {
             text: DOC1_TI.to_string(),
@@ -729,6 +729,40 @@ mod tests {
         let search = DocumentSearchRequest {
             id: "shard1".to_string(),
             body: "enough test".to_string(),
+            fields: vec!["body".to_string()],
+            filter: Some(filter.clone()),
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+            only_faceted: false,
+            ..Default::default()
+        };
+        let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 1);
+
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
+            body: "some".to_string(),
+            fields: vec!["body".to_string()],
+            filter: Some(filter.clone()),
+            faceted: Some(faceted.clone()),
+            order: Some(order.clone()),
+            page_number: 0,
+            result_per_page: 20,
+            timestamps: Some(timestamps.clone()),
+            reload: false,
+            only_faceted: false,
+            ..Default::default()
+        };
+        let result = field_reader_service.search(&search).unwrap();
+        assert_eq!(result.total, 1);
+
+        let search = DocumentSearchRequest {
+            id: "shard1".to_string(),
+            body: "unicode".to_string(),
             fields: vec!["body".to_string()],
             filter: Some(filter.clone()),
             faceted: Some(faceted.clone()),

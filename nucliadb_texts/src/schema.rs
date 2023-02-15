@@ -20,8 +20,12 @@
 use nucliadb_core::protos::*;
 use tantivy::chrono::{DateTime, NaiveDateTime, Utc};
 use tantivy::schema::{
-    Cardinality, FacetOptions, Field, NumericOptions, Schema, STORED, STRING, TEXT,
+    Cardinality, FacetOptions, Field, IndexRecordOption, NumericOptions, Schema, TextFieldIndexing,
+    TextOptions, STORED, STRING,
 };
+use tantivy::tokenizer::*;
+use tantivy::Index;
+const DEUNICODE_TOKENIZER: &str = "deunicode";
 
 #[derive(Debug, Clone)]
 pub struct TextSchema {
@@ -42,8 +46,23 @@ pub fn timestamp_to_datetime_utc(timestamp: &prost_types::Timestamp) -> DateTime
     DateTime::from_utc(naive, tantivy::chrono::Utc)
 }
 
+pub fn register_tokenizers(index: Index) -> Index {
+    let analyzer = TextAnalyzer::from(SimpleTokenizer)
+        .filter(RemoveLongFilter::limit(40))
+        .filter(LowerCaser)
+        .filter(AsciiFoldingFilter);
+    index.tokenizers().register(DEUNICODE_TOKENIZER, analyzer);
+    index
+}
+
 impl TextSchema {
     pub fn new() -> Self {
+        let text_field_indexing = TextFieldIndexing::default()
+            .set_tokenizer(DEUNICODE_TOKENIZER)
+            .set_fieldnorms(true)
+            .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+        let text_options = TextOptions::default().set_indexing_options(text_field_indexing);
+
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default()
             .set_indexed()
@@ -58,7 +77,7 @@ impl TextSchema {
         let uuid = sb.add_text_field("uuid", STRING | STORED);
         let field = sb.add_facet_field("field", facet_options.clone());
 
-        let text = sb.add_text_field("text", TEXT);
+        let text = sb.add_text_field("text", text_options);
 
         // Date fields needs to be searched in order, order_by_u64_field seems to work in TopDocs.
         let created = sb.add_date_field("created", date_options.clone());

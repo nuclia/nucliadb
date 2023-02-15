@@ -31,7 +31,7 @@ use tantivy::query::AllQuery;
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexSettings, IndexSortByField, IndexWriter, Order};
 
-use super::schema::{timestamp_to_datetime_utc, TextSchema};
+use super::schema::{register_tokenizers, timestamp_to_datetime_utc, TextSchema};
 
 pub struct TextWriterService {
     index: Index,
@@ -159,7 +159,6 @@ impl TextWriterService {
     pub fn new(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
         fs::create_dir_all(&config.path)?;
-        let mut index_builder = Index::builder().schema(field_schema.schema.clone());
         let settings = IndexSettings {
             sort_by_field: Some(IndexSortByField {
                 field: "created".to_string(),
@@ -168,10 +167,13 @@ impl TextWriterService {
             ..Default::default()
         };
 
-        index_builder = index_builder.settings(settings);
-        let index = index_builder.create_in_dir(&config.path).unwrap();
-
-        let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
+        let index = register_tokenizers(
+            Index::builder()
+                .schema(field_schema.schema.clone())
+                .settings(settings)
+                .create_in_dir(&config.path)?,
+        );
+        let writer = index.writer_with_num_threads(1, 6_000_000)?;
 
         Ok(TextWriterService {
             index,
@@ -183,7 +185,7 @@ impl TextWriterService {
     pub fn open(config: &TextConfig) -> NodeResult<Self> {
         let field_schema = TextSchema::new();
 
-        let index = Index::open_in_dir(&config.path)?;
+        let index = register_tokenizers(Index::open_in_dir(&config.path)?);
 
         let writer = index.writer_with_num_threads(1, 6_000_000).unwrap();
 
@@ -215,13 +217,12 @@ impl TextWriterService {
         }
 
         for (field, text_info) in &resource.texts {
-            let text = deunicode::deunicode(&text_info.text);
             let mut subdoc = doc.clone();
             let mut facet_key: String = "/".to_owned();
             facet_key.push_str(field.as_str());
             let facet_field = Facet::from(facet_key.as_str());
             subdoc.add_facet(self.schema.field, facet_field);
-            subdoc.add_text(self.schema.text, &text);
+            subdoc.add_text(self.schema.text, &text_info.text);
 
             #[allow(clippy::iter_cloned_collect)]
             let field_labels: Vec<String> = text_info.labels.iter().cloned().collect();
