@@ -26,7 +26,6 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID,
     ShardId,
     ShardIds,
-    ShutdownHandlerClient,
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
@@ -52,7 +51,6 @@ class Writer:
         else:
             self.channel = aio.insecure_channel(grpc_writer_address)
         self.stub = NodeWriterStub(self.channel)
-        self.handler = ShutdownHandler(grpc_writer_address)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb, timeout=self.timeout)  # type: ignore
@@ -67,26 +65,3 @@ class Writer:
         pb = EmptyQuery()
         return await self.stub.ListShards(pb)  # type: ignore
 
-    async def restart(self):
-        await self.handler.restart()
-
-
-class ShutdownHandler:
-    stub: Optional[ShutdownHandlerClient] = None
-
-    def __init__(self, grpc_address: str):
-        tracer_provider = get_telemetry(SERVICE_NAME)
-        if tracer_provider is not None:
-            telemetry_grpc = OpenTelemetryGRPC(
-                f"{SERVICE_NAME}_grpc_shutdown_handler", tracer_provider
-            )
-            self.channel = telemetry_grpc.init_client(
-                grpc_address, max_send_message=250
-            )
-        else:
-            self.channel = aio.insecure_channel(grpc_address)
-        self.stub = ShutdownHandlerClient(self.channel)
-
-    async def restart(self, pb: ShardId):
-        pb = EmptyQuery()
-        await self.stub.Restart(pb, timeout=10)  # type: ignore
