@@ -248,11 +248,13 @@ async def get_resource_field(
     if rid is None:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
         if rid is None:
+            await txn.abort()
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
     resource = ORMResource(txn, storage, kb, rid)
     field = await resource.get_field(field_id, pb_field_id, load=True)
     if field is None:
+        await txn.abort()
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
     resource_field = ResourceField(field_id=field_id, field_type=field_type)
