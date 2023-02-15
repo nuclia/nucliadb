@@ -99,6 +99,12 @@ async def search(
     debug: bool = Query(False),
     shards: List[str] = Query(default=[]),
 ) -> ResourceSearchResults:
+    if not all(map(lambda feature: feature == SearchOptions.PARAGRAPH, features)):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid search option. Only {SearchOptions.PARAGRAPH} is valid",
+        )
+
     if not rid:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
         if rid is None:
