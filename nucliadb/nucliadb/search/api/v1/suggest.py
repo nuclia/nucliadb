@@ -37,7 +37,7 @@ from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb.search.search.shards import suggest_shard
 from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_counter, get_nodes
+from nucliadb.search.utilities import get_nodes
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -179,7 +179,6 @@ async def suggest_knowledgebox(
     )
     await abort_transaction()
 
-    get_counter()[f"{kbid}_-_suggest_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
     if debug:
         search_results.shards = queried_shards

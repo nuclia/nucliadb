@@ -35,7 +35,7 @@ from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
 from nucliadb.search.search.shards import query_paragraph_shard
 from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_counter, get_nodes
+from nucliadb.search.utilities import get_nodes
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -201,7 +201,6 @@ async def search(
     )
     await abort_transaction()
 
-    get_counter()[f"{kbid}_-_search_client_{x_ndb_client.value}"] += 1
     response.status_code = 206 if incomplete_results else 200
     if debug:
         search_results.nodes = queried_nodes
