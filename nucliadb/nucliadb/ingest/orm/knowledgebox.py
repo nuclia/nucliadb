@@ -42,8 +42,6 @@ from nucliadb_protos.writer_pb2 import (
     GetVectorSetsResponse,
     GetWidgetResponse,
     GetWidgetsResponse,
-    JoinGraph,
-    JoinGraphCnx,
 )
 from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -51,6 +49,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.abc import AbstractNode
+from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
@@ -85,9 +84,7 @@ KB_LABELSET = "/kbs/{kbid}/labels/{id}"
 KB_LABELS = "/kbs/{kbid}/labels"
 KB_WIDGETS = "/kbs/{kbid}/widgets"
 KB_WIDGETS_WIDGET = "/kbs/{kbid}/widgets/{id}"
-KB_ENTITIES = "/kbs/{kbid}/entities"
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
-KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
 KB_SLUGS = KB_SLUGS_BASE + "{slug}"
@@ -109,6 +106,7 @@ class KnowledgeBox:
         self.cache = cache
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
+        self.entities_manager = EntitiesManager(self, txn)
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
@@ -369,73 +367,21 @@ class KnowledgeBox:
 
     # Entities
     async def get_entities(self, entities: GetEntitiesResponse):
-        entities_key = KB_ENTITIES.format(kbid=self.kbid)
-        async for key in self.txn.keys(entities_key, count=-1):
-            entitygroup = await self.txn.get(key)
-            id = key.split("/")[-1]
-            if entitygroup is not None:
-                eg = EntitiesGroup()
-                eg.ParseFromString(entitygroup)
-                entities.groups[id].CopyFrom(eg)
+        return await self.entities_manager.get_entities(entities)
 
     async def get_entitiesgroup(
         self, group: str, entitiesgroup: GetEntitiesGroupResponse
     ):
-        payload = await self.get_entitiesgroup_inner(group)
-        if payload is not None:
-            entitiesgroup.group.ParseFromString(payload)
-
-    async def get_entitiesgroup_inner(self, group: str):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        payload = await self.txn.get(entities_key)
-        return payload
+        return await self.entities_manager.get_entitiesgroup(group, entitiesgroup)
 
     async def set_entities(self, group: str, entities: EntitiesGroup):
-        payload = await self.get_entitiesgroup_inner(group)
-        if payload is None:
-            eg = entities
-        else:
-            eg = EntitiesGroup()
-            eg.ParseFromString(payload)
-            eg.MergeFrom(entities)
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(entities_key, eg.SerializeToString())
-
-        nodes = {}
-        entities_keys = {}
-        for i, (name, entity) in enumerate(entities.entities.items()):
-            node = RelationNode(
-                value=entity.value,
-                ntype=RelationNode.NodeType.ENTITY,
-                subtype=group,
-            )
-            nodes[i] = node
-            entities_keys[name] = i
-
-        edges = []
-        for name, entity in entities.entities.items():
-            for synonym in entity.represents:
-                edges.append(
-                    JoinGraphCnx(
-                        source=entities_keys[name],
-                        target=entities_keys[synonym],
-                        rtype=Relation.RelationType.SYNONYM,
-                    )
-                )
-
-        jg = JoinGraph(nodes=nodes, edges=edges)
-
-        async for node, shard_id in self.iterate_kb_nodes():
-            sg = SetGraph(shard_id=ShardId(id=shard_id), graph=jg)
-            await node.writer.JoinGraph(sg)
+        return await self.entities_manager.set_entities(group, entities)
 
     async def set_entities_force(self, group: str, entities: EntitiesGroup):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(entities_key, entities.SerializeToString())
+        return await self.entities_manager.set_entities_force(group, entities)
 
     async def del_entities(self, group: str):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.delete(entities_key)
+        return await self.entities_manager.del_entities(group)
 
     # Widget
     async def get_widget(self, widget: str, widgets: GetWidgetResponse):

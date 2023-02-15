@@ -20,6 +20,7 @@
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
+from nucliadb_protos.knowledgebox_pb2 import Entity as EntityPB
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.knowledgebox_pb2 import Widget as WidgetPB
@@ -73,7 +74,9 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
     for key, entity in item.entities.items():
         entitypb = pbrequest.entities.entities[key]
         entitypb.value = entity.value
-        entitypb.merged = entity.merged
+        entitypb.merged = (
+            EntityPB.DiffStatus.MERGED if entity.merged else EntityPB.DiffStatus.NORMAL
+        )
         entitypb.represents.extend(entity.represents)
 
     set_info_on_span({"nuclia.kbid": kbid})
