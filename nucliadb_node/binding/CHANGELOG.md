@@ -1,7 +1,7 @@
 # Changelog
 
 
-## 0.5.5
+## 0.5.6
 
 - increase rayon number of threads
 
