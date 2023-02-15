@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 from typing import Optional
 
 from grpc import aio  # type: ignore
@@ -35,11 +34,9 @@ CACHE = LRU(128)
 
 
 class Reader:
-    _stub: Optional[NodeReaderStub] = None
-    lock: asyncio.Lock
+    stub: Optional[NodeReaderStub] = None
 
     def __init__(self, grpc_reader_address: str):
-        self.lock = asyncio.Lock()
         tracer_provider = get_telemetry(SERVICE_NAME)
         if tracer_provider is not None:
             telemetry_grpc = OpenTelemetryGRPC(

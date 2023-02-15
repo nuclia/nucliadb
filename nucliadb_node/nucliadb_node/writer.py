@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
 from typing import Optional
 
 from grpc import aio
@@ -27,6 +26,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ResourceID,
     ShardId,
     ShardIds,
+    ShutdownHandlerClient,
 )
 from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
@@ -37,12 +37,10 @@ from nucliadb_telemetry.utils import get_telemetry
 
 
 class Writer:
-    _stub: Optional[NodeWriterStub] = None
-    lock: asyncio.Lock
+    stub: Optional[NodeWriterStub] = None
 
-    def __init__(self, grpc_writer_address: str, grpc_writer_handler_address: str, timeout: int):
+    def __init__(self, grpc_writer_address: str, timeout: int):
         self.timeout = timeout
-        self.lock = asyncio.Lock()
         tracer_provider = get_telemetry(SERVICE_NAME)
         if tracer_provider is not None:
             telemetry_grpc = OpenTelemetryGRPC(
@@ -54,7 +52,7 @@ class Writer:
         else:
             self.channel = aio.insecure_channel(grpc_writer_address)
         self.stub = NodeWriterStub(self.channel)
-        self.handler = WriterHandler(grpc_writer_handler_address)
+        self.handler = ShutdownHandler(grpc_writer_address)
 
     async def set_resource(self, pb: Resource) -> OpStatus:
         return await self.stub.SetResource(pb, timeout=self.timeout)  # type: ignore
@@ -73,21 +71,21 @@ class Writer:
         await self.handler.restart()
 
 
-class WriterHandler:
-    _stub: Optional[NodeWriterHandlerStub] = None
+class ShutdownHandler:
+    stub: Optional[ShutdownHandlerClient] = None
 
-    def __init__(self, grpc_writer_handler_address: str):
+    def __init__(self, grpc_address: str):
         tracer_provider = get_telemetry(SERVICE_NAME)
         if tracer_provider is not None:
             telemetry_grpc = OpenTelemetryGRPC(
-                f"{SERVICE_NAME}_grpc_writer_handler", tracer_provider
+                f"{SERVICE_NAME}_grpc_shutdown_handler", tracer_provider
             )
             self.channel = telemetry_grpc.init_client(
-                grpc_writer_handler_address, max_send_message=250
+                grpc_address, max_send_message=250
             )
         else:
-            self.channel = aio.insecure_channel(grpc_writer_handler_address)
-        self.stub = NodeWriterHandlerStub(self.channel)
+            self.channel = aio.insecure_channel(grpc_address)
+        self.stub = ShutdownHandlerClient(self.channel)
 
     async def restart(self, pb: ShardId):
         pb = EmptyQuery()
