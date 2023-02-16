@@ -77,8 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .on_local_network(chitchat_addr)
         .with_id(host_key.to_string())
         .with_seed_nodes(seed_nodes)
-        .insert_to_initial_state(LOAD_SCORE_KEY, node_metadata.paragraph_count as f32)
-        .insert_to_initial_state(SHARD_COUNT_KEY, node_metadata.shard_count)
+        .insert_to_initial_state(LOAD_SCORE_KEY, node_metadata.load_score())
+        .insert_to_initial_state(SHARD_COUNT_KEY, node_metadata.shard_count())
         .build()?;
 
     let node = node.start().await?;
@@ -139,6 +139,11 @@ pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>
     }
 }
 
+async fn update_node_state<T: std::fmt::Display>(node: &NodeHandle, key: Key<T>, value: T) {
+    info!("Update node state: {key} = {value}");
+    node.update_state(key, value).await;
+}
+
 pub async fn watch_node_update(
     node: NodeHandle,
     mut receiver: UnboundedReceiver<NodeWriterEvent>,
@@ -148,23 +153,18 @@ pub async fn watch_node_update(
 
     while let Some(event) = receiver.recv().await {
         match event {
-            NodeWriterEvent::ShardCreation => {
-                metadata.shard_count = metadata.shard_count.saturating_add(1);
-                info!("Update node state: shard_count = {}", metadata.shard_count);
-                node.update_state(SHARD_COUNT_KEY, metadata.shard_count)
-                    .await;
+            NodeWriterEvent::ShardCreation(id) => {
+                metadata.new_empty_shard(id);
+                update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
             }
-            NodeWriterEvent::ShardDeletion => {
-                metadata.shard_count = metadata.shard_count.saturating_sub(1);
-                info!("Update node state: shard_count = {}", metadata.shard_count);
-                node.update_state(SHARD_COUNT_KEY, metadata.shard_count)
-                    .await;
+            NodeWriterEvent::ShardDeletion(id) => {
+                metadata.delete_shard(id);
+                update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
+                update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
             }
-            NodeWriterEvent::ParagraphCount(paragraph_count) => {
-                metadata.paragraph_count = paragraph_count;
-                info!("Update node state: load_score = {paragraph_count}");
-                node.update_state(LOAD_SCORE_KEY, paragraph_count as f32)
-                    .await;
+            NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
+                metadata.update_shard(id, paragraph_count);
+                update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
             }
         }
     }
@@ -233,10 +233,7 @@ pub fn get_node_metadata() -> NodeWriterMetadata {
         };
 
         match shard.get_info(&GetShardRequest::default()) {
-            Ok(count) => {
-                node_metadata.shard_count += 1;
-                node_metadata.paragraph_count += count.paragraphs as u64;
-            }
+            Ok(count) => node_metadata.new_shard(shard.id, count.paragraphs as u64),
             Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
         }
     }

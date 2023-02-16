@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use async_std::sync::RwLock;
@@ -43,17 +44,44 @@ use crate::writer::NodeWriterService;
 /// Indicates the maximum duration used to move one shard from one node to another on failure only.
 const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
-    ShardCreation,
-    ShardDeletion,
-    ParagraphCount(u64),
+    ShardCreation(String),
+    ShardDeletion(String),
+    ParagraphCount(String, u64),
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct NodeWriterMetadata {
-    pub paragraph_count: u64,
-    pub shard_count: u64,
+    shards: HashMap<String, u64>,
+}
+
+impl NodeWriterMetadata {
+    pub fn load_score(&self) -> f32 {
+        self.shards.values().sum::<u64>() as f32
+    }
+
+    pub fn shard_count(&self) -> u64 {
+        self.shards.len() as u64
+    }
+
+    pub fn new_empty_shard(&mut self, shard_id: String) {
+        self.shards.insert(shard_id, 0);
+    }
+
+    pub fn new_shard(&mut self, shard_id: String, paragraphs: u64) {
+        self.shards.insert(shard_id, paragraphs);
+    }
+
+    pub fn delete_shard(&mut self, shard_id: String) {
+        self.shards.remove(&shard_id);
+    }
+
+    pub fn update_shard(&mut self, shard_id: String, paragraphs: u64) {
+        self.shards
+            .entry(shard_id)
+            .and_modify(|value| *value = paragraphs);
+    }
 }
 
 pub struct NodeWriterGRPCDriver {
@@ -139,7 +167,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.inner.write().await;
         let result = writer.new_shard();
         std::mem::drop(writer);
-        self.emit_event(NodeWriterEvent::ShardCreation);
+        self.emit_event(NodeWriterEvent::ShardCreation(result.id.clone()));
         Ok(tonic::Response::new(result))
     }
 
@@ -157,7 +185,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         std::mem::drop(writer);
         match result {
             Ok(_) => {
-                self.emit_event(NodeWriterEvent::ShardDeletion);
+                self.emit_event(NodeWriterEvent::ShardDeletion(shard_id.id.clone()));
 
                 Ok(tonic::Response::new(shard_id))
             }
@@ -220,7 +248,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 info!("Set resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
-                self.emit_event(NodeWriterEvent::ParagraphCount(status.count_paragraphs));
+
+                self.emit_event(NodeWriterEvent::ParagraphCount(
+                    shard_id.id.clone(),
+                    status.count_paragraphs,
+                ));
+
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
@@ -316,7 +349,12 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 info!("Remove resource ends correctly");
                 status.status = 0;
                 status.detail = "Success!".to_string();
-                self.emit_event(NodeWriterEvent::ParagraphCount(status.count_paragraphs));
+
+                self.emit_event(NodeWriterEvent::ParagraphCount(
+                    shard_id.id.clone(),
+                    status.count_paragraphs,
+                ));
+
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
