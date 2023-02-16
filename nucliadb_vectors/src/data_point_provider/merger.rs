@@ -17,26 +17,45 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Once;
 
-use std::thread;
+use crate::{VectorErr, VectorR};
 
-use crate::VectorR;
-pub type MergeRequest = Box<dyn MergeQuery>;
-pub type MergeTxn = Sender<MergeRequest>;
+static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
+static MERGER_NOTIFIER_SET: Once = Once::new();
 
-pub trait MergeQuery: Send {
+pub(crate) type MergeRequest = Box<dyn MergeQuery>;
+pub(crate) type MergeTxn = Sender<MergeRequest>;
+
+pub(crate) trait MergeQuery: Send {
     fn do_work(&self) -> VectorR<()>;
 }
 
-struct Updater {
+#[derive(Clone)]
+pub struct MergerHandle(MergeTxn);
+impl MergerHandle {
+    pub(crate) fn send(&self, request: MergeRequest) {
+        let Err(e) = self.0.send(request) else { return };
+        tracing::info!("Error sending merge request, {e}");
+    }
+}
+
+pub struct Merger {
     rtxn: Receiver<MergeRequest>,
 }
 
-impl Updater {
-    fn new(rtxn: Receiver<MergeRequest>) -> Updater {
-        Updater { rtxn }
+impl Merger {
+    pub fn install_global() -> VectorR<impl FnOnce()> {
+        let mut status = Err(VectorErr::MergerAlreadyInitialized);
+        MERGER_NOTIFIER_SET.call_once(|| unsafe {
+            let None = MERGER_NOTIFIER else { return };
+            let (stxn, rtxn) = mpsc::channel();
+            let handler = MergerHandle(stxn);
+            MERGER_NOTIFIER = Some(handler);
+            status = Ok(|| Merger { rtxn }.run());
+        });
+        status
     }
     fn run(self) {
         loop {
@@ -51,15 +70,9 @@ impl Updater {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref MERGER: Mutex<MergeTxn> = {
-        let (stxn, rtxn) = channel();
-        let updater = Updater::new(rtxn);
-        thread::spawn(move || updater.run());
-        Mutex::new(stxn)
-    };
-}
-
-pub fn get_notifier() -> MergeTxn {
-    MERGER.lock().unwrap_or_else(|e| e.into_inner()).clone()
+pub(crate) fn send_merge_request(request: MergeRequest) {
+    match unsafe { &MERGER_NOTIFIER } {
+        Some(merger) => merger.send(request),
+        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
+    }
 }

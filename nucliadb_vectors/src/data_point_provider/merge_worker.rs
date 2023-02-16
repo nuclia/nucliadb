@@ -31,7 +31,7 @@ use crate::data_point::{DataPoint, DpId};
 use crate::VectorR;
 
 const SLEEP_TIME: Duration = Duration::from_millis(100);
-pub struct Worker {
+pub(crate) struct Worker {
     location: PathBuf,
     work_flag: MergerWriterSync,
 }
@@ -41,7 +41,7 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
-    pub fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+    pub(crate) fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
         Box::new(Worker {
             location,
             work_flag,
@@ -59,11 +59,8 @@ impl Worker {
     }
     fn notify_merger(&self) {
         use crate::data_point_provider::merger;
-        let notifier = merger::get_notifier();
         let worker = Worker::request(self.location.clone(), self.work_flag.clone());
-        if let Err(e) = notifier.send(worker) {
-            tracing::info!("Could not request merge: {}", e);
-        }
+        merger::send_merge_request(worker);
     }
     fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
         loop {
@@ -103,7 +100,7 @@ impl Worker {
         let creates_work = state.replace_work_unit(new_dp);
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
-        info!("Merge on {subscriber:?}:\n{report}");
+        tracing::info!("Merge on {subscriber:?}:\n{report}");
         if creates_work {
             self.notify_merger();
         }

@@ -52,13 +52,13 @@ fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<Str
     writer.commit(lock).unwrap();
 }
 fn main() {
+    let _ = Merger::install_global().map(std::thread::spawn);
     let at = tempfile::TempDir::new().unwrap();
     let mut stats = Stats {
         writing_time: 0,
         read_time: 0,
         tagged_time: 0,
     };
-
     println!("Writing starts..");
     let mut possible_tag = vec![];
     let mut writer = Index::new(at.path(), IndexCheck::None).unwrap();

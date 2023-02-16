@@ -28,6 +28,7 @@ use nucliadb_core::protos::{
 };
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use uuid::Uuid;
 
 use crate::env;
@@ -47,6 +48,7 @@ impl NodeWriterService {
     pub fn new() -> Self {
         // We shallow the error if the threadpool was already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
+        let _ = VectorsMerger::install_global().map(std::thread::spawn);
         Self {
             cache: HashMap::new(),
         }

@@ -27,6 +27,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::SystemTime;
 
+pub use merger::Merger;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use nucliadb_core::tracing::*;
 use state::*;
@@ -84,12 +85,9 @@ impl Index {
         Ok(())
     }
     fn notify_merger(&self) {
-        use merge_worker::Worker;
-        let notifier = merger::get_notifier();
+        use crate::data_point_provider::merge_worker::Worker;
         let worker = Worker::request(self.location.clone(), self.work_flag.clone());
-        if let Err(e) = notifier.send(worker) {
-            tracing::info!("Could not request merge: {}", e);
-        }
+        merger::send_merge_request(worker);
     }
     pub fn new(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
         if !path.exists() {
