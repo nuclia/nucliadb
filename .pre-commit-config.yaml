@@ -1,33 +1,24 @@
 repos:
 - repo: local
   hooks:
-  - id: isort_ingest
-    name: ISort Ingest
+
+  - id: isort_nucliadb
+    name: Isort
     entry: isort --profile black -c
     language: system
-    files: nucliadb_ingest/.*\.py$$
-  - id: black_ingest
-    name: Black Ingest
+    files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+    types: ["python"]
+
+  - id: black_nucliadb
+    name: Black
     entry: black --check --verbose
     language: system
-    files: nucliadb_ingest/.*\.py$$
-  - id: flake8_ingest
-    name: Flake8 Ingest
-    entry: flake8 --config=nucliadb_ingest/setup.cfg
+    files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+    types: ["python"]
+
+  - id: flake8_nucliadb
+    name: Flake8
+    entry: flake8 --config=nucliadb/setup.cfg
     language: system
-    files: nucliadb_ingest/.*\.py$$
-  - id: isort_utils
-    name: ISort UTILS
-    entry: isort --profile black -c
-    language: system
-    files: nucliadb_utils/.*\.py$$
-  - id: black_utils
-    name: Black UTILS
-    entry: black --check --verbose
-    language: system
-    files: nucliadb_utils/.*\.py$$
-  - id: flake8_utils
-    name: Flake8 UTILS
-    entry: flake8 --config=nucliadb_utils/setup.cfg
-    language: system
-    files: nucliadb_utils/.*\.py$$
+    files: (^nucliadb_utils/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_dataset/)|(^nucliadb_client/)|(^nucliadb_sdk/)|(^nucliadb_models/)|(^nucliadb/)
+    types: ["python"]
