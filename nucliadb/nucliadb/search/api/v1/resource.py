@@ -84,9 +84,6 @@ async def search(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-    ],
     reload: bool = Query(False),
     highlight: bool = Query(False),
     split: bool = Query(False),
@@ -99,12 +96,6 @@ async def search(
     debug: bool = Query(False),
     shards: List[str] = Query(default=[]),
 ) -> ResourceSearchResults:
-    if not all(map(lambda feature: feature == SearchOptions.PARAGRAPH, features)):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid search option. Only {SearchOptions.PARAGRAPH} is valid",
-        )
-
     if not rid:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
         if rid is None:
@@ -123,7 +114,7 @@ async def search(
 
     # We need to query all nodes
     pb_query = await paragraph_query_to_pb(
-        features,
+        [SearchOptions.PARAGRAPH],
         rid,
         query,
         fields,
