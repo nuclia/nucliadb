@@ -165,9 +165,7 @@ async def test_get_resource_field(
     assert resp.status_code == 200
     body_by_slug = resp.json()
 
-    resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/slug/{slug}/text/{field}"
-    )
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/slug/{slug}/text/{field}")
     assert resp.status_code == 200
     body_by_rid = resp.json()
 
