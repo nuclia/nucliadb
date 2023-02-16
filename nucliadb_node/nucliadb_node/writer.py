@@ -38,8 +38,8 @@ from nucliadb_telemetry.utils import get_telemetry
 class Writer:
     stub: Optional[NodeWriterStub] = None
 
-    def __init__(self, grpc_writer_address: str, timeout: int):
-        self.timeout = timeout
+    def __init__(self, grpc_writer_address: str, timeout: Optional[int] = None):
+        self.timeout: Optional[int] = timeout
         tracer_provider = get_telemetry(SERVICE_NAME)
         if tracer_provider is not None:
             telemetry_grpc = OpenTelemetryGRPC(
