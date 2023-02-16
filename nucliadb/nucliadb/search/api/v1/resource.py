@@ -84,11 +84,6 @@ async def search(
     range_creation_end: Optional[datetime] = None,
     range_modification_start: Optional[datetime] = None,
     range_modification_end: Optional[datetime] = None,
-    features: List[SearchOptions] = [
-        SearchOptions.PARAGRAPH,
-        SearchOptions.VECTOR,
-        SearchOptions.RELATIONS,
-    ],
     reload: bool = Query(False),
     highlight: bool = Query(False),
     split: bool = Query(False),
@@ -119,7 +114,7 @@ async def search(
 
     # We need to query all nodes
     pb_query = await paragraph_query_to_pb(
-        features,
+        [SearchOptions.PARAGRAPH],
         rid,
         query,
         fields,

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import math
 from datetime import datetime
 from unittest.mock import AsyncMock, Mock
 
@@ -28,6 +29,7 @@ from nats.aio.client import Client
 from nats.js import JetStreamContext
 from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
 from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.tests.vectors import V1
@@ -1040,3 +1042,138 @@ async def test_search_and_suggest_sent_audit(
         assert False, "Invalid trace ID"
 
     clean_utility(Utility.AUDIT)
+
+
+@pytest.mark.asyncio
+async def test_search_pagination(
+    nucliadb_reader: AsyncClient,
+    ten_quick_dummy_resources_kb,
+):
+    kbid = ten_quick_dummy_resources_kb
+
+    total = 20  # 10 titles and 10 summaries
+    page_size = 5
+
+    for feature, result_key in [
+        ("paragraph", "paragraphs"),
+        ("document", "fulltext"),
+    ]:
+        total_pages = math.floor(total / page_size)
+        for page_number in range(0, total_pages):
+            resp = await nucliadb_reader.get(
+                f"/kb/{kbid}/search",
+                params={
+                    "features": [feature],
+                    "page_number": page_number,
+                    "page_size": page_size,
+                },
+            )
+            assert resp.status_code == 200
+            body = resp.json()[result_key]
+            assert body["next_page"] == (page_number != total_pages - 1)
+            assert len(body["results"]) == body["page_size"] == page_size
+
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search",
+            params={
+                "features": [feature],
+                "page_number": page_number + 1,
+                "page_size": page_size,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()[result_key]
+        assert body["next_page"] is False
+        assert len(body["results"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_resource_search_pagination(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    kbid = knowledgebox
+
+    n_texts = 20
+    texts = [(f"text-{i}", f"Dummy text field to test ({i})") for i in range(n_texts)]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "Resource with ",
+            "slug": "resource-with-texts",
+            "texts": {
+                id: {
+                    "body": text,
+                    "format": "PLAIN",
+                }
+                for id, text in texts
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.type = BrokerMessage.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+
+    for id, text in texts:
+        bm.texts[id].body = text
+        bm.texts[id].format = rpb.FieldText.Format.PLAIN
+
+        etw = rpb.ExtractedTextWrapper()
+        etw.field.field = id
+        etw.field.field_type = rpb.FieldType.TEXT
+        etw.body.text = text
+        bm.extracted_text.append(etw)
+
+        fcm = rpb.FieldComputedMetadataWrapper()
+        paragraph = rpb.Paragraph(
+            start=0, end=len(text), kind=rpb.Paragraph.TypeParagraph.TEXT
+        )
+        fcm.metadata.metadata.paragraphs.append(paragraph)
+        fcm.field.field = id
+        fcm.field.field_type = rpb.FieldType.TEXT
+        bm.field_metadata.append(fcm)
+
+    await inject_message(nucliadb_grpc, bm)
+
+    total = n_texts
+    page_size = 5
+    total_pages = math.floor(total / page_size)
+    query = "text"
+
+    for page_number in range(0, total_pages):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/resource/{rid}/search",
+            params={
+                "query": query,
+                "features": ["paragraph"],
+                "page_number": page_number,
+                "page_size": page_size,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()["paragraphs"]
+        assert body["next_page"] == (page_number != total_pages - 1)
+        assert len(body["results"]) == body["page_size"] == page_size
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/search",
+        params={
+            "query": query,
+            "features": ["paragraph"],
+            "page_number": page_number + 1,
+            "page_size": page_size,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()["paragraphs"]
+    assert body["next_page"] is False
+    assert len(body["results"]) == 0
