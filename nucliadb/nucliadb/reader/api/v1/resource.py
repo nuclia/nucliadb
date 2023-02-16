@@ -242,6 +242,7 @@ async def get_resource_field(
     kb = ORMKnowledgeBox(txn, storage, cache, kbid)
 
     if rid is None:
+        assert rslug is not None, "Either rid or rslug must be defined"
         rid = await kb.get_resource_uuid_by_slug(rslug)
         if rid is None:
             await txn.abort()
