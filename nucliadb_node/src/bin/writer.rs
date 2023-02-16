@@ -139,6 +139,11 @@ pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>
     }
 }
 
+async fn update_node_state<T: std::fmt::Display>(node: &NodeHandle, key: Key<T>, value: T) {
+    info!("Update node state: {key} = {value}");
+    node.update_state(key, value).await;
+}
+
 pub async fn watch_node_update(
     node: NodeHandle,
     mut receiver: UnboundedReceiver<NodeWriterEvent>,
@@ -147,32 +152,20 @@ pub async fn watch_node_update(
     info!("Start node update task");
 
     while let Some(event) = receiver.recv().await {
-        let (load_score, shard_count) = match event {
+        match event {
             NodeWriterEvent::ShardCreation(id) => {
                 metadata.new_empty_shard(id);
-
-                (None, Some(metadata.shard_count()))
+                update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
             }
             NodeWriterEvent::ShardDeletion(id) => {
                 metadata.delete_shard(id);
-
-                (Some(metadata.load_score()), Some(metadata.shard_count()))
+                update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
+                update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
             }
             NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
                 metadata.update_shard(id, paragraph_count);
-
-                (Some(metadata.load_score()), None)
+                update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
             }
-        };
-
-        if let Some(load_score) = load_score {
-            info!("Update node state: load_score = {load_score}");
-            node.update_state(LOAD_SCORE_KEY, load_score).await;
-        }
-
-        if let Some(shard_count) = shard_count {
-            info!("Update node state: shard_count = {shard_count}");
-            node.update_state(SHARD_COUNT_KEY, shard_count).await;
         }
     }
 
@@ -240,9 +233,7 @@ pub fn get_node_metadata() -> NodeWriterMetadata {
         };
 
         match shard.get_info(&GetShardRequest::default()) {
-            Ok(count) => {
-                node_metadata.new_shard(shard.id, count.paragraphs as u64);
-            }
+            Ok(count) => node_metadata.new_shard(shard.id, count.paragraphs as u64),
             Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
         }
     }
