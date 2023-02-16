@@ -19,6 +19,7 @@
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Mutex;
+
 use std::thread;
 
 use crate::VectorR;

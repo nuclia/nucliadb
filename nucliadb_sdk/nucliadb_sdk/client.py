@@ -71,7 +71,7 @@ class NucliaDBClient:
     def __init__(
         self,
         *,
-        environment: Environment,
+        environment: Environment = Environment.CLOUD,
         url: Optional[str] = None,
         api_key: Optional[str] = None,
         writer_host: Optional[str] = None,

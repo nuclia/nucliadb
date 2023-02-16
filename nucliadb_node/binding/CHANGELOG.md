@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.7
+
+- move merger out of the rayon threadpool
+## 0.5.6
+
+- increase rayon number of threads
+
 ## 0.5.5
 
 - sort by creation/modification date
