@@ -29,11 +29,7 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb.ingest.serialize import (
-    get_resource_uuid_by_slug,
-    serialize,
-    set_resource_field_extracted_data,
-)
+from nucliadb.ingest.serialize import serialize, set_resource_field_extracted_data
 from nucliadb.ingest.utils import get_driver
 from nucliadb.reader import SERVICE_NAME  # type: ignore
 from nucliadb.reader.api import DEFAULT_RESOURCE_LIST_PAGE_SIZE
@@ -246,7 +242,8 @@ async def get_resource_field(
     kb = ORMKnowledgeBox(txn, storage, cache, kbid)
 
     if rid is None:
-        rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
+        assert rslug is not None, "Either rid or rslug must be defined"
+        rid = await kb.get_resource_uuid_by_slug(rslug)
         if rid is None:
             await txn.abort()
             raise HTTPException(status_code=404, detail="Resource does not exist")
