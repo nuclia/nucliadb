@@ -25,7 +25,6 @@ try:
     from sentry_sdk.integrations.logging import LoggingIntegration
 
     SENTRY = True
-    SENTRY = False
 except ImportError:
     SENTRY = False
 
