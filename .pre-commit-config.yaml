@@ -34,5 +34,5 @@ repos:
     name: clippy
     entry: cargo clippy
     language: system
-    files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_cluster//)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
+    files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_cluster/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
     types: ["rust"]
