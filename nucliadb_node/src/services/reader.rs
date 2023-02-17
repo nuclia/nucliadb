@@ -27,15 +27,16 @@ use nucliadb_core::protos::shard_created::{
 use nucliadb_core::protos::{
     DocumentSearchRequest, DocumentSearchResponse, EdgeList, GetShardRequest,
     ParagraphSearchRequest, ParagraphSearchResponse, RelatedEntities, RelationPrefixSearchRequest,
-    RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, StreamRequest,
-    SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest, VectorSearchResponse,
+    RelationSearchRequest, RelationSearchResponse, SearchRequest, SearchResponse, Shard,
+    StreamRequest, SuggestRequest, SuggestResponse, TypeList, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_core::thread::{self, *};
 use nucliadb_core::tracing::{self, *};
 
 use super::shard_disk_structure::*;
 use super::versions::Versions;
-use crate::stats::StatsData;
+use crate::shard_metadata::ShardMetadata;
 use crate::telemetry::run_with_telemetry;
 
 const RELOAD_PERIOD: u128 = 5000;
@@ -45,6 +46,7 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 #[derive(Debug)]
 pub struct ShardReaderService {
     pub id: String,
+    pub metadata: ShardMetadata,
     creation_time: RwLock<SystemTime>,
     text_reader: TextsReaderPointer,
     paragraph_reader: ParagraphsReaderPointer,
@@ -90,17 +92,34 @@ impl ShardReaderService {
         }
     }
     #[tracing::instrument(skip_all)]
-    pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<StatsData> {
+    pub fn get_info(&self, request: &GetShardRequest) -> NodeResult<Shard> {
         self.reload_policy(true);
-        let resources = self.text_reader.count()?;
-        let paragraphs = self.paragraph_reader.count()?;
-        let sentences = self.vector_reader.count(&request.vectorset)?;
-        let relations = self.relation_reader.count()?;
-        Ok(StatsData {
-            resources,
-            paragraphs,
-            sentences,
-            relations,
+        let paragraphs = self.paragraph_reader.clone();
+        let vectors = self.vector_reader.clone();
+        let texts = self.text_reader.clone();
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text count");
+        let text_task = || run_with_telemetry(info, move || texts.count());
+        let info = info_span!(parent: &span, "paragraph count");
+        let paragraph_task = || run_with_telemetry(info, move || paragraphs.count());
+        let info = info_span!(parent: &span, "vector count");
+        let vector_task = || run_with_telemetry(info, move || vectors.count(&request.vectorset));
+
+        let mut text_result = Ok(0);
+        let mut paragraph_result = Ok(0);
+        let mut vector_result = Ok(0);
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+        });
+
+        Ok(Shard {
+            metadata: Some(self.metadata.clone().into()),
+            shard_id: self.id.clone(),
+            resources: text_result? as u64,
+            paragraphs: paragraph_result? as u64,
+            sentences: vector_result? as u64,
         })
     }
     #[tracing::instrument(skip_all)]
@@ -139,7 +158,11 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
+    pub fn new(
+        id: String,
+        metadata: ShardMetadata,
+        shard_path: &Path,
+    ) -> NodeResult<ShardReaderService> {
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
         };
@@ -190,6 +213,7 @@ impl ShardReaderService {
 
         Ok(ShardReaderService {
             id,
+            metadata,
             text_reader: fields.unwrap(),
             paragraph_reader: paragraphs.unwrap(),
             vector_reader: vectors.unwrap(),

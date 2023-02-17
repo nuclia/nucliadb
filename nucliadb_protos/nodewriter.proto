@@ -56,7 +56,7 @@ message AcceptShardRequest {
 
 service NodeWriter {
     rpc GetShard(noderesources.ShardId) returns (noderesources.ShardId) {}
-    rpc NewShard(noderesources.EmptyQuery) returns (noderesources.ShardCreated) {}
+    rpc NewShard(noderesources.ShardMetadata) returns (noderesources.ShardCreated) {}
     rpc CleanAndUpgradeShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}

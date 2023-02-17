@@ -30,10 +30,12 @@ use nucliadb_core::tracing::{self, *};
 
 use super::shard_disk_structure::*;
 use crate::services::versions::Versions;
+use crate::shard_metadata::ShardMetadata;
 use crate::telemetry::run_with_telemetry;
 
 #[derive(Debug)]
 pub struct ShardWriterService {
+    pub metadata: ShardMetadata,
     pub id: String,
     pub path: PathBuf,
     text_writer: TextsWriterPointer,
@@ -81,7 +83,11 @@ impl ShardWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardWriterService> {
+    pub fn new(
+        id: String,
+        metadata: ShardMetadata,
+        shard_path: &Path,
+    ) -> NodeResult<ShardWriterService> {
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
         };
@@ -132,6 +138,7 @@ impl ShardWriterService {
 
         Ok(ShardWriterService {
             id,
+            metadata,
             path: shard_path.to_path_buf(),
             text_writer: fields.unwrap(),
             paragraph_writer: paragraphs.unwrap(),
