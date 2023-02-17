@@ -44,7 +44,7 @@ class ClusterObject:
     def get_local_node(self):
         return self.local_node
 
-    def find_nodes(self, exclude_nodes: List[str]) -> List[str]:
+    def find_nodes(self, exclude_nodes: Optional[List[str]] = None) -> List[str]:
         """
         Returns a list of node ids ordered by increasing shard count.
         It will exclude the nodes passed as argument from the computation.
@@ -56,11 +56,11 @@ class ClusterObject:
             raise NodeClusterSmall(
                 f"Not enough nodes. Total: {total_nodes}, Required: {node_replicas}"
             )
-        # Filter out node ids that should be excluded
+        # Filter out excluded node ids
         available_nodes: List[Tuple[str, int, float]] = [
             (node_id, node.shard_count, node.load_score)
             for node_id, node in NODES.items()
-            if node_id not in exclude_nodes
+            if exclude_nodes is None or node_id not in exclude_nodes
         ]
         if len(available_nodes) < node_replicas:
             raise NodeClusterSmall(

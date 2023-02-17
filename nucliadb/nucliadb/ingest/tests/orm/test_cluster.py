@@ -37,12 +37,26 @@ def nodes():
         "node-3": Node("node-3", NodeType.IO, shard_count=40, load_score=0, dummy=True),
     }
     with mock.patch.object(orm, "NODES", new=nodes):
-        yield
+        yield nodes
 
 
 def test_find_nodes(nodes):
     cluster = orm.ClusterObject()
-    assert cluster.find_nodes() == ["node-1", "node-0"]
+    nodes_found = cluster.find_nodes()
+    assert len(nodes_found) == settings.node_replicas
+    assert nodes_found == ["node-1", "node-0"]
+
+
+def test_find_nodes_exclude_nodes(nodes):
+    cluster = orm.ClusterObject()
+    excluded_node = "node-1"
+    nodes_found = cluster.find_nodes(exclude_nodes=[excluded_node])
+    assert len(nodes_found) == settings.node_replicas
+    assert excluded_node not in nodes_found
+
+    with pytest.raises(NodeClusterSmall):
+        all_nodes = list(nodes.keys())
+        cluster.find_nodes(exclude_nodes=all_nodes)
 
 
 def test_find_nodes_raises_error_if_not_enough_nodes_are_found(nodes):
