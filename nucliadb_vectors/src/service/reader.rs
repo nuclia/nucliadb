@@ -24,7 +24,7 @@ use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
     DocumentScored, DocumentVectorIdentifier, VectorSearchRequest, VectorSearchResponse,
 };
-use tracing::*;
+use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
 use crate::indexset::IndexSet;

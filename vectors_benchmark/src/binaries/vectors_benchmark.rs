@@ -22,9 +22,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use nucliadb_vectors::data_point_provider::{Index, IndexCheck};
+use nucliadb_vectors::data_point_provider::{Index, IndexCheck, Merger};
 use vectors_benchmark::cli_interface::*;
 fn main() {
+    let _ = Merger::install_global().map(std::thread::spawn);
     let args = Args::new();
     let stop_point = Arc::new(AtomicBool::new(false));
     let at = tempfile::TempDir::new().unwrap();
