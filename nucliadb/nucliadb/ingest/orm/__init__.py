@@ -20,12 +20,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from nucliadb.ingest.orm.exceptions import NodeClusterNotFound, NodeClusterSmall
+from nucliadb.ingest.orm.exceptions import NodeClusterSmall
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.clandestined import Cluster  # type: ignore
-from nucliadb_utils.settings import nuclia_settings
 
 if TYPE_CHECKING:
     from nucliadb.ingest.orm.node import Node
@@ -45,38 +44,31 @@ class ClusterObject:
     def get_local_node(self):
         return self.local_node
 
-    def find_nodes(self, kbid: str):
-        if self.cluster is not None:
-            nodes = self.cluster.find_nodes(kbid)
-            if len(nodes) != len(set(nodes)):
-                raise NodeClusterSmall()
-            if len(nodes) < settings.node_replicas:
-                raise NodeClusterSmall()
-
-            return nodes[: settings.node_replicas]
-        else:
-            raise NodeClusterNotFound()
-
-    def compute(self):
-        self.date = datetime.now()
-        if len(NODES) == 0:
-            self.cluster = None
-            return
-
-        cluster_info = {}
-        for count, (id, node) in enumerate(NODES.items()):
-            cluster_info[id] = {
-                "name": node.address,
-                "type": node.type,
-                "zone": f"z{count % settings.node_replicas}",
-            }
-            count += 1
-
-        self.cluster = Cluster(
-            cluster_info,
-            replicas=settings.node_replicas,
-            seed=nuclia_settings.nuclia_hash_seed,
-        )
+    def find_nodes(self) -> List[str]:
+        """
+        Returns a list of node ids or raises exceptions if it can't find enough nodes
+        """
+        node_replicas = settings.node_replicas
+        total_nodes = len(NODES)
+        if total_nodes < node_replicas:
+            raise NodeClusterSmall(
+                f"Not enough nodes available: {total_nodes} vs {node_replicas}"
+            )
+        available_nodes: List[Tuple[str, int, float]] = [
+            (node_id, node.shard_count, node.load_score)
+            for (node_id, node) in NODES.items()
+        ]
+        if settings.max_node_shards is not None:
+            available_nodes = list(
+                filter(lambda x: x[1] < settings.max_node_shards, available_nodes)  # type: ignore
+            )
+            if len(available_nodes) < node_replicas:
+                raise NodeClusterSmall(
+                    f"Could not find enough nodes with available shards: {len(available_nodes)} vs {node_replicas}"
+                )
+        # Sort available nodes by increasing shard_count and load_scode
+        sorted_nodes = sorted(available_nodes, key=lambda x: (x[1], x[2]))
+        return [node_id for node_id, _, _ in sorted_nodes][:node_replicas]
 
 
 NODE_CLUSTER = ClusterObject()

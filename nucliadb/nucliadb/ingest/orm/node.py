@@ -161,16 +161,18 @@ class Node(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
-        nodes = NODE_CLUSTER.find_nodes(kbid)
+        nodes = NODE_CLUSTER.find_nodes()
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
         try:
             for node in nodes:
                 logger.info(f"Node description: {node}")
                 node_obj = NODES.get(node)
-                logger.info(f"Node obj: {node_obj}")
                 if node_obj is None:
                     raise NodesUnsync()
+                logger.info(
+                    f"Node obj: {node_obj} Shards: {node_obj.shard_count} Load: {node_obj.load_score}"
+                )
                 shard_created = await node_obj.new_shard()
                 sr = ShardReplica(node=str(node))
                 sr.shard.CopyFrom(shard_created)
@@ -178,9 +180,9 @@ class Node(AbstractNode):
         except Exception as e:
             # rollback
             for shard_replica in shard.replicas:
-                node = NODES.get(shard_replica.node)
-                if node is not None:
-                    await node.delete_shard(shard_replica.shard.id)
+                node_obj = NODES.get(shard_replica.node)
+                if node_obj is not None:
+                    await node_obj.delete_shard(shard_replica.shard.id)
             raise e
 
         key = KB_SHARDS.format(kbid=kbid)
@@ -305,8 +307,6 @@ class Node(AbstractNode):
         dummy: bool = False,
     ):
         NODES[ident] = Node(address, type, load_score, shard_count, dummy)
-        # Compute cluster
-        NODE_CLUSTER.compute()
 
     @classmethod
     async def get(cls, ident: str) -> Optional[Node]:
@@ -315,7 +315,6 @@ class Node(AbstractNode):
     @classmethod
     async def destroy(cls, ident: str):
         del NODES[ident]
-        NODE_CLUSTER.compute()
 
     @classmethod
     async def load_active_nodes(cls):
