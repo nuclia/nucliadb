@@ -29,7 +29,6 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
-from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb.sentry import SENTRY, set_sentry
@@ -85,6 +84,8 @@ base_app = FastAPI(title="NucliaDB Train API", **fastapi_settings)  # type: igno
 
 base_app.include_router(api)
 
+extend_openapi(base_app)
+
 application = VersionedFastAPI(
     base_app,
     version_format="{major}",
@@ -93,13 +94,6 @@ application = VersionedFastAPI(
     enable_latest=False,
     kwargs=fastapi_settings,
 )
-
-# Fastapi versioning does not propagate exception handlers to inner mounted apps
-# We need to patch it manually for now. Also extend OpenAPI definitions
-for route in application.routes:
-    if isinstance(route, Mount):
-        route.app.middleware_stack.handler = global_exception_handler  # type: ignore
-        extend_openapi(route.app)  # type: ignore
 
 
 async def homepage(request: Request) -> HTMLResponse:
