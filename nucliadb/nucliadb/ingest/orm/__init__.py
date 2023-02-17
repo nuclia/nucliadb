@@ -46,7 +46,9 @@ class ClusterObject:
 
     def find_nodes(self) -> List[str]:
         """
-        Returns a list of node ids or raises exceptions if it can't find enough nodes
+        Returns a list of node ids ordered by increasing shard count.
+        Will raise an exception if it can't find enough nodes for the
+        configured replicas.
         """
         node_replicas = settings.node_replicas
         total_nodes = len(NODES)
