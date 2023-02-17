@@ -20,18 +20,18 @@
 
 use clap::Parser;
 use eyre::{eyre, Result};
-use futures::future;
+use nucliadb_shard_balancer::balancer::{BalanceSettings, Balancer};
+use nucliadb_shard_balancer::node::Node;
 use tracing_subscriber::EnvFilter;
 use url::Url;
-
-use nucliadb_shard_balancer::balancer::{Balancer, Settings, ShardCutover};
-use nucliadb_shard_balancer::node::Node;
 
 #[derive(Parser)]
 struct Opt {
     url: Url,
+    #[arg(short, long)]
+    dry_run: bool,
     #[command(flatten)]
-    settings: Settings,
+    balance_settings: BalanceSettings,
 }
 
 #[tokio::main]
@@ -48,14 +48,17 @@ async fn main() -> Result<()> {
     let nodes = Node::fetch_all(opt.url).await?;
     tracing::debug!("Fetched nodes: {nodes:?}");
 
-    let balancer = Balancer::new(opt.settings);
-    let balance_tasks = balancer
-        .balance_shards(&nodes)
-        .into_iter()
-        .map(ShardCutover::execute)
-        .collect::<Vec<_>>();
+    let balancer = Balancer::new(opt.balance_settings);
 
-    futures::future::join_all(balance_tasks).await;
+    // Execute shard balancing one by one to handle
+    // full node and downtime cases.
+    for shard_cutover in balancer.balance_shards(nodes) {
+        tracing::debug!("Shard cutover: {shard_cutover:?}");
+
+        if !opt.dry_run {
+            shard_cutover.execute().await?;
+        }
+    }
 
     Ok(())
 }
