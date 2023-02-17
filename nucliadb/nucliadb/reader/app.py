@@ -18,13 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
     AioHttpClientInstrumentor,
 )
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-from sentry_sdk import capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -40,6 +38,7 @@ from nucliadb.reader.lifecycle import finalize, initialize
 from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.exception_handlers import default_exception_handlers
 from nucliadb_utils.fastapi.instrumentation import instrument_app
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -73,20 +72,12 @@ on_startup = [initialize]
 on_shutdown = [finalize]
 
 
-async def global_exception_handler(request, exc):
-    capture_exception(exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Something went wrong, please contact your administrator"},
-    )
-
-
 fastapi_settings = dict(
     debug=running_settings.debug,
     middleware=middleware,
     on_startup=on_startup,
     on_shutdown=on_shutdown,
-    exception_handlers={Exception: global_exception_handler},
+    exception_handlers=default_exception_handlers,
 )
 
 

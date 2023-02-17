@@ -42,6 +42,7 @@ from nucliadb.search.lifecycle import finalize, initialize
 from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
+from nucliadb_utils.fastapi.exception_handlers import default_exception_handlers
 from nucliadb_utils.fastapi.instrumentation import instrument_app
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -79,16 +80,12 @@ on_startup = [initialize]
 on_shutdown = [finalize]
 
 
-async def global_exception_handler(request, exc):
-    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
-
-
 fastapi_settings = dict(
     debug=running_settings.debug,
     middleware=middleware,
     on_startup=on_startup,
     on_shutdown=on_shutdown,
-    exception_handlers={Exception: global_exception_handler},
+    exception_handlers=default_exception_handlers,
 )
 
 
