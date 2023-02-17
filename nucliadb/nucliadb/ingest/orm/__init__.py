@@ -44,29 +44,36 @@ class ClusterObject:
     def get_local_node(self):
         return self.local_node
 
-    def find_nodes(self) -> List[str]:
+    def find_nodes(self, exclude_nodes: List[str]) -> List[str]:
         """
         Returns a list of node ids ordered by increasing shard count.
-        Will raise an exception if it can't find enough nodes for the
-        configured replicas.
+        It will exclude the nodes passed as argument from the computation.
+        It raises an exception if it can't find enough nodes for the configured replicas.
         """
         node_replicas = settings.node_replicas
         total_nodes = len(NODES)
         if total_nodes < node_replicas:
             raise NodeClusterSmall(
-                f"Not enough nodes available: {total_nodes} vs {node_replicas}"
+                f"Not enough nodes. Total: {total_nodes}, Required: {node_replicas}"
             )
+        # Filter out node ids that should be excluded
         available_nodes: List[Tuple[str, int, float]] = [
             (node_id, node.shard_count, node.load_score)
-            for (node_id, node) in NODES.items()
+            for node_id, node in NODES.items()
+            if node_id not in exclude_nodes
         ]
+        if len(available_nodes) < node_replicas:
+            raise NodeClusterSmall(
+                f"Could not find enough nodes. Total: {total_nodes}, Available: {len(available_nodes)}, Required: {node_replicas}"  # noqa
+            )
+
         if settings.max_node_shards is not None:
             available_nodes = list(
                 filter(lambda x: x[1] < settings.max_node_shards, available_nodes)  # type: ignore
             )
             if len(available_nodes) < node_replicas:
                 raise NodeClusterSmall(
-                    f"Could not find enough nodes with available shards: {len(available_nodes)} vs {node_replicas}"
+                    f"Could not find enough nodes with available shards. Available: {len(available_nodes)}, Required: {node_replicas}"  # noqa
                 )
         # Sort available nodes by increasing shard_count and load_scode
         sorted_nodes = sorted(available_nodes, key=lambda x: (x[1], x[2]))

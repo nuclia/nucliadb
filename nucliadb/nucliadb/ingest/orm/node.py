@@ -39,7 +39,7 @@ from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm import NODE_CLUSTER, NODES
+from nucliadb.ingest.orm import NODE_CLUSTER, NODES, NodeClusterSmall
 from nucliadb.ingest.orm.abc import AbstractNode  # type: ignore
 from nucliadb.ingest.orm.exceptions import NodesUnsync  # type: ignore
 from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
@@ -163,7 +163,29 @@ class Node(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
-        node_ids = NODE_CLUSTER.find_nodes()
+        kb_shards_key = KB_SHARDS.format(kbid=kbid)
+        kb_shards: Optional[PBShards] = None
+        kb_shards_binary = await txn.get(kb_shards_key)
+        already_used_nodes = []
+        if kb_shards_binary:
+            kb_shards = PBShards()
+            kb_shards.ParseFromString(kb_shards_binary)
+            # When adding a new logic shard on an existing index, we need to
+            # exclude nodes in which there is already a shard from the same KB
+            already_used_nodes = [
+                replica.node for shard in kb_shards.shards for replica in shard.replicas
+            ]
+
+        try:
+            node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=already_used_nodes)
+        except NodeClusterSmall as err:
+            if SENTRY:
+                capture_exception(err)
+            logger.error(
+                "Shard creation because replication requirements can't be met. Time to add more nodes"
+            )
+            raise
+
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
         try:
@@ -176,12 +198,12 @@ class Node(AbstractNode):
                     f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
                 )
                 shard_created = await node.new_shard()
-                sr = ShardReplica(node=str(node_id))
-                sr.shard.CopyFrom(shard_created)
-                shard.replicas.append(sr)
-        except Exception as e:
+                replica = ShardReplica(node=str(node_id))
+                replica.shard.CopyFrom(shard_created)
+                shard.replicas.append(replica)
+        except Exception as new_shard_error:
             if SENTRY:
-                capture_exception(e)
+                capture_exception(new_shard_error)
             logger.error("Error creating new shard")
             # Attempt to rollback
             for shard_replica in shard.replicas:
@@ -196,20 +218,19 @@ class Node(AbstractNode):
                         logger.error(
                             f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
                         )
-                        pass
-            raise e
+            raise new_shard_error
 
-        key = KB_SHARDS.format(kbid=kbid)
-        payload = await txn.get(key)
-        kb_shards = PBShards()
-        if payload is not None:
-            kb_shards.ParseFromString(payload)
-        else:
+        if kb_shards is None:
+            kb_shards = PBShards()
             kb_shards.kbid = kbid
             kb_shards.actual = -1
+
+        # Append the created logic shard and increase pointer to actual shard
         kb_shards.shards.append(shard)
         kb_shards.actual += 1
-        await txn.set(key, kb_shards.SerializeToString())
+
+        # Store
+        await txn.set(kb_shards_key, kb_shards.SerializeToString())
 
         return Shard(sharduuid=sharduuid, shard=shard)
 
