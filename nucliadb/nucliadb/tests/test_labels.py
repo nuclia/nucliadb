@@ -345,7 +345,7 @@ async def test_fieldmetadata_classification_labels(
     )
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
-        data=payload.json(),
+        data=payload.json(),  # type: ignore
         headers={"X-SYNCHRONOUS": "True"},
     )
     assert resp.status_code == 201
@@ -355,4 +355,4 @@ async def test_fieldmetadata_classification_labels(
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
     assert resp.status_code == 200
     resource = Resource.parse_raw(resp.content)
-    assert resource.fieldmetadata[0] == fieldmetadata
+    assert resource.fieldmetadata[0] == fieldmetadata  # type: ignore
