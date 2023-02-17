@@ -37,6 +37,8 @@ pub enum VectorErr {
     WorkDelayed,
     #[error("Several writers are open at the same time ")]
     MultipleWriters,
+    #[error("Merger is already initialized")]
+    MergerAlreadyInitialized,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

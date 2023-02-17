@@ -22,16 +22,17 @@ use std::sync::MutexGuard;
 use std::time::Duration;
 
 use nucliadb_core::fs_state;
-use tracing::*;
+use nucliadb_core::tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
 use super::work_flag::MergerWriterSync;
 use super::State;
 use crate::data_point::{DataPoint, DpId};
+use crate::data_point_provider::merger;
 use crate::VectorR;
 
 const SLEEP_TIME: Duration = Duration::from_millis(100);
-pub struct Worker {
+pub(crate) struct Worker {
     location: PathBuf,
     work_flag: MergerWriterSync,
 }
@@ -41,7 +42,7 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
-    pub fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+    pub(crate) fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
         Box::new(Worker {
             location,
             work_flag,
@@ -58,19 +59,15 @@ impl Worker {
         msg
     }
     fn notify_merger(&self) {
-        use crate::data_point_provider::merger;
-        let notifier = merger::get_notifier();
         let worker = Worker::request(self.location.clone(), self.work_flag.clone());
-        if let Err(e) = notifier.send(worker) {
-            tracing::info!("Could not request merge: {}", e);
-        }
+        merger::send_merge_request(worker);
     }
     fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
         loop {
             match self.work_flag.try_to_start_working() {
                 Ok(lock) => break lock,
                 Err(_) => {
-                    tracing::info!("Merge delayed at: {:?}", self.location);
+                    info!("Merge delayed at: {:?}", self.location);
                     std::thread::sleep(SLEEP_TIME);
                 }
             }
@@ -115,7 +112,7 @@ impl Worker {
             .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
         std::mem::drop(work_flag);
 
-        tracing::info!("Merge request completed");
+        info!("Merge request completed");
         Ok(())
     }
 }
