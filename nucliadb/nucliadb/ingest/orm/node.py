@@ -35,6 +35,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
@@ -48,6 +49,7 @@ from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
 )
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.settings import settings
+from nucliadb.sentry import SENTRY
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
@@ -161,28 +163,40 @@ class Node(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
-        nodes = NODE_CLUSTER.find_nodes()
+        node_ids = NODE_CLUSTER.find_nodes()
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
         try:
-            for node in nodes:
-                logger.info(f"Node description: {node}")
-                node_obj = NODES.get(node)
-                if node_obj is None:
-                    raise NodesUnsync()
+            for node_id in node_ids:
+                logger.info(f"Node description: {node_id}")
+                node = NODES.get(node_id)
+                if node is None:
+                    raise NodesUnsync(f"Node {node_id} is not found or not available")
                 logger.info(
-                    f"Node obj: {node_obj} Shards: {node_obj.shard_count} Load: {node_obj.load_score}"
+                    f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
                 )
-                shard_created = await node_obj.new_shard()
-                sr = ShardReplica(node=str(node))
+                shard_created = await node.new_shard()
+                sr = ShardReplica(node=str(node_id))
                 sr.shard.CopyFrom(shard_created)
                 shard.replicas.append(sr)
         except Exception as e:
-            # rollback
+            if SENTRY:
+                capture_exception(e)
+            logger.error("Error creating new shard")
+            # Attempt to rollback
             for shard_replica in shard.replicas:
-                node_obj = NODES.get(shard_replica.node)
-                if node_obj is not None:
-                    await node_obj.delete_shard(shard_replica.shard.id)
+                node_id, replica_id = shard_replica.node, shard_replica.shard.id
+                node = NODES.get(node_id)
+                if node is not None:
+                    try:
+                        await node.delete_shard(replica_id)
+                    except Exception as rollback_error:
+                        if SENTRY:
+                            capture_exception(rollback_error)
+                        logger.error(
+                            f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
+                        )
+                        pass
             raise e
 
         key = KB_SHARDS.format(kbid=kbid)
