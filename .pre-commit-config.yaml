@@ -32,7 +32,7 @@ repos:
 
  - id: clippy_nucliadb
     name: clippy
-    entry: cargo clippy
+    entry: cargo clippy --all-features -- -D warnings
     language: system
     files: (^nucliadb_vectors/)|(^nucliadb_node/)|(^nucliadb_telemetry/)|(^nucliadb_cluster/)|(^nucliadb_paragraphs/)|(^nucliadb_texts/)
     types: ["rust"]

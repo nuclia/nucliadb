@@ -34,6 +34,7 @@ use state::*;
 use work_flag::MergerWriterSync;
 
 use crate::data_point::{DataPoint, DpId};
+use crate::data_point_provider::merge_worker::Worker;
 use crate::VectorR;
 pub type TemporalMark = SystemTime;
 
@@ -85,7 +86,6 @@ impl Index {
         Ok(())
     }
     fn notify_merger(&self) {
-        use crate::data_point_provider::merge_worker::Worker;
         let worker = Worker::request(self.location.clone(), self.work_flag.clone());
         merger::send_merge_request(worker);
     }

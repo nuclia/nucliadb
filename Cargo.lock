@@ -2088,7 +2088,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
- "tracing",
  "uuid 1.2.2",
 ]
 

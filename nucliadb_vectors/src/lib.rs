@@ -37,7 +37,7 @@ pub enum VectorErr {
     WorkDelayed,
     #[error("Several writers are open at the same time ")]
     MultipleWriters,
-    #[error("Can not initialize the merger twice")]
+    #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
 }
 

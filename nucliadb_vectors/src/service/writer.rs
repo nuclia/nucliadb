@@ -24,7 +24,7 @@ use data_point::{Elem, LabelDictionary};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId};
-use tracing::*;
+use nucliadb_core::tracing::{self, *};
 
 use crate::data_point::DataPoint;
 use crate::data_point_provider::*;

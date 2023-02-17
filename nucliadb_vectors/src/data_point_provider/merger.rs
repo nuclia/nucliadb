@@ -20,6 +20,8 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Once;
 
+use nucliadb_core::tracing;
+
 use crate::{VectorErr, VectorR};
 
 pub type MergeRequest = Box<dyn MergeQuery>;
@@ -42,6 +44,9 @@ static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
 static MERGER_NOTIFIER_SET: Once = Once::new();
 
 pub fn send_merge_request(request: MergeRequest) {
+    // It is always safe to read from MERGER_NOTIFIER since
+    // it can only be writen through MERGER_NOTIFIER_SET and is not exposed in the public interface.
+    // MERGER_NOTIFIER_SET is protected by the type Once so we avoid concurrency problems.
     match unsafe { &MERGER_NOTIFIER } {
         Some(merger) => merger.send(request),
         None => tracing::warn!("Merge requests are being sent without a merger intalled"),
@@ -56,9 +61,10 @@ impl Merger {
     pub fn install_global() -> VectorR<impl FnOnce()> {
         let mut status = Err(VectorErr::MergerAlreadyInitialized);
         MERGER_NOTIFIER_SET.call_once(|| unsafe {
-            let None = MERGER_NOTIFIER else { return };
             let (stxn, rtxn) = mpsc::channel();
             let handler = MergerHandle(stxn);
+            // It is safe to initialize MERGER_NOTIFIER
+            // since the setter can only be called once.
             MERGER_NOTIFIER = Some(handler);
             status = Ok(|| Merger { rtxn }.run());
         });
