@@ -30,10 +30,19 @@ from nucliadb.ingest.orm.resource import (
 )
 from nucliadb.ingest.tests.vectors import V1, V2, V3
 from nucliadb.tests.utils import inject_message
+from nucliadb_models.common import UserClassification
 from nucliadb_models.extracted import Classification
-from nucliadb_models.metadata import ComputedMetadata, FieldClassification, FieldID
+from nucliadb_models.metadata import (
+    ComputedMetadata,
+    FieldClassification,
+    FieldID,
+    ParagraphAnnotation,
+    UserFieldMetadata,
+)
 from nucliadb_models.resource import Resource, ResourceList
 from nucliadb_models.search import KnowledgeboxSearchResults
+from nucliadb_models.text import TextField
+from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos import resources_pb2 as rpb
 
 
@@ -308,3 +317,42 @@ def test_add_field_classifications():
     assert basic.computedmetadata.field_classifications[0] == rpb.FieldClassifications(
         field=field, classifications=[c1]
     )
+
+
+@pytest.mark.asyncio
+async def test_fieldmetadata_classification_labels(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    fieldmetadata = UserFieldMetadata(
+        field=FieldID(field="text", field_type=FieldID.FieldType.TEXT),
+        paragraphs=[
+            ParagraphAnnotation(
+                key="foobar",
+                classifications=[
+                    UserClassification(
+                        label="foo", labelset="bar", cancelled_by_user=True
+                    )
+                ],
+            )
+        ],
+    )
+    payload = CreateResourcePayload(
+        title="Foo",
+        texts={"text": TextField(body="my text")},
+        fieldmetadata=[fieldmetadata],
+    )
+    resp = await nucliadb_writer.post(
+        f"/kb/{knowledgebox}/resources",
+        data=payload.json(),
+        headers={"X-SYNCHRONOUS": "True"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Check resource get
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}?show=basic")
+    assert resp.status_code == 200
+    resource = Resource.parse_raw(resp.content)
+    assert resource.fieldmetadata[0] == fieldmetadata
