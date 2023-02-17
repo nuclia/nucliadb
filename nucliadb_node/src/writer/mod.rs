@@ -46,7 +46,7 @@ impl Default for NodeWriterService {
 }
 impl NodeWriterService {
     pub fn new() -> Self {
-        // We shallow the error if the threadpool was already initialized
+        // We shallow the error if the threadpools were already initialized
         let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
         let _ = VectorsMerger::install_global().map(std::thread::spawn);
         Self {
