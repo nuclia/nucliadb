@@ -166,18 +166,18 @@ class Node(AbstractNode):
         kb_shards_key = KB_SHARDS.format(kbid=kbid)
         kb_shards: Optional[PBShards] = None
         kb_shards_binary = await txn.get(kb_shards_key)
-        already_used_nodes = []
+        kb_nodes = []
         if kb_shards_binary:
             kb_shards = PBShards()
             kb_shards.ParseFromString(kb_shards_binary)
             # When adding a new logic shard on an existing index, we need to
             # exclude nodes in which there is already a shard from the same KB
-            already_used_nodes = [
+            kb_nodes = [
                 replica.node for shard in kb_shards.shards for replica in shard.replicas
             ]
 
         try:
-            node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=already_used_nodes)
+            node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=kb_nodes)
         except NodeClusterSmall as err:
             if SENTRY:
                 capture_exception(err)
@@ -201,24 +201,12 @@ class Node(AbstractNode):
                 replica = ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
-        except Exception as new_shard_error:
+        except Exception as e:
             if SENTRY:
-                capture_exception(new_shard_error)
+                capture_exception(e)
             logger.error("Error creating new shard")
-            # Attempt to rollback
-            for shard_replica in shard.replicas:
-                node_id, replica_id = shard_replica.node, shard_replica.shard.id
-                node = NODES.get(node_id)
-                if node is not None:
-                    try:
-                        await node.delete_shard(replica_id)
-                    except Exception as rollback_error:
-                        if SENTRY:
-                            capture_exception(rollback_error)
-                        logger.error(
-                            f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
-                        )
-            raise new_shard_error
+            await cls.rollback_shard(shard)
+            raise e
 
         if kb_shards is None:
             kb_shards = PBShards()
@@ -229,10 +217,26 @@ class Node(AbstractNode):
         kb_shards.shards.append(shard)
         kb_shards.actual += 1
 
-        # Store
+        # Store the updated value
         await txn.set(kb_shards_key, kb_shards.SerializeToString())
 
         return Shard(sharduuid=sharduuid, shard=shard)
+
+    @classmethod
+    async def rollback_shard(cls, shard: PBShard):
+        for shard_replica in shard.replicas:
+            node_id = shard_replica.node
+            replica_id = shard_replica.shard.id
+            node = NODES.get(node_id)
+            if node is not None:
+                try:
+                    await node.delete_shard(replica_id)
+                except Exception as rollback_error:
+                    if SENTRY:
+                        capture_exception(rollback_error)
+                    logger.error(
+                        f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
+                    )
 
     @classmethod
     async def create_shadow_shard(

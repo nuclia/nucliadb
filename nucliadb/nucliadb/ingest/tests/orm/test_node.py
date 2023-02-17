@@ -17,11 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from unittest import mock
+
 import pytest
 from nucliadb_protos.writer_pb2 import Member
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
+from nucliadb.ingest.orm import NODES, NodeClusterSmall
+from nucliadb.ingest.orm.node import ClusterMember, Node, NodeType, chitchat_update_node
+from nucliadb.ingest.settings import settings
+from nucliadb_utils.keys import KB_SHARDS
 
 
 def get_cluster_member(
@@ -152,3 +157,84 @@ async def test_update_node_metrics(metrics_registry):
     )
 
     NODES.clear()
+
+
+async def get_kb_shards(txn, kbid):
+    kb_shards = None
+    kb_shards_key = KB_SHARDS.format(kbid=kbid)
+    kb_shards_binary = await txn.get(kb_shards_key)
+    if kb_shards_binary:
+        kb_shards = PBShards()
+        kb_shards.ParseFromString(kb_shards_binary)
+    return kb_shards
+
+
+@pytest.fixture(scope="function")
+def one_replica():
+    prev = settings.node_replicas
+    settings.node_replicas = 1
+    yield
+    settings.node_replicas = prev
+
+
+@pytest.mark.asyncio
+async def test_create_shard_by_kbid(one_replica, txn, fake_node):
+    kbid = "mykbid"
+    # Initially there is no shards object
+    assert await get_kb_shards(txn, kbid) is None
+
+    # Create a shard
+    await Node.create_shard_by_kbid(txn, kbid)
+
+    # Check that kb shards object is correct
+    kb_shards = await get_kb_shards(txn, kbid)
+    assert len(kb_shards.shards) == 1
+    assert kb_shards.actual == 0
+    assert len(kb_shards.shards[0].replicas) == 1
+    node = kb_shards.shards[0].replicas[0].node
+
+    # Create another shard
+    await Node.create_shard_by_kbid(txn, kbid)
+
+    # Check that kb shards object was updated correctly
+    kb_shards = await get_kb_shards(txn, kbid)
+    assert len(kb_shards.shards) == 2
+    assert kb_shards.actual == 1
+    assert len(kb_shards.shards[1].replicas) == 1
+    # New shard has been created in a different node
+    assert kb_shards.shards[1].replicas[0].node != node
+
+    # Attempting to create another shard will fail
+    # because we don't have sufficient nodes
+    with pytest.raises(NodeClusterSmall):
+        await Node.create_shard_by_kbid(txn, kbid)
+
+
+@pytest.mark.asyncio
+async def test_create_shard_by_kbid_insufficient_nodes(txn):
+    with pytest.raises(NodeClusterSmall):
+        await Node.create_shard_by_kbid(txn, "foo")
+
+
+@pytest.fixture(scope="function")
+async def node_errors():
+    id, node = NODES.popitem()
+    await Node.set(
+        id,
+        address="nohost:9999",
+        type=NodeType.IO,
+        load_score=0.0,
+        shard_count=0,
+        dummy=True,
+    )
+    NODES[id].new_shard = mock.AsyncMock(side_effect=ValueError)
+
+    yield
+
+    NODES[id] = node
+
+
+@pytest.mark.asyncio
+async def test_create_shard_by_kbid_rolls_back(txn, fake_node, node_errors):
+    with pytest.raises(ValueError):
+        await Node.create_shard_by_kbid(txn, "foo")
