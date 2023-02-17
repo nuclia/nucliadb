@@ -22,22 +22,29 @@ use std::sync::Once;
 
 use crate::{VectorErr, VectorR};
 
-static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
-static MERGER_NOTIFIER_SET: Once = Once::new();
+pub type MergeRequest = Box<dyn MergeQuery>;
+pub type MergeTxn = Sender<MergeRequest>;
 
-pub(crate) type MergeRequest = Box<dyn MergeQuery>;
-pub(crate) type MergeTxn = Sender<MergeRequest>;
-
-pub(crate) trait MergeQuery: Send {
+pub trait MergeQuery: Send {
     fn do_work(&self) -> VectorR<()>;
 }
 
 #[derive(Clone)]
-pub struct MergerHandle(MergeTxn);
+struct MergerHandle(MergeTxn);
 impl MergerHandle {
-    pub(crate) fn send(&self, request: MergeRequest) {
+    pub fn send(&self, request: MergeRequest) {
         let Err(e) = self.0.send(request) else { return };
         tracing::info!("Error sending merge request, {e}");
+    }
+}
+
+static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
+static MERGER_NOTIFIER_SET: Once = Once::new();
+
+pub fn send_merge_request(request: MergeRequest) {
+    match unsafe { &MERGER_NOTIFIER } {
+        Some(merger) => merger.send(request),
+        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
     }
 }
 
@@ -67,12 +74,5 @@ impl Merger {
                 },
             }
         }
-    }
-}
-
-pub(crate) fn send_merge_request(request: MergeRequest) {
-    match unsafe { &MERGER_NOTIFIER } {
-        Some(merger) => merger.send(request),
-        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
     }
 }
