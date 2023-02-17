@@ -104,6 +104,7 @@ def parse_basic_modify(
                         Classification(
                             labelset=classification.labelset,
                             label=classification.label,
+                            cancelled_by_user=classification.cancelled_by_user,
                         )
                     )
                 userfieldmetadata.paragraphs.append(paragraphpb)
