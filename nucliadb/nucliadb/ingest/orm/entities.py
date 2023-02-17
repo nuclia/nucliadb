@@ -245,7 +245,7 @@ class EntitiesManager:
 
     async def index_entities(self, group: str, entities: EntitiesGroup):
         # TODO properly indexing of SYNONYM relations
-        nodes = {
+        graph_nodes = {
             i: RelationNode(
                 value=entity.value,
                 ntype=RelationNode.NodeType.ENTITY,
@@ -254,7 +254,7 @@ class EntitiesManager:
             for i, (name, entity) in enumerate(entities.entities.items())
         }
 
-        jg = JoinGraph(nodes=nodes, edges=[])
+        jg = JoinGraph(nodes=graph_nodes, edges=[])
 
         async for node, shard_id in self.kb.iterate_kb_nodes():
             sg = SetGraph(shard_id=ShardId(id=shard_id), graph=jg)
