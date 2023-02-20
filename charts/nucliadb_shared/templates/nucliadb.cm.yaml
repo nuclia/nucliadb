@@ -55,6 +55,7 @@ data:
   NUCLIADB_INGEST: {{ .Values.nucliadb.ingest }}
   NODE_WRITER_PORT: {{ .Values.nucliadb.node_writer_port | quote }}
   NODE_READER_PORT: {{ .Values.nucliadb.node_reader_port | quote }}
+  NODE_SIDECAR_PORT: {{ .Values.nucliadb.node_sidecar_port | quote }}
   CACHE_PUBSUB_DRIVER: {{ .Values.cache.cache_pubsub_driver }}
 {{- if eq .Values.cache.cache_pubsub_driver "redis" }}
   CACHE_PUBSUB_REDIS_URL: {{ .Values.cache.cache_pubsub_redis_url }}

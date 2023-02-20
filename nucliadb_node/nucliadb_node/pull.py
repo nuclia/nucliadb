@@ -83,7 +83,7 @@ class Worker:
         logger.info("Got disconnected from NATS!")
 
     async def reconnected_cb(self):
-        # See who we are connected to on reconnect.
+        # See who we are connected to on reconnect
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
