@@ -83,7 +83,7 @@ async def main() -> App:
     worker = Worker(writer=writer, reader=reader, node=node)
     await worker.initialize()
 
-    grpc_finalizer = await start_grpc(reader=reader, writer=writer)
+    grpc_finalizer = await start_grpc(writer=writer, reader=reader)
 
     logger.info(f"======= Node sidecar started ======")
 

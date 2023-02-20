@@ -54,8 +54,8 @@ from nucliadb_protos import nodewriter_pb2_grpc
 
 class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
     def __init__(self, reader: Reader, writer: Writer):
-        self.writer = writer
         self.reader = reader
+        self.writer = writer
 
     async def initialize(self):
         pass

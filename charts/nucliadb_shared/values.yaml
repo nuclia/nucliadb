@@ -51,6 +51,7 @@ nucliadb:
   ingest: ingest:4242
   node_writer_port: 10001
   node_reader_port: 10000
+  node_sidecar_port: 10002
 
 transaction:
   transaction_jetstream_auth:
