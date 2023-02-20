@@ -171,7 +171,7 @@ class Node(AbstractNode):
                 logger.info(f"Node obj: {node_obj}")
                 if node_obj is None:
                     raise NodesUnsync()
-                shard_created = await node_obj.new_shard()
+                shard_created = await node_obj.new_shard(kbid)
                 sr = ShardReplica(node=str(node))
                 sr.shard.CopyFrom(shard_created)
                 shard.replicas.append(sr)

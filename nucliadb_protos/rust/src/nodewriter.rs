@@ -181,7 +181,7 @@ pub mod node_writer_client {
         }
         pub async fn new_shard(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardMetadata>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -608,7 +608,7 @@ pub mod node_writer_server {
         >;
         async fn new_shard(
             &self,
-            request: tonic::Request<super::super::noderesources::EmptyQuery>,
+            request: tonic::Request<super::super::noderesources::ShardMetadata>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -778,7 +778,7 @@ pub mod node_writer_server {
                     impl<
                         T: NodeWriter,
                     > tonic::server::UnaryService<
-                        super::super::noderesources::EmptyQuery,
+                        super::super::noderesources::ShardMetadata,
                     > for NewShardSvc<T> {
                         type Response = super::super::noderesources::ShardCreated;
                         type Future = BoxFuture<
@@ -788,7 +788,7 @@ pub mod node_writer_server {
                         fn call(
                             &mut self,
                             request: tonic::Request<
-                                super::super::noderesources::EmptyQuery,
+                                super::super::noderesources::ShardMetadata,
                             >,
                         ) -> Self::Future {
                             let inner = self.0.clone();

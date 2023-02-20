@@ -27,7 +27,7 @@ use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
     op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, OpStatus,
     ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest, SetGraph,
-    Shard as ShardPB, ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
+    ShardId, ShardMetadata, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
     VectorSetList,
 };
 use nucliadb_telemetry::blocking::send_telemetry_event;
@@ -133,15 +133,7 @@ impl NodeReader {
             .get_shard(shard_id)
             .map(|s| s.get_info(&request));
         match response {
-            Some(Ok(stats)) => {
-                let shard_pb = ShardPB {
-                    shard_id: shard_id.id.clone(),
-                    resources: stats.resources as u64,
-                    paragraphs: stats.paragraphs as u64,
-                    sentences: stats.sentences as u64,
-                };
-                Ok(PyList::new(py, shard_pb.encode_to_vec()))
-            }
+            Some(Ok(shard)) => Ok(PyList::new(py, shard.encode_to_vec())),
             Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
         }
@@ -279,10 +271,13 @@ impl NodeWriter {
         }
     }
 
-    pub fn new_shard<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    pub fn new_shard<'p>(&mut self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_telemetry_event(TelemetryEvent::Create);
-        let shard = self.writer.new_shard();
-        Ok(PyList::new(py, shard.encode_to_vec()))
+        let metadata = ShardMetadata::decode(&mut Cursor::new(metadata)).unwrap();
+        match self.writer.new_shard(metadata) {
+            Ok(shard) => Ok(PyList::new(py, shard.encode_to_vec())),
+            Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+        }
     }
 
     pub fn delete_shard<'p>(&mut self, shard_id: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {

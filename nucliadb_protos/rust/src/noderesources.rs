@@ -84,6 +84,8 @@ pub struct ResourceId {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Shard {
+    #[prost(message, optional, tag="5")]
+    pub metadata: ::core::option::Option<ShardMetadata>,
     #[prost(string, tag="1")]
     pub shard_id: ::prost::alloc::string::String,
     #[prost(uint64, tag="2")]
@@ -230,4 +232,9 @@ pub mod resource {
         Delete = 3,
         Pending = 4,
     }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShardMetadata {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
 }
