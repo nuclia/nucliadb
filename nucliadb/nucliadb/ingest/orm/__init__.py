@@ -69,9 +69,10 @@ class ClusterObject:
             raise NodeClusterSmall(
                 f"Not enough nodes. Total: {len(available_nodes)}, Required: {target_replicas}"
             )
+
         if exclude_nodes:
             available_nodes = list(
-                filter(lambda x: x.id not in exclude_nodes, available_nodes)
+                filter(lambda x: x.id not in exclude_nodes, available_nodes)  # type: ignore
             )
             if len(available_nodes) < target_replicas:
                 raise NodeClusterSmall(
@@ -81,7 +82,7 @@ class ClusterObject:
         if settings.max_node_shards is not None:
             available_nodes = list(
                 filter(
-                    lambda x: x.shard_count < settings.max_node_shards, available_nodes
+                    lambda x: x.shard_count < settings.max_node_shards, available_nodes  # type: ignore
                 )
             )
             if len(available_nodes) < target_replicas:
