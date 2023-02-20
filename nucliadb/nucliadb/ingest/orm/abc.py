@@ -142,7 +142,7 @@ class AbstractNode(metaclass=ABCMeta):
         return resp
 
     async def new_shard(self, kbid: str) -> ShardCreated:
-        req = ShardMetadata(kb_id=kbid)
+        req = ShardMetadata(kbid=kbid)
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 

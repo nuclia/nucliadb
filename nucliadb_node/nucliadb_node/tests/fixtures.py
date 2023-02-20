@@ -189,7 +189,7 @@ async def sidecar_grpc_servicer(sidecar):
 @pytest.fixture(scope="function")
 async def shard() -> AsyncIterable[str]:
     stub = NodeWriterStub(aio.insecure_channel(settings.writer_listen_address))
-    request = ShardMetadata(kb_id="test")
+    request = ShardMetadata(kbid="test")
     shard: ShardCreated = await stub.NewShard(request)  # type: ignore
     yield shard.id
     sid = ShardId()
