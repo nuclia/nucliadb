@@ -30,6 +30,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
     ShardCreated,
     ShardId,
+    ShardMetadata,
     VectorSetID,
     VectorSetList,
 )
@@ -140,8 +141,8 @@ class AbstractNode(metaclass=ABCMeta):
         resp = await self.writer.GetShard(req)  # type: ignore
         return resp
 
-    async def new_shard(self) -> ShardCreated:
-        req = EmptyQuery()
+    async def new_shard(self, kbid: str) -> ShardCreated:
+        req = ShardMetadata(kb_id=kbid)
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 

@@ -43,6 +43,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCreated,
     ShardId,
     ShardIds,
+    ShardMetadata,
     VectorSetID,
     VectorSetList,
 )
@@ -202,9 +203,11 @@ class LocalWriterWrapper:
         pb.ParseFromString(pb_bytes)
         return pb
 
-    async def NewShard(self, request: EmptyQuery) -> ShardCreated:
+    async def NewShard(self, request: ShardMetadata) -> ShardCreated:
         loop = asyncio.get_running_loop()
-        resp = await loop.run_in_executor(self.executor, self.writer.new_shard)
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.new_shard, request.SerializeToString()
+        )
         pb_bytes = bytes(resp)
         shard_created = ShardCreated()
         shard_created.ParseFromString(pb_bytes)

@@ -29,7 +29,7 @@ from nucliadb_protos.nodewriter_pb2 import ShardCreated
 async def main():
     writer = nucliadb_node_binding.NodeWriter.new()
     reader = nucliadb_node_binding.NodeReader.new()
-    shard = await writer.new_shard()
+    shard = await writer.new_shard("test-kbid")
     pb = ShardCreated()
     pb.ParseFromString(bytearray(shard))
 
