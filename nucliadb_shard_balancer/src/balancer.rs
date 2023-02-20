@@ -23,7 +23,6 @@ use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 
 use clap::{Args, ValueEnum};
-use derive_more::Deref;
 use itertools::Itertools;
 use nucliadb_protos::node_writer_client::NodeWriterClient as GrpcClient;
 use nucliadb_protos::{AcceptShardRequest, MoveShardRequest, ShardId};
@@ -82,13 +81,14 @@ pub enum BalanceStrategy {
 ///     - The given node does not contain the shard replica.
 ///     - The shard has not been moved during previous shard cutover.
 /// 4. *OPTIONAL*: If the node candidate is full, swap shard candidate with an empty shard.
-#[derive(Deref)]
-pub struct Balancer(BalanceSettings);
+pub struct Balancer {
+    settings: BalanceSettings,
+}
 
 impl Balancer {
     /// Creates a new balancer with the given balance settings.
     pub fn new(settings: BalanceSettings) -> Self {
-        Self(settings)
+        Self { settings }
     }
 
     /// Creates the list of shard cutovers to evenly distribute the shards in the given list of
@@ -121,7 +121,8 @@ impl Balancer {
                     .rev()
                     // only consider nodes with enough difference
                     .filter(|node_candidate| {
-                        self.load_tolerance
+                        self.settings
+                            .load_tolerance
                             .diff(weightier_node.weight(), node_candidate.weight())
                             .is_above()
                     })
@@ -133,7 +134,7 @@ impl Balancer {
                     id: shard.id().to_string(),
                     source_address: source_node.listen_address(),
                     destination_address: destination_node.listen_address(),
-                    port: self.port,
+                    port: self.settings.port,
                 };
 
                 // we use position trick here to avoid conflict with the borrow checker.
@@ -156,7 +157,7 @@ impl Balancer {
 
     /// Get the node weight depending of the shard balancing strategy.
     fn weight_node(&self, node: &Node) -> u64 {
-        match self.strategy {
+        match self.settings.strategy {
             BalanceStrategy::ActiveShard => node.active_shards().count() as u64,
             BalanceStrategy::Workload => node.load_score(),
         }
@@ -199,8 +200,8 @@ impl Balancer {
                 // checks if node candidate can accept any new shard.
                 // if not, checks if we can move an empty shard from the node candidate to
                 // the weightier one.
-                if node_candidate.shards().count() == self.shard_limit.get()
-                    && !weightier_node.shards().count() != self.shard_limit.get()
+                if node_candidate.shards().count() == self.settings.shard_limit.get()
+                    && !weightier_node.shards().count() != self.settings.shard_limit.get()
                 {
                     node_candidate
                         .empty_shards()
