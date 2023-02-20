@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -30,6 +31,13 @@ if TYPE_CHECKING:
     from nucliadb.ingest.orm.node import Node
 
 NODES: Dict[str, Node] = {}
+
+
+@dataclass
+class ScoredNode:
+    id: str
+    shard_count: int
+    load_score: float
 
 
 class ClusterObject:
@@ -51,19 +59,19 @@ class ClusterObject:
         It raises an exception if it can't find enough nodes for the configured replicas.
         """
         target_replicas = settings.node_replicas
-        total_nodes = len(NODES)
-        if total_nodes < target_replicas:
-            raise NodeClusterSmall(
-                f"Not enough nodes. Total: {total_nodes}, Required: {target_replicas}"
-            )
-
         available_nodes = [
-            (node_id, node.shard_count, node.load_score)
+            ScoredNode(
+                id=node_id, shard_count=node.shard_count, load_score=node.load_score
+            )
             for node_id, node in NODES.items()
         ]
+        if len(available_nodes) < target_replicas:
+            raise NodeClusterSmall(
+                f"Not enough nodes. Total: {len(available_nodes)}, Required: {target_replicas}"
+            )
         if exclude_nodes:
             available_nodes = list(
-                filter(lambda x: x[0] not in exclude_nodes, available_nodes)  # type: ignore
+                filter(lambda x: x.id not in exclude_nodes, available_nodes)
             )
             if len(available_nodes) < target_replicas:
                 raise NodeClusterSmall(
@@ -72,7 +80,9 @@ class ClusterObject:
 
         if settings.max_node_shards is not None:
             available_nodes = list(
-                filter(lambda x: x[1] < settings.max_node_shards, available_nodes)  # type: ignore
+                filter(
+                    lambda x: x.shard_count < settings.max_node_shards, available_nodes
+                )
             )
             if len(available_nodes) < target_replicas:
                 raise NodeClusterSmall(
@@ -80,8 +90,10 @@ class ClusterObject:
                 )
 
         # Sort available nodes by increasing shard_count and load_scode
-        sorted_nodes = sorted(available_nodes, key=lambda x: (x[1], x[2]))
-        return [node_id for node_id, _, _ in sorted_nodes][:target_replicas]
+        sorted_nodes = sorted(
+            available_nodes, key=lambda x: (x.shard_count, x.load_score)
+        )
+        return [node.id for node in sorted_nodes][:target_replicas]
 
 
 NODE_CLUSTER = ClusterObject()
