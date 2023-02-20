@@ -170,7 +170,7 @@ class Node(AbstractNode):
         if kb_shards_binary:
             kb_shards = PBShards()
             kb_shards.ParseFromString(kb_shards_binary)
-            # When adding a new logic shard on an existing index, we need to
+            # When adding a logic shard on an existing index, we need to
             # exclude nodes in which there is already a shard from the same KB
             kb_nodes = [
                 replica.node for shard in kb_shards.shards for replica in shard.replicas
@@ -182,7 +182,7 @@ class Node(AbstractNode):
             if SENTRY:
                 capture_exception(err)
             logger.error(
-                "Shard creation because replication requirements can't be met. Time to add more nodes"
+                f"Shard creation for kbid={kbid} failed: Replication requirements could not be met."
             )
             raise
 
@@ -213,11 +213,10 @@ class Node(AbstractNode):
             kb_shards.kbid = kbid
             kb_shards.actual = -1
 
-        # Append the created logic shard and increase pointer to actual shard
+        # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
         kb_shards.actual += 1
 
-        # Store the updated value
         await txn.set(kb_shards_key, kb_shards.SerializeToString())
 
         return Shard(sharduuid=sharduuid, shard=shard)
