@@ -11,9 +11,10 @@ bounded-integer = { version = "0.5.3", features = ["types", "std"] }
 eyre = "0.6.8"
 color-eyre = "0.6.2"
 clap = { version = "4.1.4", features = ["derive", "env"] }
-tokio = { version = "1.25.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.25.0", features = ["rt-multi-thread", "macros", "fs"] }
 reqwest = { version = "0.11.14", features = ["json"] }
 serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
 thiserror = "1.0.38"
 tonic = "0.7.0"
 tracing = "0.1.37"

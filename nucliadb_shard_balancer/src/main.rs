@@ -18,7 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use clap::Parser;
+use std::path::PathBuf;
+
+use clap::{ArgGroup, Parser};
 use eyre::{eyre, Result};
 use nucliadb_shard_balancer::balancer::{BalanceSettings, Balancer};
 use nucliadb_shard_balancer::node::Node;
@@ -26,8 +28,12 @@ use tracing_subscriber::EnvFilter;
 use url::Url;
 
 #[derive(Parser)]
+#[command(group(ArgGroup::new("input").required(true).args(["url", "path"])))]
 struct Opt {
-    url: Url,
+    #[arg(long)]
+    url: Option<Url>,
+    #[arg(long)]
+    path: Option<PathBuf>,
     #[arg(short, long)]
     dry_run: bool,
     #[command(flatten)]
@@ -45,8 +51,15 @@ async fn main() -> Result<()> {
 
     let opt = Opt::parse();
 
-    let nodes = Node::fetch_all(opt.url).await?;
-    tracing::debug!("Fetched nodes: {nodes:?}");
+    let nodes = if let Some(path) = opt.path {
+        Node::from_file(&path).await?
+    } else if let Some(url) = opt.url {
+        Node::from_api(url).await?
+    } else {
+        unreachable!()
+    };
+
+    tracing::debug!("Nodes: {nodes:?}");
 
     let balancer = Balancer::new(opt.balance_settings);
 

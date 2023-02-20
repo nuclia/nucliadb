@@ -25,6 +25,8 @@ use tonic::{Code, Status};
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
+    IoError(#[from] std::io::Error),
+    #[error(transparent)]
     HttpError(#[from] reqwest::Error),
     #[error(transparent)]
     TransportError(#[from] tonic::transport::Error),

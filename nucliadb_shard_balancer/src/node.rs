@@ -18,8 +18,9 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fmt;
 use std::net::SocketAddr;
+use std::path::Path;
+use std::{fmt, io};
 
 use derive_more::{Deref, DerefMut};
 use futures::stream::{StreamExt, TryStreamExt};
@@ -46,7 +47,9 @@ fn deserialize_protobuf_node_type<'de, D: de::Deserializer<'de>>(
         }
 
         fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-        where E: de::Error {
+        where
+            E: de::Error,
+        {
             // deals with incompatiblities between API and protobuf representation
             match s {
                 "IO" => Ok(NodeType::Io),
@@ -62,26 +65,25 @@ fn deserialize_protobuf_node_type<'de, D: de::Deserializer<'de>>(
     deserializer.deserialize_any(Visitor)
 }
 
-async fn fetch_all_nodes(url: Url) -> Result<Vec<RawNode>, Error> {
-    let http_client = HttpClient::new();
+async fn load_nodes(raw_nodes: Vec<RawNode>) -> Result<Vec<Node>, Error> {
+    futures::stream::iter(raw_nodes)
+        .filter(|node| futures::future::ready(node.r#type == NodeType::Io && !node.dummy))
+        .map(Ok)
+        .and_then(|node| async move {
+            let mut grpc_client =
+                GrpcClient::connect(format!("http://{}", node.listen_address)).await?;
+            let response = grpc_client.get_shards(Request::new(EmptyQuery {})).await?;
 
-    Ok(http_client
-        .get(url)
-        .send()
-        .await?
-        .json::<Vec<RawNode>>()
-        .await?)
-}
+            let ShardList { shards } = response.into_inner();
 
-async fn load_node(mut node: Node) -> Result<Node, Error> {
-    let mut grpc_client = GrpcClient::connect(format!("http://{}", node.listen_address)).await?;
-    let response = grpc_client.get_shards(Request::new(EmptyQuery {})).await?;
-
-    let ShardList { shards } = response.into_inner();
-
-    node.shards = shards.into_iter().map(Shard::from).collect();
-
-    Ok(node)
+            Ok(Node {
+                id: node.id,
+                listen_address: node.listen_address,
+                shards: shards.into_iter().map(Shard::from).collect(),
+            })
+        })
+        .try_collect()
+        .await
 }
 
 /// The Nuclia's API node representation.
@@ -105,7 +107,7 @@ pub struct RawNode {
 }
 
 /// The internal shard representation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Shard {
     /// The shard identifier.
     id: String,
@@ -163,33 +165,39 @@ pub struct Node {
     shards: Vec<Shard>,
 }
 
-impl From<RawNode> for Node {
-    fn from(node: RawNode) -> Self {
-        Self {
-            id: node.id,
-            listen_address: node.listen_address,
-            shards: Vec::default(),
-        }
-    }
-}
-
 impl Node {
-    /// Fetchs all nodes known by Nuclia's API.
+    /// Get all nodes from by Nuclia's API.
     ///
     /// Note that this associated function will remove all dummy and non IO nodes
-    /// plus load the list of shards for each selected nodes.
+    /// plus get the shards of all nodes.
     ///
     /// # Errors
     /// This associated function will returns an error if:
     /// - the Nuclia's API is not reachable
-    /// - The JSON response is mal-formed
-    pub async fn fetch_all(url: Url) -> Result<Vec<Self>, Error> {
-        futures::stream::iter(fetch_all_nodes(url).await?)
-            .filter(|node| futures::future::ready(node.r#type == NodeType::Io && !node.dummy))
-            .map(|node| Ok(Node::from(node)))
-            .and_then(load_node)
-            .try_collect()
-            .await
+    /// - The JSON response is malformed
+    pub async fn from_api(url: Url) -> Result<Vec<Self>, Error> {
+        let http_client = HttpClient::new();
+        let raw_nodes = http_client
+            .get(url)
+            .send()
+            .await?
+            .json::<Vec<RawNode>>()
+            .await?;
+
+        load_nodes(raw_nodes).await
+    }
+
+    /// Get all nodes from a JSON file.
+    ///
+    /// # Errors
+    /// This associated function will returns an error if:
+    /// - The file does not exist or cannot be open.
+    /// - The JSON content is malformed.
+    pub async fn from_file(path: &Path) -> Result<Vec<Self>, Error> {
+        let raw_nodes: Vec<RawNode> = serde_json::from_str(&tokio::fs::read_to_string(path).await?)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+
+        load_nodes(raw_nodes).await
     }
 
     /// Creates a new node.
