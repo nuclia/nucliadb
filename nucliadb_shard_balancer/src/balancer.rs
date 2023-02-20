@@ -42,7 +42,7 @@ pub struct BalanceSettings {
     /// The value that indicates the load tolerance between nodes.
     ///
     /// To put it simply, if the difference (calculated depending of the balance strategy) between
-    /// nodes is above that load tolerance, none shard balancing takes place.
+    /// nodes is below that load tolerance, none shard balancing takes place.
     #[arg(short, long)]
     load_tolerance: Threshold,
     /// The maximum number of shards per node.
