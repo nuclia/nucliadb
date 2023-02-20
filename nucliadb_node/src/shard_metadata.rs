@@ -29,23 +29,23 @@ pub const SHARD_METADATA: &str = "metadata.json";
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct ShardMetadata {
-    pub kb_id: Option<String>,
+    pub kbid: Option<String>,
 }
 
 impl From<ShardMetadata> for GrpcMetadata {
     fn from(x: ShardMetadata) -> GrpcMetadata {
         GrpcMetadata {
-            kb_id: x.kb_id.unwrap_or_default(),
+            kbid: x.kbid.unwrap_or_default(),
         }
     }
 }
 impl From<GrpcMetadata> for ShardMetadata {
     fn from(value: GrpcMetadata) -> Self {
         ShardMetadata {
-            kb_id: if value.kb_id.is_empty() {
+            kbid: if value.kbid.is_empty() {
                 None
             } else {
-                Some(value.kb_id)
+                Some(value.kbid)
             },
         }
     }
@@ -81,17 +81,17 @@ mod test {
         let dir = TempDir::new().unwrap();
         let metadata_path = dir.path().join("metadata.json");
         let meta = ShardMetadata {
-            kb_id: Some("KB".to_string()),
+            kbid: Some("KB".to_string()),
         };
         meta.serialize(&metadata_path).unwrap();
         let meta_disk = ShardMetadata::open(&metadata_path).unwrap();
-        assert_eq!(meta.kb_id, meta_disk.kb_id);
+        assert_eq!(meta.kbid, meta_disk.kbid);
     }
     #[test]
     fn open_empty() {
         let dir = TempDir::new().unwrap();
         let metadata_path = dir.path().join("metadata.json");
         let meta_disk = ShardMetadata::open(&metadata_path).unwrap();
-        assert!(meta_disk.kb_id.is_none());
+        assert!(meta_disk.kbid.is_none());
     }
 }

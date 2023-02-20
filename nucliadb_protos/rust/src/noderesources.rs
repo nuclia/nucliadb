@@ -236,5 +236,5 @@ pub mod resource {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShardMetadata {
     #[prost(string, tag="1")]
-    pub kb_id: ::prost::alloc::string::String,
+    pub kbid: ::prost::alloc::string::String,
 }

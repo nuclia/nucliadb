@@ -675,13 +675,13 @@ global___Resource = Resource
 class ShardMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    KB_ID_FIELD_NUMBER: builtins.int
-    kb_id: builtins.str
+    KBID_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
     def __init__(
         self,
         *,
-        kb_id: builtins.str = ...,
+        kbid: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kb_id", b"kb_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
 
 global___ShardMetadata = ShardMetadata

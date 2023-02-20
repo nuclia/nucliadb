@@ -56,21 +56,21 @@ async fn test_metadata() -> Result<(), Box<dyn std::error::Error>> {
     const KB2: &str = "KB2";
     let shard_0 = writer
         .new_shard(Request::new(ShardMetadata {
-            kb_id: KB0.to_string(),
+            kbid: KB0.to_string(),
         }))
         .await?
         .into_inner()
         .id;
     let shard_1 = writer
         .new_shard(Request::new(ShardMetadata {
-            kb_id: KB1.to_string(),
+            kbid: KB1.to_string(),
         }))
         .await?
         .into_inner()
         .id;
     let shard_2 = writer
         .new_shard(Request::new(ShardMetadata {
-            kb_id: KB2.to_string(),
+            kbid: KB2.to_string(),
         }))
         .await?
         .into_inner()
@@ -109,8 +109,8 @@ async fn test_metadata() -> Result<(), Box<dyn std::error::Error>> {
         .metadata
         .unwrap();
 
-    assert_eq!(request_0.kb_id, KB0);
-    assert_eq!(request_1.kb_id, KB1);
-    assert_eq!(request_2.kb_id, KB2);
+    assert_eq!(request_0.kbid, KB0);
+    assert_eq!(request_1.kbid, KB1);
+    assert_eq!(request_2.kbid, KB2);
     Ok(())
 }

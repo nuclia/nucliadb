@@ -162,5 +162,5 @@ message Resource {
 
 
 message ShardMetadata {
-    string kb_id = 1;
+    string kbid = 1;
 }
