@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     node_writer_port: int = 10000
     node_reader_port: int = 10001
-    node_sidecar_port: int = 100002
+    node_sidecar_port: int = 10002
 
     # Only for testing proposes
     writer_port_map: Dict[int, int] = {}
