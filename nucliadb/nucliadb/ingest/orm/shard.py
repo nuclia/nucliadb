@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Iterator, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import sentry_sdk
 from lru import LRU  # type: ignore
@@ -47,18 +47,22 @@ class Shard(AbstractShard):
         self.sharduuid = sharduuid
         self.node = node
 
-    def iterate_replicas(self) -> Iterator[Tuple[str, str]]:
+    def indexing_replicas(self) -> List[Tuple[str, str]]:
+        """
+        Returns the replica ids and nodes for the shard replicas and the shadow shards (if present)
+        """
+        result = []
         for replica in self.shard.replicas:
-            yield replica.shard.id, replica.node
-
+            result.append((replica.shard.id, replica.node))
             if replica.HasField("shadow_replica"):
                 shadow_replica = replica.shadow_replica
-                yield shadow_replica.shard.id, shadow_replica.node
+                result.append((shadow_replica.shard.id, shadow_replica.node))
+        return result
 
     async def delete_resource(self, uuid: str, txid: int):
         indexing = get_indexing()
 
-        for replica_id, node_id in self.iterate_replicas():
+        for replica_id, node_id in self.indexing_replicas():
             indexpb: IndexMessage = IndexMessage()
             indexpb.node = node_id
             indexpb.shard = replica_id
@@ -82,7 +86,7 @@ class Shard(AbstractShard):
 
         shard_counter: Optional[ShardCounter] = None
 
-        for replica_id, node_id in self.iterate_replicas():
+        for replica_id, node_id in self.indexing_replicas():
             resource.shard_id = resource.resource.shard_id = replica_id
             if reindex_id is not None:
                 indexpb = await storage.reindexing(
