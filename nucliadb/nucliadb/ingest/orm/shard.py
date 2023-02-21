@@ -71,7 +71,7 @@ class Shard(AbstractShard):
 
         indexpb: IndexMessage
 
-        last_counter: Optional[ShardCounter] = None
+        shard_counter: Optional[ShardCounter] = None
 
         for shardreplica in self.shard.replicas:
             resource.shard_id = (
@@ -95,31 +95,11 @@ class Shard(AbstractShard):
                     fields=counter.resources,
                     paragraphs=counter.paragraphs,
                 )
-
-                if (
-                    SENTRY
-                    and last_counter is not None
-                    and shard_counter != last_counter
-                ):
-                    with sentry_sdk.push_scope() as scope:
-                        scope.set_extra("shard", [self.sharduuid])
-                        scope.set_extra(
-                            "paragraphs",
-                            [shard_counter.paragraphs, last_counter.paragraphs],
-                        )
-                        scope.set_extra(
-                            "fields", [shard_counter.fields, last_counter.fields]
-                        )
-                        sentry_sdk.capture_message(
-                            f"Detected shard replicas out of sync"
-                        )
-
-                last_counter = shard_counter
             except Exception as exc:
                 if SENTRY:
                     sentry_sdk.capture_exception(exc)
 
-        return last_counter
+        return shard_counter
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
         replicas_cleaned: Dict[str, PBShardCleaned] = {}
