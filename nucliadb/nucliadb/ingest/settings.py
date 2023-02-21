@@ -68,7 +68,10 @@ class Settings(BaseSettings):
     writer_port_map: Dict[int, int] = {}
     reader_port_map: Dict[int, int] = {}
     sidecar_port_map: Dict[int, int] = {}
+
+    # Node limits
     max_node_fields: int = 200000
+    max_node_shards: Optional[int] = None
 
     local_reader_threads = 5
     local_writer_threads = 5
