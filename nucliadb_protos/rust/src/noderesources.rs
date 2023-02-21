@@ -107,12 +107,7 @@ pub struct EmptyResponse {
 pub struct EmptyQuery {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct VectorSentence {
-    #[prost(float, repeated, tag="1")]
-    pub vector: ::prost::alloc::vec::Vec<f32>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ParagraphPosition {
+pub struct Position {
     #[prost(uint64, tag="1")]
     pub index: u64,
     #[prost(uint64, tag="2")]
@@ -129,9 +124,21 @@ pub struct ParagraphPosition {
     pub end_seconds: ::prost::alloc::vec::Vec<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SentenceMetadata {
+    #[prost(message, optional, tag="1")]
+    pub position: ::core::option::Option<Position>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct VectorSentence {
+    #[prost(float, repeated, tag="1")]
+    pub vector: ::prost::alloc::vec::Vec<f32>,
+    #[prost(message, optional, tag="9")]
+    pub metadata: ::core::option::Option<SentenceMetadata>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ParagraphMetadata {
     #[prost(message, optional, tag="1")]
-    pub position: ::core::option::Option<ParagraphPosition>,
+    pub position: ::core::option::Option<Position>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexParagraph {

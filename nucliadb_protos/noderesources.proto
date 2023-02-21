@@ -75,11 +75,8 @@ message ShardList {
 message EmptyResponse {}
 message EmptyQuery {}
 
-message VectorSentence {
-    repeated float vector = 1;
-}
 
-message ParagraphPosition {
+message Position {
     uint64 index = 1;
     uint64 start = 2;
     uint64 end = 3;
@@ -92,8 +89,18 @@ message ParagraphPosition {
     repeated uint32 end_seconds = 6;
 }
 
+
+message SentenceMetadata {
+    Position position = 1;
+}
+
+message VectorSentence {
+    repeated float vector = 1;
+    SentenceMetadata metadata = 9;
+}
+
 message ParagraphMetadata {
-    ParagraphPosition position = 1;
+    Position position = 1;
 }
 
 message IndexParagraph {
