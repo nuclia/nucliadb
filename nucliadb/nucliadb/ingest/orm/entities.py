@@ -19,7 +19,7 @@
 #
 
 import random
-from typing import AsyncGenerator, List, Optional, Set, Tuple
+from typing import AsyncGenerator, Optional, Set, Tuple
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
@@ -33,7 +33,7 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodewriter_pb2 import SetGraph
-from nucliadb_protos.utils_pb2 import JoinGraph, JoinGraphEdge, Relation, RelationNode
+from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesGroupResponse, GetEntitiesResponse
 
 from nucliadb.ingest.maindb.driver import Transaction
@@ -46,88 +46,133 @@ from nucliadb.ingest.orm import knowledgebox
 
 
 class EntitiesManager:
-    def __init__(self, knowledgebox: "knowledgebox.Knowledgebox", txn):
+    def __init__(
+        self,
+        knowledgebox: "knowledgebox.Knowledgebox",  # type: ignore
+        txn: Transaction,
+    ):
         self.kb = knowledgebox
         self.txn = txn
         self.kbid = self.kb.kbid
 
     async def get_entities(self, entities: GetEntitiesResponse):
-        async for group, eg in self.entitiesgroups_iterator(exclude_deleted=True):
+        async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
             entities.groups[group].CopyFrom(eg)
 
     async def get_entitiesgroup(
         self, group: str, entitiesgroup: GetEntitiesGroupResponse
     ):
-        deleted_groups = await self.get_deleted_entitiesgroups()
-        if group in deleted_groups:
-            return
-        eg = await self.get_entitiesgroup_inner(group)
+        eg = await self.get_entities_group(group)
         if eg is not None:
             entitiesgroup.group.CopyFrom(eg)
 
     async def set_entities(self, group: str, entities: EntitiesGroup):
-        new_entities = EntitiesGroup()
-        stored_entities = await self.get_entitiesgroup_inner(group)
-
-        if stored_entities is None:
-            new_entities = entities
+        indexed = await self.get_indexed_entities_group(group)
+        if indexed is None:
+            updated = entities
         else:
-            merged = {}
+            updated = EntitiesGroup()
+            updated.CopyFrom(entities)
 
-            for key, entity in stored_entities.entities.items():
-                if key not in entities.entities:
-                    entity.status = Entity.DiffStatus.DELETED
-                else:
-                    entity.status = entities.entities[key].status
-                merged[key] = entity
+            for name, entity in indexed.entities.items():
+                if name not in updated.entities:
+                    updated.entities[name].CopyFrom(entity)
+                    updated.entities[name].status = Entity.DiffStatus.DELETED
 
-            # overwrite stored entities with new ones
-            merged.update(entities.entities)
+        await self.store_entities_group(group, updated)
+        await self.index_entities_group(group, updated)
 
-            new_entities.MergeFrom(
-                EntitiesGroup(
-                    entities=merged,
-                    title=entities.title,
-                    color=entities.color,
-                    custom=entities.custom,
-                )
-            )
-
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(entities_key, new_entities.SerializeToString())
-        # TODO: properly index new entities
-        await self.index_entities(group, new_entities)
-
-    async def set_entities_force(self, group: str, entities: EntitiesGroup):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(entities_key, entities.SerializeToString())
+    async def set_entities_force(self, group: str, entitiesgroup: EntitiesGroup):
+        await self.store_entities_group(group, entitiesgroup)
+        await self.index_entities_group(group, entitiesgroup)
 
     async def del_entities(self, group: str):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.delete(entities_key)
+        await self.delete_entities_group(group)
 
-        deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
-        payload = await self.txn.get(deleted_groups_key)
-        deg = DeletedEntitiesGroups()
+    # Private API
+
+    async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
+        deleted_groups = await self.get_deleted_entities_groups()
+        if group in deleted_groups:
+            return None
+        return await self.get_entities_group_inner(group)
+
+    async def get_entities_group_inner(self, group: str) -> EntitiesGroup:
+        stored = await self.get_stored_entities_group(group)
+        indexed = await self.get_indexed_entities_group(group)
+        if stored is not None and indexed is not None:
+            entities_group = self.merge_entities_groups(indexed, stored)
+        else:
+            entities_group = stored or indexed
+        return entities_group
+
+    async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
+        key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
+        payload = await self.txn.get(key)
+        if payload is None:
+            return None
+
+        eg = EntitiesGroup()
+        eg.ParseFromString(payload)
+        return eg
+
+    async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
+        node, shard_id = random.choice(
+            [node async for node in self.kb.iterate_kb_nodes()]
+        )
+        request = RelationSearchRequest(
+            shard_id=shard_id,
+            prefix=RelationPrefixSearchRequest(
+                prefix="",
+                node_filters=[
+                    RelationNodeFilter(
+                        node_type=RelationNode.NodeType.ENTITY, node_subtype=group
+                    )
+                ],
+            ),
+        )
+        results = await node.reader.RelationSearch(request)
+        entities = {
+            node.value: Entity(value=node.value, status=Entity.DiffStatus.NORMAL)
+            for node in results.prefix.nodes
+        }
+        eg = EntitiesGroup(entities=entities)
+        return eg
+
+    async def get_deleted_entities_groups(self) -> Set[str]:
+        deleted: Set[str] = set()
+        key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
+        payload = await self.txn.get(key)
         if payload is not None:
+            deg = DeletedEntitiesGroups()
             deg.ParseFromString(payload)
-        if group not in deg.entities_groups:
-            deg.entities_groups.append(group)
-        await self.txn.set(deleted_groups_key, deg.SerializeToString())
+            deleted.update(deg.entities_groups)
+        return deleted
 
-    async def entitiesgroups_iterator(
+    async def entities_group_exists(self, group: str) -> bool:
+        stored = await self.get_stored_entities_group(group)
+        if stored is not None:
+            return True
+
+        indexed = await self.get_indexed_entities_group(group)
+        if indexed:
+            return True
+
+        return False
+
+    async def iterate_entities_groups(
         self, exclude_deleted: bool
     ) -> AsyncGenerator[Tuple[str, EntitiesGroup], None]:
-        async for group in self.entitiesgroups_name_iterator(exclude_deleted):
-            eg = await self.get_entitiesgroup_inner(group)
-            if eg is not None:
-                yield group, eg
+        async for group in self.iterate_entities_groups_names(exclude_deleted):
+            eg = await self.get_entities_group_inner(group)
+            yield group, eg
 
-    async def entitiesgroups_name_iterator(
+    async def iterate_entities_groups_names(
         self, exclude_deleted: bool
     ) -> AsyncGenerator[str, None]:
         if exclude_deleted:
-            deleted_groups = await self.get_deleted_entitiesgroups()
+            deleted_groups = await self.get_deleted_entities_groups()
+
         visited_groups = set()
 
         # stored groups
@@ -153,97 +198,68 @@ class EntitiesManager:
             yield group
             visited_groups.add(group)
 
-    async def get_deleted_entitiesgroups(self) -> Set[str]:
-        deleted: Set[str] = set()
+    async def store_entities_group(self, group: str, eg: EntitiesGroup):
+        key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
+        await self.txn.set(key, eg.SerializeToString())
+        # if it was preivously deleted, we must unmark it
+        await self.unmark_entities_group_as_deleted(group)
+
+    async def delete_entities_group(self, group: str):
+        await self.delete_stored_entities_group(group)
+        await self.mark_entities_group_as_deleted(group)
+
+    async def delete_stored_entities_group(self, group: str):
+        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
+        await self.txn.delete(entities_key)
+
+    async def mark_entities_group_as_deleted(self, group: str):
+        deleted_groups_key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
+        payload = await self.txn.get(deleted_groups_key)
+        deg = DeletedEntitiesGroups()
+        if payload is not None:
+            deg.ParseFromString(payload)
+        if group not in deg.entities_groups:
+            deg.entities_groups.append(group)
+        await self.txn.set(deleted_groups_key, deg.SerializeToString())
+
+    async def unmark_entities_group_as_deleted(self, group: str):
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
         payload = await self.txn.get(key)
-        if payload is not None:
-            deg = DeletedEntitiesGroups()
-            deg.ParseFromString(payload)
-            deleted.update(deg.entities_groups)
-        return deleted
-
-    async def get_entitiesgroup_inner(self, group: str) -> Optional[EntitiesGroup]:
-        stored_entities = await self.get_stored_entities(group)
-        indexed_entities = await self.get_indexed_entities(group)
-        entities = self.merge_entities(stored_entities, indexed_entities)
-        return entities
-
-    async def get_stored_entities(self, group: str) -> Optional[EntitiesGroup]:
-        key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        payload = await self.txn.get(key)
         if payload is None:
-            return None
-
-        egd = EntitiesGroup()
-        egd.ParseFromString(payload)
-        return egd
-
-    async def get_indexed_entities(self, group: str) -> List[str]:
-        node, shard_id = random.choice(
-            [node async for node in self.kb.iterate_kb_nodes()]
-        )
-        request = RelationSearchRequest(
-            shard_id=shard_id,
-            prefix=RelationPrefixSearchRequest(
-                prefix="",
-                node_filters=[
-                    RelationNodeFilter(
-                        node_type=RelationNode.NodeType.ENTITY, node_subtype=group
-                    )
-                ],
-            ),
-        )
-        results = await node.reader.RelationSearch(request)
-
-        entities = [node.value for node in results.prefix.nodes]
-        return entities
+            return
+        deg = DeletedEntitiesGroups()
+        deg.ParseFromString(payload)
+        if group in deg.entities_groups:
+            deg.entities_groups.remove(group)
+        await self.txn.set(key, deg.SerializeToString())
 
     @staticmethod
-    def merge_entities(
-        stored: Optional[EntitiesGroup], indexed: List[str]
-    ) -> Optional[EntitiesGroup]:
-        if not indexed:
-            return stored
+    def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
+        """Create a new EntitiesGroup with the merged entities from `stored` and
+        `indexed`. The values of `stored` take priority when `stored` and
+        `indexed` share entities. That's also true for common fields.
 
-        title = ""
-        color = ""
-        custom = False
-        entities = {}
+        """
+        merged_entities = {}
 
-        if stored is None:
-            custom = False
+        merged_entities = dict(indexed.entities)
 
-            for entity in indexed:
-                entities[entity] = Entity(
-                    value=entity,
-                    status=Entity.DiffStatus.NORMAL,
-                )
-        else:
-            title = stored.title
-            color = stored.color
-            custom = stored.custom
+        for name, entity in stored.entities.items():
+            # remove entities marked as deleted, as they not exists from the user point of view
+            if entity.status == Entity.DiffStatus.DELETED:
+                merged_entities.pop(name, None)
+            else:
+                merged_entities[name] = entity
 
-            for name, entity in stored.entities.items():
-                # skip entities marked as deleted, as we provide a custom view
-                if entity.status != Entity.DiffStatus.DELETED:
-                    entities[name] = entity
+        merged = EntitiesGroup(
+            entities=merged_entities,
+            title=stored.title or indexed.title or "",
+            color=stored.color or indexed.color or "",
+            custom=False,  # if there are indexed entities, can't be a custom group
+        )
+        return merged
 
-            for name in indexed:
-                if (
-                    name in stored.entities
-                    and stored.entities[name].status == Entity.DiffStatus.DELETED
-                ):
-                    continue
-
-                entities.setdefault(
-                    name, Entity(value=name, status=Entity.DiffStatus.NORMAL)
-                )
-
-        eg = EntitiesGroup(entities=entities, title=title, color=color, custom=custom)
-        return eg
-
-    async def index_entities(self, group: str, entities: EntitiesGroup):
+    async def index_entities_group(self, group: str, entities: EntitiesGroup):
         # TODO properly indexing of SYNONYM relations
         graph_nodes = {
             i: RelationNode(

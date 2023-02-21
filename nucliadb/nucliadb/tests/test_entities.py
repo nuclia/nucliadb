@@ -105,6 +105,7 @@ async def create_entities_group_by_bm(kbid: str, group: str, nucliadb_grpc: Writ
             )
         )
     bm.relations.extend(relations)
+
     await inject_message(nucliadb_grpc, bm)
     return entities_group
 
@@ -148,6 +149,7 @@ async def kb_with_entities(
     assert resp.status_code == 201
 
     bm_indexed = False
+    iterations = 0
     while not bm_indexed:
         resp = await nucliadb_reader.get(
             f"/kb/{knowledgebox}/suggest",
@@ -160,6 +162,11 @@ async def kb_with_entities(
         bm_indexed = len(body["entities"]["entities"]) > 0
         # small sleep to give time for indexing
         await asyncio.sleep(0.1)
+        iterations += 1
+
+        assert (
+            iterations < 20
+        ), "Entity indexing lasted too much, might be an error on the test"
 
     yield knowledgebox
 
@@ -212,8 +219,9 @@ async def test_entities_store_and_indexing(
         for entity in body["relations"]["entities"]
         for related_entity in body["relations"]["entities"][entity]["related_to"]
     }
-    # "cookie" is not found because don't have relation with anything. Relations
-    # by BM have a fake relations with themselves for sake of testing
+    # "cookie" is not found because don't have relation with anything and
+    # currently the index is not indexing them. Relations by BM have a fake
+    # relations with themselves for sake of testing.
     assert entities == {"cat", "invisibility"}
 
 
@@ -252,8 +260,8 @@ async def test_set_entities(
     nucliadb_writer: AsyncClient,
     kb_with_entities,
 ):
-    """We'll modify ANIMALS entities group which is set by API and BM to test
-    setting entities by API "overwrites" whatever is stored
+    """Modify ANIMALS entities group which is set by API and BM to test setting
+    entities by API "overwrites" whatever is stored
 
     """
     kbid = kb_with_entities
@@ -266,7 +274,7 @@ async def test_set_entities(
             "seal": {"value": "seal", "represents": [], "merged": False},
         },
         "color": "pink",
-        "custom": True,
+        "custom": False,
     }
 
     resp = await nucliadb_writer.post(f"/kb/{kbid}/entitiesgroup/ANIMALS", json=animals)
@@ -306,6 +314,11 @@ async def test_delete_entitiesgroups(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
     body = resp.json()
     assert len(body["groups"]) == 0
+
+    # create and delete again an entities group
+    await create_entities_group_by_api(kbid, "ANIMALS", nucliadb_writer)
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/{entitiesgroup}")
+    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -384,7 +397,7 @@ async def test_reindex_entities(
 
     for resource in body["resources"]:
         rid = resource["id"]
-        resp = await nucliadb_writer.post(f"/kb/{kbid}/resource/reindex")
+        resp = await nucliadb_writer.post(f"/kb/{kbid}/resource/{rid}/reindex")
         assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")

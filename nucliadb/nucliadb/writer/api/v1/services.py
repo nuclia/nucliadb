@@ -74,7 +74,7 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
     for key, entity in item.entities.items():
         entitypb = pbrequest.entities.entities[key]
         entitypb.value = entity.value
-        entitypb.merged = (
+        entitypb.status = (
             EntityPB.DiffStatus.MERGED if entity.merged else EntityPB.DiffStatus.NORMAL
         )
         entitypb.represents.extend(entity.represents)

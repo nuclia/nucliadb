@@ -31,10 +31,8 @@ from nucliadb_protos.nodereader_pb2 import (
     ParagraphItem,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
-    RelationEdge,
     RelationSearchRequest,
     RelationSearchResponse,
-    RelationTypeListMember,
     SearchRequest,
     SearchResponse,
     StreamRequest,
@@ -209,9 +207,9 @@ class LocalReaderWrapper:
             self.executor, self.reader.relation_edges, request.SerializeToString()
         )
         pb_bytes = bytes(result)
-        type_list = TypeList()
-        type_list.ParseFromString(pb_bytes)
-        return type_list
+        edge_list = EdgeList()
+        edge_list.ParseFromString(pb_bytes)
+        return edge_list
 
     async def RelationTypes(self, request: ShardId):
         loop = asyncio.get_running_loop()

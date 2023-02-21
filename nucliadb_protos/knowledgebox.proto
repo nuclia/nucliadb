@@ -150,7 +150,6 @@ message DeletedEntitiesGroups {
 
 // Widgets of the Knowledge Box
 
-
 message Widget {
     string id = 1;
     string description = 2;

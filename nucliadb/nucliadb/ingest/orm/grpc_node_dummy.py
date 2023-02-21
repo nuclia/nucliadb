@@ -35,10 +35,13 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import Counter, OpStatus, SetGraph, ShadowShardResponse
-from nucliadb_protos.utils_pb2 import Relation
-
-from nucliadb.ingest.orm.shard import Shard
+from nucliadb_protos.nodewriter_pb2 import (
+    Counter,
+    OpStatus,
+    SetGraph,
+    ShadowShardResponse,
+)
+from nucliadb_protos.utils_pb2 import Relation, RelationNode
 
 
 class DummyWriterStub:
@@ -119,10 +122,10 @@ class DummyReaderStub:
 
     async def RelationTypes(self, data):
         self.calls.setdefault("RelationTypes", []).append(data)
-        result = EdgeList()
+        result = TypeList()
         result.list.append(
             RelationTypeListMember(
-                with_type=NodeType.ENTITY,
+                with_type=RelationNode.NodeType.ENTITY,
                 with_subtype="DUMMY",
             )
         )
