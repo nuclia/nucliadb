@@ -153,16 +153,9 @@ impl NodeReader for NodeReaderGRPCDriver {
         self.shard_loading(shard_id).await;
         let reader = self.0.read().await;
         match reader.get_shard(shard_id).map(|s| s.get_info(&request)) {
-            Some(Ok(stats)) => {
-                info!("Ready {:?}", shard_id);
-                let result_shard = ShardPB {
-                    shard_id: shard_id.id.clone(),
-                    resources: stats.resources as u64,
-                    paragraphs: stats.paragraphs as u64,
-                    sentences: stats.sentences as u64,
-                };
+            Some(Ok(shard)) => {
                 info!("Get shard ends {}:{}", file!(), line!());
-                Ok(tonic::Response::new(result_shard))
+                Ok(tonic::Response::new(shard))
             }
             Some(Err(e)) => {
                 info!("get_shard ended incorrectly");

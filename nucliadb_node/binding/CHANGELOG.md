@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.8
+
+- Store node metadata 
 ## 0.5.7
 
 - move merger out of the rayon threadpool

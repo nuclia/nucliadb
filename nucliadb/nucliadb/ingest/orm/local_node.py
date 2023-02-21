@@ -63,7 +63,7 @@ class LocalNode(AbstractNode):
         node = NODE_CLUSTER.get_local_node()
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
-        shard_created = await node.new_shard()
+        shard_created = await node.new_shard(kbid)
         sr = ShardReplica(node=str(node))
         sr.shard.CopyFrom(shard_created)
         shard.replicas.append(sr)

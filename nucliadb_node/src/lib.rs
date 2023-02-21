@@ -22,13 +22,13 @@
 // #![warn(missing_docs)]
 #![allow(clippy::bool_assert_comparison)]
 
+/// Shard metadata, defined at the moment of creation.
+mod shard_metadata;
+
 pub mod services;
 
 /// Global configuration enviromental variables
 pub mod env;
-
-/// Global stats struct
-pub mod stats;
 
 /// GRPC reading service
 pub mod reader;

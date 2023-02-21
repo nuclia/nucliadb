@@ -197,7 +197,7 @@ class Node(AbstractNode):
                 logger.info(
                     f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
                 )
-                shard_created = await node.new_shard()
+                shard_created = await node.new_shard(kbid)
                 replica = ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)

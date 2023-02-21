@@ -233,7 +233,7 @@ pub fn get_node_metadata() -> NodeWriterMetadata {
         };
 
         match shard.get_info(&GetShardRequest::default()) {
-            Ok(count) => node_metadata.new_shard(shard.id, count.paragraphs as u64),
+            Ok(count) => node_metadata.new_shard(shard.id, count.paragraphs),
             Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
         }
     }
