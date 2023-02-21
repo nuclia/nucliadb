@@ -811,7 +811,7 @@ mod tests {
             ..Default::default()
         };
         let result = paragraph_reader_service.search(&search).unwrap();
-        assert_eq!(result.total, 0);
+        assert_eq!(result.total, 4);
 
         // Search on all paragraphs
         let search = ParagraphSearchRequest {
