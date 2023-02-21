@@ -180,10 +180,12 @@ impl Elem {
 
 impl key_value::KVElem for Elem {
     fn serialized_len(&self) -> usize {
-        Node::serialized_len(&self.key, &self.vector, &self.labels.0)
+        let metadata: Option<&[u8]> = None;
+        Node::serialized_len(&self.key, &self.vector, &self.labels.0, metadata)
     }
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
-        Node::serialize_into(w, self.key, self.vector, self.labels.0)
+        let metadata: Option<&[u8]> = None;
+        Node::serialize_into(w, self.key, self.vector, self.labels.0, metadata)
     }
 }
 
