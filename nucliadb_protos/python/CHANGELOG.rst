@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.51
+------
+- Add ShardMetadata on shard creation
+
 0.0.50
 ------
 - Fix trace_id type
