@@ -25,7 +25,7 @@ class _ClientType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _ClientTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ClientType.ValueType], builtins.type):  # noqa: F821
+class _ClientTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ClientType.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     API: _ClientType.ValueType  # 0
     WEB: _ClientType.ValueType  # 1
@@ -44,6 +44,7 @@ DASHBOARD: ClientType.ValueType  # 4
 CHROME_EXTENSION: ClientType.ValueType  # 5
 global___ClientType = ClientType
 
+@typing_extensions.final
 class AuditField(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -88,6 +89,7 @@ class AuditField(google.protobuf.message.Message):
 
 global___AuditField = AuditField
 
+@typing_extensions.final
 class AuditShardCounter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -108,6 +110,7 @@ class AuditShardCounter(google.protobuf.message.Message):
 
 global___AuditShardCounter = AuditShardCounter
 
+@typing_extensions.final
 class AuditRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

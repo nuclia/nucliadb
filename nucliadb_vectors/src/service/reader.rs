@@ -21,8 +21,10 @@ use std::fmt::Debug;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
-    DocumentScored, DocumentVectorIdentifier, VectorSearchRequest, VectorSearchResponse,
+    DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_core::tracing::{self, *};
 
@@ -164,10 +166,18 @@ impl ReaderChild for VectorReaderService {
 }
 
 impl TryFrom<Neighbour> for DocumentScored {
-    type Error = std::str::Utf8Error;
+    type Error = String;
     fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
-        let id = std::str::from_utf8(neighbour.id())?.to_string();
+        let id = std::str::from_utf8(neighbour.id());
+        let metadata = neighbour.metadata().map(SentenceMetadata::decode);
+        let Ok(id) = id.map(|i| i.to_string())else {
+            return Err("Id could not be decoded".to_string())
+        };
+        let Ok(metadata) = metadata.transpose() else {
+            return Err("The metadata could not be decoded".to_string());
+        };
         Ok(DocumentScored {
+            metadata,
             doc_id: Some(DocumentVectorIdentifier { id }),
             score: neighbour.score(),
         })

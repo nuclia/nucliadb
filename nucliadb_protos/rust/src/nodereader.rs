@@ -247,6 +247,8 @@ pub struct DocumentVectorIdentifier {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DocumentScored {
+    #[prost(message, optional, tag="3")]
+    pub metadata: ::core::option::Option<super::noderesources::SentenceMetadata>,
     #[prost(message, optional, tag="1")]
     pub doc_id: ::core::option::Option<DocumentVectorIdentifier>,
     #[prost(float, tag="2")]
