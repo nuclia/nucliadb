@@ -24,12 +24,13 @@ from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
 )
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
+from sentry_sdk import capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
-from starlette.routing import Mount
 from starlette_prometheus import PrometheusMiddleware
 
 from nucliadb.sentry import SENTRY, set_sentry
@@ -70,10 +71,19 @@ on_startup = [initialize]
 on_shutdown = [finalize]
 
 
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception):
+    if SENTRY:
+        capture_exception(exc)
     return JSONResponse(
         status_code=500,
         content={"detail": "Something went wrong, please contact your administrator"},
+    )
+
+
+async def client_disconnect_handler(request: Request, exc: ClientDisconnect):
+    return JSONResponse(
+        status_code=200,
+        content={"detail": "Client disconnected while an operation was in course"},
     )
 
 
@@ -82,12 +92,17 @@ fastapi_settings = dict(
     middleware=middleware,
     on_startup=on_startup,
     on_shutdown=on_shutdown,
-    exception_handlers={Exception: global_exception_handler},
+    exception_handlers={
+        Exception: global_exception_handler,
+        ClientDisconnect: client_disconnect_handler,
+    },
 )
 
 base_app = FastAPI(title="NucliaDB Writer API", **fastapi_settings)  # type: ignore
 
 base_app.include_router(api_v1)
+
+extend_openapi(base_app)
 
 application = VersionedFastAPI(
     base_app,
@@ -97,13 +112,6 @@ application = VersionedFastAPI(
     enable_latest=False,
     kwargs=fastapi_settings,
 )
-
-# Fastapi versioning does not propagate exception handlers to inner mounted apps
-# We need to patch it manually for now. Also extend OpenAPI definitions
-for route in application.routes:
-    if isinstance(route, Mount):
-        route.app.middleware_stack.handler = global_exception_handler  # type: ignore
-        extend_openapi(route.app)  # type: ignore
 
 
 async def homepage(request):
