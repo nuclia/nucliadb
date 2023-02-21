@@ -136,10 +136,7 @@ impl ReaderChild for VectorReaderService {
             .enumerate()
             .filter(|(idx, _)| *idx >= offset)
             .map(|(_, v)| v)
-            .map(|(id, distance)| DocumentScored {
-                doc_id: Some(DocumentVectorIdentifier { id }),
-                score: distance,
-            })
+            .flat_map(DocumentScored::try_from)
             .collect::<Vec<_>>();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating results: ends at {v} ms");
@@ -164,6 +161,17 @@ impl ReaderChild for VectorReaderService {
         Ok(result)
     }
     fn reload(&self) {}
+}
+
+impl TryFrom<Neighbour> for DocumentScored {
+    type Error = std::str::Utf8Error;
+    fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
+        let id = std::str::from_utf8(neighbour.id())?.to_string();
+        Ok(DocumentScored {
+            doc_id: Some(DocumentVectorIdentifier { id }),
+            score: neighbour.score(),
+        })
+    }
 }
 
 impl VectorReaderService {
@@ -232,19 +240,25 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
         };
-        let sentences: HashMap<String, VectorSentence> = vec![
+        let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
             ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
             ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
             ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
-        ]
-        .iter()
-        .map(|(v, k)| (v.clone(), VectorSentence { vector: k.clone() }))
-        .collect();
+        ];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
             uuid: "DOC/KEY".to_string(),
         };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,

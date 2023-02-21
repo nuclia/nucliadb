@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, LinkedList};
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -26,7 +27,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use super::{SearchRequest, VectorR};
-use crate::data_point::{DataPoint, DpId, Journal};
+use crate::data_point::{DataPoint, DpId, Journal, Neighbour};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 const BUFFER_CAP: usize = 5;
@@ -73,12 +74,12 @@ impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
 // Fixed-sized sorted collection
 struct Fssc {
     size: usize,
-    buff: HashMap<String, f32>,
+    buff: HashMap<Neighbour, f32>,
 }
-impl From<Fssc> for Vec<(String, f32)> {
+impl From<Fssc> for Vec<Neighbour> {
     fn from(fssv: Fssc) -> Self {
-        let mut result: Vec<_> = fssv.buff.into_iter().collect();
-        result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let mut result: Vec<_> = fssv.buff.into_iter().map(|i| i.0).collect();
+        result.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(Ordering::Less));
         result
     }
 }
@@ -89,18 +90,20 @@ impl Fssc {
     fn new(size: usize) -> Fssc {
         Fssc {
             size,
-            buff: HashMap::new(),
+            buff: HashMap::with_capacity(size),
         }
     }
-    fn add(&mut self, candidate: String, score: f32) {
+    fn add(&mut self, candidate: Neighbour) {
+        let score = candidate.score();
         if self.is_full() {
             let smallest_bigger = self
                 .buff
                 .iter()
                 .map(|(key, score)| (key.clone(), *score))
                 .filter(|(_, v)| score > *v)
-                .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap());
-            if let Some((key, _)) = smallest_bigger {
+                .min_by(|(_, v0), (_, v1)| v0.partial_cmp(v1).unwrap())
+                .map(|(key, _)| key);
+            if let Some(key) = smallest_bigger {
                 self.buff.remove(&key);
                 self.buff.insert(candidate, score);
             }
@@ -179,25 +182,19 @@ impl State {
             resources: HashMap::default(),
         }
     }
-    pub fn search(
-        &self,
-        location: &Path,
-        request: &dyn SearchRequest,
-    ) -> VectorR<Vec<(String, f32)>> {
+    pub fn search(&self, location: &Path, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
         let mut ffsv = Fssc::new(request.no_results());
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
-            let results = data_point.search(
+            let result_iter = data_point.search(
                 &delete_log,
                 request.get_query(),
                 request.get_labels(),
                 request.with_duplicates(),
                 request.no_results(),
             );
-            results
-                .into_iter()
-                .for_each(|(candidate, score)| ffsv.add(candidate, score));
+            result_iter.for_each(|candidate| ffsv.add(candidate));
         }
         Ok(ffsv.into())
     }
@@ -275,24 +272,21 @@ mod test {
     use crate::data_point::{Elem, LabelDictionary};
     #[test]
     fn fssv_test() {
-        const VALUES: &[(&str, f32)] = &[
-            ("k0", 4.0),
-            ("k1", 3.0),
-            ("k2", 2.0),
-            ("k3", 1.0),
-            ("k4", 0.0),
+        let values: &[Neighbour] = &[
+            Neighbour::dummy_neighbour(b"k0", 4.0),
+            Neighbour::dummy_neighbour(b"k1", 3.0),
+            Neighbour::dummy_neighbour(b"k2", 2.0),
+            Neighbour::dummy_neighbour(b"k3", 1.0),
+            Neighbour::dummy_neighbour(b"k4", 0.0),
         ];
 
         let mut fssv = Fssc::new(2);
-        VALUES
-            .iter()
-            .map(|(key, value)| (key.to_string(), *value))
-            .for_each(|(k, v)| fssv.add(k, v));
+        values.iter().for_each(|i| fssv.add(i.clone()));
         let result: Vec<_> = fssv.into();
-        assert_eq!(&result[0].0, VALUES[0].0);
-        assert_eq!(result[0].1, VALUES[0].1);
-        assert_eq!(&result[1].0, VALUES[1].0);
-        assert_eq!(result[1].1, VALUES[1].1);
+        assert_eq!(result[0], values[0]);
+        assert_eq!(result[0].score(), values[0].score());
+        assert_eq!(result[1], values[1]);
+        assert_eq!(result[1].score(), values[1].score());
     }
 
     struct DataPointProducer<'a> {
@@ -319,7 +313,7 @@ mod test {
                     .into_iter()
                     .map(|_| random::<f32>())
                     .collect::<Vec<_>>();
-                elems.push(Elem::new(key, vector, labels));
+                elems.push(Elem::new(key, vector, labels, None));
             }
             Some(DataPoint::new(self.path, elems, None).unwrap())
         }

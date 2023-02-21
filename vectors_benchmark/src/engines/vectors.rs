@@ -45,7 +45,7 @@ impl VectorEngine for Index {
         let temporal_mark = TemporalMark::now();
         let mut elems = vec![];
         for (key, vector) in keys.into_iter().zip(embeddings.into_iter()) {
-            let elem = Elem::new(key, vector, LabelDictionary::new(vec![]));
+            let elem = Elem::new(key, vector, LabelDictionary::new(vec![]), None);
             elems.push(elem);
         }
         let new_dp = DataPoint::new(self.location(), elems, Some(temporal_mark)).unwrap();

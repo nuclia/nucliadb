@@ -33,6 +33,7 @@ use nucliadb_core::tracing::*;
 use state::*;
 use work_flag::MergerWriterSync;
 
+pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId};
 use crate::data_point_provider::merge_worker::Worker;
 use crate::VectorR;
@@ -117,7 +118,7 @@ impl Index {
     pub fn get_keys(&self, _: &Lock) -> VectorR<Vec<String>> {
         self.read_state().keys(&self.location)
     }
-    pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<(String, f32)>> {
+    pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<Neighbour>> {
         self.read_state().search(&self.location, request)
     }
     pub fn no_nodes(&self, _: &Lock) -> usize {

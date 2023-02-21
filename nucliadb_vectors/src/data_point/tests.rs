@@ -50,7 +50,7 @@ fn simple_flow() {
         let key = format!("KEY_{}", i);
         let vector = vec![rand::random::<f32>(); 8];
         let labels = label_dictionary.clone();
-        elems.push(Elem::new(key.clone(), vector, labels));
+        elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
     let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
@@ -58,7 +58,9 @@ fn simple_flow() {
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
-    let result = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
+    let result: Vec<_> = reader
+        .search(&HashSet::new(), &query, &labels[..20], true, no_results)
+        .collect();
     let got_keys = reader.get_keys(&HashSet::new());
     assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
     assert_eq!(got_keys.len(), expected_keys.len());
@@ -78,19 +80,21 @@ fn accuracy_test() {
         let key = format!("KEY_{}", i);
         let vector = create_query();
         let labels = labels_dictionary.clone();
-        elems.push(Elem::new(key, vector, labels));
+        elems.push(Elem::new(key, vector, labels, None));
     }
     let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let query = create_query();
     let no_results = 10;
-    let result_0 = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
-    let mut result_0: Vec<_> = result_0.into_iter().map(|(k, _)| k).collect();
-    result_0.sort();
+    let mut result_0 = reader
+        .search(&HashSet::new(), &query, &labels[..20], true, no_results)
+        .collect::<Vec<_>>();
+    result_0.sort_by(|i, j| i.id().cmp(j.id()));
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
-    let result_1 = reader.search(&HashSet::new(), &query, &labels[..20], true, no_results);
-    let mut result_1: Vec<_> = result_1.into_iter().map(|(k, _)| k).collect();
-    result_1.sort();
+    let mut result_1 = reader
+        .search(&HashSet::new(), &query, &labels[..20], true, no_results)
+        .collect::<Vec<_>>();
+    result_1.sort_by(|i, j| i.id().cmp(j.id()));
     assert_ne!(result_0, result_1)
 }
 
@@ -104,22 +108,27 @@ fn single_graph() {
         key.clone(),
         vector.clone(),
         LabelDictionary::default(),
+        None,
     )];
     let reader = DataPoint::new(temp_dir.path(), elems.clone(), None).unwrap();
-    let result = reader.search(
-        &HashSet::from([key.clone()]),
-        &vector,
-        &[] as &[String],
-        true,
-        5,
-    );
+    let result = reader
+        .search(
+            &HashSet::from([key.clone()]),
+            &vector,
+            &[] as &[String],
+            true,
+            5,
+        )
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 0);
 
     let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
-    let result = reader.search(&HashSet::new(), &vector, &[] as &[String], true, 5);
+    let result = reader
+        .search(&HashSet::new(), &vector, &[] as &[String], true, 5)
+        .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
-    assert!(result[0].1 >= 0.9);
-    assert!(result[0].0 == key);
+    assert!(result[0].score() >= 0.9);
+    assert!(result[0].id() == key.as_bytes());
 }
 
 #[test]
@@ -132,6 +141,7 @@ fn data_merge() {
         key0.clone(),
         vector0.clone(),
         LabelDictionary::default(),
+        None,
     )];
     let key1 = "KEY_1".to_string();
     let vector1 = create_query();
@@ -139,6 +149,7 @@ fn data_merge() {
         key1.clone(),
         vector1.clone(),
         LabelDictionary::default(),
+        None,
     )];
     let dp_0 = DataPoint::new(temp_dir.path(), elems0, None).unwrap();
     let dp_1 = DataPoint::new(temp_dir.path(), elems1, None).unwrap();
@@ -151,14 +162,18 @@ fn data_merge() {
     )
     .unwrap();
 
-    let result = dp.search(&HashSet::new(), &vector1, &[] as &[String], true, 1);
+    let result: Vec<_> = dp
+        .search(&HashSet::new(), &vector1, &[] as &[String], true, 1)
+        .collect();
     assert_eq!(result.len(), 1);
-    assert!(result[0].1 >= 0.9);
-    assert!(result[0].0 == key1);
-    let result = dp.search(&HashSet::new(), &vector0, &[] as &[String], true, 1);
+    assert!(result[0].score() >= 0.9);
+    assert!(result[0].id() == key1.as_bytes());
+    let result: Vec<_> = dp
+        .search(&HashSet::new(), &vector0, &[] as &[String], true, 1)
+        .collect();
     assert_eq!(result.len(), 1);
-    assert!(result[0].1 >= 0.9);
-    assert!(result[0].0 == key0);
+    assert!(result[0].score() >= 0.9);
+    assert!(result[0].id() == key0.as_bytes());
     let dlog = HashSet::from([key1, key0]);
     let dp = DataPoint::merge(
         temp_dir.path(),

@@ -166,12 +166,19 @@ impl LabelDictionary {
 pub struct Elem {
     pub key: Vec<u8>,
     pub vector: Vec<u8>,
+    pub metadata: Option<Vec<u8>>,
     pub labels: LabelDictionary,
 }
 impl Elem {
-    pub fn new(key: String, vector: Vec<f32>, labels: LabelDictionary) -> Elem {
+    pub fn new(
+        key: String,
+        vector: Vec<f32>,
+        labels: LabelDictionary,
+        metadata: Option<Vec<u8>>,
+    ) -> Elem {
         Elem {
             labels,
+            metadata,
             key: key.as_bytes().to_vec(),
             vector: vector::encode_vector(&vector),
         }
@@ -186,6 +193,65 @@ impl key_value::KVElem for Elem {
     fn serialize_into<W: io::Write>(self, w: W) -> io::Result<()> {
         let metadata: Option<&[u8]> = None;
         Node::serialize_into(w, self.key, self.vector, self.labels.0, metadata)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Neighbour {
+    score: f32,
+    node: Vec<u8>,
+}
+impl Eq for Neighbour {}
+impl std::hash::Hash for Neighbour {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.node.hash(state);
+    }
+}
+impl Ord for Neighbour {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.node.cmp(&other.node)
+    }
+}
+impl PartialOrd for Neighbour {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.node.partial_cmp(&other.node)
+    }
+}
+impl PartialEq for Neighbour {
+    fn eq(&self, other: &Self) -> bool {
+        self.node == other.node
+    }
+}
+
+impl Neighbour {
+    #[cfg(test)]
+    pub fn dummy_neighbour(node: &[u8], score: f32) -> Neighbour {
+        Neighbour {
+            score,
+            node: node.to_vec(),
+        }
+    }
+    fn new(Address(addr): Address, data: &[u8], score: f32) -> Neighbour {
+        let node = key_value::get_value(Node, data, addr);
+        let (exact, _) = Node.read_exact(node);
+        Neighbour {
+            score,
+            node: exact.to_vec(),
+        }
+    }
+    pub fn score(&self) -> f32 {
+        self.score
+    }
+    pub fn id(&self) -> &[u8] {
+        Node.get_key(&self.node)
+    }
+    pub fn metadata(&self) -> Option<&[u8]> {
+        let metadata = Node::metadata(&self.node);
+        if metadata.is_empty() {
+            None
+        } else {
+            Some(metadata)
+        }
     }
 }
 
@@ -222,7 +288,7 @@ impl DataPoint {
         labels: &[String],
         with_duplicates: bool,
         results: usize,
-    ) -> Vec<(String, f32)> {
+    ) -> impl Iterator<Item = Neighbour> + '_ {
         use ops_hnsw::params;
         let labels = labels.iter().map(|l| l.as_bytes()).collect::<Vec<_>>();
         let encoded_query = vector::encode_vector(query);
@@ -237,13 +303,8 @@ impl DataPoint {
         );
         neighbours
             .into_iter()
-            .map(|(Address(addr), dist)| (addr, dist))
-            .map(|(addr, dist)| (key_value::get_value(Node, &self.nodes, addr), dist))
-            .map(|(node, dist)| (Node.get_key(node), dist))
-            .map(|(node, dist)| (std::str::from_utf8(node), dist))
-            .map(|(node, dist)| (node.unwrap().to_string(), dist))
+            .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
             .take(results)
-            .collect()
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
     where Dlog: DeleteLog {

@@ -44,7 +44,7 @@ fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<Str
     let labels = LabelDictionary::new(labels);
     let elems = elems
         .into_iter()
-        .map(|(key, vector)| Elem::new(key, vector, labels.clone()))
+        .map(|(key, vector)| Elem::new(key, vector, labels.clone(), None))
         .collect();
     let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark)).unwrap();
     let lock = writer.get_elock().unwrap();

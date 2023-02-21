@@ -22,6 +22,7 @@ use std::time::SystemTime;
 
 use data_point::{Elem, LabelDictionary};
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId};
 use nucliadb_core::tracing::{self, *};
@@ -140,12 +141,13 @@ impl WriterChild for VectorWriterService {
                 for index in paragraph.paragraphs.values() {
                     let labels = resource.labels.iter().chain(index.labels.iter()).cloned();
                     let labels = LabelDictionary::new(labels.collect());
-                    index
-                        .sentences
-                        .iter()
-                        .map(|(key, sentence)| (key.clone(), sentence.vector.clone()))
-                        .map(|(key, sentence)| Elem::new(key, sentence, labels.clone()))
-                        .for_each(|e| elems.push(e));
+                    for (key, sentence) in index.sentences.iter().clone() {
+                        let key = key.to_string();
+                        let labels = labels.clone();
+                        let vector = sentence.vector.clone();
+                        let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
+                        elems.push(Elem::new(key, vector, labels, metadata));
+                    }
                 }
             }
         }
@@ -242,7 +244,7 @@ impl WriterChild for VectorWriterService {
                 let key = key.clone();
                 let vector = user_vector.vector.clone();
                 let labels = LabelDictionary::new(user_vector.labels.clone());
-                elems.push(Elem::new(key, vector, labels));
+                elems.push(Elem::new(key, vector, labels, None));
             }
             if !elems.is_empty() {
                 let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark))?;
@@ -432,18 +434,24 @@ mod tests {
             path: dir.path().to_path_buf(),
             vectorset: dir_vectorset.path().to_path_buf(),
         };
-        let sentences: HashMap<String, VectorSentence> = vec![
+        let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
             ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
             ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
-        ]
-        .iter()
-        .map(|(v, k)| (v.clone(), VectorSentence { vector: k.clone() }))
-        .collect();
+        ];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
             uuid: "DOC/KEY".to_string(),
         };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,
