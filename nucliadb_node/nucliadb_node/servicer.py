@@ -40,14 +40,10 @@ from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
 from sentry_sdk import capture_exception
 
-from nucliadb_node import logger
+from nucliadb_node import logger, shadow_shards
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
-from nucliadb_node.shadow_shards import (
-    ShadowShardNotFound,
-    ShadowShardsManager,
-    get_manager,
-)
+from nucliadb_node.shadow_shards import ShadowShardNotFound, ShadowShardsManager
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
 
@@ -72,7 +68,7 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         return response
 
     async def CreateShadowShard(self, request: EmptyQuery, context) -> ShadowShardResponse:  # type: ignore
-        ssm: ShadowShardsManager = get_manager()
+        ssm: ShadowShardsManager = shadow_shards.get_manager()
         await ssm.load()
         response = ShadowShardResponse()
         try:
@@ -87,7 +83,7 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
             return response
 
     async def DeleteShadowShard(self, request: ShardId, context) -> ShadowShardResponse:  # type: ignore
-        ssm = get_manager()
+        ssm = shadow_shards.get_manager()
         await ssm.load()
         response = ShadowShardResponse()
         shard_id = request.id
