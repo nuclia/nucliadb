@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import sentry_sdk
 from lru import LRU  # type: ignore
@@ -28,6 +28,7 @@ from nucliadb_protos.noderesources_pb2 import (
     Resource as PBBrainResource,  # type: ignore
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
+from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
@@ -46,17 +47,29 @@ class Shard(AbstractShard):
         self.sharduuid = sharduuid
         self.node = node
 
+    def indexing_replicas(self) -> List[Tuple[str, str]]:
+        """
+        Returns the replica ids and nodes for the shard replicas and the shadow shards (if present)
+        """
+        result = []
+        for replica in self.shard.replicas:
+            result.append((replica.shard.id, replica.node))
+            if replica.HasField("shadow_replica"):
+                shadow_replica = replica.shadow_replica
+                result.append((shadow_replica.shard.id, shadow_replica.node))
+        return result
+
     async def delete_resource(self, uuid: str, txid: int):
         indexing = get_indexing()
 
-        for shardreplica in self.shard.replicas:
+        for replica_id, node_id in self.indexing_replicas():
             indexpb: IndexMessage = IndexMessage()
-            indexpb.node = shardreplica.node
-            indexpb.shard = shardreplica.shard.id
+            indexpb.node = node_id
+            indexpb.shard = replica_id
             indexpb.txid = txid
             indexpb.resource = uuid
             indexpb.typemessage = IndexMessage.TypeMessage.DELETION
-            await indexing.index(indexpb, shardreplica.node)
+            await indexing.index(indexpb, node_id)
 
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
@@ -73,23 +86,19 @@ class Shard(AbstractShard):
 
         shard_counter: Optional[ShardCounter] = None
 
-        for shardreplica in self.shard.replicas:
-            resource.shard_id = (
-                resource.resource.shard_id
-            ) = shard = shardreplica.shard.id
+        for replica_id, node_id in self.indexing_replicas():
+            resource.shard_id = resource.resource.shard_id = replica_id
             if reindex_id is not None:
                 indexpb = await storage.reindexing(
-                    resource, shardreplica.node, shard, reindex_id
+                    resource, node_id, replica_id, reindex_id
                 )
             else:
-                indexpb = await storage.indexing(
-                    resource, shardreplica.node, shard, txid
-                )
+                indexpb = await storage.indexing(resource, node_id, replica_id, txid)
 
-            await indexing.index(indexpb, shardreplica.node)
+            await indexing.index(indexpb, node_id)
 
             try:
-                counter: Counter = await NODES[shardreplica.node].sidecar.GetCount(shardreplica.shard)  # type: ignore
+                counter: Counter = await NODES[node_id].sidecar.GetCount(ShardId(id=replica_id))  # type: ignore
                 shard_counter = ShardCounter(
                     shard=self.sharduuid,
                     fields=counter.resources,
@@ -98,7 +107,6 @@ class Shard(AbstractShard):
             except Exception as exc:
                 if SENTRY:
                     sentry_sdk.capture_exception(exc)
-
         return shard_counter
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:
