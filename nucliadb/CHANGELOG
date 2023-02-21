@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.2.5
+
+- Bump nucliadb_models
+
 ## 2.2.4
 
 - Send kbid to node on shard creation
