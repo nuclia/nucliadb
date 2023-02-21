@@ -25,7 +25,6 @@ from httpx import AsyncClient
 
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 
 
@@ -116,53 +115,3 @@ async def test_kb_counters_cached_nodebug(
         assert data["fields"] == 100
         assert data["sentences"] == 100
         assert "shards" not in data
-
-
-@pytest.mark.asyncio
-async def test_kb_accounting(
-    search_api: Callable[..., AsyncClient], test_search_resource: str
-) -> None:
-    kbid = test_search_resource
-
-    # perform some searches to generate accounting data
-
-    # api searches
-    async with search_api(roles=[NucliaDBRoles.READER]) as client:
-        for i in range(1):
-            resp = await client.get(
-                f"/{KB_PREFIX}/{kbid}/search?query=own+text",
-            )
-            assert resp.status_code == 200
-
-    # web searches
-    async with search_api(
-        roles=[NucliaDBRoles.READER],
-        extra_headers={"x-ndb-client": NucliaDBClientType.WEB},
-    ) as client:
-        for i in range(2):
-            resp = await client.get(
-                f"/{KB_PREFIX}/{kbid}/search?query=own+text",
-            )
-            assert resp.status_code == 200
-
-    # widget searches
-    async with search_api(
-        roles=[NucliaDBRoles.READER],
-        extra_headers={"x-ndb-client": NucliaDBClientType.WIDGET},
-    ) as client:
-        for i in range(3):
-            resp = await client.get(
-                f"/{KB_PREFIX}/{kbid}/search?query=own+text",
-            )
-            assert resp.status_code == 200
-
-    async with search_api(root=True) as client:
-        resp = await client.get(
-            f"/accounting",
-        )
-        assert resp.status_code == 200
-
-        data = resp.json()
-        assert data[f"{kbid}_-_search_client_{NucliaDBClientType.API.value}"] == 1
-        assert data[f"{kbid}_-_search_client_{NucliaDBClientType.WEB.value}"] == 2
-        assert data[f"{kbid}_-_search_client_{NucliaDBClientType.WIDGET.value}"] == 3

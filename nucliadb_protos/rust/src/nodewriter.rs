@@ -6,6 +6,10 @@ pub struct OpStatus {
     pub detail: ::prost::alloc::string::String,
     #[prost(uint64, tag="3")]
     pub count: u64,
+    #[prost(uint64, tag="5")]
+    pub count_paragraphs: u64,
+    #[prost(uint64, tag="6")]
+    pub count_sentences: u64,
     #[prost(string, tag="4")]
     pub shard_id: ::prost::alloc::string::String,
 }
@@ -79,6 +83,8 @@ pub struct AcceptShardRequest {
 pub struct Counter {
     #[prost(uint64, tag="1")]
     pub resources: u64,
+    #[prost(uint64, tag="2")]
+    pub paragraphs: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShadowShardResponse {
@@ -175,7 +181,7 @@ pub mod node_writer_client {
         }
         pub async fn new_shard(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::EmptyQuery>,
+            request: impl tonic::IntoRequest<super::super::noderesources::ShardMetadata>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -602,7 +608,7 @@ pub mod node_writer_server {
         >;
         async fn new_shard(
             &self,
-            request: tonic::Request<super::super::noderesources::EmptyQuery>,
+            request: tonic::Request<super::super::noderesources::ShardMetadata>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -772,7 +778,7 @@ pub mod node_writer_server {
                     impl<
                         T: NodeWriter,
                     > tonic::server::UnaryService<
-                        super::super::noderesources::EmptyQuery,
+                        super::super::noderesources::ShardMetadata,
                     > for NewShardSvc<T> {
                         type Response = super::super::noderesources::ShardCreated;
                         type Future = BoxFuture<
@@ -782,7 +788,7 @@ pub mod node_writer_server {
                         fn call(
                             &mut self,
                             request: tonic::Request<
-                                super::super::noderesources::EmptyQuery,
+                                super::super::noderesources::ShardMetadata,
                             >,
                         ) -> Self::Future {
                             let inner = self.0.clone();

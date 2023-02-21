@@ -13,6 +13,8 @@ message OpStatus {
     Status status = 1;
     string detail = 2;
     uint64 count = 3;
+    uint64 count_paragraphs = 5;
+    uint64 count_sentences = 6;
     string shard_id = 4;
 }
 
@@ -54,7 +56,7 @@ message AcceptShardRequest {
 
 service NodeWriter {
     rpc GetShard(noderesources.ShardId) returns (noderesources.ShardId) {}
-    rpc NewShard(noderesources.EmptyQuery) returns (noderesources.ShardCreated) {}
+    rpc NewShard(noderesources.ShardMetadata) returns (noderesources.ShardCreated) {}
     rpc CleanAndUpgradeShard(noderesources.ShardId) returns (noderesources.ShardCleaned) {}
     rpc DeleteShard(noderesources.ShardId) returns (noderesources.ShardId) {}
     rpc ListShards(noderesources.EmptyQuery) returns (noderesources.ShardIds) {}
@@ -65,7 +67,7 @@ service NodeWriter {
     rpc JoinGraph(SetGraph) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
-    rpc AddVectorSet(noderesources.VectorSetID) returns (OpStatus) {}  // New 
+    rpc AddVectorSet(noderesources.VectorSetID) returns (OpStatus) {}  // New
     rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
     rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
 
@@ -75,6 +77,8 @@ service NodeWriter {
 
 message Counter {
     uint64 resources = 1;
+    uint64 paragraphs = 2;
+
 }
 
 message ShadowShardResponse {

@@ -20,15 +20,16 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-use data_point::{DataPoint, Elem, LabelDictionary};
+use data_point::{Elem, LabelDictionary};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{Resource, ResourceId, VectorSetId};
-use tracing::*;
+use nucliadb_core::tracing::{self, *};
 
-use crate::data_point;
+use crate::data_point::DataPoint;
 use crate::data_point_provider::*;
 use crate::indexset::{IndexKeyCollector, IndexSet};
+use crate::{data_point, VectorErr};
 
 impl IndexKeyCollector for Vec<String> {
     fn add_key(&mut self, key: String) {
@@ -96,15 +97,18 @@ impl WriterChild for VectorWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    fn count(&self) -> usize {
+    fn count(&self) -> NodeResult<usize> {
         let id: Option<String> = None;
         let time = SystemTime::now();
-        let lock = self.index.get_slock().unwrap();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("{id:?} - Count starting at {v} ms");
+        }
+        let lock = self.index.get_slock()?;
         let no_nodes = self.index.no_nodes(&lock);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Ending at {v} ms");
         }
-        no_nodes
+        Ok(no_nodes)
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, resource_id: &ResourceId) -> NodeResult<()> {
@@ -152,7 +156,7 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: starts {v} ms");
         }
-        let new_dp = DataPoint::new(self.index.get_location(), elems, Some(temporal_mark))?;
+        let new_dp = DataPoint::new(self.index.location(), elems, Some(temporal_mark))?;
         let no_nodes = new_dp.meta().no_nodes();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: ends {v} ms");
@@ -197,7 +201,7 @@ impl WriterChild for VectorWriterService {
                 .map(|i| (v, i))
         });
         for (vectorlist, index) in index_iter {
-            let mut index = index?;
+            let index = index?;
             let index_lock = index.get_elock()?;
             vectorlist.vectors.iter().for_each(|vector| {
                 index.delete(vector, temporal_mark, &index_lock);
@@ -224,7 +228,7 @@ impl WriterChild for VectorWriterService {
         self.indexset.commit(indexset_elock)?;
 
         // Inner indexes are updated
-        for (index_key, mut index) in indexes {
+        for (index_key, index) in indexes {
             let mut elems = vec![];
             for (key, user_vector) in resource.vectors[index_key].vectors.iter() {
                 let key = key.clone();
@@ -232,7 +236,7 @@ impl WriterChild for VectorWriterService {
                 let labels = LabelDictionary::new(user_vector.labels.clone());
                 elems.push(Elem::new(key, vector, labels));
             }
-            let new_dp = DataPoint::new(index.get_location(), elems, Some(temporal_mark))?;
+            let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark))?;
             let lock = index.get_elock()?;
             index.add(new_dp, &lock);
             index.commit(lock)?;
@@ -246,10 +250,33 @@ impl WriterChild for VectorWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    fn garbage_collection(&mut self) {}
+    fn garbage_collection(&mut self) -> NodeResult<()> {
+        self.collect_garbage_for(&self.index)?;
+        let indexset_slock = self.indexset.get_slock()?;
+        let mut index_keys = vec![];
+        self.indexset.index_keys(&mut index_keys, &indexset_slock);
+        for index_key in index_keys {
+            let Some(index) = self.indexset.get(&index_key, &indexset_slock)? else {
+                return Err(node_error!("Unknown state for {index_key}"));
+            };
+            self.collect_garbage_for(&index)?;
+        }
+        Ok(())
+    }
 }
 
 impl VectorWriterService {
+    fn collect_garbage_for(&self, index: &Index) -> NodeResult<()> {
+        info!("Collecting garbage for index: {:?}", index.location());
+        let slock = index.get_slock()?;
+        match index.collect_garbage(&slock) {
+            Ok(_) => info!("Garbage collected for main index"),
+            Err(VectorErr::WorkDelayed) => info!("Garbage collection delayed"),
+            Err(e) => Err(e)?,
+        }
+        Ok(())
+    }
+
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
         let path = std::path::Path::new(&config.path);

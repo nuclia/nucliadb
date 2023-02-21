@@ -47,7 +47,11 @@ async def test_fieldmetadata_crud(
             {
                 "key": "paragraph0",
                 "classifications": [
-                    {"labelset": "My Labels", "label": "Label 0"},
+                    {
+                        "labelset": "My Labels",
+                        "label": "Label 0",
+                        "cancelled_by_user": False,
+                    },
                 ],
             },
         ],
@@ -66,7 +70,13 @@ async def test_fieldmetadata_crud(
         "paragraphs": [
             {
                 "key": "paragraph2",
-                "classifications": [{"labelset": "My Labels", "label": "Label 2"}],
+                "classifications": [
+                    {
+                        "labelset": "My Labels",
+                        "label": "Label 2",
+                        "cancelled_by_user": False,
+                    }
+                ],
             }
         ],
     }
@@ -75,7 +85,13 @@ async def test_fieldmetadata_crud(
         "paragraphs": [
             {
                 "key": "paragraph1",
-                "classifications": [{"labelset": "My Labels", "label": "Label 1"}],
+                "classifications": [
+                    {
+                        "labelset": "My Labels",
+                        "label": "Label 1",
+                        "cancelled_by_user": True,
+                    }
+                ],
             }
         ],
         "token": [

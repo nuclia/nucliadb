@@ -128,18 +128,19 @@ impl WriterChild for RelationsWriterService {
         Ok(())
     }
     #[tracing::instrument(skip_all)]
-    fn count(&self) -> usize {
+    fn count(&self) -> NodeResult<usize> {
         let time = SystemTime::now();
+        if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
+            info!("Count starting at {v} ms");
+        }
         let count = self
             .index
             .start_reading()
-            .and_then(|reader| reader.no_nodes())
-            .map_err(|err| error!("{err:?}"))
-            .unwrap_or_default();
+            .and_then(|reader| reader.no_nodes())?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("Ending at {v} ms")
         }
-        count as usize
+        Ok(count as usize)
     }
     #[tracing::instrument(skip_all)]
     fn delete_resource(&mut self, x: &ResourceId) -> NodeResult<()> {
@@ -198,7 +199,9 @@ impl WriterChild for RelationsWriterService {
         }
         Ok(())
     }
-    fn garbage_collection(&mut self) {}
+    fn garbage_collection(&mut self) -> NodeResult<()> {
+        Ok(())
+    }
 }
 
 impl RelationsWriterService {

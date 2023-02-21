@@ -27,7 +27,7 @@ use common::{node_services, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{EmptyQuery, IndexMetadata, Resource, ResourceId, SearchRequest};
+use nucliadb_core::protos::{IndexMetadata, Resource, ResourceId, SearchRequest, ShardMetadata};
 use tonic::Request;
 use uuid::Uuid;
 
@@ -82,7 +82,9 @@ async fn create_dummy_resources(total: u8, writer: &mut TestNodeWriter, shard_id
 async fn test_search_sorting() -> Result<(), Box<dyn std::error::Error>> {
     let (mut reader, mut writer) = node_services().await;
 
-    let new_shard_response = writer.new_shard(Request::new(EmptyQuery {})).await?;
+    let new_shard_response = writer
+        .new_shard(Request::new(ShardMetadata::default()))
+        .await?;
     let shard_id = &new_shard_response.get_ref().id;
 
     create_dummy_resources(20, &mut writer, shard_id.clone()).await;

@@ -23,14 +23,17 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, Resource, ResourceId, ShardCleaned, ShardCreated, ShardId,
-    ShardIds, VectorSetId,
+    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
+    ShardId, ShardIds, ShardMetadata as GrpcMetadata, VectorSetId,
 };
+use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_core::tracing::{self, *};
+use nucliadb_vectors::data_point_provider::Merger as VectorsMerger;
 use uuid::Uuid;
 
 use crate::env;
 use crate::services::writer::ShardWriterService;
+use crate::shard_metadata::{ShardMetadata, SHARD_METADATA};
 
 #[derive(Debug)]
 pub struct NodeWriterService {
@@ -44,6 +47,9 @@ impl Default for NodeWriterService {
 }
 impl NodeWriterService {
     pub fn new() -> Self {
+        // We shallow the error if the threadpools were already initialized
+        let _ = ThreadPoolBuilder::new().num_threads(10).build_global();
+        let _ = VectorsMerger::install_global().map(std::thread::spawn);
         Self {
             cache: HashMap::new(),
         }
@@ -65,7 +71,15 @@ impl NodeWriterService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let shard = ShardWriterService::new(file_name.clone(), &shard_path)?;
+            let metadata_path = shard_path.join(SHARD_METADATA);
+            let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
+                error!("Corrupted {metadata_path:?}");
+                continue;
+            };
+            let Ok(shard) = ShardWriterService::new(file_name.clone(), metadata, &shard_path) else {
+                error!("Shard {shard_path:?} could not be loaded from disk");
+                continue;
+            };
             self.cache.insert(file_name, shard);
             info!("Shard loaded: {shard_path:?}");
         }
@@ -76,6 +90,7 @@ impl NodeWriterService {
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
         let shard_path = env::shards_path_id(&shard_id.id);
+        let metadata_path = shard_path.join(SHARD_METADATA);
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
             return;
@@ -84,7 +99,11 @@ impl NodeWriterService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(shard) = ShardWriterService::new(shard_name, &shard_path) else {
+        let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
+            error!("Corrupted {metadata_path:?}");
+            return;
+        };
+        let Ok(shard) = ShardWriterService::new(shard_name, metadata, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };
@@ -101,11 +120,13 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new_shard(&mut self) -> ShardCreated {
+    pub fn new_shard(&mut self, metadata: GrpcMetadata) -> NodeResult<ShardCreated> {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = env::shards_path_id(&shard_id);
-        std::fs::create_dir_all(&shard_path).unwrap();
-        let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path).unwrap();
+        let metadata = ShardMetadata::from(metadata);
+        std::fs::create_dir_all(&shard_path)?;
+        metadata.serialize(&shard_path.join(SHARD_METADATA))?;
+        let new_shard = ShardWriterService::new(shard_id.clone(), metadata, &shard_path)?;
         let data = ShardCreated {
             id: new_shard.id.clone(),
             document_service: new_shard.document_version() as i32,
@@ -114,8 +135,7 @@ impl NodeWriterService {
             relation_service: new_shard.relation_version() as i32,
         };
         self.cache.insert(shard_id, new_shard);
-
-        data
+        Ok(data)
     }
 
     #[tracing::instrument(skip_all)]
@@ -138,11 +158,15 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
-        self.delete_shard(shard_id)?;
         let shard_name = shard_id.id.clone();
         let shard_path = env::shards_path_id(&shard_id.id);
+        let metadata_path = shard_path.join(SHARD_METADATA);
+        let metadata = ShardMetadata::open(&metadata_path)?;
+
+        self.delete_shard(shard_id)?;
         std::fs::create_dir_all(&shard_path).unwrap();
-        let new_shard = ShardWriterService::new(shard_name, &shard_path)?;
+
+        let new_shard = ShardWriterService::new(shard_name, metadata, &shard_path)?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,
             paragraph_service: new_shard.paragraph_version() as i32,
@@ -159,14 +183,13 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &Resource,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
 
         shard.set_resource(resource)?;
-
-        Ok(Some(shard.count()))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -174,12 +197,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.add_vectorset(setid)?;
-        Ok(Some(shard.count()))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -187,12 +210,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         setid: &VectorSetId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.remove_vectorset(setid)?;
-        Ok(Some(shard.count()))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -200,12 +223,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         graph: &JoinGraph,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.join_relations_graph(graph)?;
-        Ok(Some(shard.count()))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -213,12 +236,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         request: &DeleteGraphNodes,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
         shard.delete_relation_nodes(request)?;
-        Ok(Some(shard.count()))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -226,14 +249,12 @@ impl NodeWriterService {
         &mut self,
         shard_id: &ShardId,
         resource: &ResourceId,
-    ) -> NodeResult<Option<usize>> {
+    ) -> NodeResult<Option<OpStatus>> {
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
-
         shard.remove_resource(resource)?;
-
-        Ok(Some(shard.count()))
+        Ok(Some(shard.get_opstatus()?))
     }
 
     #[tracing::instrument(skip_all)]
@@ -260,11 +281,5 @@ impl NodeWriterService {
             .map(|id| ShardId { id })
             .collect();
         ShardIds { ids }
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub fn paragraph_count(&self, shard_id: &ShardId) -> Option<u64> {
-        self.get_shard(shard_id)
-            .map(|shard| shard.paragraph_count() as u64)
     }
 }

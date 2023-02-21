@@ -300,3 +300,19 @@ async def knowledge_graph(
     await inject_message(nucliadb_grpc, bm)
 
     return (nodes, edges)
+
+
+@pytest.fixture(scope="function")
+async def stream_audit(natsd: str):
+    from nucliadb_utils.audit.stream import StreamAuditStorage
+    from nucliadb_utils.settings import audit_settings
+
+    audit = StreamAuditStorage(
+        [natsd],
+        audit_settings.audit_jetstream_target,  # type: ignore
+        audit_settings.audit_partitions,
+        audit_settings.audit_hash_seed,
+    )
+    await audit.initialize()
+    yield audit
+    await audit.finalize()

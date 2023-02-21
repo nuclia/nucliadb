@@ -23,3 +23,22 @@ pub mod data_point_provider;
 mod data_types;
 pub mod indexset;
 pub mod service;
+
+use thiserror::Error;
+#[derive(Debug, Error)]
+pub enum VectorErr {
+    #[error("json error: {0}")]
+    SJ(#[from] serde_json::Error),
+    #[error("IO error: {0}")]
+    IoErr(#[from] std::io::Error),
+    #[error("Error in fs: {0}")]
+    FsError(#[from] nucliadb_core::fs_state::FsError),
+    #[error("Garbage collection delayed")]
+    WorkDelayed,
+    #[error("Several writers are open at the same time ")]
+    MultipleWriters,
+    #[error("Merger is already initialized")]
+    MergerAlreadyInitialized,
+}
+
+pub type VectorR<O> = Result<O, VectorErr>;

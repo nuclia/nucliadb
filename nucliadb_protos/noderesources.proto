@@ -61,6 +61,7 @@ message ResourceID {
 
 
 message Shard {
+    ShardMetadata metadata = 5;
     string shard_id = 1;
     uint64 resources = 2;
     uint64 paragraphs = 3;
@@ -157,4 +158,9 @@ message Resource {
 
     map<string, utils.UserVectors> vectors = 12; // vectorset is the key 
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
+}
+
+
+message ShardMetadata {
+    string kbid = 1;
 }

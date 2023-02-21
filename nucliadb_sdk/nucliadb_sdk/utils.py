@@ -20,13 +20,14 @@
 # europe-1.nuclia.cloud
 # localhost:8080
 
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import requests
 
-from nucliadb_models.resource import KnowledgeBoxObj
+from nucliadb_models.resource import KnowledgeBoxList, KnowledgeBoxObj
+from nucliadb_models.utils import SlugString
 from nucliadb_sdk.client import Environment, NucliaDBClient
 from nucliadb_sdk.knowledgebox import KnowledgeBox
 
@@ -109,3 +110,24 @@ def get_or_create(
     if kb is None:
         kb = create_knowledge_box(slug, nucliadb_base_url)
     return kb
+
+
+def delete_kb(slug: str, nucliadb_base_url: Optional[str] = "http://localhost:8080"):
+    kb = get_kb(slug, nucliadb_base_url)
+    if kb is None or kb.client.url is None:
+        raise AttributeError("URL should not be none")
+    response = requests.delete(kb.client.url, headers={"X-NUCLIADB-ROLES": f"MANAGER"})
+    assert response.status_code == 200
+
+
+def list_kbs(
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
+) -> List[Optional[SlugString]]:
+    response = requests.get(
+        f"{nucliadb_base_url}/kbs",
+        headers={"X-NUCLIADB-ROLES": "MANAGER"},
+    )
+
+    assert response.status_code == 200
+    kbs = KnowledgeBoxList.parse_raw(response.content)
+    return [kb.slug for kb in kbs.kbs]

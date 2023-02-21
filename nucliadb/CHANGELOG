@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2.2.4
+
+- Send kbid to node on shard creation
+
 ## 2.2.2
 
 - Set default log level on NucliaDB to INFO

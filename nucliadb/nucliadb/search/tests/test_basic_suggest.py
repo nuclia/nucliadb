@@ -28,7 +28,6 @@ from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.utils import get_driver
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.keys import KB_SHARDS
 
 
@@ -54,24 +53,6 @@ async def test_suggest_resource_all(
         assert resp.status_code == 200
         paragraph_results = resp.json()["paragraphs"]["results"]
         assert len(paragraph_results) == 1
-
-    async with search_api(roles=[NucliaDBRoles.READER], root=True) as client:
-        resp = await client.get(
-            "/accounting",
-        )
-        assert len(resp.json()) == 1
-        # as the search didn't use a specific client, it will be accounted as API
-        assert (
-            resp.json()[
-                f"{test_search_resource}_-_suggest_client_{NucliaDBClientType.API.value}"
-            ]
-            == 1
-        )
-
-        resp = await client.get(
-            "/accounting",
-        )
-        assert len(resp.json()) == 0
 
     # get shards ids
 

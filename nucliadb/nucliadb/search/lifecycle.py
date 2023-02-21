@@ -19,7 +19,6 @@
 #
 import logging
 import sys
-from collections import Counter
 
 from nucliadb.ingest import logger as ingest_logger
 from nucliadb.ingest.utils import get_driver  # type: ignore
@@ -48,7 +47,6 @@ async def initialize() -> None:
     if tracer_provider:
         await init_telemetry(tracer_provider)
 
-    set_utility(Utility.COUNTER, Counter())
     await start_ingest(SERVICE_NAME)
     predict_util = PredictEngine(
         nuclia_settings.nuclia_inner_predict_url,
@@ -84,8 +82,6 @@ async def finalize() -> None:
         clean_utility(Utility.PREDICT)
     if get_utility(Utility.NODES):
         clean_utility(Utility.NODES)
-    if get_utility(Utility.COUNTER):
-        clean_utility(Utility.COUNTER)
 
     await finalize_utilities()
     await stop_audit_utility()

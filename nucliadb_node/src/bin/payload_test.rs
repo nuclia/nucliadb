@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
     let reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");
-    let new_shard = writer.new_shard();
+    let new_shard = writer.new_shard(ShardMetadata::default())?;
     let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
     for file_path in std::fs::read_dir(resources_dir).unwrap() {
@@ -40,7 +40,7 @@ fn main() -> anyhow::Result<()> {
         println!("Adding resource {}", file_path.display());
         let res = writer.set_resource(&shard_id, &resource).unwrap();
         assert!(res.is_some());
-        println!("Resource added: {}", res.unwrap());
+        println!("Resource added: {:?}", res.unwrap());
         let info = reader
             .get_shard(&shard_id)
             .unwrap()

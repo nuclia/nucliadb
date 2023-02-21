@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use async_std::sync::RwLock;
@@ -25,7 +26,7 @@ use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
     OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
-    VectorSetId, VectorSetList,
+    ShardMetadata, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
@@ -43,17 +44,44 @@ use crate::writer::NodeWriterService;
 /// Indicates the maximum duration used to move one shard from one node to another on failure only.
 const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
-    ShardCreation,
-    ShardDeletion,
-    ParagraphCount(u64),
+    ShardCreation(String),
+    ShardDeletion(String),
+    ParagraphCount(String, u64),
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct NodeWriterMetadata {
-    pub paragraph_count: u64,
-    pub shard_count: u64,
+    shards: HashMap<String, u64>,
+}
+
+impl NodeWriterMetadata {
+    pub fn load_score(&self) -> f32 {
+        self.shards.values().sum::<u64>() as f32
+    }
+
+    pub fn shard_count(&self) -> u64 {
+        self.shards.len() as u64
+    }
+
+    pub fn new_empty_shard(&mut self, shard_id: String) {
+        self.shards.insert(shard_id, 0);
+    }
+
+    pub fn new_shard(&mut self, shard_id: String, paragraphs: u64) {
+        self.shards.insert(shard_id, paragraphs);
+    }
+
+    pub fn delete_shard(&mut self, shard_id: String) {
+        self.shards.remove(&shard_id);
+    }
+
+    pub fn update_shard(&mut self, shard_id: String, paragraphs: u64) {
+        self.shards
+            .entry(shard_id)
+            .and_modify(|value| *value = paragraphs);
+    }
 }
 
 pub struct NodeWriterGRPCDriver {
@@ -130,16 +158,19 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn new_shard(
         &self,
-        request: Request<EmptyQuery>,
+        request: Request<ShardMetadata>,
     ) -> Result<Response<ShardCreated>, Status> {
         self.instrument(&request);
 
         info!("Creating new shard");
+        let shard_metadata = request.into_inner();
         send_telemetry_event(TelemetryEvent::Create).await;
         let mut writer = self.inner.write().await;
-        let result = writer.new_shard();
+        let result = writer
+            .new_shard(shard_metadata)
+            .map_err(|e| tonic::Status::internal(e.to_string()))?;
         std::mem::drop(writer);
-        self.emit_event(NodeWriterEvent::ShardCreation);
+        self.emit_event(NodeWriterEvent::ShardCreation(result.id.clone()));
         Ok(tonic::Response::new(result))
     }
 
@@ -157,7 +188,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         std::mem::drop(writer);
         match result {
             Ok(_) => {
-                self.emit_event(NodeWriterEvent::ShardDeletion);
+                self.emit_event(NodeWriterEvent::ShardDeletion(shard_id.id.clone()));
 
                 Ok(tonic::Response::new(shard_id))
             }
@@ -216,18 +247,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let mut writer = self.inner.write().await;
         let result = writer.set_resource(&shard_id, &resource);
         match result.transpose() {
-            Some(Ok(count)) => {
+            Some(Ok(mut status)) => {
                 info!("Set resource ends correctly");
-
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+                status.status = 0;
+                status.detail = "Success!".to_string();
 
                 self.emit_event(NodeWriterEvent::ParagraphCount(
-                    writer.paragraph_count(&shard_id).unwrap_or_default(),
+                    shard_id.id.clone(),
+                    status.count_paragraphs,
                 ));
 
                 Ok(tonic::Response::new(status))
@@ -240,6 +267,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                     detail,
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(tonic::Response::new(op_status))
             }
@@ -260,18 +288,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.shard_id.as_ref().unwrap();
         let mut writer = self.inner.write().await;
         match writer.delete_relation_nodes(shard_id, &request).transpose() {
-            Some(Ok(count)) => {
-                info!("Remove resource ends correctly");
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                info!("Delete relations ends correctly");
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error joining graph {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -290,18 +314,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let graph = request.graph.unwrap();
         let mut writer = self.inner.write().await;
         match writer.join_relations_graph(&shard_id, &graph).transpose() {
-            Some(Ok(count)) => {
-                info!("Remove resource ends correctly");
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+            Some(Ok(mut status)) => {
+                info!("Join graph ends correctly");
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error joining graph {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -328,16 +348,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let result = writer.remove_resource(&shard_id, &resource);
 
         match result.transpose() {
-            Some(Ok(count)) => {
+            Some(Ok(mut status)) => {
                 info!("Remove resource ends correctly");
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+                status.status = 0;
+                status.detail = "Success!".to_string();
+
                 self.emit_event(NodeWriterEvent::ParagraphCount(
-                    writer.paragraph_count(&shard_id).unwrap_or_default(),
+                    shard_id.id.clone(),
+                    status.count_paragraphs,
                 ));
 
                 Ok(tonic::Response::new(status))
@@ -350,6 +368,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                     detail,
                     count: 0_u64,
                     shard_id: shard_id.id.clone(),
+                    ..Default::default()
                 };
                 Ok(tonic::Response::new(op_status))
             }
@@ -369,18 +388,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.shard.as_ref().unwrap();
         let mut writer = self.inner.write().await;
         match writer.add_vectorset(shard_id, &request).transpose() {
-            Some(Ok(count)) => {
+            Some(Ok(mut status)) => {
                 info!("add_vector_set ends correctly");
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error adding vector set {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -400,18 +415,14 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = request.shard.as_ref().unwrap();
         let mut writer = self.inner.write().await;
         match writer.remove_vectorset(shard_id, &request).transpose() {
-            Some(Ok(count)) => {
+            Some(Ok(mut status)) => {
                 info!("remove_vector_set ends correctly");
-                let status = OpStatus {
-                    status: 0,
-                    detail: "Success!".to_string(),
-                    count: count as u64,
-                    shard_id: shard_id.id.clone(),
-                };
+                status.status = 0;
+                status.detail = "Success!".to_string();
                 Ok(tonic::Response::new(status))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error removing vector set {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -439,7 +450,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 Ok(tonic::Response::new(list))
             }
             Some(Err(e)) => {
-                let error_msg = format!("Error listing sets {:?}: {}", shard_id, e);
+                let error_msg = format!("Error {:?}: {}", shard_id, e);
                 error!("{}", error_msg);
                 Err(tonic::Status::internal(error_msg))
             }
@@ -604,7 +615,7 @@ mod tests {
         let mut client = NodeWriterClient::new(socket_to_endpoint(grpc_addr)?.connect_lazy());
 
         let response = client
-            .new_shard(Request::new(EmptyQuery {}))
+            .new_shard(Request::new(ShardMetadata::default()))
             .await
             .expect("Error in new_shard request");
         let shard_id = &response.get_ref().id;
@@ -633,7 +644,7 @@ mod tests {
 
         for _ in 1..10 {
             let response = client
-                .new_shard(Request::new(EmptyQuery {}))
+                .new_shard(Request::new(ShardMetadata::default()))
                 .await
                 .expect("Error in new_shard request");
 
@@ -674,7 +685,7 @@ mod tests {
 
         for _ in 0..10 {
             let response = client
-                .new_shard(Request::new(EmptyQuery {}))
+                .new_shard(Request::new(ShardMetadata::default()))
                 .await
                 .expect("Error in new_shard request");
 

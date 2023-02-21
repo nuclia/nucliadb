@@ -192,6 +192,7 @@ class NucliaDBClient:
             with tempfile.NamedTemporaryFile(suffix=".tar.bz2") as temp:
                 for chunk in resp.iter_bytes():
                     temp.write(chunk)
+                temp.flush()
                 await kb.import_tar_bz2(temp.name)
         else:
             tar_location = location + ".tar.bz2"

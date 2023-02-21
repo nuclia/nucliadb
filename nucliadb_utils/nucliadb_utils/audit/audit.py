@@ -20,13 +20,13 @@
 
 from typing import List, Optional
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
+from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, AuditShardCounter
 from nucliadb_protos.nodereader_pb2 import SearchRequest
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
 class AuditStorage:
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None):  # type: ignore
+    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None, counter: Optional[AuditShardCounter] = None):  # type: ignore
         raise NotImplementedError
 
     async def initialize(self):
@@ -42,10 +42,21 @@ class AuditStorage:
         self,
         kbid: str,
         user: str,
+        client: int,
         origin: str,
         search: SearchRequest,
         timeit: float,
         resources: int,
+    ):
+        raise NotImplementedError
+
+    async def suggest(
+        self,
+        kbid: str,
+        user: str,
+        client: int,
+        origin: str,
+        timeit: float,
     ):
         raise NotImplementedError
 

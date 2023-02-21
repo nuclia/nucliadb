@@ -17,9 +17,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-pub struct StatsData {
-    pub resources: usize,
-    pub paragraphs: usize,
-    pub sentences: usize,
-    pub relations: usize,
+
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
+
+use crate::{VectorErr, VectorR};
+
+#[derive(Clone)]
+pub struct MergerWriterSync(Arc<Mutex<()>>);
+impl MergerWriterSync {
+    pub fn new() -> MergerWriterSync {
+        MergerWriterSync(Arc::new(Mutex::new(())))
+    }
+    pub fn try_to_start_working(&self) -> VectorR<MutexGuard<'_, ()>> {
+        match self.0.try_lock() {
+            Ok(lock) => Ok(lock),
+            Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
+            Err(TryLockError::WouldBlock) => Err(VectorErr::WorkDelayed),
+        }
+    }
 }

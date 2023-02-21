@@ -17,25 +17,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Once;
 
-use nucliadb_core::thread;
+use nucliadb_core::tracing;
+
+use crate::{VectorErr, VectorR};
 
 pub type MergeRequest = Box<dyn MergeQuery>;
 pub type MergeTxn = Sender<MergeRequest>;
 
 pub trait MergeQuery: Send {
-    fn do_work(&self) -> Result<(), String>;
+    fn do_work(&self) -> VectorR<()>;
 }
 
-struct Updater {
+#[derive(Clone)]
+struct MergerHandle(MergeTxn);
+impl MergerHandle {
+    pub fn send(&self, request: MergeRequest) {
+        let Err(e) = self.0.send(request) else { return };
+        tracing::info!("Error sending merge request, {e}");
+    }
+}
+
+static mut MERGER_NOTIFIER: Option<MergerHandle> = None;
+static MERGER_NOTIFIER_SET: Once = Once::new();
+
+pub fn send_merge_request(request: MergeRequest) {
+    // It is always safe to read from MERGER_NOTIFIER since
+    // it can only be writen through MERGER_NOTIFIER_SET and is not exposed in the public interface.
+    // MERGER_NOTIFIER_SET is protected by the type Once so we avoid concurrency problems.
+    match unsafe { &MERGER_NOTIFIER } {
+        Some(merger) => merger.send(request),
+        None => tracing::warn!("Merge requests are being sent without a merger intalled"),
+    }
+}
+
+pub struct Merger {
     rtxn: Receiver<MergeRequest>,
 }
 
-impl Updater {
-    fn new(rtxn: Receiver<MergeRequest>) -> Updater {
-        Updater { rtxn }
+impl Merger {
+    pub fn install_global() -> VectorR<impl FnOnce()> {
+        let mut status = Err(VectorErr::MergerAlreadyInitialized);
+        MERGER_NOTIFIER_SET.call_once(|| unsafe {
+            let (stxn, rtxn) = mpsc::channel();
+            let handler = MergerHandle(stxn);
+            // It is safe to initialize MERGER_NOTIFIER
+            // since the setter can only be called once.
+            MERGER_NOTIFIER = Some(handler);
+            status = Ok(|| Merger { rtxn }.run());
+        });
+        status
     }
     fn run(self) {
         loop {
@@ -48,17 +81,4 @@ impl Updater {
             }
         }
     }
-}
-
-lazy_static::lazy_static! {
-    static ref MERGER: Mutex<MergeTxn> = {
-        let (stxn, rtxn) = channel();
-        let updater = Updater::new(rtxn);
-        thread::spawn(move || updater.run());
-        Mutex::new(stxn)
-    };
-}
-
-pub fn get_notifier() -> MergeTxn {
-    MERGER.lock().unwrap().clone()
 }

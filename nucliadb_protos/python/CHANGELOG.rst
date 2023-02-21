@@ -1,6 +1,22 @@
 CHANGELOG
 =========
 
+0.0.51
+------
+- Add ShardMetadata on shard creation
+
+0.0.50
+------
+- Fix trace_id type
+
+0.0.49
+------
+- Extend AuditRequest with client type and trace_id
+
+0.0.48
+------
+- Extend audit with counter data
+
 0.0.47
 ------
 - Add `shard_count` attribute in `Member`

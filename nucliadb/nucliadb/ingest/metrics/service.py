@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import logging
+
 from aiohttp import web
 
 from nucliadb.ingest import logger
@@ -27,6 +29,10 @@ try:
     PROMETHEUS = True
 except ImportError:
     PROMETHEUS = False
+
+
+# Do not flood stdout with /metrics access logs
+logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 
 
 async def handler(request):

@@ -54,8 +54,8 @@ from nucliadb_protos import nodewriter_pb2_grpc
 
 class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
     def __init__(self, reader: Reader, writer: Writer):
-        self.writer = writer
         self.reader = reader
+        self.writer = writer
 
     async def initialize(self):
         pass
@@ -65,9 +65,10 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
 
     async def GetCount(self, request: ShardId, context) -> Counter:  # type: ignore
         response = Counter()
-        count = await self.reader.get_count(request)
-        if count is not None:
-            response.resources = count
+        shard = await self.reader.get_shard(request)
+        if shard is not None:
+            response.resources = shard.resources
+            response.paragraphs = shard.paragraphs
         return response
 
     async def CreateShadowShard(self, request: EmptyQuery, context) -> ShadowShardResponse:  # type: ignore

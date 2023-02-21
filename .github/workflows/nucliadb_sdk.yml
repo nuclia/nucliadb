@@ -77,9 +77,21 @@ jobs:
           filters: |
             nucliadb_modified:
               - 'nucliadb/**'
+            nucliadb_node_modified:
+              - 'nucliadb_node/**'
+              - 'nucliadb_core/**'
+              - 'nucliadb_paragraphs/**'
+              - 'nucliadb_texts/**'
+              - 'nucliadb_vectors/**'
+              - 'nucliadb_relations/**'
 
-      - name: Build local ClusterManager for testing
-        if: steps.filter.outputs.nucliadb_modified == 'true'
+      - name: Build local NucliaDB for testing
+        if: steps.filter.outputs.nucliadb_modified == 'true' && steps.filter.outputs.nucliadb_node_modified == 'false'
+        run: |
+          docker build -t nuclia/nucliadb:latest -f Dockerfile .
+
+      - name: Build local NucliaDB with Binding for testing
+        if: steps.filter.outputs.nucliadb_node_modified == 'true'
         run: |
           docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .
 

@@ -18,19 +18,26 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import math
 from datetime import datetime
 from unittest.mock import AsyncMock, Mock
 
+import nats
 import pytest
 from httpx import AsyncClient
+from nats.aio.client import Client
+from nats.js import JetStreamContext
+from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
 from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.tests.vectors import V1
 from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
-from nucliadb_utils.utilities import Utility, get_audit, set_utility
+from nucliadb_utils.audit.stream import StreamAuditStorage
+from nucliadb_utils.utilities import Utility, clean_utility, get_audit, set_utility
 
 
 @pytest.mark.asyncio
@@ -937,11 +944,12 @@ async def test_search_automatic_relations(
 
 
 @pytest.mark.asyncio
-async def test_only_search_calls_audit(nucliadb_reader, knowledgebox):
+async def test_only_search_and_suggest_calls_audit(nucliadb_reader, knowledgebox):
     kbid = knowledgebox
 
     audit = get_audit()
     audit.search = AsyncMock()
+    audit.suggest = AsyncMock()
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/catalog", params={"query": ""})
     assert resp.status_code == 200
@@ -952,3 +960,220 @@ async def test_only_search_calls_audit(nucliadb_reader, knowledgebox):
     assert resp.status_code == 200
 
     audit.search.assert_awaited_once()
+
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/suggest?query=")
+
+    assert resp.status_code == 200
+
+    audit.suggest.assert_awaited_once()
+
+
+async def get_audit_messages(sub):
+    msg = await sub.fetch(1)
+    auditreq = AuditRequest()
+    auditreq.ParseFromString(msg[0].data)
+    return auditreq
+
+
+@pytest.mark.asyncio
+async def test_search_and_suggest_sent_audit(
+    nucliadb_reader,
+    knowledgebox,
+    stream_audit: StreamAuditStorage,
+):
+    from nucliadb_utils.settings import audit_settings
+
+    kbid = knowledgebox
+
+    # Prepare a test audit stream to receive our messages
+    partition = stream_audit.get_partition(kbid)
+    client: Client = await nats.connect(stream_audit.nats_servers)
+    jetstream: JetStreamContext = client.jetstream()
+    if audit_settings.audit_jetstream_target is None:
+        assert False, "Missing jetstream target in audit settings"
+    subject = audit_settings.audit_jetstream_target.format(
+        partition=partition, type="*"
+    )
+
+    set_utility(Utility.AUDIT, stream_audit)
+    try:
+        await jetstream.delete_stream(name=audit_settings.audit_stream)
+    except nats.js.errors.NotFoundError:
+        pass
+
+    await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
+    psub = await jetstream.pull_subscribe(subject, "psub")
+
+    # Test search sends audit
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/search", headers={"x-ndb-client": "chrome_extension"}
+    )
+    assert resp.status_code == 200
+
+    auditreq = await get_audit_messages(psub)
+
+    assert auditreq.kbid == kbid
+    assert auditreq.type == AuditRequest.AuditType.SEARCH
+    assert (
+        auditreq.client_type == ClientType.CHROME_EXTENSION
+    )  # Just to use other that the enum default
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
+
+    # Test suggest sends audit
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/suggest?query=", headers={"x-ndb-client": "chrome_extension"}
+    )
+    assert resp.status_code == 200
+
+    auditreq = await get_audit_messages(psub)
+
+    assert auditreq.kbid == kbid
+    assert auditreq.type == AuditRequest.AuditType.SUGGEST
+    assert (
+        auditreq.client_type == ClientType.CHROME_EXTENSION
+    )  # Just to use other that the enum default
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
+
+    clean_utility(Utility.AUDIT)
+
+
+@pytest.mark.asyncio
+async def test_search_pagination(
+    nucliadb_reader: AsyncClient,
+    ten_quick_dummy_resources_kb,
+):
+    kbid = ten_quick_dummy_resources_kb
+
+    total = 20  # 10 titles and 10 summaries
+    page_size = 5
+
+    for feature, result_key in [
+        ("paragraph", "paragraphs"),
+        ("document", "fulltext"),
+    ]:
+        total_pages = math.floor(total / page_size)
+        for page_number in range(0, total_pages):
+            resp = await nucliadb_reader.get(
+                f"/kb/{kbid}/search",
+                params={
+                    "features": [feature],
+                    "page_number": page_number,
+                    "page_size": page_size,
+                },
+            )
+            assert resp.status_code == 200
+            body = resp.json()[result_key]
+            assert body["next_page"] == (page_number != total_pages - 1)
+            assert len(body["results"]) == body["page_size"] == page_size
+
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/search",
+            params={
+                "features": [feature],
+                "page_number": page_number + 1,
+                "page_size": page_size,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()[result_key]
+        assert body["next_page"] is False
+        assert len(body["results"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_resource_search_pagination(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox,
+):
+    kbid = knowledgebox
+
+    n_texts = 20
+    texts = [(f"text-{i}", f"Dummy text field to test ({i})") for i in range(n_texts)]
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        headers={"X-Synchronous": "true"},
+        json={
+            "title": "Resource with ",
+            "slug": "resource-with-texts",
+            "texts": {
+                id: {
+                    "body": text,
+                    "format": "PLAIN",
+                }
+                for id, text in texts
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.type = BrokerMessage.AUTOCOMMIT
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+
+    for id, text in texts:
+        bm.texts[id].body = text
+        bm.texts[id].format = rpb.FieldText.Format.PLAIN
+
+        etw = rpb.ExtractedTextWrapper()
+        etw.field.field = id
+        etw.field.field_type = rpb.FieldType.TEXT
+        etw.body.text = text
+        bm.extracted_text.append(etw)
+
+        fcm = rpb.FieldComputedMetadataWrapper()
+        paragraph = rpb.Paragraph(
+            start=0, end=len(text), kind=rpb.Paragraph.TypeParagraph.TEXT
+        )
+        fcm.metadata.metadata.paragraphs.append(paragraph)
+        fcm.field.field = id
+        fcm.field.field_type = rpb.FieldType.TEXT
+        bm.field_metadata.append(fcm)
+
+    await inject_message(nucliadb_grpc, bm)
+
+    total = n_texts
+    page_size = 5
+    total_pages = math.floor(total / page_size)
+    query = "text"
+
+    for page_number in range(0, total_pages):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/resource/{rid}/search",
+            params={
+                "query": query,
+                "features": ["paragraph"],
+                "page_number": page_number,
+                "page_size": page_size,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()["paragraphs"]
+        assert body["next_page"] == (page_number != total_pages - 1)
+        assert len(body["results"]) == body["page_size"] == page_size
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/search",
+        params={
+            "query": query,
+            "features": ["paragraph"],
+            "page_number": page_number + 1,
+            "page_size": page_size,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()["paragraphs"]
+    assert body["next_page"] is False
+    assert len(body["results"]) == 0

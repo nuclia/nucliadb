@@ -23,7 +23,7 @@ import re
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, Field, root_validator
 
 from nucliadb_protos import resources_pb2
 
@@ -65,7 +65,7 @@ class FieldID(BaseModel):
 class File(BaseModel):
     filename: Optional[str]
     content_type: str = "application/octet-stream"
-    payload: Optional[str]
+    payload: Optional[str] = Field(description="Base64 encoded file content")
     md5: Optional[str]
     # These are to be used for external files
     uri: Optional[str]

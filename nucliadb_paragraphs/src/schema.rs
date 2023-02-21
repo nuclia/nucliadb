@@ -56,6 +56,7 @@ impl ParagraphSchema {
     pub fn new() -> ParagraphSchema {
         ParagraphSchema::default()
     }
+
     /// Returns the paragraph metadata for the given document, if any.
     pub fn metadata(&self, doc: &Document) -> Option<ParagraphMetadata> {
         doc.get_first(self.metadata)

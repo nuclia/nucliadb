@@ -35,10 +35,11 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm import NODE_CLUSTER, NODES
+from nucliadb.ingest.orm import NODE_CLUSTER, NODES, NodeClusterSmall
 from nucliadb.ingest.orm.abc import AbstractNode  # type: ignore
 from nucliadb.ingest.orm.exceptions import NodesUnsync  # type: ignore
 from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
@@ -48,6 +49,7 @@ from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
 )
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.settings import settings
+from nucliadb.sentry import SENTRY
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
@@ -161,41 +163,79 @@ class Node(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
-        nodes = NODE_CLUSTER.find_nodes(kbid)
+        kb_shards_key = KB_SHARDS.format(kbid=kbid)
+        kb_shards: Optional[PBShards] = None
+        kb_shards_binary = await txn.get(kb_shards_key)
+        kb_nodes = []
+        if kb_shards_binary:
+            kb_shards = PBShards()
+            kb_shards.ParseFromString(kb_shards_binary)
+            # When adding a logic shard on an existing index, we need to
+            # exclude nodes in which there is already a shard from the same KB
+            kb_nodes = [
+                replica.node for shard in kb_shards.shards for replica in shard.replicas
+            ]
+
+        try:
+            node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=kb_nodes)
+        except NodeClusterSmall as err:
+            if SENTRY:
+                capture_exception(err)
+            logger.error(
+                f"Shard creation for kbid={kbid} failed: Replication requirements could not be met."
+            )
+            raise
+
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
         try:
-            for node in nodes:
-                logger.info(f"Node description: {node}")
-                node_obj = NODES.get(node)
-                logger.info(f"Node obj: {node_obj}")
-                if node_obj is None:
-                    raise NodesUnsync()
-                shard_created = await node_obj.new_shard()
-                sr = ShardReplica(node=str(node))
-                sr.shard.CopyFrom(shard_created)
-                shard.replicas.append(sr)
+            for node_id in node_ids:
+                logger.info(f"Node description: {node_id}")
+                node = NODES.get(node_id)
+                if node is None:
+                    raise NodesUnsync(f"Node {node_id} is not found or not available")
+                logger.info(
+                    f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
+                )
+                shard_created = await node.new_shard(kbid)
+                replica = ShardReplica(node=str(node_id))
+                replica.shard.CopyFrom(shard_created)
+                shard.replicas.append(replica)
         except Exception as e:
-            # rollback
-            for shard_replica in shard.replicas:
-                node = NODES.get(shard_replica.node)
-                if node is not None:
-                    await node.delete_shard(shard_replica.shard.id)
+            if SENTRY:
+                capture_exception(e)
+            logger.error("Error creating new shard")
+            await cls.rollback_shard(shard)
             raise e
 
-        key = KB_SHARDS.format(kbid=kbid)
-        payload = await txn.get(key)
-        kb_shards = PBShards()
-        if payload is not None:
-            kb_shards.ParseFromString(payload)
-        else:
+        if kb_shards is None:
+            kb_shards = PBShards()
             kb_shards.kbid = kbid
             kb_shards.actual = -1
+
+        # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)
         kb_shards.actual += 1
-        await txn.set(key, kb_shards.SerializeToString())
+
+        await txn.set(kb_shards_key, kb_shards.SerializeToString())
 
         return Shard(sharduuid=sharduuid, shard=shard)
+
+    @classmethod
+    async def rollback_shard(cls, shard: PBShard):
+        for shard_replica in shard.replicas:
+            node_id = shard_replica.node
+            replica_id = shard_replica.shard.id
+            node = NODES.get(node_id)
+            if node is not None:
+                try:
+                    await node.delete_shard(replica_id)
+                except Exception as rollback_error:
+                    if SENTRY:
+                        capture_exception(rollback_error)
+                    logger.error(
+                        f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
+                    )
 
     @classmethod
     async def create_shadow_shard(
@@ -305,8 +345,6 @@ class Node(AbstractNode):
         dummy: bool = False,
     ):
         NODES[ident] = Node(address, type, load_score, shard_count, dummy)
-        # Compute cluster
-        NODE_CLUSTER.compute()
 
     @classmethod
     async def get(cls, ident: str) -> Optional[Node]:
@@ -315,7 +353,6 @@ class Node(AbstractNode):
     @classmethod
     async def destroy(cls, ident: str):
         del NODES[ident]
-        NODE_CLUSTER.compute()
 
     @classmethod
     async def load_active_nodes(cls):

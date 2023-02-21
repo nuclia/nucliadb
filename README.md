@@ -15,7 +15,7 @@
 <p align="center">
   <img src="docs/assets/images/nuclia_db_positiu.svg" alt="Nuclia" height="100">
 </p>
-<h3 align="center">Searchable database for unstructured data</h3>
+<h3 align="center">The database for data scientists and machine learning engineers working with HuggingFace and other data pipelines</h3>
 
 <h4 align="center">
   <a href="docs/getting-started/quickstart.md">Quickstart</a> |
@@ -26,12 +26,18 @@
 
 ### Check out our [blog post](https://nuclia.com/building-nuclia/first-release/) to grasp what we have been doing for the last months.
 
-NucliaDB is a distributed search engine built from the ground up to offer high accuracy and semantic search on unstructured data. By mere mortals for mere mortals, NucliaDB's architecture is as simple as possible to be scalable and deliver what an NLP Database requires
+As a data scientist or NLP person your hard-drive is probably full of datasets and corpora. So, if you have found yourself crashing a notebook trying to load something too big with Pandas, doing way too many shuffles in your shell just to explore your data a bit, or just not really knowing how to perform a better search through your dataset, this is a tool for you.
 
 NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index big datasets and provide multi-teanant suport.
 
 # Features
-
+- Compare the vectors from different models in a super easy way.
+- Store text, files and vectors, labels and annotations.
+- Access and modify your resources efficiently.
+- Annotate your resources.
+- Perform text searches, given a word or set of words, return resources in our database that contain them.
+- Perform semantic searches with vectors, that is, given a set of vectors return the closest matches in our database. In an NLP use case, this allows us to look for similar sentences without being constrained by exact keywords
+- Export your data in a format compatible with most NLP pipelines (HuggingFace datasets, pytorch, etc)
 - Store original data, extracting and understanding data on object and blob storage
 - Index fields, paragraphs, and semantic sentences on index storage
 - Cloud extraction and understanding with Nuclia Understanding API™

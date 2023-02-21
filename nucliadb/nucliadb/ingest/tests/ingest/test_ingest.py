@@ -18,9 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import traceback
 import uuid
 from datetime import datetime
 from os.path import dirname, getsize
+from uuid import uuid4
 
 import nats
 import pytest
@@ -310,9 +312,23 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
+
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
+
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.NEW
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
 
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_1"].action == AuditField.FieldAction.ADDED
@@ -336,9 +352,23 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
 
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
+
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
+
     assert auditreq.fields_audit[0].action == AuditField.FieldAction.DELETED
     assert auditreq.fields_audit[0].size == 0
     assert auditreq.fields_audit[0].size_delta == -test_png_size
@@ -354,6 +384,14 @@ async def test_ingest_audit_stream_files_only(
 
     await stream_processor.process(message=message, seqid=3)
     auditreq = await get_audit_messages(psub)
+
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
 
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.rid == rid
@@ -380,6 +418,9 @@ async def test_ingest_audit_stream_files_only(
     await stream_processor.process(message=message, seqid=4)
     auditreq = await get_audit_messages(psub)
 
+    # Currently where not updating audit counters on delete operations
+    assert not auditreq.HasField("counter")
+
     audit_by_fieldid = {audit.field_id: audit for audit in auditreq.fields_audit}
     assert audit_by_fieldid["file_2"].action == AuditField.FieldAction.DELETED
     assert audit_by_fieldid["file_2"].size == 0
@@ -399,6 +440,14 @@ async def test_ingest_audit_stream_files_only(
     auditreq = await get_audit_messages(psub)
     assert auditreq.kbid == knowledgebox_ingest
     assert auditreq.type == AuditRequest.AuditType.KB_DELETED
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
+
+    # Currently where not updating audit counters on delete operations
+    assert not auditreq.HasField("counter")
 
     await txn.abort()
 
@@ -449,6 +498,15 @@ async def test_ingest_audit_stream_mixed(
     await stream_processor.process(message=message, seqid=1)
 
     auditreq = await get_audit_messages(psub)
+
+    # Minimal assert to make sure we get the information from the node on the audit
+    # gets from the sidecar to the audit report when adding or modifying a resource
+    # The values are hardcoded on nucliadb/nucliadb/ingest/orm/grpc_node_dummy.py
+
+    assert auditreq.counter.paragraphs == 2
+    assert auditreq.counter.fields == 2
+    assert auditreq.counter.shard != ""
+
     assert auditreq.kbid == kbid
     assert auditreq.rid == rid
     assert auditreq.type == AuditRequest.AuditType.MODIFIED
@@ -466,6 +524,14 @@ async def test_ingest_audit_stream_mixed(
     message = make_message(kbid, rid, message_type=BrokerMessage.MessageType.DELETE)
     await stream_processor.process(message=message, seqid=2)
     auditreq = await get_audit_messages(psub)
+
+    # Currently where not updating audit counters on delete operations
+    assert not auditreq.HasField("counter")
+
+    try:
+        int(auditreq.trace_id)
+    except ValueError:
+        assert False, "Invalid trace ID"
 
     # We know what should be in the resource and all must me delete actions
     audit_actions_by_fieldid = {
@@ -516,5 +582,30 @@ async def test_ingest_account_seq_stored(
     assert basic is not None
     assert basic.last_account_seq == 2
     assert basic.queue == 0
+
+    await txn.abort()
+
+
+@pytest.mark.asyncio
+async def test_ingest_txn_missing_kb(
+    local_files,
+    gcs_storage: Storage,
+    txn,
+    cache,
+    fake_node,
+    stream_processor,
+    redis_driver,
+    test_resource: Resource,
+):
+    kbid = str(uuid4())
+    rid = str(uuid4())
+    message = make_message(kbid, rid)
+    message.account_seq = 1
+    try:
+        await stream_processor.process(message=message, seqid=1)
+    except Exception:
+        assert (
+            False
+        ), f"Processing should not fail due to a missing Knowledgebox:\n\n{str(traceback.format_exc())}"
 
     await txn.abort()

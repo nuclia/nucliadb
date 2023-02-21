@@ -138,3 +138,35 @@ async def test_list_resources(
         got_rids.add(r["id"])
 
     assert got_rids == rids
+
+
+@pytest.mark.asyncio
+async def test_get_resource_field(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    slug = "my-resource"
+    field = "text-field"
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": slug,
+            "title": "My Resource",
+            "texts": {field: {"body": "test1", "format": "PLAIN"}},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}/text/{field}")
+    assert resp.status_code == 200
+    body_by_slug = resp.json()
+
+    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/slug/{slug}/text/{field}")
+    assert resp.status_code == 200
+    body_by_rid = resp.json()
+
+    assert body_by_slug == body_by_rid

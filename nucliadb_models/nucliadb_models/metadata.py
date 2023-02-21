@@ -271,7 +271,7 @@ class TokenSplit(BaseModel):
 
 
 class ParagraphAnnotation(BaseModel):
-    classifications: List[Classification] = []
+    classifications: List[UserClassification] = []
     key: str
 
 

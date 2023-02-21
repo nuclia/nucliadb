@@ -233,10 +233,13 @@ global___ResourceID = ResourceID
 class Shard(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    METADATA_FIELD_NUMBER: builtins.int
     SHARD_ID_FIELD_NUMBER: builtins.int
     RESOURCES_FIELD_NUMBER: builtins.int
     PARAGRAPHS_FIELD_NUMBER: builtins.int
     SENTENCES_FIELD_NUMBER: builtins.int
+    @property
+    def metadata(self) -> global___ShardMetadata: ...
     shard_id: builtins.str
     resources: builtins.int
     paragraphs: builtins.int
@@ -244,12 +247,14 @@ class Shard(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        metadata: global___ShardMetadata | None = ...,
         shard_id: builtins.str = ...,
         resources: builtins.int = ...,
         paragraphs: builtins.int = ...,
         sentences: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["paragraphs", b"paragraphs", "resources", b"resources", "sentences", b"sentences", "shard_id", b"shard_id"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "paragraphs", b"paragraphs", "resources", b"resources", "sentences", b"sentences", "shard_id", b"shard_id"]) -> None: ...
 
 global___Shard = Shard
 
@@ -665,3 +670,18 @@ class Resource(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["labels", b"labels", "metadata", b"metadata", "paragraphs", b"paragraphs", "paragraphs_to_delete", b"paragraphs_to_delete", "relations", b"relations", "relations_to_delete", b"relations_to_delete", "resource", b"resource", "sentences_to_delete", b"sentences_to_delete", "shard_id", b"shard_id", "status", b"status", "texts", b"texts", "vectors", b"vectors", "vectors_to_delete", b"vectors_to_delete"]) -> None: ...
 
 global___Resource = Resource
+
+@typing_extensions.final
+class ShardMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
+
+global___ShardMetadata = ShardMetadata

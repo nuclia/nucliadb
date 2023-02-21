@@ -58,11 +58,11 @@ class FieldLink(BaseModel):
 
 
 class LinkField(BaseModel):
-    headers: Dict[str, str] = {}
-    cookies: Dict[str, str] = {}
+    headers: Optional[Dict[str, str]] = {}
+    cookies: Optional[Dict[str, str]] = {}
     uri: str
     language: Optional[str] = None
-    localstorage: Dict[str, str] = {}
+    localstorage: Optional[Dict[str, str]] = {}
 
 
 # Processing classes (Those used to sent to push endpoints)

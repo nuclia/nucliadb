@@ -18,6 +18,21 @@ message AuditField {
   string filename = 6;
 }
 
+message AuditShardCounter {
+  string shard = 1;
+  int64 paragraphs = 2;
+  int64 fields = 3;
+}
+
+enum ClientType {
+  API = 0;
+  WEB = 1;
+  WIDGET = 2;
+  DESKTOP = 3;
+  DASHBOARD = 4;
+  CHROME_EXTENSION = 5;
+}
+
 message AuditRequest {
   enum AuditType {
     VISITED = 0;
@@ -29,7 +44,9 @@ message AuditRequest {
     SEARCH = 6;
     PROCESSED = 7;
     KB_DELETED = 8;
+    SUGGEST = 9;
   }
+
   AuditType type = 1;
   string kbid = 2;
   string userid = 4;
@@ -46,5 +63,7 @@ message AuditRequest {
   int32 resources = 12;
   repeated resources.FieldID field_metadata = 13;
   repeated AuditField fields_audit = 14;
-
+  AuditShardCounter counter = 15;
+  ClientType client_type = 16;
+  string trace_id = 17;
 }

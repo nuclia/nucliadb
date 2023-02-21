@@ -30,6 +30,7 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
     ShardCreated,
     ShardId,
+    ShardMetadata,
     VectorSetID,
     VectorSetList,
 )
@@ -37,9 +38,16 @@ from nucliadb_protos.nodewriter_pb2 import OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import Shards as PBShards
+from pydantic import BaseModel
 
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb_utils.keys import KB_SHARDS
+
+
+class ShardCounter(BaseModel):
+    shard: str
+    fields: int
+    paragraphs: int
 
 
 class AbstractShard(metaclass=ABCMeta):
@@ -54,7 +62,7 @@ class AbstractShard(metaclass=ABCMeta):
     @abstractmethod
     async def add_resource(
         self, resource: PBBrainResource, txid: int, reindex_id: Optional[str] = None
-    ) -> int:
+    ) -> Optional[ShardCounter]:
         pass
 
 
@@ -133,8 +141,8 @@ class AbstractNode(metaclass=ABCMeta):
         resp = await self.writer.GetShard(req)  # type: ignore
         return resp
 
-    async def new_shard(self) -> ShardCreated:
-        req = EmptyQuery()
+    async def new_shard(self, kbid: str) -> ShardCreated:
+        req = ShardMetadata(kbid=kbid)
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 

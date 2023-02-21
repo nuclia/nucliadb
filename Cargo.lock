@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.5.5"
+version = "0.5.8"
 dependencies = [
  "bincode",
  "log",
@@ -2077,7 +2077,6 @@ dependencies = [
 name = "nucliadb_vectors"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "fs2",
  "itertools",
  "lazy_static",
@@ -2089,7 +2088,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
- "tracing",
  "uuid 1.2.2",
 ]
 

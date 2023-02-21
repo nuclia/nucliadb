@@ -18,24 +18,35 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use std::sync::MutexGuard;
+use std::time::Duration;
 
 use nucliadb_core::fs_state;
-use tracing::*;
+use nucliadb_core::tracing::*;
 
 use super::merger::{MergeQuery, MergeRequest};
-use super::{State, VectorR};
+use super::work_flag::MergerWriterSync;
+use super::State;
 use crate::data_point::{DataPoint, DpId};
+use crate::data_point_provider::merger;
+use crate::VectorR;
 
-pub struct Worker(PathBuf);
+const SLEEP_TIME: Duration = Duration::from_millis(100);
+pub(crate) struct Worker {
+    location: PathBuf,
+    work_flag: MergerWriterSync,
+}
 impl MergeQuery for Worker {
-    fn do_work(&self) -> Result<(), String> {
+    fn do_work(&self) -> VectorR<()> {
         self.work()
-            .map_err(|e| format!("Error in vectors worker {e}"))
     }
 }
 impl Worker {
-    pub fn request(at: PathBuf) -> MergeRequest {
-        Box::new(Worker(at))
+    pub(crate) fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+        Box::new(Worker {
+            location,
+            work_flag,
+        })
     }
     fn merge_report<It>(&self, old: It, new: DpId) -> String
     where It: Iterator<Item = DpId> {
@@ -47,8 +58,26 @@ impl Worker {
         write!(msg, "==> {new}").unwrap();
         msg
     }
+    fn notify_merger(&self) {
+        let worker = Worker::request(self.location.clone(), self.work_flag.clone());
+        merger::send_merge_request(worker);
+    }
+    fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
+        loop {
+            match self.work_flag.try_to_start_working() {
+                Ok(lock) => break lock,
+                Err(_) => {
+                    info!("Merge delayed at: {:?}", self.location);
+                    std::thread::sleep(SLEEP_TIME);
+                }
+            }
+        }
+    }
     fn work(&self) -> VectorR<()> {
-        let subscriber = self.0.as_path();
+        let work_flag = self.try_to_work_or_delay();
+
+        let subscriber = self.location.as_path();
+        info!("{subscriber:?} is ready to perform a merge");
         let lock = fs_state::shared_lock(subscriber)?;
         let state: State = fs_state::load_state(&lock)?;
         std::mem::drop(lock);
@@ -68,16 +97,22 @@ impl Worker {
 
         let lock = fs_state::exclusive_lock(subscriber)?;
         let mut state: State = fs_state::load_state(&lock)?;
-        state.replace_work_unit(new_dp);
+        let creates_work = state.replace_work_unit(new_dp);
         fs_state::persist_state(&lock, &state)?;
         std::mem::drop(lock);
-
         info!("Merge on {subscriber:?}:\n{report}");
+        if creates_work {
+            self.notify_merger();
+        }
+
+        info!("Removing deprecated datapoints");
         ids.into_iter()
             .map(|dp| (subscriber, dp, DataPoint::delete(subscriber, dp)))
             .filter(|(.., r)| r.is_err())
             .for_each(|(s, id, ..)| info!("Error while deleting {s:?}/{id}"));
+        std::mem::drop(work_flag);
 
+        info!("Merge request completed");
         Ok(())
     }
 }

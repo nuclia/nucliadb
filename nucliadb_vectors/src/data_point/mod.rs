@@ -35,27 +35,16 @@ use node::Node;
 use ops_hnsw::{DataRetriever, HnswOps};
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
+use crate::VectorR;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
     pub const HNSW: &str = "index.hnsw";
     pub const JOURNAL: &str = "journal.json";
 }
-
-#[derive(Error, Debug)]
-pub enum DPError {
-    #[error("io Error: {0}")]
-    IO(#[from] io::Error),
-    #[error("bincode error: {0}")]
-    BC(#[from] bincode::Error),
-    #[error("json error: {0}")]
-    SJ(#[from] serde_json::Error),
-}
-type DPResult<T> = Result<T, DPError>;
 
 pub struct NoDLog;
 impl DeleteLog for NoDLog {
@@ -254,7 +243,7 @@ impl DataPoint {
             .take(results)
             .collect()
     }
-    pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> DPResult<DataPoint>
+    pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
     where Dlog: DeleteLog {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
@@ -278,7 +267,7 @@ impl DataPoint {
         let operants = operants
             .iter()
             .map(|(dlog, dp_id)| DataPoint::open(dir, *dp_id).map(|v| (dlog, v)))
-            .collect::<DPResult<Vec<_>>>()?;
+            .collect::<VectorR<Vec<_>>>()?;
         let node_producers = operants
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
@@ -318,19 +307,21 @@ impl DataPoint {
             journalf_buffer.flush()?;
         }
 
+        // Mark it as a Datapoint in progress, since it needs to be commited.
+
         Ok(DataPoint {
             journal,
             nodes,
             index,
         })
     }
-    pub fn delete(dir: &path::Path, uid: DpId) -> DPResult<()> {
+    pub fn delete(dir: &path::Path, uid: DpId) -> VectorR<()> {
         let uid = uid.to_string();
         let id = dir.join(uid);
         fs::remove_dir_all(id)?;
         Ok(())
     }
-    pub fn open(dir: &path::Path, uid: DpId) -> DPResult<DataPoint> {
+    pub fn open(dir: &path::Path, uid: DpId) -> VectorR<DataPoint> {
         let uid = uid.to_string();
         let id = dir.join(uid);
         let nodes = fs::OpenOptions::new()
@@ -356,7 +347,7 @@ impl DataPoint {
         dir: &path::Path,
         mut elems: Vec<Elem>,
         with_time: Option<SystemTime>,
-    ) -> DPResult<DataPoint> {
+    ) -> VectorR<DataPoint> {
         use io::{BufWriter, Write};
 
         let uid = DpId::new_v4().to_string();
