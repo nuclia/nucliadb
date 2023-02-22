@@ -137,10 +137,18 @@ impl WriterChild for VectorWriterService {
         let temporal_mark = TemporalMark::now();
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
-            for paragraph in resource.paragraphs.values() {
+            for (field, paragraph) in resource.paragraphs.iter() {
+                let field = &[field.clone()];
                 for index in paragraph.paragraphs.values() {
-                    let labels = resource.labels.iter().chain(index.labels.iter()).cloned();
-                    let labels = LabelDictionary::new(labels.collect());
+                    let labels = LabelDictionary::new(
+                        resource
+                            .labels
+                            .iter()
+                            .chain(index.labels.iter())
+                            .chain(field.iter())
+                            .cloned()
+                            .collect(),
+                    );
                     for (key, sentence) in index.sentences.iter().clone() {
                         let key = key.to_string();
                         let labels = labels.clone();

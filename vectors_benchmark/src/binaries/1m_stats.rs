@@ -1,7 +1,7 @@
-use std::time::SystemTime;
-
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::*;
+use nucliadb_vectors::query::Query;
+use std::time::SystemTime;
 use vectors_benchmark::random_vectors::RandomVectors;
 use vectors_benchmark::stats::Stats;
 
@@ -13,7 +13,7 @@ const VECTOR_DIM: usize = 128;
 
 struct Request {
     vector: Vec<f32>,
-    labels: Vec<String>,
+    queries: Vec<Query>,
 }
 impl SearchRequest for Request {
     fn with_duplicates(&self) -> bool {
@@ -23,8 +23,8 @@ impl SearchRequest for Request {
         &self.vector
     }
 
-    fn get_labels(&self) -> &[String] {
-        &self.labels
+    fn get_queries(&self) -> &[Query] {
+        &self.queries
     }
 
     fn no_results(&self) -> usize {
@@ -69,7 +69,7 @@ fn main() {
             .enumerate()
             .map(|(i, q)| (i.to_string(), q))
             .collect();
-        possible_tag.push(labels[0].clone());
+        possible_tag.push(Query::label(labels[0].clone()));
         let now = SystemTime::now();
         add_batch(&mut writer, elems, labels);
         stats.writing_time += now.elapsed().unwrap().as_millis();
@@ -79,11 +79,11 @@ fn main() {
 
     let reader = Index::new(at.path(), IndexCheck::None).unwrap();
     let lock = reader.get_slock().unwrap();
-    let labels = possible_tag;
+    let queries = possible_tag;
 
     println!("Unfiltered search..");
     let request = Request {
-        labels: vec![],
+        queries: vec![],
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
@@ -92,7 +92,7 @@ fn main() {
 
     println!("Filtered search..");
     let request = Request {
-        labels,
+        queries,
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();

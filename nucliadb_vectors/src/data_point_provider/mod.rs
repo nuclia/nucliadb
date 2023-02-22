@@ -36,12 +36,13 @@ use work_flag::MergerWriterSync;
 pub use crate::data_point::Neighbour;
 use crate::data_point::{DataPoint, DpId};
 use crate::data_point_provider::merge_worker::Worker;
+use crate::query::Query;
 use crate::VectorR;
 pub type TemporalMark = SystemTime;
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
-    fn get_labels(&self) -> &[String];
+    fn get_queries(&self) -> &[Query];
     fn no_results(&self) -> usize;
     fn with_duplicates(&self) -> bool;
 }

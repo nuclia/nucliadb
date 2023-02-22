@@ -18,10 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use super::VectorEngine;
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::*;
-
-use super::VectorEngine;
+use nucliadb_vectors::query::Query;
 
 struct Request<'a>(usize, &'a [f32]);
 impl<'a> SearchRequest for Request<'a> {
@@ -32,7 +32,7 @@ impl<'a> SearchRequest for Request<'a> {
         self.1
     }
 
-    fn get_labels(&self) -> &[String] {
+    fn get_queries(&self) -> &[Query] {
         &[]
     }
 

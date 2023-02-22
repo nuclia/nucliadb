@@ -190,7 +190,7 @@ impl State {
             let result_iter = data_point.search(
                 &delete_log,
                 request.get_query(),
-                request.get_labels(),
+                request.get_queries(),
                 request.with_duplicates(),
                 request.no_results(),
             );

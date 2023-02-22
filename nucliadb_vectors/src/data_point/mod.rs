@@ -39,6 +39,7 @@ use serde::{Deserialize, Serialize};
 pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
+use crate::query::Query;
 use crate::VectorR;
 
 mod file_names {
@@ -79,6 +80,12 @@ impl Journal {
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
 pub struct Address(usize);
+impl Address {
+    #[cfg(test)]
+    pub const fn dummy() -> Address {
+        Address(0)
+    }
+}
 
 pub struct Retriever<'a, Dlog> {
     no_nodes: usize,
@@ -286,12 +293,11 @@ impl DataPoint {
         &self,
         delete_log: &Dlog,
         query: &[f32],
-        labels: &[String],
+        labels: &[Query],
         with_duplicates: bool,
         results: usize,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         use ops_hnsw::params;
-        let labels = labels.iter().map(|l| l.as_bytes()).collect::<Vec<_>>();
         let encoded_query = vector::encode_vector(query);
         let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log);
         let ops = HnswOps { tracker: &tacker };
@@ -299,7 +305,7 @@ impl DataPoint {
             Address(self.journal.nodes),
             self.index.as_ref(),
             params::k_neighbours(),
-            &labels,
+            labels,
             with_duplicates,
         );
         neighbours
@@ -308,9 +314,7 @@ impl DataPoint {
             .take(results)
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
-    where
-        Dlog: DeleteLog,
-    {
+    where Dlog: DeleteLog {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);

@@ -30,13 +30,14 @@ use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
 use crate::indexset::IndexSet;
+use crate::query::Query;
 
-impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
+impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Vec<Query>) {
     fn with_duplicates(&self) -> bool {
         self.1.with_duplicates
     }
-    fn get_labels(&self) -> &[String] {
-        &self.1.tags
+    fn get_queries(&self) -> &[Query] {
+        &self.2
     }
     fn get_query(&self) -> &[f32] {
         &self.1.vector
@@ -103,19 +104,29 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
+        let search_request = (
+            total_to_get,
+            request,
+            request
+                .tags
+                .iter()
+                .cloned()
+                .map(Query::label)
+                .collect::<Vec<_>>(),
+        );
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Searching: starts at {v} ms");
         }
         let result = if request.vector_set.is_empty() {
             info!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&(total_to_get, request), &index_slock)?
+            self.index.search(&search_request, &index_slock)?
         } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
             info!(
                 "{id:?} - vectorset specified and found, searching on {}",
                 request.vector_set
             );
             let lock = index.get_slock()?;
-            index.search(&(total_to_get, request), &lock)?
+            index.search(&search_request, &lock)?
         } else {
             info!(
                 "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
