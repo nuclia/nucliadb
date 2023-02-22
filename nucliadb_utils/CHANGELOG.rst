@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.18
+------
+
+- Audit improvements
+
 1.0.17
 ------
 
