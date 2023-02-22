@@ -34,7 +34,7 @@ from nucliadb_protos.nodereader_pb2 import (
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
-from nucliadb_protos.writer_pb2 import GetEntitiesGroupResponse, GetEntitiesResponse
+from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.maindb.keys import (
@@ -59,12 +59,12 @@ class EntitiesManager:
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
             entities.groups[group].CopyFrom(eg)
 
-    async def get_entitiesgroup(
-        self, group: str, entitiesgroup: GetEntitiesGroupResponse
-    ):
-        eg = await self.get_entities_group(group)
-        if eg is not None:
-            entitiesgroup.group.CopyFrom(eg)
+    async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
+        deleted = await self.is_entities_group_deleted(group)
+        if deleted:
+            return await self.get_entities_group_inner(group)
+        else:
+            return None
 
     async def set_entities(self, group: str, entities: EntitiesGroup):
         indexed = await self.get_indexed_entities_group(group)
@@ -90,12 +90,6 @@ class EntitiesManager:
         await self.delete_entities_group(group)
 
     # Private API
-
-    async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        deleted_groups = await self.get_deleted_entities_groups()
-        if group in deleted_groups:
-            return None
-        return await self.get_entities_group_inner(group)
 
     async def get_entities_group_inner(self, group: str) -> EntitiesGroup:
         stored = await self.get_stored_entities_group(group)
@@ -204,6 +198,10 @@ class EntitiesManager:
         await self.txn.set(key, eg.SerializeToString())
         # if it was preivously deleted, we must unmark it
         await self.unmark_entities_group_as_deleted(group)
+
+    async def is_entities_group_deleted(self, group: str):
+        deleted_groups = await self.get_deleted_entities_groups()
+        return group in deleted_groups
 
     async def delete_entities_group(self, group: str):
         await self.delete_stored_entities_group(group)

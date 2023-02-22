@@ -426,13 +426,19 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = GetEntitiesGroupResponse()
-        if kbobj is not None:
-            await kbobj.get_entitiesgroup(request.group, response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetEntitiesGroupResponse.Status.OK
-        await txn.abort()
         if kbobj is None:
-            response.status = GetEntitiesGroupResponse.Status.NOTFOUND
+            response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
+        else:
+            entities_group = await kbobj.get_entities_group(request.group)
+            if entities_group is None:
+                response.status = (
+                    GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
+                )
+            else:
+                response.kb.uuid = kbobj.kbid
+                response.status = GetEntitiesGroupResponse.Status.OK
+                response.group.CopyFrom(entities_group)
+        await txn.abort()
         return response
 
     async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore

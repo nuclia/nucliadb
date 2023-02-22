@@ -297,7 +297,8 @@ pub mod get_entities_group_response {
     #[repr(i32)]
     pub enum Status {
         Ok = 0,
-        Notfound = 1,
+        KbNotFound = 1,
+        EntitiesGroupNotFound = 2,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

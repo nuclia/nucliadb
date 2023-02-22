@@ -18,14 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from copy import deepcopy
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import (
-    Relation,
-    RelationNode,
-)
+from nucliadb_protos.resources_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
@@ -176,7 +174,7 @@ async def kb_with_entities(
 
 
 @pytest.mark.asyncio
-async def test_create_new_entities_group_via_api(
+async def test_crud_entities_group_via_api(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     knowledgebox,
@@ -184,19 +182,44 @@ async def test_create_new_entities_group_via_api(
 ):
     kbid = knowledgebox
 
-    entitiesgroup = await create_entities_group_by_api(kbid, "ANIMALS", nucliadb_writer)
+    entities_group = deepcopy(
+        await create_entities_group_by_api(kbid, "ANIMALS", nucliadb_writer)
+    )
 
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/entitiesgroup/ANIMALS",
     )
     assert resp.status_code == 200
     body = resp.json()
+    assert body == entities_group
 
-    assert body == entitiesgroup
-    assert body["title"] == entitiesgroup["title"]
-    assert body["entities"] == entitiesgroup["entities"]
-    __import__("pdb").set_trace()
-    pass
+    entities_group["entities"]["house-cat"] = {
+        "value": "house cat",
+        "merged": True,
+        "represents": [],
+    }
+    entities_group["entities"]["cat"]["represents"].append("house-cat")
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS", json=entities_group
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == entities_group
+
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS",
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS",
+    )
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -206,6 +229,10 @@ async def test_entities_store_and_indexing(
     kb_with_entities,
     predict_mock,
 ):
+    """Store and index some entities via different sources and validate correct
+    storage and indexing.
+
+    """
     kbid = kb_with_entities
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
@@ -258,6 +285,7 @@ async def test_get_entities(
     nucliadb_reader: AsyncClient,
     kb_with_entities,
 ):
+    """Validate retrieval of entities coming from different sources."""
     kbid = kb_with_entities
 
     expected = {
@@ -283,7 +311,7 @@ async def test_get_entities(
 
 
 @pytest.mark.asyncio
-async def test_set_entities(
+async def test_modify_entities(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     kb_with_entities,
@@ -320,6 +348,7 @@ async def test_delete_entitiesgroups(
     nucliadb_writer: AsyncClient,
     kb_with_entities,
 ):
+    """Validate deletion of entities groups coming from different sources."""
     kbid = kb_with_entities
 
     resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/nonexistent")
@@ -356,6 +385,10 @@ async def test_delete_entities(
     kb_with_entities,
     predict_mock,
 ):
+    """Deletion of entities of an entities group doesn't remove them from the index,
+    but provides a custom view of entities in a KB.
+
+    """
     kbid = kb_with_entities
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroup/ANIMALS")

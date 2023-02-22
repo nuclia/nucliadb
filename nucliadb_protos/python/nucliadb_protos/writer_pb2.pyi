@@ -905,11 +905,13 @@ class GetEntitiesGroupResponse(google.protobuf.message.Message):
     class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetEntitiesGroupResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetEntitiesGroupResponse._Status.ValueType  # 0
-        NOTFOUND: GetEntitiesGroupResponse._Status.ValueType  # 1
+        KB_NOT_FOUND: GetEntitiesGroupResponse._Status.ValueType  # 1
+        ENTITIES_GROUP_NOT_FOUND: GetEntitiesGroupResponse._Status.ValueType  # 2
 
     class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
     OK: GetEntitiesGroupResponse.Status.ValueType  # 0
-    NOTFOUND: GetEntitiesGroupResponse.Status.ValueType  # 1
+    KB_NOT_FOUND: GetEntitiesGroupResponse.Status.ValueType  # 1
+    ENTITIES_GROUP_NOT_FOUND: GetEntitiesGroupResponse.Status.ValueType  # 2
 
     KB_FIELD_NUMBER: builtins.int
     GROUP_FIELD_NUMBER: builtins.int

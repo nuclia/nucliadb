@@ -213,7 +213,9 @@ message GetEntitiesGroupResponse {
     knowledgebox.EntitiesGroup group = 2;
     enum Status {
         OK = 0;
-        NOTFOUND = 1;
+        KB_NOT_FOUND = 1;
+        ENTITIES_GROUP_NOT_FOUND = 2;
+
     }
     Status status = 3;
 }

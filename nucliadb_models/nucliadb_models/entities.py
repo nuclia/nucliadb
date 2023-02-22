@@ -54,7 +54,7 @@ class Entity(BaseModel):
         if is_merged is not None:
             entity["merged"] = is_merged
 
-        return entity
+        return cls(**entity)
 
 
 class EntitiesGroup(BaseModel):
@@ -76,7 +76,7 @@ class EntitiesGroup(BaseModel):
         for name, entity in message.entities.items():
             entitiesgroup["entities"][name] = Entity.from_message(entity)
 
-        return entitiesgroup
+        return cls(**entitiesgroup)
 
 
 class KnowledgeBoxEntities(BaseModel):

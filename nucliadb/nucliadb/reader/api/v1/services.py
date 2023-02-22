@@ -75,8 +75,8 @@ async def get_entities(
         response = KnowledgeBoxEntities(uuid=kbid)
         for key, group in kbobj.groups.items():
             entities_group = EntitiesGroup.from_message(group)
-            if "" in entities_group["entities"]:
-                del entities_group["entities"][""]
+            if "" in entities_group.entities:
+                del entities_group.entities[""]
             response.groups[key] = entities_group
             if not show_entities:
                 response.groups[key].entities = {}
@@ -106,9 +106,22 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
         response = EntitiesGroup.from_message(kbobj.group)
+        response = EntitiesGroup(
+            **MessageToDict(
+                kbobj.group,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
         return response
-    elif kbobj.status == GetEntitiesGroupResponse.Status.NOTFOUND:
-        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif kbobj.status == GetEntitiesGroupResponse.Status.KB_NOT_FOUND:
+        raise HTTPException(
+            status_code=404, detail=f"Knowledge Box '{kbid}' does not exist"
+        )
+    elif kbobj.status == GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND:
+        raise HTTPException(
+            status_code=404, detail=f"Entities group '{group}' does not exist"
+        )
     else:
         raise HTTPException(status_code=500, detail="Unknown GRPC response")
 
