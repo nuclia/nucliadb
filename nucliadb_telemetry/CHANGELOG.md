@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.1.9
+
+- Telemetry for bindings
+
 ## 1.1.8
 
 - Improve error logging on errors while putting events on the queue
