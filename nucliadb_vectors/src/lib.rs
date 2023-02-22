@@ -23,6 +23,7 @@ pub mod data_point_provider;
 mod data_types;
 pub mod indexset;
 pub mod service;
+pub mod query;
 
 use thiserror::Error;
 #[derive(Debug, Error)]

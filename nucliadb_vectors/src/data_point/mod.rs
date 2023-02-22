@@ -32,7 +32,8 @@ use disk_hnsw::DiskHnsw;
 use key_value::Slot;
 use memmap2::Mmap;
 use node::Node;
-use ops_hnsw::{DataRetriever, HnswOps};
+pub use ops_hnsw::DataRetriever;
+use ops_hnsw::HnswOps;
 use ram_hnsw::RAMHnsw;
 use serde::{Deserialize, Serialize};
 pub use uuid::Uuid as DpId;
@@ -307,7 +308,9 @@ impl DataPoint {
             .take(results)
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
-    where Dlog: DeleteLog {
+    where
+        Dlog: DeleteLog,
+    {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
