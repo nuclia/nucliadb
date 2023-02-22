@@ -136,6 +136,8 @@ class EntitiesManager:
             node.value: Entity(value=node.value, status=Entity.DiffStatus.NORMAL)
             for node in results.prefix.nodes
         }
+        if not entities:
+            return None
         eg = EntitiesGroup(entities=entities)
         return eg
 

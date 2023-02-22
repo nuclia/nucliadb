@@ -22,7 +22,10 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.resources_pb2 import Relation, RelationNode
+from nucliadb_protos.resources_pb2 import (
+    Relation,
+    RelationNode,
+)
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.tests.utils import broker_resource, inject_message
@@ -32,10 +35,10 @@ TEST_API_ENTITIES_GROUPS = {
     "ANIMALS": {
         "title": "Animals",
         "entities": {
-            "cat": {"value": "cat", "represents": ["domestic-cat"]},
-            "domestic-cat": {"value": "domestic cat", "merged": True},
-            "dog": {"value": "dog"},
-            "bird": {"value": "bird"},
+            "cat": {"value": "cat", "merged": False, "represents": ["domestic-cat"]},
+            "domestic-cat": {"value": "domestic cat", "merged": True, "represents": []},
+            "dog": {"value": "dog", "merged": False, "represents": []},
+            "bird": {"value": "bird", "merged": False, "represents": []},
         },
         "color": "black",
         "custom": True,
@@ -165,10 +168,35 @@ async def kb_with_entities(
         iterations += 1
 
         assert (
-            iterations < 20
+            iterations < 10
         ), "Entity indexing lasted too much, might be an error on the test"
 
     yield knowledgebox
+
+
+@pytest.mark.asyncio
+async def test_create_new_entities_group_via_api(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+    predict_mock,
+):
+    kbid = knowledgebox
+
+    entitiesgroup = await create_entities_group_by_api(kbid, "ANIMALS", nucliadb_writer)
+
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/entitiesgroup/ANIMALS",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body == entitiesgroup
+    assert body["title"] == entitiesgroup["title"]
+    assert body["entities"] == entitiesgroup["entities"]
+    __import__("pdb").set_trace()
+    pass
 
 
 @pytest.mark.asyncio

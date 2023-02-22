@@ -18,15 +18,43 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Type, TypeVar
 
+from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
+
+from nucliadb_protos import knowledgebox_pb2
+
+_T = TypeVar("_T")
 
 
 class Entity(BaseModel):
     value: str
     merged: bool = False
     represents: List[str] = []
+
+    @classmethod
+    def from_message(cls: Type[_T], message: knowledgebox_pb2.Entity) -> _T:
+        entity = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+
+        # backwards compatibility with `merged` field. `status` is it's replacement.
+        merged = entity.pop("merged", None)
+        status = entity.pop("status", None)
+        is_merged = None
+
+        if status is not None:
+            is_merged = message.status == knowledgebox_pb2.Entity.DiffStatus.MERGED
+        elif merged is not None:
+            is_merged = message.merged
+
+        if is_merged is not None:
+            entity["merged"] = is_merged
+
+        return entity
 
 
 class EntitiesGroup(BaseModel):
@@ -37,6 +65,18 @@ class EntitiesGroup(BaseModel):
     custom: bool = Field(
         default=False, description="Denotes if it has been created by the user"
     )
+
+    @classmethod
+    def from_message(cls: Type[_T], message: knowledgebox_pb2.EntitiesGroup) -> _T:
+        entitiesgroup = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        for name, entity in message.entities.items():
+            entitiesgroup["entities"][name] = Entity.from_message(entity)
+
+        return entitiesgroup
 
 
 class KnowledgeBoxEntities(BaseModel):

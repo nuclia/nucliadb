@@ -109,13 +109,7 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
-        response = EntitiesGroup(
-            **MessageToDict(
-                kbobj.group,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
+        response = EntitiesGroup.from_message(kbobj.group)
         return response
     elif kbobj.status == GetEntitiesGroupResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
