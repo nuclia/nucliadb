@@ -74,14 +74,10 @@ async def get_entities(
     if kbobj.status == GetEntitiesResponse.Status.OK:
         response = KnowledgeBoxEntities(uuid=kbid)
         for key, group in kbobj.groups.items():
-            group_dict = MessageToDict(
-                group,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-            if "" in group_dict["entities"]:
-                del group_dict["entities"][""]
-            response.groups[key] = EntitiesGroup(**group_dict)
+            entities_group = EntitiesGroup.from_message(group)
+            if "" in entities_group["entities"]:
+                del entities_group["entities"][""]
+            response.groups[key] = entities_group
             if not show_entities:
                 response.groups[key].entities = {}
         return response

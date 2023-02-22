@@ -124,17 +124,11 @@ message Labels {
 
 
 message Entity {
-    enum DiffStatus {
-        NORMAL = 0;
-        DELETED = 1;
-        MERGED = 2;
-    }
-
     string value = 2;
     repeated string represents = 4;
 
-    bool merged = 3 [deprecated = true];
-    DiffStatus status = 5;
+    bool merged = 3;
+    bool deleted = 5;
 }
 
 message EntitiesGroup {

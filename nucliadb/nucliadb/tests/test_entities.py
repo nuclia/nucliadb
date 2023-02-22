@@ -92,6 +92,7 @@ async def create_entities_group_by_bm(kbid: str, group: str, nucliadb_grpc: Writ
         slug=f"resource-with-{group}-entities",
         title=f"Resource with {group} entities",
     )
+
     relations = []
     for entity in entities_group.values():
         node = RelationNode(
@@ -184,7 +185,6 @@ async def test_create_new_entities_group_via_api(
     kbid = knowledgebox
 
     entitiesgroup = await create_entities_group_by_api(kbid, "ANIMALS", nucliadb_writer)
-
 
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/entitiesgroup/ANIMALS",

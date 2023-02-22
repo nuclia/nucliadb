@@ -77,7 +77,7 @@ class EntitiesManager:
             for name, entity in indexed.entities.items():
                 if name not in updated.entities:
                     updated.entities[name].CopyFrom(entity)
-                    updated.entities[name].status = Entity.DiffStatus.DELETED
+                    updated.entities[name].deleted = True
 
         await self.store_entities_group(group, updated)
         await self.index_entities_group(group, updated)
@@ -133,8 +133,7 @@ class EntitiesManager:
         )
         results = await node.reader.RelationSearch(request)
         entities = {
-            node.value: Entity(value=node.value, status=Entity.DiffStatus.NORMAL)
-            for node in results.prefix.nodes
+            node.value: Entity(value=node.value) for node in results.prefix.nodes
         }
         if not entities:
             return None
@@ -248,7 +247,7 @@ class EntitiesManager:
 
         for name, entity in stored.entities.items():
             # remove entities marked as deleted, as they not exists from the user point of view
-            if entity.status == Entity.DiffStatus.DELETED:
+            if entity.deleted:
                 merged_entities.pop(name, None)
             else:
                 merged_entities[name] = entity
