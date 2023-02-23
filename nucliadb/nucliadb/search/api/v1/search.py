@@ -26,6 +26,7 @@ from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
+from nucliadb_protos.nodereader_pb2 import SearchRequest as PBSearchRequest
 from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from sentry_sdk import capture_exception
@@ -437,5 +438,5 @@ def is_valid_index_sort_field(field: SortField) -> bool:
     return SortFieldMap[field] is not None
 
 
-def check_missing_vectors(item, pb_query: SearchRequest) -> bool:
+def check_missing_vectors(item: SearchRequest, pb_query: PBSearchRequest) -> bool:
     return SearchOptions.VECTOR in item.features and len(pb_query.vector) == 0
