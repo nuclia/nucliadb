@@ -357,6 +357,7 @@ pub fn search_query(
         originals.push((Occur::Must, Box::new(term_query)))
     }
     // Fields
+    let mut field_filter: Vec<(Occur, Box<dyn Query>)> = vec![];
     search
         .fields
         .iter()
@@ -365,10 +366,13 @@ pub fn search_query(
         .for_each(|facet| {
             let facet_term = Term::from_facet(schema.field, &facet);
             let facet_term_query = TermQuery::new(facet_term, IndexRecordOption::Basic);
-            fuzzies.push((Occur::Must, Box::new(facet_term_query.clone())));
-            originals.push((Occur::Must, Box::new(facet_term_query)));
+            field_filter.push((Occur::Should, Box::new(facet_term_query)));
         });
-
+    if !field_filter.is_empty() {
+        let field_filter = Box::new(BooleanQuery::new(field_filter));
+        fuzzies.push((Occur::Must, field_filter.clone()));
+        originals.push((Occur::Must, field_filter));
+    }
     // Add filter
     search
         .filter
