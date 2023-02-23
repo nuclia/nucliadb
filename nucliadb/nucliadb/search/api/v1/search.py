@@ -373,7 +373,6 @@ async def search(
     response.status_code = 206 if incomplete_results else 200
     if check_missing_vectors(item, pb_query):
         response.status_code = 206
-        response.reason = "Vector not detected in query"
 
     if audit is not None and do_audit:
         await audit.search(
