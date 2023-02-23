@@ -20,8 +20,10 @@
 
 use std::collections::HashSet;
 
-use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary};
+use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary, Similarity};
 use crate::formula::{Formula, LabelClause};
+
+const SIMILARITY: Similarity = Similarity::Cosine;
 
 fn create_query() -> Vec<f32> {
     vec![rand::random::<f32>; 178]
@@ -56,7 +58,7 @@ fn simple_flow() {
         elems.push(Elem::new(key.clone(), vector, labels, None));
         expected_keys.push(key);
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
     let id = reader.get_id();
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
@@ -89,7 +91,7 @@ fn accuracy_test() {
         let labels = labels_dictionary.clone();
         elems.push(Elem::new(key, vector, labels, None));
     }
-    let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
     let query = create_query();
     let no_results = 10;
     let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
@@ -121,12 +123,12 @@ fn single_graph() {
         LabelDictionary::default(),
         None,
     )];
-    let reader = DataPoint::new(temp_dir.path(), elems.clone(), None).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems.clone(), None, SIMILARITY).unwrap();
     let formula = Formula::new();
     let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5);
     assert_eq!(result.count(), 0);
 
-    let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
+    let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
     let result = reader
         .search(&HashSet::new(), &vector, &formula, true, 5)
         .collect::<Vec<_>>();
@@ -155,8 +157,8 @@ fn data_merge() {
         LabelDictionary::default(),
         None,
     )];
-    let dp_0 = DataPoint::new(temp_dir.path(), elems0, None).unwrap();
-    let dp_1 = DataPoint::new(temp_dir.path(), elems1, None).unwrap();
+    let dp_0 = DataPoint::new(temp_dir.path(), elems0, None, SIMILARITY).unwrap();
+    let dp_1 = DataPoint::new(temp_dir.path(), elems1, None, SIMILARITY).unwrap();
     let dp = DataPoint::merge(
         temp_dir.path(),
         &[

@@ -80,6 +80,22 @@ pub struct AcceptShardRequest {
     pub override_shard: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewShardRequest {
+    #[prost(enumeration="new_shard_request::VectorSimilarity", tag="1")]
+    pub similarity: i32,
+    #[prost(message, optional, tag="2")]
+    pub metadata: ::core::option::Option<super::noderesources::ShardMetadata>,
+}
+/// Nested message and enum types in `NewShardRequest`.
+pub mod new_shard_request {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum VectorSimilarity {
+        Cosine = 0,
+        Dot = 1,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Counter {
     #[prost(uint64, tag="1")]
     pub resources: u64,
@@ -181,7 +197,7 @@ pub mod node_writer_client {
         }
         pub async fn new_shard(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardMetadata>,
+            request: impl tonic::IntoRequest<super::NewShardRequest>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -608,7 +624,7 @@ pub mod node_writer_server {
         >;
         async fn new_shard(
             &self,
-            request: tonic::Request<super::super::noderesources::ShardMetadata>,
+            request: tonic::Request<super::NewShardRequest>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -777,9 +793,8 @@ pub mod node_writer_server {
                     struct NewShardSvc<T: NodeWriter>(pub Arc<T>);
                     impl<
                         T: NodeWriter,
-                    > tonic::server::UnaryService<
-                        super::super::noderesources::ShardMetadata,
-                    > for NewShardSvc<T> {
+                    > tonic::server::UnaryService<super::NewShardRequest>
+                    for NewShardSvc<T> {
                         type Response = super::super::noderesources::ShardCreated;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -787,9 +802,7 @@ pub mod node_writer_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<
-                                super::super::noderesources::ShardMetadata,
-                            >,
+                            request: tonic::Request<super::NewShardRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).new_shard(request).await };

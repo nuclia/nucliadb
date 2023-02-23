@@ -22,7 +22,7 @@ class NodeWriterStub(object):
                 )
         self.NewShard = channel.unary_unary(
                 '/nodewriter.NodeWriter/NewShard',
-                request_serializer=nucliadb__protos_dot_noderesources__pb2.ShardMetadata.SerializeToString,
+                request_serializer=nucliadb__protos_dot_nodewriter__pb2.NewShardRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardCreated.FromString,
                 )
         self.CleanAndUpgradeShard = channel.unary_unary(
@@ -195,7 +195,7 @@ def add_NodeWriterServicer_to_server(servicer, server):
             ),
             'NewShard': grpc.unary_unary_rpc_method_handler(
                     servicer.NewShard,
-                    request_deserializer=nucliadb__protos_dot_noderesources__pb2.ShardMetadata.FromString,
+                    request_deserializer=nucliadb__protos_dot_nodewriter__pb2.NewShardRequest.FromString,
                     response_serializer=nucliadb__protos_dot_noderesources__pb2.ShardCreated.SerializeToString,
             ),
             'CleanAndUpgradeShard': grpc.unary_unary_rpc_method_handler(
@@ -302,7 +302,7 @@ class NodeWriter(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nodewriter.NodeWriter/NewShard',
-            nucliadb__protos_dot_noderesources__pb2.ShardMetadata.SerializeToString,
+            nucliadb__protos_dot_nodewriter__pb2.NewShardRequest.SerializeToString,
             nucliadb__protos_dot_noderesources__pb2.ShardCreated.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

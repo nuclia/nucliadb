@@ -23,7 +23,7 @@ use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId,
+    DeleteGraphNodes, JoinGraph, NewShardRequest, OpStatus, Resource, ResourceId, VectorSetId,
 };
 use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
@@ -85,9 +85,10 @@ impl ShardWriterService {
     #[tracing::instrument(skip_all)]
     pub fn new(
         id: String,
-        metadata: ShardMetadata,
+        request: NewShardRequest,
         shard_path: &Path,
     ) -> NodeResult<ShardWriterService> {
+        let metadata = request.metadata.map(|i| i.into()).unwrap_or_default();
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
         };
@@ -98,6 +99,7 @@ impl ShardWriterService {
 
         let vsc = VectorConfig {
             no_results: None,
+            similarity: Some(request.similarity()),
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),
         };

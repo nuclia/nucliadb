@@ -40,6 +40,8 @@ pub enum VectorErr {
     MultipleWriters,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
+    #[error("Can not merge zero datapoints")]
+    EmptyMerge,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

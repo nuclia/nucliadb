@@ -37,7 +37,7 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ShardId,
     ]
     NewShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardMetadata,
+        nucliadb_protos.nodewriter_pb2.NewShardRequest,
         nucliadb_protos.noderesources_pb2.ShardCreated,
     ]
     CleanAndUpgradeShard: grpc.UnaryUnaryMultiCallable[
@@ -103,7 +103,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def NewShard(
         self,
-        request: nucliadb_protos.noderesources_pb2.ShardMetadata,
+        request: nucliadb_protos.nodewriter_pb2.NewShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
     @abc.abstractmethod

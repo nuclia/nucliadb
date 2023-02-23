@@ -268,7 +268,7 @@ mod test {
     use uuid::Uuid;
 
     use super::*;
-    use crate::data_point::{Elem, LabelDictionary};
+    use crate::data_point::{Elem, LabelDictionary, Similarity};
     #[test]
     fn fssv_test() {
         let values: &[Neighbour] = &[
@@ -314,7 +314,7 @@ mod test {
                     .collect::<Vec<_>>();
                 elems.push(Elem::new(key, vector, labels, None));
             }
-            Some(DataPoint::new(self.path, elems, None).unwrap())
+            Some(DataPoint::new(self.path, elems, None, Similarity::Cosine).unwrap())
         }
     }
 

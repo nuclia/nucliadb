@@ -255,6 +255,7 @@ mod tests {
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
+            similarity: None,
             no_results: Some(3),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),

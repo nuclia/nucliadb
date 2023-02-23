@@ -172,6 +172,7 @@ impl ShardReaderService {
         };
 
         let vsc = VectorConfig {
+            similarity: None,
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),

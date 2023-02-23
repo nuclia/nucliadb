@@ -22,6 +22,8 @@ mod merge_worker;
 mod merger;
 mod state;
 mod work_flag;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -30,15 +32,18 @@ use std::time::SystemTime;
 pub use merger::Merger;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use nucliadb_core::tracing::*;
+use serde::{Deserialize, Serialize};
 use state::*;
 use work_flag::MergerWriterSync;
 
 pub use crate::data_point::Neighbour;
-use crate::data_point::{DataPoint, DpId};
+use crate::data_point::{DataPoint, DpId, Similarity};
 use crate::data_point_provider::merge_worker::Worker;
 use crate::formula::Formula;
 use crate::VectorR;
 pub type TemporalMark = SystemTime;
+
+const METADATA: &str = "metadata.json";
 
 pub trait SearchRequest {
     fn get_query(&self) -> &[f32];
@@ -53,7 +58,29 @@ pub enum IndexCheck {
     Sanity,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct IndexMetadata {
+    #[serde(default)]
+    pub similarity: Similarity,
+}
+impl IndexMetadata {
+    pub fn write(&self, path: &Path) -> VectorR<()> {
+        let mut writer = BufWriter::new(File::create(path.join(METADATA))?);
+        serde_json::to_writer(&mut writer, self)?;
+        Ok(writer.flush()?)
+    }
+    pub fn open(path: &Path) -> VectorR<Option<IndexMetadata>> {
+        let path = &path.join(METADATA);
+        if !path.is_file() {
+            return Ok(None);
+        }
+        let mut reader = BufReader::new(File::open(path)?);
+        Ok(Some(serde_json::from_reader(&mut reader)?))
+    }
+}
+
 pub struct Index {
+    metadata: IndexMetadata,
     work_flag: MergerWriterSync,
     state: RwLock<State>,
     date: RwLock<Version>,
@@ -99,7 +126,12 @@ impl Index {
         let lock = fs_state::shared_lock(path)?;
         let state = fs_state::load_state::<State>(&lock)?;
         let date = fs_state::crnt_version(&lock)?;
+        let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
+            let metadata = IndexMetadata::default();
+            metadata.write(path).map(|_| metadata)
+        })?;
         let index = Index {
+            metadata,
             work_flag: MergerWriterSync::new(),
             state: RwLock::new(state),
             date: RwLock::new(date),
@@ -176,6 +208,9 @@ impl Index {
     pub fn location(&self) -> &Path {
         &self.location
     }
+    pub fn metadata(&self) -> &IndexMetadata {
+        &self.metadata
+    }
 }
 
 #[cfg(test)]
@@ -183,13 +218,14 @@ mod test {
     use nucliadb_core::NodeResult;
 
     use super::*;
+    use crate::data_point::Similarity;
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
         let index = Index::new(dir.path(), IndexCheck::None)?;
         let empty_no_entries = std::fs::read_dir(dir.path())?.count();
         for _ in 0..10 {
-            DataPoint::new(dir.path(), vec![], None).unwrap();
+            DataPoint::new(dir.path(), vec![], None, Similarity::Cosine).unwrap();
         }
         let lock = index.get_slock()?;
         index.collect_garbage(&lock)?;

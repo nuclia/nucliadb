@@ -29,6 +29,7 @@ use std::time::SystemTime;
 use std::{fs, io, path};
 
 use disk_hnsw::DiskHnsw;
+use io::{BufWriter, Write};
 use key_value::Slot;
 use memmap2::Mmap;
 use node::Node;
@@ -40,7 +41,7 @@ pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
-use crate::VectorR;
+use crate::{VectorErr, VectorR};
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -55,11 +56,28 @@ impl DeleteLog for NoDLog {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Similarity {
+    Dot,
+    #[default]
+    Cosine,
+}
+impl Similarity {
+    pub fn compute(&self, x: &[u8], y: &[u8]) -> f32 {
+        match self {
+            Similarity::Cosine => vector::cosine_similarity(x, y),
+            Similarity::Dot => vector::dot_similarity(x, y),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct Journal {
     uid: DpId,
     nodes: usize,
     ctime: SystemTime,
+    #[serde(default)]
+    similarity: Similarity,
 }
 impl Journal {
     pub fn id(&self) -> DpId {
@@ -88,17 +106,24 @@ impl Address {
 }
 
 pub struct Retriever<'a, Dlog> {
+    similarity: Similarity,
     no_nodes: usize,
     temp: &'a [u8],
     nodes: &'a Mmap,
     delete_log: &'a Dlog,
 }
 impl<'a, Dlog: DeleteLog> Retriever<'a, Dlog> {
-    pub fn new(temp: &'a [u8], nodes: &'a Mmap, delete_log: &'a Dlog) -> Retriever<'a, Dlog> {
+    pub fn new(
+        temp: &'a [u8],
+        nodes: &'a Mmap,
+        delete_log: &'a Dlog,
+        similarity: Similarity,
+    ) -> Retriever<'a, Dlog> {
         Retriever {
             temp,
             nodes,
             delete_log,
+            similarity,
             no_nodes: key_value::get_no_elems(nodes),
         }
     }
@@ -137,21 +162,21 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             Node::has_label(x, label)
         }
     }
-    fn consine_similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
+    fn similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
         if a0 == self.no_nodes {
             let y = self.find_node(y);
             let y = Node::vector(y);
-            vector::consine_similarity(self.temp, y)
+            self.similarity.compute(self.temp, y)
         } else if a1 == self.no_nodes {
             let x = self.find_node(x);
             let x = Node::vector(x);
-            vector::consine_similarity(self.temp, x)
+            self.similarity.compute(self.temp, x)
         } else {
             let x = self.find_node(x);
             let y = self.find_node(y);
             let x = Node::vector(x);
             let y = Node::vector(y);
-            vector::consine_similarity(x, y)
+            self.similarity.compute(x, y)
         }
     }
 }
@@ -299,7 +324,8 @@ impl DataPoint {
     ) -> impl Iterator<Item = Neighbour> + '_ {
         use ops_hnsw::params;
         let encoded_query = vector::encode_vector(query);
-        let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log);
+        let similarity = self.journal.similarity;
+        let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity);
         let ops = HnswOps { tracker: &tacker };
         let neighbours = ops.search(
             Address(self.journal.nodes),
@@ -315,7 +341,9 @@ impl DataPoint {
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
     where Dlog: DeleteLog {
-        use io::{BufWriter, Write};
+        if operants.is_empty() {
+            return Err(VectorErr::EmptyMerge);
+        }
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
@@ -341,7 +369,7 @@ impl DataPoint {
         let node_producers = operants
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
-
+        let similarity = operants[0].1.journal.similarity;
         {
             let mut node_buffer = BufWriter::new(&mut nodes);
             key_value::merge(&mut node_buffer, node_producers.collect())?;
@@ -350,7 +378,7 @@ impl DataPoint {
 
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = key_value::get_no_elems(&nodes);
-        let tracker = Retriever::new(&[], &nodes, &NoDLog);
+        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity);
         let ops = HnswOps { tracker: &tracker };
         let mut index = RAMHnsw::new();
         for id in 0..no_nodes {
@@ -366,6 +394,7 @@ impl DataPoint {
         let index = unsafe { Mmap::map(&hnswf)? };
 
         let journal = Journal {
+            similarity,
             nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: SystemTime::now(),
@@ -416,10 +445,9 @@ impl DataPoint {
     pub fn new(
         dir: &path::Path,
         mut elems: Vec<Elem>,
-        with_time: Option<SystemTime>,
+        time: Option<SystemTime>,
+        similarity: Similarity,
     ) -> VectorR<DataPoint> {
-        use io::{BufWriter, Write};
-
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
@@ -452,7 +480,7 @@ impl DataPoint {
         let no_nodes = key_value::get_no_elems(&nodes);
 
         // Creating the HNSW using the mmaped nodes
-        let tracker = Retriever::new(&[], &nodes, &NoDLog);
+        let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity);
         let ops = HnswOps { tracker: &tracker };
         let mut index = RAMHnsw::new();
         for id in 0..no_nodes {
@@ -469,9 +497,10 @@ impl DataPoint {
         let index = unsafe { Mmap::map(&hnswf)? };
 
         let journal = Journal {
+            similarity,
             nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
-            ctime: with_time.unwrap_or_else(SystemTime::now),
+            ctime: time.unwrap_or_else(SystemTime::now),
         };
         {
             // Saving the journal

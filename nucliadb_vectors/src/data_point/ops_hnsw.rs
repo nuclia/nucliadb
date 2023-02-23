@@ -49,7 +49,7 @@ pub mod params {
 pub trait DataRetriever: std::marker::Sync {
     fn is_deleted(&self, _: Address) -> bool;
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
-    fn consine_similarity(&self, _: Address, _: Address) -> f32;
+    fn similarity(&self, _: Address, _: Address) -> f32;
     fn get_vector(&self, _: Address) -> &[u8];
 }
 
@@ -108,7 +108,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         picked_level.round() as usize
     }
     fn cosine_similarity(&self, x: Address, y: Address) -> f32 {
-        self.tracker.consine_similarity(x, y)
+        self.tracker.similarity(x, y)
     }
     fn closest_up_node<L: Layer>(
         &'a self,

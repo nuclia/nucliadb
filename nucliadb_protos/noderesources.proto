@@ -167,7 +167,6 @@ message Resource {
     map<string, utils.UserVectorsList> vectors_to_delete = 13;  // Vectorset prefix vector id
 }
 
-
 message ShardMetadata {
     string kbid = 1;
 }

@@ -166,11 +166,14 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: starts {v} ms");
         }
+
+        let similarity = self.index.metadata().similarity;
         let new_dp = if !elems.is_empty() {
             Some(DataPoint::new(
                 self.index.location(),
                 elems,
                 Some(temporal_mark),
+                similarity,
             )?)
         } else {
             None
@@ -255,7 +258,8 @@ impl WriterChild for VectorWriterService {
                 elems.push(Elem::new(key, vector, labels, None));
             }
             if !elems.is_empty() {
-                let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark))?;
+                let similarity = index.metadata().similarity;
+                let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark), similarity)?;
                 let lock = index.get_elock()?;
                 index.add(new_dp, &lock);
                 index.commit(lock)?;
@@ -320,6 +324,9 @@ impl VectorWriterService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
+            std::fs::create_dir_all(path)?;
+            let similarity = config.similarity.map(|i| i.into()).unwrap_or_default();
+            IndexMetadata { similarity }.write(path)?;
             Ok(VectorWriterService {
                 index: Index::new(path, IndexCheck::None)?,
                 indexset: IndexSet::new(indexset, IndexCheck::None)?,
@@ -373,6 +380,7 @@ mod tests {
     fn test_vectorset_functionality() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
+            similarity: None,
             no_results: None,
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
@@ -438,6 +446,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
+            similarity: None,
             no_results: None,
             path: dir.path().to_path_buf(),
             vectorset: dir_vectorset.path().to_path_buf(),

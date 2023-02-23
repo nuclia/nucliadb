@@ -1,4 +1,4 @@
-use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
+use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
 use std::time::SystemTime;
@@ -41,12 +41,13 @@ fn label_set(batch_id: usize) -> Vec<String> {
 
 fn add_batch(writer: &mut Index, elems: Vec<(String, Vec<f32>)>, labels: Vec<String>) {
     let temporal_mark = TemporalMark::now();
+    let similarity = Similarity::Cosine;
     let labels = LabelDictionary::new(labels);
     let elems = elems
         .into_iter()
         .map(|(key, vector)| Elem::new(key, vector, labels.clone(), None))
         .collect();
-    let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark)).unwrap();
+    let new_dp = DataPoint::new(writer.location(), elems, Some(temporal_mark), similarity).unwrap();
     let lock = writer.get_elock().unwrap();
     writer.add(new_dp, &lock);
     writer.commit(lock).unwrap();

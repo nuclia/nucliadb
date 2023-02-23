@@ -219,6 +219,39 @@ class AcceptShardRequest(google.protobuf.message.Message):
 global___AcceptShardRequest = AcceptShardRequest
 
 @typing_extensions.final
+class NewShardRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _VectorSimilarity:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _VectorSimilarityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[NewShardRequest._VectorSimilarity.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        Cosine: NewShardRequest._VectorSimilarity.ValueType  # 0
+        Dot: NewShardRequest._VectorSimilarity.ValueType  # 1
+
+    class VectorSimilarity(_VectorSimilarity, metaclass=_VectorSimilarityEnumTypeWrapper): ...
+    Cosine: NewShardRequest.VectorSimilarity.ValueType  # 0
+    Dot: NewShardRequest.VectorSimilarity.ValueType  # 1
+
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    similarity: global___NewShardRequest.VectorSimilarity.ValueType
+    @property
+    def metadata(self) -> nucliadb_protos.noderesources_pb2.ShardMetadata: ...
+    def __init__(
+        self,
+        *,
+        similarity: global___NewShardRequest.VectorSimilarity.ValueType = ...,
+        metadata: nucliadb_protos.noderesources_pb2.ShardMetadata | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "similarity", b"similarity"]) -> None: ...
+
+global___NewShardRequest = NewShardRequest
+
+@typing_extensions.final
 class Counter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

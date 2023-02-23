@@ -19,7 +19,7 @@
 //
 
 use super::VectorEngine;
-use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
+use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::Formula;
 
@@ -47,12 +47,14 @@ impl<'a> SearchRequest for Request<'a> {
 impl VectorEngine for Index {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>) {
         let temporal_mark = TemporalMark::now();
+        let similarity = Similarity::Cosine;
         let mut elems = vec![];
         for (key, vector) in keys.into_iter().zip(embeddings.into_iter()) {
             let elem = Elem::new(key, vector, LabelDictionary::new(vec![]), None);
             elems.push(elem);
         }
-        let new_dp = DataPoint::new(self.location(), elems, Some(temporal_mark)).unwrap();
+        let new_dp =
+            DataPoint::new(self.location(), elems, Some(temporal_mark), similarity).unwrap();
         let lock = self.get_elock().unwrap();
         self.add(new_dp, &lock);
         self.delete(batch_id, temporal_mark, &lock);

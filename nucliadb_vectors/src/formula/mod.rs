@@ -123,13 +123,13 @@ mod tests {
             self.labels.contains(label)
         }
         fn is_deleted(&self, _: Address) -> bool {
-            panic!("Not mean to be used")
+            panic!("Not meant to be used")
         }
-        fn consine_similarity(&self, _: Address, _: Address) -> f32 {
-            panic!("Not mean to be used")
+        fn similarity(&self, _: Address, _: Address) -> f32 {
+            panic!("Not meant to be used")
         }
         fn get_vector(&self, _: Address) -> &[u8] {
-            panic!("Not mean to be used")
+            panic!("Not meant to be used")
         }
     }
     #[test]
