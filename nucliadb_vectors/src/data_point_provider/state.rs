@@ -183,18 +183,17 @@ impl State {
         }
     }
     pub fn search(&self, location: &Path, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
+        let query = request.get_query();
+        let filter = request.get_filter();
+        let with_duplicates = request.with_duplicates();
+        let no_results = request.no_results();
         let mut ffsv = Fssc::new(request.no_results());
         for journal in self.data_point_iterator().copied() {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
-            let result_iter = data_point.search(
-                &delete_log,
-                request.get_query(),
-                request.get_queries(),
-                request.with_duplicates(),
-                request.no_results(),
-            );
-            result_iter.for_each(|candidate| ffsv.add(candidate));
+            data_point
+                .search(&delete_log, query, filter, with_duplicates, no_results)
+                .for_each(|candidate| ffsv.add(candidate));
         }
         Ok(ffsv.into())
     }

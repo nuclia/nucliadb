@@ -21,7 +21,7 @@
 use std::collections::HashSet;
 
 use crate::data_point::{DataPoint, DeleteLog, Elem, LabelDictionary};
-use crate::query::Query;
+use crate::formula::{Formula, LabelClause};
 
 fn create_query() -> Vec<f32> {
     vec![rand::random::<f32>; 178]
@@ -45,7 +45,7 @@ fn simple_flow() {
     let mut queries = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
-        queries.push(Query::label(format!("LABEL_{}", i)));
+        queries.push(LabelClause::new(format!("LABEL_{}", i)));
     }
     let mut expected_keys = vec![];
     let label_dictionary = LabelDictionary::new(labels.clone());
@@ -61,7 +61,11 @@ fn simple_flow() {
     let reader = DataPoint::open(temp_dir.path(), id).unwrap();
     let query = vec![rand::random::<f32>(); 8];
     let no_results = 10;
-    let result = reader.search(&HashSet::new(), &query, &queries[..20], true, no_results);
+    let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
+        acc.extend(i.clone());
+        acc
+    });
+    let result = reader.search(&HashSet::new(), &query, &formula, true, no_results);
     let got_keys = reader.get_keys(&HashSet::new());
     assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
     assert_eq!(got_keys.len(), expected_keys.len());
@@ -75,7 +79,7 @@ fn accuracy_test() {
     let mut queries = vec![];
     for i in 0..50 {
         labels.push(format!("LABEL_{}", i));
-        queries.push(Query::label(format!("LABEL_{}", i)));
+        queries.push(LabelClause::new(format!("LABEL_{}", i)));
     }
     let labels_dictionary = LabelDictionary::new(labels.clone());
     let mut elems = Vec::new();
@@ -88,14 +92,18 @@ fn accuracy_test() {
     let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let query = create_query();
     let no_results = 10;
+    let formula = queries[..20].iter().fold(Formula::new(), |mut acc, i| {
+        acc.extend(i.clone());
+        acc
+    });
     let mut result_0 = reader
-        .search(&HashSet::new(), &query, &queries[..20], true, no_results)
+        .search(&HashSet::new(), &query, &formula, true, no_results)
         .collect::<Vec<_>>();
     result_0.sort_by(|i, j| i.id().cmp(j.id()));
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
     let mut result_1 = reader
-        .search(&HashSet::new(), &query, &queries[..20], true, no_results)
+        .search(&HashSet::new(), &query, &formula, true, no_results)
         .collect::<Vec<_>>();
     result_1.sort_by(|i, j| i.id().cmp(j.id()));
     assert_ne!(result_0, result_1)
@@ -114,12 +122,13 @@ fn single_graph() {
         None,
     )];
     let reader = DataPoint::new(temp_dir.path(), elems.clone(), None).unwrap();
-    let result = reader.search(&HashSet::from([key.clone()]), &vector, &[], true, 5);
+    let formula = Formula::new();
+    let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5);
     assert_eq!(result.count(), 0);
 
     let reader = DataPoint::new(temp_dir.path(), elems, None).unwrap();
     let result = reader
-        .search(&HashSet::new(), &vector, &[], true, 5)
+        .search(&HashSet::new(), &vector, &formula, true, 5)
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
@@ -156,12 +165,16 @@ fn data_merge() {
         ],
     )
     .unwrap();
-
-    let result: Vec<_> = dp.search(&HashSet::new(), &vector1, &[], true, 1).collect();
+    let formula = Formula::new();
+    let result: Vec<_> = dp
+        .search(&HashSet::new(), &vector1, &formula, true, 1)
+        .collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key1.as_bytes());
-    let result: Vec<_> = dp.search(&HashSet::new(), &vector0, &[], true, 1).collect();
+    let result: Vec<_> = dp
+        .search(&HashSet::new(), &vector0, &formula, true, 1)
+        .collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key0.as_bytes());

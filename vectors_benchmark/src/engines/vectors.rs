@@ -21,7 +21,11 @@
 use super::VectorEngine;
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::*;
-use nucliadb_vectors::query::Query;
+use nucliadb_vectors::formula::Formula;
+
+lazy_static::lazy_static! {
+    static ref FORMULA: Formula = Formula::new();
+}
 
 struct Request<'a>(usize, &'a [f32]);
 impl<'a> SearchRequest for Request<'a> {
@@ -32,8 +36,8 @@ impl<'a> SearchRequest for Request<'a> {
         self.1
     }
 
-    fn get_queries(&self) -> &[Query] {
-        &[]
+    fn get_filter(&self) -> &Formula {
+        &FORMULA
     }
 
     fn no_results(&self) -> usize {

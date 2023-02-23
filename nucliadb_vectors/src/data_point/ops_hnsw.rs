@@ -27,7 +27,7 @@ use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 
 use super::*;
-use crate::query::Query;
+use crate::formula::Formula;
 
 pub mod params {
     pub fn level_factor() -> f64 {
@@ -115,7 +115,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         x: Address,
         query: Address,
         layer: L,
-        filters: &[Query],
+        filter: &Formula,
         blocked_addresses: &HashSet<Address>,
         vec_counter: &RepCounter,
     ) -> Option<(Address, f32)> {
@@ -133,8 +133,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                         && !blocked_addresses.contains(&n)
                         // The number of times this vector appears is 0
                         && vec_counter.get(self.tracker.get_vector(n)) == 0
-                        // The vector contains all the labels required by the query.
-                        && filters.iter().all(|q| q.run(n, self.tracker)) =>
+                        // The vector satisfies the given filter
+                        && filter.run(n, self.tracker) =>
                 {
                     break Some((n, self.cosine_similarity(n, query)));
                 }
@@ -244,7 +244,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: Address,
         hnsw: H,
         k_neighbours: usize,
-        with_filter: &[Query],
+        with_filter: &Formula,
         with_duplicates: bool,
     ) -> Neighbours {
         if let Some(entry_point) = hnsw.get_entry_point() {

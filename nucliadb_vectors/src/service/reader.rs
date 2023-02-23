@@ -29,14 +29,14 @@ use nucliadb_core::protos::{
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
+use crate::formula::{Formula, LabelClause};
 use crate::indexset::IndexSet;
-use crate::query::Query;
 
-impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Vec<Query>) {
+impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
         self.1.with_duplicates
     }
-    fn get_queries(&self) -> &[Query] {
+    fn get_filter(&self) -> &Formula {
         &self.2
     }
     fn get_query(&self) -> &[f32] {
@@ -104,16 +104,14 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
-        let search_request = (
-            total_to_get,
-            request,
-            request
-                .tags
-                .iter()
-                .cloned()
-                .map(Query::label)
-                .collect::<Vec<_>>(),
-        );
+        let mut formula = Formula::new();
+        request
+            .tags
+            .iter()
+            .cloned()
+            .map(LabelClause::new)
+            .for_each(|c| formula.extend(c));
+        let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Searching: starts at {v} ms");
         }

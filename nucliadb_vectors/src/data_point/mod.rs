@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
-use crate::query::Query;
+use crate::formula::Formula;
 use crate::VectorR;
 
 mod file_names {
@@ -293,7 +293,7 @@ impl DataPoint {
         &self,
         delete_log: &Dlog,
         query: &[f32],
-        labels: &[Query],
+        filter: &Formula,
         with_duplicates: bool,
         results: usize,
     ) -> impl Iterator<Item = Neighbour> + '_ {
@@ -305,7 +305,7 @@ impl DataPoint {
             Address(self.journal.nodes),
             self.index.as_ref(),
             params::k_neighbours(),
-            labels,
+            filter,
             with_duplicates,
         );
         neighbours

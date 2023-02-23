@@ -21,21 +21,27 @@
 use crate::data_point::{Address, DataRetriever};
 
 #[derive(Debug, Clone)]
-pub struct LabelData {
+pub struct LabelClause {
     value: String,
 }
-impl LabelData {
+impl LabelClause {
+    pub fn new(labels: String) -> LabelClause {
+        LabelClause { value: labels }
+    }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         retriever.has_label(x, self.value.as_bytes())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct CompountData {
+pub struct CompoundClause {
     threshold: usize,
-    labels: Vec<LabelData>,
+    labels: Vec<LabelClause>,
 }
-impl CompountData {
+impl CompoundClause {
+    pub fn new(threshold: usize, labels: Vec<LabelClause>) -> CompoundClause {
+        CompoundClause { threshold, labels }
+    }
     fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
         let number_of_subqueries = self.labels.len();
         let mut threshold = self.threshold;
@@ -50,27 +56,46 @@ impl CompountData {
 }
 
 #[derive(Debug, Clone)]
-pub enum Query {
-    Label(LabelData),
-    Compound(CompountData),
+pub enum Clause {
+    Label(LabelClause),
+    Compound(CompoundClause),
 }
 
-impl Query {
-    pub fn label(label: String) -> Query {
-        Query::Label(LabelData { value: label })
+impl Clause {
+    fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
+        match self {
+            Clause::Compound(q) => q.run(x, retriever),
+            Clause::Label(q) => q.run(x, retriever),
+        }
     }
-    pub fn compound(threshold: usize, labels: Vec<String>) -> Query {
-        let labels = labels
-            .into_iter()
-            .map(|value| LabelData { value })
-            .collect();
-        Query::Compound(CompountData { threshold, labels })
+}
+
+impl From<LabelClause> for Clause {
+    fn from(value: LabelClause) -> Self {
+        Clause::Label(value)
+    }
+}
+
+impl From<CompoundClause> for Clause {
+    fn from(value: CompoundClause) -> Self {
+        Clause::Compound(value)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Formula {
+    clauses: Vec<Clause>,
+}
+impl Formula {
+    pub fn new() -> Formula {
+        Formula::default()
+    }
+    pub fn extend<C>(&mut self, clause: C)
+    where Clause: From<C> {
+        self.clauses.push(clause.into())
     }
     pub fn run<D: DataRetriever>(&self, x: Address, retriever: &D) -> bool {
-        match self {
-            Query::Compound(q) => q.run(x, retriever),
-            Query::Label(q) => q.run(x, retriever),
-        }
+        self.clauses.iter().all(|q| q.run(x, retriever))
     }
 }
 
@@ -99,27 +124,29 @@ mod tests {
     }
     #[test]
     fn test_query() {
-        const L1: &[u8] = b"Label1";
-        const L2: &[u8] = b"Label2";
-        const L3: &[u8] = b"Label3";
+        const L1: &str = "Label1";
+        const L2: &str = "Label2";
+        const L3: &str = "Label3";
         const ADDRESS: Address = Address::dummy();
         let retriever = DummyRetriever {
-            labels: [L1, L3].into_iter().collect(),
+            labels: [L1.as_bytes(), L3.as_bytes()].into_iter().collect(),
         };
-        let queries = [
-            Query::label(String::from_utf8_lossy(L1).to_string()),
-            Query::label(String::from_utf8_lossy(L3).to_string()),
+        let mut formula = Formula::new();
+        formula.extend(LabelClause::new(L1.to_string()));
+        formula.extend(LabelClause::new(L3.to_string()));
+        assert!(formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        formula.extend(LabelClause::new(L1.to_string()));
+        formula.extend(LabelClause::new(L2.to_string()));
+        assert!(!formula.run(ADDRESS, &retriever));
+
+        let mut formula = Formula::new();
+        let inner = vec![
+            LabelClause::new(L1.to_string()),
+            LabelClause::new(L2.to_string()),
         ];
-        assert!(queries.iter().all(|q| q.run(ADDRESS, &retriever)));
-        let queries = [
-            Query::label(String::from_utf8_lossy(L1).to_string()),
-            Query::label(String::from_utf8_lossy(L2).to_string()),
-        ];
-        assert!(!queries.iter().all(|q| q.run(ADDRESS, &retriever)));
-        let labels = vec![
-            String::from_utf8_lossy(L1).to_string(),
-            String::from_utf8_lossy(L2).to_string(),
-        ];
-        assert!(Query::compound(1, labels).run(ADDRESS, &retriever));
+        formula.extend(CompoundClause::new(1, inner));
+        assert!(formula.run(ADDRESS, &retriever));
     }
 }

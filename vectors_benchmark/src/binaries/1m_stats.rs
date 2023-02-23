@@ -1,6 +1,6 @@
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
 use nucliadb_vectors::data_point_provider::*;
-use nucliadb_vectors::query::Query;
+use nucliadb_vectors::formula::*;
 use std::time::SystemTime;
 use vectors_benchmark::random_vectors::RandomVectors;
 use vectors_benchmark::stats::Stats;
@@ -13,7 +13,7 @@ const VECTOR_DIM: usize = 128;
 
 struct Request {
     vector: Vec<f32>,
-    queries: Vec<Query>,
+    filter: Formula,
 }
 impl SearchRequest for Request {
     fn with_duplicates(&self) -> bool {
@@ -23,8 +23,8 @@ impl SearchRequest for Request {
         &self.vector
     }
 
-    fn get_queries(&self) -> &[Query] {
-        &self.queries
+    fn get_filter(&self) -> &Formula {
+        &self.filter
     }
 
     fn no_results(&self) -> usize {
@@ -69,7 +69,7 @@ fn main() {
             .enumerate()
             .map(|(i, q)| (i.to_string(), q))
             .collect();
-        possible_tag.push(Query::label(labels[0].clone()));
+        possible_tag.push(LabelClause::new(labels[0].clone()));
         let now = SystemTime::now();
         add_batch(&mut writer, elems, labels);
         stats.writing_time += now.elapsed().unwrap().as_millis();
@@ -83,16 +83,19 @@ fn main() {
 
     println!("Unfiltered search..");
     let request = Request {
-        queries: vec![],
+        filter: Formula::new(),
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
     reader.search(&request, &lock).unwrap();
     stats.read_time += now.elapsed().unwrap().as_millis();
-
+    let formula = queries.into_iter().fold(Formula::new(), |mut acc, i| {
+        acc.extend(i);
+        acc
+    });
     println!("Filtered search..");
     let request = Request {
-        queries,
+        filter: formula,
         vector: RandomVectors::new(VECTOR_DIM).next().unwrap(),
     };
     let now = SystemTime::now();
