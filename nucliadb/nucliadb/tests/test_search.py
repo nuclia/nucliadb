@@ -33,6 +33,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.tests.vectors import V1
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
@@ -1177,3 +1178,43 @@ async def test_resource_search_pagination(
     body = resp.json()["paragraphs"]
     assert body["next_page"] is False
     assert len(body["results"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_search_handles_predict_errors(
+    nucliadb_reader: AsyncClient,
+    knowledgebox,
+    predict_mock,
+):
+    kbid = knowledgebox
+
+    for convert_sentence_to_vector_mock in (
+        AsyncMock(return_value=[]),
+        AsyncMock(side_effect=SendToPredictError()),
+    ):
+        predict_mock.convert_sentence_to_vector = convert_sentence_to_vector_mock
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json={
+                "features": ["vector"],
+                "query": "something",
+            },
+        )
+        assert resp.status_code == 206
+        assert resp.reason_phrase == "Partial Content"
+        predict_mock.convert_sentence_to_vector.assert_awaited_once()
+
+    for detect_entities_mock in (
+        AsyncMock(return_value=[]),
+        AsyncMock(side_effect=SendToPredictError()),
+    ):
+        predict_mock.detect_entities = detect_entities_mock
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json={
+                "features": ["relations"],
+                "query": "something",
+            },
+        )
+        assert resp.status_code == 200
+        predict_mock.detect_entities.assert_awaited_once()

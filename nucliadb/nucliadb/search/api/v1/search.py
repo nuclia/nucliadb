@@ -294,7 +294,7 @@ async def search(
         range_modification_end=item.range_modification_end,
         fields=item.fields,
         reload=item.reload,
-        vector=item.vector,
+        user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
@@ -371,6 +371,10 @@ async def search(
     await abort_transaction()
 
     response.status_code = 206 if incomplete_results else 200
+    if check_missing_vectors(item, pb_query):
+        response.status_code = 206
+        response.reason = "Vector not detected in query"
+
     if audit is not None and do_audit:
         await audit.search(
             kbid,
@@ -432,3 +436,7 @@ def is_empty_query(request: SearchRequest) -> bool:
 
 def is_valid_index_sort_field(field: SortField) -> bool:
     return SortFieldMap[field] is not None
+
+
+def check_missing_vectors(item, pb_query: SearchRequest) -> bool:
+    return SearchOptions.VECTOR in item.features and len(pb_query.vector) == 0

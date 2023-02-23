@@ -27,7 +27,10 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestRequest,
 )
 from nucliadb_protos.noderesources_pb2 import Resource
+from nucliadb_protos.utils_pb2 import RelationNode
 
+from nucliadb.search import logger
+from nucliadb.search.predict import SendToPredictError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -39,6 +42,9 @@ from nucliadb_models.search import (
 )
 
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
+
+
+Vector = List[float]
 
 
 async def global_query_to_pb(
@@ -58,14 +64,12 @@ async def global_query_to_pb(
     fields: Optional[List[str]] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
-    vector: Optional[List[float]] = None,
+    user_vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
 ) -> SearchRequest:
     fields = fields or []
-
-    predict = get_predict()
 
     request = SearchRequest()
     request.reload = reload
@@ -113,15 +117,16 @@ async def global_query_to_pb(
     request.paragraph = SearchOptions.PARAGRAPH in features
 
     if SearchOptions.VECTOR in features:
-        if vector is None:
-            request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
+        if user_vector is None:
+            predict_vector = await convert_sentence_to_vector(kbid, query)
+            request.vector.extend(predict_vector)
         else:
-            request.vector.extend(vector)
+            request.vector.extend(user_vector)
         if vectorset is not None:
             request.vectorset = vectorset
 
     if SearchOptions.RELATIONS in features:
-        detected_entities = await predict.detect_entities(kbid, query)
+        detected_entities = await detect_entities(kbid, query)
         request.relations.subgraph.entry_points.extend(detected_entities)
         request.relations.subgraph.depth = 1
 
@@ -240,3 +245,21 @@ def pre_process_query(user_query: str) -> str:
             result.append(term)
 
     return " ".join(result)
+
+
+async def convert_sentence_to_vector(kbid: str, query: str) -> Vector:
+    predict = get_predict()
+    try:
+        return await predict.convert_sentence_to_vector(kbid, query)
+    except SendToPredictError as ex:
+        logger.warning(f"Errors on predict api: {ex}")
+        return []
+
+
+async def detect_entities(kbid: str, query: str) -> List[RelationNode]:
+    predict = get_predict()
+    try:
+        return await predict.detect_entities(kbid, query)
+    except SendToPredictError as ex:
+        logger.warning(f"Errors on predict api: {ex}")
+        return []
