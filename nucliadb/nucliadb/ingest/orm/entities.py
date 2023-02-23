@@ -62,9 +62,8 @@ class EntitiesManager:
     async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         deleted = await self.is_entities_group_deleted(group)
         if deleted:
-            return await self.get_entities_group_inner(group)
-        else:
             return None
+        return await self.get_entities_group_inner(group)
 
     async def set_entities(self, group: str, entities: EntitiesGroup):
         indexed = await self.get_indexed_entities_group(group)

@@ -182,9 +182,10 @@ async def test_crud_entities_group_via_api(
 ):
     kbid = knowledgebox
 
-    entities_group = deepcopy(
-        await create_entities_group_by_api(kbid, "ANIMALS", nucliadb_writer)
+    entities_group = await create_entities_group_by_api(
+        kbid, "ANIMALS", nucliadb_writer
     )
+    entities_group = deepcopy(entities_group)
 
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/entitiesgroup/ANIMALS",
@@ -311,7 +312,7 @@ async def test_get_entities(
 
 
 @pytest.mark.asyncio
-async def test_modify_entities(
+async def test_modify_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     kb_with_entities,
@@ -343,16 +344,24 @@ async def test_modify_entities(
 
 
 @pytest.mark.asyncio
-async def test_delete_entitiesgroups(
+async def test_delete_non_existent_entities_group(
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+):
+    kbid = knowledgebox
+
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/nonexistent")
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_delete_entities_groups(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     kb_with_entities,
 ):
     """Validate deletion of entities groups coming from different sources."""
     kbid = kb_with_entities
-
-    resp = await nucliadb_writer.delete(f"/kb/{kbid}/entitiesgroup/nonexistent")
-    assert resp.status_code == 200
 
     entitiesgroups = [
         "DESSERTS",  # added with API
@@ -379,7 +388,7 @@ async def test_delete_entitiesgroups(
 
 
 @pytest.mark.asyncio
-async def test_delete_entities(
+async def test_delete_entities_from_entities_group(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     kb_with_entities,
@@ -433,3 +442,4 @@ async def test_delete_entities(
     assert resp.status_code == 200
     body = resp.json()
     assert "cat" in body["relations"]["entities"]
+    assert len(body["relations"]["entities"]["cat"]["related_to"]) > 0
