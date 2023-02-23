@@ -20,6 +20,8 @@
 
 use crate::data_point::{Address, DataRetriever};
 
+/// Is a singleton clause formed by label. It will be satisfied only if the address
+/// is applied to has the label.
 #[derive(Debug, Clone)]
 pub struct LabelClause {
     value: String,
@@ -33,6 +35,9 @@ impl LabelClause {
     }
 }
 
+/// Is a clause formed by the conjuction of several LabelClauses. Additionally this
+/// clause has a threshold that specifies the minimum number of LabelClauses that have to
+/// succeed in order for the overall conjuction to be satisfied.
 #[derive(Debug, Clone)]
 pub struct CompoundClause {
     threshold: usize,
@@ -55,6 +60,7 @@ impl CompoundClause {
     }
 }
 
+/// Wrapper that unifies the different types of clauses a formula may have.
 #[derive(Debug, Clone)]
 pub enum Clause {
     Label(LabelClause),
@@ -82,6 +88,10 @@ impl From<CompoundClause> for Clause {
     }
 }
 
+/// Formulas are boolean expressions in conjuctive normal form, but for labels.
+/// The clauses in a formula are connected by intersections, and they are formed
+/// by strings. Once applied to a given address, the formula becomes a boolean
+/// expression that evaluates to whether the address is valid or not.
 #[derive(Debug, Clone, Default)]
 pub struct Formula {
     clauses: Vec<Clause>,
