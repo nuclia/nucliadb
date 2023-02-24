@@ -85,7 +85,14 @@ impl RelationWriter for RelationsWriterService {
             .iter()
             .map(|(k, v)| (k, v.value.clone(), node_type_parsing(v.ntype(), &v.subtype)))
             .map(|(key, value, (xtype, subtype))| (key, value, xtype, subtype))
-            .map(|(key, value, xtype, subtype)| (key, value, xtype.to_string(), subtype.map(|s| s.to_string())))
+            .map(|(key, value, xtype, subtype)| {
+                (
+                    key,
+                    value,
+                    xtype.to_string(),
+                    subtype.map(|s| s.to_string()),
+                )
+            })
             .map(|(&key, value, xtype, subtype)| (key, IoNode::user_node(value, xtype, subtype)))
             .collect();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
