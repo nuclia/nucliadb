@@ -60,11 +60,14 @@ jobs:
           cache: "pip"
 
       - name: Install the package
+        # utils dep required for test fixtures for nats
+        # NEEDS TO BE DECOUPLED EVENTUALLY
         run: |
           pip install -r test-requirements.txt
           pip install -r nucliadb_telemetry/requirements.txt
-          pip install -e nucliadb_utils
           pip install -e nucliadb_telemetry
+          pip install -e nucliadb_protos/python
+          pip install -e nucliadb_utils
 
       - name: Check mypy
         run: |

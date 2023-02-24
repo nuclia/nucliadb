@@ -1,38 +1,23 @@
 from setuptools import find_packages, setup
 import re
-
-long_description = open("README.rst").read() + "\n"
-changelog = open("CHANGELOG.rst").read()
-found = 0
-for line in changelog.splitlines():
-    if len(line) > 15 and line[-1] == ")" and line[-4] == "-":
-        found += 1
-        if found >= 20:
-            break
-    long_description += "\n" + line
+from pathlib import Path
 
 
-long_description += """
-
-...
-
-You are seeing a truncated changelog.
-
-You can read the `changelog file <https://github.com/nuclia/nucliadb/blob/master/nucliadb_protos/python/CHANGELOG.rst>`_
-for a complete list.
-
-"""
+_dir = Path(__file__).resolve().parent
+VERSION = _dir.parent.parent.joinpath("VERSION").open().read().strip()
+README = _dir.joinpath("README.rst").open().read()
 
 
 def load_reqs(filename):
     with open(filename) as reqs_file:
         return [
-            line
+            # pin nucliadb-xxx to the same version as nucliadb
+            line.strip() + f"=={VERSION}"
+            if line.startswith("nucliadb-")
+            else line.strip()
             for line in reqs_file.readlines()
             if not (
-                re.match(r"\s*#", line)  # noqa
-                or re.match("-e", line)
-                or re.match("-r", line)
+                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
             )
         ]
 
@@ -41,12 +26,13 @@ requirements = load_reqs("requirements.txt")
 
 setup(
     name="nucliadb_protos",
-    version=open("VERSION").read().strip(),
+    version=VERSION,
     description="protos for nucliadb",  # noqa
-    long_description=long_description,
+    long_description=README,
     setup_requires=["pytest-runner"],
     zip_safe=True,
     include_package_data=True,
+    package_data={"": ["*.txt", "*.rst"], "nucliadb_protos": ["py.typed"]},
     packages=find_packages(),
-    install_requires=requirements
+    install_requires=requirements,
 )

@@ -1,13 +1,10 @@
 name: NucliaDB Dataset (py)
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_dataset.yml"
-      - "nucliadb_dataset/**"
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -43,6 +40,7 @@ jobs:
 
   # Job to run tests
   tests:
+    name: NucliaDBDatasetTests
     runs-on: ubuntu-latest
 
     strategy:

@@ -1,0 +1,87 @@
+name: PyPI Releases
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_wheels:
+    name: Build wheels
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v3
+        with:
+          python-version: 3.9
+
+      - name: Setup env
+        run: |
+          python bump.py --build=${{github.run_number}}
+          pip install wheel
+
+      # Install all packages we are going to release
+      - name: Install all packages
+        run: |
+          pip install -e ./nucliadb_protos/python/
+          pip install -e ./nucliadb_utils/
+          pip install -e ./nucliadb_models/
+          pip install -e ./nucliadb_client/
+          pip install -e ./nucliadb_sdk/
+          pip install -e ./nucliadb_dataset/
+          pip install -e ./nucliadb/
+
+      - name: Build wheels
+        run: pip wheel --no-deps -w dist ./nucliadb_protos/python/ ./nucliadb_utils/ ./nucliadb_models/ ./nucliadb_sdk/ ./nucliadb_client/ ./nucliadb_dataset/ ./nucliadb/
+
+      # XXX wait for tests to run successfully in all dependencies before we actually release
+      - name: Wait for utils
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBUtilsTests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for models
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBModelsTests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for client tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBClientTests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for sdk tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBSDKTests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for dataset tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBDatasetTests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+      - name: Wait for nucliadb tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: main
+          check-name: NucliaDBTests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+      - name: Upload to pypi
+        run: twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}

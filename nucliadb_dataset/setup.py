@@ -1,23 +1,23 @@
 import re
+from pathlib import Path
 
 from setuptools import find_packages, setup  # type: ignore
 
-with open("README.md") as f:
-    readme = f.read()
-
-with open("VERSION") as f:
-    version = f.read().strip()
+_dir = Path(__file__).resolve().parent
+VERSION = _dir.parent.joinpath("VERSION").open().read().strip()
+README = _dir.joinpath("README.md").open().read()
 
 
 def load_reqs(filename):
     with open(filename) as reqs_file:
         return [
-            line
+            # pin nucliadb-xxx to the same version as nucliadb
+            line.strip() + f"=={VERSION}"
+            if line.startswith("nucliadb-") and "=" not in line
+            else line.strip()
             for line in reqs_file.readlines()
             if not (
-                re.match(r"\s*#", line)  # noqa
-                or re.match("-e", line)
-                or re.match("-r", line)
+                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
             )
         ]
 
@@ -26,11 +26,11 @@ requirements = load_reqs("requirements.txt")
 
 setup(
     name="nucliadb_dataset",
-    version=version,
+    version=VERSION,
     author="nucliadb Authors",
     author_email="nucliadb@nuclia.com",
     description="NucliaDB Train Python client",
-    long_description=readme,
+    long_description=README,
     long_description_content_type="text/markdown",
     license="MIT",
     url="https://github.com/nuclia/nucliadb",
@@ -45,6 +45,7 @@ setup(
     ],
     python_requires=">=3.7",
     include_package_data=True,
+    package_data={"": ["*.txt", "*.md"], "nucliadb_dataset": ["py.typed"]},
     packages=find_packages(),
     install_requires=requirements,
     entry_points={

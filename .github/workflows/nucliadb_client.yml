@@ -1,13 +1,10 @@
 name: nucliadb Client (py)
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_client.yml"
-      - "nucliadb_client/**"
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -43,6 +40,7 @@ jobs:
 
   # Job to run tests
   tests:
+    name: NucliaDBClientTests
     runs-on: ubuntu-latest
 
     strategy:
