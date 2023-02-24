@@ -32,14 +32,9 @@ from sentry_sdk import capture_exception
 
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import (
-    global_query_to_pb,
-    pre_process_query,
-    query_vectors_to_pb,
-)
+from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_nodes
@@ -282,7 +277,7 @@ async def search(
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
-    pb_query = await global_query_to_pb(
+    pb_query, incomplete_results = await global_query_to_pb(
         kbid,
         features=item.features,
         query=processed_query,
@@ -302,22 +297,6 @@ async def search(
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
     )
-    incomplete_results = False
-    try:
-        await query_vectors_to_pb(
-            pb_query,
-            kbid,
-            query=item.query,
-            features=item.features,
-            user_vector=item.vector,
-            vectorset=item.vectorset,
-        )
-    except SendToPredictError as err:
-        logger.warning(f"Errors on predict api trying to embedd query: {err}")
-        incomplete_results = True
-    except PredictVectorMissing:
-        logger.warning("Predict api returned an empty vector")
-        incomplete_results = True
 
     ops = []
     queried_shards = []
