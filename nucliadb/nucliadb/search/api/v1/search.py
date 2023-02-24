@@ -294,6 +294,8 @@ async def search(
         range_modification_end=item.range_modification_end,
         fields=item.fields,
         reload=item.reload,
+        user_vector=item.vector,
+        vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
     )
