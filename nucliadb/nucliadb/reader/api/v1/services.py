@@ -106,13 +106,6 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
     kbobj: GetEntitiesGroupResponse = await ingest.GetEntitiesGroup(l_request)  # type: ignore
     if kbobj.status == GetEntitiesGroupResponse.Status.OK:
         response = EntitiesGroup.from_message(kbobj.group)
-        response = EntitiesGroup(
-            **MessageToDict(
-                kbobj.group,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
-        )
         return response
     elif kbobj.status == GetEntitiesGroupResponse.Status.KB_NOT_FOUND:
         raise HTTPException(
