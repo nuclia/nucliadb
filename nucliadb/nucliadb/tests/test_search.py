@@ -33,7 +33,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest.tests.vectors import V1
-from nucliadb.search.predict import SendToPredictError
+from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.query import pre_process_query
 from nucliadb.tests.utils import broker_resource, inject_message
 from nucliadb_protos import resources_pb2 as rpb
@@ -1189,7 +1189,7 @@ async def test_search_handles_predict_errors(
     kbid = knowledgebox
 
     for convert_sentence_to_vector_mock in (
-        AsyncMock(return_value=[]),
+        AsyncMock(side_effect=PredictVectorMissing()),
         AsyncMock(side_effect=SendToPredictError()),
     ):
         predict_mock.convert_sentence_to_vector = convert_sentence_to_vector_mock
@@ -1204,10 +1204,7 @@ async def test_search_handles_predict_errors(
         assert resp.reason_phrase == "Partial Content"
         predict_mock.convert_sentence_to_vector.assert_awaited_once()
 
-    for detect_entities_mock in (
-        AsyncMock(return_value=[]),
-        AsyncMock(side_effect=SendToPredictError()),
-    ):
+    for detect_entities_mock in (AsyncMock(side_effect=SendToPredictError()),):
         predict_mock.detect_entities = detect_entities_mock
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",

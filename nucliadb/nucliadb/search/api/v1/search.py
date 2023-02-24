@@ -26,16 +26,20 @@ from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.nodereader_pb2 import SearchRequest as PBSearchRequest
 from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from sentry_sdk import capture_exception
 
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import global_query_to_pb, pre_process_query
+from nucliadb.search.search.query import (
+    global_query_to_pb,
+    pre_process_query,
+    query_vectors_to_pb,
+)
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_nodes
@@ -295,12 +299,26 @@ async def search(
         range_modification_end=item.range_modification_end,
         fields=item.fields,
         reload=item.reload,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
     )
     incomplete_results = False
+    try:
+        await query_vectors_to_pb(
+            pb_query,
+            kbid,
+            query=item.query,
+            features=item.features,
+            user_vector=item.vector,
+            vectorset=item.vectorset,
+        )
+    except SendToPredictError as err:
+        logger.warning(f"Errors on predict api trying to embedd query: {err}")
+        incomplete_results = True
+    except PredictVectorMissing:
+        logger.warning("Predict api returned an empty vector")
+        incomplete_results = True
+
     ops = []
     queried_shards = []
     queried_nodes = []
@@ -372,8 +390,6 @@ async def search(
     await abort_transaction()
 
     response.status_code = 206 if incomplete_results else 200
-    if check_missing_vectors(item, pb_query):
-        response.status_code = 206
 
     if audit is not None and do_audit:
         await audit.search(
@@ -436,7 +452,3 @@ def is_empty_query(request: SearchRequest) -> bool:
 
 def is_valid_index_sort_field(field: SortField) -> bool:
     return SortFieldMap[field] is not None
-
-
-def check_missing_vectors(item: SearchRequest, pb_query: PBSearchRequest) -> bool:
-    return SearchOptions.VECTOR in item.features and len(pb_query.vector) == 0

@@ -44,9 +44,6 @@ from nucliadb_models.search import (
 REMOVABLE_CHARS = re.compile(r"\¿|\?|\!|\¡|\,|\;|\.|\:")
 
 
-Vector = List[float]
-
-
 async def global_query_to_pb(
     kbid: str,
     features: List[SearchOptions],
@@ -64,8 +61,6 @@ async def global_query_to_pb(
     fields: Optional[List[str]] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
-    user_vector: Optional[List[float]] = None,
-    vectorset: Optional[str] = None,
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
 ) -> SearchRequest:
@@ -116,21 +111,34 @@ async def global_query_to_pb(
     request.document = SearchOptions.DOCUMENT in features
     request.paragraph = SearchOptions.PARAGRAPH in features
 
-    if SearchOptions.VECTOR in features:
-        if user_vector is None:
-            predict_vector = await convert_sentence_to_vector(kbid, query)
-            request.vector.extend(predict_vector)
-        else:
-            request.vector.extend(user_vector)
-        if vectorset is not None:
-            request.vectorset = vectorset
-
     if SearchOptions.RELATIONS in features:
         detected_entities = await detect_entities(kbid, query)
         request.relations.subgraph.entry_points.extend(detected_entities)
         request.relations.subgraph.depth = 1
 
     return request
+
+
+async def query_vectors_to_pb(
+    request: SearchRequest,
+    kbid: str,
+    query: str,
+    features: List[SearchOptions],
+    user_vector: Optional[List[float]] = None,
+    vectorset: Optional[str] = None,
+):
+    if SearchOptions.VECTOR not in features:
+        return
+
+    if vectorset is not None:
+        request.vectorset = vectorset
+
+    if user_vector is None:
+        predict = get_predict()
+        predict_vector = await predict.convert_sentence_to_vector(kbid, query)
+        request.vector.extend(predict_vector)
+    else:
+        request.vector.extend(user_vector)
 
 
 async def suggest_query_to_pb(
@@ -247,19 +255,10 @@ def pre_process_query(user_query: str) -> str:
     return " ".join(result)
 
 
-async def convert_sentence_to_vector(kbid: str, query: str) -> Vector:
-    predict = get_predict()
-    try:
-        return await predict.convert_sentence_to_vector(kbid, query)
-    except SendToPredictError as ex:
-        logger.warning(f"Errors on predict api: {ex}")
-        return []
-
-
 async def detect_entities(kbid: str, query: str) -> List[RelationNode]:
     predict = get_predict()
     try:
         return await predict.detect_entities(kbid, query)
     except SendToPredictError as ex:
-        logger.warning(f"Errors on predict api: {ex}")
+        logger.warning(f"Errors on predict api detecting entities: {ex}")
         return []
