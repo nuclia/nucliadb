@@ -16,37 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+from nucliadb_telemetry.fastapi import instrument_app
 
-from typing import Callable, List, Optional
-
-from fastapi import FastAPI
-from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware  # type: ignore
-from opentelemetry.instrumentation.fastapi import _get_route_details  # type: ignore
-from opentelemetry.trace import Span  # type: ignore
-
-from nucliadb_utils.fastapi.exclude_urls import ExcludeList
-
-_ServerRequestHookT = Optional[Callable[[Span, dict], None]]
-_ClientRequestHookT = Optional[Callable[[Span, dict], None]]
-_ClientResponseHookT = Optional[Callable[[Span, dict], None]]
-
-
-def instrument_app(
-    app: FastAPI,
-    excluded_urls: List[str],
-    server_request_hook: _ServerRequestHookT = None,
-    client_request_hook: _ClientRequestHookT = None,
-    client_response_hook: _ClientResponseHookT = None,
-    tracer_provider=None,
-):
-    excluded_urls_obj = ExcludeList(excluded_urls)
-
-    app.add_middleware(
-        OpenTelemetryMiddleware,
-        excluded_urls=excluded_urls_obj,
-        default_span_details=_get_route_details,
-        server_request_hook=server_request_hook,
-        client_request_hook=client_request_hook,
-        client_response_hook=client_response_hook,
-        tracer_provider=tracer_provider,
-    )
+# backwards compatibility, deprecated -- use nucliadb_telemetry.fastapi.instrument_app
+__all__ = ("instrument_app",)

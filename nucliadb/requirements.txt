@@ -39,10 +39,10 @@ grpc-stubs>=1.24.7
 aiodns>=3.0.0
 
 types-orjson
-nucliadb-protos>=0.0.51
-nucliadb-utils[storages,fastapi,cache]>=1.0.17
-nucliadb-telemetry>=1.1.8
-nucliadb-models>=2.0.0
+nucliadb-telemetry>=1.2.0
+nucliadb-utils[storages,fastapi,cache]
+nucliadb-protos
+nucliadb-models
 
 tikv-client>=0.0.3
 

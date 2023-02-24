@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/nucliadb_telemetry_release.yml"
-      - "nucliadb_telemetry/VERSION"
+      - ".github/workflows/nucliadb_sdk_release.yml"
+      - "nucliadb_sdk/VERSION"
 
 jobs:
   build_wheels:

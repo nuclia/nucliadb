@@ -63,7 +63,6 @@ jobs:
         run: |
           pip install -r test-requirements.txt
           pip install -r nucliadb_telemetry/requirements.txt
-          pip install -e nucliadb_utils
           pip install -e nucliadb_telemetry
 
       - name: Check mypy

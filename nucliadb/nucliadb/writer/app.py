@@ -37,9 +37,9 @@ from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb.writer import API_PREFIX, SERVICE_NAME
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import finalize, initialize
+from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
-from nucliadb_utils.fastapi.instrumentation import instrument_app
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings

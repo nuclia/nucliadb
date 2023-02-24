@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_protos_release.yml"
-      - "nucliadb_protos/python/VERSION"
 
 jobs:
   build_wheels:
@@ -25,6 +22,7 @@ jobs:
 
       - name: Install requirements
         run: |
+          python bump.py --build=${{github.run_number}}
           pip install -r nucliadb_protos/python/requirements.txt
           pip install wheel
 

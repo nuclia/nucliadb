@@ -1,12 +1,10 @@
 name: Release NucliaDB Utils
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/nucliadb_utils_release.yml"
-      - "nucliadb_utils/VERSION"
+  workflow_run:
+    workflows: [Release NucliaDB Protos]
+    types:
+      - completed
 
 jobs:
   build:
@@ -71,6 +69,8 @@ jobs:
 
       - run: pip install -U twine wheel 'black>=22.3.0,<23' typing_extensions
 
+      - run: python bump.py --build=${{github.run_number}}
+
       - run: cd nucliadb_utils; python setup.py sdist -d ../dist/; cd ..
 
       - name: Install cibuildwheel
@@ -121,6 +121,7 @@ jobs:
         with:
           python-version: "3.10"
 
+      - run: python bump.py --build=${{github.run_number}}
       - run: pip install -U twine
 
       - name: get dist artifacts

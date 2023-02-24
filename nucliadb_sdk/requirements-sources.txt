@@ -1,1 +1,2 @@
+-e ./nucliadb_protos
 -e ./nucliadb_models

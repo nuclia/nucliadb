@@ -5,32 +5,20 @@ from typing import List
 
 from setuptools import Extension, find_packages, setup
 
-with open("README.md") as f:
-    readme = f.read()
-
-
-def build_readme():
-    readme = ""
-    with open("README.md") as f:
-        readme += f.read()
-
-    readme += "\n"
-
-    with open("CHANGELOG.rst") as f:
-        readme += f.read()
-
-    return readme
+VERSION = open("../VERSION").read().strip()
+README = open("README.md").read()
 
 
 def load_reqs(filename):
     with open(filename) as reqs_file:
         return [
-            line
+            # pin nucliadb-xxx to the same version as nucliadb
+            line.strip() + f"=={VERSION}"
+            if line.startswith("nucliadb-") and "=" not in line
+            else line.strip()
             for line in reqs_file.readlines()
             if not (
-                re.match(r"\s*#", line)  # noqa
-                or re.match("-e", line)
-                or re.match("-r", line)
+                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
             )
         ]
 
@@ -67,8 +55,8 @@ if system() != "Windows":
 
 setup(
     name="nucliadb_utils",
-    version=open("VERSION").read().strip(),
-    long_description=build_readme(),
+    version=VERSION,
+    long_description=README,
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3.7",

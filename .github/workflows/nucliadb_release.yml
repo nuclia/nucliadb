@@ -1,12 +1,15 @@
 name: Release NucliaDB
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/nucliadb_release.yml"
-      - "nucliadb/VERSION"
+  workflow_run:
+    workflows:
+      [
+        Release NucliaDB Protos,
+        Release NucliaDB Utils,
+        Release NucliaDB Telemetry,
+      ]
+    types:
+      - completed
 
 jobs:
   build_wheels:
@@ -25,6 +28,7 @@ jobs:
 
       - name: Install requirements
         run: |
+          python bump.py --build=${{github.run_number}}
           pip install -r nucliadb/requirements.txt
           pip install wheel
 
