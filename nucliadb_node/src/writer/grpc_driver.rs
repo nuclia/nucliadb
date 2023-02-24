@@ -33,6 +33,7 @@ use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
 use nucliadb_telemetry::payload::TelemetryEvent;
 use nucliadb_telemetry::sync::send_telemetry_event;
 use opentelemetry::global;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -46,41 +47,63 @@ const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
-    ShardCreation(String),
+    ShardCreation(String, String),
     ShardDeletion(String),
     ParagraphCount(String, u64),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct ShardMetadata {
+    load_score: f32,
+    knowledge_box: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NodeWriterMetadata {
-    shards: HashMap<String, u64>,
+    load_score: f32,
+    shard_count: u64,
+    shards: HashMap<String, ShardMetadata>,
 }
 
 impl NodeWriterMetadata {
     pub fn load_score(&self) -> f32 {
-        self.shards.values().sum::<u64>() as f32
+        self.load_score
     }
 
     pub fn shard_count(&self) -> u64 {
-        self.shards.len() as u64
+        self.shard_count
     }
 
-    pub fn new_empty_shard(&mut self, shard_id: String) {
-        self.shards.insert(shard_id, 0);
-    }
-
-    pub fn new_shard(&mut self, shard_id: String, paragraphs: u64) {
-        self.shards.insert(shard_id, paragraphs);
+    pub fn new_shard(&mut self, shard_id: String, knowledge_box: String, load_score: f32) {
+        match self.shards.insert(
+            shard_id,
+            ShardMetadata {
+                knowledge_box,
+                load_score,
+            },
+        ) {
+            Some(shard) => {
+                self.load_score -= shard.load_score - load_score;
+            }
+            None => {
+                self.load_score += load_score;
+                self.shard_count += 1;
+            }
+        }
     }
 
     pub fn delete_shard(&mut self, shard_id: String) {
-        self.shards.remove(&shard_id);
+        if let Some(shard) = self.shards.remove(&shard_id) {
+            self.shard_count -= 1;
+            self.load_score -= shard.load_score;
+        }
     }
 
-    pub fn update_shard(&mut self, shard_id: String, paragraphs: u64) {
-        self.shards
-            .entry(shard_id)
-            .and_modify(|value| *value = paragraphs);
+    pub fn update_shard(&mut self, shard_id: String, paragraph_count: u64) {
+        if let Some(mut shard) = self.shards.get_mut(&shard_id) {
+            self.load_score -= shard.load_score - paragraph_count as f32;
+            shard.load_score = paragraph_count as f32;
+        }
     }
 }
 
@@ -170,7 +193,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .new_shard(&request)
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
         std::mem::drop(writer);
-        self.emit_event(NodeWriterEvent::ShardCreation(result.id.clone()));
+        self.emit_event(NodeWriterEvent::ShardCreation(
+            result.id.clone(),
+            request.kbid,
+        ));
         Ok(tonic::Response::new(result))
     }
 

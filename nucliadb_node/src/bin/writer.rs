@@ -18,13 +18,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::fs;
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Instant;
+use std::{fs, io};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
@@ -55,7 +55,8 @@ async fn main() -> NodeResult<()> {
 
     let start_bootstrap = Instant::now();
 
-    let node_metadata = get_node_metadata();
+    let metadata_path = env::metadata_path();
+    let node_metadata = load_node_metadata(&metadata_path).await?;
     let mut node_writer_service = NodeWriterService::new();
 
     std::fs::create_dir_all(env::shards_path())?;
@@ -90,7 +91,12 @@ async fn main() -> NodeResult<()> {
     nucliadb_telemetry::sync::start_telemetry_loop();
     tokio::spawn(start_grpc_service(grpc_driver));
     tokio::spawn(monitor_cluster(cluster_watcher));
-    tokio::spawn(watch_node_update(update_handle, receiver, node_metadata));
+    tokio::spawn(watch_node_update(
+        update_handle,
+        receiver,
+        node_metadata,
+        metadata_path,
+    ));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
@@ -156,13 +162,16 @@ pub async fn watch_node_update(
     node: NodeHandle,
     mut receiver: UnboundedReceiver<NodeWriterEvent>,
     mut metadata: NodeWriterMetadata,
+    path: PathBuf,
 ) {
     info!("Start node update task");
 
     while let Some(event) = receiver.recv().await {
+        debug!("Receive node update event: {event:?}");
+
         match event {
-            NodeWriterEvent::ShardCreation(id) => {
-                metadata.new_empty_shard(id);
+            NodeWriterEvent::ShardCreation(id, knowledge_box) => {
+                metadata.new_shard(id, knowledge_box, 0.0);
                 update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
             }
             NodeWriterEvent::ShardDeletion(id) => {
@@ -174,6 +183,12 @@ pub async fn watch_node_update(
                 metadata.update_shard(id, paragraph_count);
                 update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
             }
+        }
+
+        if let Err(e) = persist_node_metadata(&path, &metadata).await {
+            error!("{e}");
+        } else {
+            info!("Node metadata file updated successfully");
         }
     }
 
@@ -217,34 +232,52 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
     Ok(host_key)
 }
 
-pub fn get_node_metadata() -> NodeWriterMetadata {
-    let mut node_reader = NodeReaderService::new();
+pub async fn load_node_metadata(path: &Path) -> Result<NodeWriterMetadata> {
+    info!("Loading node metadata file '{}'", path.display());
 
-    let shards = match node_reader.iter_shards() {
-        Ok(shards) => shards,
-        Err(e) => {
-            error!("Cannot read shards folder: {e}");
+    match tokio::fs::read_to_string(path).await {
+        Ok(metadata) => serde_json::from_str(&metadata)
+            .map_err(|e| anyhow!("Cannot deserialize node metadata: {e}")),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            info!("Node metadata file is missing. Starting creation...");
 
-            return NodeWriterMetadata::default();
-        }
-    };
+            let mut node_reader = NodeReaderService::new();
 
-    let mut node_metadata = NodeWriterMetadata::default();
+            let shards = node_reader
+                .iter_shards()
+                .map_err(|e| anyhow!("Cannot read shards folder: {e}"))?;
 
-    for shard in shards {
-        let shard = match shard {
-            Ok(shard) => shard,
-            Err(e) => {
-                error!("Cannot load shard: {e}");
-                continue;
+            let mut metadata = NodeWriterMetadata::default();
+
+            for shard in shards {
+                let shard = shard.map_err(|e| anyhow!("Cannot load shard: {e}"))?;
+
+                match shard.get_info(&GetShardRequest::default()) {
+                    Ok(count) if count.metadata.is_some() => metadata.new_shard(
+                        shard.id,
+                        count.metadata.unwrap().kbid,
+                        count.paragraphs as f32,
+                    ),
+                    Ok(_) => return Err(anyhow!("Missing shard metadata for {}", shard.id)),
+                    Err(e) => return Err(anyhow!("Cannot get metrics for {}: {e:?}", shard.id)),
+                }
             }
-        };
 
-        match shard.get_info(&GetShardRequest::default()) {
-            Ok(count) => node_metadata.new_shard(shard.id, count.paragraphs),
-            Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
+            persist_node_metadata(path, &metadata).await?;
+
+            info!("Node metadata file created successfully");
+
+            Ok(metadata)
         }
+        Err(e) => panic!("Cannot load node metadata file: {e}"),
     }
+}
 
-    node_metadata
+pub async fn persist_node_metadata(path: &Path, metadata: &NodeWriterMetadata) -> Result<()> {
+    match serde_json::to_string(&metadata) {
+        Ok(metadata) => tokio::fs::write(&path, metadata)
+            .await
+            .map_err(|e| anyhow!("Cannot update node metadata file: {e}")),
+        Err(e) => Err(anyhow!("Cannot serialize node metadata: {e}")),
+    }
 }
