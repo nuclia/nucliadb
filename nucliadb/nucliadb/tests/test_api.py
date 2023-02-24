@@ -349,6 +349,8 @@ async def test_extracted_small_metadata(
 
     await inject_message(nucliadb_grpc, br)
 
+    cropped_fields = ["ner", "positions", "relations"]
+
     # Check that when 'small_metadata' in extracted param fields are cropped
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
@@ -359,9 +361,8 @@ async def test_extracted_small_metadata(
     metadata = resp_json["extracted"]["metadata"]["metadata"]
     split_metadata = resp_json["extracted"]["metadata"]["split_metadata"]["split"]
     for meta in (metadata, split_metadata):
-        assert len(meta["ner"]) == 0
-        assert len(meta["positions"]) == 0
-        assert len(meta["relations"]) == 0
+        for cropped_field in cropped_fields:
+            assert len(meta[cropped_field]) == 0
 
     # Check that when 'metadata' in extracted param fields are returned
     for extracted_param in (["metadata"], ["metadata", "small_metadata"]):
@@ -374,6 +375,5 @@ async def test_extracted_small_metadata(
         metadata = resp_json["extracted"]["metadata"]["metadata"]
         split_metadata = resp_json["extracted"]["metadata"]["split_metadata"]["split"]
         for meta in (metadata, split_metadata):
-            assert len(meta["ner"])
-            assert len(meta["positions"])
-            assert len(meta["relations"])
+            for cropped_field in cropped_fields:
+                assert len(meta[cropped_field]) > 0
