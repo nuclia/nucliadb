@@ -19,6 +19,7 @@
 #
 import os
 import tempfile
+from unittest.mock import Mock
 
 import pytest
 from grpc import aio
@@ -33,7 +34,13 @@ from nucliadb.run import run_async_nucliadb
 from nucliadb.settings import Settings
 from nucliadb.tests.utils import inject_message
 from nucliadb.writer import API_PREFIX
-from nucliadb_utils.utilities import clear_global_cache
+from nucliadb_utils.utilities import (
+    Utility,
+    clean_utility,
+    clear_global_cache,
+    get_utility,
+    set_utility,
+)
 
 
 def free_port() -> int:
@@ -316,3 +323,17 @@ async def stream_audit(natsd: str):
     await audit.initialize()
     yield audit
     await audit.finalize()
+
+
+@pytest.fixture(scope="function")
+def predict_mock() -> Mock:  # type: ignore
+    predict = get_utility(Utility.PREDICT)
+    mock = Mock()
+    set_utility(Utility.PREDICT, mock)
+
+    yield mock
+
+    if predict is None:
+        clean_utility(Utility.PREDICT)
+    else:
+        set_utility(Utility.PREDICT, predict)

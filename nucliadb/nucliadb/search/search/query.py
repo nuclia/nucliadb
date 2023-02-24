@@ -19,7 +19,7 @@
 #
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
@@ -28,6 +28,8 @@ from nucliadb_protos.nodereader_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import Resource
 
+from nucliadb.search import logger
+from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -58,14 +60,12 @@ async def global_query_to_pb(
     fields: Optional[List[str]] = None,
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
-    vector: Optional[List[float]] = None,
+    user_vector: Optional[List[float]] = None,
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
-) -> SearchRequest:
+) -> Tuple[SearchRequest, bool]:
     fields = fields or []
-
-    predict = get_predict()
 
     request = SearchRequest()
     request.reload = reload
@@ -112,20 +112,52 @@ async def global_query_to_pb(
     request.document = SearchOptions.DOCUMENT in features
     request.paragraph = SearchOptions.PARAGRAPH in features
 
+    incomplete = False
     if SearchOptions.VECTOR in features:
-        if vector is None:
-            request.vector.extend(await predict.convert_sentence_to_vector(kbid, query))
-        else:
-            request.vector.extend(vector)
-        if vectorset is not None:
-            request.vectorset = vectorset
+        incomplete = await _parse_vectors(
+            request, kbid, query, user_vector=user_vector, vectorset=vectorset
+        )
 
     if SearchOptions.RELATIONS in features:
+        await _parse_entities(request, kbid, query)
+
+    return request, incomplete
+
+
+async def _parse_vectors(
+    request: SearchRequest,
+    kbid: str,
+    query: str,
+    user_vector: Optional[List[float]],
+    vectorset: Optional[str],
+) -> bool:
+    incomplete = False
+    if vectorset is not None:
+        request.vectorset = vectorset
+    if user_vector is None:
+        predict = get_predict()
+        try:
+            predict_vector = await predict.convert_sentence_to_vector(kbid, query)
+            request.vector.extend(predict_vector)
+        except SendToPredictError as err:
+            logger.warning(f"Errors on predict api trying to embedd query: {err}")
+            incomplete = True
+        except PredictVectorMissing:
+            logger.warning("Predict api returned an empty vector")
+            incomplete = True
+    else:
+        request.vector.extend(user_vector)
+    return incomplete
+
+
+async def _parse_entities(request: SearchRequest, kbid: str, query: str):
+    predict = get_predict()
+    try:
         detected_entities = await predict.detect_entities(kbid, query)
         request.relations.subgraph.entry_points.extend(detected_entities)
         request.relations.subgraph.depth = 1
-
-    return request
+    except SendToPredictError as ex:
+        logger.warning(f"Errors on predict api detecting entities: {ex}")
 
 
 async def suggest_query_to_pb(
