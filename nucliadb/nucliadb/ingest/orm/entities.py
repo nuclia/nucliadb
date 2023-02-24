@@ -218,7 +218,7 @@ class EntitiesManager:
             deg.ParseFromString(payload)
         if group not in deg.entities_groups:
             deg.entities_groups.append(group)
-        await self.txn.set(deleted_groups_key, deg.SerializeToString())
+            await self.txn.set(deleted_groups_key, deg.SerializeToString())
 
     async def unmark_entities_group_as_deleted(self, group: str):
         key = KB_DELETED_ENTITIES_GROUPS.format(kbid=self.kbid)
@@ -229,7 +229,7 @@ class EntitiesManager:
         deg.ParseFromString(payload)
         if group in deg.entities_groups:
             deg.entities_groups.remove(group)
-        await self.txn.set(key, deg.SerializeToString())
+            await self.txn.set(key, deg.SerializeToString())
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
