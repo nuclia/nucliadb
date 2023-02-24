@@ -25,10 +25,9 @@ use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
-    op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, OpStatus,
+    op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, NewShardRequest, OpStatus,
     ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest, SetGraph,
-    ShardId, ShardMetadata, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId,
-    VectorSetList,
+    ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId, VectorSetList,
 };
 use nucliadb_telemetry::blocking::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
@@ -273,8 +272,8 @@ impl NodeWriter {
 
     pub fn new_shard<'p>(&mut self, metadata: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
         send_telemetry_event(TelemetryEvent::Create);
-        let metadata = ShardMetadata::decode(&mut Cursor::new(metadata)).unwrap();
-        match self.writer.new_shard(metadata) {
+        let request = NewShardRequest::decode(&mut Cursor::new(metadata)).unwrap();
+        match self.writer.new_shard(&request) {
             Ok(shard) => Ok(PyList::new(py, shard.encode_to_vec())),
             Err(e) => Err(exceptions::PyTypeError::new_err(e.to_string())),
         }

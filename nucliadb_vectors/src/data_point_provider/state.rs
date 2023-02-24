@@ -27,7 +27,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use super::{SearchRequest, VectorR};
-use crate::data_point::{DataPoint, DpId, Journal, Neighbour};
+use crate::data_point::{DataPoint, DpId, Journal, Neighbour, Similarity};
 use crate::data_types::dtrie_ram::DTrie;
 use crate::data_types::DeleteLog;
 const BUFFER_CAP: usize = 5;
@@ -182,7 +182,12 @@ impl State {
             resources: HashMap::default(),
         }
     }
-    pub fn search(&self, location: &Path, request: &dyn SearchRequest) -> VectorR<Vec<Neighbour>> {
+    pub fn search(
+        &self,
+        location: &Path,
+        request: &dyn SearchRequest,
+        similarity: Similarity,
+    ) -> VectorR<Vec<Neighbour>> {
         let query = request.get_query();
         let filter = request.get_filter();
         let with_duplicates = request.with_duplicates();
@@ -192,7 +197,14 @@ impl State {
             let delete_log = self.delete_log(journal);
             let data_point = DataPoint::open(location, journal.id())?;
             data_point
-                .search(&delete_log, query, filter, with_duplicates, no_results)
+                .search(
+                    &delete_log,
+                    query,
+                    filter,
+                    with_duplicates,
+                    no_results,
+                    similarity,
+                )
                 .for_each(|candidate| ffsv.add(candidate));
         }
         Ok(ffsv.into())
@@ -338,7 +350,7 @@ mod test {
             .iter()
             .map(|j| (state.delete_log(*j), j.id()))
             .collect::<Vec<_>>();
-        let new = DataPoint::merge(dir.path(), &work).unwrap();
+        let new = DataPoint::merge(dir.path(), &work, Similarity::Cosine).unwrap();
         std::mem::drop(work);
         let _ = state.replace_work_unit(new);
         assert!(state.current_work_unit().is_none());

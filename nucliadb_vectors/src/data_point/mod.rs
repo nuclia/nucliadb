@@ -41,7 +41,7 @@ pub use uuid::Uuid as DpId;
 
 use crate::data_types::{key_value, trie, trie_ram, vector, DeleteLog};
 use crate::formula::Formula;
-use crate::{VectorErr, VectorR};
+use crate::VectorR;
 
 mod file_names {
     pub const NODES: &str = "nodes.kv";
@@ -76,8 +76,6 @@ pub struct Journal {
     uid: DpId,
     nodes: usize,
     ctime: SystemTime,
-    #[serde(default)]
-    similarity: Similarity,
 }
 impl Journal {
     pub fn id(&self) -> DpId {
@@ -321,10 +319,10 @@ impl DataPoint {
         filter: &Formula,
         with_duplicates: bool,
         results: usize,
+        similarity: Similarity,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         use ops_hnsw::params;
         let encoded_query = vector::encode_vector(query);
-        let similarity = self.journal.similarity;
         let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity);
         let ops = HnswOps { tracker: &tacker };
         let neighbours = ops.search(
@@ -339,11 +337,14 @@ impl DataPoint {
             .map(|(address, dist)| (Neighbour::new(address, &self.nodes, dist)))
             .take(results)
     }
-    pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
-    where Dlog: DeleteLog {
-        if operants.is_empty() {
-            return Err(VectorErr::EmptyMerge);
-        }
+    pub fn merge<Dlog>(
+        dir: &path::Path,
+        operants: &[(Dlog, DpId)],
+        similarity: Similarity,
+    ) -> VectorR<DataPoint>
+    where
+        Dlog: DeleteLog,
+    {
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
         fs::create_dir(&id)?;
@@ -369,7 +370,6 @@ impl DataPoint {
         let node_producers = operants
             .iter()
             .map(|dp| ((dp.0, Node), dp.1.nodes.as_ref()));
-        let similarity = operants[0].1.journal.similarity;
         {
             let mut node_buffer = BufWriter::new(&mut nodes);
             key_value::merge(&mut node_buffer, node_producers.collect())?;
@@ -394,7 +394,6 @@ impl DataPoint {
         let index = unsafe { Mmap::map(&hnswf)? };
 
         let journal = Journal {
-            similarity,
             nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: SystemTime::now(),
@@ -497,7 +496,6 @@ impl DataPoint {
         let index = unsafe { Mmap::map(&hnswf)? };
 
         let journal = Journal {
-            similarity,
             nodes: no_nodes,
             uid: DpId::parse_str(&uid).unwrap(),
             ctime: time.unwrap_or_else(SystemTime::now),

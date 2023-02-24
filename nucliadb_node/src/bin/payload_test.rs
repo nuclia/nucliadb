@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
     let reader = NodeReaderService::new();
 
     let resources_dir = std::path::Path::new("/path/to/data");
-    let new_shard = writer.new_shard(ShardMetadata::default())?;
+    let new_shard = writer.new_shard(&NewShardRequest::default())?;
     let shard_id = ShardId { id: new_shard.id };
     assert!(resources_dir.exists());
     for file_path in std::fs::read_dir(resources_dir).unwrap() {

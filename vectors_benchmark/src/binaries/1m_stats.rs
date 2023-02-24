@@ -1,7 +1,8 @@
+use std::time::SystemTime;
+
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::*;
-use std::time::SystemTime;
 use vectors_benchmark::random_vectors::RandomVectors;
 use vectors_benchmark::stats::Stats;
 
@@ -62,7 +63,7 @@ fn main() {
     };
     println!("Writing starts..");
     let mut possible_tag = vec![];
-    let mut writer = Index::new(at.path(), IndexCheck::None).unwrap();
+    let mut writer = Index::new(at.path(), IndexMetadata::default()).unwrap();
     for i in 0..(INDEX_SIZE / BATCH_SIZE) {
         let labels = label_set(i);
         let elems = RandomVectors::new(VECTOR_DIM)
@@ -78,7 +79,7 @@ fn main() {
     }
     possible_tag.truncate(1);
 
-    let reader = Index::new(at.path(), IndexCheck::None).unwrap();
+    let reader = Index::open(at.path(), IndexCheck::None).unwrap();
     let lock = reader.get_slock().unwrap();
     let queries = possible_tag;
 

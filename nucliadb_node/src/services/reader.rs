@@ -158,11 +158,8 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(
-        id: String,
-        metadata: ShardMetadata,
-        shard_path: &Path,
-    ) -> NodeResult<ShardReaderService> {
+    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
+        let metadata = ShardMetadata::open(&shard_path.join(METADATA_FILE))?;
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
         };

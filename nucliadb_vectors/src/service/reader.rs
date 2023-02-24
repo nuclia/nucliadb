@@ -217,8 +217,11 @@ impl VectorReaderService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
+            let Some(similarity) = config.similarity.map(|i| i.into()) else {
+                return Err(node_error!("A similarity must be specified"));
+            };
             Ok(VectorReaderService {
-                index: Index::new(path, IndexCheck::None)?,
+                index: Index::new(path, IndexMetadata { similarity })?,
                 indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
             })
         }
@@ -231,7 +234,7 @@ impl VectorReaderService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorReaderService {
-                index: Index::new(path, IndexCheck::None)?,
+                index: Index::open(path, IndexCheck::None)?,
                 indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
             })
         }
@@ -242,6 +245,7 @@ impl VectorReaderService {
 mod tests {
     use std::collections::HashMap;
 
+    use nucliadb_core::protos::new_shard_request::VectorSimilarity;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence,
@@ -255,7 +259,7 @@ mod tests {
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: None,
+            similarity: Some(VectorSimilarity::Cosine),
             no_results: Some(3),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),

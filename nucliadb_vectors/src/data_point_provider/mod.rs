@@ -115,18 +115,20 @@ impl Index {
         Ok(())
     }
     fn notify_merger(&self) {
-        let worker = Worker::request(self.location.clone(), self.work_flag.clone());
+        let worker = Worker::request(
+            self.location.clone(),
+            self.work_flag.clone(),
+            self.metadata.similarity,
+        );
         merger::send_merge_request(worker);
     }
-    pub fn new(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
-        if !path.exists() {
-            std::fs::create_dir_all(path)?;
-        }
-        fs_state::initialize_disk(path, State::new)?;
+    pub fn open(path: &Path, with_check: IndexCheck) -> VectorR<Index> {
         let lock = fs_state::shared_lock(path)?;
         let state = fs_state::load_state::<State>(&lock)?;
         let date = fs_state::crnt_version(&lock)?;
         let metadata = IndexMetadata::open(path)?.map(Ok).unwrap_or_else(|| {
+            // Old indexes may not have this file so in that case the
+            // metadata file they should have is created.
             let metadata = IndexMetadata::default();
             metadata.write(path).map(|_| metadata)
         })?;
@@ -144,6 +146,22 @@ impl Index {
         }
         Ok(index)
     }
+    pub fn new(path: &Path, metadata: IndexMetadata) -> VectorR<Index> {
+        std::fs::create_dir_all(path)?;
+        fs_state::initialize_disk(path, State::new)?;
+        metadata.write(path)?;
+        let lock = fs_state::shared_lock(path)?;
+        let state = fs_state::load_state::<State>(&lock)?;
+        let date = fs_state::crnt_version(&lock)?;
+        let index = Index {
+            metadata,
+            work_flag: MergerWriterSync::new(),
+            state: RwLock::new(state),
+            date: RwLock::new(date),
+            location: path.to_path_buf(),
+        };
+        Ok(index)
+    }
     pub fn delete(&self, prefix: impl AsRef<str>, temporal_mark: SystemTime, _: &ELock) {
         let mut state = self.write_state();
         state.remove(prefix.as_ref(), temporal_mark);
@@ -152,7 +170,8 @@ impl Index {
         self.read_state().keys(&self.location)
     }
     pub fn search(&self, request: &dyn SearchRequest, _: &Lock) -> VectorR<Vec<Neighbour>> {
-        self.read_state().search(&self.location, request)
+        self.read_state()
+            .search(&self.location, request, self.metadata.similarity)
     }
     pub fn no_nodes(&self, _: &Lock) -> usize {
         self.read_state().no_nodes()
@@ -222,7 +241,7 @@ mod test {
     #[test]
     fn garbage_collection_test() -> NodeResult<()> {
         let dir = tempfile::tempdir()?;
-        let index = Index::new(dir.path(), IndexCheck::None)?;
+        let index = Index::new(dir.path(), IndexMetadata::default())?;
         let empty_no_entries = std::fs::read_dir(dir.path())?.count();
         for _ in 0..10 {
             DataPoint::new(dir.path(), vec![], None, Similarity::Cosine).unwrap();

@@ -60,7 +60,7 @@ message NewShardRequest {
         Dot = 1;
     }
     VectorSimilarity similarity = 1;
-    noderesources.ShardMetadata metadata = 2;
+    string kbid = 2;
 }
 
 service NodeWriter {

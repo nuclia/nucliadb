@@ -236,18 +236,16 @@ class NewShardRequest(google.protobuf.message.Message):
     Dot: NewShardRequest.VectorSimilarity.ValueType  # 1
 
     SIMILARITY_FIELD_NUMBER: builtins.int
-    METADATA_FIELD_NUMBER: builtins.int
+    KBID_FIELD_NUMBER: builtins.int
     similarity: global___NewShardRequest.VectorSimilarity.ValueType
-    @property
-    def metadata(self) -> nucliadb_protos.noderesources_pb2.ShardMetadata: ...
+    kbid: builtins.str
     def __init__(
         self,
         *,
         similarity: global___NewShardRequest.VectorSimilarity.ValueType = ...,
-        metadata: nucliadb_protos.noderesources_pb2.ShardMetadata | None = ...,
+        kbid: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "similarity", b"similarity"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "similarity", b"similarity"]) -> None: ...
 
 global___NewShardRequest = NewShardRequest
 

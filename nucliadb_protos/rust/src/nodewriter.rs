@@ -83,8 +83,8 @@ pub struct AcceptShardRequest {
 pub struct NewShardRequest {
     #[prost(enumeration="new_shard_request::VectorSimilarity", tag="1")]
     pub similarity: i32,
-    #[prost(message, optional, tag="2")]
-    pub metadata: ::core::option::Option<super::noderesources::ShardMetadata>,
+    #[prost(string, tag="2")]
+    pub kbid: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `NewShardRequest`.
 pub mod new_shard_request {

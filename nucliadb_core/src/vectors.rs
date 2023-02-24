@@ -20,9 +20,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use crate::prelude::*;
-use nucliadb_protos::*;
 use new_shard_request::VectorSimilarity;
+use nucliadb_protos::*;
+
+use crate::prelude::*;
 
 pub type VectorsReaderPointer = Arc<dyn VectorReader>;
 pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;

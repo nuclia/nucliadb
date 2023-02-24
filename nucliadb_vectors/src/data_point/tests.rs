@@ -67,7 +67,14 @@ fn simple_flow() {
         acc.extend(i.clone());
         acc
     });
-    let result = reader.search(&HashSet::new(), &query, &formula, true, no_results);
+    let result = reader.search(
+        &HashSet::new(),
+        &query,
+        &formula,
+        true,
+        no_results,
+        Similarity::Cosine,
+    );
     let got_keys = reader.get_keys(&HashSet::new());
     assert!(got_keys.iter().all(|k| expected_keys.contains(k)));
     assert_eq!(got_keys.len(), expected_keys.len());
@@ -99,13 +106,27 @@ fn accuracy_test() {
         acc
     });
     let mut result_0 = reader
-        .search(&HashSet::new(), &query, &formula, true, no_results)
+        .search(
+            &HashSet::new(),
+            &query,
+            &formula,
+            true,
+            no_results,
+            Similarity::Cosine,
+        )
         .collect::<Vec<_>>();
     result_0.sort_by(|i, j| i.id().cmp(j.id()));
     let query: Vec<_> = query.into_iter().map(|v| v + 1.0).collect();
     let no_results = 10;
     let mut result_1 = reader
-        .search(&HashSet::new(), &query, &formula, true, no_results)
+        .search(
+            &HashSet::new(),
+            &query,
+            &formula,
+            true,
+            no_results,
+            Similarity::Cosine,
+        )
         .collect::<Vec<_>>();
     result_1.sort_by(|i, j| i.id().cmp(j.id()));
     assert_ne!(result_0, result_1)
@@ -125,12 +146,26 @@ fn single_graph() {
     )];
     let reader = DataPoint::new(temp_dir.path(), elems.clone(), None, SIMILARITY).unwrap();
     let formula = Formula::new();
-    let result = reader.search(&HashSet::from([key.clone()]), &vector, &formula, true, 5);
+    let result = reader.search(
+        &HashSet::from([key.clone()]),
+        &vector,
+        &formula,
+        true,
+        5,
+        Similarity::Cosine,
+    );
     assert_eq!(result.count(), 0);
 
     let reader = DataPoint::new(temp_dir.path(), elems, None, SIMILARITY).unwrap();
     let result = reader
-        .search(&HashSet::new(), &vector, &formula, true, 5)
+        .search(
+            &HashSet::new(),
+            &vector,
+            &formula,
+            true,
+            5,
+            Similarity::Cosine,
+        )
         .collect::<Vec<_>>();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
@@ -165,17 +200,32 @@ fn data_merge() {
             (HashSet::default(), dp_1.get_id()),
             (HashSet::default(), dp_0.get_id()),
         ],
+        Similarity::Cosine,
     )
     .unwrap();
     let formula = Formula::new();
     let result: Vec<_> = dp
-        .search(&HashSet::new(), &vector1, &formula, true, 1)
+        .search(
+            &HashSet::new(),
+            &vector1,
+            &formula,
+            true,
+            1,
+            Similarity::Cosine,
+        )
         .collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
     assert!(result[0].id() == key1.as_bytes());
     let result: Vec<_> = dp
-        .search(&HashSet::new(), &vector0, &formula, true, 1)
+        .search(
+            &HashSet::new(),
+            &vector0,
+            &formula,
+            true,
+            1,
+            Similarity::Cosine,
+        )
         .collect();
     assert_eq!(result.len(), 1);
     assert!(result[0].score() >= 0.9);
@@ -184,6 +234,7 @@ fn data_merge() {
     let dp = DataPoint::merge(
         temp_dir.path(),
         &[(&dlog, dp_1.get_id()), (&dlog, dp_0.get_id())],
+        Similarity::Cosine,
     )
     .unwrap();
     assert_eq!(dp.meta().no_nodes(), 0);

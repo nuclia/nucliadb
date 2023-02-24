@@ -18,10 +18,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use super::VectorEngine;
 use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
 use nucliadb_vectors::formula::Formula;
+
+use super::VectorEngine;
 
 lazy_static::lazy_static! {
     static ref FORMULA: Formula = Formula::new();

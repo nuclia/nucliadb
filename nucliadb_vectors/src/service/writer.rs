@@ -324,11 +324,11 @@ impl VectorWriterService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
-            std::fs::create_dir_all(path)?;
-            let similarity = config.similarity.map(|i| i.into()).unwrap_or_default();
-            IndexMetadata { similarity }.write(path)?;
+            let Some(similarity) = config.similarity.map(|i| i.into()) else {
+                return Err(node_error!("A similarity must be specified"));
+            };
             Ok(VectorWriterService {
-                index: Index::new(path, IndexCheck::None)?,
+                index: Index::new(path, IndexMetadata { similarity })?,
                 indexset: IndexSet::new(indexset, IndexCheck::None)?,
             })
         }
@@ -341,7 +341,7 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Index::new(path, IndexCheck::Sanity)?,
+                index: Index::open(path, IndexCheck::Sanity)?,
                 indexset: IndexSet::new(indexset, IndexCheck::Sanity)?,
             })
         }
@@ -352,6 +352,7 @@ impl VectorWriterService {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
+    use nucliadb_core::protos::new_shard_request::VectorSimilarity;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors,
@@ -361,7 +362,6 @@ mod tests {
 
     use super::*;
     use crate::service::reader::VectorReaderService;
-
     fn create_vector_set(set_name: String) -> (String, UserVectors) {
         let label = format!("{set_name}/label");
         let key = format!("{set_name}/key");
@@ -380,7 +380,7 @@ mod tests {
     fn test_vectorset_functionality() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: None,
+            similarity: Some(VectorSimilarity::Cosine),
             no_results: None,
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
@@ -444,12 +444,11 @@ mod tests {
     #[test]
     fn test_new_vector_writer() {
         let dir = TempDir::new().unwrap();
-        let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
-            similarity: None,
+            similarity: Some(VectorSimilarity::Cosine),
             no_results: None,
-            path: dir.path().to_path_buf(),
-            vectorset: dir_vectorset.path().to_path_buf(),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorset"),
         };
         let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),

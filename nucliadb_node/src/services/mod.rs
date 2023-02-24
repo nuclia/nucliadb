@@ -30,4 +30,5 @@ mod shard_disk_structure {
     pub const TEXTS_DIR: &str = "text";
     pub const PARAGRAPHS_DIR: &str = "paragraph";
     pub const RELATIONS_DIR: &str = "relations";
+    pub const METADATA_FILE: &str = "metadata.json";
 }
