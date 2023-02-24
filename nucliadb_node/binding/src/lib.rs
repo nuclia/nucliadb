@@ -25,9 +25,10 @@ use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService as RustReaderService;
 use nucliadb_node::writer::NodeWriterService as RustWriterService;
 use nucliadb_protos::{
-    op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, NewShardRequest, OpStatus,
-    ParagraphSearchRequest, RelationSearchRequest, Resource, ResourceId, SearchRequest, SetGraph,
-    ShardId, StreamRequest, SuggestRequest, VectorSearchRequest, VectorSetId, VectorSetList,
+    op_status, DeleteGraphNodes, DocumentSearchRequest, GetShardRequest, NewShardRequest,
+    NewVectorSetRequest, OpStatus, ParagraphSearchRequest, RelationSearchRequest, Resource,
+    ResourceId, SearchRequest, SetGraph, ShardId, StreamRequest, SuggestRequest,
+    VectorSearchRequest, VectorSetId, VectorSetList,
 };
 use nucliadb_telemetry::blocking::send_telemetry_event;
 use nucliadb_telemetry::payload::TelemetryEvent;
@@ -445,10 +446,12 @@ impl NodeWriter {
     }
 
     pub fn set_vectorset<'p>(&mut self, request: RawProtos, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let vectorset = VectorSetId::decode(&mut Cursor::new(request)).unwrap();
-        let shard_id = vectorset.shard.as_ref().unwrap();
-        self.writer.load_shard(shard_id);
-        match self.writer.add_vectorset(shard_id, &vectorset).transpose() {
+        let request = NewVectorSetRequest::decode(&mut Cursor::new(request)).unwrap();
+        let Some(shard_id) = request.id.as_ref().and_then(|i| i.shard.clone()) else {
+            return Err(exceptions::PyTypeError::new_err("A shard id must be given"));
+        };
+        self.writer.load_shard(&shard_id);
+        match self.writer.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
                 status.status = 0;
                 status.detail = "Success!".to_string();

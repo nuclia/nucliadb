@@ -23,8 +23,8 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, NewShardRequest, OpStatus, Resource, ResourceId, ShardCleaned,
-    ShardCreated, ShardId, ShardIds, VectorSetId,
+    DeleteGraphNodes, JoinGraph, NewShardRequest, NewVectorSetRequest, OpStatus, Resource,
+    ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
 };
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_core::tracing::{self, *};
@@ -173,15 +173,17 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(
-        &mut self,
-        shard_id: &ShardId,
-        setid: &VectorSetId,
-    ) -> NodeResult<Option<OpStatus>> {
+    pub fn add_vectorset(&mut self, request: &NewVectorSetRequest) -> NodeResult<Option<OpStatus>> {
+        let Some(setid) = &request.id else {
+            return Err(node_error!("missing vectorset id"));
+        };
+        let Some(shard_id) = &setid.shard else {
+            return Err(node_error!("missing shard id"));
+        };
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
-        shard.add_vectorset(setid)?;
+        shard.add_vectorset(setid, request.similarity())?;
         Ok(Some(shard.get_opstatus()?))
     }
 

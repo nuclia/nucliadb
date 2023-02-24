@@ -21,7 +21,7 @@
 pub mod reader;
 pub mod writer;
 
-use nucliadb_core::protos::new_shard_request::VectorSimilarity as GrpcSimilarity;
+use nucliadb_core::protos::VectorSimilarity as GrpcSimilarity;
 pub use reader::*;
 pub use writer::*;
 

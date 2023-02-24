@@ -20,7 +20,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use new_shard_request::VectorSimilarity;
 use nucliadb_protos::*;
 
 use crate::prelude::*;
@@ -44,6 +43,10 @@ pub trait VectorReader:
 
 pub trait VectorWriter: WriterChild {
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
-    fn add_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
+    fn add_vectorset(
+        &mut self,
+        setid: &VectorSetId,
+        similarity: VectorSimilarity,
+    ) -> NodeResult<()>;
 }

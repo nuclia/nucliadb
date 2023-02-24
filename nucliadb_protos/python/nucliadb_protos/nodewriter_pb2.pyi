@@ -43,6 +43,21 @@ from nucliadb_protos.noderesources_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _VectorSimilarity:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _VectorSimilarityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_VectorSimilarity.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    Cosine: _VectorSimilarity.ValueType  # 0
+    Dot: _VectorSimilarity.ValueType  # 1
+
+class VectorSimilarity(_VectorSimilarity, metaclass=_VectorSimilarityEnumTypeWrapper): ...
+
+Cosine: VectorSimilarity.ValueType  # 0
+Dot: VectorSimilarity.ValueType  # 1
+global___VectorSimilarity = VectorSimilarity
+
 @typing_extensions.final
 class OpStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -222,32 +237,39 @@ global___AcceptShardRequest = AcceptShardRequest
 class NewShardRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    class _VectorSimilarity:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _VectorSimilarityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[NewShardRequest._VectorSimilarity.ValueType], builtins.type):  # noqa: F821
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        Cosine: NewShardRequest._VectorSimilarity.ValueType  # 0
-        Dot: NewShardRequest._VectorSimilarity.ValueType  # 1
-
-    class VectorSimilarity(_VectorSimilarity, metaclass=_VectorSimilarityEnumTypeWrapper): ...
-    Cosine: NewShardRequest.VectorSimilarity.ValueType  # 0
-    Dot: NewShardRequest.VectorSimilarity.ValueType  # 1
-
     SIMILARITY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
-    similarity: global___NewShardRequest.VectorSimilarity.ValueType
+    similarity: global___VectorSimilarity.ValueType
     kbid: builtins.str
     def __init__(
         self,
         *,
-        similarity: global___NewShardRequest.VectorSimilarity.ValueType = ...,
+        similarity: global___VectorSimilarity.ValueType = ...,
         kbid: builtins.str = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "similarity", b"similarity"]) -> None: ...
 
 global___NewShardRequest = NewShardRequest
+
+@typing_extensions.final
+class NewVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    @property
+    def id(self) -> nucliadb_protos.noderesources_pb2.VectorSetID: ...
+    similarity: global___VectorSimilarity.ValueType
+    def __init__(
+        self,
+        *,
+        id: nucliadb_protos.noderesources_pb2.VectorSetID | None = ...,
+        similarity: global___VectorSimilarity.ValueType = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["id", b"id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "similarity", b"similarity"]) -> None: ...
+
+global___NewVectorSetRequest = NewVectorSetRequest
 
 @typing_extensions.final
 class Counter(google.protobuf.message.Message):

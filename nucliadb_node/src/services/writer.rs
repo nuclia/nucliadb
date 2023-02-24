@@ -24,6 +24,7 @@ use nucliadb_core::protos::shard_created::{
 };
 use nucliadb_core::protos::{
     DeleteGraphNodes, JoinGraph, NewShardRequest, OpStatus, Resource, ResourceId, VectorSetId,
+    VectorSimilarity,
 };
 use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
@@ -425,9 +426,13 @@ impl ShardWriterService {
         Ok(keys)
     }
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
+    pub fn add_vectorset(
+        &self,
+        setid: &VectorSetId,
+        similarity: VectorSimilarity,
+    ) -> NodeResult<()> {
         let mut writer = vector_write(&self.vector_writer);
-        writer.add_vectorset(setid)?;
+        writer.add_vectorset(setid, similarity)?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]

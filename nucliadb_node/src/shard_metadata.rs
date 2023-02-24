@@ -22,8 +22,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
-use nucliadb_core::protos::new_shard_request::VectorSimilarity;
-use nucliadb_core::protos::{NewShardRequest, ShardMetadata as GrpcMetadata};
+use nucliadb_core::protos::{NewShardRequest, ShardMetadata as GrpcMetadata, VectorSimilarity};
 use nucliadb_core::{node_error, NodeResult};
 use serde::*;
 

@@ -73,7 +73,7 @@ class NodeWriterStub:
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
     AddVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.VectorSetID,
+        nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
     RemoveVectorSet: grpc.UnaryUnaryMultiCallable[
@@ -157,7 +157,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def AddVectorSet(
         self,
-        request: nucliadb_protos.noderesources_pb2.VectorSetID,
+        request: nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod

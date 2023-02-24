@@ -25,8 +25,8 @@ use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    NewShardRequest, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId,
-    ShardIds, VectorSetId, VectorSetList,
+    NewShardRequest, NewVectorSetRequest, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned,
+    ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
@@ -381,13 +381,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn add_vector_set(
         &self,
-        request: Request<VectorSetId>,
+        request: Request<NewVectorSetRequest>,
     ) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let request = request.into_inner();
-        let shard_id = request.shard.as_ref().unwrap();
+        let shard_id = request.id.as_ref().and_then(|i| i.shard.clone());
         let mut writer = self.inner.write().await;
-        match writer.add_vectorset(shard_id, &request).transpose() {
+        match writer.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
                 info!("add_vector_set ends correctly");
                 status.status = 0;

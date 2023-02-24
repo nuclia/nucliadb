@@ -4,6 +4,12 @@ package nodewriter;
 
 import public "nucliadb_protos/noderesources.proto";
 
+
+enum VectorSimilarity {
+    Cosine = 0;
+    Dot = 1;
+}
+
 message OpStatus {
     enum Status {
         OK = 0;
@@ -55,12 +61,13 @@ message AcceptShardRequest {
 }
 
 message NewShardRequest {
-    enum VectorSimilarity {
-        Cosine = 0;
-        Dot = 1;
-    }
     VectorSimilarity similarity = 1;
     string kbid = 2;
+}
+
+message NewVectorSetRequest {
+    noderesources.VectorSetID id = 1;
+    VectorSimilarity similarity = 2;
 }
 
 service NodeWriter {
@@ -76,7 +83,7 @@ service NodeWriter {
     rpc JoinGraph(SetGraph) returns (OpStatus) {}
     rpc RemoveResource(noderesources.ResourceID) returns (OpStatus) {}
 
-    rpc AddVectorSet(noderesources.VectorSetID) returns (OpStatus) {}  // New
+    rpc AddVectorSet(NewVectorSetRequest) returns (OpStatus) {}  // New
     rpc RemoveVectorSet(noderesources.VectorSetID) returns (OpStatus) {}
     rpc ListVectorSets(noderesources.ShardId) returns (noderesources.VectorSetList) {}
 

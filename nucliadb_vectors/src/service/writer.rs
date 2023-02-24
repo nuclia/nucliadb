@@ -24,7 +24,7 @@ use data_point::{Elem, LabelDictionary};
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{Resource, ResourceId, VectorSetId};
+use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point::DataPoint;
@@ -63,13 +63,19 @@ impl VectorWriter for VectorWriterService {
         Ok(collector)
     }
     #[tracing::instrument(skip_all)]
-    fn add_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()> {
+    fn add_vectorset(
+        &mut self,
+        setid: &VectorSetId,
+        similarity: VectorSimilarity,
+    ) -> NodeResult<()> {
         let id = setid.shard.as_ref().map(|s| &s.id);
         let time = SystemTime::now();
         let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
+        let similarity = similarity.into();
         let indexset_elock = self.indexset.get_elock()?;
-        self.indexset.get_or_create(indexid, &indexset_elock)?;
+        self.indexset
+            .get_or_create(indexid, similarity, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?}/{set} - Ending at {v} ms");
@@ -243,13 +249,13 @@ impl WriterChild for VectorWriterService {
         let indexes = resource
             .vectors
             .keys()
-            .map(|k| (k, self.indexset.get_or_create::<&str>(k, &indexset_elock)))
+            .map(|k| (k, self.indexset.get(k, &indexset_elock)))
             .map(|(key, index)| index.map(|index| (key, index)))
             .collect::<Result<HashMap<_, _>, _>>()?;
         self.indexset.commit(indexset_elock)?;
 
         // Inner indexes are updated
-        for (index_key, index) in indexes {
+        for (index_key, index) in indexes.into_iter().flat_map(|i| i.1.map(|j| (i.0, j))) {
             let mut elems = vec![];
             for (key, user_vector) in resource.vectors[index_key].vectors.iter() {
                 let key = key.clone();
@@ -352,17 +358,19 @@ impl VectorWriterService {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use nucliadb_core::protos::new_shard_request::VectorSimilarity;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors,
-        VectorSearchRequest, VectorSentence,
+        VectorSearchRequest, VectorSentence, VectorSimilarity,
     };
     use tempfile::TempDir;
 
     use super::*;
     use crate::service::reader::VectorReaderService;
-    fn create_vector_set(set_name: String) -> (String, UserVectors) {
+    fn create_vector_set(
+        writer: &mut VectorWriterService,
+        set_name: String,
+    ) -> (String, UserVectors) {
         let label = format!("{set_name}/label");
         let key = format!("{set_name}/key");
         let vector = vec![1.0, 3.0, 4.0];
@@ -374,6 +382,11 @@ mod tests {
         let set = UserVectors {
             vectors: HashMap::from([(key, data)]),
         };
+        let id = VectorSetId {
+            shard: None,
+            vectorset: set_name.clone(),
+        };
+        writer.add_vectorset(&id, VectorSimilarity::Cosine).unwrap();
         (set_name, set)
     }
     #[test]
@@ -385,9 +398,12 @@ mod tests {
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
         };
-        let indexes: HashMap<_, _> = (0..10).map(|i| create_vector_set(i.to_string())).collect();
-        let keys: HashSet<_> = indexes.keys().cloned().collect();
+
         let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let indexes: HashMap<_, _> = (0..10)
+            .map(|i| create_vector_set(&mut writer, i.to_string()))
+            .collect();
+        let keys: HashSet<_> = indexes.keys().cloned().collect();
         let resource = Resource {
             vectors: indexes,
             ..Default::default()

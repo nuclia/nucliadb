@@ -245,10 +245,9 @@ impl VectorReaderService {
 mod tests {
     use std::collections::HashMap;
 
-    use nucliadb_core::protos::new_shard_request::VectorSimilarity;
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence,
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
     };
     use tempfile::TempDir;
 
