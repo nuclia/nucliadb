@@ -306,3 +306,74 @@ async def test_entitygroups(
     assert groups["group1"]["title"] == "Kitchen"
     assert groups["group1"]["color"] == "blue"
     assert groups["group1"]["custom"] is True
+
+
+@pytest.mark.asyncio
+async def test_extracted_small_metadata(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_grpc: WriterStub,
+    knowledgebox: str,
+):
+    """
+    Test description:
+
+    - Create a resource with a field containing FieldMetadata with ner, positions and relations
+    - Check that new extracted data option filters them out
+    """
+    br = broker_resource(knowledgebox)
+
+    field = rpb.FieldID(field_type=rpb.FieldType.TEXT, field="text")
+    fcmw = FieldComputedMetadataWrapper()
+    fcmw.field.CopyFrom(field)
+    fcmw.metadata.metadata.language = "es"
+
+    # Add some relations
+    relation = rpb.Relation(relation_label="foo")
+    relations = rpb.Relations()
+    relations.relations.append(relation)
+    fcmw.metadata.metadata.relations.append(relations)
+    fcmw.metadata.split_metadata["split"].relations.append(relations)
+
+    # Add some ners
+    ner = {"Barcelona": "CITY/Barcelona"}
+    fcmw.metadata.metadata.ner.update(ner)
+    fcmw.metadata.split_metadata["split"].ner.update(ner)
+
+    # Add some positions
+    position = rpb.Position(start=1, end=2)
+    fcmw.metadata.metadata.positions["foo"].position.append(position)
+    fcmw.metadata.split_metadata["split"].positions["foo"].position.append(position)
+
+    br.field_metadata.append(fcmw)
+
+    await inject_message(nucliadb_grpc, br)
+
+    # Check that when 'small_metadata' in extracted param fields are cropped
+    resp = await nucliadb_reader.get(
+        f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
+        params=dict(show=["extracted"], extracted=["small_metadata"]),
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    metadata = resp_json["extracted"]["metadata"]["metadata"]
+    split_metadata = resp_json["extracted"]["metadata"]["split_metadata"]["split"]
+    for meta in (metadata, split_metadata):
+        assert len(meta["ner"]) == 0
+        assert len(meta["positions"]) == 0
+        assert len(meta["relations"]) == 0
+
+    # Check that when 'metadata' in extracted param fields are returned
+    for extracted_param in (["metadata"], ["metadata", "small_metadata"]):
+        resp = await nucliadb_reader.get(
+            f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
+            params=dict(show=["extracted"], extracted=extracted_param),
+        )
+        assert resp.status_code == 200
+        resp_json = resp.json()
+        metadata = resp_json["extracted"]["metadata"]["metadata"]
+        split_metadata = resp_json["extracted"]["metadata"]["split_metadata"]["split"]
+        for meta in (metadata, split_metadata):
+            assert len(meta["ner"])
+            assert len(meta["positions"])
+            assert len(meta["relations"])

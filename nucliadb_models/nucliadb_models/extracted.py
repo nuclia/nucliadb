@@ -119,7 +119,13 @@ class FieldComputedMetadata(BaseModel):
     deleted_splits: Optional[List[str]]
 
     @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldComputedMetadata) -> _T:
+    def from_message(
+        cls: Type[_T],
+        message: resources_pb2.FieldComputedMetadata,
+        small_version: bool = False,
+    ) -> _T:
+        if small_version:
+            crop_large_fields_from_fieldmetadata(message)
         metadata = convert_fieldmetadata_pb_to_dict(message.metadata)
         split_metadata = {
             split: convert_fieldmetadata_pb_to_dict(metadata_split)
@@ -269,3 +275,15 @@ def convert_fieldmetadata_pb_to_dict(
         for relation in relations.relations
     ]
     return value
+
+
+def crop_large_fields_from_fieldmetadata(
+    message: resources_pb2.FieldComputedMetadata,
+) -> Dict[str, Any]:
+    large_fields = ["ner", "relations", "positions"]
+    for field in large_fields:
+        message.metadata.ClearField(field)
+    for metadata in message.split_metadata.values():
+        for field in large_fields:
+            metadata.ClearField(field)
+    return message
