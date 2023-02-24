@@ -701,12 +701,57 @@ class ShardMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     KBID_FIELD_NUMBER: builtins.int
+    LOAD_SCORE_FIELD_NUMBER: builtins.int
     kbid: builtins.str
+    load_score: builtins.float
     def __init__(
         self,
         *,
         kbid: builtins.str = ...,
+        load_score: builtins.float | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["_load_score", b"_load_score", "load_score", b"load_score"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["_load_score", b"_load_score", "kbid", b"kbid", "load_score", b"load_score"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["_load_score", b"_load_score"]) -> typing_extensions.Literal["load_score"] | None: ...
 
 global___ShardMetadata = ShardMetadata
+
+@typing_extensions.final
+class NodeMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class ShardsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___ShardMetadata: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___ShardMetadata | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    LOAD_SCORE_FIELD_NUMBER: builtins.int
+    SHARD_COUNT_FIELD_NUMBER: builtins.int
+    SHARDS_FIELD_NUMBER: builtins.int
+    load_score: builtins.float
+    shard_count: builtins.int
+    @property
+    def shards(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___ShardMetadata]: ...
+    def __init__(
+        self,
+        *,
+        load_score: builtins.float = ...,
+        shard_count: builtins.int = ...,
+        shards: collections.abc.Mapping[builtins.str, global___ShardMetadata] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["load_score", b"load_score", "shard_count", b"shard_count", "shards", b"shards"]) -> None: ...
+
+global___NodeMetadata = NodeMetadata
