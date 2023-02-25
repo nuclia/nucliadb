@@ -1,10 +1,12 @@
 name: nucliadb Utils (py)
 
 on:
-  workflow_run:
-    workflows: [Release NucliaDB Protos]
-    types:
-      - completed
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/nucliadb_utils.yml"
+      - "nucliadb_utils/**"
 
 jobs:
   # Job to run pre-checks

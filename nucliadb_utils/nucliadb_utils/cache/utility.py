@@ -30,7 +30,7 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings
 
 try:
-    from nucliadb_utils.cache.lru import LRU
+    from memorylru import LRU
 except ImportError:
     from lru import LRU  # type: ignore
 

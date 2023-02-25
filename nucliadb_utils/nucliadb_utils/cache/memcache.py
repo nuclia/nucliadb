@@ -22,7 +22,7 @@ from typing import Optional
 from nucliadb_utils.cache.settings import settings
 
 try:
-    from nucliadb_utils.cache.lru import LRU
+    from memorylru import LRU
 except ModuleNotFoundError:
     from lru import LRU  # type: ignore
 
