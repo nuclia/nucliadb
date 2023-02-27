@@ -277,7 +277,7 @@ async def search(
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
-    pb_query = await global_query_to_pb(
+    pb_query, incomplete_results = await global_query_to_pb(
         kbid,
         features=item.features,
         query=processed_query,
@@ -294,12 +294,12 @@ async def search(
         range_modification_end=item.range_modification_end,
         fields=item.fields,
         reload=item.reload,
-        vector=item.vector,
+        user_vector=item.vector,
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
     )
-    incomplete_results = False
+
     ops = []
     queried_shards = []
     queried_nodes = []
@@ -371,6 +371,7 @@ async def search(
     await abort_transaction()
 
     response.status_code = 206 if incomplete_results else 200
+
     if audit is not None and do_audit:
         await audit.search(
             kbid,

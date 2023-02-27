@@ -156,8 +156,16 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: starts {v} ms");
         }
-        let new_dp = DataPoint::new(self.index.location(), elems, Some(temporal_mark))?;
-        let no_nodes = new_dp.meta().no_nodes();
+        let new_dp = if !elems.is_empty() {
+            Some(DataPoint::new(
+                self.index.location(),
+                elems,
+                Some(temporal_mark),
+            )?)
+        } else {
+            None
+        };
+
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: ends {v} ms");
         }
@@ -176,12 +184,12 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Indexing datapoint: starts {v} ms");
         }
-        if no_nodes == 0 {
-            info!("{id:?} - The datapoint is empty, no need to add it");
-            self.index.commit(lock)?;
-        } else {
+        if let Some(new_dp) = new_dp {
             info!("{id:?} - The datapoint is not empty, adding it");
             self.index.add(new_dp, &lock);
+            self.index.commit(lock)?;
+        } else {
+            info!("{id:?} - The datapoint is empty, no need to add it");
             self.index.commit(lock)?;
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
@@ -236,10 +244,12 @@ impl WriterChild for VectorWriterService {
                 let labels = LabelDictionary::new(user_vector.labels.clone());
                 elems.push(Elem::new(key, vector, labels));
             }
-            let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark))?;
-            let lock = index.get_elock()?;
-            index.add(new_dp, &lock);
-            index.commit(lock)?;
+            if !elems.is_empty() {
+                let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark))?;
+                let lock = index.get_elock()?;
+                index.add(new_dp, &lock);
+                index.commit(lock)?;
+            }
         }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating and geting indexes in the set: ends {v} ms");

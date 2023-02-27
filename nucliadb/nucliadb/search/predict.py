@@ -30,6 +30,10 @@ class SendToPredictError(Exception):
     pass
 
 
+class PredictVectorMissing(Exception):
+    pass
+
+
 DUMMY_RELATION_NODE = [
     RelationNode(value="Ferran", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
     RelationNode(
@@ -103,6 +107,8 @@ class PredictEngine:
                 data = await resp.json()
             else:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        if len(data["data"]) == 0:
+            raise PredictVectorMissing()
         return data["data"]
 
     async def detect_entities(self, kbid: str, sentence: str) -> List[RelationNode]:
