@@ -32,3 +32,7 @@ class InvalidPBClass(Exception):
             "Source and destination does not match "
             f"{self.source} - {self.destination}"
         )
+
+
+class VectorObjectNotFound(Exception):
+    pass

@@ -51,9 +51,11 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_protos.utils_pb2 import Relation as PBRelation
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.ingest import logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.date import Datetime
+from nucliadb.ingest.fields.exceptions import VectorObjectNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GLOBAL, Generic
 from nucliadb.ingest.fields.keywordset import Keywordset
@@ -723,18 +725,27 @@ class Resource:
                     field_vectors.field.field_type,
                     load=False,
                 )
-                (
-                    vo,
-                    replace_field_sentences,
-                    replace_splits_sentences,
-                ) = await field_obj.set_vectors(field_vectors)
                 field_key = self.generate_field_id(field_vectors.field)
+                try:
+                    (
+                        vo,
+                        replace_field_sentences,
+                        replace_splits_sentences,
+                    ) = await field_obj.set_vectors(field_vectors)
+                except VectorObjectNotFound:
+                    # field_vector was created but it did not have any
+                    # vectors in storage to download.
+                    logger.warning(
+                        f"Did not find any vectors in storage for field {field_key}"
+                    )
+                    continue
                 if vo is not None:
                     self.indexer.apply_field_vectors(
                         field_key, vo, replace_field_sentences, replace_splits_sentences
                     )
                 else:
                     raise AttributeError("VO not found on set")
+
             for user_vectors in message.user_vectors:
                 field_obj = await self.get_field(
                     user_vectors.field.field,

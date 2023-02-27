@@ -40,7 +40,11 @@ from nucliadb_protos.utils_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import Error
 
-from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
+from nucliadb.ingest.fields.exceptions import (
+    InvalidFieldClass,
+    InvalidPBClass,
+    VectorObjectNotFound,
+)
 from nucliadb_utils.storages.storage import Storage, StorageField
 
 KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
@@ -269,10 +273,11 @@ class Field:
         replace_field: bool = True
         replace_splits = []
         if actual_payload is None:
-            # Its first extracted text
             if payload.HasField("file"):
                 await self.storage.normalize_binary(payload.file, sf)
                 vo = await self.storage.download_pb(sf, VectorObject)
+                if vo is None:
+                    raise VectorObjectNotFound()
             else:
                 await self.storage.upload_pb(sf, payload.vectors)
                 vo = payload.vectors
