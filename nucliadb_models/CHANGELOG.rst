@@ -1,6 +1,14 @@
 CHANGELOG
 =========
 
+2.0.7
+-----
+- Make sure py.typed is on the package
+
+2.0.6
+-----
+- Add relations interface
+
 2.0.5
 -----
 - Add relations to extracted field metadata
