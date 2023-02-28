@@ -79,7 +79,7 @@ class ClusterObject:
                     f"Could not find enough nodes. Available: {len(available_nodes)}, Required: {target_replicas}"  # noqa
                 )
 
-        if settings.max_node_shards is not None:
+        if settings.max_node_shards >= 0:
             available_nodes = list(
                 filter(
                     lambda x: x.shard_count < settings.max_node_shards, available_nodes  # type: ignore

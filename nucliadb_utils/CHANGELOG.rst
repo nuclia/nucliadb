@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+1.0.19
+------
+
+- Make sure py.typed is on the package
+
 1.0.18
 ------
 

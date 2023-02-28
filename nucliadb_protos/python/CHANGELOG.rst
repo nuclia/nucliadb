@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.0.52
+------
+- Make sure py.typed is on the package
+
 0.0.51
 ------
 - Add ShardMetadata on shard creation

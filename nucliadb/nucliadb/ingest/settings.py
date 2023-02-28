@@ -71,7 +71,7 @@ class Settings(BaseSettings):
 
     # Node limits
     max_node_fields: int = 200000
-    max_node_shards: Optional[int] = None
+    max_node_shards: int = 600
 
     local_reader_threads = 5
     local_writer_threads = 5

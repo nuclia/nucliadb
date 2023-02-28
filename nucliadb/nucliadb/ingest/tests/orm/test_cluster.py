@@ -80,7 +80,7 @@ def test_find_nodes_checks_max_node_shards_only_if_set(nodes):
     with pytest.raises(NodeClusterSmall):
         cluster.find_nodes()
 
-    settings.max_node_shards = None
+    settings.max_node_shards = -1
     assert len(cluster.find_nodes())
 
     settings.max_node_shards = prev
