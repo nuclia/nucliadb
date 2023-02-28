@@ -84,7 +84,7 @@ message Origin {
     google.protobuf.Timestamp modified = 5;
     map<string, string> metadata = 6;
     repeated string tags = 7;
-    repeated string colaborators = 8;
+    repeated string collaborators = 8;
     string filename = 9;
     repeated string related = 10;
 }

@@ -320,7 +320,7 @@ class InputOrigin(BaseModel):
     modified: Optional[datetime] = None
     metadata: Dict[str, str] = {}
     tags: List[str] = []
-    colaborators: List[str] = []
+    collaborators: List[str] = []
     filename: Optional[str] = None
     related: List[str] = []
 

@@ -112,7 +112,7 @@ pub struct Origin {
     #[prost(string, repeated, tag="7")]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, repeated, tag="8")]
-    pub colaborators: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub collaborators: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag="9")]
     pub filename: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="10")]
