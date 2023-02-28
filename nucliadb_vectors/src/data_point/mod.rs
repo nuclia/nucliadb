@@ -208,7 +208,7 @@ impl DataPoint {
     }
     pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
         key_value::get_keys(Node, &self.nodes)
-            .filter(|k| !delete_log.is_deleted(*k))
+            .filter(|k| !delete_log.is_deleted(k))
             .map(String::from_utf8_lossy)
             .map(|s| s.to_string())
             .collect()
@@ -244,9 +244,7 @@ impl DataPoint {
             .collect()
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
-    where
-        Dlog: DeleteLog,
-    {
+    where Dlog: DeleteLog {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);
