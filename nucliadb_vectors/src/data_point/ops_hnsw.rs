@@ -282,6 +282,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                     vec_counter.add(self.tracker.get_vector(addr));
                 }
             });
+            // order may be lost
             filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
             filtered_result
         } else {
