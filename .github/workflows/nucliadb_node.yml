@@ -332,7 +332,7 @@ jobs:
           sed -i.bak "s#IMAGE_TO_REPLACE#$IMAGE_NAME_NODE:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
           sed -i.bak "s#IMAGE_SIDECAR_TO_REPLACE#$IMAGE_NAME_NODE_SIDECAR:${{ steps.env-vars.outputs.short_sha }}#" ./charts/nucliadb_node/values.yaml
           sed -i.bak "s#CONTAINER_REGISTRY_TO_REPLACE#$CONTAINER_REGISTRY#" ./charts/nucliadb_node/values.yaml
-          VERSION=`cat nucliadb_node/VERSION`
+          VERSION=`cat VERSION`
           VERSION_SHA=$VERSION+${{ steps.env-vars.outputs.short_sha }}
           sed -i.bak "s#99999.99999.99999#$VERSION_SHA#" ./charts/nucliadb_node/Chart.yaml
           echo "::set-output name=version_number::$VERSION_SHA"
