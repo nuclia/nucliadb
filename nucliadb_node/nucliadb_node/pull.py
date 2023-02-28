@@ -35,6 +35,7 @@ from nucliadb_node import SERVICE_NAME, logger, shadow_shards
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
 from nucliadb_node.settings import settings
+from nucliadb_node.shared import sidecar_lock
 from nucliadb_node.writer import Writer
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
@@ -61,7 +62,6 @@ class Worker:
         self.reader = reader
         self.subscriptions = []
         self.ack_wait = 10 * 60
-        self.lock = asyncio.Lock()
         self.event = asyncio.Event()
         self.node = node
         self.gc_task = None
@@ -131,7 +131,7 @@ class Worker:
             await self.event.wait()
             await asyncio.sleep(10)
             if self.event.is_set():
-                async with self.lock:
+                async with sidecar_lock:
                     try:
                         logger.info(f"Mr Propper working")
                         shards: ShardIds = await self.writer.shards()
@@ -199,7 +199,7 @@ class Worker:
         self.event.clear()
 
         status: Optional[OpStatus] = None
-        async with self.lock:
+        async with sidecar_lock:
             try:
                 pb = IndexMessage()
                 pb.ParseFromString(msg.data)

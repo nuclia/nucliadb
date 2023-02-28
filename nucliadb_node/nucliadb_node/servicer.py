@@ -36,8 +36,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, Resource, ResourceID, ShardId
 from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
 from sentry_sdk import capture_exception
@@ -50,6 +48,7 @@ from nucliadb_node.shadow_shards import (
     ShadowShardNotFound,
     ShadowShardsManager,
 )
+from nucliadb_node.shared import sidecar_lock
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
 
@@ -109,27 +108,47 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         finally:
             return response
 
-    async def ProcessShadowShard(self, request: ShardId, context):  # Stream the process
+    async def ProcessShadowShard(
+        self, request: ProcessShadowShardRequest, context
+    ):  # Stream the process
+        response = ProcessShadowShardResponse()
         ssm = shadow_shards.get_manager()
         await ssm.load()
+
         shadow_shard_id = request.shadow_shard_id
-        dst_shard_id = request.dst_shard_id
+        dst_replica_id = request.dst_replica_id
         if not ssm.exists(shadow_shard_id):
-            # Nothing to do. Maybe return error?
-            return
-        lock = asyncio.Lock()  # TODO: global shared lock
-        async with lock:
-            async for op in ssm.iter_operations(shadow_shard_id):
-                opcode = op[0]
-                if opcode == OperationCode.SET:
-                    resource: Resource = op[1]
-                    resource
-                    # TODO: set destination shard
-                    status = await self.writer.set_resource(resource)
-                elif opcode == OperationCode.DELETE:
-                    uuid: str = op[1]
-                    rid = ResourceID(shard_id=dst_shard_id, uuid=uuid)
-                    status = await self.writer.delete_resource(rid)
-                else:
-                    raise ValueError(f"Unknown opcode: {op}")
-                self.reader.update(dst_shard_id, status)
+            logger.warning(f"Shadow shard {shadow_shard_id} not found on node")
+            response.success = False
+            return response
+
+        try:
+            logger.info(
+                f"Processing shadow shard {shadow_shard_id} into {dst_replica_id}..."
+            )
+            async with sidecar_lock:
+                async for op in ssm.iter_operations(shadow_shard_id):
+                    opcode = op[0]
+                    if opcode == OperationCode.SET:
+                        resource: Resource = op[1]
+                        resource.shard_id = dst_replica_id
+                        status = await self.writer.set_resource(resource)
+                    elif opcode == OperationCode.DELETE:
+                        uuid: str = op[1]
+                        rid = ResourceID(shard_id=dst_replica_id, uuid=uuid)
+                        status = await self.writer.delete_resource(rid)
+                    else:
+                        raise ValueError(f"Unknown opcode: {op}")
+                    self.reader.update(dst_replica_id, status)
+        except Exception as ex:
+            response.success = False
+            if SENTRY:
+                capture_exception(ex)
+            logger.error(
+                f"Errors processing shadow shard {shadow_shard_id} to shard {dst_replica_id}: {ex}"
+            )
+        else:
+            logger.info("...done")
+            response.success = True
+        finally:
+            return response

@@ -86,8 +86,20 @@ message ShadowShardResponse {
     noderesources.ShardId shard = 2;
 }
 
+message ProcessShadowShardRequest {
+    string shadow_shard_id = 1;
+    string dst_replica_id = 2;
+}
+
+
+message ProcessShadowShardResponse {
+    bool success = 1;
+}
+
+
 service NodeSidecar {
     rpc GetCount(noderesources.ShardId) returns (Counter) {}
     rpc CreateShadowShard(noderesources.EmptyQuery) returns (ShadowShardResponse) {}
     rpc DeleteShadowShard(noderesources.ShardId) returns (ShadowShardResponse) {}
+    rpc ProcessShadowShard(ProcessShadowShardRequest) returns (ProcessShadowShardResponse) {}
 }

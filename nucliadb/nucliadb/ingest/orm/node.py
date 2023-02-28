@@ -347,7 +347,7 @@ class Node(AbstractNode):
             raise ValueError(f"Node {to_process.node} not found")
 
         preq = ProcessShadowShardRequest(
-            shadow=to_process.shard.id, dst_shard=dst_replica_id
+            shadow_shard_id=to_process.shard.id, dst_replica_id=dst_replica_id
         )
         ssresp = await node.sidecar.ProcessShadowShard(preq)  # type: ignore
         if not ssresp.success:
@@ -356,7 +356,7 @@ class Node(AbstractNode):
         # Now update the Shards pb object from maindb
         updated_shards = PBShards()
         updated_shards.CopyFrom(all_shards)
-        promoted = promote_shadow_replica_in_shards(
+        promoted = promote_replica_in_shards(
             updated_shards,
             src_replica_id,
             dst_replica_id,
@@ -366,6 +366,15 @@ class Node(AbstractNode):
 
         key = KB_SHARDS.format(kbid=kbid)
         await txn.set(key, updated_shards.SerializeToString())
+
+        # Should we delete the original shard always?
+        if True:
+            try:
+                await node.delete_shard(src_replica_id)
+            except Exception as ex:
+                if SENTRY:
+                    capture_exception(ex)
+                logger.warning(f"Error deleting old shard: {ex}")
 
     @classmethod
     async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[Shard]:
@@ -579,12 +588,9 @@ def cleanup_shadow_replica_from_shards(shards: PBShards, replica_id: str) -> boo
     return True
 
 
-def promote_shadow_replica_in_shards(
+def promote_replica_in_shards(
     shards: PBShards, src_replica_id: str, dst_replica_id: str
 ) -> bool:
-    """
-    Promotes the shadow shard as the primary
-    """
     replica = get_replica(shards, src_replica_id)
     if replica is None or not replica.HasField("shadow_replica"):
         return False
