@@ -43,7 +43,7 @@ impl<'a, D: DeleteLog> DeleteLog for &'a D {
     }
 }
 
-impl<Prop: std::marker::Sync> DeleteLog for dtrie_ram::DTrie<Prop> {
+impl DeleteLog for dtrie_ram::DTrie {
     fn is_deleted(&self, key: &[u8]) -> bool {
         self.get(key).is_some()
     }

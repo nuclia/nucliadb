@@ -58,14 +58,14 @@ impl WorkUnit {
 
 #[derive(Clone, Copy)]
 struct TimeSensitiveDLog<'a> {
-    dlog: &'a DTrie<SystemTime>,
+    dlog: &'a DTrie,
     time: SystemTime,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
     fn is_deleted(&self, key: &[u8]) -> bool {
         self.dlog
             .get(key)
-            .map(|t| *t > self.time)
+            .map(|t| t > self.time)
             .unwrap_or_default()
     }
 }
@@ -128,7 +128,7 @@ pub struct State {
 
     // Trie containing the deleted keys and the
     // time when they were deleted
-    delete_log: DTrie<SystemTime>,
+    delete_log: DTrie,
 
     // Already closed WorkUnits waiting to be merged
     work_stack: LinkedList<WorkUnit>,
@@ -221,13 +221,9 @@ impl State {
             .work_stack
             .back()
             .and_then(|v| v.load.last().map(|l| l.time()));
-        let older = self
-            .delete_log
-            .iter()
-            .filter(|(_, age)| age_cap.map(|cap| **age <= cap).unwrap_or_default())
-            .map(|(key, _)| key)
-            .collect::<Vec<_>>();
-        older.iter().for_each(|v| self.delete_log.delete(v));
+        if let Some(age_cap) = age_cap {
+            self.delete_log.prune(age_cap);
+        }
         unit.load.iter().cloned().for_each(|dp| {
             // The data_point may be older that the refactor
             self.data_points.remove(&dp.id());
