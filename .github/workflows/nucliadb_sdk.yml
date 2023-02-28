@@ -1,13 +1,10 @@
 name: NucliaDB SDK (py)
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_sdk.yml"
-      - "nucliadb_sdk/**"
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -43,6 +40,7 @@ jobs:
 
   # Job to run tests
   tests:
+    name: NucliaDBSDKTests
     runs-on: ubuntu-latest
 
     strategy:

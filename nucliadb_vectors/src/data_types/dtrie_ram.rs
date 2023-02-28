@@ -19,49 +19,41 @@
 //
 
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct DTrie<Prop> {
-    value: Option<Prop>,
-    go_table: HashMap<u8, Box<DTrie<Prop>>>,
+#[derive(Default, Clone, Serialize, Deserialize)]
+pub struct DTrie {
+    value: Option<SystemTime>,
+    go_table: HashMap<u8, Box<DTrie>>,
 }
-
-impl<Prop> Default for DTrie<Prop> {
-    fn default() -> Self {
-        DTrie::new()
+impl DTrie {
+    fn inner_get(&self, key: &[u8], current: Option<SystemTime>) -> Option<SystemTime> {
+        let current = std::cmp::max(current, self.value);
+        let [head, tail @ ..] = key else { return current };
+        let Some(node) = self.go_table.get(head) else { return current};
+        node.inner_get(tail, current)
     }
-}
-impl<Prop> DTrie<Prop> {
-    fn inner_delete(&mut self, key: &[u8]) -> bool {
+    fn inner_prune(&mut self, time: SystemTime) -> bool {
+        self.value = self.value.filter(|v| *v > time);
+        self.go_table = std::mem::take(&mut self.go_table)
+            .into_iter()
+            .map(|(k, mut v)| (v.inner_prune(time), k, v))
+            .filter(|v| !v.0)
+            .map(|v| (v.1, v.2))
+            .collect();
+        self.value.is_none() && self.go_table.is_empty()
+    }
+    pub fn new() -> DTrie {
+        DTrie::default()
+    }
+    pub fn insert(&mut self, key: &[u8], value: SystemTime) {
         match key {
             [] => {
-                self.value = None;
-                self.go_table.is_empty()
+                self.value = Some(value);
+                self.go_table.clear();
             }
-            [head, tail @ ..] => self
-                .go_table
-                .get_mut(head)
-                .map(|node| node.inner_delete(tail))
-                .filter(|removed| *removed)
-                .map(|_| self.go_table.remove(head))
-                .map(|_| self.go_table.is_empty() && self.value.is_none())
-                .unwrap_or_default(),
-        }
-    }
-    fn is_value(&self) -> bool {
-        self.value.is_some()
-    }
-    pub fn new() -> DTrie<Prop> {
-        DTrie {
-            value: None,
-            go_table: HashMap::new(),
-        }
-    }
-    pub fn insert(&mut self, key: &[u8], value: Prop) {
-        match key {
-            [] => self.value = Some(value),
             [head, tail @ ..] => {
                 self.go_table
                     .entry(*head)
@@ -71,127 +63,123 @@ impl<Prop> DTrie<Prop> {
             }
         }
     }
-    pub fn get(&self, key: &[u8]) -> Option<&Prop> {
-        match key {
-            [] => self.value.as_ref(),
-            [head, tail @ ..] => self
-                .go_table
-                .get(head)
-                .and_then(|n| n.get(tail))
-                .or(self.value.as_ref()),
-        }
+    pub fn get(&self, key: &[u8]) -> Option<SystemTime> {
+        self.inner_get(key, None)
     }
-    pub fn iter(&self) -> DTrieIter<Prop> {
-        DTrieIter::new(self)
-    }
-    pub fn delete(&mut self, key: &[u8]) {
-        self.inner_delete(key);
-    }
-}
-
-pub struct DTrieIter<'a, V> {
-    stack: Vec<(Vec<u8>, &'a DTrie<V>)>,
-    crnt_key: Vec<u8>,
-    crnt_trie: &'a DTrie<V>,
-}
-impl<'a, V> DTrieIter<'a, V> {
-    fn new(trie: &'a DTrie<V>) -> DTrieIter<'a, V> {
-        DTrieIter {
-            stack: Vec::new(),
-            crnt_key: Vec::new(),
-            crnt_trie: trie,
-        }
-    }
-}
-impl<'a, V> Iterator for DTrieIter<'a, V> {
-    type Item = (Vec<u8>, &'a V);
-    fn next(&mut self) -> Option<Self::Item> {
-        for (index, child) in self.crnt_trie.go_table.iter() {
-            let mut key = self.crnt_key.clone();
-            key.push(*index);
-            self.stack.push((key, child));
-        }
-        match self.stack.pop() {
-            None => None,
-            Some((new_key, new_trie)) => {
-                self.crnt_key = new_key;
-                self.crnt_trie = new_trie;
-                if !self.crnt_trie.is_value() {
-                    self.next()
-                } else {
-                    self.crnt_trie
-                        .value
-                        .as_ref()
-                        .map(|v| (self.crnt_key.clone(), v))
-                }
-            }
-        }
+    pub fn prune(&mut self, time: SystemTime) {
+        self.inner_prune(time);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::time::Duration;
 
     use super::*;
 
-    const VALUES: &[usize] = &[12, 0, 1, 2];
-    const KEY: (&str, usize) = ("key", VALUES[0]);
-    const N0: (&str, usize) = ("key_0", VALUES[1]);
-    const N1: (&str, usize) = ("key_1", VALUES[2]);
-    const N2: (&str, usize) = ("key_2", VALUES[3]);
+    const KEY: &str = "key";
+    const N0: &str = "key_0";
+    const N1: &str = "key_1";
+    const N2: &str = "key_2";
 
     #[test]
     fn insert_search() {
+        let tplus0 = SystemTime::now();
+        let tplus1 = tplus0 + Duration::from_secs(1);
+        let tplus2 = tplus0 + Duration::from_secs(2);
+        let tplus3 = tplus0 + Duration::from_secs(3);
+
+        // Time matches the prefix order
         let mut trie = DTrie::new();
-        trie.insert(N0.0.as_bytes(), N0.1);
-        trie.insert(N1.0.as_bytes(), N1.1);
-        trie.insert(N2.0.as_bytes(), N2.1);
-        trie.insert(KEY.0.as_bytes(), KEY.1);
-        assert_eq!(trie.get(N0.0.as_bytes()).copied(), Some(N0.1));
-        assert_eq!(trie.get(N1.0.as_bytes()).copied(), Some(N1.1));
-        assert_eq!(trie.get(N2.0.as_bytes()).copied(), Some(N2.1));
-        assert_eq!(trie.get(KEY.0.as_bytes()).copied(), Some(KEY.1));
-        let expected = VALUES.iter().copied();
-        let got = trie.iter().map(|(_, v)| v).copied();
-        assert_eq!(
-            expected.collect::<HashSet<_>>(),
-            got.collect::<HashSet<_>>()
-        );
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(N2.as_bytes(), tplus3);
+        assert_eq!(trie.get(N0.as_bytes()), Some(tplus1));
+        assert_eq!(trie.get(N1.as_bytes()), Some(tplus2));
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus3));
+        assert_eq!(trie.get(KEY.as_bytes()), Some(tplus0));
+
+        // Prefixes overwrite previous values
+        let mut trie = DTrie::new();
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(N2.as_bytes(), tplus3);
+        assert_eq!(trie.get(KEY.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N0.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N1.as_bytes()), Some(tplus2));
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus3));
+
+        let mut trie = DTrie::new();
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N2.as_bytes(), tplus3);
+        assert_eq!(trie.get(KEY.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N0.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N1.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus3));
+
+        let mut trie = DTrie::new();
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N2.as_bytes(), tplus0);
+        assert_eq!(trie.get(KEY.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N0.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N1.as_bytes()), Some(tplus0));
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus0));
     }
     #[test]
-    fn delete_search() {
+    fn prune() {
+        let tplus0 = SystemTime::now();
+        let tplus1 = tplus0 + Duration::from_secs(1);
+        let tplus2 = tplus0 + Duration::from_secs(2);
+        let tplus3 = tplus0 + Duration::from_secs(3);
+
         let mut trie = DTrie::new();
-        trie.insert(N0.0.as_bytes(), N0.1);
-        trie.insert(N1.0.as_bytes(), N1.1);
-        trie.insert(N2.0.as_bytes(), N2.1);
-        trie.insert(KEY.0.as_bytes(), KEY.1);
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(N2.as_bytes(), tplus3);
+        trie.prune(tplus0);
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus3));
+        assert_eq!(trie.get(N1.as_bytes()), Some(tplus2));
+        assert_eq!(trie.get(N0.as_bytes()), Some(tplus1));
+        assert_eq!(trie.get(KEY.as_bytes()), None);
 
-        let mut t1 = trie.clone();
-        t1.delete(N0.0.as_bytes());
-        assert_eq!(t1.get(N0.0.as_bytes()).copied(), Some(KEY.1));
-        assert_eq!(t1.get(N1.0.as_bytes()).copied(), Some(N1.1));
-        assert_eq!(t1.get(N2.0.as_bytes()).copied(), Some(N2.1));
-        assert_eq!(t1.get(KEY.0.as_bytes()).copied(), Some(KEY.1));
+        let mut trie = DTrie::new();
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(N2.as_bytes(), tplus3);
+        trie.prune(tplus1);
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus3));
+        assert_eq!(trie.get(N1.as_bytes()), Some(tplus2));
+        assert_eq!(trie.get(N0.as_bytes()), None);
+        assert_eq!(trie.get(KEY.as_bytes()), None);
 
-        let mut t2 = trie.clone();
-        t2.delete(N1.0.as_bytes());
-        assert_eq!(t2.get(N0.0.as_bytes()).copied(), Some(N0.1));
-        assert_eq!(t2.get(N1.0.as_bytes()).copied(), Some(KEY.1));
-        assert_eq!(t2.get(N2.0.as_bytes()).copied(), Some(N2.1));
-        assert_eq!(t2.get(KEY.0.as_bytes()).copied(), Some(KEY.1));
+        let mut trie = DTrie::new();
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(N2.as_bytes(), tplus3);
+        trie.prune(tplus2);
+        assert_eq!(trie.get(N2.as_bytes()), Some(tplus3));
+        assert_eq!(trie.get(N1.as_bytes()), None);
+        assert_eq!(trie.get(N0.as_bytes()), None);
+        assert_eq!(trie.get(KEY.as_bytes()), None);
 
-        let mut t3 = trie.clone();
-        t3.delete(KEY.0.as_bytes());
-        assert_eq!(t3.get(N0.0.as_bytes()).copied(), Some(N0.1));
-        assert_eq!(t3.get(N1.0.as_bytes()).copied(), Some(N1.1));
-        assert_eq!(t3.get(N2.0.as_bytes()).copied(), Some(N2.1));
-        assert_eq!(t3.get(KEY.0.as_bytes()).copied(), None);
-        t3.delete(N0.0.as_bytes());
-        assert_eq!(t3.get(N0.0.as_bytes()).copied(), None);
-        t3.delete(N1.0.as_bytes());
-        assert_eq!(t3.get(N1.0.as_bytes()).copied(), None);
-        t3.delete(N2.0.as_bytes());
-        assert_eq!(t3.get(N2.0.as_bytes()).copied(), None);
+        let mut trie = DTrie::new();
+        trie.insert(KEY.as_bytes(), tplus0);
+        trie.insert(N0.as_bytes(), tplus1);
+        trie.insert(N1.as_bytes(), tplus2);
+        trie.insert(N2.as_bytes(), tplus3);
+        trie.prune(tplus3);
+        assert_eq!(trie.get(N2.as_bytes()), None);
+        assert_eq!(trie.get(N1.as_bytes()), None);
+        assert_eq!(trie.get(N0.as_bytes()), None);
+        assert_eq!(trie.get(KEY.as_bytes()), None);
     }
 }

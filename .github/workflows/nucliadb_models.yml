@@ -1,13 +1,10 @@
 name: nucliadb Models (py)
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_models.yml"
-      - "nucliadb_models/**"
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -17,6 +14,7 @@ on:
 jobs:
   # Job to run pre-checks
   pre-checks:
+    name: NucliaDBModelsTests
     runs-on: ubuntu-latest
     strategy:
       matrix:

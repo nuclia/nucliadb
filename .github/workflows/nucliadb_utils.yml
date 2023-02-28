@@ -1,13 +1,10 @@
 name: nucliadb Utils (py)
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_utils.yml"
-      - "nucliadb_utils/**"
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -43,6 +40,7 @@ jobs:
 
   # Job to run tests
   tests:
+    name: NucliaDBUtilsTests
     runs-on: ubuntu-latest
 
     strategy:

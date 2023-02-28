@@ -16,9 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from typing import Any, Dict, Optional
 
-class LRU(Dict[str, Any]):
-    def __init__(self, size: int): ...
-    def set(self, key: str, value: Any, size: Optional[int] = None) -> None: ...
+
+def test_bw_capatible_exclude_list_import():
+    from nucliadb_utils.fastapi.exclude_urls import ExcludeList  # noqa: F401

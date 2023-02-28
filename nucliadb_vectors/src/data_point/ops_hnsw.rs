@@ -166,7 +166,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             match (candidates.pop(), ms_neighbours.peek().cloned()) {
                 (None, _) => break,
                 (Some(Cnx(_, cs)), Some(Reverse(Cnx(_, ws)))) if cs < ws => break,
-                (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, ws)))) => {
+                (Some(Cnx(cn, _)), Some(Reverse(Cnx(_, mut ws)))) => {
                     for (y, _) in layer.get_out_edges(cn) {
                         if !visited.contains(&y) {
                             visited.insert(y);
@@ -177,6 +177,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                                 if ms_neighbours.len() > k_neighbours {
                                     ms_neighbours.pop();
                                 }
+                                ws = ms_neighbours.peek().map_or(ws, |Reverse(v)| v.1);
                             }
                         }
                     }
@@ -281,6 +282,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                     vec_counter.add(self.tracker.get_vector(addr));
                 }
             });
+            filtered_result.sort_by(|a, b| b.1.total_cmp(&a.1));
             filtered_result
         } else {
             Neighbours::default()

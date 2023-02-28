@@ -8,18 +8,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb.yml"
-      - "charts/nucliadb/**"
-      - "Dockerfile"
-      - "nucliadb/**"
-      - "nucliadb_utils/**"
-      - "nucliadb_fields_tantivy/**"
-      - "nucliadb_paragraphs_tantivy/**"
-      - "nucliadb_relations/**"
-      - "nucliadb_node/**"
-      - "nucliadb_vectors2/**"
-      - "nucliadb_protos/**"
   push:
     branches:
       - main
@@ -65,6 +53,7 @@ jobs:
 
   # Job to run tests
   tests:
+    name: NucliaDBTests
     runs-on: ubuntu-latest
 
     strategy:
@@ -141,7 +130,7 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: true
@@ -149,13 +138,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: '@nuclia/nuclia-db'
+          alert-comment-cc-users: "@nuclia/nuclia-db"
 
       - name: Comment benchmark result based on main
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name != 'push'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmarks.json
           external-data-json-path: ./cache/benchmark-data.json
           save-data-file: false
@@ -163,13 +152,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           fail-on-alert: true
-          alert-comment-cc-users: '@nuclia/nuclia-db'
+          alert-comment-cc-users: "@nuclia/nuclia-db"
 
       - name: Store on GH Pages
         uses: benchmark-action/github-action-benchmark@v1
         if: github.event_name == 'push'
         with:
-          tool: 'pytest'
+          tool: "pytest"
           output-file-path: benchmarks.json
           auto-push: true
           github-token: ${{ secrets.PERFORMANCE_TOKEN }}
