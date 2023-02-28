@@ -72,16 +72,15 @@ async def set_resource_field_extracted_data(
             field_data.text = models.ExtractedText.from_message(data_et)
 
     metadata_wanted = ExtractedDataTypeName.METADATA in wanted_extracted_data
-    small_metadata_wanted = (
-        ExtractedDataTypeName.SMALL_METADATA in wanted_extracted_data
+    shortened_metadata_wanted = (
+        ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
     )
-    if metadata_wanted or small_metadata_wanted:
+    if metadata_wanted or shortened_metadata_wanted:
         data_fcm = await field.get_field_metadata()
 
         if data_fcm is not None:
-            small_version = small_metadata_wanted and not metadata_wanted
             field_data.metadata = models.FieldComputedMetadata.from_message(
-                data_fcm, small_version=small_version
+                data_fcm, shortened=shortened_metadata_wanted and not metadata_wanted
             )
 
     if ExtractedDataTypeName.LARGE_METADATA in wanted_extracted_data:

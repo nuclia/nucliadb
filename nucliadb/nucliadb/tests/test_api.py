@@ -309,7 +309,7 @@ async def test_entitygroups(
 
 
 @pytest.mark.asyncio
-async def test_extracted_small_metadata(
+async def test_extracted_shortened_metadata(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_grpc: WriterStub,
@@ -318,7 +318,7 @@ async def test_extracted_small_metadata(
     """
     Test description:
 
-    - Create a resource with a field containing FieldMetadata with ner, positions and relations
+    - Create a resource with a field containing FieldMetadata with ner, positions and relations.
     - Check that new extracted data option filters them out
     """
     br = broker_resource(knowledgebox)
@@ -345,16 +345,21 @@ async def test_extracted_small_metadata(
     fcmw.metadata.metadata.positions["foo"].position.append(position)
     fcmw.metadata.split_metadata["split"].positions["foo"].position.append(position)
 
+    # Add some classification
+    classification = rpb.Classification(label="foo", labelset="bar")
+    fcmw.metadata.metadata.classifications.append(classification)
+    fcmw.metadata.split_metadata["split"].classifications.append(classification)
+
     br.field_metadata.append(fcmw)
 
     await inject_message(nucliadb_grpc, br)
 
-    cropped_fields = ["ner", "positions", "relations"]
+    cropped_fields = ["ner", "positions", "relations", "classifications"]
 
-    # Check that when 'small_metadata' in extracted param fields are cropped
+    # Check that when 'shortened_metadata' in extracted param fields are cropped
     resp = await nucliadb_reader.get(
         f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
-        params=dict(show=["extracted"], extracted=["small_metadata"]),
+        params=dict(show=["extracted"], extracted=["shortened_metadata"]),
     )
     assert resp.status_code == 200
     resp_json = resp.json()
@@ -365,7 +370,7 @@ async def test_extracted_small_metadata(
             assert len(meta[cropped_field]) == 0
 
     # Check that when 'metadata' in extracted param fields are returned
-    for extracted_param in (["metadata"], ["metadata", "small_metadata"]):
+    for extracted_param in (["metadata"], ["metadata", "shortened_metadata"]):
         resp = await nucliadb_reader.get(
             f"/kb/{knowledgebox}/resource/{br.uuid}/text/text",
             params=dict(show=["extracted"], extracted=extracted_param),

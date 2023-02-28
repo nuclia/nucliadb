@@ -122,10 +122,10 @@ class FieldComputedMetadata(BaseModel):
     def from_message(
         cls: Type[_T],
         message: resources_pb2.FieldComputedMetadata,
-        small_version: bool = False,
+        shortened: bool = False,
     ) -> _T:
-        if small_version:
-            cls.crop_large_fields_from_fieldmetadata(message)
+        if shortened:
+            cls.shorten_fieldmetadata(message)
         metadata = convert_fieldmetadata_pb_to_dict(message.metadata)
         split_metadata = {
             split: convert_fieldmetadata_pb_to_dict(metadata_split)
@@ -141,11 +141,11 @@ class FieldComputedMetadata(BaseModel):
         return cls(**value)
 
     @classmethod
-    def crop_large_fields_from_fieldmetadata(
+    def shorten_fieldmetadata(
         cls,
         message: resources_pb2.FieldComputedMetadata,
     ) -> Dict[str, Any]:
-        large_fields = ["ner", "relations", "positions"]
+        large_fields = ["ner", "relations", "positions", "classifications"]
         for field in large_fields:
             message.metadata.ClearField(field)
         for metadata in message.split_metadata.values():
