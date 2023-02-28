@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.9
+
+- Fix vector deletion 
 ## 0.5.8
 
 - Store node metadata 
