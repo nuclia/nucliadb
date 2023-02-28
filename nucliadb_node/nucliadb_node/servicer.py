@@ -36,14 +36,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
+import asyncio
+
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, Resource, ResourceID, ShardId
 from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
 from sentry_sdk import capture_exception
 
 from nucliadb_node import logger, shadow_shards
 from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
-from nucliadb_node.shadow_shards import ShadowShardNotFound, ShadowShardsManager
+from nucliadb_node.shadow_shards import (
+    OperationCode,
+    ShadowShardNotFound,
+    ShadowShardsManager,
+)
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodewriter_pb2_grpc
 
@@ -102,3 +108,28 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
             logger.warn(f"Error deleting shadow shard: {shard_id}")
         finally:
             return response
+
+    async def ProcessShadowShard(self, request: ShardId, context):  # Stream the process
+        ssm = shadow_shards.get_manager()
+        await ssm.load()
+        shadow_shard_id = request.shadow_shard_id
+        dst_shard_id = request.dst_shard_id
+        if not ssm.exists(shadow_shard_id):
+            # Nothing to do. Maybe return error?
+            return
+        lock = asyncio.Lock()  # TODO: global shared lock
+        async with lock:
+            async for op in ssm.iter_operations(shadow_shard_id):
+                opcode = op[0]
+                if opcode == OperationCode.SET:
+                    resource: Resource = op[1]
+                    resource
+                    # TODO: set destination shard
+                    status = await self.writer.set_resource(resource)
+                elif opcode == OperationCode.DELETE:
+                    uuid: str = op[1]
+                    rid = ResourceID(shard_id=dst_shard_id, uuid=uuid)
+                    status = await self.writer.delete_resource(rid)
+                else:
+                    raise ValueError(f"Unknown opcode: {op}")
+                self.reader.update(dst_shard_id, status)

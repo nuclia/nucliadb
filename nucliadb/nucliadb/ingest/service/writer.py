@@ -787,6 +787,28 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.abort()
         return response
 
+    async def ProcessShadowShard(  # type: ignore
+        self, request: ProcessShadowShardRequest, context=None
+    ) -> ShadowShardResponse:
+        response = ShadowShardResponse(success=False)
+        try:
+            node_klass = get_node_klass()
+            txn = await self.proc.driver.begin()
+            await node_klass.process_shadow_shard(
+                txn, request.kbid, request.src_replica.id, request.dst_replica.id
+            )
+            await txn.commit(resource=False)
+            response.success = True
+        except Exception as exc:
+            event_id: Optional[str] = None
+            if SENTRY:
+                event_id = capture_exception(exc)
+            logger.error(
+                f"Error processing shadow shard. Check sentry for more details. Event id: {event_id}"
+            )
+            await txn.abort()
+        return response
+
 
 def update_shards_with_updated_replica(
     shards: PBShards, replica_id: str, updated_replica: ShardCleaned

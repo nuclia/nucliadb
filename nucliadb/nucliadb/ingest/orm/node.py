@@ -323,6 +323,51 @@ class Node(AbstractNode):
         await txn.set(key, updated_shards.SerializeToString())
 
     @classmethod
+    async def process_shadow_shard(
+        cls, txn: Transaction, kbid: str, src_replica_id: str, dst_replica_id: str
+    ):
+        # TODO: Make sure shadow shards are taken into account while rebalancing.
+        # TODO: Make sure replication is correct when choosing the shadow shards.
+        # TODO: Clarify to the team: Shadow shard needs to be created in the same node it will be consumed.
+
+        # Check if requested replica has a shadow shard to process
+        all_shards = await cls.get_all_shards(txn, kbid)
+        if all_shards is None:
+            raise KBNotFoundError()
+        replica = get_replica(all_shards, src_replica_id)
+        if replica is None:
+            raise ReplicaShardNotFound()
+        if not replica.HasField("shadow_replica"):
+            raise ShadowShardNotFound()
+
+        # Shadow shard found. Process it
+        to_process = replica.shadow_replica
+        node = NODES.get(to_process.node)
+        if node is None:
+            raise ValueError(f"Node {to_process.node} not found")
+
+        preq = ProcessShadowShardRequest(
+            shadow=to_process.shard.id, dst_shard=dst_replica_id
+        )
+        ssresp = await node.sidecar.ProcessShadowShard(preq)  # type: ignore
+        if not ssresp.success:
+            raise SidecarDeleteShadowShardError("Sidecar error")
+
+        # Now update the Shards pb object from maindb
+        updated_shards = PBShards()
+        updated_shards.CopyFrom(all_shards)
+        promoted = promote_shadow_replica_in_shards(
+            updated_shards,
+            src_replica_id,
+            dst_replica_id,
+        )
+        if not promoted:
+            raise UpdatingShardsError()
+
+        key = KB_SHARDS.format(kbid=kbid)
+        await txn.set(key, updated_shards.SerializeToString())
+
+    @classmethod
     async def actual_shard(cls, txn: Transaction, kbid: str) -> Optional[Shard]:
         key = KB_SHARDS.format(kbid=kbid)
         kb_shards_bytes: Optional[bytes] = await txn.get(key)
@@ -530,6 +575,20 @@ def cleanup_shadow_replica_from_shards(shards: PBShards, replica_id: str) -> boo
     replica = get_replica(shards, replica_id)
     if replica is None:
         return False
+    replica.ClearField("shadow_replica")
+    return True
+
+
+def promote_shadow_replica_in_shards(
+    shards: PBShards, src_replica_id: str, dst_replica_id: str
+) -> bool:
+    """
+    Promotes the shadow shard as the primary
+    """
+    replica = get_replica(shards, src_replica_id)
+    if replica is None or not replica.HasField("shadow_replica"):
+        return False
+    replica.shard.id = dst_replica_id
     replica.ClearField("shadow_replica")
     return True
 
