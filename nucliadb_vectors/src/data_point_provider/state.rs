@@ -62,9 +62,9 @@ struct TimeSensitiveDLog<'a> {
     time: SystemTime,
 }
 impl<'a> DeleteLog for TimeSensitiveDLog<'a> {
-    fn is_deleted(&self, key: &str) -> bool {
+    fn is_deleted(&self, key: &[u8]) -> bool {
         self.dlog
-            .get(key.as_bytes())
+            .get(key)
             .map(|t| *t > self.time)
             .unwrap_or_default()
     }

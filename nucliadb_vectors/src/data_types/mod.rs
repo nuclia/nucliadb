@@ -34,18 +34,18 @@ pub mod usize_utils {
 }
 
 pub trait DeleteLog: std::marker::Sync {
-    fn is_deleted(&self, _: &str) -> bool;
+    fn is_deleted(&self, _: &[u8]) -> bool;
 }
 
 impl<'a, D: DeleteLog> DeleteLog for &'a D {
-    fn is_deleted(&self, x: &str) -> bool {
+    fn is_deleted(&self, x: &[u8]) -> bool {
         D::is_deleted(self, x)
     }
 }
 
 impl<Prop: std::marker::Sync> DeleteLog for dtrie_ram::DTrie<Prop> {
-    fn is_deleted(&self, key: &str) -> bool {
-        self.get(key.as_bytes()).is_some()
+    fn is_deleted(&self, key: &[u8]) -> bool {
+        self.get(key).is_some()
     }
 }
 
@@ -60,7 +60,7 @@ impl<Dl: DeleteLog, S: key_value::Slot> key_value::Slot for (Dl, S) {
         self.1.read_exact(x)
     }
     fn keep_in_merge(&self, x: &[u8]) -> bool {
-        let key = std::str::from_utf8(self.get_key(x)).unwrap();
+        let key = self.1.get_key(x);
         !self.0.is_deleted(key)
     }
 }
