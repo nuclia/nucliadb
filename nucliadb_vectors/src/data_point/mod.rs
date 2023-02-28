@@ -48,7 +48,7 @@ mod file_names {
 
 pub struct NoDLog;
 impl DeleteLog for NoDLog {
-    fn is_deleted(&self, _: &str) -> bool {
+    fn is_deleted(&self, _: &[u8]) -> bool {
         false
     }
 }
@@ -117,7 +117,7 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             false
         } else {
             let x = self.find_node(x);
-            let key = std::str::from_utf8(Node::key(x)).unwrap();
+            let key = Node::key(x);
             self.delete_log.is_deleted(key)
         }
     }
@@ -208,9 +208,9 @@ impl DataPoint {
     }
     pub fn get_keys<Dlog: DeleteLog>(&self, delete_log: &Dlog) -> Vec<String> {
         key_value::get_keys(Node, &self.nodes)
+            .filter(|k| !delete_log.is_deleted(*k))
             .map(String::from_utf8_lossy)
             .map(|s| s.to_string())
-            .filter(|k| !delete_log.is_deleted(k.as_str()))
             .collect()
     }
     pub fn search<Dlog: DeleteLog>(
@@ -244,7 +244,9 @@ impl DataPoint {
             .collect()
     }
     pub fn merge<Dlog>(dir: &path::Path, operants: &[(Dlog, DpId)]) -> VectorR<DataPoint>
-    where Dlog: DeleteLog {
+    where
+        Dlog: DeleteLog,
+    {
         use io::{BufWriter, Write};
         let uid = DpId::new_v4().to_string();
         let id = dir.join(&uid);

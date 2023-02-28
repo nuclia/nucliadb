@@ -30,8 +30,9 @@ fn create_query() -> Vec<f32> {
 }
 
 impl DeleteLog for HashSet<String> {
-    fn is_deleted(&self, x: &str) -> bool {
-        self.contains(x)
+    fn is_deleted(&self, x: &[u8]) -> bool {
+        let as_str = String::from_utf8_lossy(x).to_string();
+        self.contains(&as_str)
     }
 }
 
