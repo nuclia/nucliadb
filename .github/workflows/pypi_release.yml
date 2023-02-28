@@ -21,6 +21,7 @@ jobs:
         run: |
           python bump.py --build=${{github.run_number}}
           pip install wheel
+          pip install -U twine
 
       # Install all packages we are going to release
       - name: Install all packages
