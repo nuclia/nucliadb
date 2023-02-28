@@ -116,8 +116,8 @@ pub struct Shard {
 }
 
 impl Shard {
-    /// Creates an empty shard, a.k.a a shard with a load score equals to zero.
-    pub fn empty(id: String) -> Self {
+    /// Creates an idle shard, a.k.a a shard with a load score equals to zero.
+    pub fn idle(id: String) -> Self {
         Self { id, load_score: 0 }
     }
 

@@ -80,7 +80,7 @@ pub enum BalanceStrategy {
 /// 3. Find a shard that match the following criterias:
 ///     - The given node does not contain the shard replica.
 ///     - The shard has not been moved during previous shard cutover.
-/// 4. *OPTIONAL*: If the node candidate is full, swap shard candidate with an empty shard.
+/// 4. *OPTIONAL*: If the node candidate is full, swap shard candidate with an idle shard.
 pub struct Balancer {
     settings: BalanceSettings,
 }
@@ -165,7 +165,7 @@ impl Balancer {
 
     /// Select the appropriate shard to move between the two nodes.
     ///
-    /// Note that if the node candidate is full, the method will try to swap any empty shard
+    /// Note that if the node candidate is full, the method will try to swap any idle shard
     /// from it to the weightier node.
     fn select_shard<'a, 'b>(
         &'a self,
@@ -198,14 +198,14 @@ impl Balancer {
             })
             .and_then(|shard| {
                 // checks if node candidate can accept any new shard.
-                // if not, checks if we can move an empty shard from the node candidate to
+                // if not, checks if we can move an idle shard from the node candidate to
                 // the weightier one.
                 if node_candidate.shards().count() == self.settings.shard_limit.get()
                     && !weightier_node.shards().count() != self.settings.shard_limit.get()
                 {
                     node_candidate
-                        .empty_shards()
-                        // select first empty shard
+                        .idle_shards()
+                        // select first idle shard
                         .next()
                         .map(|shard| (node_candidate, weightier_node, shard))
                 } else {
@@ -283,7 +283,7 @@ mod tests {
                 "n1".to_string(),
                 "192.168.0.1:4444".parse().unwrap(),
                 vec![
-                    Shard::empty("s1".to_string()),
+                    Shard::idle("s1".to_string()),
                     Shard::new("s2".to_string(), 42),
                     Shard::new("s3".to_string(), 21),
                     Shard::new("s4".to_string(), 21),
@@ -293,8 +293,8 @@ mod tests {
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::empty("s5".to_string()),
-                    Shard::empty("s6".to_string()),
+                    Shard::idle("s5".to_string()),
+                    Shard::idle("s6".to_string()),
                 ],
             ),
             Node::new(
@@ -390,7 +390,7 @@ mod tests {
                 "n1".to_string(),
                 "192.168.0.1:4444".parse().unwrap(),
                 vec![
-                    Shard::empty("s1".to_string()),
+                    Shard::idle("s1".to_string()),
                     Shard::new("s2".to_string(), 100),
                     Shard::new("s3".to_string(), 20),
                 ],
@@ -399,8 +399,8 @@ mod tests {
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::empty("s4".to_string()),
-                    Shard::empty("s5".to_string()),
+                    Shard::idle("s4".to_string()),
+                    Shard::idle("s5".to_string()),
                 ],
             ),
             Node::new(
@@ -416,7 +416,7 @@ mod tests {
                 "n4".to_string(),
                 "192.168.0.4:4444".parse().unwrap(),
                 vec![
-                    Shard::empty("s8".to_string()),
+                    Shard::idle("s8".to_string()),
                     Shard::new("s9".to_string(), 80),
                 ],
             ),
@@ -478,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    fn it_moves_out_empty_shard_on_full_node() {
+    fn it_moves_out_idle_shard_on_full_node() {
         let nodes = vec![
             Node::new(
                 "n1".to_string(),
@@ -492,9 +492,9 @@ mod tests {
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::empty("s3".to_string()),
-                    Shard::empty("s4".to_string()),
-                    Shard::empty("s4".to_string()),
+                    Shard::idle("s3".to_string()),
+                    Shard::idle("s4".to_string()),
+                    Shard::idle("s4".to_string()),
                 ],
             ),
         ];
@@ -545,7 +545,7 @@ mod tests {
             Node::new(
                 "n3".to_string(),
                 "192.168.0.3:4444".parse().unwrap(),
-                vec![Shard::empty("4".to_string())],
+                vec![Shard::idle("4".to_string())],
             ),
         ];
 
