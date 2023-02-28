@@ -3,8 +3,8 @@ FROM python:3.9
 
 RUN ARCH="$(uname -m)"; \
     case "$ARCH" in \
-        aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_aarch64.whl;; \
-        x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
+    aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_aarch64.whl;; \
+    x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
     esac;
 
 RUN pip install nucliadb-node-binding>=0.5.2
@@ -21,6 +21,7 @@ RUN curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-hea
 RUN apt-get update && apt-get install -y jq
 
 # Copy source code
+COPY VERSION /usr/src/app/VERSION
 COPY nucliadb_utils /usr/src/app/nucliadb_utils
 COPY nucliadb_telemetry /usr/src/app/nucliadb_telemetry
 COPY nucliadb_protos /usr/src/app/nucliadb_protos

@@ -1,0 +1,10 @@
+[report]
+omit =
+    *setup.py
+exclude_lines =
+    pragma: no cover
+    ^\s*...\s*$
+
+[run]
+omit =
+    *setup.py

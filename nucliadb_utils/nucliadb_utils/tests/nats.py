@@ -236,11 +236,8 @@ def natsd(natsd_server: Gnatsd):
 
 images.settings["nats"] = {
     "image": "nats",
-    "version": "latest",
-    "options": {
-        "command": ["-js"],
-        "ports": {"4222": None},
-    },
+    "version": "2.8.4",
+    "options": {"command": ["-js"], "ports": {"4222": None}},
 }
 
 

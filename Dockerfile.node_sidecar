@@ -9,6 +9,7 @@ RUN curl -L -o /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-hea
 
 # Copy requirements from all packages to install them before
 # transfering the source code.
+COPY VERSION /usr/src/app/VERSION
 COPY nucliadb_utils/requirements.txt /usr/src/app/requirements-utils.txt
 COPY nucliadb_utils/requirements-storages.txt /usr/src/app/requirements-storages.txt
 COPY nucliadb_protos/python/requirements.txt /usr/src/app/requirements-protos.txt

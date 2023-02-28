@@ -252,7 +252,12 @@ nucliadb_node_2_sidecar = nucliadbNodeSidecar()
 def node(natsd: str, gcs: str):
     running_settings.log_level = "DEBUG"
     docker_client = docker.from_env(version=BaseImage.docker_version)
-    if "DESKTOP" in docker_client.api.version()["Platform"]["Name"].upper():
+    docker_platform_name = docker_client.api.version()["Platform"]["Name"].upper()
+    if (
+        "DESKTOP" in docker_platform_name
+        # newer versions use community
+        or "DOCKER ENGINE - COMMUNITY" == docker_platform_name
+    ):
         # Valid when using Docker desktop
         docker_internal_host = "host.docker.internal"
     else:

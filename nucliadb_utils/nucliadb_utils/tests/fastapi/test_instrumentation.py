@@ -16,21 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-from typing import Optional
-
-from nucliadb_utils.cache.settings import settings
-
-try:
-    from memorylru import LRU  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
-    from lru import LRU  # type: ignore
-
-_lru: Optional[LRU] = None
 
 
-def get_memory_cache() -> LRU:
-    global _lru
-    if _lru is None:
-        _lru = LRU(settings.cache_memory_size)
-    return _lru
+def test_bw_capatible_instrument_app_import():
+    from nucliadb_utils.fastapi.instrumentation import instrument_app  # noqa: F401

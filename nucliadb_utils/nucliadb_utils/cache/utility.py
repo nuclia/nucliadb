@@ -30,8 +30,8 @@ from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings
 
 try:
-    from nucliadb_utils.cache.lru import LRU
-except ImportError:
+    from memorylru import LRU  # type: ignore
+except ImportError:  # pragma: no cover
     from lru import LRU  # type: ignore
 
 _default_size = 1024

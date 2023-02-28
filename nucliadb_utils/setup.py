@@ -1,36 +1,25 @@
 # -*- coding: utf-8 -*-
 import re
-from platform import system
+from pathlib import Path
 from typing import List
 
-from setuptools import Extension, find_packages, setup
+from setuptools import find_packages, setup
 
-with open("README.md") as f:
-    readme = f.read()
-
-
-def build_readme():
-    readme = ""
-    with open("README.md") as f:
-        readme += f.read()
-
-    readme += "\n"
-
-    with open("CHANGELOG.rst") as f:
-        readme += f.read()
-
-    return readme
+_dir = Path(__file__).resolve().parent
+VERSION = _dir.parent.joinpath("VERSION").open().read().strip()
+README = _dir.joinpath("README.md").open().read()
 
 
 def load_reqs(filename):
     with open(filename) as reqs_file:
         return [
-            line
+            # pin nucliadb-xxx to the same version as nucliadb
+            line.strip() + f"=={VERSION}"
+            if line.startswith("nucliadb-") and "=" not in line
+            else line.strip()
             for line in reqs_file.readlines()
             if not (
-                re.match(r"\s*#", line)  # noqa
-                or re.match("-e", line)
-                or re.match("-r", line)
+                re.match(r"\s*#", line) or re.match("-e", line) or re.match("-r", line)
             )
         ]
 
@@ -55,20 +44,10 @@ requirements = load_reqs("requirements.txt")
 
 extra_requirements = load_extra(["cache", "storages", "fastapi"])
 
-lru_module = Extension(
-    "nucliadb_utils.cache.lru", sources=["nucliadb_utils/cache/lru.c"]
-)
-
-
-extensions = []
-if system() != "Windows":
-    extensions.append(lru_module)
-
-
 setup(
     name="nucliadb_utils",
-    version=open("VERSION").read().strip(),
-    long_description=build_readme(),
+    version=VERSION,
+    long_description=README,
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3.7",
@@ -81,7 +60,7 @@ setup(
     ],
     zip_safe=True,
     include_package_data=True,
-    ext_modules=extensions,
+    package_data={"": ["*.txt", "*.md"], "nucliadb_utils": ["py.typed"]},
     packages=find_packages(),
     install_requires=requirements,
     extras_require=extra_requirements,

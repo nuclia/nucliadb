@@ -113,11 +113,11 @@ install: ## Install dependencies (on the active environment)
 	pip install Cython==0.29.24
 	pip install grpcio-tools
 	pip install -r code-requirements.txt
-	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_protos/python
+	pip install -e ./nucliadb_telemetry
+	pip install -e ./nucliadb_utils
 	pip install -e ./nucliadb_models
 	pip install -e ./nucliadb
-	pip install -e ./nucliadb_telemetry
 	pip install -e ./nucliadb_client
 	pip install -e ./nucliadb_sdk
 	pip install -e ./nucliadb_dataset
