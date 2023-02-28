@@ -67,6 +67,7 @@ class ResourceFieldProperties(str, Enum):
 class ExtractedDataTypeName(str, Enum):
     TEXT = "text"
     METADATA = "metadata"
+    SHORTENED_METADATA = "shortened_metadata"
     LARGE_METADATA = "large_metadata"
     VECTOR = "vectors"
     LINK = "link"

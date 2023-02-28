@@ -119,7 +119,13 @@ class FieldComputedMetadata(BaseModel):
     deleted_splits: Optional[List[str]]
 
     @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldComputedMetadata) -> _T:
+    def from_message(
+        cls: Type[_T],
+        message: resources_pb2.FieldComputedMetadata,
+        shortened: bool = False,
+    ) -> _T:
+        if shortened:
+            cls.shorten_fieldmetadata(message)
         metadata = convert_fieldmetadata_pb_to_dict(message.metadata)
         split_metadata = {
             split: convert_fieldmetadata_pb_to_dict(metadata_split)
@@ -133,6 +139,19 @@ class FieldComputedMetadata(BaseModel):
         value["metadata"] = metadata
         value["split_metadata"] = split_metadata
         return cls(**value)
+
+    @classmethod
+    def shorten_fieldmetadata(
+        cls,
+        message: resources_pb2.FieldComputedMetadata,
+    ) -> Dict[str, Any]:
+        large_fields = ["ner", "relations", "positions", "classifications"]
+        for field in large_fields:
+            message.metadata.ClearField(field)
+        for metadata in message.split_metadata.values():
+            for field in large_fields:
+                metadata.ClearField(field)
+        return message
 
 
 class FieldComputedMetadataWrapper(BaseModel):
