@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.2.4
+
+- Add py.typed on the package
+
 ## 1.2.3
 
 - Improve signatures for Datascience use case

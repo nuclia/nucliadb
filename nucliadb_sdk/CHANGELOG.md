@@ -1,5 +1,9 @@
 # nucliadb_sdk
 
+## 1.2.8
+
+- Make sure py.typed is on the package
+
 ## 1.2.7
 
 - Cloud as the default option when creating a client
