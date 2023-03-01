@@ -321,8 +321,7 @@ class InputOrigin(BaseModel):
     metadata: Dict[str, str] = {}
     tags: List[str] = []
     collaborators: List[str] = []
-    # XXX need b/w compatible parsing for old
-    # colaborators field value
+    # old field was "colaborators"
     filename: Optional[str] = None
     related: List[str] = []
 
@@ -338,13 +337,15 @@ class Origin(InputOrigin):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.Origin) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        data = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        if message.colaborators and not message.collaborators:
+            # b/w compatible handling for old field name
+            data["collaborators"] = message.colaborators
+        return cls(**data)
 
 
 class Relations(BaseModel):
