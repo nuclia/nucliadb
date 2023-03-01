@@ -91,7 +91,6 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.maindb.driver import TXNID
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -536,8 +535,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.knowledgeboxes.append(key)
 
         for partition in settings.partitions:
-            key = TXNID.format(worker=partition)
-            msgid = await txn.get(key)
+            msgid = await self.proc.driver.last_seqid(partition)
             if msgid is not None:
                 response.msgid[partition] = msgid
 
