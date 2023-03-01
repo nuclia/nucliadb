@@ -17,9 +17,7 @@ fn deserialize_protobuf_node_type<'de, D: de::Deserializer<'de>>(
         }
 
         fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
+        where E: de::Error {
             // deals with incompatiblities between API and protobuf representation
             match s {
                 "IO" => Ok(NodeType::Io),
