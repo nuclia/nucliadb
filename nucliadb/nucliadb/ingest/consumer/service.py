@@ -162,4 +162,4 @@ class ConsumerService:
     def _handle_task_result(self, task: asyncio.Task) -> None:
         e = task.exception()
         if e:
-            logger.exception("Consumer loop stoped by exception", exc_info=e)
+            logger.exception("Consumer loop stopped by exception", exc_info=e)
