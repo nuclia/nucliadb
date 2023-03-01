@@ -288,11 +288,13 @@ impl ShardCutover {
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_lines)]
 mod tests {
     use super::*;
 
     #[test]
     fn it_distributes_active_shards() {
+        let shard_index = ShardIndex::new(Vec::default());
         let nodes = vec![
             Node::new(
                 "n1".to_string(),
@@ -325,7 +327,7 @@ mod tests {
         ];
 
         let tests = vec![
-            ((
+            (
                 Balancer::new(BalanceSettings {
                     strategy: BalanceStrategy::ActiveShard,
                     load_tolerance: Threshold::PlainValue(1),
@@ -346,8 +348,8 @@ mod tests {
                         port: 42,
                     },
                 ],
-            )),
-            ((
+            ),
+            (
                 Balancer::new(BalanceSettings {
                     strategy: BalanceStrategy::ActiveShard,
                     load_tolerance: Threshold::PlainValue(0),
@@ -374,8 +376,8 @@ mod tests {
                         port: 42,
                     },
                 ],
-            )),
-            ((
+            ),
+            (
                 Balancer::new(BalanceSettings {
                     strategy: BalanceStrategy::ActiveShard,
                     load_tolerance: Threshold::PlainValue(2),
@@ -388,11 +390,13 @@ mod tests {
                     destination_address: "192.168.0.2:4444".parse().unwrap(),
                     port: 42,
                 }],
-            )),
+            ),
         ];
 
         for (balancer, expected_shard_cutovers) in tests {
-            let shard_cutovers = balancer.balance_shards(nodes.clone()).collect::<Vec<_>>();
+            let shard_cutovers = balancer
+                .balance_shards(nodes.clone(), &shard_index)
+                .collect::<Vec<_>>();
 
             assert_eq!(shard_cutovers, expected_shard_cutovers);
         }
@@ -400,6 +404,7 @@ mod tests {
 
     #[test]
     fn it_distributes_workload() {
+        let shard_index = ShardIndex::new(Vec::default());
         let nodes = vec![
             Node::new(
                 "n1".to_string(),
@@ -438,7 +443,7 @@ mod tests {
         ];
 
         let tests = vec![
-            ((
+            (
                 Balancer::new(BalanceSettings {
                     strategy: BalanceStrategy::Workload,
                     load_tolerance: Threshold::PlainValue(120),
@@ -446,8 +451,8 @@ mod tests {
                     port: 42,
                 }),
                 vec![],
-            )),
-            ((
+            ),
+            (
                 Balancer::new(BalanceSettings {
                     strategy: BalanceStrategy::Workload,
                     load_tolerance: Threshold::PlainValue(100),
@@ -460,8 +465,8 @@ mod tests {
                     destination_address: "192.168.0.2:4444".parse().unwrap(),
                     port: 42,
                 }],
-            )),
-            ((
+            ),
+            (
                 Balancer::new(BalanceSettings {
                     strategy: BalanceStrategy::Workload,
                     load_tolerance: Threshold::PlainValue(50),
@@ -482,11 +487,13 @@ mod tests {
                         port: 42,
                     },
                 ],
-            )),
+            ),
         ];
 
         for (balancer, expected_shard_cutovers) in tests {
-            let shard_cutovers = balancer.balance_shards(nodes.clone()).collect::<Vec<_>>();
+            let shard_cutovers = balancer
+                .balance_shards(nodes.clone(), &shard_index)
+                .collect::<Vec<_>>();
 
             assert_eq!(shard_cutovers, expected_shard_cutovers);
         }
@@ -494,6 +501,7 @@ mod tests {
 
     #[test]
     fn it_moves_out_idle_shard_on_full_node() {
+        let shard_index = ShardIndex::new(Vec::default());
         let nodes = vec![
             Node::new(
                 "n1".to_string(),
@@ -536,13 +544,16 @@ mod tests {
             },
         ];
 
-        let shard_cutovers = balancer.balance_shards(nodes).collect::<Vec<_>>();
+        let shard_cutovers = balancer
+            .balance_shards(nodes, &shard_index)
+            .collect::<Vec<_>>();
 
         assert_eq!(shard_cutovers, expected_shard_cutovers);
     }
 
     #[test]
     fn it_ignores_loaded_nodes_with_only_one_active_shard() {
+        let shard_index = ShardIndex::new(Vec::default());
         let nodes = vec![
             Node::new(
                 "n1".to_string(),
@@ -578,7 +589,9 @@ mod tests {
             port: 42,
         }];
 
-        let shard_cutovers = balancer.balance_shards(nodes).collect::<Vec<_>>();
+        let shard_cutovers = balancer
+            .balance_shards(nodes, &shard_index)
+            .collect::<Vec<_>>();
 
         assert_eq!(shard_cutovers, expected_shard_cutovers);
     }
