@@ -27,6 +27,8 @@
 pub mod balancer;
 pub mod error;
 pub mod node;
+pub mod shard;
 pub mod threshold;
+pub mod views;
 
 pub use error::Error;
