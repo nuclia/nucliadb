@@ -32,6 +32,7 @@ use serde::{de, Deserialize};
 use tonic::Request;
 use url::Url;
 
+use crate::shard::Shard;
 use crate::Error;
 
 fn deserialize_protobuf_node_type<'de, D: de::Deserializer<'de>>(
