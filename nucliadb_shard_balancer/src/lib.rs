@@ -29,7 +29,6 @@ pub mod error;
 pub mod index;
 pub mod node;
 pub mod shard;
-pub mod shard;
 pub mod threshold;
 pub mod views;
 

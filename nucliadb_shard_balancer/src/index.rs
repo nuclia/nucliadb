@@ -55,7 +55,7 @@ impl<T> IndexHandle<T> {
 ///
 /// Note that this type allows to easily know the replicas of any given value.
 #[derive(Debug)]
-pub struct ReversedIndex<T: Indexable {
+pub struct ReversedIndex<T: Indexable> {
     // clippy doesn't know that this type is self-referential.
     #[allow(dead_code)]
     replicas: Vec<Arc<Vec<T::Item>>>,

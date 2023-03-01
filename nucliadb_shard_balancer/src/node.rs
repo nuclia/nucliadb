@@ -44,7 +44,7 @@ pub struct Node {
 }
 
 impl Node {
-    /// Get all nodes from by Nuclia's API.
+    /// Get all nodes from Nuclia's API.
     ///
     /// Note that this associated function will remove all dummy and non IO nodes
     /// plus get the shards of all nodes.
@@ -63,12 +63,12 @@ impl Node {
             .json::<Vec<NodeView>>()
             .await?;
 
-        Ok(futures::stream::iter(nodes)
+        futures::stream::iter(nodes)
             .filter(|node| futures::future::ready(node.r#type == NodeType::Io && !node.dummy))
             .map(Ok)
             .and_then(Node::try_load)
             .try_collect::<Vec<_>>()
-            .await?)
+            .await
     }
 
     /// Loads the node from its view.
