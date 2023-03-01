@@ -18,22 +18,15 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::path::PathBuf;
-
-use clap::{ArgGroup, Parser};
+use clap::Parser;
 use eyre::{eyre, Result};
 use nucliadb_shard_balancer::balancer::{BalanceSettings, Balancer};
 use nucliadb_shard_balancer::node::Node;
+use nucliadb_shard_balancer::shard::ShardIndex;
 use tracing_subscriber::EnvFilter;
-use url::Url;
 
 #[derive(Parser)]
-#[command(group(ArgGroup::new("input").required(true).args(["url", "path"])))]
 struct Opt {
-    #[arg(long)]
-    url: Option<Url>,
-    #[arg(long)]
-    path: Option<PathBuf>,
     url: String,
     #[arg(short, long)]
     dry_run: bool,
@@ -52,21 +45,17 @@ async fn main() -> Result<()> {
 
     let opt = Opt::parse();
 
-    let nodes = if let Some(path) = opt.path {
-        Node::from_file(&path).await?
-    } else if let Some(url) = opt.url {
-        Node::from_api(url).await?
-    } else {
-        unreachable!()
-    };
-
+    let nodes = Node::from_api(&opt.url).await?;
     tracing::debug!("Nodes: {nodes:?}");
+
+    let shard_index = ShardIndex::from_api(&opt.url, &nodes).await?;
+    tracing::debug!("Shard index: {shard_index:?}");
 
     let balancer = Balancer::new(opt.balance_settings);
 
     // Execute shard balancing one by one to handle
     // full node and downtime cases.
-    for shard_cutover in balancer.balance_shards(nodes) {
+    for shard_cutover in balancer.balance_shards(nodes, &shard_index) {
         tracing::debug!("Shard cutover: {shard_cutover:?}");
 
         if !opt.dry_run {

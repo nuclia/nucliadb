@@ -28,7 +28,8 @@ use nucliadb_protos::node_writer_client::NodeWriterClient as GrpcClient;
 use nucliadb_protos::{AcceptShardRequest, MoveShardRequest, ShardId};
 use tonic::Request;
 
-use crate::node::{Node, Shard, WeightedNode};
+use crate::node::{Node, WeightedNode};
+use crate::shard::{Shard, ShardIndex};
 use crate::threshold::Threshold;
 use crate::Error;
 
@@ -96,7 +97,11 @@ impl Balancer {
     ///
     /// Note that this method will do not perform the real shard balancing but just create the list
     /// of effective shard cutovers.
-    pub fn balance_shards(&self, mut nodes: Vec<Node>) -> impl Iterator<Item = ShardCutover> + '_ {
+    pub fn balance_shards<'a>(
+        &'a self,
+        mut nodes: Vec<Node>,
+        shard_index: &'a ShardIndex,
+    ) -> impl Iterator<Item = ShardCutover> + '_ {
         // store moved shards in order to avoid cyclic shard balancing
         let mut moved_shards = Vec::default();
 
@@ -127,7 +132,12 @@ impl Balancer {
                             .is_above()
                     })
                     .find_map(|node_candidate| {
-                        self.select_shard(weightier_node, *node_candidate, &moved_shards)
+                        self.select_shard(
+                            weightier_node,
+                            *node_candidate,
+                            &moved_shards,
+                            shard_index,
+                        )
                     })?;
 
                 let shard_cutover = ShardCutover {
@@ -172,6 +182,7 @@ impl Balancer {
         weightier_node: WeightedNode<'b>,
         node_candidate: WeightedNode<'b>,
         moved_shards: &[String],
+        shard_index: &ShardIndex,
     ) -> Option<(WeightedNode<'b>, WeightedNode<'b>, &'b Shard)> {
         let weight_difference = weightier_node.weight() - node_candidate.weight();
 
@@ -179,7 +190,11 @@ impl Balancer {
             .active_shards()
             // removes all shards that can not be used for the current shard balancing
             .filter(|shard| {
-                !node_candidate.contains_shard_replica(shard)
+                let shard_replica = shard_index.get(shard.id());
+
+                !node_candidate
+                    .shards()
+                    .any(|shard| shard_replica.is_replica_of(shard.id()))
                     && !moved_shards
                         .iter()
                         .any(|moved_shard| moved_shard == shard.id())
@@ -283,28 +298,28 @@ mod tests {
                 "n1".to_string(),
                 "192.168.0.1:4444".parse().unwrap(),
                 vec![
-                    Shard::idle("s1".to_string()),
-                    Shard::new("s2".to_string(), 42),
-                    Shard::new("s3".to_string(), 21),
-                    Shard::new("s4".to_string(), 21),
+                    Shard::new("s1".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s2".to_string(), 42, "kb1".to_string()),
+                    Shard::new("s3".to_string(), 21, "kb1".to_string()),
+                    Shard::new("s4".to_string(), 21, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::idle("s5".to_string()),
-                    Shard::idle("s6".to_string()),
+                    Shard::new("s5".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s6".to_string(), 0, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n3".to_string(),
                 "192.168.0.3:4444".parse().unwrap(),
                 vec![
-                    Shard::new("s7".to_string(), 1),
-                    Shard::new("s8".to_string(), 2),
-                    Shard::new("s9".to_string(), 3),
-                    Shard::new("s10".to_string(), 4),
+                    Shard::new("s7".to_string(), 1, "kb1".to_string()),
+                    Shard::new("s8".to_string(), 2, "kb1".to_string()),
+                    Shard::new("s9".to_string(), 3, "kb1".to_string()),
+                    Shard::new("s10".to_string(), 4, "kb1".to_string()),
                 ],
             ),
         ];
@@ -390,34 +405,34 @@ mod tests {
                 "n1".to_string(),
                 "192.168.0.1:4444".parse().unwrap(),
                 vec![
-                    Shard::idle("s1".to_string()),
-                    Shard::new("s2".to_string(), 100),
-                    Shard::new("s3".to_string(), 20),
+                    Shard::new("s1".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s2".to_string(), 100, "kb1".to_string()),
+                    Shard::new("s3".to_string(), 20, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::idle("s4".to_string()),
-                    Shard::idle("s5".to_string()),
+                    Shard::new("s4".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s5".to_string(), 0, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n3".to_string(),
                 "192.168.0.3:4444".parse().unwrap(),
                 vec![
-                    Shard::new("s6".to_string(), 50),
-                    Shard::new("s7".to_string(), 25),
-                    Shard::new("s8".to_string(), 25),
+                    Shard::new("s6".to_string(), 50, "kb1".to_string()),
+                    Shard::new("s7".to_string(), 25, "kb1".to_string()),
+                    Shard::new("s8".to_string(), 25, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n4".to_string(),
                 "192.168.0.4:4444".parse().unwrap(),
                 vec![
-                    Shard::idle("s8".to_string()),
-                    Shard::new("s9".to_string(), 80),
+                    Shard::new("s8".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s9".to_string(), 80, "kb1".to_string()),
                 ],
             ),
         ];
@@ -484,17 +499,17 @@ mod tests {
                 "n1".to_string(),
                 "192.168.0.1:4444".parse().unwrap(),
                 vec![
-                    Shard::new("s1".to_string(), 1),
-                    Shard::new("s2".to_string(), 2),
+                    Shard::new("s1".to_string(), 1, "kb1".to_string()),
+                    Shard::new("s2".to_string(), 2, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::idle("s3".to_string()),
-                    Shard::idle("s4".to_string()),
-                    Shard::idle("s4".to_string()),
+                    Shard::new("s3".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s4".to_string(), 0, "kb1".to_string()),
+                    Shard::new("s4".to_string(), 0, "kb1".to_string()),
                 ],
             ),
         ];
@@ -532,20 +547,20 @@ mod tests {
             Node::new(
                 "n1".to_string(),
                 "192.168.0.1:4444".parse().unwrap(),
-                vec![Shard::new("s1".to_string(), 100)],
+                vec![Shard::new("s1".to_string(), 100, "kb1".to_string())],
             ),
             Node::new(
                 "n2".to_string(),
                 "192.168.0.2:4444".parse().unwrap(),
                 vec![
-                    Shard::new("s2".to_string(), 50),
-                    Shard::new("s3".to_string(), 25),
+                    Shard::new("s2".to_string(), 50, "kb1".to_string()),
+                    Shard::new("s3".to_string(), 25, "kb1".to_string()),
                 ],
             ),
             Node::new(
                 "n3".to_string(),
                 "192.168.0.3:4444".parse().unwrap(),
-                vec![Shard::idle("4".to_string())],
+                vec![Shard::new("4".to_string(), 0, "kb1".to_string())],
             ),
         ];
 

@@ -19,141 +19,18 @@
 //
 
 use std::net::SocketAddr;
-use std::path::Path;
-use std::{fmt, io};
 
 use derive_more::{Deref, DerefMut};
 use futures::stream::{StreamExt, TryStreamExt};
 use nucliadb_protos::fdbwriter::member::Type as NodeType;
-use nucliadb_protos::node_reader_client::NodeReaderClient as GrpcClient;
-use nucliadb_protos::{EmptyQuery, ShardList};
+use nucliadb_protos::node_writer_client::NodeWriterClient as GrpcClient;
+use nucliadb_protos::EmptyQuery;
 use reqwest::Client as HttpClient;
-use serde::{de, Deserialize};
 use tonic::Request;
-use url::Url;
 
 use crate::shard::Shard;
+use crate::views::Node as NodeView;
 use crate::Error;
-
-fn deserialize_protobuf_node_type<'de, D: de::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<NodeType, D::Error> {
-    struct Visitor;
-
-    impl<'de> de::Visitor<'de> for Visitor {
-        type Value = NodeType;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string containing 'IO', 'SEARCH', 'INGEST', 'TRAIN', 'UNKNOWN'")
-        }
-
-        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            // deals with incompatiblities between API and protobuf representation
-            match s {
-                "IO" => Ok(NodeType::Io),
-                "SEARCH" => Ok(NodeType::Search),
-                "INGEST" => Ok(NodeType::Ingest),
-                "TRAIN" => Ok(NodeType::Train),
-                "UNKNOWN" => Ok(NodeType::Unknown),
-                _ => Err(E::custom("Invalid '{s}' node type")),
-            }
-        }
-    }
-
-    deserializer.deserialize_any(Visitor)
-}
-
-async fn load_nodes(raw_nodes: Vec<RawNode>) -> Result<Vec<Node>, Error> {
-    futures::stream::iter(raw_nodes)
-        .filter(|node| futures::future::ready(node.r#type == NodeType::Io && !node.dummy))
-        .map(Ok)
-        .and_then(|node| async move {
-            let mut grpc_client =
-                GrpcClient::connect(format!("http://{}", node.listen_address)).await?;
-            let response = grpc_client.get_shards(Request::new(EmptyQuery {})).await?;
-
-            let ShardList { shards } = response.into_inner();
-
-            Ok(Node {
-                id: node.id,
-                listen_address: node.listen_address,
-                shards: shards.into_iter().map(Shard::from).collect(),
-            })
-        })
-        .try_collect()
-        .await
-}
-
-/// The Nuclia's API node representation.
-#[derive(Deserialize)]
-pub struct RawNode {
-    /// The node identifier.
-    id: String,
-    /// The `gRPC` listen address.
-    listen_address: SocketAddr,
-    /// The node type.
-    #[serde(deserialize_with = "deserialize_protobuf_node_type")]
-    r#type: NodeType,
-    /// The last known node score.
-    #[allow(dead_code)]
-    load_score: f32,
-    /// The last known number of shards in the node.
-    #[allow(dead_code)]
-    shard_count: u64,
-    /// Indicates if the node is a dummy one.
-    dummy: bool,
-}
-
-/// The internal shard representation.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct Shard {
-    /// The shard identifier.
-    id: String,
-    /// The shard load score.
-    load_score: u64,
-}
-
-impl Shard {
-    /// Creates an idle shard, a.k.a a shard with a load score equals to zero.
-    pub fn idle(id: String) -> Self {
-        Self { id, load_score: 0 }
-    }
-
-    /// Creates a new shard.
-    pub fn new(id: String, load_score: u64) -> Self {
-        Self { id, load_score }
-    }
-
-    /// Returns the shard identifier.
-    #[inline]
-    pub fn id(&self) -> &str {
-        self.id.as_str()
-    }
-
-    /// Indicates if the shard is empty or not.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.load_score == 0
-    }
-
-    /// Returns the shard load score.
-    #[inline]
-    pub fn load_score(&self) -> u64 {
-        self.load_score
-    }
-}
-
-impl From<nucliadb_protos::Shard> for Shard {
-    fn from(shard: nucliadb_protos::Shard) -> Self {
-        Self {
-            id: shard.shard_id,
-            load_score: shard.paragraphs,
-        }
-    }
-}
 
 /// The internal node representation.
 #[derive(Debug, Clone)]
@@ -176,29 +53,44 @@ impl Node {
     /// This associated function will returns an error if:
     /// - the Nuclia's API is not reachable
     /// - The JSON response is malformed
-    pub async fn from_api(url: Url) -> Result<Vec<Self>, Error> {
+    pub async fn from_api(url: &str) -> Result<Vec<Self>, Error> {
         let http_client = HttpClient::new();
-        let raw_nodes = http_client
-            .get(url)
+
+        let nodes = http_client
+            .get(format!("http://search.{url}/chitchat/members"))
             .send()
             .await?
-            .json::<Vec<RawNode>>()
+            .json::<Vec<NodeView>>()
             .await?;
 
-        load_nodes(raw_nodes).await
+        Ok(futures::stream::iter(nodes)
+            .filter(|node| futures::future::ready(node.r#type == NodeType::Io && !node.dummy))
+            .map(Ok)
+            .and_then(Node::try_load)
+            .try_collect::<Vec<_>>()
+            .await?)
     }
 
-    /// Get all nodes from a JSON file.
-    ///
-    /// # Errors
-    /// This associated function will returns an error if:
-    /// - The file does not exist or cannot be open.
-    /// - The JSON content is malformed.
-    pub async fn from_file(path: &Path) -> Result<Vec<Self>, Error> {
-        let raw_nodes: Vec<RawNode> = serde_json::from_str(&tokio::fs::read_to_string(path).await?)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    /// Loads the node from its view.
+    async fn try_load(node: NodeView) -> Result<Node, Error> {
+        todo!()
 
-        load_nodes(raw_nodes).await
+        // let url = format!("http://{}", node.listen_address);
+        // let mut grpc_client = GrpcClient::connect(url).await?;
+
+        // let metadata = grpc_client
+        //     .get_metadata(Request::new(EmptyQuery {}))
+        //     .await?
+        //     .into_inner();
+
+        // Ok(Node {
+        //     id: node.id,
+        //     listen_address: node.listen_address,
+        //     shards: metadata
+        //         .into_iter()
+        //         .map(|(id, value)| Shard::new(id, value.load_score, value.kbid))
+        //         .collect(),
+        // })
     }
 
     /// Creates a new node.
@@ -241,22 +133,15 @@ impl Node {
     /// Note that an active shard is a shard with a load score strictly superiors to zero.
     #[inline]
     pub fn active_shards(&self) -> impl Iterator<Item = &Shard> {
-        self.shards.iter().filter(|shard| !shard.is_empty())
+        self.shards.iter().filter(|shard| shard.is_active())
     }
 
-    /// Returns an iterator over the node empty shards.
+    /// Returns an iterator over the idle shards.
     ///
-    /// Note that an empty shard is a shard with a load score equals to zero.
+    /// Note that an idle shard is a shard with a load score equals to zero.
     #[inline]
-    pub fn empty_shards(&self) -> impl Iterator<Item = &Shard> {
-        self.shards.iter().filter(|shard| shard.is_empty())
-    }
-
-    /// Indicates if the node contains a shard replica of the given shard.
-    #[inline]
-    pub fn contains_shard_replica(&self, _shard: &Shard) -> bool {
-        // TODO: load shard replicas for each shard
-        self.shards.iter().any(|_shard| false)
+    pub fn idle_shards(&self) -> impl Iterator<Item = &Shard> {
+        self.shards.iter().filter(|shard| !shard.is_active())
     }
 
     /// Remove a shard from the node using the given shard identifier.
