@@ -58,3 +58,6 @@ opentelemetry-propagator-b3
 multidict>=6.0.4
 deprecated>=1.2.12
 asgiref>=3.3.2
+jmespath>=1.0.0
+idna>=3.3
+sniffio>=1.2.0
