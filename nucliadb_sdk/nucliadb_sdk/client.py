@@ -160,7 +160,7 @@ class NucliaDBClient:
     async def async_get_resource(self, id: str):
         url = RESOURCE_PATH.format(rid=id)
         params = {
-            "show": ["values", "relations", "origin", "basic"],
+            "show": ["values", "relations", "origin", "basic", "extracted"],
             "extracted": ["vectors", "text", "metadata", "link", "file"],
         }
         response = await self.async_reader_session.get(url, params=params)
