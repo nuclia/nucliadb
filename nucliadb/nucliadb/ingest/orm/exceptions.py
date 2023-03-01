@@ -49,3 +49,8 @@ class DeadletteredError(Exception):
 
 class ReallyStopPulling(Exception):
     pass
+
+
+class SequenceOrderViolation(Exception):
+    def __init__(self, last_seqid: int):
+        self.last_seqid = last_seqid

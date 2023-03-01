@@ -268,10 +268,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = OpStatusWriter()
         cache = await get_cache()
         async for message in request_stream:
-            processed: bool = False
             try:
-                processed = await self.proc.process(
-                    message, -1, 0, transaction_check=False
+                await self.proc.process(
+                    message, -1, partition=0, transaction_check=False
                 )
             except Exception:
                 logger.exception("Error processing", stack_info=True)
@@ -279,7 +278,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 break
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
-            if processed and cache is not None:
+            if cache is not None:
                 await cache.delete(
                     KB_COUNTER_CACHE.format(kbid=message.kbid), invalidate=True
                 )
