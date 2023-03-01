@@ -19,19 +19,14 @@
 //
 
 use std::collections::VecDeque;
-use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 
 use clap::{Args, ValueEnum};
 use itertools::Itertools;
-use nucliadb_protos::node_writer_client::NodeWriterClient as GrpcClient;
-use nucliadb_protos::{AcceptShardRequest, MoveShardRequest, ShardId};
-use tonic::Request;
 
 use crate::node::{Node, WeightedNode};
-use crate::shard::{Shard, ShardIndex};
+use crate::shard::{Shard, ShardCutover, ShardIndex};
 use crate::threshold::Threshold;
-use crate::Error;
 
 /// A structure containing all shard balancing settings.
 #[derive(Args)]
@@ -140,12 +135,12 @@ impl Balancer {
                         )
                     })?;
 
-                let shard_cutover = ShardCutover {
-                    id: shard.id().to_string(),
-                    source_address: source_node.listen_address(),
-                    destination_address: destination_node.listen_address(),
-                    port: self.settings.port,
-                };
+                let shard_cutover = ShardCutover::new(
+                    shard.id().to_string(),
+                    source_node.listen_address(),
+                    destination_node.listen_address(),
+                    self.settings.port,
+                );
 
                 // we use position trick here to avoid conflict with the borrow checker.
                 (
@@ -230,63 +225,6 @@ impl Balancer {
     }
 }
 
-/// The shard cutover representation
-///
-/// Note that to actually perform the shard cutover, [`ShardCutover::execute`] must be called.
-#[derive(Debug, PartialEq, Eq)]
-pub struct ShardCutover {
-    /// The shard identifier.
-    id: String,
-    /// The gRPC address of the source node of the shard.
-    source_address: SocketAddr,
-    /// The gRPC address of the destination node of the shard.
-    destination_address: SocketAddr,
-    /// The TCP/IP port to use for transferring the shard.
-    port: u16,
-}
-
-impl ShardCutover {
-    /// Perform the shard cutover.
-    ///
-    /// # Errors
-    /// This method may fails if:
-    /// - The source/destination nodes are not reachable.
-    /// - The shard transfer fails somehow.
-    /// - The creation/deletion of the shadow shard fails.
-    pub async fn execute(self) -> Result<(), Error> {
-        let mut source_client =
-            GrpcClient::connect(format!("http://{}", self.source_address)).await?;
-
-        let mut destination_client =
-            GrpcClient::connect(format!("http://{}", self.destination_address)).await?;
-
-        // TODO
-        // destination_client.create_shadow_shard().await?;
-
-        tokio::try_join!(
-            destination_client.accept_shard(Request::new(AcceptShardRequest {
-                shard_id: Some(ShardId {
-                    id: self.id.clone(),
-                }),
-                port: self.port.into(),
-                override_shard: true,
-            })),
-            source_client.move_shard(Request::new(MoveShardRequest {
-                shard_id: Some(ShardId {
-                    id: self.id.clone()
-                }),
-                address: format!("{}:{}", self.destination_address.ip(), self.port),
-            })),
-        )?;
-
-        // TODO
-        // destination_client.delete_shadow_shard().await?;
-        // source_client_delete_shard(Request::new(ShardId { id: self.id.clone() })).await?
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::too_many_lines)]
 mod tests {
@@ -335,18 +273,18 @@ mod tests {
                     port: 42,
                 }),
                 vec![
-                    ShardCutover {
-                        id: "s8".to_string(),
-                        source_address: "192.168.0.3:4444".parse().unwrap(),
-                        destination_address: "192.168.0.2:4444".parse().unwrap(),
-                        port: 42,
-                    },
-                    ShardCutover {
-                        id: "s7".to_string(),
-                        source_address: "192.168.0.3:4444".parse().unwrap(),
-                        destination_address: "192.168.0.2:4444".parse().unwrap(),
-                        port: 42,
-                    },
+                    ShardCutover::new(
+                        "s8".to_string(),
+                        "192.168.0.3:4444".parse().unwrap(),
+                        "192.168.0.2:4444".parse().unwrap(),
+                        42,
+                    ),
+                    ShardCutover::new(
+                        "s7".to_string(),
+                        "192.168.0.3:4444".parse().unwrap(),
+                        "192.168.0.2:4444".parse().unwrap(),
+                        42,
+                    ),
                 ],
             ),
             (
@@ -357,24 +295,24 @@ mod tests {
                     port: 42,
                 }),
                 vec![
-                    ShardCutover {
-                        id: "s8".to_string(),
-                        source_address: "192.168.0.3:4444".parse().unwrap(),
-                        destination_address: "192.168.0.2:4444".parse().unwrap(),
-                        port: 42,
-                    },
-                    ShardCutover {
-                        id: "s7".to_string(),
-                        source_address: "192.168.0.3:4444".parse().unwrap(),
-                        destination_address: "192.168.0.2:4444".parse().unwrap(),
-                        port: 42,
-                    },
-                    ShardCutover {
-                        id: "s3".to_string(),
-                        source_address: "192.168.0.1:4444".parse().unwrap(),
-                        destination_address: "192.168.0.2:4444".parse().unwrap(),
-                        port: 42,
-                    },
+                    ShardCutover::new(
+                        "s8".to_string(),
+                        "192.168.0.3:4444".parse().unwrap(),
+                        "192.168.0.2:4444".parse().unwrap(),
+                        42,
+                    ),
+                    ShardCutover::new(
+                        "s7".to_string(),
+                        "192.168.0.3:4444".parse().unwrap(),
+                        "192.168.0.2:4444".parse().unwrap(),
+                        42,
+                    ),
+                    ShardCutover::new(
+                        "s3".to_string(),
+                        "192.168.0.1:4444".parse().unwrap(),
+                        "192.168.0.2:4444".parse().unwrap(),
+                        42,
+                    ),
                 ],
             ),
             (
@@ -384,12 +322,12 @@ mod tests {
                     shard_limit: NonZeroUsize::new(10).unwrap(),
                     port: 42,
                 }),
-                vec![ShardCutover {
-                    id: "s8".to_string(),
-                    source_address: "192.168.0.3:4444".parse().unwrap(),
-                    destination_address: "192.168.0.2:4444".parse().unwrap(),
-                    port: 42,
-                }],
+                vec![ShardCutover::new(
+                    "s8".to_string(),
+                    "192.168.0.3:4444".parse().unwrap(),
+                    "192.168.0.2:4444".parse().unwrap(),
+                    42,
+                )],
             ),
         ];
 
@@ -459,12 +397,12 @@ mod tests {
                     shard_limit: NonZeroUsize::new(10).unwrap(),
                     port: 42,
                 }),
-                vec![ShardCutover {
-                    id: "s2".to_string(),
-                    source_address: "192.168.0.1:4444".parse().unwrap(),
-                    destination_address: "192.168.0.2:4444".parse().unwrap(),
-                    port: 42,
-                }],
+                vec![ShardCutover::new(
+                    "s2".to_string(),
+                    "192.168.0.1:4444".parse().unwrap(),
+                    "192.168.0.2:4444".parse().unwrap(),
+                    42,
+                )],
             ),
             (
                 Balancer::new(BalanceSettings {
@@ -474,18 +412,18 @@ mod tests {
                     port: 42,
                 }),
                 vec![
-                    ShardCutover {
-                        id: "s2".to_string(),
-                        source_address: "192.168.0.1:4444".parse().unwrap(),
-                        destination_address: "192.168.0.2:4444".parse().unwrap(),
-                        port: 42,
-                    },
-                    ShardCutover {
-                        id: "s6".to_string(),
-                        source_address: "192.168.0.3:4444".parse().unwrap(),
-                        destination_address: "192.168.0.1:4444".parse().unwrap(),
-                        port: 42,
-                    },
+                    ShardCutover::new(
+                        "s2".to_string(),
+                        "192.168.0.1:4444".parse().unwrap(),
+                        "192.168.0.2:4444".parse().unwrap(),
+                        42,
+                    ),
+                    ShardCutover::new(
+                        "s6".to_string(),
+                        "192.168.0.3:4444".parse().unwrap(),
+                        "192.168.0.1:4444".parse().unwrap(),
+                        42,
+                    ),
                 ],
             ),
         ];
@@ -530,18 +468,18 @@ mod tests {
         });
 
         let expected_shard_cutovers = vec![
-            ShardCutover {
-                id: "s3".to_string(),
-                source_address: "192.168.0.2:4444".parse().unwrap(),
-                destination_address: "192.168.0.1:4444".parse().unwrap(),
-                port: 42,
-            },
-            ShardCutover {
-                id: "s1".to_string(),
-                source_address: "192.168.0.1:4444".parse().unwrap(),
-                destination_address: "192.168.0.2:4444".parse().unwrap(),
-                port: 42,
-            },
+            ShardCutover::new(
+                "s3".to_string(),
+                "192.168.0.2:4444".parse().unwrap(),
+                "192.168.0.1:4444".parse().unwrap(),
+                42,
+            ),
+            ShardCutover::new(
+                "s1".to_string(),
+                "192.168.0.1:4444".parse().unwrap(),
+                "192.168.0.2:4444".parse().unwrap(),
+                42,
+            ),
         ];
 
         let shard_cutovers = balancer
@@ -582,12 +520,12 @@ mod tests {
             port: 42,
         });
 
-        let expected_shard_cutovers = vec![ShardCutover {
-            id: "s2".to_string(),
-            source_address: "192.168.0.2:4444".parse().unwrap(),
-            destination_address: "192.168.0.3:4444".parse().unwrap(),
-            port: 42,
-        }];
+        let expected_shard_cutovers = vec![ShardCutover::new(
+            "s2".to_string(),
+            "192.168.0.2:4444".parse().unwrap(),
+            "192.168.0.3:4444".parse().unwrap(),
+            42,
+        )];
 
         let shard_cutovers = balancer
             .balance_shards(nodes, &shard_index)
