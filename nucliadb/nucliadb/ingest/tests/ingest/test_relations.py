@@ -141,10 +141,10 @@ async def test_ingest_colab_relation_extraction(
     assert index._calls[0][1] != index._calls[1][1]
     assert pb == pb2
 
-    for i, colaborator in enumerate(collaborators):
+    for i, collaborator in enumerate(collaborators):
         assert pb.relations[i].relation == Relation.RelationType.COLAB
         assert pb.relations[i].source.value == rid
-        assert pb.relations[i].to.value == colaborator
+        assert pb.relations[i].to.value == collaborator
 
 
 @pytest.mark.asyncio

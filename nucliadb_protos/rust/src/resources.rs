@@ -111,12 +111,15 @@ pub struct Origin {
     pub metadata: ::std::collections::HashMap<::prost::alloc::string::String, ::prost::alloc::string::String>,
     #[prost(string, repeated, tag="7")]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// XXX deprecated
     #[prost(string, repeated, tag="8")]
-    pub collaborators: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub colaborators: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag="9")]
     pub filename: ::prost::alloc::string::String,
     #[prost(string, repeated, tag="10")]
     pub related: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, repeated, tag="11")]
+    pub collaborators: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `Origin`.
 pub mod origin {

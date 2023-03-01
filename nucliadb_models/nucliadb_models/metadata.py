@@ -321,6 +321,8 @@ class InputOrigin(BaseModel):
     metadata: Dict[str, str] = {}
     tags: List[str] = []
     collaborators: List[str] = []
+    # XXX need b/w compatible parsing for old
+    # colaborators field value
     filename: Optional[str] = None
     related: List[str] = []
 
