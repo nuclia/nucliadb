@@ -34,6 +34,7 @@ struct Opt {
     url: Option<Url>,
     #[arg(long)]
     path: Option<PathBuf>,
+    url: String,
     #[arg(short, long)]
     dry_run: bool,
     #[command(flatten)]
