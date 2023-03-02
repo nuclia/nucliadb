@@ -410,7 +410,10 @@ class Processor:
                     # Check if we have enough resource to create a new shard
                     shard = await node_klass.actual_shard(txn, kbid)
                     if shard is None:
-                        shard = await node_klass.create_shard_by_kbid(txn, kbid)
+                        similarity = await kb.get_similarity()
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
@@ -419,6 +422,7 @@ class Processor:
                         counter is not None
                         and counter.fields > settings.max_node_fields
                     ):
+                        similarity = await kb.get_similarity()
                         shard = await node_klass.create_shard_by_kbid(txn, kbid)
 
                 else:

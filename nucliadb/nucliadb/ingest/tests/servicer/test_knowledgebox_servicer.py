@@ -24,7 +24,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 
@@ -87,6 +87,31 @@ async def test_create_knowledgebox(
         else:
             break
     assert len(resp.json()["data"]) == expected_spans
+
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-dot")
+    pb.config.title = "My Title"
+    pb.config.similarity = utils_pb2.VectorSimilarity.Dot
+    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    kbid = knowledgebox_pb2.KnowledgeBoxID(slug="test-dot")
+    resp = await stub.GetKnowledgeBox(kbid)
+    assert resp.config.similarity == utils_pb2.VectorSimilarity.Dot
+
+    # Check that by default we get cosine similarity
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default")
+    pb.config.title = "My Title"
+    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    kbid = knowledgebox_pb2.KnowledgeBoxID(slug="test-default")
+    resp = await stub.GetKnowledgeBox(kbid)
+    assert resp.config.similarity == utils_pb2.VectorSimilarity.Cosine
 
 
 @pytest.mark.asyncio

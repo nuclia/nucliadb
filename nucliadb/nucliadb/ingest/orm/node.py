@@ -30,6 +30,7 @@ from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
@@ -162,7 +163,9 @@ class Node(AbstractNode):
         return Shard(sharduuid=shard_id, shard=pbshard)
 
     @classmethod
-    async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
+    async def create_shard_by_kbid(
+        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity
+    ) -> Shard:
         kb_shards_key = KB_SHARDS.format(kbid=kbid)
         kb_shards: Optional[PBShards] = None
         kb_shards_binary = await txn.get(kb_shards_key)
@@ -197,7 +200,7 @@ class Node(AbstractNode):
                 logger.info(
                     f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
                 )
-                shard_created = await node.new_shard(kbid)
+                shard_created = await node.new_shard(kbid, similarity=similarity)
                 replica = ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)

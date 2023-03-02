@@ -27,3 +27,5 @@ def test_create_kb(nucliadb: str):
     assert kbid is not None
     with pytest.raises(KnowledgeBoxAlreadyExists):
         kbid = create_knowledge_box(slug="hola", nucliadb_base_url=nucliadb)
+
+    assert create_knowledge_box(slug="dot", similarity="dot")

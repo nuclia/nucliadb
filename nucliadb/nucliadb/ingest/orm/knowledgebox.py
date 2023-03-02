@@ -32,6 +32,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
     GetEntitiesResponse,
@@ -233,11 +234,12 @@ class KnowledgeBox:
             logger.error(f"{uuid} KB could not be created")
             failed = True
 
-        # locate a node with renderzvouz
         if failed is False:
             try:
                 node_klass = get_node_klass()
-                await node_klass.create_shard_by_kbid(txn, uuid)
+                await node_klass.create_shard_by_kbid(
+                    txn, uuid, similarity=config.similarity
+                )
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e
@@ -539,6 +541,10 @@ class KnowledgeBox:
             if shard.shard == shard_id:
                 return node_klass.create_shard_klass(shard_id, shard)
         return None
+
+    async def get_similarity(self) -> VectorSimilarity:
+        config = await self.get_config()
+        return config.similarity
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

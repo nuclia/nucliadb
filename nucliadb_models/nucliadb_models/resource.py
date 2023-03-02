@@ -21,8 +21,11 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Type, TypeVar, Union
 
+from google.protobuf.json_format import MessageToDict
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
+from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from pydantic import BaseModel, validator
 
 from nucliadb_models.conversation import FieldConversation
@@ -51,6 +54,8 @@ from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
 from nucliadb_models.vectors import UserVectorSet
 
+_T = TypeVar("_T")
+
 
 class NucliaDBRoles(str, Enum):
     MANAGER = "MANAGER"
@@ -75,6 +80,19 @@ class ExtractedDataTypeName(str, Enum):
     USERVECTORS = "uservectors"
 
 
+class VectorSimilarity(str, Enum):
+    COSINE = "Cosine"
+    DOT = "Dot"
+
+    def to_pb(self) -> PBVectorSimilarity:
+        if self.value == self.COSINE:
+            return PBVectorSimilarity.Cosine
+        elif self.value == self.DOT:
+            return PBVectorSimilarity.Dot
+        else:
+            raise ValueError("Unknown similarity")
+
+
 class KnowledgeBoxConfig(BaseModel):
     slug: Optional[SlugString] = None
     title: Optional[str] = None
@@ -82,6 +100,7 @@ class KnowledgeBoxConfig(BaseModel):
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
     disable_vectors: bool = False
+    similarity: Optional[VectorSimilarity] = None
 
     @validator("slug")
     def id_check(cls, v: str) -> str:
@@ -90,8 +109,17 @@ class KnowledgeBoxConfig(BaseModel):
                 raise ValueError("No uppercase ID")
             if char in "&@ /\\ ":
                 raise ValueError("Invalid chars")
-
         return v
+
+    @classmethod
+    def from_message(cls: Type[_T], message: PBKnowledgeBoxConfig) -> _T:
+        return cls(
+            **MessageToDict(
+                message,
+                preserving_proto_field_name=True,
+                including_default_value_fields=True,
+            )
+        )
 
 
 class KnowledgeBoxObjSummary(BaseModel):

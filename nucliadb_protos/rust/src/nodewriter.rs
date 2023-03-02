@@ -81,7 +81,7 @@ pub struct AcceptShardRequest {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewShardRequest {
-    #[prost(enumeration="VectorSimilarity", tag="1")]
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="1")]
     pub similarity: i32,
     #[prost(string, tag="2")]
     pub kbid: ::prost::alloc::string::String,
@@ -90,7 +90,7 @@ pub struct NewShardRequest {
 pub struct NewVectorSetRequest {
     #[prost(message, optional, tag="1")]
     pub id: ::core::option::Option<super::noderesources::VectorSetId>,
-    #[prost(enumeration="VectorSimilarity", tag="2")]
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
     pub similarity: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -106,12 +106,6 @@ pub struct ShadowShardResponse {
     pub success: bool,
     #[prost(message, optional, tag="2")]
     pub shard: ::core::option::Option<super::noderesources::ShardId>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum VectorSimilarity {
-    Cosine = 0,
-    Dot = 1,
 }
 /// Generated client implementations.
 pub mod node_writer_client {

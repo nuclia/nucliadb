@@ -725,7 +725,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 # Check if we have enough resource to create a new shard
                 shard = await node_klass.actual_shard(txn, request.kbid)
                 if shard is None:
-                    shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
+                    similarity = await kbobj.get_similarity()
+                    shard = await node_klass.create_shard_by_kbid(
+                        txn, request.kbid, similarity=similarity
+                    )
 
                 await kbobj.set_resource_shard_id(request.rid, shard.sharduuid)
 
@@ -735,7 +738,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 logger.info("Finished shard.add_resource")
 
                 if counter is not None and counter.fields > settings.max_node_fields:
-                    shard = await node_klass.create_shard_by_kbid(txn, request.kbid)
+                    similarity = await kbobj.get_similarity()
+                    shard = await node_klass.create_shard_by_kbid(
+                        txn, request.kbid, similarity=similarity
+                    )
 
             response = IndexStatus()
             await txn.abort()

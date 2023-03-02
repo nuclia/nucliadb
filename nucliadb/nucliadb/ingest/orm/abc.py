@@ -30,12 +30,12 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
     ShardCreated,
     ShardId,
-    ShardMetadata,
     VectorSetID,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel
@@ -86,7 +86,9 @@ class AbstractNode(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> AbstractShard:
+    async def create_shard_by_kbid(
+        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity
+    ) -> AbstractShard:
         pass
 
     @classmethod
@@ -141,8 +143,12 @@ class AbstractNode(metaclass=ABCMeta):
         resp = await self.writer.GetShard(req)  # type: ignore
         return resp
 
-    async def new_shard(self, kbid: str) -> ShardCreated:
-        req = ShardMetadata(kbid=kbid)
+    async def new_shard(
+        self,
+        kbid: str,
+        similarity: Optional[VectorSimilarity.ValueType] = VectorSimilarity.Cosine,
+    ) -> ShardCreated:
+        req = NewShardRequest(kbid=kbid, similarity=similarity)
         resp = await self.writer.NewShard(req)  # type: ignore
         return resp
 

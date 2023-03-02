@@ -5,11 +5,6 @@ package nodewriter;
 import public "nucliadb_protos/noderesources.proto";
 
 
-enum VectorSimilarity {
-    Cosine = 0;
-    Dot = 1;
-}
-
 message OpStatus {
     enum Status {
         OK = 0;
@@ -61,13 +56,13 @@ message AcceptShardRequest {
 }
 
 message NewShardRequest {
-    VectorSimilarity similarity = 1;
+    utils.VectorSimilarity similarity = 1;
     string kbid = 2;
 }
 
 message NewVectorSetRequest {
     noderesources.VectorSetID id = 1;
-    VectorSimilarity similarity = 2;
+    utils.VectorSimilarity similarity = 2;
 }
 
 service NodeWriter {

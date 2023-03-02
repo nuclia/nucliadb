@@ -39,6 +39,36 @@ from nucliadb_protos import writer_pb2 as wpb
 
 
 @pytest.mark.asyncio
+async def test_kb_creation_with_similarity(
+    nucliadb_manager,
+    nucliadb_reader,
+):
+    # Check that by default we get cosine similarity
+    resp = await nucliadb_manager.post(
+        f"/kbs",
+        json={"title": "My KB", "slug": "kb1"},
+    )
+    assert resp.status_code == 201
+    resp = await nucliadb_reader.get("/kb/s/kb1")
+    assert resp.status_code == 200
+    body = resp.json()
+    config = body["config"]
+    assert config["similarity"] == "Cosine"
+
+    # Check that we can define it to dot similarity
+    resp = await nucliadb_manager.post(
+        f"/kbs",
+        json={"title": "My KB with dot similarity", "slug": "dot", "similarity": "Dot"},
+    )
+    assert resp.status_code == 201
+    resp = await nucliadb_reader.get("/kb/s/dot")
+    assert resp.status_code == 200
+    body = resp.json()
+    config = body["config"]
+    assert config["similarity"] == "Dot"
+
+
+@pytest.mark.asyncio
 async def test_creation(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,

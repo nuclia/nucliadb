@@ -34,6 +34,8 @@ pub struct KnowledgeBoxConfig {
     pub slug: ::prost::alloc::string::String,
     #[prost(bool, tag="6")]
     pub disable_vectors: bool,
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="7")]
+    pub similarity: i32,
 }
 // NEW
 

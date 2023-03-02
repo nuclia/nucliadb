@@ -43,21 +43,6 @@ from nucliadb_protos.noderesources_pb2 import (
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-class _VectorSimilarity:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
-
-class _VectorSimilarityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_VectorSimilarity.ValueType], builtins.type):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    Cosine: _VectorSimilarity.ValueType  # 0
-    Dot: _VectorSimilarity.ValueType  # 1
-
-class VectorSimilarity(_VectorSimilarity, metaclass=_VectorSimilarityEnumTypeWrapper): ...
-
-Cosine: VectorSimilarity.ValueType  # 0
-Dot: VectorSimilarity.ValueType  # 1
-global___VectorSimilarity = VectorSimilarity
-
 @typing_extensions.final
 class OpStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -239,12 +224,12 @@ class NewShardRequest(google.protobuf.message.Message):
 
     SIMILARITY_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
-    similarity: global___VectorSimilarity.ValueType
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     kbid: builtins.str
     def __init__(
         self,
         *,
-        similarity: global___VectorSimilarity.ValueType = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
         kbid: builtins.str = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "similarity", b"similarity"]) -> None: ...
@@ -259,12 +244,12 @@ class NewVectorSetRequest(google.protobuf.message.Message):
     SIMILARITY_FIELD_NUMBER: builtins.int
     @property
     def id(self) -> nucliadb_protos.noderesources_pb2.VectorSetID: ...
-    similarity: global___VectorSimilarity.ValueType
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
         id: nucliadb_protos.noderesources_pb2.VectorSetID | None = ...,
-        similarity: global___VectorSimilarity.ValueType = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["id", b"id"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "similarity", b"similarity"]) -> None: ...

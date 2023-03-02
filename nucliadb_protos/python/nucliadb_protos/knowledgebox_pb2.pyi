@@ -8,6 +8,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import nucliadb_protos.utils_pb2
 import sys
 import typing
 
@@ -15,6 +16,24 @@ if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
+from nucliadb_protos.utils_pb2 import (
+    Cosine as Cosine,
+    Dot as Dot,
+    ExtractedText as ExtractedText,
+    JoinGraph as JoinGraph,
+    JoinGraphCnx as JoinGraphCnx,
+    Relation as Relation,
+    RelationMetadata as RelationMetadata,
+    RelationNode as RelationNode,
+    UserVector as UserVector,
+    UserVectorSet as UserVectorSet,
+    UserVectors as UserVectors,
+    UserVectorsList as UserVectorsList,
+    Vector as Vector,
+    VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
+    Vectors as Vectors,
+)
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -95,6 +114,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     @property
@@ -103,6 +123,7 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     def enabled_insights(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     slug: builtins.str
     disable_vectors: builtins.bool
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
@@ -112,8 +133,9 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
         slug: builtins.str = ...,
         disable_vectors: builtins.bool = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "slug", b"slug", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "similarity", b"similarity", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 

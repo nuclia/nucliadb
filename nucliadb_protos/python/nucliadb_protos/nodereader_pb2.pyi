@@ -42,6 +42,8 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList as VectorSetList,
 )
 from nucliadb_protos.utils_pb2 import (
+    Cosine as Cosine,
+    Dot as Dot,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
@@ -54,6 +56,7 @@ from nucliadb_protos.utils_pb2 import (
     UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
     Vectors as Vectors,
 )
 

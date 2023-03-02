@@ -104,3 +104,8 @@ message UserVectorSet {
 message UserVectorsList {
     repeated string vectors = 1;
 }
+
+enum VectorSimilarity {
+    Cosine = 0;
+    Dot = 1;
+}
