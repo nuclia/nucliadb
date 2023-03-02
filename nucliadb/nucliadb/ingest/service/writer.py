@@ -431,18 +431,21 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = GetEntitiesGroupResponse()
+
         if kbobj is None:
+            await txn.abort()
             response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
+            return response
+
+        entities_manager = EntitiesManager(kbobj, txn)
+        entities_group = await entities_manager.get_entities_group(request.group)
+        if entities_group is None:
+            response.status = GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
         else:
-            entities_group = await kbobj.get_entities_group(request.group)
-            if entities_group is None:
-                response.status = (
-                    GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
-                )
-            else:
-                response.kb.uuid = kbobj.kbid
-                response.status = GetEntitiesGroupResponse.Status.OK
-                response.group.CopyFrom(entities_group)
+            response.kb.uuid = kbobj.kbid
+            response.status = GetEntitiesGroupResponse.Status.OK
+            response.group.CopyFrom(entities_group)
+
         await txn.abort()
         return response
 

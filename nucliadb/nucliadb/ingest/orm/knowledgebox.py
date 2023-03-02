@@ -354,8 +354,8 @@ class KnowledgeBox:
         return labels
 
     async def get_labelset(self, labelset: str, labelset_response: GetLabelSetResponse):
-        entities_key = KB_LABELSET.format(kbid=self.kbid, id=labelset)
-        payload = await self.txn.get(entities_key)
+        labelset_key = KB_LABELSET.format(kbid=self.kbid, id=labelset)
+        payload = await self.txn.get(labelset_key)
         if payload is not None:
             labelset_response.labelset.ParseFromString(payload)
 
@@ -364,9 +364,6 @@ class KnowledgeBox:
         await self.txn.delete(labelset_key)
 
     # Entities
-    async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        return await self.entities_manager.get_entities_group(group)
-
     async def set_entities(self, group: str, entities: EntitiesGroup):
         return await self.entities_manager.set_entities(group, entities)
 
