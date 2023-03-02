@@ -342,8 +342,7 @@ class Origin(InputOrigin):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        data["collaborators"] = message.colaborators
-        data.pop("colaborators", None)
+        data["collaborators"] = data.pop("colaborators", [])
         return cls(**data)
 
 

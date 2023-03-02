@@ -33,7 +33,7 @@ def parse_origin(origin: Origin, origin_payload: InputOrigin):
     if origin_payload.tags:
         origin.tags.extend(origin_payload.tags)
     if origin_payload.collaborators:
-        origin.collaborators.extend(origin_payload.collaborators)
+        origin.colaborators.extend(origin_payload.collaborators)
     if origin_payload.filename:
         origin.filename = origin_payload.filename
     if origin_payload.related:

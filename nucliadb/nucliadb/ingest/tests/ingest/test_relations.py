@@ -127,7 +127,7 @@ async def test_ingest_colab_relation_extraction(
     )
 
     collaborators = ["Alice", "Bob", "Trudy"]
-    bm.origin.collaborators.extend(collaborators)
+    bm.origin.colaborators.extend(collaborators)
 
     await processor.process(message=bm, seqid=1)
 
