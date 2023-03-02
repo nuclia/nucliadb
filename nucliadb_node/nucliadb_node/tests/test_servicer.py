@@ -19,7 +19,7 @@
 
 import pytest
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
-from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub
+from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 
 
 @pytest.mark.asyncio

@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=nucliadb_protos/noderesources.proto");
     println!("cargo:rerun-if-changed=nucliadb_protos/utils.proto");
     println!("cargo:rerun-if-changed=nucliadb_protos/writer.proto");
+    println!("cargo:rerun-if-changed=nucliadb_protos/nodesidecar.proto");
     println!("cargo:rerun-if-changed=nucliadb_protos/nodewriter.proto");
     println!("cargo:rerun-if-changed=nucliadb_protos/nodereader.proto");
 

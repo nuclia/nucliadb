@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package nodesidecar;
+
+import public "nucliadb_protos/noderesources.proto";
+
+message Counter {
+    uint64 resources = 1;
+    uint64 paragraphs = 2;
+
+}
+
+message ShadowShardResponse {
+    bool success = 1;
+    noderesources.ShardId shard = 2;
+}
+
+service NodeSidecar {
+    rpc GetCount(noderesources.ShardId) returns (Counter) {}
+    rpc CreateShadowShard(noderesources.EmptyQuery) returns (ShadowShardResponse) {}
+    rpc DeleteShadowShard(noderesources.ShardId) returns (ShadowShardResponse) {}
+}
