@@ -97,7 +97,12 @@ impl NodeMetadata {
         if !path.exists() {
             info!("Node metadata file does not exist.");
 
-            let node_metadata = Self::create(path).await?;
+            let node_metadata = Self::create(path).await.unwrap_or_else(|e| {
+                warn!("Cannot create metadata file '{}': {e}", path.display());
+                info!("Create default metadata file '{}'", path.display());
+
+                Self::default()
+            });
 
             node_metadata.save(path).await?;
 
