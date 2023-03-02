@@ -457,7 +457,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
             return response
-        await kbobj.set_entities(request.group, request.entities)
+        entities_manager = EntitiesManager(kbobj, txn)
+        await entities_manager.set_entities(request.group, request.entities)
         response.status = OpStatusWriter.Status.OK
         await txn.commit(resource=False)
         return response
@@ -468,7 +469,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = OpStatusWriter()
         if kbobj is not None:
             try:
-                await kbobj.del_entities(request.group)
+                entities_manager = EntitiesManager(kbobj, txn)
+                await entities_manager.del_entities(request.group)
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:

@@ -24,7 +24,6 @@ from uuid import uuid4
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.knowledgebox_pb2 import (
-    EntitiesGroup,
     KnowledgeBoxConfig,
     Labels,
     LabelSet,
@@ -47,7 +46,6 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.abc import AbstractNode
-from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
     KnowledgeBoxNotFound,
@@ -362,16 +360,6 @@ class KnowledgeBox:
     async def del_labelset(self, id: str):
         labelset_key = KB_LABELSET.format(kbid=self.kbid, id=id)
         await self.txn.delete(labelset_key)
-
-    # Entities
-    async def set_entities(self, group: str, entities: EntitiesGroup):
-        return await self.entities_manager.set_entities(group, entities)
-
-    async def set_entities_force(self, group: str, entities: EntitiesGroup):
-        return await self.entities_manager.set_entities_force(group, entities)
-
-    async def del_entities(self, group: str):
-        return await self.entities_manager.del_entities(group)
 
     # Widget
     async def get_widget(self, widget: str, widgets: GetWidgetResponse):

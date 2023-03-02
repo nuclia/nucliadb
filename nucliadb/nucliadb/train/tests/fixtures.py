@@ -36,6 +36,7 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
+from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
@@ -214,9 +215,10 @@ async def test_pagination_resources(
     storage = await get_storage()
     txn = await driver.begin()
     kb = KnowledgeBox(txn, storage, kbid=knowledgebox_ingest, cache=None)
+    entities_manager = EntitiesManager(kb, txn)
     entities = EntitiesGroup()
     entities.entities["entity1"].value = "PERSON"
-    await kb.set_entities_force("group1", entities)
+    await entities_manager.set_entities_force("group1", entities)
 
     # Add ontology
     labelset = LabelSet()

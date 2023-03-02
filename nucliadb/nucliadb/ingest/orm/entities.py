@@ -42,13 +42,13 @@ from nucliadb.ingest.maindb.keys import (
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
 )
-from nucliadb.ingest.orm import knowledgebox
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 
 class EntitiesManager:
     def __init__(
         self,
-        knowledgebox: "knowledgebox.Knowledgebox",  # type: ignore
+        knowledgebox: KnowledgeBox,
         txn: Transaction,
     ):
         self.kb = knowledgebox
