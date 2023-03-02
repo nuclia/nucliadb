@@ -29,7 +29,7 @@ from nucliadb_protos import resources_pb2
 _T = TypeVar("_T")
 
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     LayoutFormatValue = resources_pb2.FieldLayout.Format.V
 else:
     LayoutFormatValue = str

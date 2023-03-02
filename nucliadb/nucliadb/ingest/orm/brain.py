@@ -51,7 +51,7 @@ from nucliadb.ingest.orm.labels import BASE_TAGS, flat_resource_tags
 from nucliadb.ingest.orm.utils import compute_paragraph_key
 from nucliadb_models.metadata import ResourceProcessingStatus
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     StatusValue = Union[Metadata.Status.V, int]
 else:
     StatusValue = int

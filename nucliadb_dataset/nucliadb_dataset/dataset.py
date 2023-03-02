@@ -63,7 +63,7 @@ from nucliadb_sdk.utils import get_kb
 
 CHUNK_SIZE = 5 * 1024 * 1024
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     TaskValue = TaskType.V
 else:
     TaskValue = int

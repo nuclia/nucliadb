@@ -36,7 +36,7 @@ from nucliadb_utils import logger
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import Storage
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     SourceValue = CloudFile.Source.V
 else:
     SourceValue = int

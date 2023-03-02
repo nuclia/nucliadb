@@ -27,7 +27,7 @@ from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_ut
 
 # Needs to be session to be executed at the begging
 @pytest.fixture(scope="function")
-async def cleanup_indexing(natsd):
+async def cleanup_indexing(natsd):  # pragma: no cover
     nc = await nats.connect(servers=[natsd])
     js = nc.jetstream()
 
@@ -52,7 +52,7 @@ async def cleanup_indexing(natsd):
 
 
 @pytest.fixture(scope="function")
-async def indexing_utility_registered():
+async def indexing_utility_registered():  # pragma: no cover
     indexing_util = IndexingUtility(
         nats_creds=indexing_settings.index_jetstream_auth,
         nats_servers=indexing_settings.index_jetstream_servers,

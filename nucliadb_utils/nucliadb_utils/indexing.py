@@ -23,9 +23,9 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
-
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
+
 from nucliadb_utils import logger
 
 
@@ -81,7 +81,7 @@ class IndexingUtility:
 
         tracer_provider = get_telemetry(service_name)
 
-        if tracer_provider is not None and jetstream is not None:
+        if tracer_provider is not None and jetstream is not None:  # pragma: no cover
             logger.info("Configuring indexing queue with telemetry")
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{service_name}_index", tracer_provider

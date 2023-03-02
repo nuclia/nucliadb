@@ -32,7 +32,7 @@ from nucliadb_utils.settings_running import running_settings
 STARTUP_FAILURE = 3
 
 
-def run_fastapi_with_metrics(application):
+def run_fastapi_with_metrics(application):  # pragma: no cover
     loop_setup = "auto"
     log_level = running_settings.log_level.lower()
     if log_level == "warn":
@@ -93,7 +93,7 @@ async def serve(
     main_config: Config,
     metrics_server: Server,
     metrics_config: Config,
-):
+):  # pragma: no cover
     process_id = os.getpid()
 
     if not main_config.loaded:

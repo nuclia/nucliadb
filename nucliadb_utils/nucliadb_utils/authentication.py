@@ -57,7 +57,6 @@ class STFAuthenticationBackend(AuthenticationBackend):
         self, request: HTTPConnection
     ) -> Optional[Tuple[AuthCredentials, BaseUser]]:
         if self.roles_header not in request.headers:
-            auth_creds = None
             return None
         else:
             header_roles = request.headers[self.roles_header]
@@ -164,85 +163,5 @@ def requires(
     return decorator
 
 
-def requires_one(
-    scopes: typing.Union[str, typing.Sequence[str]],
-    status_code: int = 403,
-    redirect: Optional[str] = None,
-) -> typing.Callable:
-    # As a fastapi requirement, custom Enum classes have to inherit also from
-    # string, so we MUST check for Enum before str
-    if isinstance(scopes, Enum):
-        scopes_list = [scopes.value]
-    elif isinstance(scopes, str):
-        scopes_list = [scopes]
-    elif isinstance(scopes, list):
-        scopes_list = [
-            scope.value if isinstance(scope, Enum) else scope for scope in scopes
-        ]
-
-    def decorator(func: typing.Callable) -> typing.Callable:
-        func.__required_scopes__ = scopes_list  # type: ignore
-        type = None
-        sig = inspect.signature(func)
-        for idx, parameter in enumerate(sig.parameters.values()):
-            if parameter.name == "request" or parameter.name == "websocket":
-                type = parameter.name
-                break
-        else:
-            raise Exception(
-                f'No "request" or "websocket" argument on function "{func}"'
-            )
-
-        if type == "websocket":
-            # Handle websocket functions. (Always async)
-            @functools.wraps(func)
-            async def websocket_wrapper(
-                *args: typing.Any, **kwargs: typing.Any
-            ) -> None:
-                websocket = kwargs.get("websocket", args[idx])
-                assert isinstance(websocket, WebSocket)
-
-                if not has_required_scope(websocket, scopes_list):
-                    await websocket.close()
-                else:
-                    await func(*args, **kwargs)
-
-            return websocket_wrapper
-
-        elif asyncio.iscoroutinefunction(func):
-            # Handle async request/response functions.
-            @functools.wraps(func)
-            async def async_wrapper(
-                *args: typing.Any, **kwargs: typing.Any
-            ) -> Response:
-                request = kwargs.get("request", None)
-                assert isinstance(request, Request)
-
-                if not has_required_scope(request, scopes_list):
-                    if redirect is not None:
-                        return RedirectResponse(
-                            url=request.url_for(redirect), status_code=303
-                        )
-                    raise HTTPException(status_code=status_code)
-                return await func(*args, **kwargs)
-
-            return async_wrapper
-
-        else:
-            # Handle sync request/response functions.
-            @functools.wraps(func)
-            def sync_wrapper(*args: typing.Any, **kwargs: typing.Any) -> Response:
-                request = kwargs.get("request", args[idx])
-                assert isinstance(request, Request)
-
-                if not has_required_scope(request, scopes_list):
-                    if redirect is not None:
-                        return RedirectResponse(
-                            url=request.url_for(redirect), status_code=303
-                        )
-                    raise HTTPException(status_code=status_code)
-                return func(*args, **kwargs)
-
-            return sync_wrapper
-
-    return decorator
+# this code was an exact copy previously so get rid of it but keep b/w compat
+requires_one = requires

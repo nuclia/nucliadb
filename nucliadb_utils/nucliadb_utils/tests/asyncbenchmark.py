@@ -38,10 +38,10 @@ from pytest_benchmark.stats import Metadata  # type: ignore
 
 
 class FixtureAlreadyUsed(Exception):
-    pass
+    ...
 
 
-class AsyncBenchmarkFixture(object):
+class AsyncBenchmarkFixture(object):  # pragma: no cover
     _precisions: Dict[Callable, float] = {}
 
     def __init__(
@@ -287,7 +287,7 @@ class AsyncBenchmarkFixture(object):
 
 
 @pytest.fixture(scope="function")
-async def asyncbenchmark(request: pytest.FixtureRequest):
+async def asyncbenchmark(request: pytest.FixtureRequest):  # pragma: no cover
     bs: BenchmarkSession = request.config._benchmarksession  # type: ignore
 
     if bs.skip:

@@ -27,7 +27,7 @@ try:
     import prometheus_client  # type: ignore
 
     PROMETHEUS = True
-except ImportError:
+except ImportError:  # pragma: no cover
     PROMETHEUS = False
 
 

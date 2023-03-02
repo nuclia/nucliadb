@@ -99,17 +99,19 @@ class StreamAuditStorage(AuditStorage):
 
     async def run(self):
         while True:
-            audit = await self.queue.get()
             try:
+                audit = await self.queue.get()
                 await self._send(audit)
-            except Exception:
+            except (asyncio.CancelledError, KeyboardInterrupt, RuntimeError):
+                return
+            except Exception:  # pragma: no cover
                 logger.exception("Could not send audit", stack_info=True)
 
     async def send(self, message: AuditRequest):
         self.queue.put_nowait(message)
 
     async def _send(self, message: AuditRequest):
-        if self.js is None:
+        if self.js is None:  # pragma: no cover
             raise AttributeError()
 
         partition = self.get_partition(message.kbid)

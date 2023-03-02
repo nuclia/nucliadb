@@ -48,7 +48,7 @@ class Gnatsd(object):
         cluster_listen=None,
         routes=None,
         config_file=None,
-    ):
+    ):  # pragma: no cover
         self.port = port
         self.user = user
         self.password = password
@@ -174,13 +174,13 @@ class Gnatsd(object):
                 )
 
 
-class NatsServer(Gnatsd):
+class NatsServer(Gnatsd):  # pragma: no cover
     def __init__(self):
         super(Gnatsd, self)
         self.bin_name = "nats-server"
 
 
-def start_gnatsd(gnatsd: Gnatsd):
+def start_gnatsd(gnatsd: Gnatsd):  # pragma: no cover
     gnatsd.start()
 
     endpoint = "127.0.0.1:{port}".format(port=gnatsd.http_port)
@@ -201,7 +201,7 @@ def start_gnatsd(gnatsd: Gnatsd):
 
 
 @pytest.fixture(scope="session")
-def natsd_server():
+def natsd_server():  # pragma: no cover
     if not os.path.isfile("nats-server"):
         version = "v2.8.4"
         arch = platform.machine()
@@ -227,7 +227,7 @@ def natsd_server():
 
 
 @pytest.fixture(scope="session")
-def natsd(natsd_server: Gnatsd):
+def natsd(natsd_server: Gnatsd):  # pragma: no cover
     start_gnatsd(natsd_server)
     print("Started natsd")
     yield f"nats://localhost:{natsd_server.port}"
@@ -241,7 +241,7 @@ images.settings["nats"] = {
 }
 
 
-class NatsImage(BaseImage):
+class NatsImage(BaseImage):  # pragma: no cover
     name = "nats"
     port = 4222
 
@@ -258,7 +258,7 @@ nats_image = NatsImage()
 
 
 @pytest.fixture(scope="session")
-def natsdocker():
+def natsdocker():  # pragma: no cover
     nats_host, nats_port = nats_image.run()
     print("Started natsd docker")
     yield f"nats://{nats_host}:{nats_port}"

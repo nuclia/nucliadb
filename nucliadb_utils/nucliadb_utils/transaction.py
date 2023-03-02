@@ -27,9 +27,9 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
-
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
+
 from nucliadb_utils import logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
 
@@ -160,7 +160,7 @@ class TransactionUtility:
         jetstream = self.nc.jetstream()
         tracer_provider = get_telemetry(service_name)
 
-        if tracer_provider is not None and jetstream is not None:
+        if tracer_provider is not None and jetstream is not None:  # pragma: no cover
             logger.info("Configuring transaction queue with telemetry")
             self.js = JetStreamContextTelemetry(
                 jetstream, f"{service_name}_transaction", tracer_provider

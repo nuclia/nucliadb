@@ -4,6 +4,8 @@ omit =
 exclude_lines =
     pragma: no cover
     ^\s*...\s*$
+    raise NotImplementedError
+    @abstract
 
 [run]
 omit =

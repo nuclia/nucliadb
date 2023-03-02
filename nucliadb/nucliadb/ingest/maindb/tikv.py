@@ -34,7 +34,7 @@ try:
     from tikv_client.asynchronous import TransactionClient  # type: ignore
 
     TiKV = True
-except ImportError:
+except ImportError:  # pragma: no cover
     TiKV = False
 
 
