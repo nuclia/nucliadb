@@ -35,12 +35,8 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import (
-    Counter,
-    OpStatus,
-    SetGraph,
-    ShadowShardResponse,
-)
+from nucliadb_protos.nodesidecar_pb2 import Counter, ShadowShardResponse
+from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 
 

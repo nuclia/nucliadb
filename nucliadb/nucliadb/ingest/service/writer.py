@@ -419,9 +419,16 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return response
 
         entities_manager = EntitiesManager(kbobj, txn)
-        await entities_manager.get_entities(response)
-        response.kb.uuid = kbobj.kbid
-        response.status = GetEntitiesResponse.Status.OK
+        try:
+            await entities_manager.get_entities(response)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            response.status = OpStatusWriter.Status.ERROR
+        else:
+            response.kb.uuid = kbobj.kbid
+            response.status = GetEntitiesResponse.Status.OK
         await txn.abort()
         return response
 
@@ -438,13 +445,22 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return response
 
         entities_manager = EntitiesManager(kbobj, txn)
-        entities_group = await entities_manager.get_entities_group(request.group)
-        if entities_group is None:
-            response.status = GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
+        try:
+            entities_group = await entities_manager.get_entities_group(request.group)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            response.status = OpStatusWriter.Status.ERROR
         else:
-            response.kb.uuid = kbobj.kbid
-            response.status = GetEntitiesGroupResponse.Status.OK
-            response.group.CopyFrom(entities_group)
+            if entities_group is None:
+                response.status = (
+                    GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
+                )
+            else:
+                response.kb.uuid = kbobj.kbid
+                response.status = GetEntitiesGroupResponse.Status.OK
+                response.group.CopyFrom(entities_group)
 
         await txn.abort()
         return response
@@ -458,9 +474,17 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.status = OpStatusWriter.Status.NOTFOUND
             return response
         entities_manager = EntitiesManager(kbobj, txn)
-        await entities_manager.set_entities(request.group, request.entities)
-        response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
+        try:
+            await entities_manager.set_entities(request.group, request.entities)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            response.status = OpStatusWriter.Status.ERROR
+            await txn.abort()
+        else:
+            response.status = OpStatusWriter.Status.OK
+            await txn.commit(resource=False)
         return response
 
     async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore

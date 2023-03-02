@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import random
 from typing import AsyncGenerator, Dict, Optional, Set, Tuple
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -116,9 +115,7 @@ class EntitiesManager:
         return eg
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        node, shard_id = random.choice(
-            [node async for node in self.kb.iterate_kb_nodes()]
-        )
+        node, shard_id = await self.kb.arbitrary_kb_node()
         request = RelationSearchRequest(
             shard_id=shard_id,
             prefix=RelationPrefixSearchRequest(
@@ -185,9 +182,7 @@ class EntitiesManager:
             visited_groups.add(group)
 
         # indexed groups
-        node, shard_id = random.choice(
-            [node async for node in self.kb.iterate_kb_nodes()]
-        )
+        node, shard_id = await self.kb.arbitrary_kb_node()
         types = await node.reader.RelationTypes(ShardId(id=shard_id))
         for item in types.list:
             if item.with_type != RelationNode.NodeType.ENTITY:

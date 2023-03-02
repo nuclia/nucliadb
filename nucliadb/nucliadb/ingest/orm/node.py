@@ -29,7 +29,8 @@ from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
-from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
+from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard

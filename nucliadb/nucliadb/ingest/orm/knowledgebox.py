@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import random
 from datetime import datetime
 from typing import AsyncGenerator, AsyncIterator, Optional, Sequence, Tuple, Union
 from uuid import uuid4
@@ -300,6 +301,14 @@ class KnowledgeBox:
                 )
                 if node is not None:
                     yield node, replica.shard.id
+
+    async def arbitrary_kb_node(self) -> Tuple[AbstractNode, str]:
+        choices = [(node, shard_id) async for node, shard_id in self.iterate_kb_nodes()]
+        if not choices:
+            raise ShardNotFound("No node available to perform the operation")
+
+        node, shard_id = random.choice(choices)
+        return (node, shard_id)
 
     # Vectorset
     async def get_vectorsets(self, response: GetVectorSetsResponse):
