@@ -40,20 +40,6 @@ class Entity(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-
-        # backwards compatibility with `merged` field. `status` is it's replacement.
-        merged = entity.pop("merged", None)
-        status = entity.pop("status", None)
-        is_merged = None
-
-        if status is not None:
-            is_merged = message.status == knowledgebox_pb2.Entity.DiffStatus.MERGED
-        elif merged is not None:
-            is_merged = message.merged
-
-        if is_merged is not None:
-            entity["merged"] = is_merged
-
         return cls(**entity)
 
 
@@ -74,7 +60,8 @@ class EntitiesGroup(BaseModel):
             including_default_value_fields=True,
         )
         for name, entity in message.entities.items():
-            entitiesgroup["entities"][name] = Entity.from_message(entity)
+            if not entity.deleted:
+                entitiesgroup["entities"][name] = Entity.from_message(entity)
 
         return cls(**entitiesgroup)
 

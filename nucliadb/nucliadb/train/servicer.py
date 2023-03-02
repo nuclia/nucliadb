@@ -82,16 +82,24 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
-        txn = await self.proc.driver.begin()
-        kbobj = await self.proc.get_kb_obj(txn, request.kb.uuid)
+        kbid = request.kb.uuid
         response = GetEntitiesResponse()
-        if kbobj is not None:
-            await kbobj.get_entities(response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetEntitiesResponse.Status.OK
-        await txn.abort()
-        if kbobj is None:
+        txn = await self.proc.driver.begin()
+
+        entities_manager = await self.get_kb_entities_manager(txn, kbid)
+        if entities_manager is None:
+            await txn.abort()
             response.status = GetEntitiesResponse.Status.NOTFOUND
+            return response
+
+        # entities_groups = await entities_manager.get_entities_groups()
+        # response.groups.update(entities_groups)
+
+        await entities_manager.get_entities(response)
+        response.kb.uuid = kbid
+        response.status = GetEntitiesResponse.Status.OK
+
+        await txn.abort()
         return response
 
     async def GetOntology(  # type: ignore

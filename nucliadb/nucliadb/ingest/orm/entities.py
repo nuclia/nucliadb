@@ -19,7 +19,7 @@
 #
 
 import random
-from typing import AsyncGenerator, Optional, Set, Tuple
+from typing import AsyncGenerator, Dict, Optional, Set, Tuple
 
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
@@ -58,6 +58,12 @@ class EntitiesManager:
     async def get_entities(self, entities: GetEntitiesResponse):
         async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
             entities.groups[group].CopyFrom(eg)
+
+    async def get_entities_groups(self) -> Dict[str, EntitiesGroup]:
+        groups = {}
+        async for group, eg in self.iterate_entities_groups(exclude_deleted=True):
+            groups[group] = eg
+        return groups
 
     async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         deleted = await self.is_entities_group_deleted(group)

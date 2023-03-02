@@ -95,6 +95,7 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm import NODES
+from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
@@ -408,16 +409,20 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
+        response = GetEntitiesResponse()
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetEntitiesResponse()
-        if kbobj is not None:
-            await kbobj.get_entities(response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetEntitiesResponse.Status.OK
-        await txn.abort()
+
         if kbobj is None:
+            await txn.abort()
             response.status = GetEntitiesResponse.Status.NOTFOUND
+            return response
+
+        entities_manager = EntitiesManager(kbobj, txn)
+        await entities_manager.get_entities(response)
+        response.kb.uuid = kbobj.kbid
+        response.status = GetEntitiesResponse.Status.OK
+        await txn.abort()
         return response
 
     async def GetEntitiesGroup(  # type: ignore

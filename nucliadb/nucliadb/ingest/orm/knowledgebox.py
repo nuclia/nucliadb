@@ -36,7 +36,6 @@ from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorSimilarity
 from nucliadb_protos.writer_pb2 import (
-    GetEntitiesResponse,
     GetLabelSetResponse,
     GetVectorSetsResponse,
     GetWidgetResponse,
@@ -365,9 +364,6 @@ class KnowledgeBox:
         await self.txn.delete(labelset_key)
 
     # Entities
-    async def get_entities(self, entities: GetEntitiesResponse):
-        return await self.entities_manager.get_entities(entities)
-
     async def get_entities_group(self, group: str) -> Optional[EntitiesGroup]:
         return await self.entities_manager.get_entities_group(group)
 

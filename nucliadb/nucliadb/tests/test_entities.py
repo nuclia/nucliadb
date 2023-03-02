@@ -370,6 +370,7 @@ async def test_delete_entities_groups(
     ]
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    assert resp.status_code == 200
     body = resp.json()
     assert set(entitiesgroups) == set(body["groups"])
 
@@ -378,6 +379,7 @@ async def test_delete_entities_groups(
         assert resp.status_code == 200
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    assert resp.status_code == 200
     body = resp.json()
     assert len(body["groups"]) == 0
 
