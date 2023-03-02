@@ -124,8 +124,10 @@ class KnowledgeBox:
     async def async_new_vectorset(self, key: str, dimension: int):
         await self.client.async_set_vectorset(key, VectorSet(dimension=dimension))
 
-    def new_vectorset(self, key: str, dimension: int):
-        self.client.set_vectorset(key, VectorSet(dimension=dimension))
+    def new_vectorset(self, key: str, dimension: int, similarity: Optional[str] = None):
+        self.client.set_vectorset(
+            key, VectorSet(dimension=dimension, similarity=similarity)
+        )
 
     async def async_list_vectorset(self) -> VectorSets:
         return self.client.async_get_vectorsets()

@@ -1,6 +1,8 @@
+from enum import Enum
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
+from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from pydantic import BaseModel
 
 from nucliadb_models import FieldID
@@ -31,8 +33,31 @@ class UserVectorWrapper(BaseModel):
 UserVectorsWrapper = List[UserVectorWrapper]
 
 
+class VectorSimilarity(str, Enum):
+    COSINE = "cosine"
+    DOT = "dot"
+
+    def to_pb(self) -> PBVectorSimilarity:
+        if self.value == self.COSINE:
+            return PBVectorSimilarity.Cosine
+        elif self.value == self.DOT:
+            return PBVectorSimilarity.Dot
+        else:
+            raise ValueError("Unknown similarity")
+
+    @classmethod
+    def from_pb(cls, message: PBVectorSimilarity):
+        if message == PBVectorSimilarity.Cosine:
+            return cls("cosine")
+        elif message == PBVectorSimilarity.Dot:
+            return cls("dot")
+        else:
+            raise ValueError("Unknown similarity")
+
+
 class VectorSet(BaseModel):
     dimension: int
+    similarity: Optional[VectorSimilarity]
 
 
 class VectorSets(BaseModel):

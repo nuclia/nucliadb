@@ -166,6 +166,7 @@ message Widget {
 
 message VectorSet {
     int32 dimension = 1;
+    utils.VectorSimilarity similarity = 2;
 }
 
 message VectorSets {

@@ -210,6 +210,8 @@ pub mod widget {
 pub struct VectorSet {
     #[prost(int32, tag="1")]
     pub dimension: i32,
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
+    pub similarity: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSets {

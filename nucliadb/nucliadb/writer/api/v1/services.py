@@ -285,7 +285,7 @@ async def delete_widget(request: Request, kbid: str, widget: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_vectorset(request: Request, kbid: str, vectorset: str, item: VectorSet):
-    await create_vectorset(kbid, vectorset, item.dimension)
+    await create_vectorset(kbid, vectorset, item.dimension, similarity=item.similarity)
 
 
 @api.delete(

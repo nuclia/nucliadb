@@ -561,13 +561,16 @@ class VectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DIMENSION_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
     dimension: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
         dimension: builtins.int = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension", "similarity", b"similarity"]) -> None: ...
 
 global___VectorSet = VectorSet
 

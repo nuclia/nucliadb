@@ -25,7 +25,6 @@ from typing import Dict, List, Optional, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
-from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
 from pydantic import BaseModel, validator
 
 from nucliadb_models.conversation import FieldConversation
@@ -52,7 +51,7 @@ from nucliadb_models.metadata import (
 )
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import UserVectorSet
+from nucliadb_models.vectors import UserVectorSet, VectorSimilarity
 
 _T = TypeVar("_T")
 
@@ -78,19 +77,6 @@ class ExtractedDataTypeName(str, Enum):
     LINK = "link"
     FILE = "file"
     USERVECTORS = "uservectors"
-
-
-class VectorSimilarity(str, Enum):
-    COSINE = "Cosine"
-    DOT = "Dot"
-
-    def to_pb(self) -> PBVectorSimilarity:
-        if self.value == self.COSINE:
-            return PBVectorSimilarity.Cosine
-        elif self.value == self.DOT:
-            return PBVectorSimilarity.Dot
-        else:
-            raise ValueError("Unknown similarity")
 
 
 class KnowledgeBoxConfig(BaseModel):

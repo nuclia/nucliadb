@@ -341,7 +341,7 @@ class KnowledgeBox:
         vts.vectorsets[id].CopyFrom(vs)
         # For each Node on the KB add the vectorset
         async for node, shard in self.iterate_kb_nodes():
-            await node.set_vectorset(shard, id)
+            await node.set_vectorset(shard, id, similarity=vs.similarity)
         payload = vts.SerializeToString()
         await self.txn.set(vectorset_key, payload)
 

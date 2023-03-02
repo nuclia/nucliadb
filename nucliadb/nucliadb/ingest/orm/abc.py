@@ -33,7 +33,11 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetID,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import NewShardRequest, OpStatus
+from nucliadb_protos.nodewriter_pb2 import (
+    NewShardRequest,
+    NewVectorSetRequest,
+    OpStatus,
+)
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
@@ -174,10 +178,16 @@ class AbstractNode(metaclass=ABCMeta):
         resp = await self.writer.RemoveVectorSet(req)  # type: ignore
         return resp
 
-    async def set_vectorset(self, shard_id: str, vectorset: str) -> OpStatus:
-        req = VectorSetID()
-        req.shard.id = shard_id
-        req.vectorset = vectorset
+    async def set_vectorset(
+        self,
+        shard_id: str,
+        vectorset: str,
+        similarity: VectorSimilarity = VectorSimilarity.Cosine,
+    ) -> OpStatus:
+        req = NewVectorSetRequest()
+        req.id.shard.id = shard_id
+        req.id.vectorset = vectorset
+        req.similarity = similarity
         resp = await self.writer.AddVectorSet(req)  # type: ignore
         return resp
 
