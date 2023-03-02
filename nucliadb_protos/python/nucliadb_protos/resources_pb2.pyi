@@ -276,7 +276,6 @@ class Origin(google.protobuf.message.Message):
     COLABORATORS_FIELD_NUMBER: builtins.int
     FILENAME_FIELD_NUMBER: builtins.int
     RELATED_FIELD_NUMBER: builtins.int
-    COLLABORATORS_FIELD_NUMBER: builtins.int
     source: global___Origin.Source.ValueType
     source_id: builtins.str
     url: builtins.str
@@ -289,13 +288,10 @@ class Origin(google.protobuf.message.Message):
     @property
     def tags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
-    def colaborators(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """XXX deprecated"""
+    def colaborators(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     filename: builtins.str
     @property
     def related(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
-    @property
-    def collaborators(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -309,10 +305,9 @@ class Origin(google.protobuf.message.Message):
         colaborators: collections.abc.Iterable[builtins.str] | None = ...,
         filename: builtins.str = ...,
         related: collections.abc.Iterable[builtins.str] | None = ...,
-        collaborators: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["created", b"created", "modified", b"modified"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["colaborators", b"colaborators", "collaborators", b"collaborators", "created", b"created", "filename", b"filename", "metadata", b"metadata", "modified", b"modified", "related", b"related", "source", b"source", "source_id", b"source_id", "tags", b"tags", "url", b"url"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["colaborators", b"colaborators", "created", b"created", "filename", b"filename", "metadata", b"metadata", "modified", b"modified", "related", b"related", "source", b"source", "source_id", b"source_id", "tags", b"tags", "url", b"url"]) -> None: ...
 
 global___Origin = Origin
 

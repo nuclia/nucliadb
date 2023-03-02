@@ -346,7 +346,7 @@ class ResourceBrain:
                 self.tags["u"].append(f"s/{origin.source_id}")
 
             # origin contributors
-            for contrib in origin.collaborators or origin.colaborators:
+            for contrib in origin.colaborators:
                 self.tags["u"].append(f"o/{contrib}")
                 relationnodeuser = RelationNode(
                     value=contrib, ntype=RelationNode.NodeType.USER

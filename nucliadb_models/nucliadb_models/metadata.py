@@ -342,9 +342,8 @@ class Origin(InputOrigin):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        if message.colaborators and not message.collaborators:
-            # b/w compatible handling for old field name
-            data["collaborators"] = message.colaborators
+        data["collaborators"] = message.colaborators
+        data.pop("colaborators", None)
         return cls(**data)
 
 
