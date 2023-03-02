@@ -25,76 +25,78 @@ use std::sync::Arc;
 
 /// Indicates that a type might be indexable.
 pub trait Indexable {
-    /// The indexed type.
-    type Item;
+    type Key;
+
+    /// Returns an iterator over all the indexable keys for the current block of data.
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &Self::Key> + 'a>;
 }
 
 /// An handle over a reversed index.
-pub enum IndexHandle<T> {
+pub enum IndexHandle<T: Indexable> {
     /// Indicates that the handle points to an empty index.
     Empty,
-    /// Indicates that the handle points to some indexed replicas.
-    Replicas(Arc<Vec<T>>),
+    /// Indicates that the handle points to some indexed block.
+    Block(Arc<T>),
 }
 
-impl<T> IndexHandle<T> {
-    /// Indicates if the given value is one the of indexed replicas.
-    pub fn is_replica_of<U>(&self, value: &U) -> bool
+impl<T: Indexable> IndexHandle<T> {
+    /// Indicates if the current block of data contains the given key.
+    pub fn contains<U>(&self, key: &U) -> bool
     where
-        T: Borrow<U>,
+        T::Key: Borrow<U>,
         U: PartialEq + Eq + ?Sized,
     {
         match self {
             Self::Empty => false,
-            Self::Replicas(replicas) => replicas.iter().any(|replica| replica.borrow() == value),
+            Self::Block(data) => data.keys().any(|other_key| other_key.borrow() == key),
         }
     }
 }
 
-/// Represents a reversed index over any kind of indexable type.
-///
-/// Note that this type allows to easily know the replicas of any given value.
+/// Represents a reversed index over any kind of indexable data.
 #[derive(Debug)]
 pub struct ReversedIndex<T: Indexable> {
     // clippy doesn't know that this type is self-referential.
     #[allow(dead_code)]
-    replicas: Vec<Arc<Vec<T::Item>>>,
-    inner: HashMap<T::Item, Arc<Vec<T::Item>>>,
+    blocks: Vec<Arc<T>>,
+    inner: HashMap<T::Key, Arc<T>>,
 }
 
 impl<T: Indexable> ReversedIndex<T> {
     /// Creates a new reverse index.
-    pub fn new(replicas: Vec<Vec<T::Item>>) -> Self
-    where T::Item: Clone + Hash + Eq {
-        let (inner, replicas): (Vec<_>, Vec<_>) = replicas
+    pub fn new(data: Vec<T>) -> Self
+    where
+        T::Key: Hash + Eq + Clone,
+    {
+        let (inner, blocks): (Vec<_>, Vec<_>) = data
             .into_iter()
-            .map(|replicas| {
-                let replicas = Arc::new(replicas);
+            .map(|block| {
+                let block = Arc::new(block);
 
                 (
-                    replicas
-                        .iter()
-                        .map(|replica| (replica.clone(), Arc::clone(&replicas)))
+                    block
+                        .keys()
+                        .map(|key| (key.clone(), Arc::clone(&block)))
                         .collect::<HashMap<_, _>>(),
-                    replicas,
+                    block,
                 )
             })
             .unzip();
 
         Self {
-            replicas,
+            blocks,
             inner: inner.into_iter().flatten().collect(),
         }
     }
 
     /// Gets a handle to the reverse index for the given key.
-    pub fn get<U>(&self, key: &U) -> IndexHandle<T::Item>
+    pub fn get<U>(&self, key: &U) -> IndexHandle<T>
     where
-        T::Item: Borrow<U> + Hash + Eq,
+        T::Key: Borrow<U> + Hash + Eq,
         U: Hash + Eq + ?Sized,
     {
         self.inner.get(key).map_or(IndexHandle::Empty, |replicas| {
-            IndexHandle::Replicas(Arc::clone(replicas))
+            IndexHandle::Block(Arc::clone(replicas))
         })
     }
 }

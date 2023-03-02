@@ -12,28 +12,20 @@ use crate::node::Node;
 use crate::views::KnowledgeBox as KnowledgeBoxView;
 use crate::Error;
 
-#[derive(Debug)]
-pub struct Index;
-
-impl Indexable for Index {
-    type Item = String;
-}
-
-/// A reversed index storing information about shard replicas.
-pub type ShardIndex = ReversedIndex<Index>;
+/// A reversed index storing information about logic shard (and so knowledge box and shard replicas).
+pub type ShardIndex = ReversedIndex<LogicShard>;
 
 impl ShardIndex {
-    /// Get all shard replicas from Nuclia's API for the given list of nodes.
+    /// Get all logic shards from Nuclia's API for the given list of nodes.
     ///
     /// # Errors
     /// This associated function will return an error if:
     /// - The Nuclia's API is not reachable
     /// - The JSON response is malformed
     pub async fn from_api(url: &str, nodes: &[Node]) -> Result<Self, Error> {
-        let mut shard_replicas = Vec::default();
+        let mut data = Vec::default();
         let http_client = HttpClient::new();
 
-        // iterates over all unique KBs only
         for kb_id in nodes
             .iter()
             .flat_map(Node::shards)
@@ -50,18 +42,41 @@ impl ShardIndex {
                 .json::<KnowledgeBoxView>()
                 .await?;
 
-            for shard in kb.shards {
-                shard_replicas.push(
-                    shard
-                        .replicas
-                        .into_iter()
-                        .map(|replica| replica.shard.id)
-                        .collect::<Vec<_>>(),
-                );
-            }
+            data.append(
+                &mut kb
+                    .shards
+                    .into_iter()
+                    .map(|shard| LogicShard {
+                        id: shard.id,
+                        replicas: shard
+                            .replicas
+                            .into_iter()
+                            .map(|replica| replica.shard.id)
+                            .collect::<Vec<_>>(),
+                    })
+                    .collect(),
+            );
         }
 
-        Ok(Self::new(shard_replicas))
+        Ok(Self::new(data))
+    }
+}
+
+/// The internal logic shard representation.
+#[derive(Debug)]
+pub struct LogicShard {
+    #[allow(dead_code)]
+    /// The shard identifier.
+    id: String,
+    /// The shard replicas.
+    replicas: Vec<String>,
+}
+
+impl Indexable for LogicShard {
+    type Key = String;
+
+    fn keys<'a>(&'a self) -> Box<dyn Iterator<Item = &Self::Key> + 'a> {
+        Box::new(self.replicas.iter())
     }
 }
 
@@ -86,6 +101,7 @@ impl Shard {
         }
     }
 
+    /// Returns the knowledge box the shard belongs to.
     #[inline]
     pub fn kb_id(&self) -> &str {
         self.kb_id.as_str()

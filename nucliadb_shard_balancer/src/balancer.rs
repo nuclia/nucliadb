@@ -185,11 +185,11 @@ impl Balancer {
             .active_shards()
             // removes all shards that can not be used for the current shard balancing
             .filter(|shard| {
-                let shard_replica = shard_index.get(shard.id());
+                let shard_handle = shard_index.get(shard.id());
 
                 !node_candidate
                     .shards()
-                    .any(|shard| shard_replica.is_replica_of(shard.id()))
+                    .any(|shard| shard_handle.contains(shard.id()))
                     && !moved_shards
                         .iter()
                         .any(|moved_shard| moved_shard == shard.id())
