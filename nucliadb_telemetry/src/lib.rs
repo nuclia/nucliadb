@@ -25,6 +25,6 @@ pub(crate) mod sink;
 
 pub mod blocking;
 pub mod sync;
-
+pub use sender::TelemetryLoopHandle;
 /// This environment variable can be set to disable sending telemetry events.
 pub const DISABLE_TELEMETRY_ENV_KEY: &str = "NUCLIADB_DISABLE_TELEMETRY";

@@ -1936,6 +1936,7 @@ dependencies = [
  "http",
  "itertools",
  "lazy_static",
+ "libc",
  "log",
  "nucliadb_cluster",
  "nucliadb_core",

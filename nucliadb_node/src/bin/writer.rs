@@ -30,6 +30,7 @@ use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
+use nucliadb_core::NodeResult;
 use nucliadb_node::env;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
@@ -37,6 +38,7 @@ use nucliadb_node::writer::grpc_driver::{
     NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
 };
 use nucliadb_node::writer::NodeWriterService;
+use nucliadb_telemetry::TelemetryLoopHandle;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
@@ -46,7 +48,7 @@ const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> NodeResult<()> {
     eprintln!("NucliaDB Writer Node starting...");
     let _guard = init_telemetry()?;
 
@@ -61,7 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-    let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(sender);
+    let grpc_sender = sender.clone();
+    let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(grpc_sender);
     let host_key_path = env::host_key_path();
     let public_ip = env::public_ip().await;
     let chitchat_port = env::chitchat_port();
@@ -71,7 +74,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Cluster
     let host_key = read_or_create_host_key(Path::new(&host_key_path))?;
-
     let node = Node::builder()
         .register_as(NodeType::Io)
         .on_local_network(chitchat_addr)
@@ -80,26 +82,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .insert_to_initial_state(LOAD_SCORE_KEY, node_metadata.load_score())
         .insert_to_initial_state(SHARD_COUNT_KEY, node_metadata.shard_count())
         .build()?;
-
     let node = node.start().await?;
-
-    let writer_task = tokio::spawn(start_grpc_service(grpc_driver));
-
     let telemetry_handle = nucliadb_telemetry::sync::start_telemetry_loop();
-
     let cluster_watcher = node.cluster_watcher().await;
-    let monitor_task = tokio::task::spawn(monitor_cluster(cluster_watcher));
+    let update_handle = node.clone();
 
-    let update_task = tokio::spawn(watch_node_update(node, receiver, node_metadata));
+    tokio::spawn(start_grpc_service(grpc_driver));
+    tokio::spawn(monitor_cluster(cluster_watcher));
+    tokio::spawn(watch_node_update(update_handle, receiver, node_metadata));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    tokio::try_join!(writer_task, monitor_task, update_task)?;
-    telemetry_handle.terminate_telemetry().await;
-    // node_writer_service.shutdown().await;
+    termination(telemetry_handle, node).await
+}
 
-    Ok(())
+async fn termination(
+    telemetry_handle: TelemetryLoopHandle,
+    node_handle: NodeHandle,
+) -> NodeResult<()> {
+    use libc::SIGKILL;
+    use tokio::signal::unix;
+    use tokio::signal::unix::SignalKind;
+    let mut sigkill = unix::signal(SignalKind::from_raw(SIGKILL))?;
+    sigkill.recv().await;
+    telemetry_handle.terminate_telemetry().await;
+    Ok(node_handle.shutdown().await?)
 }
 
 pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
