@@ -437,10 +437,10 @@ class Processor:
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
-                logger.warn(f"This message did not modified resource")
+                logger.warn(f"This message did not modify the resource")
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
-            # as we need to do some cleanup. Exception will be reraised at the end of the function
+            # as we need to do some cleanup. The exception will be reraised at the end of the function
             # and then handled by the top caller, so errors can be handled in the same place.
             await self.deadletter(messages, partition, seqid)
             await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
@@ -448,8 +448,8 @@ class Processor:
         finally:
             if resource is not None:
                 resource.clean()
-            # tx should be already commited or aborted, but in the event of an exception
-            # it could be left open. Make sure to close it it's still open
+            # txn should be already commited or aborted, but in the event of an exception
+            # it could be left open. Make sure to close if it's still open
             if txn.open:
                 await txn.abort()
 
@@ -526,7 +526,7 @@ class Processor:
                 await resource.set_basic(
                     message.basic,
                     slug=message.slug,
-                    deleted_fields=[field for field in message.delete_fields],
+                    deleted_fields=message.delete_fields,  # type: ignore
                 )
         elif resource is None and message.source is message.MessageSource.PROCESSOR:
             # It's a new resource, and somehow we received the message coming from processing before
