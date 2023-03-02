@@ -53,3 +53,11 @@ opentelemetry-instrumentation-aiohttp-client>=0.30b1
 opentelemetry-semantic-conventions>=0.30b1
 opentelemetry-instrumentation-fastapi>=0.30b1
 opentelemetry-propagator-b3
+
+# improve dependency resolution
+multidict>=6.0.4
+deprecated>=1.2.12
+asgiref>=3.3.2
+jmespath>=1.0.0
+idna>=3.3
+sniffio>=1.2.0
