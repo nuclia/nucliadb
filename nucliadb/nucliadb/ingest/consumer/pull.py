@@ -210,7 +210,7 @@ class PullWorker:
         await msg.ack()
 
     async def subscription_worker(self, msg: Msg):
-        self.started_at = time.time()
+        self.msg_consume_start = time.time()
         subject = msg.subject
         reply = msg.reply
         seqid = int(reply.split(".")[5])  # TODO: Could there be a bug here?
