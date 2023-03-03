@@ -19,7 +19,6 @@
 #
 import asyncio
 import base64
-import time
 from typing import List, Optional
 
 import aiohttp
@@ -49,11 +48,6 @@ from nucliadb_utils.utilities import get_transaction
 
 if SENTRY:
     from sentry_sdk import capture_exception
-
-
-NON_RETRIED_EXCEPTIONS = (
-    ShardsNotFound,  # /kb/{id}/shards key or the whole /kb/{kbid} is missing
-)
 
 
 class PullWorker:
@@ -109,7 +103,6 @@ class PullWorker:
 
         self.lock = asyncio.Lock()
         self.processor = Processor(driver, storage, audit, cache, partition)
-        self.msg_consume_start: Optional[int] = None
 
     async def disconnected_cb(self):
         logger.info("Got disconnected from NATS!")
@@ -199,21 +192,10 @@ class PullWorker:
                 pass
             await self.nc.close()
 
-    async def ack(self, msg: Msg) -> None:
-        if self.msg_consume_start:
-            msg_time = time.time() - self.msg_consume_start
-            if msg_time >= self.ack_wait:
-                logger.warning(
-                    f"Consuming message took longer {msg_time:.2f}s \
-                         than AckWait {self.ack_wait}s: the message may be redelivered!"
-                )
-        await msg.ack()
-
     async def subscription_worker(self, msg: Msg):
-        self.msg_consume_start = time.time()
         subject = msg.subject
         reply = msg.reply
-        seqid = int(reply.split(".")[5])  # TODO: Could there be a bug here?
+        seqid = int(reply.split(".")[5])
         logger.debug(
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}"
         )
@@ -239,7 +221,6 @@ class PullWorker:
                 try:
                     await self.processor.process(pb, seqid, self.partition)
                 except SequenceOrderViolation as err:
-                    # TODO: Should this be logger.warning if it's being handled?
                     logger.error(
                         f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). \
                              Current seqid: {err.last_seqid}"
@@ -265,11 +246,11 @@ class PullWorker:
                     f"A copy of the message has been stored on {self.processor.storage.deadletter_bucket}. "
                     f"Check sentry for more details: {str(e)}"
                 )
-                await self.ack(msg)
-            except NON_RETRIED_EXCEPTIONS as e:
+                await msg.ack()
+            except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
-                # TODO: Should we send event to sentry here?
+                # - ShardsNotFound: /kb/{id}/shards key or the whole /kb/{kbid} is missing
                 if SENTRY:
                     capture_exception(e)
                 logger.info(
@@ -277,7 +258,7 @@ class PullWorker:
                     f"This message has been dropped and won't be retried again"
                     f"Check sentry for more details: {str(e)}"
                 )
-                await self.ack(msg)
+                await msg.ack()
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
                 if SENTRY:
@@ -288,11 +269,10 @@ class PullWorker:
                     f"Check sentry for more details: {str(e)}"
                 )
                 await asyncio.sleep(2)
-                # TODO: What happens at the NATS server on consumer error?
                 raise e
             else:
                 # Successful processing
-                await self.ack(msg)
+                await msg.ack()
 
     async def loop(self):
         while self.initialized is False:
