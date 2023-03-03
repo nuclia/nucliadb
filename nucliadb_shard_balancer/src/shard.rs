@@ -12,7 +12,8 @@ use crate::node::Node;
 use crate::views::KnowledgeBox as KnowledgeBoxView;
 use crate::Error;
 
-/// A reversed index storing information about logic shard (and so knowledge box and shard replicas).
+/// A reversed index storing information about logic shard (and so knowledge box and shard
+/// replicas).
 pub type ShardIndex = ReversedIndex<LogicShard>;
 
 impl ShardIndex {

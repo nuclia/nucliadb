@@ -65,9 +65,7 @@ pub struct ReversedIndex<T: Indexable> {
 impl<T: Indexable> ReversedIndex<T> {
     /// Creates a new reverse index.
     pub fn new(data: Vec<T>) -> Self
-    where
-        T::Key: Hash + Eq + Clone,
-    {
+    where T::Key: Hash + Eq + Clone {
         let (inner, blocks): (Vec<_>, Vec<_>) = data
             .into_iter()
             .map(|block| {
