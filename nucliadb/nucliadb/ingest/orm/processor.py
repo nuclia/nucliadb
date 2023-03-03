@@ -449,7 +449,7 @@ class Processor:
             if resource is not None:
                 resource.clean()
             # txn should be already commited or aborted, but in the event of an exception
-            # it could be left open. Make sure to close if it's still open
+            # it could be left open. Make sure to close it if it's still open
             if txn.open:
                 await txn.abort()
 
