@@ -103,7 +103,7 @@ class EntitiesManager:
             # If an entitiesgroup appears without stored or indexed entities,
             # most probably the node is reporting a node subtype with no nodes
             # or a wrongwentitiesgroup is being searched
-            logger.warning("Suspicious entities group without entities: '{group}'")
+            logger.warning(f"Suspicious entities group without entities: '{group}'")
             entities_group = EntitiesGroup()
         elif stored is not None and indexed is not None:
             entities_group = self.merge_entities_groups(indexed, stored)

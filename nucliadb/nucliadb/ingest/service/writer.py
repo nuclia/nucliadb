@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import traceback
 import uuid
 from io import BytesIO
 from typing import AsyncIterator, Optional
@@ -170,7 +169,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
             raise
 
@@ -206,7 +205,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
 
         return response
@@ -303,7 +302,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -323,7 +322,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -425,7 +424,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             response.status = GetEntitiesResponse.Status.ERROR
         else:
             response.kb.uuid = kbobj.kbid
@@ -451,7 +450,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             response.status = GetEntitiesGroupResponse.Status.ERROR
         else:
             if entities_group is None:
@@ -480,7 +479,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             response.status = OpStatusWriter.Status.ERROR
             await txn.abort()
         else:
@@ -501,7 +500,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -564,7 +563,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -784,7 +783,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
             raise
 

@@ -25,7 +25,6 @@ from nucliadb_protos.nodereader_pb2 import (
     EdgeList,
     RelationEdge,
     RelationSearchResponse,
-    RelationTypeListMember,
     TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
@@ -38,7 +37,7 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.nodesidecar_pb2 import Counter, ShadowShardResponse
 from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
-from nucliadb_protos.utils_pb2 import Relation, RelationNode
+from nucliadb_protos.utils_pb2 import Relation
 
 
 class DummyWriterStub:
@@ -125,12 +124,6 @@ class DummyReaderStub:
     async def RelationTypes(self, data):
         self.calls.setdefault("RelationTypes", []).append(data)
         result = TypeList()
-        result.list.append(
-            RelationTypeListMember(
-                with_type=RelationNode.NodeType.ENTITY,
-                with_subtype="DUMMY",
-            )
-        )
         return result
 
 
