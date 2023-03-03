@@ -53,19 +53,19 @@ async def test_kb_creation_with_similarity(
     assert resp.status_code == 200
     body = resp.json()
     config = body["config"]
-    assert config["similarity"] == "Cosine"
+    assert config["similarity"] == "cosine"
 
     # Check that we can define it to dot similarity
     resp = await nucliadb_manager.post(
         f"/kbs",
-        json={"title": "My KB with dot similarity", "slug": "dot", "similarity": "Dot"},
+        json={"title": "My KB with dot similarity", "slug": "dot", "similarity": "dot"},
     )
     assert resp.status_code == 201
     resp = await nucliadb_reader.get("/kb/s/dot")
     assert resp.status_code == 200
     body = resp.json()
     config = body["config"]
-    assert config["similarity"] == "Dot"
+    assert config["similarity"] == "dot"
 
 
 @pytest.mark.asyncio

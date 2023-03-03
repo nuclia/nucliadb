@@ -99,13 +99,13 @@ class KnowledgeBoxConfig(BaseModel):
 
     @classmethod
     def from_message(cls: Type[_T], message: PBKnowledgeBoxConfig) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        as_dict = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        as_dict["similarity"] = VectorSimilarity.from_pb(message.similarity)
+        return cls(**as_dict)
 
 
 class KnowledgeBoxObjSummary(BaseModel):
