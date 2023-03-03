@@ -99,7 +99,7 @@ class EntitiesManager:
     async def get_entities_group_inner(self, group: str) -> EntitiesGroup:
         stored = await self.get_stored_entities_group(group)
         indexed = await self.get_indexed_entities_group(group)
-        if stored is None and indexed is None:
+        if (stored is None) and (indexed is None):
             # If an entitiesgroup appears without stored or indexed entities,
             # most probably the node is reporting a node subtype with no nodes
             # or a wrongwentitiesgroup is being searched
@@ -108,7 +108,7 @@ class EntitiesManager:
         elif stored is not None and indexed is not None:
             entities_group = self.merge_entities_groups(indexed, stored)
         else:
-            entities_group = stored or indexed
+            entities_group = stored or indexed  # type: ignore
         return entities_group
 
     async def get_stored_entities_group(self, group: str) -> Optional[EntitiesGroup]:
@@ -134,7 +134,7 @@ class EntitiesManager:
                 ],
             ),
         )
-        results = await node.reader.RelationSearch(request)
+        results = await node.reader.RelationSearch(request)  # type: ignore
         entities = {
             node.value: Entity(value=node.value) for node in results.prefix.nodes
         }
@@ -190,7 +190,7 @@ class EntitiesManager:
 
         # indexed groups
         node, shard_id = await self.kb.arbitrary_kb_node()
-        types = await node.reader.RelationTypes(ShardId(id=shard_id))
+        types = await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
         for item in types.list:
             if item.with_type != RelationNode.NodeType.ENTITY:
                 continue
@@ -280,4 +280,4 @@ class EntitiesManager:
 
         async for node, shard_id in self.kb.iterate_kb_nodes():
             sg = SetGraph(shard_id=ShardId(id=shard_id), graph=jg)
-            await node.writer.JoinGraph(sg)
+            await node.writer.JoinGraph(sg)  # type: ignore
