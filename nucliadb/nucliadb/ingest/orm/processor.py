@@ -423,7 +423,9 @@ class Processor:
                         and counter.fields > settings.max_node_fields
                     ):
                         similarity = await kb.get_similarity()
-                        shard = await node_klass.create_shard_by_kbid(txn, kbid)
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
 
                 else:
                     raise AttributeError("Shard is not available")

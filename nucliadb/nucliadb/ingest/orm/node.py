@@ -164,7 +164,10 @@ class Node(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(
-        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity.ValueType
+        cls,
+        txn: Transaction,
+        kbid: str,
+        similarity: VectorSimilarity.ValueType = VectorSimilarity.Cosine,
     ) -> Shard:
         kb_shards_key = KB_SHARDS.format(kbid=kbid)
         kb_shards: Optional[PBShards] = None
