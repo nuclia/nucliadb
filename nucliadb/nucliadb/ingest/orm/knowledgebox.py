@@ -551,7 +551,7 @@ class KnowledgeBox:
                 f"Config for kb not found: {self.kbid} while trying to get the similarity. \
                     Defaulting to cosine distance."
             )
-            return VectorSimilarity.Cosine
+            return VectorSimilarity.COSINE
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

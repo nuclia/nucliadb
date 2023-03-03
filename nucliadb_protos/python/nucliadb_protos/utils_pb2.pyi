@@ -24,13 +24,13 @@ class _VectorSimilarity:
 
 class _VectorSimilarityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_VectorSimilarity.ValueType], builtins.type):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    Cosine: _VectorSimilarity.ValueType  # 0
-    Dot: _VectorSimilarity.ValueType  # 1
+    COSINE: _VectorSimilarity.ValueType  # 0
+    DOT: _VectorSimilarity.ValueType  # 1
 
 class VectorSimilarity(_VectorSimilarity, metaclass=_VectorSimilarityEnumTypeWrapper): ...
 
-Cosine: VectorSimilarity.ValueType  # 0
-Dot: VectorSimilarity.ValueType  # 1
+COSINE: VectorSimilarity.ValueType  # 0
+DOT: VectorSimilarity.ValueType  # 1
 global___VectorSimilarity = VectorSimilarity
 
 @typing_extensions.final

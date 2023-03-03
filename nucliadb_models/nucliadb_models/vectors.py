@@ -46,8 +46,8 @@ class VectorSimilarity(str, Enum):
 
 
 VECTOR_SIMILARITY_ENUM_TO_PB = {
-    VectorSimilarity.COSINE.value: PBVectorSimilarity.Cosine,
-    VectorSimilarity.DOT.value: PBVectorSimilarity.Dot,
+    VectorSimilarity.COSINE.value: PBVectorSimilarity.COSINE,
+    VectorSimilarity.DOT.value: PBVectorSimilarity.DOT,
 }
 VECTOR_SIMILARITY_PB_TO_ENUM = {v: k for k, v in VECTOR_SIMILARITY_ENUM_TO_PB.items()}
 

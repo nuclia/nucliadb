@@ -95,13 +95,13 @@ async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture)
 
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-dot")
     pb.config.title = "My Title"
-    pb.config.similarity = utils_pb2.VectorSimilarity.Dot
+    pb.config.similarity = utils_pb2.VectorSimilarity.DOT
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
     kbid = knowledgebox_pb2.KnowledgeBoxID(slug="test-dot")
     resp = await stub.GetKnowledgeBox(kbid)  # type: ignore
-    assert resp.config.similarity == utils_pb2.VectorSimilarity.Dot
+    assert resp.config.similarity == utils_pb2.VectorSimilarity.DOT
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_create_knowledgebox_defaults_to_cosine_similarity(
 
     kbid = knowledgebox_pb2.KnowledgeBoxID(slug="test-default")
     resp = await stub.GetKnowledgeBox(kbid)  # type: ignore
-    assert resp.config.similarity == utils_pb2.VectorSimilarity.Cosine
+    assert resp.config.similarity == utils_pb2.VectorSimilarity.COSINE
 
 
 @pytest.mark.asyncio

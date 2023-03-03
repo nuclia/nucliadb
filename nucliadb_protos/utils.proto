@@ -106,6 +106,6 @@ message UserVectorsList {
 }
 
 enum VectorSimilarity {
-    Cosine = 0;
-    Dot = 1;
+    COSINE = 0;
+    DOT = 1;
 }

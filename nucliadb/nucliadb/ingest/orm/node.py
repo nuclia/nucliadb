@@ -167,7 +167,7 @@ class Node(AbstractNode):
         cls,
         txn: Transaction,
         kbid: str,
-        similarity: VectorSimilarity.ValueType = VectorSimilarity.Cosine,
+        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
     ) -> Shard:
         kb_shards_key = KB_SHARDS.format(kbid=kbid)
         kb_shards: Optional[PBShards] = None
