@@ -70,7 +70,6 @@ from nucliadb_protos.writer_pb2 import (
     IndexStatus,
     ListMembersRequest,
     ListMembersResponse,
-    Member,
     OpStatusWriter,
     ResourceFieldExistsResponse,
     ResourceFieldId,
@@ -95,10 +94,12 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm import NODES
+from nucliadb.ingest.maindb.driver import TXNID
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.orm.shard import Shard
@@ -660,16 +661,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListMembersRequest, context=None
     ) -> ListMembersResponse:
         response = ListMembersResponse()
-        for nodeid, node in NODES.items():
-            member = Member(
-                id=str(nodeid),
-                listen_address=node.address,
-                type=node.type.to_pb(),
-                load_score=node.load_score,
-                shard_count=node.shard_count,
-                dummy=node.dummy,
-            )
-            response.members.append(member)
+        response.members.extend(await Node.list_members())
         return response
 
     async def GetResourceId(  # type: ignore
