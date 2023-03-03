@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.5.10
+## 0.6.0
 
-- Define similarity on shards and vectorsets
+- Be able to set vector similarity on shards and vectorsets
 
 ## 0.5.9
 

@@ -12,7 +12,6 @@ from nucliadb_protos import resources_pb2
 UserVectorPosition = Tuple[int, int]
 _T = TypeVar("_T")
 
-
 # Managing vectors
 
 
@@ -39,21 +38,18 @@ class VectorSimilarity(str, Enum):
     DOT = "dot"
 
     def to_pb(self) -> PBVectorSimilarity.ValueType:
-        if self.value == self.COSINE:
-            return PBVectorSimilarity.Cosine
-        elif self.value == self.DOT:
-            return PBVectorSimilarity.Dot
-        else:
-            raise ValueError("Unknown similarity")
+        return VECTOR_SIMILARITY_ENUM_TO_PB[self.value]
 
     @classmethod
     def from_pb(cls, message: PBVectorSimilarity.ValueType):
-        if message == PBVectorSimilarity.Cosine:
-            return cls("cosine")
-        elif message == PBVectorSimilarity.Dot:
-            return cls("dot")
-        else:
-            raise ValueError("Unknown similarity")
+        return cls(VECTOR_SIMILARITY_PB_TO_ENUM[message])
+
+
+VECTOR_SIMILARITY_ENUM_TO_PB = {
+    VectorSimilarity.COSINE.value: PBVectorSimilarity.Cosine,
+    VectorSimilarity.DOT.value: PBVectorSimilarity.Dot,
+}
+VECTOR_SIMILARITY_PB_TO_ENUM = {v: k for k, v in VECTOR_SIMILARITY_ENUM_TO_PB.items()}
 
 
 class VectorSet(BaseModel):
@@ -62,10 +58,13 @@ class VectorSet(BaseModel):
 
     @classmethod
     def from_message(cls, message: PBVectorSet):
-        return cls(
-            dimension=message.dimension,
-            similarity=VectorSimilarity.from_pb(message.similarity),
+        as_dict = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        as_dict["similarity"] = VectorSimilarity.from_pb(message.similarity)
+        return cls(**as_dict)
 
 
 class VectorSets(BaseModel):

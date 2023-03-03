@@ -103,7 +103,12 @@ async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture)
     resp = await stub.GetKnowledgeBox(kbid)  # type: ignore
     assert resp.config.similarity == utils_pb2.VectorSimilarity.Dot
 
-    # Check that by default we get cosine similarity
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_defaults_to_cosine_similarity(
+    grpc_servicer: IngestFixture,
+):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
     pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default")
     pb.config.title = "My Title"
     result = await stub.NewKnowledgeBox(pb)  # type: ignore
