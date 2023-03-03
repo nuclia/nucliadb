@@ -26,7 +26,6 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use futures::Stream;
-use libc::SIGKILL;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::protos::GetShardRequest;
@@ -39,8 +38,8 @@ use nucliadb_node::writer::grpc_driver::{
     NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
 };
 use nucliadb_node::writer::NodeWriterService;
-use tokio::signal::unix;
 use tokio::signal::unix::SignalKind;
+use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
@@ -102,11 +101,15 @@ async fn main() -> NodeResult<()> {
 }
 
 async fn wait_for_sigkill() -> NodeResult<()> {
-    let mut sigkill = unix::signal(SignalKind::from_raw(SIGKILL))?;
-    sigkill.recv().await;
+    let mut sigterm = unix::signal(SignalKind::terminate())?;
+    let mut sigquit = unix::signal(SignalKind::quit())?;
+    tokio::select! {
+        _ = sigterm.recv() => println!("Terminating on SIGTERM"),
+        _ = sigquit.recv() => println!("Terminating on SIGQUIT"),
+        _ = ctrl_c() => println!("Terminating on ctrl-c"),
+    }
     Ok(())
 }
-
 pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
     let addr = env::writer_listen_address();
 
