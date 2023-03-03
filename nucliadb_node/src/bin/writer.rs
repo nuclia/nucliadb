@@ -26,6 +26,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use futures::Stream;
+use libc::SIGKILL;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
 use nucliadb_core::protos::GetShardRequest;
@@ -38,6 +39,8 @@ use nucliadb_node::writer::grpc_driver::{
     NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
 };
 use nucliadb_node::writer::NodeWriterService;
+use tokio::signal::unix;
+use tokio::signal::unix::SignalKind;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
@@ -93,16 +96,15 @@ async fn main() -> NodeResult<()> {
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    termination(node).await
+    wait_for_sigkill().await?;
+    node.shutdown().await?;
+    Ok(())
 }
 
-async fn termination(node_handle: NodeHandle) -> NodeResult<()> {
-    use libc::SIGKILL;
-    use tokio::signal::unix;
-    use tokio::signal::unix::SignalKind;
+async fn wait_for_sigkill() -> NodeResult<()> {
     let mut sigkill = unix::signal(SignalKind::from_raw(SIGKILL))?;
     sigkill.recv().await;
-    Ok(node_handle.shutdown().await?)
+    Ok(())
 }
 
 pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
