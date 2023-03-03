@@ -542,9 +542,16 @@ class KnowledgeBox:
                 return node_klass.create_shard_klass(shard_id, shard)
         return None
 
-    async def get_similarity(self) -> VectorSimilarity:
+    async def get_similarity(self) -> VectorSimilarity.ValueType:
         config = await self.get_config()
-        return config.similarity
+        if config is not None:
+            return config.similarity
+        else:
+            logger.warning(
+                f"Config for kb not found: {self.kbid} while trying to get the similarity. \
+                    Defaulting to cosine distance."
+            )
+            return VectorSimilarity.Cosine
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

@@ -300,9 +300,7 @@ async def get_vectorsets(request: Request, kbid: str):
     if vectorsets.status == GetVectorSetsResponse.Status.OK:
         result = VectorSets(vectorsets={})
         for key, vector in vectorsets.vectorsets.vectorsets.items():
-            result.vectorsets[key] = VectorSet(
-                dimension=vector.dimension, similarity=VectorSet.from_pb(vector)
-            )
+            result.vectorsets[key] = VectorSet.from_message(vector)
         return result
     elif vectorsets.status == GetVectorSetsResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="VectorSet does not exist")

@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.utils_pb2 import VectorSimilarity as PBVectorSimilarity
+from nucliadb_protos.writer_pb2 import VectorSet as PBVectorSet
 from pydantic import BaseModel
 
 from nucliadb_models import FieldID
@@ -37,7 +38,7 @@ class VectorSimilarity(str, Enum):
     COSINE = "cosine"
     DOT = "dot"
 
-    def to_pb(self) -> PBVectorSimilarity:
+    def to_pb(self) -> PBVectorSimilarity.ValueType:
         if self.value == self.COSINE:
             return PBVectorSimilarity.Cosine
         elif self.value == self.DOT:
@@ -46,7 +47,7 @@ class VectorSimilarity(str, Enum):
             raise ValueError("Unknown similarity")
 
     @classmethod
-    def from_pb(cls, message: PBVectorSimilarity):
+    def from_pb(cls, message: PBVectorSimilarity.ValueType):
         if message == PBVectorSimilarity.Cosine:
             return cls("cosine")
         elif message == PBVectorSimilarity.Dot:
@@ -58,6 +59,13 @@ class VectorSimilarity(str, Enum):
 class VectorSet(BaseModel):
     dimension: int
     similarity: Optional[VectorSimilarity]
+
+    @classmethod
+    def from_message(cls, message: PBVectorSet):
+        return cls(
+            dimension=message.dimension,
+            similarity=VectorSimilarity.from_pb(message.similarity),
+        )
 
 
 class VectorSets(BaseModel):

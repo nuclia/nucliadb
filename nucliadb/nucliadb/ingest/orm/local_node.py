@@ -61,7 +61,7 @@ class LocalNode(AbstractNode):
 
     @classmethod
     async def create_shard_by_kbid(
-        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity
+        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity.ValueType
     ) -> LocalShard:
         node = NODE_CLUSTER.get_local_node()
         sharduuid = uuid4().hex

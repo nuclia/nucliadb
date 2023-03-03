@@ -144,7 +144,7 @@ class FieldComputedMetadata(BaseModel):
     def shorten_fieldmetadata(
         cls,
         message: resources_pb2.FieldComputedMetadata,
-    ):
+    ) -> None:
         large_fields = ["ner", "relations", "positions", "classifications"]
         for field in large_fields:
             message.metadata.ClearField(field)  # type: ignore

@@ -100,7 +100,7 @@ async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture)
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
     kbid = knowledgebox_pb2.KnowledgeBoxID(slug="test-dot")
-    resp = await stub.GetKnowledgeBox(kbid)
+    resp = await stub.GetKnowledgeBox(kbid)  # type: ignore
     assert resp.config.similarity == utils_pb2.VectorSimilarity.Dot
 
     # Check that by default we get cosine similarity
@@ -110,7 +110,7 @@ async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture)
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
     kbid = knowledgebox_pb2.KnowledgeBoxID(slug="test-default")
-    resp = await stub.GetKnowledgeBox(kbid)
+    resp = await stub.GetKnowledgeBox(kbid)  # type: ignore
     assert resp.config.similarity == utils_pb2.VectorSimilarity.Cosine
 
 
