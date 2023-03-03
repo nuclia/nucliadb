@@ -38,7 +38,6 @@ use nucliadb_node::writer::grpc_driver::{
     NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
 };
 use nucliadb_node::writer::NodeWriterService;
-use nucliadb_telemetry::TelemetryLoopHandle;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
@@ -83,10 +82,10 @@ async fn main() -> NodeResult<()> {
         .insert_to_initial_state(SHARD_COUNT_KEY, node_metadata.shard_count())
         .build()?;
     let node = node.start().await?;
-    let telemetry_handle = nucliadb_telemetry::sync::start_telemetry_loop();
     let cluster_watcher = node.cluster_watcher().await;
     let update_handle = node.clone();
 
+    nucliadb_telemetry::sync::start_telemetry_loop();
     tokio::spawn(start_grpc_service(grpc_driver));
     tokio::spawn(monitor_cluster(cluster_watcher));
     tokio::spawn(watch_node_update(update_handle, receiver, node_metadata));
@@ -94,19 +93,15 @@ async fn main() -> NodeResult<()> {
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
-    termination(telemetry_handle, node).await
+    termination(node).await
 }
 
-async fn termination(
-    telemetry_handle: TelemetryLoopHandle,
-    node_handle: NodeHandle,
-) -> NodeResult<()> {
+async fn termination(node_handle: NodeHandle) -> NodeResult<()> {
     use libc::SIGKILL;
     use tokio::signal::unix;
     use tokio::signal::unix::SignalKind;
     let mut sigkill = unix::signal(SignalKind::from_raw(SIGKILL))?;
     sigkill.recv().await;
-    telemetry_handle.terminate_telemetry().await;
     Ok(node_handle.shutdown().await?)
 }
 
