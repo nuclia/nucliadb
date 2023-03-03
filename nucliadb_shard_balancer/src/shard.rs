@@ -1,12 +1,12 @@
 use std::net::SocketAddr;
 
 use itertools::Itertools;
-use nucliadb_protos::node_writer_client::NodeWriterClient as GrpcClient;
-use nucliadb_protos::{AcceptShardRequest, MoveShardRequest, ShardId};
+// use nucliadb_protos::node_writer_client::NodeWriterClient as GrpcClient;
+// use nucliadb_protos::{AcceptShardRequest, MoveShardRequest, ShardId};
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
-use tonic::Request;
 
+// use tonic::Request;
 use crate::index::{Indexable, ReversedIndex};
 use crate::node::Node;
 use crate::views::KnowledgeBox as KnowledgeBoxView;
@@ -100,7 +100,7 @@ pub struct Shard {
 }
 
 impl Shard {
-    /// Creates a new shard.
+    /// Creates a new virtual shard.
     pub fn new(id: String, load_score: u64, kb_id: String) -> Self {
         Self {
             id,
@@ -171,36 +171,40 @@ impl ShardCutover {
     /// - The source/destination nodes are not reachable.
     /// - The shard transfer fails somehow.
     /// - The creation/deletion of the shadow shard fails.
+    #[allow(clippy::unused_async)]
     pub async fn execute(self) -> Result<(), Error> {
-        let mut source_client =
-            GrpcClient::connect(format!("http://{}", self.source_address)).await?;
+        unimplemented!();
 
-        let mut destination_client =
-            GrpcClient::connect(format!("http://{}", self.destination_address)).await?;
+        // NOTE: Uncomment these codes when shadow shard feature is implemented
+        // let mut source_client =
+        //     GrpcClient::connect(format!("http://{}", self.source_address)).await?;
 
-        // TODO
-        // destination_client.create_shadow_shard().await?;
+        // let mut destination_client =
+        //     GrpcClient::connect(format!("http://{}", self.destination_address)).await?;
 
-        tokio::try_join!(
-            destination_client.accept_shard(Request::new(AcceptShardRequest {
-                shard_id: Some(ShardId {
-                    id: self.id.clone(),
-                }),
-                port: self.port.into(),
-                override_shard: true,
-            })),
-            source_client.move_shard(Request::new(MoveShardRequest {
-                shard_id: Some(ShardId {
-                    id: self.id.clone()
-                }),
-                address: format!("{}:{}", self.destination_address.ip(), self.port),
-            })),
-        )?;
+        // // TODO
+        // // destination_client.create_shadow_shard().await?;
 
-        // TODO
-        // destination_client.delete_shadow_shard().await?;
-        // source_client_delete_shard(Request::new(ShardId { id: self.id.clone() })).await?
+        // tokio::try_join!(
+        //     destination_client.accept_shard(Request::new(AcceptShardRequest {
+        //         shard_id: Some(ShardId {
+        //             id: self.id.clone(),
+        //         }),
+        //         port: self.port.into(),
+        //         override_shard: true,
+        //     })),
+        //     source_client.move_shard(Request::new(MoveShardRequest {
+        //         shard_id: Some(ShardId {
+        //             id: self.id.clone()
+        //         }),
+        //         address: format!("{}:{}", self.destination_address.ip(), self.port),
+        //     })),
+        // )?;
 
-        Ok(())
+        // // TODO
+        // // destination_client.delete_shadow_shard().await?;
+        // // source_client_delete_shard(Request::new(ShardId { id: self.id.clone() })).await?
+
+        // Ok(())
     }
 }
