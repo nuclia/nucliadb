@@ -49,7 +49,7 @@ async def test_create_entities_group(grpc_servicer: IngestFixture):
         ),
     )
     result = await stub.SetEntities(pb_ser)  # type: ignore
-    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    assert result.status == writer_pb2.OpStatusWriter.OK
 
     pb_ger = writer_pb2.GetEntitiesRequest(
         kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kb_id, slug="test"),

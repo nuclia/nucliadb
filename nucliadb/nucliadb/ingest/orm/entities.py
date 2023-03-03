@@ -35,6 +35,7 @@ from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
+from nucliadb.ingest import logger
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.maindb.keys import (
     KB_DELETED_ENTITIES_GROUPS,
@@ -98,7 +99,13 @@ class EntitiesManager:
     async def get_entities_group_inner(self, group: str) -> EntitiesGroup:
         stored = await self.get_stored_entities_group(group)
         indexed = await self.get_indexed_entities_group(group)
-        if stored is not None and indexed is not None:
+        if stored is None and indexed is None:
+            # If an entitiesgroup appears without stored or indexed entities,
+            # most probably the node is reporting a node subtype with no nodes
+            # or a wrongwentitiesgroup is being searched
+            logger.warning("Suspicious entities group without entities: '{group}'")
+            entities_group = EntitiesGroup()
+        elif stored is not None and indexed is not None:
             entities_group = self.merge_entities_groups(indexed, stored)
         else:
             entities_group = stored or indexed

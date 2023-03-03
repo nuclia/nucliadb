@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import traceback
 from typing import Optional
 
 import aiohttp
@@ -38,9 +39,13 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
+from nucliadb.sentry import SENTRY
 from nucliadb.train.settings import settings
 from nucliadb.train.utils import get_nodes_manager
 from nucliadb_protos import train_pb2_grpc
+
+if SENTRY:
+    from sentry_sdk import capture_exception
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
@@ -86,18 +91,22 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         response = GetEntitiesResponse()
         txn = await self.proc.driver.begin()
 
-        entities_manager = await self.get_kb_entities_manager(txn, kbid)
+        entities_manager = await self.proc.get_kb_entities_manager(txn, kbid)
         if entities_manager is None:
             await txn.abort()
             response.status = GetEntitiesResponse.Status.NOTFOUND
             return response
 
-        # entities_groups = await entities_manager.get_entities_groups()
-        # response.groups.update(entities_groups)
-
-        await entities_manager.get_entities(response)
-        response.kb.uuid = kbid
-        response.status = GetEntitiesResponse.Status.OK
+        try:
+            await entities_manager.get_entities(response)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            traceback.print_exc()
+            response.status = GetEntitiesResponse.Status.ERROR
+        else:
+            response.kb.uuid = kbid
+            response.status = GetEntitiesResponse.Status.OK
 
         await txn.abort()
         return response

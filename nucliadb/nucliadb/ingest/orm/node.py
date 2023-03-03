@@ -26,6 +26,7 @@ from uuid import uuid4
 
 import prometheus_client  # type: ignore
 from grpc import aio  # type: ignore
+from grpc.aio._call import AioRpcError  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
@@ -43,7 +44,10 @@ from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm import NODE_CLUSTER, NODES, NodeClusterSmall
 from nucliadb.ingest.orm.abc import AbstractNode  # type: ignore
-from nucliadb.ingest.orm.exceptions import NodesUnsync  # type: ignore
+from nucliadb.ingest.orm.exceptions import (  # type: ignore
+    NodeClusterNotAvailable,
+    NodesUnsync,
+)
 from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
     DummyReaderStub,
     DummySidecarStub,
@@ -369,7 +373,13 @@ class Node(AbstractNode):
 
         stub = WriterStub(aio.insecure_channel(nucliadb_settings.nucliadb_ingest))
         request = ListMembersRequest()
-        members = await stub.ListMembers(request)
+        try:
+            members = await stub.ListMembers(request)
+        except AioRpcError as grpc_error:
+            raise NodeClusterNotAvailable(
+                "Unable to obtain cluster members"
+            ) from grpc_error
+
         for member in members.members:
             NODES[member.id] = Node(
                 member.listen_address,

@@ -425,7 +425,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if SENTRY:
                 capture_exception(e)
             traceback.print_exc()
-            response.status = OpStatusWriter.Status.ERROR
+            response.status = GetEntitiesResponse.Status.ERROR
         else:
             response.kb.uuid = kbobj.kbid
             response.status = GetEntitiesResponse.Status.OK
@@ -451,7 +451,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             if SENTRY:
                 capture_exception(e)
             traceback.print_exc()
-            response.status = OpStatusWriter.Status.ERROR
+            response.status = GetEntitiesGroupResponse.Status.ERROR
         else:
             if entities_group is None:
                 response.status = (

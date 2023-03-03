@@ -24,6 +24,7 @@ from typing import Any, Dict, List
 from nucliadb_protos.nodereader_pb2 import (
     EdgeList,
     RelationEdge,
+    RelationSearchResponse,
     RelationTypeListMember,
     TypeList,
 )
@@ -107,6 +108,11 @@ class DummyReaderStub:
         return NodeResourcesShard(
             shard_id="shard", resources=2, paragraphs=2, sentences=2
         )
+
+    async def RelationSearch(self, data):
+        self.calls.setdefault("RelationSearch", []).append(data)
+        result = RelationSearchResponse()
+        return result
 
     async def RelationEdges(self, data):
         self.calls.setdefault("RelationEdges", []).append(data)

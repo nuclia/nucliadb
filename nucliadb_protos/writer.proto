@@ -168,6 +168,7 @@ message GetEntitiesResponse {
     enum Status {
         OK = 0;
         NOTFOUND = 1;
+        ERROR = 2;
     }
     Status status = 3;
 }
@@ -215,7 +216,7 @@ message GetEntitiesGroupResponse {
         OK = 0;
         KB_NOT_FOUND = 1;
         ENTITIES_GROUP_NOT_FOUND = 2;
-
+        ERROR = 3;
     }
     Status status = 3;
 }

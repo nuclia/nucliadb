@@ -222,6 +222,7 @@ pub mod get_entities_response {
     pub enum Status {
         Ok = 0,
         Notfound = 1,
+        Error = 2,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -299,6 +300,7 @@ pub mod get_entities_group_response {
         Ok = 0,
         KbNotFound = 1,
         EntitiesGroupNotFound = 2,
+        Error = 3,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
