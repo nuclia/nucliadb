@@ -16,14 +16,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-import pytest
-
-from nucliadb_sdk.utils import KnowledgeBoxAlreadyExists, create_knowledge_box
+from nucliadb_sdk.utils import create_knowledge_box
 
 
-def test_create_kb(nucliadb: str):
-    kb = create_knowledge_box(slug="hola", nucliadb_base_url=nucliadb)
+def test_similarity(nucliadb: str):
+    # Create a KB with dot similarity
+    kb = create_knowledge_box(slug="dot", similarity="dot", nucliadb_base_url=nucliadb)
     assert kb is not None
-    with pytest.raises(KnowledgeBoxAlreadyExists):
-        create_knowledge_box(slug="hola", nucliadb_base_url=nucliadb)
+
+    # Add vectorsets with different similarities
+    kb.new_vectorset("cosine", dimension=728, similarity="cosine")
+    kb.new_vectorset("dot", dimension=728, similarity="dot")
+
+    vectorsets = kb.list_vectorset()
+    assert vectorsets.vectorsets["dot"].similarity.value == "dot"
+    assert vectorsets.vectorsets["cosine"].similarity.value == "cosine"
