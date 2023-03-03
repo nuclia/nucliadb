@@ -229,6 +229,7 @@ impl Balancer {
 #[allow(clippy::too_many_lines)]
 mod tests {
     use super::*;
+    use crate::shard::LogicShard;
 
     #[test]
     fn it_distributes_active_shards() {
@@ -524,6 +525,55 @@ mod tests {
             "s2".to_string(),
             "192.168.0.2:4444".parse().unwrap(),
             "192.168.0.3:4444".parse().unwrap(),
+            42,
+        )];
+
+        let shard_cutovers = balancer
+            .balance_shards(nodes, &shard_index)
+            .collect::<Vec<_>>();
+
+        assert_eq!(shard_cutovers, expected_shard_cutovers);
+    }
+
+    #[test]
+    fn it_moves_shard_replica_to_correct_node() {
+        let shard_index = ShardIndex::new(vec![
+            LogicShard::new("ls1".to_string(), vec!["s1".to_string(), "s1'".to_string()]),
+            LogicShard::new("ls2".to_string(), vec!["s2".to_string(), "s2'".to_string()]),
+        ]);
+
+        let nodes = vec![
+            Node::new(
+                "n1".to_string(),
+                "192.168.0.1:4444".parse().unwrap(),
+                vec![
+                    Shard::new("s1".to_string(), 1, "kb1".to_string()),
+                    Shard::new("s2".to_string(), 2, "kb2".to_string()),
+                ],
+            ),
+            Node::new(
+                "n2".to_string(),
+                "192.168.0.2:4444".parse().unwrap(),
+                vec![Shard::new("s1'".to_string(), 0, "kb1".to_string())],
+            ),
+            Node::new(
+                "n3".to_string(),
+                "192.168.0.2:4444".parse().unwrap(),
+                vec![Shard::new("s2'".to_string(), 4, "kb2".to_string())],
+            ),
+        ];
+
+        let balancer = Balancer::new(BalanceSettings {
+            strategy: BalanceStrategy::ActiveShard,
+            load_tolerance: Threshold::PlainValue(0),
+            shard_limit: NonZeroUsize::new(3).unwrap(),
+            port: 42,
+        });
+
+        let expected_shard_cutovers = vec![ShardCutover::new(
+            "s2".to_string(),
+            "192.168.0.1:4444".parse().unwrap(),
+            "192.168.0.2:4444".parse().unwrap(),
             42,
         )];
 

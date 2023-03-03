@@ -73,6 +73,13 @@ pub struct LogicShard {
     replicas: Vec<String>,
 }
 
+impl LogicShard {
+    /// Creates a new logic shard
+    pub fn new(id: String, replicas: Vec<String>) -> Self {
+        Self { id, replicas }
+    }
+}
+
 impl Indexable for LogicShard {
     type Key = String;
 
