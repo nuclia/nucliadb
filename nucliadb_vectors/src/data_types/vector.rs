@@ -103,8 +103,17 @@ mod test {
         let bb: f32 = b.iter().cloned().map(|b| b * b).sum();
         ab / (f32::sqrt(aa) * f32::sqrt(bb))
     }
+
+    fn naive_dot_similatiry(a: &[f32], b: &[f32]) -> f32 {
+        a.iter()
+            .cloned()
+            .zip(b.iter().cloned())
+            .map(|(a, b)| a * b)
+            .sum()
+    }
+
     #[test]
-    fn naive_equivalence() {
+    fn cosine_test() {
         let v0: Vec<_> = (0..758).map(|i| (i * 2) as f32).collect();
         let v1: Vec<_> = (0..758).map(|i| ((i * 2) + 1) as f32).collect();
         let v0_r = encode_vector(&v0);
@@ -117,5 +126,15 @@ mod test {
             naive_cosine_similatiry(&v0, &v0),
             cosine_similarity(&v0_r, &v0_r)
         );
+    }
+
+    #[test]
+    fn dot_test() {
+        let v0: Vec<_> = (0..758).map(|i| (i * 2) as f32).collect();
+        let v1: Vec<_> = (0..758).map(|i| ((i * 2) + 1) as f32).collect();
+        let v0_r = encode_vector(&v0);
+        let v1_r = encode_vector(&v1);
+        assert_eq!(naive_dot_similatiry(&v0, &v1), dot_similarity(&v0_r, &v1_r));
+        assert_eq!(naive_dot_similatiry(&v0, &v1), dot_similarity(&v0_r, &v1_r));
     }
 }
