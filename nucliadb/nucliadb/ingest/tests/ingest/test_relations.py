@@ -126,8 +126,8 @@ async def test_ingest_colab_relation_extraction(
         kbid=knowledgebox_ingest, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT
     )
 
-    colaborators = ["Alice", "Bob", "Trudy"]
-    bm.origin.colaborators.extend(colaborators)
+    collaborators = ["Alice", "Bob", "Trudy"]
+    bm.origin.colaborators.extend(collaborators)
 
     await processor.process(message=bm, seqid=1)
 
@@ -141,10 +141,10 @@ async def test_ingest_colab_relation_extraction(
     assert index._calls[0][1] != index._calls[1][1]
     assert pb == pb2
 
-    for i, colaborator in enumerate(colaborators):
+    for i, collaborator in enumerate(collaborators):
         assert pb.relations[i].relation == Relation.RelationType.COLAB
         assert pb.relations[i].source.value == rid
-        assert pb.relations[i].to.value == colaborator
+        assert pb.relations[i].to.value == collaborator
 
 
 @pytest.mark.asyncio

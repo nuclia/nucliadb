@@ -756,7 +756,7 @@ async def test_search_automatic_relations(
             "slug": "myresource",
             "summary": "Some summary",
             "origin": {
-                "colaborators": ["Anne", "John"],
+                "collaborators": ["Anne", "John"],
             },
             "usermetadata": {
                 "classifications": [

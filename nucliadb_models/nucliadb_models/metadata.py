@@ -320,7 +320,8 @@ class InputOrigin(BaseModel):
     modified: Optional[datetime] = None
     metadata: Dict[str, str] = {}
     tags: List[str] = []
-    colaborators: List[str] = []
+    collaborators: List[str] = []
+    # old field was "colaborators"
     filename: Optional[str] = None
     related: List[str] = []
 
@@ -336,13 +337,15 @@ class Origin(InputOrigin):
 
     @classmethod
     def from_message(cls: Type[_T], message: resources_pb2.Origin) -> _T:
-        return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
-            )
+        data = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
         )
+        # old field was "colaborators" and we want to keep pb field name
+        # to avoid migration
+        data["collaborators"] = data.pop("colaborators", [])
+        return cls(**data)
 
 
 class Relations(BaseModel):

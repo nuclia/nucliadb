@@ -151,7 +151,7 @@ async def test_extracted_relations(
             "slug": "myresource",
             "summary": "Some summary",
             "origin": {
-                "colaborators": ["Anne", "John"],
+                "collaborators": ["Anne", "John"],
             },
             "usermetadata": {
                 "classifications": [

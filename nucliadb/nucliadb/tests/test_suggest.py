@@ -160,7 +160,7 @@ async def test_suggest_related_entities(
     Create a new resoure with some entities and relations and use
     /suggest endpoint to make autocomplete suggestions.
     """
-    colaborators = ["Irene", "Anastasia"]
+    collaborators = ["Irene", "Anastasia"]
     entities = [
         ("Anna", "person"),
         ("Anthony", "person"),
@@ -193,7 +193,7 @@ async def test_suggest_related_entities(
             "slug": "pap",
             "summary": "Test entities to validate suggest on relations index",
             "origin": {
-                "colaborators": colaborators,
+                "collaborators": collaborators,
             },
             "usermetadata": {
                 "classifications": [
