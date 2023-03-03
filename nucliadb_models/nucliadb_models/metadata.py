@@ -342,6 +342,8 @@ class Origin(InputOrigin):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
+        # old field was "colaborators" and we want to keep pb field name
+        # to avoid migration
         data["collaborators"] = data.pop("colaborators", [])
         return cls(**data)
 
