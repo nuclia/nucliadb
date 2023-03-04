@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
+DEFAULT_LABELSET = "default"
+
 
 class LabelType(str, Enum):
     PARAGRAPHS = "PARAGRAPHS"

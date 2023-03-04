@@ -38,11 +38,10 @@ from nucliadb_models.search import (
     SearchRequest,
 )
 from nucliadb_models.vectors import VectorSet, VectorSets
-from nucliadb_sdk import DEFAULT_LABELSET
 from nucliadb_sdk.client import NucliaDBClient
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
-from nucliadb_sdk.labels import Label, Labels, LabelSet, LabelType
+from nucliadb_sdk.labels import DEFAULT_LABELSET, Label, Labels, LabelSet, LabelType
 from nucliadb_sdk.resource import (
     create_resource,
     from_resource_to_payload,
