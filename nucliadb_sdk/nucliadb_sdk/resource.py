@@ -18,10 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import base64
-from typing import Callable, Dict, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union, cast
 from uuid import uuid4
-
-import numpy as np
 
 from nucliadb_models.common import Classification, FieldID
 from nucliadb_models.common import File as NDBModelsFile
@@ -43,6 +41,11 @@ from nucliadb_sdk.file import File
 from nucliadb_sdk.labels import Label, Labels
 from nucliadb_sdk.vectors import Vector, Vectors, convert_vector
 
+if TYPE_CHECKING:  # pragma: no cover
+    from numpy import ndarray
+else:
+    ndarray = None
+
 
 def create_resource(
     key: Optional[str] = None,
@@ -50,7 +53,7 @@ def create_resource(
     binary: Optional[Union[File, str]] = None,
     labels: Optional[Labels] = None,
     entities: Optional[Entities] = None,
-    vectors: Optional[Union[Vectors, Dict[str, Union[np.ndarray, List[float]]]]] = None,
+    vectors: Optional[Union[Vectors, Dict[str, Union[ndarray, List[float]]]]] = None,
     vectorsets: Optional[VectorSets] = None,
     icon: Optional[str] = None,
 ) -> CreateResourcePayload:
@@ -173,7 +176,7 @@ def update_resource(
     binary: Optional[Union[File, str]] = None,
     labels: Optional[Labels] = None,
     entities: Optional[Entities] = None,
-    vectors: Optional[Union[Vectors, Dict[str, Union[np.ndarray, List[float]]]]] = None,
+    vectors: Optional[Union[Vectors, Dict[str, Union[ndarray, List[float]]]]] = None,
     vectorsets: Optional[VectorSets] = None,
 ) -> UpdateResourcePayload:
     upload_payload = UpdateResourcePayload()
