@@ -91,7 +91,7 @@ def start_span_client(
 
     # add some attributes from the metadata
     if client_call_details.metadata is not None:
-        mutable_metadata = OrderedDict(client_call_details.metadata)
+        mutable_metadata = OrderedDict(tuple(client_call_details.metadata))
         inject(mutable_metadata, setter=_carrier_setter)  # type: ignore
         for key, value in mutable_metadata.items():
             client_call_details.metadata.add(key=key, value=value)  # type: ignore
