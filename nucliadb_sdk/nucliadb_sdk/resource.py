@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import base64
+import logging
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union, cast
 from uuid import uuid4
 
@@ -35,16 +36,17 @@ from nucliadb_models.writer import (
     CreateResourcePayload,
     UpdateResourcePayload,
 )
-from nucliadb_sdk import DEFAULT_LABELSET, logger
 from nucliadb_sdk.entities import Entities
 from nucliadb_sdk.file import File
-from nucliadb_sdk.labels import Label, Labels
+from nucliadb_sdk.labels import DEFAULT_LABELSET, Label, Labels
 from nucliadb_sdk.vectors import Vector, Vectors, convert_vector
 
 if TYPE_CHECKING:  # pragma: no cover
     from numpy import ndarray
 else:
     ndarray = None
+
+logger = logging.getLogger("nucliadb_sdk")
 
 
 def create_resource(
