@@ -18,9 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, Union
-
-import numpy as np
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Union,
+)
 
 from nucliadb_models.labels import KnowledgeBoxLabels
 from nucliadb_models.labels import Label as NDBLabel
@@ -43,6 +50,11 @@ from nucliadb_sdk.resource import (
 )
 from nucliadb_sdk.search import SearchResult
 from nucliadb_sdk.vectors import Vectors, convert_vector
+
+if TYPE_CHECKING:  # pragma: no cover
+    from numpy import ndarray
+else:
+    ndarray = None
 
 NUCLIA_CLOUD = os.environ.get("NUCLIA_CLOUD_URL", ".nuclia.cloud")
 
@@ -188,7 +200,7 @@ class KnowledgeBox:
         labels: Optional[Labels] = None,
         entities: Optional[Entities] = None,
         vectors: Optional[
-            Union[Vectors, Dict[str, Union[np.ndarray, List[float]]]]
+            Union[Vectors, Dict[str, Union[ndarray, List[float]]]]
         ] = None,
     ) -> str:
         resource: Optional[Resource] = None
@@ -301,7 +313,7 @@ class KnowledgeBox:
         self,
         text: Optional[str] = None,
         filter: Optional[List[Union[Label, str]]] = None,
-        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
     ):
@@ -314,7 +326,7 @@ class KnowledgeBox:
         self,
         text: Optional[str] = None,
         filter: Optional[List[Union[Label, str]]] = None,
-        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
     ):
@@ -327,7 +339,7 @@ class KnowledgeBox:
         self,
         text: Optional[str] = None,
         filter: Optional[List[Union[Label, str]]] = None,
-        vector: Optional[Union[np.ndarray, List[float]]] = None,
+        vector: Optional[Union[ndarray, List[float]]] = None,
         vectorset: Optional[str] = None,
         min_score: Optional[float] = 0.0,
     ) -> SearchRequest:
