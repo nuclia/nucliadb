@@ -24,6 +24,7 @@ import nats
 import pytest
 import requests
 from fastapi import FastAPI
+from grpc import aio  # type: ignore
 from httpx import AsyncClient
 from nats.aio.msg import Msg
 from nats.js import api
@@ -325,7 +326,13 @@ async def http_service(
         with tracer.start_as_current_span("simple_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
             stub = helloworld_pb2_grpc.GreeterStub(channel)
-            response = await stub.SayHello(helloworld_pb2.HelloRequest(name="you"))
+            response = await stub.SayHello(
+                helloworld_pb2.HelloRequest(name="you"),
+                # This metadata is here to make sure our instrumentor handles correctly
+                # requests with metadata, as it does some manipulation of in on start_client_span
+                # The servicer endpoint does not use this metadata
+                metadata=aio.Metadata.from_tuple((("header1", "value1"),)),
+            )
         with tracer.start_as_current_span("simple_stream_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
             stub = hellostreamingworld_pb2_grpc.MultiGreeterStub(channel)
