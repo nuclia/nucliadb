@@ -210,12 +210,12 @@ class PullWorker:
                 elif pb.source == pb.MessageSource.WRITER:
                     message_source = "writer"
                 if pb.HasField("audit"):
-                    pbtime = pb.audit.when.ToDatetime().isoformat()
+                    time = pb.audit.when.ToDatetime().isoformat()
                 else:
-                    pbtime = ""
+                    time = ""
 
                 logger.debug(
-                    f"Received {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} at {pbtime}"
+                    f"Received {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} at {time}"
                 )
 
                 try:
@@ -230,7 +230,7 @@ class PullWorker:
                     logger.info(
                         f"Successfully processed {message_type_name} message from \
                             {message_source}. kb: {pb.kbid}, resource: {pb.uuid}, \
-                                nucliadb seqid: {seqid}, partition: {self.partition} as {pbtime}"
+                                nucliadb seqid: {seqid}, partition: {self.partition} as {time}"
                     )
                     if self.cache is not None:
                         await self.cache.delete(
