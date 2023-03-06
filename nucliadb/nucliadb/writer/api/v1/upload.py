@@ -727,6 +727,9 @@ async def store_file_on_nuclia_db(
         file_field.password = password
 
     writer.files[field].CopyFrom(file_field)
+    # Do not store passwords on maindb
+    writer.files[field].ClearField("password")
+
     toprocess.filefield[field] = await processing.convert_internal_filefield_to_str(
         file_field, storage=storage
     )
