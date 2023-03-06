@@ -531,8 +531,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         logger.info("Status Call")
         response = WriterStatusResponse()
         txn = await self.proc.driver.begin()
-        async for key in KnowledgeBoxObj.get_kbs(txn, slug="", count=-1):
-            response.knowledgeboxes.append(key)
+        async for (kbid, slug) in KnowledgeBoxObj.get_kbs(txn, slug="", count=-1):
+            response.knowledgeboxes.append(slug)
 
         for partition in settings.partitions:
             msgid = await self.proc.driver.last_seqid(partition)

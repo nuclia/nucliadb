@@ -667,7 +667,7 @@ class Processor:
 
     async def list_kb(self, prefix: str):
         txn = await self.driver.begin()
-        async for slug in KnowledgeBox.get_kbs(txn, prefix):
+        async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
             yield slug
         await txn.abort()
 

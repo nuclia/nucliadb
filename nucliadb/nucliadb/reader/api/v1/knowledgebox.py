@@ -48,10 +48,8 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     driver = await get_driver()
     txn = await driver.begin()
     response = KnowledgeBoxList()
-    async for slug in KnowledgeBox.get_kbs(txn, prefix):
-        uuid = await KnowledgeBox.get_kb_uuid(txn, slug)
-        slug = slug or None  # type: ignore
-        response.kbs.append(KnowledgeBoxObjSummary(slug=slug, uuid=uuid))
+    async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
+        response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
     return response
 
 
