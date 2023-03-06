@@ -520,6 +520,8 @@ pub struct Shards {
     pub kbid: ::prost::alloc::string::String,
     #[prost(int32, tag="3")]
     pub actual: i32,
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
+    pub similarity: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResourceFieldId {

@@ -41,7 +41,7 @@ class VectorSimilarity(str, Enum):
         return VECTOR_SIMILARITY_ENUM_TO_PB[self.value]
 
     @classmethod
-    def from_pb(cls, message: PBVectorSimilarity.ValueType):
+    def from_message(cls, message: PBVectorSimilarity.ValueType):
         return cls(VECTOR_SIMILARITY_PB_TO_ENUM[message])
 
 
@@ -63,7 +63,7 @@ class VectorSet(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        as_dict["similarity"] = VectorSimilarity.from_pb(message.similarity)
+        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
         return cls(**as_dict)
 
 

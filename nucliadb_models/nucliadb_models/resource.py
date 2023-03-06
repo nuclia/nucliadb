@@ -86,7 +86,7 @@ class KnowledgeBoxConfig(BaseModel):
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
     disable_vectors: bool = False
-    similarity: Optional[VectorSimilarity] = None
+    similarity: Optional[VectorSimilarity]
 
     @validator("slug")
     def id_check(cls, v: str) -> str:
@@ -104,7 +104,6 @@ class KnowledgeBoxConfig(BaseModel):
             preserving_proto_field_name=True,
             including_default_value_fields=True,
         )
-        as_dict["similarity"] = VectorSimilarity.from_pb(message.similarity)
         return cls(**as_dict)
 
 

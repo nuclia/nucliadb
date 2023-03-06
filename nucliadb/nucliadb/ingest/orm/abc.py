@@ -150,7 +150,7 @@ class AbstractNode(metaclass=ABCMeta):
     async def new_shard(
         self,
         kbid: str,
-        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
+        similarity: VectorSimilarity.ValueType,
     ) -> ShardCreated:
         req = NewShardRequest(kbid=kbid, similarity=similarity)
         resp = await self.writer.NewShard(req)  # type: ignore

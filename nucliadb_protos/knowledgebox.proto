@@ -38,7 +38,6 @@ message KnowledgeBoxConfig {
     repeated string enabled_insights = 4;
     string slug = 5;
     bool disable_vectors = 6;
-    utils.VectorSimilarity similarity = 7;
 }
 
 // NEW
@@ -47,6 +46,7 @@ message KnowledgeBoxNew {
     string slug = 1;
     KnowledgeBoxConfig config = 2;
     string forceuuid = 3;
+    utils.VectorSimilarity similarity = 4;    
 }
 
 

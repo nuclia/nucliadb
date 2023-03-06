@@ -34,8 +34,6 @@ pub struct KnowledgeBoxConfig {
     pub slug: ::prost::alloc::string::String,
     #[prost(bool, tag="6")]
     pub disable_vectors: bool,
-    #[prost(enumeration="super::utils::VectorSimilarity", tag="7")]
-    pub similarity: i32,
 }
 // NEW
 
@@ -47,6 +45,8 @@ pub struct KnowledgeBoxNew {
     pub config: ::core::option::Option<KnowledgeBoxConfig>,
     #[prost(string, tag="3")]
     pub forceuuid: ::prost::alloc::string::String,
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="4")]
+    pub similarity: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewKnowledgeBoxResponse {

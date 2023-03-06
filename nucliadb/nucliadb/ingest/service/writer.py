@@ -214,7 +214,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     ) -> NewKnowledgeBoxResponse:
         try:
             kbid = await self.proc.create_kb(
-                request.slug, request.config, request.forceuuid
+                request.slug,
+                request.config,
+                forceuuid=request.forceuuid,
+                similarity=request.similarity,
             )
         except KnowledgeBoxConflict:
             return NewKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)

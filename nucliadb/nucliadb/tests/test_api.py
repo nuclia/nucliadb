@@ -47,13 +47,14 @@ async def test_kb_creation_with_similarity(
     resp = await nucliadb_manager.post(
         f"/kbs",
         json={"title": "My KB", "slug": "kb1"},
+        timeout=None,
     )
     assert resp.status_code == 201
-    resp = await nucliadb_reader.get("/kb/s/kb1")
+    kbid = resp.json()["uuid"]
+    resp = await nucliadb_manager.get(f"/kb/{kbid}/shards")
     assert resp.status_code == 200
     body = resp.json()
-    config = body["config"]
-    assert config["similarity"] == "cosine"
+    assert body["similarity"] == "cosine"
 
     # Check that we can define it to dot similarity
     resp = await nucliadb_manager.post(
@@ -61,11 +62,11 @@ async def test_kb_creation_with_similarity(
         json={"title": "My KB with dot similarity", "slug": "dot", "similarity": "dot"},
     )
     assert resp.status_code == 201
-    resp = await nucliadb_reader.get("/kb/s/dot")
+    dot_kbid = resp.json()["uuid"]
+    resp = await nucliadb_manager.get(f"/kb/{dot_kbid}/shards")
     assert resp.status_code == 200
     body = resp.json()
-    config = body["config"]
-    assert config["similarity"] == "dot"
+    assert body["similarity"] == "dot"
 
 
 @pytest.mark.asyncio

@@ -184,6 +184,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _SHARDOBJECT._serialized_start=6597
   _SHARDOBJECT._serialized_end=6715
   _SHARDS._serialized_start=6717
+<<<<<<< HEAD
   _SHARDS._serialized_end=6795
   _RESOURCEFIELDID._serialized_start=6797
   _RESOURCEFIELDID._serialized_end=6898
@@ -227,4 +228,43 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _GETSYNONYMSRESPONSE._serialized_end=8113
   _WRITER._serialized_start=8116
   _WRITER._serialized_end=11156
+=======
+  _SHARDS._serialized_end=6840
+  _RESOURCEFIELDID._serialized_start=6842
+  _RESOURCEFIELDID._serialized_end=6943
+  _INDEXRESOURCE._serialized_start=6945
+  _INDEXRESOURCE._serialized_end=7012
+  _INDEXSTATUS._serialized_start=7014
+  _INDEXSTATUS._serialized_end=7027
+  _RESOURCEFIELDEXISTSRESPONSE._serialized_start=7029
+  _RESOURCEFIELDEXISTSRESPONSE._serialized_end=7073
+  _RESOURCEIDREQUEST._serialized_start=7075
+  _RESOURCEIDREQUEST._serialized_end=7122
+  _RESOURCEIDRESPONSE._serialized_start=7124
+  _RESOURCEIDRESPONSE._serialized_end=7158
+  _EXPORTREQUEST._serialized_start=7160
+  _EXPORTREQUEST._serialized_end=7189
+  _SETVECTORSREQUEST._serialized_start=7191
+  _SETVECTORSREQUEST._serialized_end=7310
+  _SETVECTORSRESPONSE._serialized_start=7312
+  _SETVECTORSRESPONSE._serialized_end=7347
+  _FILEREQUEST._serialized_start=7349
+  _FILEREQUEST._serialized_end=7391
+  _BINARYDATA._serialized_start=7393
+  _BINARYDATA._serialized_end=7419
+  _BINARYMETADATA._serialized_start=7421
+  _BINARYMETADATA._serialized_end=7518
+  _UPLOADBINARYDATA._serialized_start=7520
+  _UPLOADBINARYDATA._serialized_end=7627
+  _FILEUPLOADED._serialized_start=7629
+  _FILEUPLOADED._serialized_end=7643
+  _CREATESHADOWSHARDREQUEST._serialized_start=7645
+  _CREATESHADOWSHARDREQUEST._serialized_end=7740
+  _DELETESHADOWSHARDREQUEST._serialized_start=7742
+  _DELETESHADOWSHARDREQUEST._serialized_end=7823
+  _SHADOWSHARDRESPONSE._serialized_start=7825
+  _SHADOWSHARDRESPONSE._serialized_end=7909
+  _WRITER._serialized_start=7912
+  _WRITER._serialized_end=10724
+>>>>>>> 0543cfe0 (Store similarity in shards object)
 # @@protoc_insertion_point(module_scope)

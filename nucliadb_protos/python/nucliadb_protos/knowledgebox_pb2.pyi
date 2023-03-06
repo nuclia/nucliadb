@@ -114,7 +114,6 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     ENABLED_INSIGHTS_FIELD_NUMBER: builtins.int
     SLUG_FIELD_NUMBER: builtins.int
     DISABLE_VECTORS_FIELD_NUMBER: builtins.int
-    SIMILARITY_FIELD_NUMBER: builtins.int
     title: builtins.str
     description: builtins.str
     @property
@@ -123,7 +122,6 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
     def enabled_insights(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     slug: builtins.str
     disable_vectors: builtins.bool
-    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
@@ -133,9 +131,8 @@ class KnowledgeBoxConfig(google.protobuf.message.Message):
         enabled_insights: collections.abc.Iterable[builtins.str] | None = ...,
         slug: builtins.str = ...,
         disable_vectors: builtins.bool = ...,
-        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "similarity", b"similarity", "slug", b"slug", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["description", b"description", "disable_vectors", b"disable_vectors", "enabled_filters", b"enabled_filters", "enabled_insights", b"enabled_insights", "slug", b"slug", "title", b"title"]) -> None: ...
 
 global___KnowledgeBoxConfig = KnowledgeBoxConfig
 
@@ -148,19 +145,22 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     SLUG_FIELD_NUMBER: builtins.int
     CONFIG_FIELD_NUMBER: builtins.int
     FORCEUUID_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
     slug: builtins.str
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
     forceuuid: builtins.str
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
         slug: builtins.str = ...,
         config: global___KnowledgeBoxConfig | None = ...,
         forceuuid: builtins.str = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "forceuuid", b"forceuuid", "slug", b"slug"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "forceuuid", b"forceuuid", "similarity", b"similarity", "slug", b"slug"]) -> None: ...
 
 global___KnowledgeBoxNew = KnowledgeBoxNew
 

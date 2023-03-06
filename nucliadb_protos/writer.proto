@@ -370,6 +370,7 @@ message Shards {
     repeated ShardObject shards = 1;
     string kbid = 2;
     int32 actual = 3;
+    utils.VectorSimilarity similarity = 4;
 }
 
 message ResourceFieldId {

@@ -38,7 +38,7 @@ from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_driver, get_nodes
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards, ShardObject
+from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -64,11 +64,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
             status_code=404,
             detail="The knowledgebox or its shards configuration is missing",
         )
-    result = KnowledgeboxShards(kbid=shards.kbid, actual=shards.actual, shards=[])
-    for shard_object in shards.shards:
-        shard_object_py: ShardObject = ShardObject.from_message(shard_object)
-        result.shards.append(shard_object_py)
-    return result
+    return KnowledgeboxShards.from_message(shards)
 
 
 @api.get(
