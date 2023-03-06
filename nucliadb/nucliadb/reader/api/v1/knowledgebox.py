@@ -20,14 +20,10 @@
 from fastapi import HTTPException
 from fastapi_versioning import version  # type: ignore
 from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBox,
-    KnowledgeBoxID,
-    KnowledgeBoxPrefix,
-    KnowledgeBoxResponseStatus,
-)
 from starlette.requests import Request
 
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.utils import get_driver
 from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
     KnowledgeBoxList,
@@ -36,7 +32,6 @@ from nucliadb_models.resource import (
     NucliaDBRoles,
 )
 from nucliadb_utils.authentication import requires, requires_one
-from nucliadb_utils.utilities import get_ingest
 
 
 @api.get(
@@ -50,14 +45,13 @@ from nucliadb_utils.utilities import get_ingest
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
-    ingest = get_ingest()
+    driver = await get_driver()
+    txn = await driver.begin()
     response = KnowledgeBoxList()
-    async for kb_id in ingest.ListKnowledgeBox(KnowledgeBoxPrefix(prefix=prefix)):  # type: ignore
-        if kb_id.slug == "":
-            slug = None
-        else:
-            slug = kb_id.slug
-        response.kbs.append(KnowledgeBoxObjSummary(slug=slug, uuid=kb_id.uuid))
+    async for slug in KnowledgeBox.get_kbs(txn, prefix):
+        uuid = await KnowledgeBox.get_kb_uuid(txn, slug)
+        slug = slug or None  # type: ignore
+        response.kbs.append(KnowledgeBoxObjSummary(slug=slug, uuid=uuid))
     return response
 
 
@@ -71,18 +65,18 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
-    ingest = get_ingest()
-    kbobj: KnowledgeBox = await ingest.GetKnowledgeBox(KnowledgeBoxID(uuid=kbid))  # type: ignore
-    if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(
-            uuid=kbobj.uuid,
-            slug=kbobj.slug,
-            config=MessageToDict(kbobj.config, preserving_proto_field_name=True),
-        )
-    elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
+    driver = await get_driver()
+    txn = await driver.begin()
+
+    kb_config = await KnowledgeBox.get_kb(txn, kbid)
+    if kb_config is None:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    else:
-        raise HTTPException(status_code=500, detail="Uknonwn GRPC response")
+
+    return KnowledgeBoxObj(
+        uuid=kbid,
+        slug=kb_config.slug,
+        config=MessageToDict(kb_config, preserving_proto_field_name=True),
+    )
 
 
 @api.get(
@@ -95,15 +89,19 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
-    ingest = get_ingest()
-    kbobj: KnowledgeBox = await ingest.GetKnowledgeBox(KnowledgeBoxID(slug=slug))  # type: ignore
-    if kbobj.status == KnowledgeBoxResponseStatus.OK:
-        return KnowledgeBoxObj(
-            uuid=kbobj.uuid,
-            slug=kbobj.slug,
-            config=MessageToDict(kbobj.config, preserving_proto_field_name=True),
-        )
-    elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
+    driver = await get_driver()
+    txn = await driver.begin()
+
+    kbid = await KnowledgeBox.get_kb_uuid(txn, slug)
+    if kbid is None:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
-    else:
-        raise HTTPException(status_code=500, detail="Uknonwn GRPC response")
+
+    kb_config = await KnowledgeBox.get_kb(txn, kbid)
+    if kb_config is None:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+    return KnowledgeBoxObj(
+        uuid=kbid,
+        slug=kb_config.slug,
+        config=MessageToDict(kb_config, preserving_proto_field_name=True),
+    )
