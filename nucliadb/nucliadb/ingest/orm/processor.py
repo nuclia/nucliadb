@@ -34,7 +34,11 @@ from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
-from nucliadb.ingest.orm.exceptions import DeadletteredError, KnowledgeBoxNotFound
+from nucliadb.ingest.orm.exceptions import (
+    DeadletteredError,
+    KnowledgeBoxNotFound,
+    SequenceOrderViolation,
+)
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard, ShardCounter
@@ -240,7 +244,7 @@ class Processor:
         seqid: int,
         partition: Optional[str] = None,
         transaction_check: bool = True,
-    ) -> bool:
+    ):
         partition = partition if self.partition is None else self.partition
         if partition is None:
             raise AttributeError()
@@ -251,7 +255,7 @@ class Processor:
         if transaction_check:
             last_seqid = await self.driver.last_seqid(partition)
             if last_seqid is not None and seqid <= last_seqid:
-                return False
+                raise SequenceOrderViolation(last_seqid)
 
         audit_type: Optional[int] = None
         audit_fields = None
@@ -279,7 +283,6 @@ class Processor:
                     if txn_result.counter is not None
                     else None
                 )
-
         elif message.type == BrokerMessage.MessageType.MULTI:
             await self.multi(message, seqid)
         elif message.type == BrokerMessage.MessageType.COMMIT:
@@ -300,7 +303,6 @@ class Processor:
                     if txn_result.counter is not None
                     else None
                 )
-
         elif message.type == BrokerMessage.MessageType.ROLLBACK:
             await self.rollback(message, seqid, partition)
 
@@ -318,7 +320,6 @@ class Processor:
             logger.warning("No audit defined")
         elif audit_type is None and txn_result is not None:
             logger.warning(f"Audit type empty txn_result: {txn_result.action}")
-        return True
 
     async def get_resource_uuid(self, kb: KnowledgeBox, message: BrokerMessage) -> str:
         if message.uuid is None:
@@ -436,10 +437,10 @@ class Processor:
             elif resource and resource.modified is False:
                 await txn.abort()
                 await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
-                logger.warn(f"This message did not modified resource")
+                logger.warn(f"This message did not modify the resource")
         except Exception as exc:
             # As we are in the middle of a transaction, we cannot let the exception raise directly
-            # as we need to do some cleanup. Exception will be reraised at the end of the function
+            # as we need to do some cleanup. The exception will be reraised at the end of the function
             # and then handled by the top caller, so errors can be handled in the same place.
             await self.deadletter(messages, partition, seqid)
             await self.notify_abort(partition, origin_txn, multi, kbid, uuid)
@@ -447,8 +448,8 @@ class Processor:
         finally:
             if resource is not None:
                 resource.clean()
-            # tx should be already commited or aborted, but in the event of an exception
-            # it could be left open. Make sure to close it it's still open
+            # txn should be already commited or aborted, but in the event of an exception
+            # it could be left open. Make sure to close it if it's still open
             if txn.open:
                 await txn.abort()
 
@@ -525,7 +526,7 @@ class Processor:
                 await resource.set_basic(
                     message.basic,
                     slug=message.slug,
-                    deleted_fields=[field for field in message.delete_fields],
+                    deleted_fields=message.delete_fields,  # type: ignore
                 )
         elif resource is None and message.source is message.MessageSource.PROCESSOR:
             # It's a new resource, and somehow we received the message coming from processing before

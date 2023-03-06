@@ -180,7 +180,7 @@ class Resource:
         deleted_fields: Optional[List[FieldID]] = None,
     ):
         """
-        deleted_fields arg is needed to clean classification labels of removed fields from computedmetadata
+        Some basic fields are computed off field metadata. This means we need to recompute upon field deletions.
         """
         await self.get_basic()
         if self.basic is not None and self.basic != payload:

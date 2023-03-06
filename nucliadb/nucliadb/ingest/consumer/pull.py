@@ -30,7 +30,11 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.maindb.driver import Driver
-from nucliadb.ingest.orm.exceptions import DeadletteredError, ReallyStopPulling
+from nucliadb.ingest.orm.exceptions import (
+    DeadletteredError,
+    ReallyStopPulling,
+    SequenceOrderViolation,
+)
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.sentry import SENTRY
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
@@ -213,9 +217,15 @@ class PullWorker:
                 logger.debug(
                     f"Received {message_source} on {pb.kbid}/{pb.uuid} seq {seqid} at {time}"
                 )
-                processed = await self.processor.process(pb, seqid, self.partition)
 
-                if processed:
+                try:
+                    await self.processor.process(pb, seqid, self.partition)
+                except SequenceOrderViolation as err:
+                    logger.error(
+                        f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition}). \
+                             Current seqid: {err.last_seqid}"
+                    )
+                else:
                     message_type_name = pb.MessageType.Name(pb.type)
                     logger.info(
                         f"Successfully processed {message_type_name} message from \
@@ -226,16 +236,11 @@ class PullWorker:
                         await self.cache.delete(
                             KB_COUNTER_CACHE.format(kbid=pb.kbid), invalidate=True
                         )
-                else:
-                    logger.error(
-                        f"Old txn: DISCARD (nucliadb seqid: {seqid}, partition: {self.partition})"
-                    )
             except DeadletteredError as e:
                 # Messages that have been sent to deadletter at some point
                 # We don't want to process it again so it's ack'd
                 if SENTRY:
                     capture_exception(e)
-
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     f"A copy of the message has been stored on {self.processor.storage.deadletter_bucket}. "
@@ -245,22 +250,19 @@ class PullWorker:
             except (ShardsNotFound,) as e:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
-                #  - ShardsNotFound: /kb/{id}/shards key or the whole /kb/{kbid} is missing
+                # - ShardsNotFound: /kb/{id}/shards key or the whole /kb/{kbid} is missing
                 if SENTRY:
                     capture_exception(e)
-
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
-                    f"This message has been dropped, won't be retried again"
+                    f"This message has been dropped and won't be retried again"
                     f"Check sentry for more details: {str(e)}"
                 )
                 await msg.ack()
-
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
                 if SENTRY:
                     capture_exception(e)
-
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     "Message has not been ACKd and will be retried. "

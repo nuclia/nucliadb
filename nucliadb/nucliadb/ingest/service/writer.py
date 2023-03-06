@@ -91,7 +91,6 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.maindb.driver import TXNID
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -268,10 +267,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = OpStatusWriter()
         cache = await get_cache()
         async for message in request_stream:
-            processed: bool = False
             try:
-                processed = await self.proc.process(
-                    message, -1, 0, transaction_check=False
+                await self.proc.process(
+                    message, -1, partition=0, transaction_check=False
                 )
             except Exception:
                 logger.exception("Error processing", stack_info=True)
@@ -279,7 +277,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 break
             response.status = OpStatusWriter.Status.OK
             logger.info(f"Processed {message.uuid}")
-            if processed and cache is not None:
+            if cache is not None:
                 await cache.delete(
                     KB_COUNTER_CACHE.format(kbid=message.kbid), invalidate=True
                 )
@@ -537,8 +535,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             response.knowledgeboxes.append(key)
 
         for partition in settings.partitions:
-            key = TXNID.format(worker=partition)
-            msgid = await txn.get(key)
+            msgid = await self.proc.driver.last_seqid(partition)
             if msgid is not None:
                 response.msgid[partition] = msgid
 
