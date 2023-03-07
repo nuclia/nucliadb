@@ -17,12 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import List, Optional, Type, TypeVar
+from typing import Dict, List, Type, TypeVar
 
-from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel
 
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import knowledgebox_pb2
 
 _T = TypeVar("_T")
 
@@ -30,22 +29,25 @@ _T = TypeVar("_T")
 # Shared classes
 
 
-class Keyword(BaseModel):
-    value: str
-
-
-class FieldKeywordset(BaseModel):
-    keywords: Optional[List[Keyword]]
+class KnowledgeBoxSynonyms(BaseModel):
+    synonyms: Dict[str, List[str]]
 
     @classmethod
-    def from_message(cls: Type[_T], message: resources_pb2.FieldKeywordset) -> _T:
+    def from_message(cls: Type[_T], message: knowledgebox_pb2.Synonyms) -> _T:
         return cls(
-            **MessageToDict(
-                message,
-                preserving_proto_field_name=True,
-                including_default_value_fields=True,
+            **dict(
+                synonyms={
+                    term: list(value.synonyms)
+                    for term, value in message.synonyms.items()
+                }
             )
         )
+
+    def to_message(self) -> knowledgebox_pb2.Synonyms:
+        pbsyn = knowledgebox_pb2.Synonyms()
+        for term, synonyms in self.synonyms.items():
+            pbsyn.synonyms[term].synonyms.extend(synonyms)
+        return pbsyn
 
 
 # Visualization classes (Those used on reader endpoints)
@@ -53,4 +55,4 @@ class FieldKeywordset(BaseModel):
 # - This model is unified
 
 # Processing classes (Those used to sent to push endpoints)
-# - Doesn't apply, Keywordsets are not sent to process
+# - Doesn't apply, Synonyms are not sent to process

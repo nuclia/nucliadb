@@ -463,6 +463,19 @@ message ShadowShardResponse {
     bool success = 2;
 }
 
+message SynonymsRequest {
+    string kbid = 1;
+}
+
+message SetSynonymsRequest {
+    knowledgebox.KnowledgeBoxID kbid = 1;
+    knowledgebox.Synonyms synonyms = 2;
+}
+
+message GetSynonymsResponse {
+    OpStatusWriter status = 1;
+    knowledgebox.Synonyms synonyms = 2;
+}
 
 service Writer {
     rpc GetKnowledgeBox(knowledgebox.KnowledgeBoxID) returns (knowledgebox.KnowledgeBox) {}
@@ -502,6 +515,11 @@ service Writer {
     rpc GetWidgets(GetWidgetsRequest) returns (GetWidgetsResponse) {}
     rpc SetWidgets(SetWidgetsRequest) returns (OpStatusWriter) {}
     rpc DelWidgets(DetWidgetsRequest) returns (OpStatusWriter) {}
+
+    // Synonyms
+    rpc GetSynonyms(knowledgebox.KnowledgeBoxID) returns (GetSynonymsResponse) {}
+    rpc SetSynonyms(SetSynonymsRequest) returns (OpStatusWriter) {}
+    rpc DeleteSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 

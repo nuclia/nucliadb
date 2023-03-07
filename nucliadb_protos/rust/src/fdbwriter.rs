@@ -651,3 +651,22 @@ pub struct ShadowShardResponse {
     #[prost(bool, tag="2")]
     pub success: bool,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SynonymsRequest {
+    #[prost(string, tag="1")]
+    pub kbid: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetSynonymsRequest {
+    #[prost(message, optional, tag="1")]
+    pub kbid: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+    #[prost(message, optional, tag="2")]
+    pub synonyms: ::core::option::Option<super::knowledgebox::Synonyms>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetSynonymsResponse {
+    #[prost(message, optional, tag="1")]
+    pub status: ::core::option::Option<OpStatusWriter>,
+    #[prost(message, optional, tag="2")]
+    pub synonyms: ::core::option::Option<super::knowledgebox::Synonyms>,
+}

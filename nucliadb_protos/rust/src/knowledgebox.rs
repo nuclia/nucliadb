@@ -212,6 +212,16 @@ pub struct VectorSets {
     #[prost(map="string, message", tag="1")]
     pub vectorsets: ::std::collections::HashMap<::prost::alloc::string::String, VectorSet>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TermSynonyms {
+    #[prost(string, repeated, tag="1")]
+    pub synonyms: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Synonyms {
+    #[prost(map="string, message", tag="1")]
+    pub synonyms: ::std::collections::HashMap<::prost::alloc::string::String, TermSynonyms>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum KnowledgeBoxResponseStatus {

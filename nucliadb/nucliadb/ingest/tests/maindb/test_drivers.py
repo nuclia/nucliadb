@@ -48,6 +48,11 @@ async def test_local_driver(local_driver):
 async def driver_basic(driver):
     await driver.initialize()
 
+    # Test deleting a key that doesn't exist does not raise any error
+    txn = await driver.begin()
+    await txn.delete("/i/do/not/exist")
+    await txn.commit(resource=False)
+
     txn = await driver.begin()
     await txn.set("/internal/kbs/kb1/title", b"My title")
     await txn.set("/internal/kbs/kb1/shards/shard1", b"node1")

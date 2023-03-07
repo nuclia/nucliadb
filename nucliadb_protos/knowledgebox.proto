@@ -166,3 +166,13 @@ message VectorSet {
 message VectorSets {
     map<string, VectorSet> vectorsets = 1;
 }
+
+
+message TermSynonyms {
+    repeated string synonyms = 1;
+}
+
+
+message Synonyms {
+    map <string, TermSynonyms> synonyms = 1;
+}

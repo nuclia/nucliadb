@@ -19,6 +19,7 @@
 #
 from fastapi import HTTPException, Response
 from fastapi_versioning import version
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxID
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
 from nucliadb_protos.knowledgebox_pb2 import Widget as WidgetPB
@@ -30,6 +31,7 @@ from nucliadb_protos.writer_pb2 import (
     OpStatusWriter,
     SetEntitiesRequest,
     SetLabelsRequest,
+    SetSynonymsRequest,
     SetWidgetsRequest,
 )
 from starlette.requests import Request
@@ -39,6 +41,7 @@ from nucliadb.writer.resource.vectors import create_vectorset  # type: ignore
 from nucliadb_models.entities import EntitiesGroup
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.vectors import VectorSet
 from nucliadb_models.widgets import Widget, WidgetMode
 from nucliadb_telemetry.utils import set_info_on_span
@@ -310,3 +313,53 @@ async def delete_vectorset(request: Request, kbid: str, vectorset: str):
             status_code=500, detail="Error on deleting vectorset from a Knowledge box"
         )
     return Response(status_code=204)
+
+
+@api.put(
+    f"/{KB_PREFIX}/{{kbid}}/synonyms",
+    status_code=200,
+    name="Set Knowledge Box Synonyms",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-operation_order": 1},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def set_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
+    set_info_on_span({"nuclia.kbid": kbid})
+    ingest = get_ingest()
+    pbrequest = SetSynonymsRequest()
+    pbrequest.kbid.uuid = kbid
+    pbrequest.synonyms.CopyFrom(item.to_message())
+    status: OpStatusWriter = await ingest.SetSynonyms(pbrequest)  # type: ignore
+    if status.status == OpStatusWriter.Status.OK:
+        return Response(status_code=204)
+    elif status.status == OpStatusWriter.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif status.status == OpStatusWriter.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error setting synonyms of a Knowledge box"
+        )
+
+
+@api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/synonyms",
+    status_code=200,
+    name="Delete Knowledge Box Synonyms",
+    tags=["Knowledge Box Services"],
+    openapi_extra={"x-operation_order": 3},
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_synonyms(request: Request, kbid: str):
+    set_info_on_span({"nuclia.kbid": kbid})
+    ingest = get_ingest()
+    pbrequest = KnowledgeBoxID(uuid=kbid)
+    status: OpStatusWriter = await ingest.DeleteSynonyms(pbrequest)  # type: ignore
+    if status.status == OpStatusWriter.Status.OK:
+        return Response(status_code=204)
+    elif status.status == OpStatusWriter.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif status.status == OpStatusWriter.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error deleting synonyms of a Knowledge box"
+        )
