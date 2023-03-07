@@ -17,8 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.utils import get_driver  # noqa
-from nucliadb.search.nodes import NodesManager
 from nucliadb.search.predict import PredictEngine
 from nucliadb_utils.utilities import Utility, get_utility
 
