@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 from typing import AsyncGenerator, Dict, Optional, Set, Tuple
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -34,6 +35,7 @@ from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
+from sentry_sdk import capture_exception
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.maindb.driver import Transaction
@@ -42,7 +44,12 @@ from nucliadb.ingest.maindb.keys import (
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
 )
+from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.nodes_manager import NodesManager
+from nucliadb.ingest.settings import settings
+from nucliadb.ingest.utils import get_driver
+from nucliadb_utils.utilities import get_cache
 
 
 class EntitiesManager:
@@ -122,22 +129,50 @@ class EntitiesManager:
         return eg
 
     async def get_indexed_entities_group(self, group: str) -> Optional[EntitiesGroup]:
-        node, shard_id = await self.kb.arbitrary_kb_node()
-        request = RelationSearchRequest(
-            shard_id=shard_id,
-            prefix=RelationPrefixSearchRequest(
-                prefix="",
-                node_filters=[
-                    RelationNodeFilter(
-                        node_type=RelationNode.NodeType.ENTITY, node_subtype=group
-                    )
-                ],
-            ),
-        )
-        results = await node.reader.RelationSearch(request)  # type: ignore
-        entities = {
-            node.value: Entity(value=node.value) for node in results.prefix.nodes
-        }
+        driver = await get_driver()
+        cache = await get_cache()
+        nodes_manager = NodesManager(driver=driver, cache=cache)
+        shards = await nodes_manager.get_shards_by_kbid(self.kbid)
+        ops = []
+
+        for shard_obj in shards:
+            node, shard_id, node_id = nodes_manager.choose_node(shard_obj, shards)  # type: ignore
+            if shard_id is None:
+                raise ShardNotFound("Found a node but not a shard")
+
+            request = RelationSearchRequest(
+                shard_id=shard_id,
+                prefix=RelationPrefixSearchRequest(
+                    prefix="",
+                    node_filters=[
+                        RelationNodeFilter(
+                            node_type=RelationNode.NodeType.ENTITY, node_subtype=group
+                        )
+                    ],
+                ),
+            )
+            ops.append(node.reader.RelationSearch(request))
+
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*ops, return_exceptions=True),  # type: ignore
+                timeout=settings.relation_search_timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            capture_exception(exc)
+            raise NodeError("Node unavailable for relation search") from exc
+
+        for result in results:
+            if isinstance(result, Exception):
+                capture_exception(result)
+                raise NodeError("Error while querying relation index")
+
+        entities = {}
+        for result in results:
+            entities.update(
+                {node.value: Entity(value=node.value) for node in result.prefix.nodes}
+            )
+
         if not entities:
             return None
         eg = EntitiesGroup(entities=entities)

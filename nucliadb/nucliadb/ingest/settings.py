@@ -78,5 +78,8 @@ class Settings(BaseSettings):
 
     max_receive_message_length: int = 4
 
+    # Search query timeouts
+    relation_search_timeout: float = 10.0
+
 
 settings = Settings()
