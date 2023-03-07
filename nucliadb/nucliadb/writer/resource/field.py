@@ -219,8 +219,6 @@ async def parse_internal_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
-    if file_field.password:
-        writer.files[key].password = file_field.password
 
     processing = get_processing()
 
@@ -256,8 +254,6 @@ def parse_external_file_field(
     writer.files[key].added.FromDatetime(datetime.now())
     if file_field.language:
         writer.files[key].language = file_field.language
-    if file_field.password:
-        writer.files[key].password = file_field.password
     uri = file_field.file.uri
     writer.files[key].url = uri  # type: ignore
     writer.files[key].file.uri = uri  # type: ignore
