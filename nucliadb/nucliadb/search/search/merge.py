@@ -321,6 +321,7 @@ async def merge_paragraph_results(
     raw_paragraph_list: List[Tuple[ParagraphResult, Score]] = []
     facets: Dict[str, Any] = {}
     query = None
+    # TODO: add advanced_query on paragraph response too
     next_page = False
     ematches: Optional[List[str]] = None
     for paragraph_response in paragraph_responses:
@@ -328,7 +329,6 @@ async def merge_paragraph_results(
             ematches = paragraph_response.ematches  # type: ignore
         if query is None:
             query = paragraph_response.query
-
         if paragraph_response.facets:
             for key, value in paragraph_response.facets.items():
                 for facetresult in value.facetresults:

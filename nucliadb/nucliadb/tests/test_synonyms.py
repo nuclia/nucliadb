@@ -87,7 +87,6 @@ async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip("Will be implemented in another PR")
 async def test_search_with_synonims(
     nucliadb_reader,
     nucliadb_writer,
@@ -95,7 +94,9 @@ async def test_search_with_synonims(
 ):
     kbid = knowledgebox_with_synonyms
 
-    # Create a resource
+    # Create a resource with:
+    # - the term on the summary
+    # - one of the synonyms in the title
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
@@ -105,15 +106,32 @@ async def test_search_with_synonims(
             "icon": "text/plain",
         },
     )
+    # Create another resource with the remaining
+    # synonyms present in title and summary fields
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "myresource",
+            "title": "Globe Sphere",
+            "summary": "A world that is the home of many incredible creatures",
+            "icon": "text/plain",
+        },
+    )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.post(f"/kb/{kbid}/search?query=planet")
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(
+            query="planet",
+            with_synonyms=True,
+            highlight=True,
+        ),
+    )
     assert resp.status_code == 200
     body = resp.json()
 
-    # Fulltext and paragraph search should match on
-    # summary (term) and title (synonym)
-    assert len(body["paragraphs"]["results"]) == 2
-    assert len(body["fulltext"]["results"]) == 2
+    # Paragraph search should match on summary (term)
+    # and title (synonym) for the two resources
+    assert len(body["paragraphs"]["results"]) == 4
     assert body["resources"][rid]

@@ -121,6 +121,7 @@ class Paragraphs(BaseModel):
     results: List[Paragraph] = []
     facets: Optional[FacetsResult] = None
     query: Optional[str] = None
+    advanced_query: Optional[str] = None
     total: int = 0
     page_number: int = 0
     page_size: int = 20
@@ -349,3 +350,4 @@ class SearchRequest(BaseModel):
     vectorset: Optional[str] = None
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
+    with_synonyms: bool = False
