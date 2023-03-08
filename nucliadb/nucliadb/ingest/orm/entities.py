@@ -49,6 +49,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
+from nucliadb.sentry import SENTRY
 from nucliadb_utils.utilities import get_cache
 
 
@@ -159,12 +160,14 @@ class EntitiesManager:
                 timeout=settings.relation_search_timeout,
             )
         except asyncio.TimeoutError as exc:
-            capture_exception(exc)
+            if SENTRY:
+                capture_exception(exc)
             raise NodeError("Node unavailable for relation search") from exc
 
         for result in results:
             if isinstance(result, Exception):
-                capture_exception(result)
+                if SENTRY:
+                    capture_exception(result)
                 raise NodeError("Error while querying relation index")
 
         entities = {}
