@@ -50,6 +50,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     response = KnowledgeBoxList()
     async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
         response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
+    await txn.abort()
     return response
 
 
@@ -65,8 +66,9 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
 async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
     driver = await get_driver()
     txn = await driver.begin()
-
     kb_config = await KnowledgeBox.get_kb(txn, kbid)
+    await txn.abort()
+
     if kb_config is None:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
@@ -92,12 +94,15 @@ async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
 
     kbid = await KnowledgeBox.get_kb_uuid(txn, slug)
     if kbid is None:
+        await txn.abort()
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
     kb_config = await KnowledgeBox.get_kb(txn, kbid)
     if kb_config is None:
+        await txn.abort()
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
+    await txn.abort()
     return KnowledgeBoxObj(
         uuid=kbid,
         slug=kb_config.slug,
