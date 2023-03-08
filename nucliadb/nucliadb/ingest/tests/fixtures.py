@@ -25,6 +25,7 @@ from os.path import dirname, getsize
 from shutil import rmtree
 from tempfile import mkdtemp
 from typing import AsyncIterator, List, Optional
+from unittest.mock import AsyncMock, patch
 
 import nats
 import pytest
@@ -744,3 +745,17 @@ def metrics_registry():
             continue
         collector._metrics.clear()
     yield prometheus_client.registry.REGISTRY
+
+
+@pytest.fixture(scope="function")
+async def entities_manager_mock():
+    """EntitiesManager mock for ingest gRPC API disabling indexed entities
+    functionality. As tests doesn't startup a node, with this mock we allow
+    testing ingest's gRPC API while the whole entities functionality is properly
+    tested in tests nos using this fixture.
+
+    """
+    klass = "nucliadb.ingest.service.writer.EntitiesManager"
+    with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
+        with patch(f"{klass}.index_entities_group", AsyncMock(return_value=None)):
+            yield

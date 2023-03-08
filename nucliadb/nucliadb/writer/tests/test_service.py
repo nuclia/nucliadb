@@ -28,7 +28,7 @@ from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.mark.asyncio
-async def test_service_lifecycle_entities(writer_api):
+async def test_service_lifecycle_entities(writer_api, entities_manager_mock):
     async with writer_api(roles=[NucliaDBRoles.MANAGER]) as client:
         resp = await client.post(
             f"/{KBS_PREFIX}",
@@ -72,7 +72,7 @@ async def test_service_lifecycle_entities(writer_api):
 
 
 @pytest.mark.asyncio
-async def test_entities_custom_field(writer_api):
+async def test_entities_custom_field(writer_api, entities_manager_mock):
     """
     Test description:
 

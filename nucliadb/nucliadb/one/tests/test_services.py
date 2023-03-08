@@ -87,7 +87,9 @@ async def test_disable_vectors_service(
 
 @pytest.mark.asyncio
 async def test_entities_service(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    nucliadb_api: Callable[..., AsyncClient],
+    knowledgebox_one,
+    entities_manager_mock,
 ) -> None:
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         entitygroup = {
