@@ -90,7 +90,10 @@ class Worker:
 
     async def error_cb(self, e):
         capture_exception(e)
-        logger.error("There was an error on the worker, check sentry: {}".format(e))
+        logger.error(
+            "There was an error on the worker, check sentry: {}".format(e),
+            exc_info=True,
+        )
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")

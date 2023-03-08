@@ -114,7 +114,9 @@ class PullWorker:
         )
 
     async def error_cb(self, e):
-        logger.error("There was an error on consumer ingest worker: {}".format(e))
+        logger.error(
+            "There was an error on consumer ingest worker: {}".format(e), exc_info=True
+        )
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
