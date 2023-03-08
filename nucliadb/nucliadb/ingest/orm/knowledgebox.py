@@ -181,9 +181,14 @@ class KnowledgeBox:
     @classmethod
     async def get_kbs(
         cls, txn: Transaction, slug: str, count: int = -1
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[Tuple[str, str]]:
         async for key in txn.keys(KB_SLUGS.format(slug=slug), count=count):
-            yield key.replace(KB_SLUGS_BASE, "")
+            slug = key.replace(KB_SLUGS_BASE, "")
+            uuid = await cls.get_kb_uuid(txn, slug)
+            if uuid is None:
+                logger.error(f"KB with slug ({slug}) but without uuid?")
+                continue
+            yield (uuid, slug)
 
     @classmethod
     async def create(
