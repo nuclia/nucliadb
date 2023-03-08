@@ -92,8 +92,6 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.maindb.driver import TXNID
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
