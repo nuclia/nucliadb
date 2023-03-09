@@ -103,6 +103,7 @@ class KnowledgeBox:
         self.kbid = kbid
         self.cache = cache
         self._config: Optional[KnowledgeBoxConfig] = None
+        self.synonyms = Synonyms(self.txn, self.kbid)
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
@@ -436,15 +437,15 @@ class KnowledgeBox:
         await self.txn.delete(entities_key)
 
     async def get_synonyms(self, synonyms: PBSynonyms):
-        pbsyn = await Synonyms(self.txn, self.kbid).get()
+        pbsyn = await self.synonyms.get()
         if pbsyn is not None:
             synonyms.CopyFrom(pbsyn)
 
     async def set_synonyms(self, synonyms: PBSynonyms):
-        await Synonyms(self.txn, self.kbid).set(synonyms)
+        await self.synonyms.set(synonyms)
 
     async def delete_synonyms(self):
-        await Synonyms(self.txn, self.kbid).clear()
+        await self.synonyms.clear()
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):
