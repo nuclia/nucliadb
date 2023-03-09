@@ -31,11 +31,11 @@ async def test_set_get(txn, gcs_storage, fake_node, knowledgebox_ingest):
     assert await synonyms.get() is None
 
     pbs = PBSynonyms()
-    pbs.synonyms["planet"].synonyms.extend(["globe", "earth"])
+    pbs.terms["planet"].synonyms.extend(["globe", "earth"])
     await synonyms.set(pbs)
 
     pbs2 = await synonyms.get()
-    assert pbs2.synonyms["planet"].synonyms == ["globe", "earth"]
+    assert pbs2.terms["planet"].synonyms == ["globe", "earth"]
 
 
 @pytest.mark.asyncio
@@ -45,7 +45,7 @@ async def test_clear(txn, gcs_storage, fake_node, knowledgebox_ingest):
     await synonyms.clear()
 
     pbs = PBSynonyms()
-    pbs.synonyms["planet"].synonyms.extend(["globe", "earth"])
+    pbs.terms["planet"].synonyms.extend(["globe", "earth"])
     await synonyms.set(pbs)
 
     await synonyms.clear()
