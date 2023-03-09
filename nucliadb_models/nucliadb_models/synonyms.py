@@ -37,16 +37,16 @@ class KnowledgeBoxSynonyms(BaseModel):
         return cls(
             **dict(
                 synonyms={
-                    term: list(value.synonyms)
-                    for term, value in message.synonyms.items()
+                    term: list(term_synonyms.synonyms)
+                    for term, term_synonyms in message.terms.items()
                 }
             )
         )
 
     def to_message(self) -> knowledgebox_pb2.Synonyms:
         pbsyn = knowledgebox_pb2.Synonyms()
-        for term, synonyms in self.synonyms.items():
-            pbsyn.synonyms[term].synonyms.extend(synonyms)
+        for term, term_synonyms in self.synonyms.items():
+            pbsyn.terms[term].synonyms.extend(term_synonyms)
         return pbsyn
 
 
