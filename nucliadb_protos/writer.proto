@@ -519,7 +519,7 @@ service Writer {
     // Synonyms
     rpc GetSynonyms(knowledgebox.KnowledgeBoxID) returns (GetSynonymsResponse) {}
     rpc SetSynonyms(SetSynonymsRequest) returns (OpStatusWriter) {}
-    rpc DeleteSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
+    rpc DelSynonyms(knowledgebox.KnowledgeBoxID) returns (OpStatusWriter) {}
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 

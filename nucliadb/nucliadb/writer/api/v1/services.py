@@ -354,7 +354,7 @@ async def delete_synonyms(request: Request, kbid: str):
     set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = KnowledgeBoxID(uuid=kbid)
-    status: OpStatusWriter = await ingest.DeleteSynonyms(pbrequest)  # type: ignore
+    status: OpStatusWriter = await ingest.DelSynonyms(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:
         return Response(status_code=204)
     elif status.status == OpStatusWriter.Status.NOTFOUND:

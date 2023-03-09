@@ -573,7 +573,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.ERROR
                 return response
 
-    async def DeleteSynonyms(  # type: ignore
+    async def DelSynonyms(  # type: ignore
         self, request: KnowledgeBoxID, context=None
     ) -> OpStatusWriter:
         kbid = request
