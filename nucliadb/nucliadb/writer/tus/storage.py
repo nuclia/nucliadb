@@ -36,6 +36,12 @@ class BlobStore:
     bucket: str
     source: CloudFile.Source.V
 
+    async def initialize(self, *args, **kwargs):
+        pass
+
+    async def finalize(self):
+        pass
+
     async def create_bucket(self, bucket_name: str) -> bool:
         raise NotImplementedError()
 

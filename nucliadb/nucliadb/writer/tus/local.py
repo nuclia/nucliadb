@@ -144,7 +144,7 @@ class LocalBlobStore(BlobStore):
         self.bucket = "ndb_{kbid}"
         self.source = CloudFile.LOCAL
 
-    async def initialize(self):
+    async def initialize(self, *args, **kwargs):
         pass
 
     async def finalize(self):

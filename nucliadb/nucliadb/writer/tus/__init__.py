@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Optional
 
 from nucliadb.writer.settings import settings as writer_settings
 from nucliadb.writer.tus.dm import FileDataMangaer, RedisFileDataManager
@@ -25,20 +26,27 @@ from nucliadb.writer.tus.exceptions import ManagerNotAvailable
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
 from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
 from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
-from nucliadb.writer.tus.storage import FileStorageManager
+from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb_utils.settings import storage_settings
-
-DRIVER: Dict[str, Any] = {}
 
 TUSUPLOAD = "tusupload"
 UPLOAD = "upload"
 
 
+@dataclass
+class TusStorageDriver:
+    backend: BlobStore
+    manager: FileStorageManager
+
+
+DRIVER: Optional[TusStorageDriver] = None
+
+
 async def initialize():
+    global DRIVER
+
     if storage_settings.file_backend == "gcs":
         storage_backend = GCloudBlobStore()
-
-        DRIVER["StorageBackend"] = storage_backend
 
         await storage_backend.initialize(
             json_credentials=storage_settings.gcs_base64_creds,
@@ -48,12 +56,13 @@ async def initialize():
             bucket_labels=storage_settings.gcs_bucket_labels,
             object_base_url=storage_settings.gcs_endpoint_url,
         )
-        DRIVER["StorageManager"] = GCloudFileStorageManager(storage_backend)
+
+        storage_manager = GCloudFileStorageManager(storage_backend)
+
+        DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
     if storage_settings.file_backend == "s3":
         storage_backend = S3BlobStore()
-
-        DRIVER["StorageBackend"] = storage_backend
 
         await storage_backend.initialize(
             client_id=storage_settings.s3_client_id,
@@ -66,23 +75,26 @@ async def initialize():
             bucket=storage_settings.s3_bucket,
         )
 
-        DRIVER["StorageManager"] = S3FileStorageManager(storage_backend)
+        storage_manager = S3FileStorageManager(storage_backend)
+
+        DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
     if storage_settings.file_backend == "local":
         storage_backend = LocalBlobStore(storage_settings.local_files)
 
-        DRIVER["StorageBackend"] = storage_backend
-
         await storage_backend.initialize()
 
-        DRIVER["StorageManager"] = LocalFileStorageManager(storage_backend)
+        storage_manager = LocalFileStorageManager(storage_backend)
+
+        DRIVER = TusStorageDriver(backend=storage_backend, manager=storage_manager)
 
 
 async def finalize():
-    if DRIVER.get("StorageBackend"):
-        await DRIVER["StorageBackend"].finalize()
-        DRIVER["StorageBackend"] = None
-        DRIVER["StorageManagerKlass"] = None
+    global DRIVER
+
+    if DRIVER is not None:
+        await DRIVER.backend.finalize()
+        DRIVER = None
 
 
 def get_dm() -> FileDataMangaer:  # type: ignore
@@ -99,11 +111,14 @@ def get_dm() -> FileDataMangaer:  # type: ignore
 
 
 def get_storage_manager() -> FileStorageManager:
-    storage_manager = DRIVER.get("StorageManager")
-    if storage_manager is None:
+    global DRIVER
+
+    if DRIVER is None:
         raise ManagerNotAvailable()
-    return storage_manager
+    return DRIVER.manager
 
 
 def clear_storage():
-    DRIVER.clear()
+    global DRIVER
+
+    DRIVER = None
