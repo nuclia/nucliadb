@@ -88,7 +88,7 @@ class Driver:
         raise NotImplementedError()
 
     @asynccontextmanager
-    async def managed_transaction(self) -> AsyncGenerator[Transaction, None]:
+    async def transaction(self) -> AsyncGenerator[Transaction, None]:
         """
         Use to make sure transaction is always aborted
         """

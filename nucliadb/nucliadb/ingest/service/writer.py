@@ -534,7 +534,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request
         response = GetSynonymsResponse()
         txn: Transaction
-        async with self.proc.driver.managed_transaction() as txn:
+        async with self.proc.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status.status = OpStatusWriter.Status.NOTFOUND
@@ -556,7 +556,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request.kbid
         response = OpStatusWriter()
         txn: Transaction
-        async with self.proc.driver.managed_transaction() as txn:
+        async with self.proc.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND
@@ -579,7 +579,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         kbid = request
         response = OpStatusWriter()
         txn: Transaction
-        async with self.proc.driver.managed_transaction() as txn:
+        async with self.proc.driver.transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status = OpStatusWriter.Status.NOTFOUND

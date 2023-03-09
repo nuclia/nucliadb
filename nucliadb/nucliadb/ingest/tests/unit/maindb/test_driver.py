@@ -34,15 +34,15 @@ def driver() -> Driver:  # type: ignore
 
 
 @pytest.mark.asyncio
-async def test_managed_transaction_aborts(driver):
-    async with driver.managed_transaction() as txn:
+async def test_transaction_aborts(driver):
+    async with driver.transaction() as txn:
         pass
     txn.abort.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_managed_transaction_aborts_on_errors(driver):
+async def test_transaction_aborts_on_errors(driver):
     with pytest.raises(ValueError):
-        async with driver.managed_transaction() as txn:
+        async with driver.transaction() as txn:
             raise ValueError()
     txn.abort.assert_awaited_once()
