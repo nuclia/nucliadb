@@ -33,7 +33,6 @@ async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
         return
 
     if request.advanced_query:
-        # TODO: ask if this is a use-case?
         logger.warning(
             "Applying synonyms is not applicable when an advanced query is present"
         )
@@ -46,21 +45,16 @@ async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
             # No synonyms found
             return
 
-    parts: List[str] = []
+    synonyms_found: List[str] = []
+    advanced_query = []
     for term in request.body.split(" "):
-        for sterm in synonyms.terms.keys():
-            if not synonym_match(term, sterm):
-                continue
-            parts.append(term)
-            parts.extend(synonyms.terms[term].synonyms)  # type: ignore
-            break
+        advanced_query.append(term)
+        term_synonyms = synonyms.terms.get(term)
+        if term_synonyms is None or len(term_synonyms.synonyms) == 0:
+            # No synonyms found for this term
+            continue
+        synonyms_found.extend(term_synonyms.synonyms)
 
-    if len(parts):
-        advanced_query = " ".join(parts)
-        request.advanced_query = advanced_query
+    if len(synonyms_found):
+        request.advanced_query = " ".join(advanced_query + synonyms_found)
         request.ClearField("body")
-
-
-def synonym_match(term: str, another_term: str) -> bool:
-    # TODO: Think if we should somehow pre-process the stored synonyms too...
-    return term == another_term

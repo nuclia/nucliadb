@@ -100,25 +100,36 @@ async def test_search_with_synonims(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
-            "slug": "myresource",
             "title": "Life on Earth",
             "summary": "All the secrets of this planet",
-            "icon": "text/plain",
         },
     )
+    assert resp.status_code == 201
+    planet_rid = resp.json()["uuid"]
+
     # Create another resource with the remaining
     # synonyms present in title and summary fields
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
-            "slug": "myresource",
             "title": "Globe Sphere",
             "summary": "A world that is the home of many incredible creatures",
-            "icon": "text/plain",
         },
     )
     assert resp.status_code == 201
-    rid = resp.json()["uuid"]
+    sphere_rid = resp.json()["uuid"]
+
+    # Create another resource that does not match
+    # with the term or any of its synonyms
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Tomatoes",
+            "summary": "The tomatoe collection",
+        },
+    )
+    assert resp.status_code == 201
+    tomatoe_rid = resp.json()["uuid"]
 
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
@@ -127,6 +138,7 @@ async def test_search_with_synonims(
             with_synonyms=True,
             highlight=True,
         ),
+        timeout=None,
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -134,4 +146,33 @@ async def test_search_with_synonims(
     # Paragraph search should match on summary (term)
     # and title (synonym) for the two resources
     assert len(body["paragraphs"]["results"]) == 4
-    assert body["resources"][rid]
+    assert body["resources"][planet_rid]
+    assert body["resources"][sphere_rid]
+    assert tomatoe_rid not in body["resources"]
+
+    # Check that searching without synonyms matches only query term
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(query="planet"),
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 1
+    assert body["resources"][planet_rid]
+    assert sphere_rid not in body["resources"]
+    assert tomatoe_rid not in body["resources"]
+
+    # Check that searching with a term that has synonyms and
+    # one that doesn't matches all of them
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(query="planet tomatoe", with_synonyms=True),
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 5
+    assert body["resources"][planet_rid]
+    assert body["resources"][sphere_rid]
+    assert body["resources"][tomatoe_rid]

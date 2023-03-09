@@ -202,7 +202,6 @@ def highlight_paragraph(
     text: str, words: Optional[List[str]] = None, ematches: Optional[List[str]] = None
 ) -> str:
     text_lower = text.lower()
-
     marks = [0] * (len(text_lower) + 1)
     if ematches is not None:
         for quote in ematches:
