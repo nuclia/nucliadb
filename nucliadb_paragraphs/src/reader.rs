@@ -241,8 +241,13 @@ impl ReaderChild for ParagraphReaderService {
             .advanced_query
             .as_deref()
             .filter(|q| !q.is_empty())
-            .map(|q| format!("({}) AND ({q})", response.query))
-            .unwrap_or(response.query);
+            .map_or(response.query.clone(), |q| {
+                if !response.query.is_empty() {
+                    format!("({}) AND ({q})", response.query)
+                } else {
+                    q.to_string()
+                }
+            });
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Producing results: ends at {v} ms");
         }
