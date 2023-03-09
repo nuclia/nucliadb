@@ -15,3 +15,9 @@ __pycache__
 data
 logs
 **/*.egg-info
+bin
+lib
+include
+coverage.xml
+nats-server
+charts

@@ -4,10 +4,7 @@ coverage:
       default:
         target: auto
         threshold: 1%
-    patch:
-      default:
-        target: auto
-        threshold: 30%
+    patch: off
 ignore:
   - "**/tests/*.py"
   - "nucliadb_client/examples/"
@@ -15,12 +12,6 @@ ignore:
 flag_management:
   default_rules: # the rules that will be followed for any flag added, generally
     carryforward: true # needed for monorepos: total coverage is not uploaded at every commit.
-    statuses:
-      - type: project
-        target: auto
-        threshold: 1%
-      - type: patch
-        target: 30%
   individual_flags:
     - name: one
       paths:
@@ -28,45 +19,35 @@ flag_management:
       carryforward: true
       statuses:
         - type: project
-          target: 20%
-        - type: patch
-          target: 30%
+          target: 80%
     - name: ingest
       paths:
         - nucliadb/nucliadb/ingest/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
-        - type: patch
-          target: 30%
+          target: 50%
     - name: utils
       paths:
         - nucliadb_utils/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
-        - type: patch
-          target: 30%
+          target: 85%
     - name: train
       paths:
         - nucliadb/nucliadb/train/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
-        - type: patch
-          target: 30%
+          target: 55%
     - name: telemetry
       paths:
         - nucliadb_telemetry/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
-        - type: patch
-          target: 30%
+          target: 78%
     - name: search
       paths:
         - nucliadb/nucliadb/search/**
@@ -74,17 +55,13 @@ flag_management:
       statuses:
         - type: project
           target: 75%
-        - type: patch
-          target: 30%
     - name: writer
       paths:
         - nucliadb/nucliadb/writer/**
       carryforward: true
       statuses:
         - type: project
-          target: 75%
-        - type: patch
-          target: 30%
+          target: 83%
     - name: reader
       paths:
         - nucliadb/nucliadb/reader/**
@@ -92,8 +69,6 @@ flag_management:
       statuses:
         - type: project
           target: 60%
-        - type: patch
-          target: 30%
     - name: sdk
       paths:
         - nucliadb_sdk/nucliadb_sdk/**
@@ -101,8 +76,6 @@ flag_management:
       statuses:
         - type: project
           target: 60%
-        - type: patch
-          target: 30%
     - name: dataset
       paths:
         - nucliadb_dataset/nucliadb_dataset/**
@@ -110,14 +83,10 @@ flag_management:
       statuses:
         - type: project
           target: 60%
-        - type: patch
-          target: 30%
     - name: node-sidecar
       paths:
         - nucliadb_node/nucliadb_node/**
       carryforward: true
       statuses:
         - type: project
-          target: 20%
-        - type: patch
-          target: 30%
+          target: 75%

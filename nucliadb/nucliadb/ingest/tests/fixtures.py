@@ -42,7 +42,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.node import Node, NodeType
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.service.writer import WriterServicer
-from nucliadb.ingest.settings import settings
+from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb.ingest.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -174,7 +174,7 @@ async def tikv_driver(tikvd: List[str]) -> AsyncIterator[Driver]:
 async def redis_driver(redis: List[str]) -> AsyncIterator[RedisDriver]:
     url = f"redis://{redis[0]}:{redis[1]}"
     settings.driver_redis_url = f"redis://{redis[0]}:{redis[1]}"
-    settings.driver = "redis"
+    settings.driver = DriverConfig.redis
     driver = RedisDriver(url=url)
     await driver.initialize()
     if driver.redis is not None:

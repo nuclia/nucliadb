@@ -63,6 +63,7 @@ jobs:
           pip install -r test-requirements.txt
           pip install -r nucliadb/requirements-sources.txt
           pip install -r nucliadb/requirements.txt
+          pip install -r nucliadb/requirements-test.txt
           pip install -e nucliadb
 
       - name: Check mypy

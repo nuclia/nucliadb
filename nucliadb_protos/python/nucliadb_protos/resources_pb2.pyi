@@ -84,6 +84,7 @@ class CloudFile(google.protobuf.message.Message):
         EXTERNAL: CloudFile._Source.ValueType  # 4
         EMPTY: CloudFile._Source.ValueType  # 5
         EXPORT: CloudFile._Source.ValueType  # 6
+        POSTGRES: CloudFile._Source.ValueType  # 7
 
     class Source(_Source, metaclass=_SourceEnumTypeWrapper): ...
     FLAPS: CloudFile.Source.ValueType  # 0
@@ -93,6 +94,7 @@ class CloudFile(google.protobuf.message.Message):
     EXTERNAL: CloudFile.Source.ValueType  # 4
     EMPTY: CloudFile.Source.ValueType  # 5
     EXPORT: CloudFile.Source.ValueType  # 6
+    POSTGRES: CloudFile.Source.ValueType  # 7
 
     URI_FIELD_NUMBER: builtins.int
     SIZE_FIELD_NUMBER: builtins.int

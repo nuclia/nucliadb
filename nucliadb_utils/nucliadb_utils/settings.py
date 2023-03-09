@@ -44,7 +44,7 @@ http_settings = HTTPSettings()
 
 
 class StorageSettings(BaseSettings):
-    file_backend: str = "gcs"  # gcs | s3
+    file_backend: str = "gcs"  # gcs | s3 | pg | local
 
     gcs_base64_creds: Optional[str] = None
     gcs_bucket: Optional[str] = None
@@ -64,6 +64,8 @@ class StorageSettings(BaseSettings):
 
     local_files: Optional[str] = None
     upload_token_expiration: Optional[int] = 3
+
+    driver_pg_url: Optional[str] = None  # match same env var for k/v storage
 
 
 storage_settings = StorageSettings()

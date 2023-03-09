@@ -6,3 +6,5 @@ aiobotocore
 aioboto3
 s3fs
 datasets
+asyncpg
+redis>=4.3.4
