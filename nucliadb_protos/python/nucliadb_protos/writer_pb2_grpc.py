@@ -155,8 +155,8 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.SetSynonymsRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
-        self.DeleteSynonyms = channel.unary_unary(
-                '/fdbwriter.Writer/DeleteSynonyms',
+        self.DelSynonyms = channel.unary_unary(
+                '/fdbwriter.Writer/DelSynonyms',
                 request_serializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
@@ -383,7 +383,7 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def DeleteSynonyms(self, request, context):
+    def DelSynonyms(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -587,8 +587,8 @@ def add_WriterServicer_to_server(servicer, server):
                     request_deserializer=nucliadb__protos_dot_writer__pb2.SetSynonymsRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
-            'DeleteSynonyms': grpc.unary_unary_rpc_method_handler(
-                    servicer.DeleteSynonyms,
+            'DelSynonyms': grpc.unary_unary_rpc_method_handler(
+                    servicer.DelSynonyms,
                     request_deserializer=nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
             ),
@@ -1124,7 +1124,7 @@ class Writer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def DeleteSynonyms(request,
+    def DelSynonyms(request,
             target,
             options=(),
             channel_credentials=None,
@@ -1134,7 +1134,7 @@ class Writer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DeleteSynonyms',
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/DelSynonyms',
             nucliadb__protos_dot_knowledgebox__pb2.KnowledgeBoxID.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
             options, channel_credentials,
