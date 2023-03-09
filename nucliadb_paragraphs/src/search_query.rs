@@ -333,6 +333,7 @@ pub fn search_query(
     distance: u8,
     with_advance: Option<Box<dyn Query>>,
 ) -> (Box<dyn Query>, SharedTermC, Box<dyn Query>) {
+    use std::collections::BTreeMap;
     let mut term_collector = TermCollector::default();
     let processed = preprocess_raw_query(text, &mut term_collector);
     let query = parse_query(parser, &processed.regular_query);
@@ -341,6 +342,14 @@ pub fn search_query(
     let mut fuzzies = fuzzied_queries(fuzzy_query, false, distance, termc.clone());
     let mut originals = vec![(Occur::Must, query)];
     if let Some(advance) = with_advance {
+        let mut term_collector = termc.get_termc();
+        let mut terms = BTreeMap::new();
+        advance.query_terms(&mut terms);
+        terms
+            .into_iter()
+            .flat_map(|(t, _)| t.as_str().map(|t| t.to_string()))
+            .for_each(|t| term_collector.log_eterm(t));
+        termc.set_termc(term_collector);
         originals.push((Occur::Must, advance.box_clone()));
         fuzzies.push((Occur::Must, advance));
     }

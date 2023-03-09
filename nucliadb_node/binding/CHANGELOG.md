@@ -1,5 +1,7 @@
 # Changelog
+## 0.5.10
 
+-  Paragraphs ematches with advanced
 ## 0.5.9
 
 - Fix vector deletion 
