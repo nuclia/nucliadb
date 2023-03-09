@@ -24,17 +24,33 @@ import pytest
 from nucliadb.ingest.maindb.driver import Driver
 
 
+class TransactionTest:
+    def __init__(self):
+        self.abort = mock.AsyncMock()
+        self.open = True
+
+    async def commit(self, **kw):
+        self.open = False
+
+
 @pytest.fixture(scope="function")
 def driver() -> Driver:  # type: ignore
     driver = Driver()
     with mock.patch.object(
-        driver, "begin", new=mock.AsyncMock(return_value=mock.AsyncMock())
+        driver, "begin", new=mock.AsyncMock(return_value=TransactionTest())
     ):
         yield driver
 
 
 @pytest.mark.asyncio
-async def test_transaction_aborts(driver):
+async def test_transaction_does_not_abotr_if_commited(driver):
+    async with driver.transaction() as txn:
+        await txn.commit(resource=False)
+    txn.abort.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_transaction_aborts_if_txn_open(driver):
     async with driver.transaction() as txn:
         pass
     txn.abort.assert_awaited_once()

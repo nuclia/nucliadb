@@ -133,6 +133,8 @@ async def driver_basic(driver):
 
     await _test_keys_async_generator(driver)
 
+    await _test_transaction_context_manager(driver)
+
     await driver.finalize()
 
 
@@ -148,3 +150,20 @@ async def _test_keys_async_generator(driver):
     await async_generator.__anext__()
     await async_generator.aclose()
     await txn.abort()
+
+
+async def _test_transaction_context_manager(driver):
+    # It should abort the transaction if there are uncommited changes
+    async with driver.transaction() as txn:
+        assert txn.open
+        await txn.set("/some/key", b"some value")
+    assert not txn.open
+
+    # It should not attempt to abort if commited
+    async with driver.transaction() as txn:
+        assert await txn.get("/some/key") is None
+        await txn.set("/some/key", b"some value")
+        await txn.commit(resource=False)
+
+    async with driver.transaction() as txn:
+        assert await txn.get("/some/key") == b"some value"

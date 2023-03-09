@@ -97,5 +97,5 @@ class Driver:
             txn = await self.begin()
             yield txn
         finally:
-            if txn is not None:
+            if txn is not None and txn.open:
                 await txn.abort()
