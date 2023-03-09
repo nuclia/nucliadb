@@ -237,8 +237,12 @@ impl ReaderChild for ParagraphReaderService {
                 sc.booster = total - (i as f32);
             }
         });
+        let advanced = request.advanced_query.as_deref().unwrap_or_default();
+        if !advanced.is_empty() {
+            response.query += &format!("AND {}", advanced);
+        }
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
-            info!("{id:?} - Producing results: starts at {v} ms");
+            info!("{id:?} - Producing results: ends at {v} ms");
         }
 
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
