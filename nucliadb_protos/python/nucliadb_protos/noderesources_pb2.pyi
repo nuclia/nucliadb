@@ -18,6 +18,8 @@ if sys.version_info >= (3, 10):
 else:
     import typing_extensions
 from nucliadb_protos.utils_pb2 import (
+    COSINE as COSINE,
+    DOT as DOT,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
@@ -30,6 +32,7 @@ from nucliadb_protos.utils_pb2 import (
     UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
     Vectors as Vectors,
 )
 
@@ -295,23 +298,7 @@ class EmptyQuery(google.protobuf.message.Message):
 global___EmptyQuery = EmptyQuery
 
 @typing_extensions.final
-class VectorSentence(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    VECTOR_FIELD_NUMBER: builtins.int
-    @property
-    def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
-    def __init__(
-        self,
-        *,
-        vector: collections.abc.Iterable[builtins.float] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["vector", b"vector"]) -> None: ...
-
-global___VectorSentence = VectorSentence
-
-@typing_extensions.final
-class ParagraphPosition(google.protobuf.message.Message):
+class Position(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     INDEX_FIELD_NUMBER: builtins.int
@@ -342,7 +329,45 @@ class ParagraphPosition(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "end_seconds", b"end_seconds", "index", b"index", "page_number", b"page_number", "start", b"start", "start_seconds", b"start_seconds"]) -> None: ...
 
-global___ParagraphPosition = ParagraphPosition
+global___Position = Position
+
+@typing_extensions.final
+class SentenceMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    POSITION_FIELD_NUMBER: builtins.int
+    @property
+    def position(self) -> global___Position: ...
+    def __init__(
+        self,
+        *,
+        position: global___Position | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["position", b"position"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["position", b"position"]) -> None: ...
+
+global___SentenceMetadata = SentenceMetadata
+
+@typing_extensions.final
+class VectorSentence(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VECTOR_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    @property
+    def vector(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
+    @property
+    def metadata(self) -> global___SentenceMetadata: ...
+    def __init__(
+        self,
+        *,
+        vector: collections.abc.Iterable[builtins.float] | None = ...,
+        metadata: global___SentenceMetadata | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "vector", b"vector"]) -> None: ...
+
+global___VectorSentence = VectorSentence
 
 @typing_extensions.final
 class ParagraphMetadata(google.protobuf.message.Message):
@@ -350,11 +375,11 @@ class ParagraphMetadata(google.protobuf.message.Message):
 
     POSITION_FIELD_NUMBER: builtins.int
     @property
-    def position(self) -> global___ParagraphPosition: ...
+    def position(self) -> global___Position: ...
     def __init__(
         self,
         *,
-        position: global___ParagraphPosition | None = ...,
+        position: global___Position | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["position", b"position"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["position", b"position"]) -> None: ...

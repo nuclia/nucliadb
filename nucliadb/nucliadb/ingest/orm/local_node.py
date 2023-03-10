@@ -24,6 +24,7 @@ from uuid import uuid4
 
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID
 from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -59,11 +60,13 @@ class LocalNode(AbstractNode):
         return NODE_CLUSTER.get_local_node()
 
     @classmethod
-    async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> LocalShard:
+    async def create_shard_by_kbid(
+        cls, txn: Transaction, kbid: str, similarity: VectorSimilarity.ValueType
+    ) -> LocalShard:
         node = NODE_CLUSTER.get_local_node()
         sharduuid = uuid4().hex
         shard = PBShard(shard=sharduuid)
-        shard_created = await node.new_shard(kbid)
+        shard_created = await node.new_shard(kbid, similarity=similarity)
         sr = ShardReplica(node=str(node))
         sr.shard.CopyFrom(shard_created)
         shard.replicas.append(sr)
@@ -76,6 +79,7 @@ class LocalNode(AbstractNode):
         else:
             kb_shards.kbid = kbid
             kb_shards.actual = -1
+            kb_shards.similarity = similarity
         kb_shards.shards.append(shard)
         kb_shards.actual += 1
         await txn.set(key, kb_shards.SerializeToString())

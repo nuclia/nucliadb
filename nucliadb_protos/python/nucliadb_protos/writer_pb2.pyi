@@ -55,9 +55,10 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     ParagraphMetadata as ParagraphMetadata,
-    ParagraphPosition as ParagraphPosition,
+    Position as Position,
     Resource as Resource,
     ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
@@ -1436,18 +1437,21 @@ class Shards(google.protobuf.message.Message):
     SHARDS_FIELD_NUMBER: builtins.int
     KBID_FIELD_NUMBER: builtins.int
     ACTUAL_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
     @property
     def shards(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ShardObject]: ...
     kbid: builtins.str
     actual: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
         shards: collections.abc.Iterable[global___ShardObject] | None = ...,
         kbid: builtins.str = ...,
         actual: builtins.int = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "shards", b"shards"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["actual", b"actual", "kbid", b"kbid", "shards", b"shards", "similarity", b"similarity"]) -> None: ...
 
 global___Shards = Shards
 

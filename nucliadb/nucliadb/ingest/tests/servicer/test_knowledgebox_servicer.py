@@ -22,11 +22,13 @@ import asyncio
 
 import pytest
 from httpx import AsyncClient
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest.tests.fixtures import IngestFixture
-from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2, writer_pb2_grpc
 from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
+from nucliadb_utils.keys import KB_SHARDS
 
 
 @pytest.mark.asyncio
@@ -87,6 +89,44 @@ async def test_create_knowledgebox(
         else:
             break
     assert len(resp.json()["data"]) == expected_spans
+
+
+async def get_kb_similarity(txn, kbid) -> utils_pb2.VectorSimilarity.ValueType:
+    kb_shards_key = KB_SHARDS.format(kbid=kbid)
+    kb_shards_binary = await txn.get(kb_shards_key)
+    assert kb_shards_binary, "Shards object not found!"
+    kb_shards = PBShards()
+    kb_shards.ParseFromString(kb_shards_binary)
+    return kb_shards.similarity
+
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_with_similarity(grpc_servicer: IngestFixture, txn):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-dot")
+    pb.config.title = "My Title"
+    pb.similarity = utils_pb2.VectorSimilarity.DOT
+    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    assert await get_kb_similarity(txn, result.uuid) == utils_pb2.VectorSimilarity.DOT
+
+
+@pytest.mark.asyncio
+async def test_create_knowledgebox_defaults_to_cosine_similarity(
+    grpc_servicer: IngestFixture,
+    txn,
+):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test-default")
+    pb.config.title = "My Title"
+    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    assert (
+        await get_kb_similarity(txn, result.uuid) == utils_pb2.VectorSimilarity.COSINE
+    )
 
 
 @pytest.mark.asyncio

@@ -18,6 +18,21 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _VectorSimilarity:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _VectorSimilarityEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_VectorSimilarity.ValueType], builtins.type):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    COSINE: _VectorSimilarity.ValueType  # 0
+    DOT: _VectorSimilarity.ValueType  # 1
+
+class VectorSimilarity(_VectorSimilarity, metaclass=_VectorSimilarityEnumTypeWrapper): ...
+
+COSINE: VectorSimilarity.ValueType  # 0
+DOT: VectorSimilarity.ValueType  # 1
+global___VectorSimilarity = VectorSimilarity
+
 @typing_extensions.final
 class Relation(google.protobuf.message.Message):
     """Relations are connexions between nodes in the relation index.

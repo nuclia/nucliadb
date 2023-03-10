@@ -18,6 +18,8 @@ if sys.version_info >= (3, 10):
 else:
     import typing_extensions
 from nucliadb_protos.utils_pb2 import (
+    COSINE as COSINE,
+    DOT as DOT,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
@@ -30,6 +32,7 @@ from nucliadb_protos.utils_pb2 import (
     UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
     Vectors as Vectors,
 )
 

@@ -21,8 +21,10 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Type, TypeVar, Union
 
+from google.protobuf.json_format import MessageToDict
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig as PBKnowledgeBoxConfig
 from pydantic import BaseModel, validator
 
 from nucliadb_models.conversation import FieldConversation
@@ -49,7 +51,9 @@ from nucliadb_models.metadata import (
 )
 from nucliadb_models.text import FieldText
 from nucliadb_models.utils import SlugString
-from nucliadb_models.vectors import UserVectorSet
+from nucliadb_models.vectors import UserVectorSet, VectorSimilarity
+
+_T = TypeVar("_T")
 
 
 class NucliaDBRoles(str, Enum):
@@ -82,6 +86,7 @@ class KnowledgeBoxConfig(BaseModel):
     enabled_filters: List[str] = []
     enabled_insights: List[str] = []
     disable_vectors: bool = False
+    similarity: Optional[VectorSimilarity]
 
     @validator("slug")
     def id_check(cls, v: str) -> str:
@@ -90,8 +95,16 @@ class KnowledgeBoxConfig(BaseModel):
                 raise ValueError("No uppercase ID")
             if char in "&@ /\\ ":
                 raise ValueError("Invalid chars")
-
         return v
+
+    @classmethod
+    def from_message(cls: Type[_T], message: PBKnowledgeBoxConfig) -> _T:
+        as_dict = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        return cls(**as_dict)
 
 
 class KnowledgeBoxObjSummary(BaseModel):

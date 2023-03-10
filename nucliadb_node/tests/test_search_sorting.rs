@@ -27,7 +27,7 @@ use common::{node_services, TestNodeReader, TestNodeWriter};
 use nucliadb_core::protos::op_status::Status;
 use nucliadb_core::protos::prost_types::Timestamp;
 use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{IndexMetadata, Resource, ResourceId, SearchRequest, ShardMetadata};
+use nucliadb_core::protos::{IndexMetadata, NewShardRequest, Resource, ResourceId, SearchRequest};
 use tonic::Request;
 use uuid::Uuid;
 
@@ -83,7 +83,7 @@ async fn test_search_sorting() -> Result<(), Box<dyn std::error::Error>> {
     let (mut reader, mut writer) = node_services().await;
 
     let new_shard_response = writer
-        .new_shard(Request::new(ShardMetadata::default()))
+        .new_shard(Request::new(NewShardRequest::default()))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 

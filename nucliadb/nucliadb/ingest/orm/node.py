@@ -30,6 +30,7 @@ from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
@@ -162,21 +163,31 @@ class Node(AbstractNode):
         return Shard(sharduuid=shard_id, shard=pbshard)
 
     @classmethod
-    async def create_shard_by_kbid(cls, txn: Transaction, kbid: str) -> Shard:
+    async def create_shard_by_kbid(
+        cls,
+        txn: Transaction,
+        kbid: str,
+        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
+    ) -> Shard:
         kb_shards_key = KB_SHARDS.format(kbid=kbid)
         kb_shards: Optional[PBShards] = None
         kb_shards_binary = await txn.get(kb_shards_key)
-        kb_nodes = []
-        if kb_shards_binary:
+        if not kb_shards_binary:
+            # First logic shard on the index
+            kb_shards = PBShards()
+            kb_shards.kbid = kbid
+            kb_shards.actual = -1
+            kb_shards.similarity = similarity
+        else:
+            # New logic shard on an existing index
             kb_shards = PBShards()
             kb_shards.ParseFromString(kb_shards_binary)
-            # When adding a logic shard on an existing index, we need to
-            # exclude nodes in which there is already a shard from the same KB
+
+        try:
+            # When choosing the nodes, we need to exclude nodes in which there is already a shard from the same KB
             kb_nodes = [
                 replica.node for shard in kb_shards.shards for replica in shard.replicas
             ]
-
-        try:
             node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=kb_nodes)
         except NodeClusterSmall as err:
             if SENTRY:
@@ -197,7 +208,9 @@ class Node(AbstractNode):
                 logger.info(
                     f"Node obj: {node} Shards: {node.shard_count} Load: {node.load_score}"
                 )
-                shard_created = await node.new_shard(kbid)
+                shard_created = await node.new_shard(
+                    kbid, similarity=kb_shards.similarity
+                )
                 replica = ShardReplica(node=str(node_id))
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
@@ -207,11 +220,6 @@ class Node(AbstractNode):
             logger.error("Error creating new shard")
             await cls.rollback_shard(shard)
             raise e
-
-        if kb_shards is None:
-            kb_shards = PBShards()
-            kb_shards.kbid = kbid
-            kb_shards.actual = -1
 
         # Append the created shard and make `actual` point to it.
         kb_shards.shards.append(shard)

@@ -13,6 +13,10 @@ _sym_db = _symbol_database.Default()
 
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from nucliadb_protos import knowledgebox_pb2 as nucliadb__protos_dot_knowledgebox__pb2
+try:
+  nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb__protos_dot_utils__pb2
+except AttributeError:
+  nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_knowledgebox__pb2.nucliadb_protos.utils_pb2
 from nucliadb_protos import resources_pb2 as nucliadb__protos_dot_resources__pb2
 try:
   nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_resources__pb2.nucliadb__protos_dot_utils__pb2
@@ -39,6 +43,10 @@ try:
   nucliadb__protos_dot_knowledgebox__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb__protos_dot_knowledgebox__pb2
 except AttributeError:
   nucliadb__protos_dot_knowledgebox__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb_protos.knowledgebox_pb2
+try:
+  nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb__protos_dot_utils__pb2
+except AttributeError:
+  nucliadb__protos_dot_utils__pb2 = nucliadb__protos_dot_writer__pb2.nucliadb_protos.utils_pb2
 
 from nucliadb_protos.knowledgebox_pb2 import *
 from nucliadb_protos.resources_pb2 import *

@@ -31,11 +31,17 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
 from nucliadb_models.vectors import UserVectorsWrapper as UserVectorsWrapperPy
+from nucliadb_models.vectors import VectorSimilarity
 from nucliadb_telemetry.utils import set_info_on_span
 from nucliadb_utils.utilities import get_ingest
 
 
-async def create_vectorset(kbid: str, vectorset: str, dimension: Optional[int] = None):
+async def create_vectorset(
+    kbid: str,
+    vectorset: str,
+    dimension: Optional[int] = None,
+    similarity: Optional[VectorSimilarity] = None,
+):
     ingest = get_ingest()
     pbrequest: SetVectorSetRequest = SetVectorSetRequest(id=vectorset)
     pbrequest.kb.uuid = kbid
@@ -44,6 +50,8 @@ async def create_vectorset(kbid: str, vectorset: str, dimension: Optional[int] =
 
     if dimension is not None:
         pbrequest.vectorset.dimension = dimension
+    if similarity:
+        pbrequest.vectorset.similarity = similarity.to_pb()
 
     status: OpStatusWriter = await ingest.SetVectorSet(pbrequest)  # type: ignore
     if status.status == OpStatusWriter.Status.OK:

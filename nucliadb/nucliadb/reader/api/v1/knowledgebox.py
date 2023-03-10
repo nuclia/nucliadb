@@ -19,13 +19,13 @@
 #
 from fastapi import HTTPException
 from fastapi_versioning import version  # type: ignore
-from google.protobuf.json_format import MessageToDict
 from starlette.requests import Request
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.utils import get_driver
 from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb_models.resource import (
+    KnowledgeBoxConfig,
     KnowledgeBoxList,
     KnowledgeBoxObj,
     KnowledgeBoxObjSummary,
@@ -72,7 +72,7 @@ async def get_kb(request: Request, kbid: str) -> KnowledgeBoxObj:
         return KnowledgeBoxObj(
             uuid=kbid,
             slug=kb_config.slug,
-            config=MessageToDict(kb_config, preserving_proto_field_name=True),
+            config=KnowledgeBoxConfig.from_message(kb_config),
         )
 
 
@@ -99,5 +99,5 @@ async def get_kb_by_slug(request: Request, slug: str) -> KnowledgeBoxObj:
         return KnowledgeBoxObj(
             uuid=kbid,
             slug=kb_config.slug,
-            config=MessageToDict(kb_config, preserving_proto_field_name=True),
+            config=KnowledgeBoxConfig.from_message(kb_config),
         )

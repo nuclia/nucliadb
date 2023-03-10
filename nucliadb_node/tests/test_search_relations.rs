@@ -30,9 +30,9 @@ use nucliadb_core::protos::relation::RelationType;
 use nucliadb_core::protos::relation_node::NodeType;
 use nucliadb_core::protos::resource::ResourceStatus;
 use nucliadb_core::protos::{
-    EntitiesSubgraphRequest, IndexMetadata, Relation, RelationEdgeFilter, RelationNode,
-    RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest, RelationSearchResponse,
-    Resource, ResourceId, ShardMetadata,
+    EntitiesSubgraphRequest, IndexMetadata, NewShardRequest, Relation, RelationEdgeFilter,
+    RelationNode, RelationNodeFilter, RelationPrefixSearchRequest, RelationSearchRequest,
+    RelationSearchResponse, Resource, ResourceId,
 };
 use tonic::Request;
 use uuid::Uuid;
@@ -331,7 +331,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
     let (mut reader, mut writer) = node_services().await;
 
     let new_shard_response = writer
-        .new_shard(Request::new(ShardMetadata::default()))
+        .new_shard(Request::new(NewShardRequest::default()))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 
@@ -463,7 +463,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
     let (mut reader, mut writer) = node_services().await;
 
     let new_shard_response = writer
-        .new_shard(Request::new(ShardMetadata::default()))
+        .new_shard(Request::new(NewShardRequest::default()))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 

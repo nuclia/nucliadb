@@ -25,9 +25,10 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     ParagraphMetadata as ParagraphMetadata,
-    ParagraphPosition as ParagraphPosition,
+    Position as Position,
     Resource as Resource,
     ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
@@ -41,6 +42,8 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList as VectorSetList,
 )
 from nucliadb_protos.utils_pb2 import (
+    COSINE as COSINE,
+    DOT as DOT,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
@@ -53,6 +56,7 @@ from nucliadb_protos.utils_pb2 import (
     UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
     Vectors as Vectors,
 )
 
@@ -615,19 +619,23 @@ global___DocumentVectorIdentifier = DocumentVectorIdentifier
 class DocumentScored(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    METADATA_FIELD_NUMBER: builtins.int
     DOC_ID_FIELD_NUMBER: builtins.int
     SCORE_FIELD_NUMBER: builtins.int
+    @property
+    def metadata(self) -> nucliadb_protos.noderesources_pb2.SentenceMetadata: ...
     @property
     def doc_id(self) -> global___DocumentVectorIdentifier: ...
     score: builtins.float
     def __init__(
         self,
         *,
+        metadata: nucliadb_protos.noderesources_pb2.SentenceMetadata | None = ...,
         doc_id: global___DocumentVectorIdentifier | None = ...,
         score: builtins.float = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["doc_id", b"doc_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["doc_id", b"doc_id", "score", b"score"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["doc_id", b"doc_id", "metadata", b"metadata"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["doc_id", b"doc_id", "metadata", b"metadata", "score", b"score"]) -> None: ...
 
 global___DocumentScored = DocumentScored
 

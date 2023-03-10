@@ -55,7 +55,8 @@ async def test_resource_crud_min(
     knowledgebox_id = knowledgebox_writer
     async with writer_api([NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
-            f"/{KB_PREFIX}/{knowledgebox_id}/vectorset/base", json={"dimension": 3}
+            f"/{KB_PREFIX}/{knowledgebox_id}/vectorset/base",
+            json={"dimension": 3, "similarity": "dot"},
         )
         assert resp.status_code == 200
         # Test create resource

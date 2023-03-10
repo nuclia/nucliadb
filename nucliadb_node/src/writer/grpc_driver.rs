@@ -25,8 +25,8 @@ use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    OpStatus, Resource, ResourceId, SetGraph, ShardCleaned, ShardCreated, ShardId, ShardIds,
-    ShardMetadata, VectorSetId, VectorSetList,
+    NewShardRequest, NewVectorSetRequest, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned,
+    ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
@@ -158,16 +158,16 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn new_shard(
         &self,
-        request: Request<ShardMetadata>,
+        request: Request<NewShardRequest>,
     ) -> Result<Response<ShardCreated>, Status> {
         self.instrument(&request);
 
         info!("Creating new shard");
-        let shard_metadata = request.into_inner();
+        let request = request.into_inner();
         send_telemetry_event(TelemetryEvent::Create).await;
         let mut writer = self.inner.write().await;
         let result = writer
-            .new_shard(shard_metadata)
+            .new_shard(&request)
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
         std::mem::drop(writer);
         self.emit_event(NodeWriterEvent::ShardCreation(result.id.clone()));
@@ -381,13 +381,13 @@ impl NodeWriter for NodeWriterGRPCDriver {
     #[tracing::instrument(skip_all)]
     async fn add_vector_set(
         &self,
-        request: Request<VectorSetId>,
+        request: Request<NewVectorSetRequest>,
     ) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let request = request.into_inner();
-        let shard_id = request.shard.as_ref().unwrap();
+        let shard_id = request.id.as_ref().and_then(|i| i.shard.clone());
         let mut writer = self.inner.write().await;
-        match writer.add_vectorset(shard_id, &request).transpose() {
+        match writer.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
                 info!("add_vector_set ends correctly");
                 status.status = 0;
@@ -615,7 +615,7 @@ mod tests {
         let mut client = NodeWriterClient::new(socket_to_endpoint(grpc_addr)?.connect_lazy());
 
         let response = client
-            .new_shard(Request::new(ShardMetadata::default()))
+            .new_shard(Request::new(NewShardRequest::default()))
             .await
             .expect("Error in new_shard request");
         let shard_id = &response.get_ref().id;
@@ -644,7 +644,7 @@ mod tests {
 
         for _ in 1..10 {
             let response = client
-                .new_shard(Request::new(ShardMetadata::default()))
+                .new_shard(Request::new(NewShardRequest::default()))
                 .await
                 .expect("Error in new_shard request");
 
@@ -685,7 +685,7 @@ mod tests {
 
         for _ in 0..10 {
             let response = client
-                .new_shard(Request::new(ShardMetadata::default()))
+                .new_shard(Request::new(NewShardRequest::default()))
                 .await
                 .expect("Error in new_shard request");
 

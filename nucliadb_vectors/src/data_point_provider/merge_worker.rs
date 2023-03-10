@@ -27,7 +27,7 @@ use nucliadb_core::tracing::*;
 use super::merger::{MergeQuery, MergeRequest};
 use super::work_flag::MergerWriterSync;
 use super::State;
-use crate::data_point::{DataPoint, DpId};
+use crate::data_point::{DataPoint, DpId, Similarity};
 use crate::data_point_provider::merger;
 use crate::VectorR;
 
@@ -35,6 +35,7 @@ const SLEEP_TIME: Duration = Duration::from_millis(100);
 pub(crate) struct Worker {
     location: PathBuf,
     work_flag: MergerWriterSync,
+    similarity: Similarity,
 }
 impl MergeQuery for Worker {
     fn do_work(&self) -> VectorR<()> {
@@ -42,8 +43,13 @@ impl MergeQuery for Worker {
     }
 }
 impl Worker {
-    pub(crate) fn request(location: PathBuf, work_flag: MergerWriterSync) -> MergeRequest {
+    pub(crate) fn request(
+        location: PathBuf,
+        work_flag: MergerWriterSync,
+        similarity: Similarity,
+    ) -> MergeRequest {
         Box::new(Worker {
+            similarity,
             location,
             work_flag,
         })
@@ -59,7 +65,11 @@ impl Worker {
         msg
     }
     fn notify_merger(&self) {
-        let worker = Worker::request(self.location.clone(), self.work_flag.clone());
+        let worker = Worker::request(
+            self.location.clone(),
+            self.work_flag.clone(),
+            self.similarity,
+        );
         merger::send_merge_request(worker);
     }
     fn try_to_work_or_delay(&self) -> MutexGuard<'_, ()> {
@@ -89,7 +99,7 @@ impl Worker {
             .map(|journal| (state.delete_log(*journal), journal.id()))
             .collect::<Vec<_>>()
         ) else { return Ok(());};
-        let new_dp = DataPoint::merge(subscriber, &work)?;
+        let new_dp = DataPoint::merge(subscriber, &work, self.similarity)?;
         let ids: Vec<_> = work.into_iter().map(|(_, v)| v).collect();
         std::mem::drop(state);
 

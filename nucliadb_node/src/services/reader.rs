@@ -158,11 +158,8 @@ impl ShardReaderService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new(
-        id: String,
-        metadata: ShardMetadata,
-        shard_path: &Path,
-    ) -> NodeResult<ShardReaderService> {
+    pub fn new(id: String, shard_path: &Path) -> NodeResult<ShardReaderService> {
+        let metadata = ShardMetadata::open(&shard_path.join(METADATA_FILE))?;
         let tsc = TextConfig {
             path: shard_path.join(TEXTS_DIR),
         };
@@ -172,6 +169,7 @@ impl ShardReaderService {
         };
 
         let vsc = VectorConfig {
+            similarity: None,
             no_results: Some(FIXED_VECTORS_RESULTS),
             path: shard_path.join(VECTORS_DIR),
             vectorset: shard_path.join(VECTORSET_DIR),

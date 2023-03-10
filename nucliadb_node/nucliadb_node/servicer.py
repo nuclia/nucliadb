@@ -78,7 +78,7 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         except Exception as exc:
             if SENTRY:
                 capture_exception(exc)
-            logger.warn(f"Error creating shadow shard: {shard_id}")
+            logger.warning(f"Error creating shadow shard: {shard_id}")
         finally:
             return response
 
@@ -99,6 +99,6 @@ class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
         except Exception as exc:
             if SENTRY:
                 capture_exception(exc)
-            logger.warn(f"Error deleting shadow shard: {shard_id}")
+            logger.warning(f"Error deleting shadow shard: {shard_id}")
         finally:
             return response

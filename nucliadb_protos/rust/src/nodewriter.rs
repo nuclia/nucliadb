@@ -80,6 +80,20 @@ pub struct AcceptShardRequest {
     pub override_shard: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewShardRequest {
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="1")]
+    pub similarity: i32,
+    #[prost(string, tag="2")]
+    pub kbid: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewVectorSetRequest {
+    #[prost(message, optional, tag="1")]
+    pub id: ::core::option::Option<super::noderesources::VectorSetId>,
+    #[prost(enumeration="super::utils::VectorSimilarity", tag="2")]
+    pub similarity: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Counter {
     #[prost(uint64, tag="1")]
     pub resources: u64,
@@ -181,7 +195,7 @@ pub mod node_writer_client {
         }
         pub async fn new_shard(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::ShardMetadata>,
+            request: impl tonic::IntoRequest<super::NewShardRequest>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -365,7 +379,7 @@ pub mod node_writer_client {
         }
         pub async fn add_vector_set(
             &mut self,
-            request: impl tonic::IntoRequest<super::super::noderesources::VectorSetId>,
+            request: impl tonic::IntoRequest<super::NewVectorSetRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status> {
             self.inner
                 .ready()
@@ -608,7 +622,7 @@ pub mod node_writer_server {
         >;
         async fn new_shard(
             &self,
-            request: tonic::Request<super::super::noderesources::ShardMetadata>,
+            request: tonic::Request<super::NewShardRequest>,
         ) -> Result<
             tonic::Response<super::super::noderesources::ShardCreated>,
             tonic::Status,
@@ -659,7 +673,7 @@ pub mod node_writer_server {
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
         async fn add_vector_set(
             &self,
-            request: tonic::Request<super::super::noderesources::VectorSetId>,
+            request: tonic::Request<super::NewVectorSetRequest>,
         ) -> Result<tonic::Response<super::OpStatus>, tonic::Status>;
         async fn remove_vector_set(
             &self,
@@ -777,9 +791,8 @@ pub mod node_writer_server {
                     struct NewShardSvc<T: NodeWriter>(pub Arc<T>);
                     impl<
                         T: NodeWriter,
-                    > tonic::server::UnaryService<
-                        super::super::noderesources::ShardMetadata,
-                    > for NewShardSvc<T> {
+                    > tonic::server::UnaryService<super::NewShardRequest>
+                    for NewShardSvc<T> {
                         type Response = super::super::noderesources::ShardCreated;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -787,9 +800,7 @@ pub mod node_writer_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<
-                                super::super::noderesources::ShardMetadata,
-                            >,
+                            request: tonic::Request<super::NewShardRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).new_shard(request).await };
@@ -1138,9 +1149,8 @@ pub mod node_writer_server {
                     struct AddVectorSetSvc<T: NodeWriter>(pub Arc<T>);
                     impl<
                         T: NodeWriter,
-                    > tonic::server::UnaryService<
-                        super::super::noderesources::VectorSetId,
-                    > for AddVectorSetSvc<T> {
+                    > tonic::server::UnaryService<super::NewVectorSetRequest>
+                    for AddVectorSetSvc<T> {
                         type Response = super::OpStatus;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -1148,9 +1158,7 @@ pub mod node_writer_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<
-                                super::super::noderesources::VectorSetId,
-                            >,
+                            request: tonic::Request<super::NewVectorSetRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move {

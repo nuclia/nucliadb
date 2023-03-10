@@ -18,10 +18,15 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary};
+use nucliadb_vectors::data_point::{DataPoint, Elem, LabelDictionary, Similarity};
 use nucliadb_vectors::data_point_provider::*;
+use nucliadb_vectors::formula::Formula;
 
 use super::VectorEngine;
+
+lazy_static::lazy_static! {
+    static ref FORMULA: Formula = Formula::new();
+}
 
 struct Request<'a>(usize, &'a [f32]);
 impl<'a> SearchRequest for Request<'a> {
@@ -32,8 +37,8 @@ impl<'a> SearchRequest for Request<'a> {
         self.1
     }
 
-    fn get_labels(&self) -> &[String] {
-        &[]
+    fn get_filter(&self) -> &Formula {
+        &FORMULA
     }
 
     fn no_results(&self) -> usize {
@@ -43,12 +48,14 @@ impl<'a> SearchRequest for Request<'a> {
 impl VectorEngine for Index {
     fn add_batch(&mut self, batch_id: String, keys: Vec<String>, embeddings: Vec<Vec<f32>>) {
         let temporal_mark = TemporalMark::now();
+        let similarity = Similarity::Cosine;
         let mut elems = vec![];
         for (key, vector) in keys.into_iter().zip(embeddings.into_iter()) {
-            let elem = Elem::new(key, vector, LabelDictionary::new(vec![]));
+            let elem = Elem::new(key, vector, LabelDictionary::new(vec![]), None);
             elems.push(elem);
         }
-        let new_dp = DataPoint::new(self.location(), elems, Some(temporal_mark)).unwrap();
+        let new_dp =
+            DataPoint::new(self.location(), elems, Some(temporal_mark), similarity).unwrap();
         let lock = self.get_elock().unwrap();
         self.add(new_dp, &lock);
         self.delete(batch_id, temporal_mark, &lock);

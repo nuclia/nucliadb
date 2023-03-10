@@ -21,20 +21,23 @@ use std::fmt::Debug;
 use std::time::SystemTime;
 
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::{
-    DocumentScored, DocumentVectorIdentifier, VectorSearchRequest, VectorSearchResponse,
+    DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchRequest,
+    VectorSearchResponse,
 };
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point_provider::*;
+use crate::formula::{Formula, LabelClause};
 use crate::indexset::IndexSet;
 
-impl<'a> SearchRequest for (usize, &'a VectorSearchRequest) {
+impl<'a> SearchRequest for (usize, &'a VectorSearchRequest, Formula) {
     fn with_duplicates(&self) -> bool {
         self.1.with_duplicates
     }
-    fn get_labels(&self) -> &[String] {
-        &self.1.tags
+    fn get_filter(&self) -> &Formula {
+        &self.2
     }
     fn get_query(&self) -> &[f32] {
         &self.1.vector
@@ -101,19 +104,27 @@ impl ReaderChild for VectorReaderService {
         let total_to_get = total_to_get as usize;
         let indexet_slock = self.indexset.get_slock()?;
         let index_slock = self.index.get_slock()?;
+        let mut formula = Formula::new();
+        request
+            .tags
+            .iter()
+            .cloned()
+            .map(LabelClause::new)
+            .for_each(|c| formula.extend(c));
+        let search_request = (total_to_get, request, formula);
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Searching: starts at {v} ms");
         }
         let result = if request.vector_set.is_empty() {
             info!("{id:?} - No vectorset specified, searching in the main index");
-            self.index.search(&(total_to_get, request), &index_slock)?
+            self.index.search(&search_request, &index_slock)?
         } else if let Some(index) = self.indexset.get(&request.vector_set, &indexet_slock)? {
             info!(
                 "{id:?} - vectorset specified and found, searching on {}",
                 request.vector_set
             );
             let lock = index.get_slock()?;
-            index.search(&(total_to_get, request), &lock)?
+            index.search(&search_request, &lock)?
         } else {
             info!(
                 "{id:?} - A was vectorset specified, but not found. {} is not a vectorset",
@@ -136,10 +147,7 @@ impl ReaderChild for VectorReaderService {
             .enumerate()
             .filter(|(idx, _)| *idx >= offset)
             .map(|(_, v)| v)
-            .map(|(id, distance)| DocumentScored {
-                doc_id: Some(DocumentVectorIdentifier { id }),
-                score: distance,
-            })
+            .flat_map(DocumentScored::try_from)
             .collect::<Vec<_>>();
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Creating results: ends at {v} ms");
@@ -166,6 +174,25 @@ impl ReaderChild for VectorReaderService {
     fn reload(&self) {}
 }
 
+impl TryFrom<Neighbour> for DocumentScored {
+    type Error = String;
+    fn try_from(neighbour: Neighbour) -> Result<Self, Self::Error> {
+        let id = std::str::from_utf8(neighbour.id());
+        let metadata = neighbour.metadata().map(SentenceMetadata::decode);
+        let Ok(id) = id.map(|i| i.to_string())else {
+            return Err("Id could not be decoded".to_string())
+        };
+        let Ok(metadata) = metadata.transpose() else {
+            return Err("The metadata could not be decoded".to_string());
+        };
+        Ok(DocumentScored {
+            metadata,
+            doc_id: Some(DocumentVectorIdentifier { id }),
+            score: neighbour.score(),
+        })
+    }
+}
+
 impl VectorReaderService {
     #[tracing::instrument(skip_all)]
     pub fn start(config: &VectorConfig) -> NodeResult<Self> {
@@ -190,8 +217,11 @@ impl VectorReaderService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
+            let Some(similarity) = config.similarity.map(|i| i.into()) else {
+                return Err(node_error!("A similarity must be specified"));
+            };
             Ok(VectorReaderService {
-                index: Index::new(path, IndexCheck::None)?,
+                index: Index::new(path, IndexMetadata { similarity })?,
                 indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
             })
         }
@@ -204,7 +234,7 @@ impl VectorReaderService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorReaderService {
-                index: Index::new(path, IndexCheck::None)?,
+                index: Index::open(path, IndexCheck::None)?,
                 indexset: IndexSet::new(path_indexset, IndexCheck::None)?,
             })
         }
@@ -217,7 +247,7 @@ mod tests {
 
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
-        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence,
+        IndexParagraph, IndexParagraphs, Resource, ResourceId, VectorSentence, VectorSimilarity,
     };
     use tempfile::TempDir;
 
@@ -228,23 +258,30 @@ mod tests {
     fn test_new_vector_reader() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
+            similarity: Some(VectorSimilarity::Cosine),
             no_results: Some(3),
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorset"),
         };
-        let sentences: HashMap<String, VectorSentence> = vec![
+        let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
             ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
             ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
             ("DOC/KEY/1/4".to_string(), vec![3.0, 5.0, 6.0]),
-        ]
-        .iter()
-        .map(|(v, k)| (v.clone(), VectorSentence { vector: k.clone() }))
-        .collect();
+        ];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
             uuid: "DOC/KEY".to_string(),
         };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,

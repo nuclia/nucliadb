@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package knowledgebox;
 
+import public "nucliadb_protos/utils.proto";
+
+
 enum KnowledgeBoxResponseStatus {
     OK = 0;
     CONFLICT = 1;
@@ -43,6 +46,7 @@ message KnowledgeBoxNew {
     string slug = 1;
     KnowledgeBoxConfig config = 2;
     string forceuuid = 3;
+    utils.VectorSimilarity similarity = 4;    
 }
 
 
@@ -162,6 +166,7 @@ message Widget {
 
 message VectorSet {
     int32 dimension = 1;
+    utils.VectorSimilarity similarity = 2;
 }
 
 message VectorSets {

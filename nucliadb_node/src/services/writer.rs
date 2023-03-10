@@ -23,7 +23,8 @@ use nucliadb_core::protos::shard_created::{
     DocumentService, ParagraphService, RelationService, VectorService,
 };
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, VectorSetId,
+    DeleteGraphNodes, JoinGraph, NewShardRequest, OpStatus, Resource, ResourceId, VectorSetId,
+    VectorSimilarity,
 };
 use nucliadb_core::thread;
 use nucliadb_core::tracing::{self, *};
@@ -49,6 +50,63 @@ pub struct ShardWriterService {
 }
 
 impl ShardWriterService {
+    #[tracing::instrument(skip_all)]
+    fn initialize(
+        id: String,
+        path: &Path,
+        metadata: ShardMetadata,
+        tsc: TextConfig,
+        psc: ParagraphConfig,
+        vsc: VectorConfig,
+        rsc: RelationConfig,
+    ) -> NodeResult<ShardWriterService> {
+        let versions = Versions::load_or_create(&path.join(VERSION_FILE))?;
+        let text_task = || Some(versions.get_texts_writer(&tsc));
+        let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
+        let vector_task = || Some(versions.get_vectors_writer(&vsc));
+        let relation_task = || Some(versions.get_relations_writer(&rsc));
+
+        let span = tracing::Span::current();
+        let info = info_span!(parent: &span, "text start");
+        let text_task = || run_with_telemetry(info, text_task);
+        let info = info_span!(parent: &span, "paragraph start");
+        let paragraph_task = || run_with_telemetry(info, paragraph_task);
+        let info = info_span!(parent: &span, "vector start");
+        let vector_task = || run_with_telemetry(info, vector_task);
+        let info = info_span!(parent: &span, "relation start");
+        let relation_task = || run_with_telemetry(info, relation_task);
+
+        let mut text_result = None;
+        let mut paragraph_result = None;
+        let mut vector_result = None;
+        let mut relation_result = None;
+        thread::scope(|s| {
+            s.spawn(|_| text_result = text_task());
+            s.spawn(|_| paragraph_result = paragraph_task());
+            s.spawn(|_| vector_result = vector_task());
+            s.spawn(|_| relation_result = relation_task());
+        });
+
+        let fields = text_result.transpose()?;
+        let paragraphs = paragraph_result.transpose()?;
+        let vectors = vector_result.transpose()?;
+        let relations = relation_result.transpose()?;
+
+        Ok(ShardWriterService {
+            id,
+            metadata,
+            path: path.to_path_buf(),
+            text_writer: fields.unwrap(),
+            paragraph_writer: paragraphs.unwrap(),
+            vector_writer: vectors.unwrap(),
+            relation_writer: relations.unwrap(),
+            document_service_version: versions.version_texts() as i32,
+            paragraph_service_version: versions.version_paragraphs() as i32,
+            vector_service_version: versions.version_vectors() as i32,
+            relation_service_version: versions.version_relations() as i32,
+        })
+    }
+
     #[tracing::instrument(skip_all)]
     pub fn document_version(&self) -> DocumentService {
         match self.document_service_version {
@@ -81,75 +139,83 @@ impl ShardWriterService {
             i => panic!("Unknown relation version {i}"),
         }
     }
-
-    #[tracing::instrument(skip_all)]
-    pub fn new(
-        id: String,
-        metadata: ShardMetadata,
-        shard_path: &Path,
-    ) -> NodeResult<ShardWriterService> {
+    pub fn clean_and_create(id: String, path: &Path) -> NodeResult<ShardWriterService> {
+        let metadata = ShardMetadata::open(&path.join(METADATA_FILE))?;
+        std::fs::remove_dir_all(path)?;
+        std::fs::create_dir_all(path)?;
         let tsc = TextConfig {
-            path: shard_path.join(TEXTS_DIR),
+            path: path.join(TEXTS_DIR),
         };
 
         let psc = ParagraphConfig {
-            path: shard_path.join(PARAGRAPHS_DIR),
+            path: path.join(PARAGRAPHS_DIR),
         };
 
         let vsc = VectorConfig {
             no_results: None,
-            path: shard_path.join(VECTORS_DIR),
-            vectorset: shard_path.join(VECTORSET_DIR),
+            similarity: metadata.similarity(),
+            path: path.join(VECTORS_DIR),
+            vectorset: path.join(VECTORSET_DIR),
         };
         let rsc = RelationConfig {
-            path: shard_path.join(RELATIONS_DIR),
+            path: path.join(RELATIONS_DIR),
         };
-        let versions = Versions::load_or_create(&shard_path.join(VERSION_FILE))?;
-        let text_task = || Some(versions.get_texts_writer(&tsc));
-        let paragraph_task = || Some(versions.get_paragraphs_writer(&psc));
-        let vector_task = || Some(versions.get_vectors_writer(&vsc));
-        let relation_task = || Some(versions.get_relations_writer(&rsc));
-
-        let span = tracing::Span::current();
-        let info = info_span!(parent: &span, "text create");
-        let text_task = || run_with_telemetry(info, text_task);
-        let info = info_span!(parent: &span, "paragraph create");
-        let paragraph_task = || run_with_telemetry(info, paragraph_task);
-        let info = info_span!(parent: &span, "vector create");
-        let vector_task = || run_with_telemetry(info, vector_task);
-        let info = info_span!(parent: &span, "relation create");
-        let relation_task = || run_with_telemetry(info, relation_task);
-
-        let mut text_result = None;
-        let mut paragraph_result = None;
-        let mut vector_result = None;
-        let mut relation_result = None;
-        thread::scope(|s| {
-            s.spawn(|_| text_result = text_task());
-            s.spawn(|_| paragraph_result = paragraph_task());
-            s.spawn(|_| vector_result = vector_task());
-            s.spawn(|_| relation_result = relation_task());
-        });
-
-        let fields = text_result.transpose()?;
-        let paragraphs = paragraph_result.transpose()?;
-        let vectors = vector_result.transpose()?;
-        let relations = relation_result.transpose()?;
-
-        Ok(ShardWriterService {
-            id,
-            metadata,
-            path: shard_path.to_path_buf(),
-            text_writer: fields.unwrap(),
-            paragraph_writer: paragraphs.unwrap(),
-            vector_writer: vectors.unwrap(),
-            relation_writer: relations.unwrap(),
-            document_service_version: versions.version_texts() as i32,
-            paragraph_service_version: versions.version_paragraphs() as i32,
-            vector_service_version: versions.version_vectors() as i32,
-            relation_service_version: versions.version_relations() as i32,
-        })
+        ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
     }
+    pub fn new(
+        id: String,
+        path: &Path,
+        request: &NewShardRequest,
+    ) -> NodeResult<ShardWriterService> {
+        std::fs::create_dir_all(path)?;
+        let metadata_path = path.join(METADATA_FILE);
+        let similarity = request.similarity();
+        let metadata = ShardMetadata::from(request.clone());
+        let tsc = TextConfig {
+            path: path.join(TEXTS_DIR),
+        };
+
+        let psc = ParagraphConfig {
+            path: path.join(PARAGRAPHS_DIR),
+        };
+
+        let vsc = VectorConfig {
+            no_results: None,
+            similarity: Some(similarity),
+            path: path.join(VECTORS_DIR),
+            vectorset: path.join(VECTORSET_DIR),
+        };
+        let rsc = RelationConfig {
+            path: path.join(RELATIONS_DIR),
+        };
+
+        metadata.serialize(&metadata_path)?;
+        ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+    }
+
+    pub fn open(id: String, path: &Path) -> NodeResult<ShardWriterService> {
+        let metadata_path = path.join(METADATA_FILE);
+        let metadata = ShardMetadata::open(&metadata_path)?;
+        let tsc = TextConfig {
+            path: path.join(TEXTS_DIR),
+        };
+
+        let psc = ParagraphConfig {
+            path: path.join(PARAGRAPHS_DIR),
+        };
+
+        let vsc = VectorConfig {
+            no_results: None,
+            similarity: None,
+            path: path.join(VECTORS_DIR),
+            vectorset: path.join(VECTORSET_DIR),
+        };
+        let rsc = RelationConfig {
+            path: path.join(RELATIONS_DIR),
+        };
+        ShardWriterService::initialize(id, path, metadata, tsc, psc, vsc, rsc)
+    }
+
     #[tracing::instrument(skip_all)]
     pub fn stop(&mut self) {
         info!("Stopping shard {}...", { &self.id });
@@ -360,9 +426,13 @@ impl ShardWriterService {
         Ok(keys)
     }
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(&self, setid: &VectorSetId) -> NodeResult<()> {
+    pub fn add_vectorset(
+        &self,
+        setid: &VectorSetId,
+        similarity: VectorSimilarity,
+    ) -> NodeResult<()> {
         let mut writer = vector_write(&self.vector_writer);
-        writer.add_vectorset(setid)?;
+        writer.add_vectorset(setid, similarity)?;
         Ok(())
     }
     #[tracing::instrument(skip_all)]

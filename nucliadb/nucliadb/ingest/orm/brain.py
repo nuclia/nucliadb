@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 from google.protobuf.internal.containers import MessageMap
 from nucliadb_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nucliadb_protos.noderesources_pb2 import ParagraphMetadata
-from nucliadb_protos.noderesources_pb2 import ParagraphPosition as TextPosition
+from nucliadb_protos.noderesources_pb2 import Position as TextPosition
 from nucliadb_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb_protos.noderesources_pb2 import ResourceID
 from nucliadb_protos.resources_pb2 import (

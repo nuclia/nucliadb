@@ -29,6 +29,7 @@ pub type VectorsWriterPointer = Arc<RwLock<dyn VectorWriter>>;
 
 #[derive(Clone)]
 pub struct VectorConfig {
+    pub similarity: Option<VectorSimilarity>,
     pub no_results: Option<usize>,
     pub path: PathBuf,
     pub vectorset: PathBuf,
@@ -42,6 +43,10 @@ pub trait VectorReader:
 
 pub trait VectorWriter: WriterChild {
     fn list_vectorsets(&self) -> NodeResult<Vec<String>>;
-    fn add_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
     fn remove_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()>;
+    fn add_vectorset(
+        &mut self,
+        setid: &VectorSetId,
+        similarity: VectorSimilarity,
+    ) -> NodeResult<()>;
 }

@@ -289,7 +289,7 @@ async def get_widget(request: Request, kbid: str, widget: str) -> Widget:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_vectorset(request: Request, kbid: str):
+async def get_vectorsets(request: Request, kbid: str):
     ingest = get_ingest()
     pbrequest: GetVectorSetsRequest = GetVectorSetsRequest()
     pbrequest.kb.uuid = kbid
@@ -300,7 +300,7 @@ async def get_vectorset(request: Request, kbid: str):
     if vectorsets.status == GetVectorSetsResponse.Status.OK:
         result = VectorSets(vectorsets={})
         for key, vector in vectorsets.vectorsets.vectorsets.items():
-            result.vectorsets[key] = VectorSet(dimension=vector.dimension)
+            result.vectorsets[key] = VectorSet.from_message(vector)
         return result
     elif vectorsets.status == GetVectorSetsResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="VectorSet does not exist")

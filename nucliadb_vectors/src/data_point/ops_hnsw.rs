@@ -27,6 +27,7 @@ use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 
 use super::*;
+use crate::formula::Formula;
 
 pub mod params {
     pub fn level_factor() -> f64 {
@@ -48,7 +49,7 @@ pub mod params {
 pub trait DataRetriever: std::marker::Sync {
     fn is_deleted(&self, _: Address) -> bool;
     fn has_label(&self, _: Address, _: &[u8]) -> bool;
-    fn consine_similarity(&self, _: Address, _: Address) -> f32;
+    fn similarity(&self, _: Address, _: Address) -> f32;
     fn get_vector(&self, _: Address) -> &[u8];
 }
 
@@ -107,14 +108,14 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         picked_level.round() as usize
     }
     fn cosine_similarity(&self, x: Address, y: Address) -> f32 {
-        self.tracker.consine_similarity(x, y)
+        self.tracker.similarity(x, y)
     }
     fn closest_up_node<L: Layer>(
         &'a self,
         x: Address,
         query: Address,
         layer: L,
-        filters: &[&[u8]],
+        filter: &Formula,
         blocked_addresses: &HashSet<Address>,
         vec_counter: &RepCounter,
     ) -> Option<(Address, f32)> {
@@ -132,8 +133,8 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
                         && !blocked_addresses.contains(&n)
                         // The number of times this vector appears is 0
                         && vec_counter.get(self.tracker.get_vector(n)) == 0
-                        // The vector contains all the labels required by the query.
-                        && filters.iter().all(|label| self.tracker.has_label(n, label)) =>
+                        // The vector satisfies the given filter
+                        && filter.run(n, self.tracker) =>
                 {
                     break Some((n, self.cosine_similarity(n, query)));
                 }
@@ -243,7 +244,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         query: Address,
         hnsw: H,
         k_neighbours: usize,
-        with_filter: &[&[u8]],
+        with_filter: &Formula,
         with_duplicates: bool,
     ) -> Neighbours {
         if let Some(entry_point) = hnsw.get_entry_point() {

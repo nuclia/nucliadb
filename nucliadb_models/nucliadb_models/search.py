@@ -26,11 +26,13 @@ from nucliadb_protos.audit_pb2 import ClientType
 from nucliadb_protos.nodereader_pb2 import OrderBy
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
+from nucliadb_protos.writer_pb2 import Shards as PBShards
 from pydantic import BaseModel, Field
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
+from nucliadb_models.vectors import VectorSimilarity
 
 _T = TypeVar("_T")
 
@@ -316,7 +318,18 @@ class ShardObject(BaseModel):
 class KnowledgeboxShards(BaseModel):
     kbid: str
     actual: int
+    similarity: VectorSimilarity
     shards: List[ShardObject]
+
+    @classmethod
+    def from_message(cls: Type[_T], message: PBShards) -> _T:
+        as_dict = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        as_dict["similarity"] = VectorSimilarity.from_message(message.similarity)
+        return cls(**as_dict)
 
 
 class SearchRequest(BaseModel):

@@ -28,6 +28,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxResponseStatus,
     Widget,
 )
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from pydantic import BaseModel
 from sentry_sdk import capture_exception
@@ -410,7 +411,10 @@ class Processor:
                     # Check if we have enough resource to create a new shard
                     shard = await node_klass.actual_shard(txn, kbid)
                     if shard is None:
-                        shard = await node_klass.create_shard_by_kbid(txn, kbid)
+                        similarity = await kb.get_similarity()
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
                     await kb.set_resource_shard_id(uuid, shard.sharduuid)
 
                 if shard is not None:
@@ -419,7 +423,10 @@ class Processor:
                         counter is not None
                         and counter.fields > settings.max_node_fields
                     ):
-                        shard = await node_klass.create_shard_by_kbid(txn, kbid)
+                        similarity = await kb.get_similarity()
+                        shard = await node_klass.create_shard_by_kbid(
+                            txn, kbid, similarity=similarity
+                        )
 
                 else:
                     raise AttributeError("Shard is not available")
@@ -628,11 +635,12 @@ class Processor:
         slug: str,
         config: Optional[KnowledgeBoxConfig],
         forceuuid: Optional[str] = None,
+        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
     ) -> str:
         txn = await self.driver.begin()
         try:
             uuid, failed = await KnowledgeBox.create(
-                txn, slug, config=config, uuid=forceuuid
+                txn, slug, config=config, uuid=forceuuid, similarity=similarity
             )
         except Exception as e:
             await txn.abort()

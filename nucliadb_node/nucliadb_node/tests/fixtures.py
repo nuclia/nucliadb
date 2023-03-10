@@ -28,12 +28,8 @@ import pytest
 from grpc import aio, insecure_channel  # type: ignore
 from grpc_health.v1 import health_pb2_grpc  # type: ignore
 from grpc_health.v1.health_pb2 import HealthCheckRequest  # type: ignore
-from nucliadb_protos.noderesources_pb2 import (
-    EmptyQuery,
-    ShardCreated,
-    ShardId,
-    ShardMetadata,
-)
+from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardCreated, ShardId
+from nucliadb_protos.nodewriter_pb2 import NewShardRequest
 from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
 from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
@@ -174,10 +170,9 @@ async def sidecar(data_path, node_single, gcs_storage, natsd):
     settings.force_host_id = "node1"
     settings.data_path = "/tmp"
     app = await main()
-    # Create a shard
+
     yield app
 
-    # Delete a shard
     for finalizer in app.finalizers:
         if asyncio.iscoroutinefunction(finalizer):
             await finalizer()
@@ -194,7 +189,7 @@ async def sidecar_grpc_servicer(sidecar):
 @pytest.fixture(scope="function")
 async def shard() -> AsyncIterable[str]:
     stub = NodeWriterStub(aio.insecure_channel(settings.writer_listen_address))
-    request = ShardMetadata(kbid="test")
+    request = NewShardRequest(kbid="test")
     shard: ShardCreated = await stub.NewShard(request)  # type: ignore
     yield shard.id
     sid = ShardId()

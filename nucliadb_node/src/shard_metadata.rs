@@ -22,14 +22,38 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
-use nucliadb_core::protos::ShardMetadata as GrpcMetadata;
+use nucliadb_core::protos::{NewShardRequest, ShardMetadata as GrpcMetadata, VectorSimilarity};
 use nucliadb_core::{node_error, NodeResult};
 use serde::*;
-pub const SHARD_METADATA: &str = "metadata.json";
+
+#[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Similarity {
+    #[default]
+    Cosine,
+    Dot,
+}
+
+impl From<VectorSimilarity> for Similarity {
+    fn from(value: VectorSimilarity) -> Self {
+        match value {
+            VectorSimilarity::Cosine => Similarity::Cosine,
+            VectorSimilarity::Dot => Similarity::Dot,
+        }
+    }
+}
+impl From<Similarity> for VectorSimilarity {
+    fn from(value: Similarity) -> Self {
+        match value {
+            Similarity::Cosine => VectorSimilarity::Cosine,
+            Similarity::Dot => VectorSimilarity::Dot,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct ShardMetadata {
-    pub kbid: Option<String>,
+    kbid: Option<String>,
+    similarity: Option<Similarity>,
 }
 
 impl From<ShardMetadata> for GrpcMetadata {
@@ -39,14 +63,11 @@ impl From<ShardMetadata> for GrpcMetadata {
         }
     }
 }
-impl From<GrpcMetadata> for ShardMetadata {
-    fn from(value: GrpcMetadata) -> Self {
+impl From<NewShardRequest> for ShardMetadata {
+    fn from(value: NewShardRequest) -> Self {
         ShardMetadata {
-            kbid: if value.kbid.is_empty() {
-                None
-            } else {
-                Some(value.kbid)
-            },
+            similarity: Some(value.similarity().into()),
+            kbid: Some(value.kbid).filter(|s| !s.is_empty()),
         }
     }
 }
@@ -69,6 +90,12 @@ impl ShardMetadata {
         serde_json::to_writer(&mut writer, self)?;
         Ok(writer.flush()?)
     }
+    pub fn kbid(&self) -> Option<&str> {
+        self.kbid.as_deref()
+    }
+    pub fn similarity(&self) -> Option<VectorSimilarity> {
+        self.similarity.map(VectorSimilarity::from)
+    }
 }
 
 #[cfg(test)]
@@ -82,10 +109,12 @@ mod test {
         let metadata_path = dir.path().join("metadata.json");
         let meta = ShardMetadata {
             kbid: Some("KB".to_string()),
+            similarity: Some(Similarity::Cosine),
         };
         meta.serialize(&metadata_path).unwrap();
         let meta_disk = ShardMetadata::open(&metadata_path).unwrap();
         assert_eq!(meta.kbid, meta_disk.kbid);
+        assert_eq!(meta.similarity, meta_disk.similarity);
     }
     #[test]
     fn open_empty() {

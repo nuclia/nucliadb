@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nucliadb_core::protos::{GetShardRequest, ShardId, ShardMetadata};
+use nucliadb_core::protos::{GetShardRequest, NewShardRequest, ShardId};
 
 mod common;
 
@@ -32,7 +32,7 @@ async fn test_create_shard() -> Result<(), Box<dyn std::error::Error>> {
     const KB1: &str = "KB1";
     const KB2: &str = "KB2";
     let new_shard_response = writer
-        .new_shard(Request::new(ShardMetadata::default()))
+        .new_shard(Request::new(NewShardRequest::default()))
         .await?;
     let shard_id = &new_shard_response.get_ref().id;
 
@@ -55,22 +55,25 @@ async fn test_metadata() -> Result<(), Box<dyn std::error::Error>> {
     const KB1: &str = "KB1";
     const KB2: &str = "KB2";
     let shard_0 = writer
-        .new_shard(Request::new(ShardMetadata {
+        .new_shard(Request::new(NewShardRequest {
             kbid: KB0.to_string(),
+            ..Default::default()
         }))
         .await?
         .into_inner()
         .id;
     let shard_1 = writer
-        .new_shard(Request::new(ShardMetadata {
+        .new_shard(Request::new(NewShardRequest {
             kbid: KB1.to_string(),
+            ..Default::default()
         }))
         .await?
         .into_inner()
         .id;
     let shard_2 = writer
-        .new_shard(Request::new(ShardMetadata {
+        .new_shard(Request::new(NewShardRequest {
             kbid: KB2.to_string(),
+            ..Default::default()
         }))
         .await?
         .into_inner()

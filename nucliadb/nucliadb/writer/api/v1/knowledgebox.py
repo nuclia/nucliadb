@@ -62,6 +62,8 @@ async def create_kb(request: Request, item: KnowledgeBoxConfig):
         requestpb.config.title = item.title
     if item.description:
         requestpb.config.description = item.description
+    if item.similarity:
+        requestpb.similarity = item.similarity.to_pb()
 
     requestpb.config.disable_vectors = item.disable_vectors
 

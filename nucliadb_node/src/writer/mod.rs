@@ -23,8 +23,8 @@ use std::collections::HashMap;
 
 use nucliadb_core::prelude::*;
 use nucliadb_core::protos::{
-    DeleteGraphNodes, JoinGraph, OpStatus, Resource, ResourceId, ShardCleaned, ShardCreated,
-    ShardId, ShardIds, ShardMetadata as GrpcMetadata, VectorSetId,
+    DeleteGraphNodes, JoinGraph, NewShardRequest, NewVectorSetRequest, OpStatus, Resource,
+    ResourceId, ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId,
 };
 use nucliadb_core::thread::ThreadPoolBuilder;
 use nucliadb_core::tracing::{self, *};
@@ -33,7 +33,6 @@ use uuid::Uuid;
 
 use crate::env;
 use crate::services::writer::ShardWriterService;
-use crate::shard_metadata::{ShardMetadata, SHARD_METADATA};
 
 #[derive(Debug)]
 pub struct NodeWriterService {
@@ -71,12 +70,7 @@ impl NodeWriterService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let metadata_path = shard_path.join(SHARD_METADATA);
-            let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
-                error!("Corrupted {metadata_path:?}");
-                continue;
-            };
-            let Ok(shard) = ShardWriterService::new(file_name.clone(), metadata, &shard_path) else {
+            let Ok(shard) = ShardWriterService::open(file_name.clone(), &shard_path) else {
                 error!("Shard {shard_path:?} could not be loaded from disk");
                 continue;
             };
@@ -90,7 +84,6 @@ impl NodeWriterService {
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
         let shard_path = env::shards_path_id(&shard_id.id);
-        let metadata_path = shard_path.join(SHARD_METADATA);
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
             return;
@@ -99,11 +92,7 @@ impl NodeWriterService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
-            error!("Corrupted {metadata_path:?}");
-            return;
-        };
-        let Ok(shard) = ShardWriterService::new(shard_name, metadata, &shard_path) else {
+        let Ok(shard) = ShardWriterService::open(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };
@@ -120,13 +109,10 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn new_shard(&mut self, metadata: GrpcMetadata) -> NodeResult<ShardCreated> {
+    pub fn new_shard(&mut self, request: &NewShardRequest) -> NodeResult<ShardCreated> {
         let shard_id = Uuid::new_v4().to_string();
         let shard_path = env::shards_path_id(&shard_id);
-        let metadata = ShardMetadata::from(metadata);
-        std::fs::create_dir_all(&shard_path)?;
-        metadata.serialize(&shard_path.join(SHARD_METADATA))?;
-        let new_shard = ShardWriterService::new(shard_id.clone(), metadata, &shard_path)?;
+        let new_shard = ShardWriterService::new(shard_id.clone(), &shard_path, request)?;
         let data = ShardCreated {
             id: new_shard.id.clone(),
             document_service: new_shard.document_version() as i32,
@@ -158,23 +144,17 @@ impl NodeWriterService {
 
     #[tracing::instrument(skip_all)]
     pub fn clean_and_upgrade_shard(&mut self, shard_id: &ShardId) -> NodeResult<ShardCleaned> {
-        let shard_name = shard_id.id.clone();
-        let shard_path = env::shards_path_id(&shard_id.id);
-        let metadata_path = shard_path.join(SHARD_METADATA);
-        let metadata = ShardMetadata::open(&metadata_path)?;
-
-        self.delete_shard(shard_id)?;
-        std::fs::create_dir_all(&shard_path).unwrap();
-
-        let new_shard = ShardWriterService::new(shard_name, metadata, &shard_path)?;
+        self.cache.remove(&shard_id.id);
+        let shard_id = shard_id.id.clone();
+        let shard_path = env::shards_path_id(&shard_id);
+        let new_shard = ShardWriterService::clean_and_create(shard_id.clone(), &shard_path)?;
         let shard_data = ShardCleaned {
             document_service: new_shard.document_version() as i32,
             paragraph_service: new_shard.paragraph_version() as i32,
             vector_service: new_shard.vector_version() as i32,
             relation_service: new_shard.relation_version() as i32,
         };
-        self.cache.insert(shard_id.id.clone(), new_shard);
-
+        self.cache.insert(shard_id, new_shard);
         Ok(shard_data)
     }
 
@@ -193,15 +173,17 @@ impl NodeWriterService {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn add_vectorset(
-        &mut self,
-        shard_id: &ShardId,
-        setid: &VectorSetId,
-    ) -> NodeResult<Option<OpStatus>> {
+    pub fn add_vectorset(&mut self, request: &NewVectorSetRequest) -> NodeResult<Option<OpStatus>> {
+        let Some(setid) = &request.id else {
+            return Err(node_error!("missing vectorset id"));
+        };
+        let Some(shard_id) = &setid.shard else {
+            return Err(node_error!("missing shard id"));
+        };
         let Some(shard) = self.get_mut_shard(shard_id) else {
             return Ok(None);
         };
-        shard.add_vectorset(setid)?;
+        shard.add_vectorset(setid, request.similarity())?;
         Ok(Some(shard.get_opstatus()?))
     }
 

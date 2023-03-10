@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "nucliadb_node_binding"
-version = "0.5.9"
+version = "0.6.0"
 dependencies = [
  "bincode",
  "log",
@@ -4076,6 +4076,7 @@ name = "vectors_benchmark"
 version = "0.1.0"
 dependencies = [
  "clap 3.2.23",
+ "lazy_static",
  "nucliadb_vectors",
  "rand 0.8.5",
  "serde",

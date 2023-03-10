@@ -1,8 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Be able to set vector similarity on shards and vectorsets
+
 ## 0.5.9
 
 - Fix vector deletion 
+
 ## 0.5.8
 
 - Store node metadata 

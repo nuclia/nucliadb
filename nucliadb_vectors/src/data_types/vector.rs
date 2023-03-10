@@ -19,7 +19,6 @@
 //
 
 use std::io::{Read, Write};
-
 type Len = u64;
 type Unit = f32;
 type Dist = f32;
@@ -35,13 +34,8 @@ fn encode_unit(mut buff: Vec<u8>, unit: Unit) -> Vec<u8> {
     buff.flush().unwrap();
     buff
 }
-pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
-    vec.iter()
-        .cloned()
-        .fold(encode_length(vec![], vec), encode_unit)
-}
 
-pub fn consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
+pub fn cosine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
     x.read_exact(&mut buff_x).unwrap();
@@ -67,6 +61,34 @@ pub fn consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     sum / (f32::sqrt(dem_x) * f32::sqrt(dem_y))
 }
 
+pub fn dot_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
+    let mut buff_x = [0; 8];
+    let mut buff_y = [0; 8];
+    x.read_exact(&mut buff_x).unwrap();
+    y.read_exact(&mut buff_y).unwrap();
+    let len_x = Len::from_le_bytes(buff_x);
+    let len_y = Len::from_le_bytes(buff_y);
+    assert_eq!(len_x, len_y);
+    let len = len_x;
+    let mut buff_x = [0; 4];
+    let mut buff_y = [0; 4];
+    let mut sum = 0.0;
+    for _ in 0..len {
+        x.read_exact(&mut buff_x).unwrap();
+        y.read_exact(&mut buff_y).unwrap();
+        let x_value = Unit::from_le_bytes(buff_x);
+        let y_value = Unit::from_le_bytes(buff_y);
+        sum += x_value * y_value;
+    }
+    sum
+}
+
+pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
+    vec.iter()
+        .cloned()
+        .fold(encode_length(vec![], vec), encode_unit)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -81,19 +103,38 @@ mod test {
         let bb: f32 = b.iter().cloned().map(|b| b * b).sum();
         ab / (f32::sqrt(aa) * f32::sqrt(bb))
     }
+
+    fn naive_dot_similatiry(a: &[f32], b: &[f32]) -> f32 {
+        a.iter()
+            .cloned()
+            .zip(b.iter().cloned())
+            .map(|(a, b)| a * b)
+            .sum()
+    }
+
     #[test]
-    fn naive_equivalence() {
+    fn cosine_test() {
         let v0: Vec<_> = (0..758).map(|i| (i * 2) as f32).collect();
         let v1: Vec<_> = (0..758).map(|i| ((i * 2) + 1) as f32).collect();
         let v0_r = encode_vector(&v0);
         let v1_r = encode_vector(&v1);
         assert_eq!(
             naive_cosine_similatiry(&v0, &v1),
-            consine_similarity(&v0_r, &v1_r)
+            cosine_similarity(&v0_r, &v1_r)
         );
         assert_eq!(
             naive_cosine_similatiry(&v0, &v0),
-            consine_similarity(&v0_r, &v0_r)
+            cosine_similarity(&v0_r, &v0_r)
         );
+    }
+
+    #[test]
+    fn dot_test() {
+        let v0: Vec<_> = (0..758).map(|i| (i * 2) as f32).collect();
+        let v1: Vec<_> = (0..758).map(|i| ((i * 2) + 1) as f32).collect();
+        let v0_r = encode_vector(&v0);
+        let v1_r = encode_vector(&v1);
+        assert_eq!(naive_dot_similatiry(&v0, &v1), dot_similarity(&v0_r, &v1_r));
+        assert_eq!(naive_dot_similatiry(&v0, &v1), dot_similarity(&v0_r, &v1_r));
     }
 }

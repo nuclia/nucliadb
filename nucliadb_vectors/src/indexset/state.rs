@@ -24,7 +24,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::IndexKeyCollector;
-use crate::data_point_provider::{Index, IndexCheck};
+use crate::data_point::Similarity;
+use crate::data_point_provider::{Index, IndexCheck, IndexMetadata};
 use crate::VectorR;
 #[derive(Serialize, Deserialize)]
 pub struct State {
@@ -44,7 +45,7 @@ impl State {
     pub fn do_sanity_checks(&self) -> VectorR<()> {
         for index in &self.indexes {
             let index_path = self.location.join(index);
-            Index::new(&index_path, IndexCheck::Sanity)?;
+            Index::open(&index_path, IndexCheck::Sanity)?;
         }
         Ok(())
     }
@@ -58,23 +59,23 @@ impl State {
     pub fn get(&self, index: &str) -> VectorR<Option<Index>> {
         if self.indexes.contains(index) {
             let location = self.location.join(index);
-            Some(Index::new(&location, IndexCheck::None)).transpose()
+            Some(Index::open(&location, IndexCheck::None)).transpose()
         } else {
             Ok(None)
         }
     }
-    pub fn get_or_create<'a, S>(&mut self, index: S) -> VectorR<Index>
+    pub fn get_or_create<'a, S>(&mut self, index: S, similarity: Similarity) -> VectorR<Index>
     where S: Into<Cow<'a, str>> {
         let index: Cow<_> = index.into();
         if self.indexes.contains(index.as_ref()) {
             let index = index.as_ref();
             let location = self.location.join(index);
-            Index::new(&location, IndexCheck::None)
+            Index::open(&location, IndexCheck::None)
         } else {
             let index = index.to_string();
             let location = self.location.join(&index);
             self.indexes.insert(index);
-            Index::new(&location, IndexCheck::None)
+            Index::new(&location, IndexMetadata { similarity })
         }
     }
 }
@@ -88,9 +89,15 @@ mod test {
     fn basic_functionality_test() {
         let dir = TempDir::new().unwrap();
         let mut vectorset = State::new(dir.path().to_path_buf());
-        let _index1 = vectorset.get_or_create("Index1".to_string()).unwrap();
-        let _index2 = vectorset.get_or_create("Index2".to_string()).unwrap();
-        let _index3 = vectorset.get_or_create("Index3".to_string()).unwrap();
+        let _index1 = vectorset
+            .get_or_create("Index1".to_string(), Similarity::Cosine)
+            .unwrap();
+        let _index2 = vectorset
+            .get_or_create("Index2".to_string(), Similarity::Cosine)
+            .unwrap();
+        let _index3 = vectorset
+            .get_or_create("Index3".to_string(), Similarity::Cosine)
+            .unwrap();
         assert!(vectorset.get("Index1").unwrap().is_some());
         assert!(vectorset.get("Index2").unwrap().is_some());
         assert!(vectorset.get("Index3").unwrap().is_some());

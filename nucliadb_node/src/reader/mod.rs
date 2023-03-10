@@ -33,7 +33,6 @@ use nucliadb_core::tracing::{self, *};
 
 use crate::env;
 use crate::services::reader::ShardReaderService;
-use crate::shard_metadata::*;
 
 #[derive(Debug)]
 pub struct NodeReaderService {
@@ -73,11 +72,7 @@ impl NodeReaderService {
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
             info!("Opening {shard_path:?}");
-            let metadata_path = shard_path.join(SHARD_METADATA);
-            let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
-                return Err(node_error!("Corrupted {metadata_path:?}"));
-            };
-            ShardReaderService::new(file_name, metadata, &shard_path)
+            ShardReaderService::new(file_name, &shard_path)
         }))
     }
 
@@ -90,12 +85,7 @@ impl NodeReaderService {
             let entry = entry?;
             let file_name = entry.file_name().to_str().unwrap().to_string();
             let shard_path = entry.path();
-            let metadata_path = shard_path.join(SHARD_METADATA);
-            let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
-                error!("Corrupted {metadata_path:?}");
-                continue;
-            };
-            match ShardReaderService::new(file_name.clone(), metadata, &shard_path) {
+            match ShardReaderService::new(file_name.clone(), &shard_path) {
                 Err(err) => error!("Loading {shard_path:?} raised {err}"),
                 Ok(shard) => {
                     info!("Shard loaded: {shard_path:?}");
@@ -110,7 +100,6 @@ impl NodeReaderService {
     pub fn load_shard(&mut self, shard_id: &ShardId) {
         let shard_name = shard_id.id.clone();
         let shard_path = env::shards_path_id(&shard_id.id);
-        let metadata_path = shard_path.join(SHARD_METADATA);
 
         if self.cache.contains_key(&shard_id.id) {
             info!("Shard {shard_path:?} is already on memory");
@@ -120,11 +109,7 @@ impl NodeReaderService {
             error!("Shard {shard_path:?} is not on disk");
             return;
         }
-        let Ok(metadata) = ShardMetadata::open(&metadata_path) else {
-            error!("Corrupted {metadata_path:?}");
-            return;
-        };
-        let Ok(shard) = ShardReaderService::new(shard_name, metadata, &shard_path) else {
+        let Ok(shard) = ShardReaderService::new(shard_name, &shard_path) else {
             error!("Shard {shard_path:?} could not be loaded from disk");
             return;
         };

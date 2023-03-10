@@ -22,8 +22,9 @@ use std::time::SystemTime;
 
 use data_point::{Elem, LabelDictionary};
 use nucliadb_core::prelude::*;
+use nucliadb_core::protos::prost::Message;
 use nucliadb_core::protos::resource::ResourceStatus;
-use nucliadb_core::protos::{Resource, ResourceId, VectorSetId};
+use nucliadb_core::protos::{Resource, ResourceId, VectorSetId, VectorSimilarity};
 use nucliadb_core::tracing::{self, *};
 
 use crate::data_point::DataPoint;
@@ -62,13 +63,19 @@ impl VectorWriter for VectorWriterService {
         Ok(collector)
     }
     #[tracing::instrument(skip_all)]
-    fn add_vectorset(&mut self, setid: &VectorSetId) -> NodeResult<()> {
+    fn add_vectorset(
+        &mut self,
+        setid: &VectorSetId,
+        similarity: VectorSimilarity,
+    ) -> NodeResult<()> {
         let id = setid.shard.as_ref().map(|s| &s.id);
         let time = SystemTime::now();
         let set = &setid.vectorset;
         let indexid = setid.vectorset.as_str();
+        let similarity = similarity.into();
         let indexset_elock = self.indexset.get_elock()?;
-        self.indexset.get_or_create(indexid, &indexset_elock)?;
+        self.indexset
+            .get_or_create(indexid, similarity, &indexset_elock)?;
         self.indexset.commit(indexset_elock)?;
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?}/{set} - Ending at {v} ms");
@@ -136,16 +143,25 @@ impl WriterChild for VectorWriterService {
         let temporal_mark = TemporalMark::now();
         let mut elems = Vec::new();
         if resource.status != ResourceStatus::Delete as i32 {
-            for paragraph in resource.paragraphs.values() {
+            for (field, paragraph) in resource.paragraphs.iter() {
+                let field = &[field.clone()];
                 for index in paragraph.paragraphs.values() {
-                    let labels = resource.labels.iter().chain(index.labels.iter()).cloned();
-                    let labels = LabelDictionary::new(labels.collect());
-                    index
-                        .sentences
-                        .iter()
-                        .map(|(key, sentence)| (key.clone(), sentence.vector.clone()))
-                        .map(|(key, sentence)| Elem::new(key, sentence, labels.clone()))
-                        .for_each(|e| elems.push(e));
+                    let labels = LabelDictionary::new(
+                        resource
+                            .labels
+                            .iter()
+                            .chain(index.labels.iter())
+                            .chain(field.iter())
+                            .cloned()
+                            .collect(),
+                    );
+                    for (key, sentence) in index.sentences.iter().clone() {
+                        let key = key.to_string();
+                        let labels = labels.clone();
+                        let vector = sentence.vector.clone();
+                        let metadata = sentence.metadata.as_ref().map(|m| m.encode_to_vec());
+                        elems.push(Elem::new(key, vector, labels, metadata));
+                    }
                 }
             }
         }
@@ -156,11 +172,14 @@ impl WriterChild for VectorWriterService {
         if let Ok(v) = time.elapsed().map(|s| s.as_millis()) {
             info!("{id:?} - Datapoint creation: starts {v} ms");
         }
+
+        let similarity = self.index.metadata().similarity;
         let new_dp = if !elems.is_empty() {
             Some(DataPoint::new(
                 self.index.location(),
                 elems,
                 Some(temporal_mark),
+                similarity,
             )?)
         } else {
             None
@@ -230,22 +249,23 @@ impl WriterChild for VectorWriterService {
         let indexes = resource
             .vectors
             .keys()
-            .map(|k| (k, self.indexset.get_or_create::<&str>(k, &indexset_elock)))
+            .map(|k| (k, self.indexset.get(k, &indexset_elock)))
             .map(|(key, index)| index.map(|index| (key, index)))
             .collect::<Result<HashMap<_, _>, _>>()?;
         self.indexset.commit(indexset_elock)?;
 
         // Inner indexes are updated
-        for (index_key, index) in indexes {
+        for (index_key, index) in indexes.into_iter().flat_map(|i| i.1.map(|j| (i.0, j))) {
             let mut elems = vec![];
             for (key, user_vector) in resource.vectors[index_key].vectors.iter() {
                 let key = key.clone();
                 let vector = user_vector.vector.clone();
                 let labels = LabelDictionary::new(user_vector.labels.clone());
-                elems.push(Elem::new(key, vector, labels));
+                elems.push(Elem::new(key, vector, labels, None));
             }
             if !elems.is_empty() {
-                let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark))?;
+                let similarity = index.metadata().similarity;
+                let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark), similarity)?;
                 let lock = index.get_elock()?;
                 index.add(new_dp, &lock);
                 index.commit(lock)?;
@@ -310,8 +330,11 @@ impl VectorWriterService {
         if path.exists() {
             Err(node_error!("Shard does exist".to_string()))
         } else {
+            let Some(similarity) = config.similarity.map(|i| i.into()) else {
+                return Err(node_error!("A similarity must be specified"));
+            };
             Ok(VectorWriterService {
-                index: Index::new(path, IndexCheck::None)?,
+                index: Index::new(path, IndexMetadata { similarity })?,
                 indexset: IndexSet::new(indexset, IndexCheck::None)?,
             })
         }
@@ -324,7 +347,7 @@ impl VectorWriterService {
             Err(node_error!("Shard does not exist".to_string()))
         } else {
             Ok(VectorWriterService {
-                index: Index::new(path, IndexCheck::Sanity)?,
+                index: Index::open(path, IndexCheck::Sanity)?,
                 indexset: IndexSet::new(indexset, IndexCheck::Sanity)?,
             })
         }
@@ -338,14 +361,16 @@ mod tests {
     use nucliadb_core::protos::resource::ResourceStatus;
     use nucliadb_core::protos::{
         IndexParagraph, IndexParagraphs, Resource, ResourceId, UserVector, UserVectors,
-        VectorSearchRequest, VectorSentence,
+        VectorSearchRequest, VectorSentence, VectorSimilarity,
     };
     use tempfile::TempDir;
 
     use super::*;
     use crate::service::reader::VectorReaderService;
-
-    fn create_vector_set(set_name: String) -> (String, UserVectors) {
+    fn create_vector_set(
+        writer: &mut VectorWriterService,
+        set_name: String,
+    ) -> (String, UserVectors) {
         let label = format!("{set_name}/label");
         let key = format!("{set_name}/key");
         let vector = vec![1.0, 3.0, 4.0];
@@ -357,19 +382,28 @@ mod tests {
         let set = UserVectors {
             vectors: HashMap::from([(key, data)]),
         };
+        let id = VectorSetId {
+            shard: None,
+            vectorset: set_name.clone(),
+        };
+        writer.add_vectorset(&id, VectorSimilarity::Cosine).unwrap();
         (set_name, set)
     }
     #[test]
     fn test_vectorset_functionality() {
         let dir = TempDir::new().unwrap();
         let vsc = VectorConfig {
+            similarity: Some(VectorSimilarity::Cosine),
             no_results: None,
             path: dir.path().join("vectors"),
             vectorset: dir.path().join("vectorsets"),
         };
-        let indexes: HashMap<_, _> = (0..10).map(|i| create_vector_set(i.to_string())).collect();
-        let keys: HashSet<_> = indexes.keys().cloned().collect();
+
         let mut writer = VectorWriterService::start(&vsc).unwrap();
+        let indexes: HashMap<_, _> = (0..10)
+            .map(|i| create_vector_set(&mut writer, i.to_string()))
+            .collect();
+        let keys: HashSet<_> = indexes.keys().cloned().collect();
         let resource = Resource {
             vectors: indexes,
             ..Default::default()
@@ -426,24 +460,30 @@ mod tests {
     #[test]
     fn test_new_vector_writer() {
         let dir = TempDir::new().unwrap();
-        let dir_vectorset = TempDir::new().unwrap();
         let vsc = VectorConfig {
+            similarity: Some(VectorSimilarity::Cosine),
             no_results: None,
-            path: dir.path().to_path_buf(),
-            vectorset: dir_vectorset.path().to_path_buf(),
+            path: dir.path().join("vectors"),
+            vectorset: dir.path().join("vectorset"),
         };
-        let sentences: HashMap<String, VectorSentence> = vec![
+        let raw_sentences = [
             ("DOC/KEY/1/1".to_string(), vec![1.0, 3.0, 4.0]),
             ("DOC/KEY/1/2".to_string(), vec![2.0, 4.0, 5.0]),
             ("DOC/KEY/1/3".to_string(), vec![3.0, 5.0, 6.0]),
-        ]
-        .iter()
-        .map(|(v, k)| (v.clone(), VectorSentence { vector: k.clone() }))
-        .collect();
+        ];
         let resource_id = ResourceId {
             shard_id: "DOC".to_string(),
             uuid: "DOC/KEY".to_string(),
         };
+
+        let mut sentences = HashMap::new();
+        for (key, vector) in raw_sentences {
+            let vector = VectorSentence {
+                vector,
+                ..Default::default()
+            };
+            sentences.insert(key, vector);
+        }
         let paragraph = IndexParagraph {
             start: 0,
             end: 0,

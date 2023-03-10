@@ -24,6 +24,7 @@ use std::sync::RwLock;
 use nucliadb_core::fs_state::{self, ELock, Lock, SLock, Version};
 use state::State;
 
+use crate::data_point::Similarity;
 use crate::data_point_provider::{Index, IndexCheck};
 use crate::VectorR;
 pub trait IndexKeyCollector {
@@ -58,10 +59,17 @@ impl IndexSet {
         let mut write = self.state.write().unwrap();
         write.remove_index(index)
     }
-    pub fn get_or_create<'a, S>(&'a mut self, index: S, _: &ELock) -> VectorR<Index>
-    where S: Into<std::borrow::Cow<'a, str>> {
+    pub fn get_or_create<'a, S>(
+        &'a mut self,
+        index: S,
+        similarity: Similarity,
+        _: &ELock,
+    ) -> VectorR<Index>
+    where
+        S: Into<std::borrow::Cow<'a, str>>,
+    {
         let mut write = self.state.write().unwrap();
-        write.get_or_create(index)
+        write.get_or_create(index, similarity)
     }
     fn update(&self, lock: &fs_state::Lock) -> VectorR<()> {
         let disk_v = fs_state::crnt_version(lock)?;

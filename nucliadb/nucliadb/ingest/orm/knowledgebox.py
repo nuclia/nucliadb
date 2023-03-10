@@ -32,6 +32,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
 from nucliadb_protos.resources_pb2 import Basic
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
     GetEntitiesResponse,
@@ -198,6 +199,7 @@ class KnowledgeBox:
         slug: str,
         uuid: Optional[str] = None,
         config: Optional[KnowledgeBoxConfig] = None,
+        similarity: VectorSimilarity.ValueType = VectorSimilarity.COSINE,
     ) -> Tuple[str, bool]:
         failed = False
         exist = await cls.get_kb_uuid(txn, slug)
@@ -233,11 +235,10 @@ class KnowledgeBox:
             logger.error(f"{uuid} KB could not be created")
             failed = True
 
-        # locate a node with renderzvouz
         if failed is False:
             try:
                 node_klass = get_node_klass()
-                await node_klass.create_shard_by_kbid(txn, uuid)
+                await node_klass.create_shard_by_kbid(txn, uuid, similarity=similarity)
             except Exception as e:
                 await storage.delete_kb(uuid)
                 raise e
@@ -289,14 +290,7 @@ class KnowledgeBox:
         return uuid
 
     async def iterate_kb_nodes(self) -> AsyncIterator[Tuple[AbstractNode, str]]:
-        shards_match = KB_SHARDS.format(kbid=self.kbid)
-        payload = await self.txn.get(shards_match)
-        if payload is None:
-            await self.txn.abort()
-            raise ShardsNotFound(f"No shards on knowlege box {self.kbid}")
-        shards_obj = Shards()
-        shards_obj.ParseFromString(payload)
-
+        shards_obj = await self.get_shards_object()
         if not indexing_settings.index_local:
             await Node.load_active_nodes()
 
@@ -339,7 +333,7 @@ class KnowledgeBox:
         vts.vectorsets[id].CopyFrom(vs)
         # For each Node on the KB add the vectorset
         async for node, shard in self.iterate_kb_nodes():
-            await node.set_vectorset(shard, id)
+            await node.set_vectorset(shard, id, similarity=vs.similarity)
         payload = vts.SerializeToString()
         await self.txn.set(vectorset_key, payload)
 
@@ -529,16 +523,32 @@ class KnowledgeBox:
                 await txn.commit(resource=False)
 
     async def get_resource_shard(self, shard_id: str, node_klass) -> Optional[Shard]:
-        key = KB_SHARDS.format(kbid=self.kbid)
-        payload = await self.txn.get(key)
-        if payload is None:
-            raise ShardsNotFound(self.kbid)
-        pb = PBShards()
-        pb.ParseFromString(payload)
+        pb = await self.get_shards_object()
         for shard in pb.shards:
             if shard.shard == shard_id:
                 return node_klass.create_shard_klass(shard_id, shard)
         return None
+
+    async def get_shards_object(self) -> PBShards:
+        key = KB_SHARDS.format(kbid=self.kbid)
+        payload = await self.txn.get(key)
+        if payload is None:
+            await self.txn.abort()
+            raise ShardsNotFound(self.kbid)
+        pb = PBShards()
+        pb.ParseFromString(payload)
+        return pb
+
+    async def get_similarity(self) -> VectorSimilarity.ValueType:
+        try:
+            shards_obj = await self.get_shards_object()
+            return shards_obj.similarity
+        except ShardsNotFound:
+            logger.warning(
+                f"Config for kb not found: {self.kbid} while trying to get the similarity. \
+                    Defaulting to cosine distance."
+            )
+            return VectorSimilarity.COSINE
 
     async def get(self, uuid: str) -> Optional[Resource]:
         raw_basic = await get_basic(self.txn, self.kbid, uuid)

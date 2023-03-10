@@ -42,6 +42,7 @@ class KnowledgeBoxAlreadyExists(Exception):
 
 def create_knowledge_box(
     slug: Optional[str] = None,
+    similarity: Optional[str] = None,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
 ):
     url_obj = urlparse(nucliadb_base_url)
@@ -53,10 +54,14 @@ def create_knowledge_box(
     if slug is None:
         slug = uuid4().hex
 
+    payload = {"slug": slug}
+    if similarity:
+        payload["similarity"] = similarity
+
     api_path = f"{nucliadb_base_url}/api/v1"
     response = requests.post(
         f"{api_path}/kbs",
-        json={"slug": slug},
+        json=payload,
         headers={"X-NUCLIADB-ROLES": "MANAGER"},
     )
     if response.status_code == 419:

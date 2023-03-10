@@ -14,9 +14,10 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     ParagraphMetadata as ParagraphMetadata,
-    ParagraphPosition as ParagraphPosition,
+    Position as Position,
     Resource as Resource,
     ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
@@ -30,6 +31,8 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetList as VectorSetList,
 )
 from nucliadb_protos.utils_pb2 import (
+    COSINE as COSINE,
+    DOT as DOT,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
     JoinGraphCnx as JoinGraphCnx,
@@ -42,6 +45,7 @@ from nucliadb_protos.utils_pb2 import (
     UserVectorsList as UserVectorsList,
     Vector as Vector,
     VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
     Vectors as Vectors,
 )
 

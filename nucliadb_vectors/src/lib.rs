@@ -21,6 +21,7 @@
 pub mod data_point;
 pub mod data_point_provider;
 mod data_types;
+pub mod formula;
 pub mod indexset;
 pub mod service;
 
@@ -39,6 +40,8 @@ pub enum VectorErr {
     MultipleWriters,
     #[error("Merger is already initialized")]
     MergerAlreadyInitialized,
+    #[error("Can not merge zero datapoints")]
+    EmptyMerge,
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

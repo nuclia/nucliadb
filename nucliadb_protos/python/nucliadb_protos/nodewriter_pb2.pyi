@@ -24,9 +24,10 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     ParagraphMetadata as ParagraphMetadata,
-    ParagraphPosition as ParagraphPosition,
+    Position as Position,
     Resource as Resource,
     ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
@@ -216,6 +217,44 @@ class AcceptShardRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["override_shard", b"override_shard", "port", b"port", "shard_id", b"shard_id"]) -> None: ...
 
 global___AcceptShardRequest = AcceptShardRequest
+
+@typing_extensions.final
+class NewShardRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    KBID_FIELD_NUMBER: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    kbid: builtins.str
+    def __init__(
+        self,
+        *,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+        kbid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "similarity", b"similarity"]) -> None: ...
+
+global___NewShardRequest = NewShardRequest
+
+@typing_extensions.final
+class NewVectorSetRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
+    @property
+    def id(self) -> nucliadb_protos.noderesources_pb2.VectorSetID: ...
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
+    def __init__(
+        self,
+        *,
+        id: nucliadb_protos.noderesources_pb2.VectorSetID | None = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["id", b"id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["id", b"id", "similarity", b"similarity"]) -> None: ...
+
+global___NewVectorSetRequest = NewVectorSetRequest
 
 @typing_extensions.final
 class Counter(google.protobuf.message.Message):

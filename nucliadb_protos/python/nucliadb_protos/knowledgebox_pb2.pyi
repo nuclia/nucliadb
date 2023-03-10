@@ -8,6 +8,7 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import nucliadb_protos.utils_pb2
 import sys
 import typing
 
@@ -15,6 +16,24 @@ if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
+from nucliadb_protos.utils_pb2 import (
+    COSINE as COSINE,
+    DOT as DOT,
+    ExtractedText as ExtractedText,
+    JoinGraph as JoinGraph,
+    JoinGraphCnx as JoinGraphCnx,
+    Relation as Relation,
+    RelationMetadata as RelationMetadata,
+    RelationNode as RelationNode,
+    UserVector as UserVector,
+    UserVectorSet as UserVectorSet,
+    UserVectors as UserVectors,
+    UserVectorsList as UserVectorsList,
+    Vector as Vector,
+    VectorObject as VectorObject,
+    VectorSimilarity as VectorSimilarity,
+    Vectors as Vectors,
+)
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -126,19 +145,22 @@ class KnowledgeBoxNew(google.protobuf.message.Message):
     SLUG_FIELD_NUMBER: builtins.int
     CONFIG_FIELD_NUMBER: builtins.int
     FORCEUUID_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
     slug: builtins.str
     @property
     def config(self) -> global___KnowledgeBoxConfig: ...
     forceuuid: builtins.str
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
         slug: builtins.str = ...,
         config: global___KnowledgeBoxConfig | None = ...,
         forceuuid: builtins.str = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "forceuuid", b"forceuuid", "slug", b"slug"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["config", b"config", "forceuuid", b"forceuuid", "similarity", b"similarity", "slug", b"slug"]) -> None: ...
 
 global___KnowledgeBoxNew = KnowledgeBoxNew
 
@@ -539,13 +561,16 @@ class VectorSet(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DIMENSION_FIELD_NUMBER: builtins.int
+    SIMILARITY_FIELD_NUMBER: builtins.int
     dimension: builtins.int
+    similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType
     def __init__(
         self,
         *,
         dimension: builtins.int = ...,
+        similarity: nucliadb_protos.utils_pb2.VectorSimilarity.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["dimension", b"dimension", "similarity", b"similarity"]) -> None: ...
 
 global___VectorSet = VectorSet
 

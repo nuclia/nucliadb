@@ -13,9 +13,10 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
     ParagraphMetadata as ParagraphMetadata,
-    ParagraphPosition as ParagraphPosition,
+    Position as Position,
     Resource as Resource,
     ResourceID as ResourceID,
+    SentenceMetadata as SentenceMetadata,
     Shard as Shard,
     ShardCleaned as ShardCleaned,
     ShardCreated as ShardCreated,
@@ -36,7 +37,7 @@ class NodeWriterStub:
         nucliadb_protos.noderesources_pb2.ShardId,
     ]
     NewShard: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.ShardMetadata,
+        nucliadb_protos.nodewriter_pb2.NewShardRequest,
         nucliadb_protos.noderesources_pb2.ShardCreated,
     ]
     CleanAndUpgradeShard: grpc.UnaryUnaryMultiCallable[
@@ -72,7 +73,7 @@ class NodeWriterStub:
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
     AddVectorSet: grpc.UnaryUnaryMultiCallable[
-        nucliadb_protos.noderesources_pb2.VectorSetID,
+        nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
         nucliadb_protos.nodewriter_pb2.OpStatus,
     ]
     RemoveVectorSet: grpc.UnaryUnaryMultiCallable[
@@ -102,7 +103,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def NewShard(
         self,
-        request: nucliadb_protos.noderesources_pb2.ShardMetadata,
+        request: nucliadb_protos.nodewriter_pb2.NewShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.ShardCreated: ...
     @abc.abstractmethod
@@ -156,7 +157,7 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def AddVectorSet(
         self,
-        request: nucliadb_protos.noderesources_pb2.VectorSetID,
+        request: nucliadb_protos.nodewriter_pb2.NewVectorSetRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.nodewriter_pb2.OpStatus: ...
     @abc.abstractmethod
