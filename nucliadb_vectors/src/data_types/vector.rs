@@ -41,6 +41,66 @@ pub fn encode_vector(vec: &[Unit]) -> Vec<u8> {
         .fold(encode_length(vec![], vec), encode_unit)
 }
 
+#[inline]
+fn remove_len(x: &[u8]) -> &[u8] {
+    &x[8..]
+}
+
+#[inline]
+#[allow(unused)]
+pub fn simd_cosine_similarity(left: &[u8], right: &[u8]) -> f32 {
+    use wide::f32x8;
+    const NUM_LANES: usize = 8;
+    let left = remove_len(left);
+    let right = remove_len(right);
+    let dim = left.len()/4;
+    let slots = dim / NUM_LANES;
+    let used_bytes = slots * NUM_LANES * 4;
+    assert_eq!(left.len(), dim * 4);
+    assert_eq!(right.len(), dim * 4);
+    let mut left_ptr = left.as_ptr() as *const f32x8;
+    let mut right_ptr = right.as_ptr() as *const f32x8;
+    let mut acc_left_norm: f32x8 = Default::default();
+    let mut acc_right_norm: f32x8 = Default::default();
+    let mut acc_dot_product: f32x8 = Default::default();
+    unsafe {
+        if used_bytes < left.len() {
+            let unused = (left.len() - used_bytes) / 4;
+            let mut unused_left = left[used_bytes..].as_ptr() as *const f32;
+            let mut unused_right = right[used_bytes..].as_ptr() as *const f32;
+            let mut aux_buff_left = [0.0; 8];
+            let mut aux_buff_right = [0.0; 8];
+            for i in 0..unused {
+                let left: f32 = std::ptr::read_unaligned(unused_left);
+                let right: f32 = std::ptr::read_unaligned(unused_right);
+                aux_buff_left[i] = left;
+                aux_buff_right[i] = right;
+                unused_left = unused_left.offset(1);
+                unused_right = unused_right.offset(1);
+            }
+            let aux_left = f32x8::new(aux_buff_left);
+            let aux_right = f32x8::new(aux_buff_right);
+            acc_left_norm = aux_left * aux_left;
+            acc_right_norm = aux_right * aux_right;
+            acc_dot_product = aux_left * aux_right;
+        }
+        for i in 0..slots {
+            let mut left: f32x8 = std::ptr::read_unaligned(left_ptr);
+            let right: f32x8 = std::ptr::read_unaligned(right_ptr);
+            acc_left_norm += left * left;
+            acc_right_norm += right * right;
+            acc_dot_product += left * right;
+            left_ptr = left_ptr.offset(1);
+            right_ptr = right_ptr.offset(1);
+        }
+    }
+    let norm_left = acc_left_norm.reduce_add().sqrt();
+    let norm_right = acc_right_norm.reduce_add().sqrt();
+    acc_dot_product.reduce_add() / (norm_left * norm_right)
+}
+
+#[inline]
+#[allow(unused)]
 pub fn consine_similarity(mut x: &[u8], mut y: &[u8]) -> Dist {
     let mut buff_x = [0; 8];
     let mut buff_y = [0; 8];
@@ -95,5 +155,20 @@ mod test {
             naive_cosine_similatiry(&v0, &v0),
             consine_similarity(&v0_r, &v0_r)
         );
+    }
+    #[test]
+    fn naive_equivalence_simd() {
+        let v0: Vec<_> = (0..758).map(|i| (i * 2) as f32).collect();
+        let v1: Vec<_> = (0..758).map(|i| ((i * 2) + 1) as f32).collect();
+        let v0_r = encode_vector(&v0);
+        let v1_r = encode_vector(&v1);
+        let naive = naive_cosine_similatiry(&v0, &v1);
+        let simd = simd_cosine_similarity(&v0_r, &v1_r);
+        let diff = f32::abs(naive - simd);
+        assert!(diff <= 0.000001);
+        let naive = naive_cosine_similatiry(&v0, &v0);
+        let simd = simd_cosine_similarity(&v0_r, &v0_r);
+        let diff = f32::abs(naive - simd);
+        assert!(diff <= 0.000001);
     }
 }

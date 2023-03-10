@@ -129,21 +129,22 @@ impl<'a, Dlog: DeleteLog> DataRetriever for Retriever<'a, Dlog> {
             Node::has_label(x, label)
         }
     }
+    #[inline]
     fn consine_similarity(&self, x @ Address(a0): Address, y @ Address(a1): Address) -> f32 {
         if a0 == self.no_nodes {
             let y = self.find_node(y);
             let y = Node::vector(y);
-            vector::consine_similarity(self.temp, y)
+            vector::simd_cosine_similarity(self.temp, y)
         } else if a1 == self.no_nodes {
             let x = self.find_node(x);
             let x = Node::vector(x);
-            vector::consine_similarity(self.temp, x)
+            vector::simd_cosine_similarity(self.temp, x)
         } else {
             let x = self.find_node(x);
             let y = self.find_node(y);
             let x = Node::vector(x);
             let y = Node::vector(y);
-            vector::consine_similarity(x, y)
+            vector::simd_cosine_similarity(x, y)
         }
     }
 }
