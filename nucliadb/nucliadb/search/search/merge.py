@@ -25,9 +25,9 @@ from nucliadb_protos.nodereader_pb2 import (
     DocumentResult,
     DocumentScored,
     DocumentSearchResponse,
+    EntitiesSubgraphRequest,
     ParagraphResult,
     ParagraphSearchResponse,
-    RelationSearchRequest,
     RelationSearchResponse,
     SearchResponse,
     SuggestResponse,
@@ -399,11 +399,12 @@ async def merge_paragraph_results(
 
 
 async def merge_relations_results(
-    relations_responses: List[RelationSearchResponse], query: RelationSearchRequest
+    relations_responses: List[RelationSearchResponse],
+    query: EntitiesSubgraphRequest,
 ) -> Relations:
     relations = Relations(entities={}, graph=[])
 
-    for entry_point in query.subgraph.entry_points:
+    for entry_point in query.entry_points:
         relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
 
     for relation_response in relations_responses:
@@ -454,7 +455,7 @@ async def merge_results(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     sort: SortOptions,
-    requested_relations: RelationSearchRequest,
+    requested_relations: EntitiesSubgraphRequest,
     min_score: float = 0.85,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:

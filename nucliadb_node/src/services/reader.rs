@@ -438,12 +438,14 @@ impl ShardReaderService {
             }
         };
 
-        let relation_reader_service = self.relation_reader.clone();
-        let relation_task = move || {
-            search_request
-                .relations
-                .map(|relation_request| relation_reader_service.search(&relation_request))
+        let relation_request = RelationSearchRequest {
+            shard_id: search_request.shard.clone(),
+            reload: search_request.reload,
+            prefix: search_request.relation_prefix.clone(),
+            subgraph: search_request.relation_subgraph.clone(),
         };
+        let relation_reader_service = self.relation_reader.clone();
+        let relation_task = move || Some(relation_reader_service.search(&relation_request));
 
         let span = tracing::Span::current();
         let info = info_span!(parent: &span, "text search");

@@ -35,8 +35,6 @@ from nucliadb.ingest.orm.node import Node
 
 def query_shard(node: Node, shard: str, query: SearchRequest) -> SearchResponse:
     query.shard = shard
-    if query.relations:
-        query.relations.shard_id = shard
     return node.reader.Search(query)
 
 
