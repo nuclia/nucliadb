@@ -28,10 +28,9 @@ from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     Labels,
     LabelSet,
-    VectorSet,
-    VectorSets,
-    Widget,
 )
+from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
+from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.writer_pb2 import (
     GetEntitiesGroupResponse,
@@ -60,6 +59,7 @@ from nucliadb.ingest.orm.resource import (
     Resource,
 )
 from nucliadb.ingest.orm.shard import Shard
+from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.orm.utils import (
     compute_paragraph_key,
     get_basic,
@@ -103,6 +103,7 @@ class KnowledgeBox:
         self.kbid = kbid
         self.cache = cache
         self._config: Optional[KnowledgeBoxConfig] = None
+        self.synonyms = Synonyms(self.txn, self.kbid)
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:
@@ -434,6 +435,17 @@ class KnowledgeBox:
     async def del_widgets(self, widget: str):
         entities_key = KB_WIDGETS_WIDGET.format(kbid=self.kbid, id=widget)
         await self.txn.delete(entities_key)
+
+    async def get_synonyms(self, synonyms: PBSynonyms):
+        pbsyn = await self.synonyms.get()
+        if pbsyn is not None:
+            synonyms.CopyFrom(pbsyn)
+
+    async def set_synonyms(self, synonyms: PBSynonyms):
+        await self.synonyms.set(synonyms)
+
+    async def delete_synonyms(self):
+        await self.synonyms.clear()
 
     @classmethod
     async def purge(cls, driver: Driver, kbid: str):

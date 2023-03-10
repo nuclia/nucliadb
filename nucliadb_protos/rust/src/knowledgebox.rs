@@ -158,6 +158,8 @@ pub struct EntitiesGroup {
     #[prost(bool, tag="4")]
     pub custom: bool,
 }
+// Widgets of the Knowledge Box
+
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Widget {
     #[prost(string, tag="1")]
@@ -211,6 +213,18 @@ pub struct VectorSet {
 pub struct VectorSets {
     #[prost(map="string, message", tag="1")]
     pub vectorsets: ::std::collections::HashMap<::prost::alloc::string::String, VectorSet>,
+}
+// Synonyms of a Knowledge Box
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TermSynonyms {
+    #[prost(string, repeated, tag="1")]
+    pub synonyms: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Synonyms {
+    #[prost(map="string, message", tag="1")]
+    pub terms: ::std::collections::HashMap<::prost::alloc::string::String, TermSynonyms>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

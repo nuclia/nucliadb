@@ -434,6 +434,8 @@ global___EntitiesGroup = EntitiesGroup
 
 @typing_extensions.final
 class Widget(google.protobuf.message.Message):
+    """Widgets of the Knowledge Box"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class _WidgetMode:
@@ -580,3 +582,55 @@ class VectorSets(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["vectorsets", b"vectorsets"]) -> None: ...
 
 global___VectorSets = VectorSets
+
+@typing_extensions.final
+class TermSynonyms(google.protobuf.message.Message):
+    """Synonyms of a Knowledge Box"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SYNONYMS_FIELD_NUMBER: builtins.int
+    @property
+    def synonyms(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        synonyms: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["synonyms", b"synonyms"]) -> None: ...
+
+global___TermSynonyms = TermSynonyms
+
+@typing_extensions.final
+class Synonyms(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class TermsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___TermSynonyms: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___TermSynonyms | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    TERMS_FIELD_NUMBER: builtins.int
+    @property
+    def terms(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, global___TermSynonyms]: ...
+    def __init__(
+        self,
+        *,
+        terms: collections.abc.Mapping[builtins.str, global___TermSynonyms] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["terms", b"terms"]) -> None: ...
+
+global___Synonyms = Synonyms

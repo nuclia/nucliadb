@@ -28,6 +28,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NOTFOUND as NOTFOUND,
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
+    Synonyms as Synonyms,
+    TermSynonyms as TermSynonyms,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     VectorSet as VectorSet,
     VectorSets as VectorSets,
@@ -222,6 +224,19 @@ class WriterStub:
     ]
     DelWidgets: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.DetWidgetsRequest,
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
+    GetSynonyms: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+        nucliadb_protos.writer_pb2.GetSynonymsResponse,
+    ]
+    """Synonyms"""
+    SetSynonyms: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.SetSynonymsRequest,
+        nucliadb_protos.writer_pb2.OpStatusWriter,
+    ]
+    DelSynonyms: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
     Status: grpc.UnaryUnaryMultiCallable[
@@ -421,6 +436,25 @@ class WriterServicer(metaclass=abc.ABCMeta):
     def DelWidgets(
         self,
         request: nucliadb_protos.writer_pb2.DetWidgetsRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
+    @abc.abstractmethod
+    def GetSynonyms(
+        self,
+        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.GetSynonymsResponse:
+        """Synonyms"""
+    @abc.abstractmethod
+    def SetSynonyms(
+        self,
+        request: nucliadb_protos.writer_pb2.SetSynonymsRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
+    @abc.abstractmethod
+    def DelSynonyms(
+        self,
+        request: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
     @abc.abstractmethod

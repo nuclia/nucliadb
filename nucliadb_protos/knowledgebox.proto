@@ -132,6 +132,7 @@ message EntitiesGroup {
     bool custom = 4;
 }
 
+// Widgets of the Knowledge Box
 
 message Widget {
     string id = 1;
@@ -165,4 +166,16 @@ message VectorSet {
 
 message VectorSets {
     map<string, VectorSet> vectorsets = 1;
+}
+
+
+// Synonyms of a Knowledge Box
+
+message TermSynonyms {
+    repeated string synonyms = 1;
+}
+
+
+message Synonyms {
+    map <string, TermSynonyms> terms = 1;
 }

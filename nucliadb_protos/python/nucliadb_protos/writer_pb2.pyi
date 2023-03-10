@@ -41,6 +41,8 @@ from nucliadb_protos.knowledgebox_pb2 import (
     NOTFOUND as NOTFOUND,
     NewKnowledgeBoxResponse as NewKnowledgeBoxResponse,
     OK as OK,
+    Synonyms as Synonyms,
+    TermSynonyms as TermSynonyms,
     UpdateKnowledgeBoxResponse as UpdateKnowledgeBoxResponse,
     VectorSet as VectorSet,
     VectorSets as VectorSets,
@@ -1766,3 +1768,60 @@ class ShadowShardResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["shadow_shard", b"shadow_shard", "success", b"success"]) -> None: ...
 
 global___ShadowShardResponse = ShadowShardResponse
+
+@typing_extensions.final
+class SynonymsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    kbid: builtins.str
+    def __init__(
+        self,
+        *,
+        kbid: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid"]) -> None: ...
+
+global___SynonymsRequest = SynonymsRequest
+
+@typing_extensions.final
+class SetSynonymsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KBID_FIELD_NUMBER: builtins.int
+    SYNONYMS_FIELD_NUMBER: builtins.int
+    @property
+    def kbid(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    @property
+    def synonyms(self) -> nucliadb_protos.knowledgebox_pb2.Synonyms: ...
+    def __init__(
+        self,
+        *,
+        kbid: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+        synonyms: nucliadb_protos.knowledgebox_pb2.Synonyms | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "synonyms", b"synonyms"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kbid", b"kbid", "synonyms", b"synonyms"]) -> None: ...
+
+global___SetSynonymsRequest = SetSynonymsRequest
+
+@typing_extensions.final
+class GetSynonymsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATUS_FIELD_NUMBER: builtins.int
+    SYNONYMS_FIELD_NUMBER: builtins.int
+    @property
+    def status(self) -> global___OpStatusWriter: ...
+    @property
+    def synonyms(self) -> nucliadb_protos.knowledgebox_pb2.Synonyms: ...
+    def __init__(
+        self,
+        *,
+        status: global___OpStatusWriter | None = ...,
+        synonyms: nucliadb_protos.knowledgebox_pb2.Synonyms | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["status", b"status", "synonyms", b"synonyms"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["status", b"status", "synonyms", b"synonyms"]) -> None: ...
+
+global___GetSynonymsResponse = GetSynonymsResponse

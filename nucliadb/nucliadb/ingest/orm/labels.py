@@ -17,11 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Dict, List, Optional
-
-from nucliadb_protos.knowledgebox_pb2 import Labels as PBLabels
-
-from nucliadb.ingest.maindb.driver import Transaction
+from typing import Dict, List
 
 BASE_TAGS: Dict[str, List[str]] = {
     "t": [],  # doc tags
@@ -34,8 +30,6 @@ BASE_TAGS: Dict[str, List[str]] = {
     "f": [],  # field keyword field (field/keyword)
     "fg": [],  # field keyword (keywords) flat
 }
-
-KB_LABELS = "/kbs/{kbid}/"
 
 
 def flat_resource_tags(tags_dict):
@@ -50,27 +44,3 @@ def flat_resource_tags(tags_dict):
             for value in values:
                 flat_tags.append(f"/{key}/{value}")
     return flat_tags
-
-
-class Labels:
-    def __init__(self, txn: Transaction, kbid: str):
-        self.txn = txn
-        self.kbid = kbid
-
-    async def set(self, labels: PBLabels):
-        body = labels.SerializeToString()
-        key = KB_LABELS.format(kbid=self.kbid)
-        await self.txn.set(key, body)
-
-    async def get(self) -> Optional[PBLabels]:
-        key = KB_LABELS.format(kbid=self.kbid)
-        payload = await self.txn.get(key)
-        if payload is None:
-            return None
-        body = PBLabels()
-        body.ParseFromString(payload)
-        return body
-
-    async def clean(self):
-        key = KB_LABELS.format(kbid=self.kbid)
-        await self.txn.delete(key)

@@ -19,6 +19,7 @@
 #
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List, Optional
 
 TXNID = "/internal/worker/{worker}"
@@ -85,3 +86,16 @@ class Driver:
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
     ) -> AsyncGenerator[str, None]:
         raise NotImplementedError()
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncGenerator[Transaction, None]:
+        """
+        Use to make sure transaction is always aborted
+        """
+        txn: Optional[Transaction] = None
+        try:
+            txn = await self.begin()
+            yield txn
+        finally:
+            if txn is not None and txn.open:
+                await txn.abort()

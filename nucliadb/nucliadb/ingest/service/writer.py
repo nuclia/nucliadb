@@ -59,6 +59,7 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelSetResponse,
     GetLabelsRequest,
     GetLabelsResponse,
+    GetSynonymsResponse,
     GetVectorSetsRequest,
     GetVectorSetsResponse,
     GetWidgetRequest,
@@ -77,6 +78,7 @@ from nucliadb_protos.writer_pb2 import (
     ResourceIdResponse,
     SetEntitiesRequest,
     SetLabelsRequest,
+    SetSynonymsRequest,
     SetVectorSetRequest,
     SetVectorsRequest,
     SetVectorsResponse,
@@ -91,6 +93,7 @@ from nucliadb_protos.writer_pb2 import (
 )
 
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.maindb.driver import Transaction
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -524,6 +527,74 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
         return response
+
+    async def GetSynonyms(  # type: ignore
+        self, request: KnowledgeBoxID, context=None
+    ) -> GetSynonymsResponse:
+        kbid = request
+        response = GetSynonymsResponse()
+        txn: Transaction
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, kbid)
+            if kbobj is None:
+                response.status.status = OpStatusWriter.Status.NOTFOUND
+                return response
+            try:
+                await kbobj.get_synonyms(response.synonyms)
+                response.status.status = OpStatusWriter.Status.OK
+                return response
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                logger.exception(f"Errors getting synonyms")
+                response.status.status = OpStatusWriter.Status.ERROR
+                return response
+
+    async def SetSynonyms(  # type: ignore
+        self, request: SetSynonymsRequest, context=None
+    ) -> OpStatusWriter:
+        kbid = request.kbid
+        response = OpStatusWriter()
+        txn: Transaction
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, kbid)
+            if kbobj is None:
+                response.status = OpStatusWriter.Status.NOTFOUND
+                return response
+            try:
+                await kbobj.set_synonyms(request.synonyms)
+                await txn.commit(resource=False)
+                response.status = OpStatusWriter.Status.OK
+                return response
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                logger.exception(f"Errors setting synonyms")
+                response.status = OpStatusWriter.Status.ERROR
+                return response
+
+    async def DelSynonyms(  # type: ignore
+        self, request: KnowledgeBoxID, context=None
+    ) -> OpStatusWriter:
+        kbid = request
+        response = OpStatusWriter()
+        txn: Transaction
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, kbid)
+            if kbobj is None:
+                response.status = OpStatusWriter.Status.NOTFOUND
+                return response
+            try:
+                await kbobj.delete_synonyms()
+                await txn.commit(resource=False)
+                response.status = OpStatusWriter.Status.OK
+                return response
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                logger.exception(f"Errors deleting synonyms")
+                response.status = OpStatusWriter.Status.ERROR
+                return response
 
     async def Status(  # type: ignore
         self, request: WriterStatusRequest, context=None

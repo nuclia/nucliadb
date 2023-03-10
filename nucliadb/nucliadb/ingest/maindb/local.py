@@ -72,8 +72,12 @@ class LocalTransaction(Transaction):
             await resp.write(value)
 
     async def remove(self, key: str):
-        key = self.compute_path(key)
-        os.remove(key)
+        try:
+            path = self.compute_path(key)
+            os.remove(path)
+        except FileNotFoundError:
+            # Deleting a key that does not exist
+            pass
 
     async def read(self, key: str) -> Optional[bytes]:
         try:
