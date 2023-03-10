@@ -34,7 +34,7 @@ try:
     import aiofiles
 
     FILES = True
-except ImportError:
+except ImportError:  # pragma: no cover
     FILES = False
 
 

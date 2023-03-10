@@ -35,7 +35,7 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 
 from nucliadb_models.resource import Resource as NucliaDBResource
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from nucliadb_client.knowledgebox import KnowledgeBox
 
 RESOURCE_PREFIX = "resource"

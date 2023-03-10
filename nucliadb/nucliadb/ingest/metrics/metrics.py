@@ -24,7 +24,7 @@ from typing import Dict, Optional, Type
 
 try:
     from prometheus_client import Counter, Histogram  # type: ignore
-except ImportError:
+except ImportError:  # pragma: no cover
     Counter = Histogram = None
 
 ERROR_NONE = "none"

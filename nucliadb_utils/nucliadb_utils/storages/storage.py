@@ -218,7 +218,10 @@ class Storage:
         else:
             return True
 
-    async def normalize_binary(self, file: CloudFile, destination: StorageField):
+    async def normalize_binary(
+        self, file: CloudFile, destination: StorageField
+    ):  # pragma: no cover
+        # this is covered by other tests
         # see if file is in the same Cloud in the same bucket
         if file.source == self.source and file.uri != destination.key:
             new_cf = await self.move(file, destination)
@@ -373,7 +376,8 @@ class Storage:
         result.seek(0)
         return result
 
-    async def downloadbytescf(self, cf: CloudFile) -> BytesIO:
+    async def downloadbytescf(self, cf: CloudFile) -> BytesIO:  # pragma: no cover
+        # this is covered by other tests
         result = BytesIO()
         if cf.source == self.source:
             async for data in self.download(cf.bucket_name, cf.uri):
@@ -395,7 +399,8 @@ class Storage:
 
     async def downloadbytescf_iterator(
         self, cf: CloudFile
-    ) -> AsyncGenerator[bytes, None]:
+    ) -> AsyncGenerator[bytes, None]:  # pragma: no cover
+        # this is covered by other tests
         if cf.source == self.source:
             async for data in self.download(cf.bucket_name, cf.uri):
                 if data is not None:

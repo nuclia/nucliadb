@@ -35,14 +35,14 @@ try:
     from nucliadb.ingest.maindb.redis import RedisDriver
 
     REDIS = True
-except ImportError:
+except ImportError:  # pragma: no cover
     REDIS = False
 
 try:
     from nucliadb.ingest.maindb.tikv import TiKVDriver
 
     TIKV = True
-except ImportError:
+except ImportError:  # pragma: no cover
     TIKV = False
 
 
@@ -50,7 +50,7 @@ try:
     from nucliadb.ingest.maindb.local import LocalDriver
 
     FILES = True
-except ImportError:
+except ImportError:  # pragma: no cover
     FILES = False
 
 

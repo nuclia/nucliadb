@@ -44,19 +44,27 @@ async def test_local_driver(local_storage: LocalStorage):
 
 async def storage_test(storage: Storage):
     example = b"mytestinfo"
-    key = "mytest"
-    kbid = uuid4().hex
-    created = await storage.create_kb(kbid)
-    assert created
+    key1 = "mytest1"
+    key2 = "mytest2"
+    kbid1 = uuid4().hex
+    kbid2 = uuid4().hex
 
-    bucket = storage.get_bucket_name(kbid)
+    assert await storage.create_kb(kbid1)
+    assert await storage.create_kb(kbid2)
 
-    await storage.uploadbytes(bucket, key, example)
-    async for data in storage.download(bucket, key):
+    bucket = storage.get_bucket_name(kbid1)
+
+    await storage.uploadbytes(bucket, key1, example)
+    await storage.uploadbytes(bucket, key2, example)
+    async for data in storage.download(bucket, key1):
         assert data == example
 
-    async for keys in storage.iterate_bucket(bucket, ""):
-        assert keys["name"] == "mytest"
+    await storage.delete_upload(key2, bucket)
 
-    deleted = await storage.schedule_delete_kb(kbid)
+    async for keys in storage.iterate_bucket(bucket, ""):
+        assert keys["name"] == key1
+
+    deleted = await storage.schedule_delete_kb(kbid1)
     assert deleted
+
+    await storage.delete_kb(kbid2)

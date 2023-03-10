@@ -66,7 +66,7 @@ from nucliadb.ingest.orm.utils import get_basic, set_basic
 from nucliadb_models.common import CloudLink
 from nucliadb_utils.storages.storage import Storage
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"

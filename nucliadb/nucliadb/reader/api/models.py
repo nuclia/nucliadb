@@ -35,7 +35,7 @@ from nucliadb_models.resource import (
     TextFieldExtractedData,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     ValueType = Optional[
         Union[
             models.FieldText,

@@ -28,7 +28,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb.ingest.orm.abc import AbstractShard, ShardCounter
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.local_node import LocalNode
 
 

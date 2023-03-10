@@ -54,7 +54,7 @@ from nucliadb.ingest.settings import settings
 try:
     from nucliadb_node_binding import NodeReader  # type: ignore
     from nucliadb_node_binding import NodeWriter  # type: ignore
-except ImportError:
+except ImportError:  # pragma: no cover
     NodeReader = None
     NodeWriter = None
 

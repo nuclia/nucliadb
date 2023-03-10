@@ -51,7 +51,7 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.writer import CreateResourcePayload, ResourceCreated
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from nucliadb_client.client import NucliaDBClient
 
 import aiofiles

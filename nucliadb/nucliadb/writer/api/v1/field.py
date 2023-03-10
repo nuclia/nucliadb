@@ -49,7 +49,7 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import get_partitioning, get_transaction
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     SKIP_STORE_DEFAULT = False
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: Dict[models.FieldTypeName, FieldType.V]
     SYNC_CALL = False

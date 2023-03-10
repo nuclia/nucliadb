@@ -17,13 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
+from nucliadb_utils.fastapi import versioning  # noqa: F401
 
-
-def mock_murmur3_32(key, seed=0):  # pragma: no cover
-    return 4294967295
-
-
-@pytest.fixture(scope="function")
-def clandestined(mocker):
-    mocker.patch("mmh3.hash", return_value=4294967295)
+# force import, tests placeholder

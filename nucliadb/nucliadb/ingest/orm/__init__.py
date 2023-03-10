@@ -27,7 +27,7 @@ from nucliadb.ingest.orm.exceptions import NodeClusterSmall
 from nucliadb.ingest.settings import settings
 from nucliadb_utils.clandestined import Cluster  # type: ignore
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.node import Node
 
 NODES: Dict[str, Node] = {}

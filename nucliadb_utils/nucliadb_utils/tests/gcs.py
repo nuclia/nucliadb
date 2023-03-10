@@ -55,7 +55,7 @@ class GCS(BaseImage):
                 f"http://{self.host}:{self.get_port()}/storage/v1/b"
             )
             return response.status_code == 200
-        except:
+        except:  # pragma: no cover
             return False
 
 

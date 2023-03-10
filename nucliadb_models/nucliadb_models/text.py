@@ -28,7 +28,7 @@ from nucliadb_protos import resources_pb2
 _T = TypeVar("_T")
 
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     TextFormatValue = resources_pb2.FieldText.Format.V
 else:
     TextFormatValue = int

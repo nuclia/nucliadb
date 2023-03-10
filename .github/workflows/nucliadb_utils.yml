@@ -31,12 +31,11 @@ jobs:
 
       - name: Install package
         run: |
-          pip install -r code-requirements.txt
+          cd nucliadb_utils && make install-dev
+
       - name: Run pre-checks
         run: |
-          flake8 nucliadb_utils --config=nucliadb_utils/setup.cfg
-          isort -c --profile black nucliadb_utils/
-          black --check --verbose nucliadb_utils
+          cd nucliadb_utils && make lint
 
   # Job to run tests
   tests:
@@ -59,18 +58,11 @@ jobs:
 
       - name: Install the package
         run: |
-          pip install -r test-requirements.txt
-          pip install -r nucliadb_utils/requirements-sources.txt
-          pip install -r nucliadb_utils/requirements.txt
-          pip install -e nucliadb_utils[cache,storages,fastapi]
-
-      - name: Check mypy
-        run: |
-          MYPYPATH=./mypy_stubs mypy nucliadb_utils/
+          cd nucliadb_utils && make install-dev
 
       - name: Run tests
         run: |
-          pytest -rfE --cov=nucliadb_utils -s --tb=native -v --cov-report xml --cov-append nucliadb_utils/nucliadb_utils
+          cd nucliadb_utils && make test-cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

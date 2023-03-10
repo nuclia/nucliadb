@@ -34,9 +34,9 @@ import google.auth.transport.requests  # type: ignore
 import yarl
 from google.oauth2 import service_account  # type: ignore
 from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from opentelemetry.instrumentation.aiohttp_client import create_trace_config
 
-from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
@@ -454,7 +454,7 @@ class GCSStorage(Storage):
         loop = asyncio.get_event_loop()
 
         tracer_provider = get_telemetry(service_name)
-        if tracer_provider:
+        if tracer_provider:  # pragma: no cover
             await init_telemetry(tracer_provider)
             logger.info("Initializing Telemetry on GCS Driver")
             self.session = aiohttp.ClientSession(
@@ -476,7 +476,7 @@ class GCSStorage(Storage):
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":
                 await self.create_bucket(self.deadletter_bucket)
-        except Exception:
+        except Exception:  # pragma: no cover
             logger.exception(
                 f"Could not create bucket {self.deadletter_bucket}", exc_info=True
             )
@@ -484,7 +484,7 @@ class GCSStorage(Storage):
         try:
             if self.indexing_bucket is not None and self.indexing_bucket != "":
                 await self.create_bucket(self.indexing_bucket)
-        except Exception:
+        except Exception:  # pragma: no cover
             logger.exception(
                 f"Could not create bucket {self.indexing_bucket}", exc_info=True
             )
@@ -572,7 +572,7 @@ class GCSStorage(Storage):
                 },
             },
         ) as resp:
-            if resp.status != 200:
+            if resp.status != 200:  # pragma: no cover
                 logger.info(f"Creation of bucket error: {resp.status}")
                 text = await resp.text()
                 logger.info(f"Bucket : {bucket_name}")

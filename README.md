@@ -4,7 +4,6 @@
 ![nucliadb_ingest](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_ingest.yml/badge.svg)
 ![nucliadb_node](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_node.yml/badge.svg)
 ![nucliadb_search](https://github.com/nuclia/nucliadb/actions/workflows/nucliadb_search.yml/badge.svg)
-[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS)](https://codecov.io/gh/nuclia/nucliadb)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![License: AGPL V3](https://img.shields.io/badge/license-AGPL%20V3-blue)](LICENCE.md)
 ![Twitter Follow](https://img.shields.io/twitter/follow/nuclia_?color=%231DA1F2&logo=Twitter&style=plastic)
@@ -29,6 +28,20 @@
 As a data scientist or NLP person your hard-drive is probably full of datasets and corpora. So, if you have found yourself crashing a notebook trying to load something too big with Pandas, doing way too many shuffles in your shell just to explore your data a bit, or just not really knowing how to perform a better search through your dataset, this is a tool for you.
 
 NucliaDB is written in Rust and Python and built on top of the mighty [tantivy](https://github.com/quickwit-oss/tantivy) library. We designed it to index big datasets and provide multi-teanant suport.
+
+
+## Component code coverage
+
+|Module|Coverage|
+|------|--------|
+|search|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=search)](https://codecov.io/gh/nuclia/nucliadb)|
+|reader|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=reader)](https://codecov.io/gh/nuclia/nucliadb)|
+|writer|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=writer)](https://codecov.io/gh/nuclia/nucliadb)|
+|ingest|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=ingest)](https://codecov.io/gh/nuclia/nucliadb)|
+|one|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=one)](https://codecov.io/gh/nuclia/nucliadb)|
+|sidecar|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=node-sidecar)](https://codecov.io/gh/nuclia/nucliadb)|
+|utils|[![codecov](https://codecov.io/gh/nuclia/nucliadb/branch/main/graph/badge.svg?token=06SRGAV5SS&flag=utils)](https://codecov.io/gh/nuclia/nucliadb)|
+
 
 # Features
 - Compare the vectors from different models in a super easy way.

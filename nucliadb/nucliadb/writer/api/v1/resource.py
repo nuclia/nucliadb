@@ -83,7 +83,7 @@ from nucliadb_utils.utilities import (
     get_transaction,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     SKIP_STORE_DEFAULT = False
     SYNC_CALL = False
 else:

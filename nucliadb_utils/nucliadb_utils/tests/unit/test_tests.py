@@ -17,13 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
+from nucliadb_utils.tests import asyncbenchmark  # noqa: F401
+from nucliadb_utils.tests import indexing  # noqa: F401
+from nucliadb_utils.tests import nats  # noqa: F401
 
-
-def mock_murmur3_32(key, seed=0):  # pragma: no cover
-    return 4294967295
-
-
-@pytest.fixture(scope="function")
-def clandestined(mocker):
-    mocker.patch("mmh3.hash", return_value=4294967295)
+# placeholder for test modules
+# AND these test modules do not get coverage
+# but we don't want to be penalized for them
+# AND we don't want to deal with test config files not working

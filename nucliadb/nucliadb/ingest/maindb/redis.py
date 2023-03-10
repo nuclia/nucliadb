@@ -32,7 +32,7 @@ try:
     from redis import asyncio as aioredis
 
     REDIS = True
-except ImportError:
+except ImportError:  # pragma: no cover
     REDIS = False
 
 
