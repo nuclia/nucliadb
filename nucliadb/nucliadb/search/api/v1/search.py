@@ -127,6 +127,7 @@ async def search_knowledgebox(
     shards: List[str] = Query([]),
     with_duplicates: bool = Query(default=False),
     with_status: Optional[ResourceProcessingStatus] = Query(default=None),
+    with_synonyms: bool = Query(default=False),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
@@ -159,6 +160,7 @@ async def search_knowledgebox(
         shards=shards,
         with_duplicates=with_duplicates,
         with_status=with_status,
+        with_synonyms=with_synonyms,
     )
     return await search(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
@@ -298,6 +300,7 @@ async def search(
         vectorset=item.vectorset,
         with_duplicates=item.with_duplicates,
         with_status=item.with_status,
+        with_synonyms=item.with_synonyms,
     )
 
     ops = []

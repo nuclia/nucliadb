@@ -95,6 +95,8 @@ async def search(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     debug: bool = Query(False),
     shards: List[str] = Query(default=[]),
+    with_duplicates: bool = Query(False),
+    with_synonyms: bool = Query(False),
 ) -> ResourceSearchResults:
     if not rid:
         rid = await get_resource_uuid_by_slug(kbid, rslug, service_name=SERVICE_NAME)  # type: ignore
@@ -128,6 +130,8 @@ async def search(
         range_modification_end,
         reload=reload,
         sort=sort.value if sort else None,
+        with_duplicates=with_duplicates,
+        with_synonyms=with_synonyms,
     )
 
     incomplete_results = False

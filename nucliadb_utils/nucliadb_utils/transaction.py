@@ -204,6 +204,6 @@ class TransactionUtility:
             await self.stop_waiting(writer.kbid, request_id=request_id)
 
         logger.info(
-            f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"
+            f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"  # noqa
         )
         return res.seq

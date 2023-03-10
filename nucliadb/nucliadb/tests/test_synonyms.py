@@ -27,7 +27,7 @@ async def test_api(
     knowledgebox,
 ):
     kbid = knowledgebox
-    synonyms_url = f"/kb/{kbid}/synonyms"
+    synonyms_url = f"/kb/{kbid}/custom-synonyms"
 
     # Delete first
     resp = await nucliadb_writer.delete(synonyms_url, timeout=None)
@@ -75,7 +75,7 @@ async def test_api(
 @pytest.fixture(scope="function")
 async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
     kbid = knowledgebox
-    synonyms_url = f"/kb/{kbid}/synonyms"
+    synonyms_url = f"/kb/{kbid}/custom-synonyms"
     kb_synonyms = {
         "synonyms": {
             "planet": ["earth", "globe", "sphere", "world"],
@@ -87,7 +87,6 @@ async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip("Will be implemented in another PR")
 async def test_search_with_synonims(
     nucliadb_reader,
     nucliadb_writer,
@@ -95,25 +94,85 @@ async def test_search_with_synonims(
 ):
     kbid = knowledgebox_with_synonyms
 
-    # Create a resource
+    # Create a resource with:
+    # - the term on the summary
+    # - one of the synonyms in the title
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
-            "slug": "myresource",
-            "title": "Life on Earth",
-            "summary": "All the secrets of this planet",
-            "icon": "text/plain",
+            "title": "Earth",
+            "summary": "Planet",
         },
     )
     assert resp.status_code == 201
-    rid = resp.json()["uuid"]
+    planet_rid = resp.json()["uuid"]
 
-    resp = await nucliadb_reader.post(f"/kb/{kbid}/search?query=planet")
+    # Create another resource with the remaining
+    # synonyms present in title and summary fields
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Globe Sphere",
+            "summary": "World",
+        },
+    )
+    assert resp.status_code == 201
+    sphere_rid = resp.json()["uuid"]
+
+    # Create another resource that does not match
+    # with the term or any of its synonyms
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Tomatoes",
+            "summary": "The tomatoe collection",
+        },
+    )
+    assert resp.status_code == 201
+    tomatoe_rid = resp.json()["uuid"]
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(
+            query="planet",
+            with_synonyms=True,
+            highlight=True,
+        ),
+        timeout=None,
+    )
     assert resp.status_code == 200
     body = resp.json()
 
-    # Fulltext and paragraph search should match on
-    # summary (term) and title (synonym)
-    assert len(body["paragraphs"]["results"]) == 2
-    assert len(body["fulltext"]["results"]) == 2
-    assert body["resources"][rid]
+    # Paragraph search should match on summary (term)
+    # and title (synonym) for the two resources
+    assert len(body["paragraphs"]["results"]) == 4
+    assert body["resources"][planet_rid]
+    assert body["resources"][sphere_rid]
+    assert tomatoe_rid not in body["resources"]
+
+    # Check that searching without synonyms matches only query term
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(query="planet"),
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 1
+    assert body["resources"][planet_rid]
+    assert sphere_rid not in body["resources"]
+    assert tomatoe_rid not in body["resources"]
+
+    # Check that searching with a term that has synonyms and
+    # one that doesn't matches all of them
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(query="planet tomatoe", with_synonyms=True),
+        timeout=None,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["paragraphs"]["results"]) == 5
+    assert body["resources"][planet_rid]
+    assert body["resources"][sphere_rid]
+    assert body["resources"][tomatoe_rid]

@@ -311,16 +311,16 @@ async def get_vectorsets(request: Request, kbid: str):
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/synonyms",
+    f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
     status_code=200,
-    name="Get Knowledge Box Synonyms",
+    name="Get Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     response_model=KnowledgeBoxSynonyms,
     openapi_extra={"x-operation_order": 2},
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_synonyms(request: Request, kbid: str):
+async def get_custom_synonyms(request: Request, kbid: str):
     set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = KnowledgeBoxID(uuid=kbid)

@@ -42,8 +42,8 @@ class KnowledgeBoxAlreadyExists(Exception):
 
 def create_knowledge_box(
     slug: Optional[str] = None,
-    similarity: Optional[str] = None,
     nucliadb_base_url: Optional[str] = "http://localhost:8080",
+    similarity: Optional[str] = None,
 ):
     url_obj = urlparse(nucliadb_base_url)
     if url_obj.hostname and url_obj.hostname.endswith("nuclia.cloud"):  # type: ignore
@@ -109,11 +109,15 @@ def get_kb(
 
 
 def get_or_create(
-    slug: str, nucliadb_base_url: Optional[str] = "http://localhost:8080"
+    slug: str,
+    nucliadb_base_url: Optional[str] = "http://localhost:8080",
+    similarity: Optional[str] = None,
 ):
     kb = get_kb(slug, nucliadb_base_url)
     if kb is None:
-        kb = create_knowledge_box(slug, nucliadb_base_url)
+        kb = create_knowledge_box(
+            slug, nucliadb_base_url=nucliadb_base_url, similarity=similarity
+        )
     return kb
 
 

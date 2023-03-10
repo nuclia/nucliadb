@@ -67,5 +67,5 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage.xml
+          file: ./nucliadb_utils/coverage.xml
           flags: utils

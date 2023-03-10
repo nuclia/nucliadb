@@ -30,6 +30,7 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -64,6 +65,7 @@ async def global_query_to_pb(
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
+    with_synonyms: bool = False,
 ) -> Tuple[SearchRequest, bool]:
     fields = fields or []
 
@@ -120,6 +122,9 @@ async def global_query_to_pb(
 
     if SearchOptions.RELATIONS in features:
         await _parse_entities(request, kbid, query)
+
+    if with_synonyms and SearchOptions.PARAGRAPH in features:
+        await apply_synonyms_to_request(request, kbid)
 
     return request, incomplete
 
@@ -206,6 +211,7 @@ async def paragraph_query_to_pb(
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     with_duplicates: bool = False,
+    with_synonyms: bool = False,
 ) -> ParagraphSearchRequest:
     request = ParagraphSearchRequest()
     request.reload = reload
