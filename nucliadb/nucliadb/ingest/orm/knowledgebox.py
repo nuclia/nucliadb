@@ -24,17 +24,11 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBoxConfig,
-    Labels,
-    LabelSet,
-)
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, Labels, LabelSet
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
-from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.resources_pb2 import Basic
-from nucliadb_protos.utils_pb2 import Relation, RelationNode, VectorSimilarity
+from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import (
     GetLabelSetResponse,
     GetVectorSetsResponse,
@@ -103,7 +97,6 @@ class KnowledgeBox:
         self.cache = cache
         self._config: Optional[KnowledgeBoxConfig] = None
         self.synonyms = Synonyms(self.txn, self.kbid)
-        self.entities_manager = EntitiesManager(self, txn)
 
     async def get_config(self) -> Optional[KnowledgeBoxConfig]:
         if self._config is None:

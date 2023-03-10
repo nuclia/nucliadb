@@ -32,7 +32,7 @@ from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
+from nucliadb_protos.writer_pb2 import Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
