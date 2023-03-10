@@ -442,7 +442,7 @@ impl ShardReaderService {
             shard_id: search_request.shard.clone(),
             reload: search_request.reload,
             prefix: search_request.relation_prefix.clone(),
-            subgraph: search_request.relation_subgraph.clone(),
+            subgraph: search_request.relation_subgraph,
         };
         let relation_reader_service = self.relation_reader.clone();
         let relation_task = move || Some(relation_reader_service.search(&relation_request));
