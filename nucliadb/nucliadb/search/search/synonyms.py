@@ -38,12 +38,10 @@ async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
         )
         return
 
-    driver = await get_driver()
-    async with driver.transaction() as txn:
-        synonyms: Optional[PBSynonyms] = await Synonyms(txn, kbid).get()
-        if synonyms is None:
-            # No synonyms found
-            return
+    synonyms = await get_kb_synonyms(kbid)
+    if synonyms is None:
+        # No synonyms found
+        return
 
     synonyms_found: List[str] = []
     advanced_query = []
@@ -58,3 +56,9 @@ async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
     if len(synonyms_found):
         request.advanced_query = " ".join(advanced_query + synonyms_found)
         request.ClearField("body")
+
+
+async def get_kb_synonyms(kbid: str) -> Optional[PBSynonyms]:
+    driver = await get_driver()
+    async with driver.transaction() as txn:
+        return await Synonyms(txn, kbid).get()
