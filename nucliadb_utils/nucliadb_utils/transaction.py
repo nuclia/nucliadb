@@ -27,9 +27,9 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
-
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
+
 from nucliadb_utils import logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
 
@@ -204,6 +204,6 @@ class TransactionUtility:
             await self.stop_waiting(writer.kbid, request_id=request_id)
 
         logger.info(
-            f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"  # noqa
+            f" - Pushed message to ingest.  kb: {writer.kbid}, resource: {writer.uuid}, nucliadb seqid: {res.seq}, partition: {partition}"
         )
         return res.seq

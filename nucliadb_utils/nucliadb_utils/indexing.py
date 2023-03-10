@@ -23,9 +23,9 @@ import nats
 from nats.aio.client import Client
 from nats.js.client import JetStreamContext
 from nucliadb_protos.nodewriter_pb2 import IndexMessage  # type: ignore
-
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
+
 from nucliadb_utils import logger
 
 
@@ -107,6 +107,6 @@ class IndexingUtility:
             self.nats_target.format(node=node), writer.SerializeToString()
         )
         logger.info(
-            f" - Pushed message to index {self.nats_target.format(node=node)}.  shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"  # noqa
+            f" - Pushed message to index {self.nats_target.format(node=node)}.  shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"
         )
         return res.seq
