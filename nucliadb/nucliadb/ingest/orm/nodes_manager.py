@@ -17,15 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import random
-from typing import List, Optional, Tuple
+from typing import Any, Awaitable, Callable, List, Optional, Tuple
 
 from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
+from sentry_sdk import capture_exception
 
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm import NODE_CLUSTER, NODES
+from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest.orm.node import Node
+from nucliadb.sentry import SENTRY
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.keys import KB_SHARDS
 
@@ -83,3 +87,31 @@ class NodesManager:
             raise KeyError("Could not find a node to query")
 
         return node_obj, shard_id, node_id
+
+    async def apply_for_all_shards(
+        self,
+        kbid: str,
+        aw: Callable[[Node, str, str], Awaitable[Any]],
+        timeout: float,
+    ) -> List[Any]:
+        shards = await self.get_shards_by_kbid(kbid)
+        ops = []
+
+        for shard_obj in shards:
+            node, shard_id, node_id = self.choose_node(shard_obj, shards)  # type: ignore
+            if shard_id is None:
+                raise ShardNotFound("Fount a node but not a shard")
+
+            ops.append(aw(node, shard_id, node_id))
+
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*ops, return_exceptions=True),  # type: ignore
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            if SENTRY:
+                capture_exception(exc)
+            raise NodeError("Node unavailable for relation search") from exc
+
+        return results

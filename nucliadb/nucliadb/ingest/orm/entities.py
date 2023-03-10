@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
 from typing import AsyncGenerator, Dict, Optional, Set, Tuple
 
 from nucliadb_protos.knowledgebox_pb2 import (
@@ -30,6 +29,8 @@ from nucliadb_protos.nodereader_pb2 import (
     RelationNodeFilter,
     RelationPrefixSearchRequest,
     RelationSearchRequest,
+    RelationSearchResponse,
+    TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodewriter_pb2 import SetGraph
@@ -44,8 +45,9 @@ from nucliadb.ingest.maindb.keys import (
     KB_ENTITIES,
     KB_ENTITIES_GROUP,
 )
-from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
+from nucliadb.ingest.orm.exceptions import NodeError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
@@ -133,14 +135,10 @@ class EntitiesManager:
         driver = await get_driver()
         cache = await get_cache()
         nodes_manager = NodesManager(driver=driver, cache=cache)
-        shards = await nodes_manager.get_shards_by_kbid(self.kbid)
-        ops = []
 
-        for shard_obj in shards:
-            node, shard_id, node_id = nodes_manager.choose_node(shard_obj, shards)  # type: ignore
-            if shard_id is None:
-                raise ShardNotFound("Found a node but not a shard")
-
+        async def do_entities_search(
+            node: Node, shard_id: str, node_id: str
+        ) -> RelationSearchResponse:
             request = RelationSearchRequest(
                 shard_id=shard_id,
                 prefix=RelationPrefixSearchRequest(
@@ -152,18 +150,11 @@ class EntitiesManager:
                     ],
                 ),
             )
-            ops.append(node.reader.RelationSearch(request))
+            return await node.reader.RelationSearch(request)  # type: ignore
 
-        try:
-            results = await asyncio.wait_for(
-                asyncio.gather(*ops, return_exceptions=True),  # type: ignore
-                timeout=settings.relation_search_timeout,
-            )
-        except asyncio.TimeoutError as exc:
-            if SENTRY:
-                capture_exception(exc)
-            raise NodeError("Node unavailable for relation search") from exc
-
+        results = await nodes_manager.apply_for_all_shards(
+            self.kbid, do_entities_search, settings.relation_search_timeout
+        )
         for result in results:
             if isinstance(result, Exception):
                 if SENTRY:
@@ -227,16 +218,35 @@ class EntitiesManager:
             visited_groups.add(group)
 
         # indexed groups
-        node, shard_id = await self.kb.arbitrary_kb_node()
-        types = await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
-        for item in types.list:
-            if item.with_type != RelationNode.NodeType.ENTITY:
-                continue
-            group = item.with_subtype
-            if (exclude_deleted and group in deleted_groups) or group in visited_groups:
-                continue
-            yield group
-            visited_groups.add(group)
+        driver = await get_driver()
+        cache = await get_cache()
+        nodes_manager = NodesManager(driver=driver, cache=cache)
+
+        async def get_indexed_entities_group_names(
+            node: Node, shard_id: str, node_id: str
+        ) -> TypeList:
+            return await node.reader.RelationTypes(ShardId(id=shard_id))  # type: ignore
+
+        results = await nodes_manager.apply_for_all_shards(
+            self.kbid, get_indexed_entities_group_names, settings.relation_types_timeout
+        )
+        for result in results:
+            if isinstance(result, Exception):
+                if SENTRY:
+                    capture_exception(result)
+                raise NodeError("Error while looking for relations types")
+
+        for relation_types in results:
+            for item in relation_types.list:
+                if item.with_type != RelationNode.NodeType.ENTITY:
+                    continue
+                group = item.with_subtype
+                if (
+                    exclude_deleted and group in deleted_groups
+                ) or group in visited_groups:
+                    continue
+                yield group
+                visited_groups.add(group)
 
     async def store_entities_group(self, group: str, eg: EntitiesGroup):
         key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)

@@ -80,6 +80,7 @@ class Settings(BaseSettings):
 
     # Search query timeouts
     relation_search_timeout: float = 10.0
+    relation_types_timeout: float = 10.0
 
 
 settings = Settings()
