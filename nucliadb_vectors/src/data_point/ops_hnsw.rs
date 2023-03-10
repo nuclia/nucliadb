@@ -42,9 +42,6 @@ pub mod params {
     pub const fn ef_construction() -> usize {
         100
     }
-    pub const fn k_neighbours() -> usize {
-        10
-    }
 }
 pub trait DataRetriever: std::marker::Sync {
     fn is_deleted(&self, _: Address) -> bool;

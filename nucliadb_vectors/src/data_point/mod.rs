@@ -321,14 +321,13 @@ impl DataPoint {
         results: usize,
         similarity: Similarity,
     ) -> impl Iterator<Item = Neighbour> + '_ {
-        use ops_hnsw::params;
         let encoded_query = vector::encode_vector(query);
         let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity);
         let ops = HnswOps { tracker: &tacker };
         let neighbours = ops.search(
             Address(self.journal.nodes),
             self.index.as_ref(),
-            params::k_neighbours(),
+            results,
             filter,
             with_duplicates,
         );
