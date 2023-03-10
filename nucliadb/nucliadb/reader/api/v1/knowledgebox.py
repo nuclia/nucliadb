@@ -19,13 +19,6 @@
 #
 from fastapi import HTTPException
 from fastapi_versioning import version  # type: ignore
-from google.protobuf.json_format import MessageToDict
-from nucliadb_protos.knowledgebox_pb2 import (
-    KnowledgeBox,
-    KnowledgeBoxID,
-    KnowledgeBoxPrefix,
-    KnowledgeBoxResponseStatus,
-)
 from starlette.requests import Request
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
