@@ -110,7 +110,9 @@ async def test_entities_service(
         assert resp.status_code == 200
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
+        resp = await client.get(
+            f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups?show_entities=true"
+        )
         groups = resp.json()["groups"]
         assert len(groups) == 1
         assert groups["group1"]["custom"] is True

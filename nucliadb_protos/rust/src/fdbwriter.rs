@@ -202,6 +202,28 @@ pub struct SetEntitiesRequest {
     pub entities: ::core::option::Option<super::knowledgebox::EntitiesGroup>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListEntitiesGroupsRequest {
+    #[prost(message, optional, tag="1")]
+    pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListEntitiesGroupsResponse {
+    #[prost(map="string, message", tag="1")]
+    pub groups: ::std::collections::HashMap<::prost::alloc::string::String, super::knowledgebox::EntitiesGroupSummary>,
+    #[prost(enumeration="list_entities_groups_response::Status", tag="2")]
+    pub status: i32,
+}
+/// Nested message and enum types in `ListEntitiesGroupsResponse`.
+pub mod list_entities_groups_response {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Status {
+        Ok = 0,
+        Notfound = 1,
+        Error = 2,
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetEntitiesRequest {
     #[prost(message, optional, tag="1")]
     pub kb: ::core::option::Option<super::knowledgebox::KnowledgeBoxId>,

@@ -23,6 +23,7 @@ from typing import AsyncGenerator, Dict, Optional, Set, Tuple
 from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups,
     EntitiesGroup,
+    EntitiesGroupSummary,
     Entity,
 )
 from nucliadb_protos.nodereader_pb2 import (
@@ -80,6 +81,20 @@ class EntitiesManager:
         if deleted:
             return None
         return await self.get_entities_group_inner(group)
+
+    async def list_entities_groups(self) -> Dict[str, EntitiesGroupSummary]:
+        groups = {}
+        async for group in self.iterate_entities_groups_names(exclude_deleted=True):
+            stored = await self.get_stored_entities_group(group)
+            if stored is not None:
+                groups[group] = EntitiesGroupSummary(
+                    title=stored.title, color=stored.color, custom=stored.custom
+                )
+            else:
+                # We don't want to search for each indexed group, as we are
+                # providing a quick summary
+                groups[group] = EntitiesGroupSummary()
+        return groups
 
     async def set_entities(self, group: str, entities: EntitiesGroup):
         indexed = await self.get_indexed_entities_group(group)
@@ -294,8 +309,6 @@ class EntitiesManager:
         `indexed` share entities. That's also true for common fields.
 
         """
-        merged_entities = {}
-
         merged_entities = dict(indexed.entities)
 
         for name, entity in stored.entities.items():

@@ -14,6 +14,7 @@ from nucliadb_protos.knowledgebox_pb2 import (
     DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
     EntitiesGroup as EntitiesGroup,
+    EntitiesGroupSummary as EntitiesGroupSummary,
     Entity as Entity,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KnowledgeBox as KnowledgeBox,
@@ -194,11 +195,15 @@ class WriterStub:
         nucliadb_protos.writer_pb2.SetVectorSetRequest,
         nucliadb_protos.writer_pb2.OpStatusWriter,
     ]
+    ListEntitiesGroups: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.writer_pb2.ListEntitiesGroupsRequest,
+        nucliadb_protos.writer_pb2.ListEntitiesGroupsResponse,
+    ]
+    """Entities"""
     GetEntities: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetEntitiesRequest,
         nucliadb_protos.writer_pb2.GetEntitiesResponse,
     ]
-    """Entities"""
     GetEntitiesGroup: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.writer_pb2.GetEntitiesGroupRequest,
         nucliadb_protos.writer_pb2.GetEntitiesGroupResponse,
@@ -391,12 +396,18 @@ class WriterServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.writer_pb2.OpStatusWriter: ...
     @abc.abstractmethod
+    def ListEntitiesGroups(
+        self,
+        request: nucliadb_protos.writer_pb2.ListEntitiesGroupsRequest,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.writer_pb2.ListEntitiesGroupsResponse:
+        """Entities"""
+    @abc.abstractmethod
     def GetEntities(
         self,
         request: nucliadb_protos.writer_pb2.GetEntitiesRequest,
         context: grpc.ServicerContext,
-    ) -> nucliadb_protos.writer_pb2.GetEntitiesResponse:
-        """Entities"""
+    ) -> nucliadb_protos.writer_pb2.GetEntitiesResponse: ...
     @abc.abstractmethod
     def GetEntitiesGroup(
         self,

@@ -415,6 +415,27 @@ class Entity(google.protobuf.message.Message):
 global___Entity = Entity
 
 @typing_extensions.final
+class EntitiesGroupSummary(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TITLE_FIELD_NUMBER: builtins.int
+    COLOR_FIELD_NUMBER: builtins.int
+    CUSTOM_FIELD_NUMBER: builtins.int
+    title: builtins.str
+    color: builtins.str
+    custom: builtins.bool
+    def __init__(
+        self,
+        *,
+        title: builtins.str = ...,
+        color: builtins.str = ...,
+        custom: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color", b"color", "custom", b"custom", "title", b"title"]) -> None: ...
+
+global___EntitiesGroupSummary = EntitiesGroupSummary
+
+@typing_extensions.final
 class EntitiesGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

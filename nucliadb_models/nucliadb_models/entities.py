@@ -53,7 +53,10 @@ class EntitiesGroup(BaseModel):
     )
 
     @classmethod
-    def from_message(cls: Type[_T], message: knowledgebox_pb2.EntitiesGroup) -> _T:
+    def from_message(
+        cls: Type[_T],
+        message: knowledgebox_pb2.EntitiesGroup,
+    ) -> _T:
         entitiesgroup = MessageToDict(
             message,
             preserving_proto_field_name=True,
@@ -63,6 +66,18 @@ class EntitiesGroup(BaseModel):
             if not entity.deleted:
                 entitiesgroup["entities"][name] = Entity.from_message(entity)
 
+        return cls(**entitiesgroup)
+
+    @classmethod
+    def from_summary_message(
+        cls: Type[_T],
+        message: knowledgebox_pb2.EntitiesGroupSummary,
+    ) -> _T:
+        entitiesgroup = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
         return cls(**entitiesgroup)
 
 

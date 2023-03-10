@@ -67,6 +67,8 @@ from nucliadb_protos.writer_pb2 import (
     GetWidgetsResponse,
     IndexResource,
     IndexStatus,
+    ListEntitiesGroupsRequest,
+    ListEntitiesGroupsResponse,
     ListMembersRequest,
     ListMembersResponse,
     OpStatusWriter,
@@ -430,6 +432,32 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         await txn.abort()
         return response
 
+    async def ListEntitiesGroups(  # type: ignore
+        self, request: ListEntitiesGroupsRequest, context=None
+    ) -> ListEntitiesGroupsResponse:
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = ListEntitiesGroupsResponse()
+
+            if kbobj is None:
+                response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
+                return response
+
+            entities_manager = EntitiesManager(kbobj, txn)
+            try:
+                entities_groups = await entities_manager.list_entities_groups()
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                    logger.error("Error in ingest gRPC servicer", exc_info=True)
+                    response.status = ListEntitiesGroupsResponse.Status.ERROR
+            else:
+                response.status = ListEntitiesGroupsResponse.Status.OK
+                for name, group in entities_groups.items():
+                    response.groups[name].CopyFrom(group)
+
+            return response
+
     async def GetEntitiesGroup(  # type: ignore
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
@@ -587,7 +615,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                logger.exception(f"Errors getting synonyms")
+                logger.exception("Errors getting synonyms")
                 response.status.status = OpStatusWriter.Status.ERROR
                 return response
 
@@ -610,7 +638,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                logger.exception(f"Errors setting synonyms")
+                logger.exception("Errors setting synonyms")
                 response.status = OpStatusWriter.Status.ERROR
                 return response
 
@@ -633,7 +661,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                logger.exception(f"Errors deleting synonyms")
+                logger.exception("Errors deleting synonyms")
                 response.status = OpStatusWriter.Status.ERROR
                 return response
 

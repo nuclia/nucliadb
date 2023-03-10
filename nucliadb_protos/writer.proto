@@ -158,6 +158,20 @@ message SetEntitiesRequest {
 }
 
 
+message ListEntitiesGroupsRequest {
+    knowledgebox.KnowledgeBoxID kb = 1;
+}
+
+message ListEntitiesGroupsResponse {
+    map<string, knowledgebox.EntitiesGroupSummary> groups = 1;
+    enum Status {
+        OK = 0;
+        NOTFOUND = 1;
+        ERROR = 2;
+    }
+    Status status = 2;
+}
+
 message GetEntitiesRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
 }
@@ -509,6 +523,7 @@ service Writer {
     rpc SetVectorSet(SetVectorSetRequest) returns (OpStatusWriter) {}
     
     // Entities
+    rpc ListEntitiesGroups(ListEntitiesGroupsRequest) returns (ListEntitiesGroupsResponse) {}
     rpc GetEntities(GetEntitiesRequest) returns (GetEntitiesResponse) {}
     rpc GetEntitiesGroup(GetEntitiesGroupRequest) returns (GetEntitiesGroupResponse) {}
     rpc SetEntities(SetEntitiesRequest) returns (OpStatusWriter) {}

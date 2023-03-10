@@ -152,6 +152,15 @@ pub struct Entity {
     pub deleted: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EntitiesGroupSummary {
+    #[prost(string, tag="2")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub color: ::prost::alloc::string::String,
+    #[prost(bool, tag="4")]
+    pub custom: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EntitiesGroup {
     #[prost(map="string, message", tag="1")]
     pub entities: ::std::collections::HashMap<::prost::alloc::string::String, Entity>,

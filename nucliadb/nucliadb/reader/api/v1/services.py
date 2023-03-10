@@ -37,6 +37,8 @@ from nucliadb_protos.writer_pb2 import (
     GetWidgetResponse,
     GetWidgetsRequest,
     GetWidgetsResponse,
+    ListEntitiesGroupsRequest,
+    ListEntitiesGroupsResponse,
     OpStatusWriter,
 )
 from starlette.requests import Request
@@ -63,8 +65,17 @@ from nucliadb_utils.utilities import get_ingest
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_entities(
-    request: Request, kbid: str, show_entities: bool = True
+    request: Request, kbid: str, show_entities: bool = False
 ) -> KnowledgeBoxEntities:
+    if show_entities:
+        return await get_all_entities(kbid)
+    else:
+        return await list_entities_groups(kbid)
+
+
+async def get_all_entities(kbid: str):
+    """WARNING: this function is really costly due to how entities are retrieved
+    from the node."""
     ingest = get_ingest()
     e_request: GetEntitiesRequest = GetEntitiesRequest()
     e_request.kb.uuid = kbid
@@ -78,11 +89,36 @@ async def get_entities(
             if "" in entities_group.entities:
                 del entities_group.entities[""]
             response.groups[key] = entities_group
-            if not show_entities:
-                response.groups[key].entities = {}
         return response
     elif kbobj.status == GetEntitiesResponse.Status.NOTFOUND:
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif kbobj.status == GetEntitiesResponse.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error while getting entities groups"
+        )
+    else:
+        raise HTTPException(status_code=500, detail="Unknown GRPC response")
+
+
+async def list_entities_groups(kbid: str):
+    ingest = get_ingest()
+    e_request: ListEntitiesGroupsRequest = ListEntitiesGroupsRequest()
+    e_request.kb.uuid = kbid
+    set_info_on_span({"nuclia.kbid": kbid})
+
+    entities_groups = await ingest.ListEntitiesGroups(e_request)  # type: ignore
+    if entities_groups.status == ListEntitiesGroupsResponse.Status.OK:
+        response = KnowledgeBoxEntities(uuid=kbid)
+        for key, eg_summary in entities_groups.groups.items():
+            entities_group = EntitiesGroup.from_summary_message(eg_summary)
+            response.groups[key] = entities_group
+        return response
+    elif entities_groups.status == ListEntitiesGroupsResponse.Status.NOTFOUND:
+        raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+    elif entities_groups.status == ListEntitiesGroupsResponse.Status.ERROR:
+        raise HTTPException(
+            status_code=500, detail="Error while listing entities groups"
+        )
     else:
         raise HTTPException(status_code=500, detail="Unknown GRPC response")
 

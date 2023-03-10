@@ -236,7 +236,7 @@ async def test_entities_store_and_indexing(
     """
     kbid = kb_with_entities
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=true")
     assert resp.status_code == 200
     body = resp.json()
     assert set(body["groups"].keys()) == {"ANIMALS", "DESSERTS", "SUPERPOWERS"}
@@ -295,7 +295,7 @@ async def test_get_entities(
         "SUPERPOWERS": {"fly", "invisibility", "telepathy"},
     }
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=true")
     assert resp.status_code == 200
     entitiesgroups = resp.json()
     assert len(entitiesgroups["groups"]) == len(expected)
@@ -369,7 +369,7 @@ async def test_delete_entities_groups(
         "ANIMALS",  # added with API and broker message
     ]
 
-    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups")
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/entitiesgroups?show_entities=true")
     assert resp.status_code == 200
     body = resp.json()
     assert set(entitiesgroups) == set(body["groups"])
