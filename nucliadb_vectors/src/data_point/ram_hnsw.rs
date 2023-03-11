@@ -21,9 +21,13 @@
 use std::collections::HashMap;
 
 use ops_hnsw::{Hnsw, Layer};
+use rand::distributions::Uniform;
+use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 use super::*;
+use crate::data_point::ops_hnsw::params;
 
 const NO_EDGES: [(Address, Edge); 0] = [];
 
@@ -38,7 +42,7 @@ pub struct Edge {
     pub dist: f32,
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone)]
 pub struct RAMLayer {
     pub out: HashMap<Address, Vec<(Address, Edge)>>,
 }
@@ -79,15 +83,24 @@ impl RAMLayer {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct RAMHnsw {
+    layer_rng: ChaCha8Rng,
     pub entry_point: Option<EntryPoint>,
     pub layers: Vec<RAMLayer>,
 }
-
+impl Default for RAMHnsw {
+    fn default() -> Self {
+        RAMHnsw {
+            layer_rng: ChaCha8Rng::seed_from_u64(2),
+            entry_point: None,
+            layers: vec![],
+        }
+    }
+}
 impl RAMHnsw {
     pub fn new() -> RAMHnsw {
-        RAMHnsw::default()
+        Self::default()
     }
     pub fn increase_layers_with(&mut self, x: Address, level: usize) -> &mut Self {
         while self.layers.len() <= level {
@@ -113,6 +126,12 @@ impl RAMHnsw {
             .and_then(|(index, l)| l.first().map(|node| (node, index)))
             .map(|(node, layer)| EntryPoint { node, layer });
         self
+    }
+    pub fn get_random_layer(&mut self) -> usize {
+        let distribution = Uniform::new(0.0, 1.0);
+        let sample: f64 = self.layer_rng.sample(distribution);
+        let picked_level = -sample.ln() * params::level_factor();
+        picked_level.round() as usize
     }
     pub fn no_layers(&self) -> usize {
         self.layers.len()

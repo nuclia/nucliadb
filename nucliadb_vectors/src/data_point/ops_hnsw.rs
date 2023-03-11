@@ -23,8 +23,6 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use nucliadb_core::thread::*;
 use ram_hnsw::*;
-use rand::distributions::Uniform;
-use rand::{thread_rng, Rng};
 
 use super::*;
 use crate::formula::Formula;
@@ -83,7 +81,7 @@ impl PartialOrd for Cnx {
 pub type Neighbours = Vec<(Address, f32)>;
 
 pub struct HnswOps<'a, DR> {
-    pub tracker: &'a DR,
+    tracker: &'a DR,
 }
 
 impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
@@ -96,13 +94,6 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         candidates.dedup_by_key(|(addr, _)| *addr);
         candidates.truncate(k_neighbours);
         candidates
-    }
-    fn get_random_layer(&self) -> usize {
-        let mut rng = thread_rng();
-        let distribution = Uniform::new(0.0, 1.0);
-        let sample: f64 = rng.sample(distribution);
-        let picked_level = -sample.ln() * params::level_factor();
-        picked_level.round() as usize
     }
     fn cosine_similarity(&self, x: Address, y: Address) -> f32 {
         self.tracker.similarity(x, y)
@@ -220,11 +211,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     pub fn insert(&self, x: Address, hnsw: &mut RAMHnsw) {
         match hnsw.entry_point {
             None => {
-                let top_level = self.get_random_layer();
+                let top_level = hnsw.get_random_layer();
                 hnsw.increase_layers_with(x, top_level).update_entry_point();
             }
             Some(entry_point) => {
-                let level = self.get_random_layer();
+                let level = hnsw.get_random_layer();
                 hnsw.increase_layers_with(x, level);
                 let top_layer = std::cmp::min(entry_point.layer, level);
                 let ep = entry_point.node;
@@ -286,6 +277,10 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         } else {
             Neighbours::default()
         }
+    }
+
+    pub fn new(tracker: &DR) -> HnswOps<'_, DR> {
+        HnswOps { tracker }
     }
 }
 

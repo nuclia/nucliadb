@@ -322,8 +322,8 @@ impl DataPoint {
         similarity: Similarity,
     ) -> impl Iterator<Item = Neighbour> + '_ {
         let encoded_query = vector::encode_vector(query);
-        let tacker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity);
-        let ops = HnswOps { tracker: &tacker };
+        let tracker = Retriever::new(&encoded_query, &self.nodes, delete_log, similarity);
+        let ops = HnswOps::new(&tracker);
         let neighbours = ops.search(
             Address(self.journal.nodes),
             self.index.as_ref(),
@@ -378,7 +378,7 @@ impl DataPoint {
         let nodes = unsafe { Mmap::map(&nodes)? };
         let no_nodes = key_value::get_no_elems(&nodes);
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity);
-        let ops = HnswOps { tracker: &tracker };
+        let ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();
         for id in 0..no_nodes {
             ops.insert(Address(id), &mut index)
@@ -479,7 +479,7 @@ impl DataPoint {
 
         // Creating the HNSW using the mmaped nodes
         let tracker = Retriever::new(&[], &nodes, &NoDLog, similarity);
-        let ops = HnswOps { tracker: &tracker };
+        let ops = HnswOps::new(&tracker);
         let mut index = RAMHnsw::new();
         for id in 0..no_nodes {
             ops.insert(Address(id), &mut index)

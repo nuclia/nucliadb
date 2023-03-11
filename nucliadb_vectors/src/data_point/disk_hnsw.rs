@@ -231,10 +231,7 @@ mod tests {
     }
     #[test]
     fn empty_hnsw() {
-        let hnsw = RAMHnsw {
-            entry_point: None,
-            layers: vec![],
-        };
+        let hnsw = RAMHnsw::new();
         let mut buf = vec![];
         DiskHnsw::serialize_into(&mut buf, 0, hnsw).unwrap();
         let ep = DiskHnsw::get_entry_point(&buf);
@@ -279,10 +276,9 @@ mod tests {
             node: Address(0),
             layer: 2,
         };
-        let hnsw = RAMHnsw {
-            entry_point: Some(entry_point),
-            layers: vec![layer0, layer1, layer2],
-        };
+        let mut hnsw = RAMHnsw::new();
+        hnsw.entry_point = Some(entry_point);
+        hnsw.layers = vec![layer0, layer1, layer2];
         let mut buf = vec![];
         DiskHnsw::serialize_into(&mut buf, no_nodes, hnsw).unwrap();
         let ep = DiskHnsw::get_entry_point(&buf).unwrap();

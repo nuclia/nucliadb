@@ -2083,6 +2083,7 @@ dependencies = [
  "memmap2",
  "nucliadb_core",
  "rand 0.8.5",
+ "rand_chacha",
  "regex",
  "serde",
  "serde_json",
