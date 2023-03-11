@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use ops_hnsw::{Hnsw, Layer};
 use rand::distributions::Uniform;
 use rand::prelude::*;
-use rand_chacha::ChaCha8Rng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -85,14 +85,14 @@ impl RAMLayer {
 
 #[derive(Clone)]
 pub struct RAMHnsw {
-    layer_rng: ChaCha8Rng,
+    layer_rng: StdRng,
     pub entry_point: Option<EntryPoint>,
     pub layers: Vec<RAMLayer>,
 }
 impl Default for RAMHnsw {
     fn default() -> Self {
         RAMHnsw {
-            layer_rng: ChaCha8Rng::seed_from_u64(2),
+            layer_rng: StdRng::seed_from_u64(2),
             entry_point: None,
             layers: vec![],
         }

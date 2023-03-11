@@ -8,7 +8,6 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 regex = "1.7.0"
-rand_chacha = "0.3.1"
 serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "1.1", features = ["serde", "v4"] }
 tempfile = "3"
