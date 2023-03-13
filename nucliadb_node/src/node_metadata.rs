@@ -30,7 +30,21 @@ use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 
 use crate::reader::NodeReaderService;
-use crate::shard_metadata::ShardMetadata;
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+struct ShardMetadata {
+    kbid: String,
+    load_score: f32,
+}
+
+impl From<ShardMetadata> for nucliadb_core::protos::node_metadata::ShardMetadata {
+    fn from(shard_metadata: ShardMetadata) -> Self {
+        nucliadb_core::protos::node_metadata::ShardMetadata {
+            kbid: shard_metadata.kbid,
+            load_score: shard_metadata.load_score,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct NodeMetadata {
@@ -74,14 +88,11 @@ impl NodeMetadata {
     }
 
     pub fn new_shard(&mut self, shard_id: String, kbid: String, load_score: f32) {
-        let load_score = if let Some(shard) = self.shards.insert(
-            shard_id,
-            ShardMetadata {
-                kbid: Some(kbid),
-                load_score: Some(load_score),
-            },
-        ) {
-            load_score - shard.load_score.unwrap_or_default()
+        let load_score = if let Some(shard) = self
+            .shards
+            .insert(shard_id, ShardMetadata { kbid, load_score })
+        {
+            load_score - shard.load_score
         } else {
             load_score
         };
@@ -91,7 +102,7 @@ impl NodeMetadata {
 
     pub fn delete_shard(&mut self, shard_id: String) {
         if let Some(shard) = self.shards.remove(&shard_id) {
-            self.load_score -= shard.load_score.unwrap_or_default();
+            self.load_score -= shard.load_score;
         }
     }
 
@@ -99,8 +110,8 @@ impl NodeMetadata {
         if let Some(mut shard) = self.shards.get_mut(&shard_id) {
             let load_score = paragraph_count as f32;
 
-            self.load_score += load_score - shard.load_score.unwrap_or_default();
-            shard.load_score = Some(load_score);
+            self.load_score += load_score - shard.load_score;
+            shard.load_score = load_score;
         }
     }
 
