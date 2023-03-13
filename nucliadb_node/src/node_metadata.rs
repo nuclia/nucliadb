@@ -32,6 +32,7 @@ use crate::shard_metadata::ShardMetadata;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct NodeMetadata {
+    load_score: f32,
     shards: HashMap<String, ShardMetadata>,
 }
 
@@ -63,10 +64,7 @@ impl From<NodeMetadata> for nucliadb_core::protos::NodeMetadata {
 
 impl NodeMetadata {
     pub fn load_score(&self) -> f32 {
-        self.shards
-            .values()
-            .map(|shard| shard.load_score.unwrap_or_default())
-            .sum()
+        self.load_score
     }
 
     pub fn shard_count(&self) -> u64 {
@@ -74,22 +72,33 @@ impl NodeMetadata {
     }
 
     pub fn new_shard(&mut self, shard_id: String, kbid: String, load_score: f32) {
-        self.shards.insert(
+        let load_score = if let Some(shard) = self.shards.insert(
             shard_id,
             ShardMetadata {
                 kbid: Some(kbid),
                 load_score: Some(load_score),
             },
-        );
+        ) {
+            load_score - shard.load_score.unwrap_or_default()
+        } else {
+            load_score
+        };
+
+        self.load_score += load_score;
     }
 
     pub fn delete_shard(&mut self, shard_id: String) {
-        self.shards.remove(&shard_id);
+        if let Some(shard) = self.shards.remove(&shard_id) {
+            self.load_score -= shard.load_score.unwrap_or_default();
+        }
     }
 
     pub fn update_shard(&mut self, shard_id: String, paragraph_count: u64) {
         if let Some(mut shard) = self.shards.get_mut(&shard_id) {
-            shard.load_score = Some(paragraph_count as f32);
+            let load_score = paragraph_count as f32;
+
+            self.load_score += load_score - shard.load_score.unwrap_or_default();
+            shard.load_score = Some(load_score);
         }
     }
 
