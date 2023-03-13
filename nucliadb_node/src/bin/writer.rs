@@ -182,7 +182,7 @@ pub async fn watch_node_update(
             }
         }
 
-        if let Err(e) = node_metadata.save(&path).await {
+        if let Err(e) = node_metadata.save(&path) {
             error!("Node metadata update failed: {e}");
         } else {
             info!("Node metadata file updated successfully");

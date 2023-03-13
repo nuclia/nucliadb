@@ -523,7 +523,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<NodeMetadata>, Status> {
         self.instrument(&request);
 
-        match crate::node_metadata::NodeMetadata::load(&env::metadata_path()).await {
+        match crate::node_metadata::NodeMetadata::load(&env::metadata_path()) {
             Ok(node_metadata) => Ok(tonic::Response::new(node_metadata.into())),
             Err(e) => {
                 let e = format!("Cannot get node metadata: {e}");

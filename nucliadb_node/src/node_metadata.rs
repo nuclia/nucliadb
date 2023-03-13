@@ -108,22 +108,22 @@ impl NodeMetadata {
         if !path.exists() {
             info!("Node metadata file does not exist.");
 
-            let node_metadata = Self::create(path).await.unwrap_or_else(|e| {
+            let node_metadata = Self::create(path).unwrap_or_else(|e| {
                 warn!("Cannot create metadata file '{}': {e}", path.display());
                 info!("Create default metadata file '{}'", path.display());
 
                 Self::default()
             });
 
-            node_metadata.save(path).await?;
+            node_metadata.save(path)?;
 
             Ok(node_metadata)
         } else {
-            Self::load(path).await
+            Self::load(path)
         }
     }
 
-    pub async fn save(&self, path: &Path) -> NodeResult<()> {
+    pub fn save(&self, path: &Path) -> NodeResult<()> {
         info!("Saving node metadata file '{}'", path.display());
 
         let file =
@@ -137,7 +137,7 @@ impl NodeMetadata {
         Ok(writer.flush()?)
     }
 
-    pub async fn load(path: &Path) -> NodeResult<Self> {
+    pub fn load(path: &Path) -> NodeResult<Self> {
         info!("Loading node metadata file '{}'", path.display());
 
         let file =
@@ -149,7 +149,7 @@ impl NodeMetadata {
             .map_err(|e| node_error!("Cannot deserialize node metadata: {e}"))
     }
 
-    pub async fn create(path: &Path) -> NodeResult<Self> {
+    pub fn create(path: &Path) -> NodeResult<Self> {
         info!("Creating node metadata file '{}'", path.display());
 
         let mut reader = NodeReaderService::new();
