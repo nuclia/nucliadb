@@ -244,8 +244,6 @@ pub mod resource {
 pub struct ShardMetadata {
     #[prost(string, tag="1")]
     pub kbid: ::prost::alloc::string::String,
-    #[prost(float, optional, tag="2")]
-    pub load_score: ::core::option::Option<f32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NodeMetadata {
@@ -254,5 +252,15 @@ pub struct NodeMetadata {
     #[prost(uint64, tag="2")]
     pub shard_count: u64,
     #[prost(map="string, message", tag="3")]
-    pub shards: ::std::collections::HashMap<::prost::alloc::string::String, ShardMetadata>,
+    pub shards: ::std::collections::HashMap<::prost::alloc::string::String, node_metadata::ShardMetadata>,
+}
+/// Nested message and enum types in `NodeMetadata`.
+pub mod node_metadata {
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct ShardMetadata {
+        #[prost(string, tag="1")]
+        pub kbid: ::prost::alloc::string::String,
+        #[prost(float, tag="2")]
+        pub load_score: f32,
+    }
 }
