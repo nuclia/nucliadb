@@ -26,15 +26,19 @@ from typing import AsyncIterator
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentItem,
+    EdgeList,
     GetShardRequest,
     ParagraphItem,
     ParagraphSearchRequest,
     ParagraphSearchResponse,
+    RelationSearchRequest,
+    RelationSearchResponse,
     SearchRequest,
     SearchResponse,
     StreamRequest,
     SuggestRequest,
     SuggestResponse,
+    TypeList,
 )
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, Resource, ResourceID
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
@@ -47,7 +51,7 @@ from nucliadb_protos.noderesources_pb2 import (
     VectorSetID,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import OpStatus
+from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 
 from nucliadb.ingest.settings import settings
 
@@ -85,6 +89,18 @@ class LocalReaderWrapper:
         )
         pb_bytes = bytes(result)
         pb = ParagraphSearchResponse()
+        pb.ParseFromString(pb_bytes)
+        return pb
+
+    async def RelationSearch(
+        self, request: RelationSearchRequest
+    ) -> RelationSearchResponse:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.relation_search, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        pb = RelationSearchResponse()
         pb.ParseFromString(pb_bytes)
         return pb
 
@@ -184,6 +200,26 @@ class LocalReaderWrapper:
         if exception is not None:
             raise exception
         await loop.run_in_executor(self.executor, t1.join)
+
+    async def RelationEdges(self, request: ShardId):
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.relation_edges, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        edge_list = EdgeList()
+        edge_list.ParseFromString(pb_bytes)
+        return edge_list
+
+    async def RelationTypes(self, request: ShardId):
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            self.executor, self.reader.relation_types, request.SerializeToString()
+        )
+        pb_bytes = bytes(result)
+        type_list = TypeList()
+        type_list.ParseFromString(pb_bytes)
+        return type_list
 
 
 class LocalWriterWrapper:
@@ -289,6 +325,16 @@ class LocalWriterWrapper:
         loop = asyncio.get_running_loop()
         resp = await loop.run_in_executor(
             self.executor, self.writer.remove_resource, request.SerializeToString()
+        )
+        pb_bytes = bytes(resp)
+        op_status = OpStatus()
+        op_status.ParseFromString(pb_bytes)
+        return op_status
+
+    async def JoinGraph(self, request: SetGraph) -> OpStatus:
+        loop = asyncio.get_running_loop()
+        resp = await loop.run_in_executor(
+            self.executor, self.writer.join_graph, request.SerializeToString()
         )
         pb_bytes = bytes(resp)
         op_status = OpStatus()

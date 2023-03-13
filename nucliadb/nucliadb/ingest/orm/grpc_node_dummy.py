@@ -21,6 +21,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from nucliadb_protos.nodereader_pb2 import (
+    EdgeList,
+    RelationEdge,
+    RelationSearchResponse,
+    TypeList,
+)
 from nucliadb_protos.noderesources_pb2 import Shard as NodeResourcesShard
 from nucliadb_protos.noderesources_pb2 import (
     ShardCleaned,
@@ -29,7 +35,9 @@ from nucliadb_protos.noderesources_pb2 import (
     ShardList,
     VectorSetList,
 )
-from nucliadb_protos.nodewriter_pb2 import Counter, OpStatus, ShadowShardResponse
+from nucliadb_protos.nodesidecar_pb2 import Counter, ShadowShardResponse
+from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
+from nucliadb_protos.utils_pb2 import Relation
 
 
 class DummyWriterStub:
@@ -84,6 +92,12 @@ class DummyWriterStub:
         result.vectorset.append("base")
         return result
 
+    async def JoinGraph(self, data: SetGraph):
+        self.calls.setdefault("JoinGraph", []).append(data)
+        result = OpStatus()
+        result.count = 1
+        return result
+
 
 class DummyReaderStub:
     calls: Dict[str, List[Any]] = {}
@@ -93,6 +107,24 @@ class DummyReaderStub:
         return NodeResourcesShard(
             shard_id="shard", resources=2, paragraphs=2, sentences=2
         )
+
+    async def RelationSearch(self, data):
+        self.calls.setdefault("RelationSearch", []).append(data)
+        result = RelationSearchResponse()
+        return result
+
+    async def RelationEdges(self, data):
+        self.calls.setdefault("RelationEdges", []).append(data)
+        result = EdgeList()
+        result.list.append(
+            RelationEdge(edge_type=Relation.RelationType.ENTITY, property="dummy")
+        )
+        return result
+
+    async def RelationTypes(self, data):
+        self.calls.setdefault("RelationTypes", []).append(data)
+        result = TypeList()
+        return result
 
 
 class DummySidecarStub:

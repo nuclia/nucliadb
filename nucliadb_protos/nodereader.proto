@@ -317,7 +317,9 @@ message SearchRequest {
 
     // if provided, search metadata for this nodes (nodes at distance
     // one) and get the shortest path between nodes
-    RelationSearchRequest relations = 19;
+    RelationSearchRequest relations = 19 [deprecated = true];
+    RelationPrefixSearchRequest relation_prefix = 20;
+    EntitiesSubgraphRequest relation_subgraph = 21;
 }
 
 message SuggestRequest {

@@ -35,6 +35,7 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 from nucliadb.ingest.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm import NODE_CLUSTER, NODES
+from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
@@ -138,6 +139,16 @@ class TrainNodesManager:
 
         kbobj = KnowledgeBox(txn, self.storage, self.cache, kbid)
         return kbobj
+
+    async def get_kb_entities_manager(
+        self, txn: Transaction, kbid: str
+    ) -> Optional[EntitiesManager]:
+        kbobj = await self.get_kb_obj(txn, kbid)
+        if kbobj is None:
+            return None
+
+        manager = EntitiesManager(kbobj, txn)
+        return manager
 
     async def kb_sentences(
         self, request: GetSentencesRequest

@@ -24,8 +24,10 @@ from nucliadb_protos.knowledgebox_pb2 import (
     CONFLICT as CONFLICT,
     CleanedKnowledgeBoxResponse as CleanedKnowledgeBoxResponse,
     DeleteKnowledgeBoxResponse as DeleteKnowledgeBoxResponse,
+    DeletedEntitiesGroups as DeletedEntitiesGroups,
     ERROR as ERROR,
     EntitiesGroup as EntitiesGroup,
+    EntitiesGroupSummary as EntitiesGroupSummary,
     Entity as Entity,
     GCKnowledgeBoxResponse as GCKnowledgeBoxResponse,
     KnowledgeBox as KnowledgeBox,
@@ -687,6 +689,75 @@ class SetEntitiesRequest(google.protobuf.message.Message):
 global___SetEntitiesRequest = SetEntitiesRequest
 
 @typing_extensions.final
+class ListEntitiesGroupsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KB_FIELD_NUMBER: builtins.int
+    @property
+    def kb(self) -> nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID: ...
+    def __init__(
+        self,
+        *,
+        kb: nucliadb_protos.knowledgebox_pb2.KnowledgeBoxID | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["kb", b"kb"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["kb", b"kb"]) -> None: ...
+
+global___ListEntitiesGroupsRequest = ListEntitiesGroupsRequest
+
+@typing_extensions.final
+class ListEntitiesGroupsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Status:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[ListEntitiesGroupsResponse._Status.ValueType], builtins.type):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        OK: ListEntitiesGroupsResponse._Status.ValueType  # 0
+        NOTFOUND: ListEntitiesGroupsResponse._Status.ValueType  # 1
+        ERROR: ListEntitiesGroupsResponse._Status.ValueType  # 2
+
+    class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
+    OK: ListEntitiesGroupsResponse.Status.ValueType  # 0
+    NOTFOUND: ListEntitiesGroupsResponse.Status.ValueType  # 1
+    ERROR: ListEntitiesGroupsResponse.Status.ValueType  # 2
+
+    @typing_extensions.final
+    class GroupsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> nucliadb_protos.knowledgebox_pb2.EntitiesGroupSummary: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: nucliadb_protos.knowledgebox_pb2.EntitiesGroupSummary | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+
+    GROUPS_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    @property
+    def groups(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, nucliadb_protos.knowledgebox_pb2.EntitiesGroupSummary]: ...
+    status: global___ListEntitiesGroupsResponse.Status.ValueType
+    def __init__(
+        self,
+        *,
+        groups: collections.abc.Mapping[builtins.str, nucliadb_protos.knowledgebox_pb2.EntitiesGroupSummary] | None = ...,
+        status: global___ListEntitiesGroupsResponse.Status.ValueType = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["groups", b"groups", "status", b"status"]) -> None: ...
+
+global___ListEntitiesGroupsResponse = ListEntitiesGroupsResponse
+
+@typing_extensions.final
 class GetEntitiesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -715,10 +786,12 @@ class GetEntitiesResponse(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetEntitiesResponse._Status.ValueType  # 0
         NOTFOUND: GetEntitiesResponse._Status.ValueType  # 1
+        ERROR: GetEntitiesResponse._Status.ValueType  # 2
 
     class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
     OK: GetEntitiesResponse.Status.ValueType  # 0
     NOTFOUND: GetEntitiesResponse.Status.ValueType  # 1
+    ERROR: GetEntitiesResponse.Status.ValueType  # 2
 
     @typing_extensions.final
     class GroupsEntry(google.protobuf.message.Message):
@@ -904,11 +977,15 @@ class GetEntitiesGroupResponse(google.protobuf.message.Message):
     class _StatusEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[GetEntitiesGroupResponse._Status.ValueType], builtins.type):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         OK: GetEntitiesGroupResponse._Status.ValueType  # 0
-        NOTFOUND: GetEntitiesGroupResponse._Status.ValueType  # 1
+        KB_NOT_FOUND: GetEntitiesGroupResponse._Status.ValueType  # 1
+        ENTITIES_GROUP_NOT_FOUND: GetEntitiesGroupResponse._Status.ValueType  # 2
+        ERROR: GetEntitiesGroupResponse._Status.ValueType  # 3
 
     class Status(_Status, metaclass=_StatusEnumTypeWrapper): ...
     OK: GetEntitiesGroupResponse.Status.ValueType  # 0
-    NOTFOUND: GetEntitiesGroupResponse.Status.ValueType  # 1
+    KB_NOT_FOUND: GetEntitiesGroupResponse.Status.ValueType  # 1
+    ENTITIES_GROUP_NOT_FOUND: GetEntitiesGroupResponse.Status.ValueType  # 2
+    ERROR: GetEntitiesGroupResponse.Status.ValueType  # 3
 
     KB_FIELD_NUMBER: builtins.int
     GROUP_FIELD_NUMBER: builtins.int

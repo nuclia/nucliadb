@@ -17,15 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nucliadb.ingest.orm.nodes_manager import NodesManager
-from nucliadb.ingest.utils import get_driver  # noqa
-from nucliadb.search.predict import PredictEngine
-from nucliadb_utils.utilities import Utility, get_utility
 
-
-def get_predict() -> PredictEngine:
-    return get_utility(Utility.PREDICT)  # type: ignore
-
-
-def get_nodes() -> NodesManager:
-    return get_utility(Utility.NODES)  # type: ignore
+KB_ENTITIES = "/kbs/{kbid}/entities"
+KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
+KB_DELETED_ENTITIES_GROUPS = "/kbs/{kbid}/deletedentities"

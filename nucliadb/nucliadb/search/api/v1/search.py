@@ -367,7 +367,7 @@ async def search(
         field_type_filter=item.field_type_filter,
         extracted=item.extracted,
         sort=sort_options,
-        requested_relations=pb_query.relations,
+        requested_relations=pb_query.relation_subgraph,
         min_score=item.min_score,
         highlight=item.highlight,
     )

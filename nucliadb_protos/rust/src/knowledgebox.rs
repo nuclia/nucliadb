@@ -144,10 +144,21 @@ pub struct Labels {
 pub struct Entity {
     #[prost(string, tag="2")]
     pub value: ::prost::alloc::string::String,
-    #[prost(bool, tag="3")]
-    pub merged: bool,
     #[prost(string, repeated, tag="4")]
     pub represents: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(bool, tag="3")]
+    pub merged: bool,
+    #[prost(bool, tag="5")]
+    pub deleted: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EntitiesGroupSummary {
+    #[prost(string, tag="2")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag="3")]
+    pub color: ::prost::alloc::string::String,
+    #[prost(bool, tag="4")]
+    pub custom: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EntitiesGroup {
@@ -159,6 +170,11 @@ pub struct EntitiesGroup {
     pub color: ::prost::alloc::string::String,
     #[prost(bool, tag="4")]
     pub custom: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeletedEntitiesGroups {
+    #[prost(string, repeated, tag="1")]
+    pub entities_groups: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 // Widgets of the Knowledge Box
 
@@ -206,6 +222,8 @@ pub mod widget {
         Form = 2,
     }
 }
+// Vectorsets
+
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VectorSet {
     #[prost(int32, tag="1")]

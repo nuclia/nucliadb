@@ -35,6 +35,7 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
+from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.utils import get_driver
 from nucliadb.train import SERVICE_NAME
@@ -74,16 +75,21 @@ class UploadServicer:
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
+        kbid = request.kb.uuid
+        response = GetEntitiesResponse()
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetEntitiesResponse()
-        if kbobj is not None:
-            await kbobj.get_entities(response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetEntitiesResponse.Status.OK
-        await txn.abort()
+
         if kbobj is None:
+            await txn.abort()
             response.status = GetEntitiesResponse.Status.NOTFOUND
+            return response
+
+        entities_manager = EntitiesManager(kbobj, txn)
+        await entities_manager.get_entities(response)
+        response.kb.uuid = kbid
+        response.status = GetEntitiesResponse.Status.OK
+        await txn.abort()
         return response
 
     async def GetOntology(  # type: ignore

@@ -319,21 +319,21 @@ async def test_entitygroups(
     )
     assert resp.status_code == 200
 
-    # Entities are returned by default
+    # Entities are not returned by default
     resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/entitiesgroups")
     groups = resp.json()["groups"]
-    assert len(groups) == 1
-    assert groups["group1"]["entities"] != {}
+    assert groups["group1"]["entities"] == {}
     assert groups["group1"]["title"] == "Kitchen"
     assert groups["group1"]["color"] == "blue"
     assert groups["group1"]["custom"] is True
 
-    # But they can be ommited with show_entities=false
+    # But they can be included with show_entities=true
     resp = await nucliadb_reader.get(
-        f"/kb/{knowledgebox}/entitiesgroups?show_entities=false"
+        f"/kb/{knowledgebox}/entitiesgroups?show_entities=true"
     )
     groups = resp.json()["groups"]
-    assert groups["group1"]["entities"] == {}
+    assert len(groups) == 1
+    assert groups["group1"]["entities"] != {}
     assert groups["group1"]["title"] == "Kitchen"
     assert groups["group1"]["color"] == "blue"
     assert groups["group1"]["custom"] is True

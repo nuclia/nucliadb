@@ -105,6 +105,11 @@ class WriterStub(object):
                 request_serializer=nucliadb__protos_dot_writer__pb2.SetVectorSetRequest.SerializeToString,
                 response_deserializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
                 )
+        self.ListEntitiesGroups = channel.unary_unary(
+                '/fdbwriter.Writer/ListEntitiesGroups',
+                request_serializer=nucliadb__protos_dot_writer__pb2.ListEntitiesGroupsRequest.SerializeToString,
+                response_deserializer=nucliadb__protos_dot_writer__pb2.ListEntitiesGroupsResponse.FromString,
+                )
         self.GetEntities = channel.unary_unary(
                 '/fdbwriter.Writer/GetEntities',
                 request_serializer=nucliadb__protos_dot_writer__pb2.GetEntitiesRequest.SerializeToString,
@@ -320,9 +325,15 @@ class WriterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetEntities(self, request, context):
+    def ListEntitiesGroups(self, request, context):
         """Entities
         """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetEntities(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -536,6 +547,11 @@ def add_WriterServicer_to_server(servicer, server):
                     servicer.SetVectorSet,
                     request_deserializer=nucliadb__protos_dot_writer__pb2.SetVectorSetRequest.FromString,
                     response_serializer=nucliadb__protos_dot_writer__pb2.OpStatusWriter.SerializeToString,
+            ),
+            'ListEntitiesGroups': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListEntitiesGroups,
+                    request_deserializer=nucliadb__protos_dot_writer__pb2.ListEntitiesGroupsRequest.FromString,
+                    response_serializer=nucliadb__protos_dot_writer__pb2.ListEntitiesGroupsResponse.SerializeToString,
             ),
             'GetEntities': grpc.unary_unary_rpc_method_handler(
                     servicer.GetEntities,
@@ -950,6 +966,23 @@ class Writer(object):
         return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/SetVectorSet',
             nucliadb__protos_dot_writer__pb2.SetVectorSetRequest.SerializeToString,
             nucliadb__protos_dot_writer__pb2.OpStatusWriter.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ListEntitiesGroups(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/fdbwriter.Writer/ListEntitiesGroups',
+            nucliadb__protos_dot_writer__pb2.ListEntitiesGroupsRequest.SerializeToString,
+            nucliadb__protos_dot_writer__pb2.ListEntitiesGroupsResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

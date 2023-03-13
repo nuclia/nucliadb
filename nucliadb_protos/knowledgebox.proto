@@ -125,8 +125,16 @@ message Labels {
 
 message Entity {
     string value = 2;
-    bool merged = 3;
     repeated string represents = 4;
+
+    bool merged = 3;
+    bool deleted = 5;
+}
+
+message EntitiesGroupSummary {
+    string title = 2;
+    string color = 3;
+    bool custom = 4;
 }
 
 message EntitiesGroup {
@@ -134,6 +142,10 @@ message EntitiesGroup {
     string title = 2;
     string color = 3;
     bool custom = 4;
+}
+
+message DeletedEntitiesGroups {
+    repeated string entities_groups = 1;
 }
 
 // Widgets of the Knowledge Box
@@ -163,6 +175,10 @@ message Widget {
     repeated string topEntities = 6;
     map<string, string> style = 7;
 }
+
+
+// Vectorsets
+
 
 message VectorSet {
     int32 dimension = 1;

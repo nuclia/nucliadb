@@ -23,19 +23,12 @@ from uuid import uuid4
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.knowledgebox_pb2 import (
-    EntitiesGroup,
-    KnowledgeBoxConfig,
-    Labels,
-    LabelSet,
-)
+from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig, Labels, LabelSet
 from nucliadb_protos.knowledgebox_pb2 import Synonyms as PBSynonyms
 from nucliadb_protos.knowledgebox_pb2 import VectorSet, VectorSets, Widget
 from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import (
-    GetEntitiesGroupResponse,
-    GetEntitiesResponse,
     GetLabelSetResponse,
     GetVectorSetsResponse,
     GetWidgetResponse,
@@ -81,9 +74,7 @@ KB_LABELSET = "/kbs/{kbid}/labels/{id}"
 KB_LABELS = "/kbs/{kbid}/labels"
 KB_WIDGETS = "/kbs/{kbid}/widgets"
 KB_WIDGETS_WIDGET = "/kbs/{kbid}/widgets/{id}"
-KB_ENTITIES = "/kbs/{kbid}/entities"
 KB_VECTORSET = "/kbs/{kbid}/vectorsets"
-KB_ENTITIES_GROUP = "/kbs/{kbid}/entities/{id}"
 KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 KB_SLUGS_BASE = "/kbslugs/"
 KB_SLUGS = KB_SLUGS_BASE + "{slug}"
@@ -295,7 +286,6 @@ class KnowledgeBox:
             await Node.load_active_nodes()
 
         for shard in shards_obj.shards:
-            # Delete the shard on nodes
             for replica in shard.replicas:
                 node_klass = get_node_klass()
                 node: Optional[Union[LocalNode, Node]] = await node_klass.get(
@@ -355,56 +345,14 @@ class KnowledgeBox:
         return labels
 
     async def get_labelset(self, labelset: str, labelset_response: GetLabelSetResponse):
-        entities_key = KB_LABELSET.format(kbid=self.kbid, id=labelset)
-        payload = await self.txn.get(entities_key)
+        labelset_key = KB_LABELSET.format(kbid=self.kbid, id=labelset)
+        payload = await self.txn.get(labelset_key)
         if payload is not None:
             labelset_response.labelset.ParseFromString(payload)
 
     async def del_labelset(self, id: str):
         labelset_key = KB_LABELSET.format(kbid=self.kbid, id=id)
         await self.txn.delete(labelset_key)
-
-    # Entities
-    async def get_entities(self, entities: GetEntitiesResponse):
-        entities_key = KB_ENTITIES.format(kbid=self.kbid)
-        async for key in self.txn.keys(entities_key, count=-1):
-            entitygroup = await self.txn.get(key)
-            id = key.split("/")[-1]
-            if entitygroup is not None:
-                eg = EntitiesGroup()
-                eg.ParseFromString(entitygroup)
-                entities.groups[id].CopyFrom(eg)
-
-    async def get_entitiesgroup(
-        self, group: str, entitiesgroup: GetEntitiesGroupResponse
-    ):
-        payload = await self.get_entitiesgroup_inner(group)
-        if payload is not None:
-            entitiesgroup.group.ParseFromString(payload)
-
-    async def get_entitiesgroup_inner(self, group: str):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        payload = await self.txn.get(entities_key)
-        return payload
-
-    async def set_entities(self, group: str, entities: EntitiesGroup):
-        payload = await self.get_entitiesgroup_inner(group)
-        if payload is None:
-            eg = entities
-        else:
-            eg = EntitiesGroup()
-            eg.ParseFromString(payload)
-            eg.MergeFrom(entities)
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(entities_key, eg.SerializeToString())
-
-    async def set_entities_force(self, group: str, entities: EntitiesGroup):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.set(entities_key, entities.SerializeToString())
-
-    async def del_entities(self, group: str):
-        entities_key = KB_ENTITIES_GROUP.format(kbid=self.kbid, id=group)
-        await self.txn.delete(entities_key)
 
     # Widget
     async def get_widget(self, widget: str, widgets: GetWidgetResponse):

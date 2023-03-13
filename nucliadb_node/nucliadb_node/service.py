@@ -27,7 +27,7 @@ from nucliadb_node.reader import Reader  # type: ignore
 from nucliadb_node.servicer import SidecarServicer
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
-from nucliadb_protos import nodewriter_pb2_grpc
+from nucliadb_protos import nodesidecar_pb2_grpc
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry
 
@@ -48,7 +48,7 @@ async def start_grpc(writer: Writer, reader: Reader):
     health_servicer = health.aio.HealthServicer()  # type: ignore
     server.add_insecure_port(settings.sidecar_listen_address)
 
-    nodewriter_pb2_grpc.add_NodeSidecarServicer_to_server(servicer, server)
+    nodesidecar_pb2_grpc.add_NodeSidecarServicer_to_server(servicer, server)
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     await server.start()
 

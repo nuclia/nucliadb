@@ -29,13 +29,13 @@ from grpc import aio  # type: ignore
 from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2_grpc import NodeReaderStub
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
-from nucliadb_protos.nodewriter_pb2_grpc import NodeSidecarStub, NodeWriterStub
+from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
+from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
+from nucliadb_protos.writer_pb2 import Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from nucliadb_protos.writer_pb2_grpc import WriterStub
 from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -364,12 +364,8 @@ class Node(AbstractNode):
 
     @classmethod
     async def load_active_nodes(cls):
-        from nucliadb_utils.settings import nucliadb_settings
-
-        stub = WriterStub(aio.insecure_channel(nucliadb_settings.nucliadb_ingest))
-        request = ListMembersRequest()
-        members = await stub.ListMembers(request)
-        for member in members.members:
+        members = await cls.list_members()
+        for member in members:
             NODES[member.id] = Node(
                 member.listen_address,
                 NodeType.from_pb(member.type),
@@ -377,6 +373,21 @@ class Node(AbstractNode):
                 member.shard_count,
                 member.dummy,
             )
+
+    @classmethod
+    async def list_members(cls) -> List[Member]:
+        members = []
+        for nodeid, node in NODES.items():
+            member = Member(
+                id=str(nodeid),
+                listen_address=node.address,
+                type=node.type.to_pb(),
+                load_score=node.load_score,
+                shard_count=node.shard_count,
+                dummy=node.dummy,
+            )
+            members.append(member)
+        return members
 
     @property
     def sidecar(self) -> NodeSidecarStub:

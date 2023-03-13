@@ -21,7 +21,7 @@ from nucliadb_protos.utils_pb2 import (
     DOT as DOT,
     ExtractedText as ExtractedText,
     JoinGraph as JoinGraph,
-    JoinGraphCnx as JoinGraphCnx,
+    JoinGraphEdge as JoinGraphEdge,
     Relation as Relation,
     RelationMetadata as RelationMetadata,
     RelationNode as RelationNode,
@@ -394,22 +394,46 @@ class Entity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     VALUE_FIELD_NUMBER: builtins.int
-    MERGED_FIELD_NUMBER: builtins.int
     REPRESENTS_FIELD_NUMBER: builtins.int
+    MERGED_FIELD_NUMBER: builtins.int
+    DELETED_FIELD_NUMBER: builtins.int
     value: builtins.str
-    merged: builtins.bool
     @property
     def represents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    merged: builtins.bool
+    deleted: builtins.bool
     def __init__(
         self,
         *,
         value: builtins.str = ...,
-        merged: builtins.bool = ...,
         represents: collections.abc.Iterable[builtins.str] | None = ...,
+        merged: builtins.bool = ...,
+        deleted: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["merged", b"merged", "represents", b"represents", "value", b"value"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["deleted", b"deleted", "merged", b"merged", "represents", b"represents", "value", b"value"]) -> None: ...
 
 global___Entity = Entity
+
+@typing_extensions.final
+class EntitiesGroupSummary(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TITLE_FIELD_NUMBER: builtins.int
+    COLOR_FIELD_NUMBER: builtins.int
+    CUSTOM_FIELD_NUMBER: builtins.int
+    title: builtins.str
+    color: builtins.str
+    custom: builtins.bool
+    def __init__(
+        self,
+        *,
+        title: builtins.str = ...,
+        color: builtins.str = ...,
+        custom: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["color", b"color", "custom", b"custom", "title", b"title"]) -> None: ...
+
+global___EntitiesGroupSummary = EntitiesGroupSummary
 
 @typing_extensions.final
 class EntitiesGroup(google.protobuf.message.Message):
@@ -453,6 +477,22 @@ class EntitiesGroup(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["color", b"color", "custom", b"custom", "entities", b"entities", "title", b"title"]) -> None: ...
 
 global___EntitiesGroup = EntitiesGroup
+
+@typing_extensions.final
+class DeletedEntitiesGroups(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTITIES_GROUPS_FIELD_NUMBER: builtins.int
+    @property
+    def entities_groups(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def __init__(
+        self,
+        *,
+        entities_groups: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["entities_groups", b"entities_groups"]) -> None: ...
+
+global___DeletedEntitiesGroups = DeletedEntitiesGroups
 
 @typing_extensions.final
 class Widget(google.protobuf.message.Message):
@@ -558,6 +598,8 @@ global___Widget = Widget
 
 @typing_extensions.final
 class VectorSet(google.protobuf.message.Message):
+    """Vectorsets"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DIMENSION_FIELD_NUMBER: builtins.int

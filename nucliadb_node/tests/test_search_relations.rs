@@ -57,7 +57,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Animal".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -65,7 +65,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Batman".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -73,7 +73,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Becquer".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -97,7 +97,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Eric".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -105,7 +105,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Fly".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -113,7 +113,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Gravity".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -121,7 +121,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Joan Antoni".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -129,7 +129,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Joker".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -137,7 +137,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Newton".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -145,7 +145,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Physics".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -153,7 +153,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Poetry".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
     relation_nodes.insert(
@@ -161,7 +161,7 @@ async fn create_knowledge_graph(
         RelationNode {
             value: "Swallow".to_string(),
             ntype: NodeType::Entity as i32,
-            subtype: "".to_string(),
+            subtype: String::new(),
         },
     );
 
@@ -345,7 +345,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         .relation_search(RelationSearchRequest {
             shard_id: shard_id.clone(),
             prefix: Some(RelationPrefixSearchRequest {
-                prefix: "".to_string(),
+                prefix: String::new(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -373,7 +373,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec!["Cat".to_string(), "Catwoman".to_string()]);
+    let expected = HashSet::from_iter(["Cat".to_string(), "Catwoman".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = prefix_response
@@ -401,7 +401,7 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec!["Cat".to_string()]);
+    let expected = HashSet::from_iter(["Cat".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = prefix_response
@@ -425,7 +425,35 @@ async fn test_search_relations_prefixed() -> Result<(), Box<dyn std::error::Erro
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec!["Catwoman".to_string()]);
+    let expected = HashSet::from_iter(["Catwoman".to_string()]);
+    assert!(response.get_ref().prefix.is_some());
+    let prefix_response = response.get_ref().prefix.as_ref().unwrap();
+    let results = prefix_response
+        .nodes
+        .iter()
+        .map(|node| node.value.to_owned())
+        .collect::<HashSet<_>>();
+    assert_eq!(results, expected);
+
+    // --------------------------------------------------------------
+    // Test: prefixed search with node filters and empty query
+    // --------------------------------------------------------------
+
+    let response = reader
+        .relation_search(RelationSearchRequest {
+            shard_id: shard_id.clone(),
+            prefix: Some(RelationPrefixSearchRequest {
+                prefix: String::new(),
+                node_filters: vec![RelationNodeFilter {
+                    node_type: NodeType::Entity as i32,
+                    node_subtype: Some("animal".to_string()),
+                }],
+            }),
+            ..Default::default()
+        })
+        .await?;
+
+    let expected = HashSet::from_iter(["Cat".to_string()]);
     assert!(response.get_ref().prefix.is_some());
     let prefix_response = response.get_ref().prefix.as_ref().unwrap();
     let results = prefix_response
@@ -475,7 +503,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
             .iter()
             .flat_map(|neighbours| neighbours.relations.iter())
             .flat_map(|node| {
-                vec![(
+                [(
                     node.source.as_ref().unwrap().value.to_owned(),
                     node.to.as_ref().unwrap().value.to_owned(),
                 )]
@@ -499,7 +527,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec![
+    let expected = HashSet::from_iter([
         ("Poetry".to_string(), "Swallow".to_string()),
         ("Swallow".to_string(), "Animal".to_string()),
         ("Swallow".to_string(), "Fly".to_string()),
@@ -526,7 +554,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec![
+    let expected = HashSet::from_iter([
         ("Newton".to_string(), "Physics".to_string()),
         ("Newton".to_string(), "Gravity".to_string()),
         ("Becquer".to_string(), "Poetry".to_string()),
@@ -546,7 +574,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
                 entry_points: vec![RelationNode {
                     value: "Fake".to_string(),
                     ntype: NodeType::Entity as i32,
-                    subtype: "".to_string(),
+                    subtype: String::new(),
                 }],
                 depth: Some(1),
                 ..Default::default()
@@ -581,7 +609,7 @@ async fn test_search_relations_neighbours() -> Result<(), Box<dyn std::error::Er
         })
         .await?;
 
-    let expected = HashSet::from_iter(vec![("Poetry".to_string(), "Swallow".to_string())]);
+    let expected = HashSet::from_iter([("Poetry".to_string(), "Swallow".to_string())]);
     let neighbour_relations = extract_relations(response.get_ref());
     assert_eq!(neighbour_relations, expected);
 
