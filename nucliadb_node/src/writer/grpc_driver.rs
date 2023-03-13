@@ -24,9 +24,8 @@ use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    NewShardRequest, NewVectorSetRequest, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned,
-    ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
-    NodeMetadata,
+    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, SetGraph,
+    ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
