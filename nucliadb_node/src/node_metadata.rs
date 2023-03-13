@@ -19,6 +19,8 @@
 //
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
 use nucliadb_core::protos::GetShardRequest;
@@ -124,24 +126,26 @@ impl NodeMetadata {
     pub async fn save(&self, path: &Path) -> NodeResult<()> {
         info!("Saving node metadata file '{}'", path.display());
 
-        let node_metadata = serde_json::to_string(&self)
+        let file =
+            File::create(path).map_err(|e| node_error!("Cannot open node metadata file: {e}"))?;
+
+        let mut writer = BufWriter::new(file);
+
+        serde_json::to_writer(&mut writer, &self)
             .map_err(|e| node_error!("Cannot serialize node metadata: {e}"))?;
 
-        tokio::fs::write(&path, node_metadata)
-            .await
-            .map_err(|e| node_error!("Cannot save node metadata file: {e}"))?;
-
-        Ok(())
+        Ok(writer.flush()?)
     }
 
     pub async fn load(path: &Path) -> NodeResult<Self> {
         info!("Loading node metadata file '{}'", path.display());
 
-        let node_metadata = tokio::fs::read_to_string(path)
-            .await
-            .map_err(|e| node_error!("Cannot load node metadata file: {e}"))?;
+        let file =
+            File::open(path).map_err(|e| node_error!("Cannot open node metadata file: {e}"))?;
 
-        serde_json::from_str(&node_metadata)
+        let reader = BufReader::new(file);
+
+        serde_json::from_reader(reader)
             .map_err(|e| node_error!("Cannot deserialize node metadata: {e}"))
     }
 
