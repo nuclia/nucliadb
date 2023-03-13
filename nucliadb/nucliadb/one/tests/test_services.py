@@ -113,6 +113,7 @@ async def test_entities_service(
         resp = await client.get(
             f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups?show_entities=true"
         )
+        assert resp.status_code == 200
         groups = resp.json()["groups"]
         assert len(groups) == 1
         assert groups["group1"]["custom"] is True
