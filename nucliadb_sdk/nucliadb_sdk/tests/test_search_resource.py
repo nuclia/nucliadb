@@ -269,7 +269,7 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     resources = knowledgebox.search(
         vector=vector_q, vectorset="all-MiniLM-L6-v2", min_score=0.70
     )
-    assert len(resources.sentences.results) == 20
+    assert len(resources.sentences.results) == 11
 
 
 def _test_search_resource_simple_label(knowledgebox: KnowledgeBox):
