@@ -21,6 +21,7 @@ import re
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
     SearchRequest,
@@ -123,7 +124,12 @@ async def global_query_to_pb(
     if SearchOptions.RELATIONS in features:
         await _parse_entities(request, kbid, query)
 
-    if with_synonyms and SearchOptions.PARAGRAPH in features:
+    if with_synonyms:
+        if features != [SearchOptions.PARAGRAPH]:
+            raise HTTPException(
+                status_code=422,
+                detail="Search with custom synonyms is only supported on paragraph search",
+            )
         await apply_synonyms_to_request(request, kbid)
 
     return request, incomplete
@@ -211,7 +217,6 @@ async def paragraph_query_to_pb(
     sort_ord: int = Sort.ASC.value,
     reload: bool = False,
     with_duplicates: bool = False,
-    with_synonyms: bool = False,
 ) -> ParagraphSearchRequest:
     request = ParagraphSearchRequest()
     request.reload = reload

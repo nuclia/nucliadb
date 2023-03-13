@@ -87,7 +87,7 @@ async def knowledgebox_with_synonyms(nucliadb_writer, knowledgebox):
 
 
 @pytest.mark.asyncio
-async def test_search_with_synonims(
+async def test_search_with_synonyms(
     nucliadb_reader,
     nucliadb_writer,
     knowledgebox_with_synonyms,
@@ -134,11 +134,11 @@ async def test_search_with_synonims(
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
         json=dict(
+            features=["paragraph"],
             query="planet",
             with_synonyms=True,
             highlight=True,
         ),
-        timeout=None,
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -153,8 +153,7 @@ async def test_search_with_synonims(
     # Check that searching without synonyms matches only query term
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        json=dict(query="planet"),
-        timeout=None,
+        json=dict(features=["paragraph"], query="planet"),
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -167,8 +166,7 @@ async def test_search_with_synonims(
     # one that doesn't matches all of them
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        json=dict(query="planet tomatoe", with_synonyms=True),
-        timeout=None,
+        json=dict(features=["paragraph"], query="planet tomatoe", with_synonyms=True),
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -176,3 +174,25 @@ async def test_search_with_synonims(
     assert body["resources"][planet_rid]
     assert body["resources"][sphere_rid]
     assert body["resources"][tomatoe_rid]
+
+
+@pytest.mark.asyncio
+async def test_search_with_synonyms_errors_if_vectors_or_relations_requested(
+    nucliadb_reader,
+    nucliadb_writer,
+    knowledgebox,
+):
+    kbid = knowledgebox
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json=dict(
+            features=["paragraph", "vector", "relations"],
+            query="planet",
+            with_synonyms=True,
+        ),
+    )
+    assert resp.status_code == 422
+    assert (
+        resp.json()["detail"]
+        == "Search with custom synonyms is only supported on paragraph search"
+    )

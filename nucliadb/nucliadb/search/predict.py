@@ -67,6 +67,8 @@ class PredictEngine:
         self.zone = zone
         self.onprem = onprem
         self.dummy = dummy
+        # TODO: Should we accumulate sentences requested,
+        # or is this only for testing purposes?
         self.calls: List[str] = []
 
     async def initialize(self):
