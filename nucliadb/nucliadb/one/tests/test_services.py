@@ -87,7 +87,9 @@ async def test_disable_vectors_service(
 
 @pytest.mark.asyncio
 async def test_entities_service(
-    nucliadb_api: Callable[..., AsyncClient], knowledgebox_one
+    nucliadb_api: Callable[..., AsyncClient],
+    knowledgebox_one,
+    entities_manager_mock,
 ) -> None:
     async with nucliadb_api(roles=[NucliaDBRoles.WRITER]) as client:
         entitygroup = {
@@ -108,7 +110,10 @@ async def test_entities_service(
         assert resp.status_code == 200
 
     async with nucliadb_api(roles=[NucliaDBRoles.READER]) as client:
-        resp = await client.get(f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups")
+        resp = await client.get(
+            f"/{KB_PREFIX}/{knowledgebox_one}/entitiesgroups?show_entities=true"
+        )
+        assert resp.status_code == 200
         groups = resp.json()["groups"]
         assert len(groups) == 1
         assert groups["group1"]["custom"] is True

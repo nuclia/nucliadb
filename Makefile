@@ -42,6 +42,7 @@ proto-py:
 	python -m grpc_tools.protoc nucliadb_protos/resources.proto     -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/knowledgebox.proto  -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/audit.proto 		-I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/
+	python -m grpc_tools.protoc nucliadb_protos/nodesidecar.proto   -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/nodewriter.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/nodereader.proto    -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
 	python -m grpc_tools.protoc nucliadb_protos/writer.proto        -I ./ --python_out=./nucliadb_protos/python/ --mypy_out=./nucliadb_protos/python/ --grpc_python_out=./nucliadb_protos/python/ --mypy_grpc_out=./nucliadb_protos/python/
@@ -59,7 +60,8 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	isort --profile black nucliadb_utils
+	make -C nucliadb_utils/ format
+
 	isort --profile black nucliadb_node
 	isort --profile black nucliadb_telemetry
 	isort --profile black nucliadb_dataset
@@ -68,7 +70,6 @@ python-code-lint:
 	isort --profile black nucliadb_models
 	isort --profile black nucliadb
 
-	black nucliadb_utils
 	black nucliadb_node
 	black nucliadb_telemetry
 	black nucliadb_dataset
@@ -77,7 +78,6 @@ python-code-lint:
 	black nucliadb_models
 	black nucliadb
 
-	flake8  --config nucliadb_utils/setup.cfg nucliadb_utils/nucliadb_utils
 	flake8  --config nucliadb_node/setup.cfg nucliadb_node/nucliadb_node
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
 	flake8  --config nucliadb_dataset/setup.cfg nucliadb_dataset/nucliadb_dataset
@@ -87,7 +87,6 @@ python-code-lint:
 	flake8  --config nucliadb/setup.cfg nucliadb/nucliadb
 
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
-	MYPYPATH=./mypy_stubs mypy nucliadb_utils
 	MYPYPATH=./mypy_stubs mypy nucliadb_node
 	MYPYPATH=./mypy_stubs mypy nucliadb_dataset
 	MYPYPATH=./mypy_stubs mypy nucliadb_client

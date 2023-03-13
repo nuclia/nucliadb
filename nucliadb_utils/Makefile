@@ -9,7 +9,7 @@ install-dev:
 .PHONY: format
 format:
 	isort --profile black .
-	black --verbose .
+	black .
 
 .PHONY: lint
 lint:

@@ -29,7 +29,8 @@ from nucliadb_protos.noderesources_pb2 import (
 )
 from nucliadb_protos.noderesources_pb2 import ShardCleaned as PBShardCleaned
 from nucliadb_protos.noderesources_pb2 import ShardId
-from nucliadb_protos.nodewriter_pb2 import Counter, IndexMessage
+from nucliadb_protos.nodesidecar_pb2 import Counter
+from nucliadb_protos.nodewriter_pb2 import IndexMessage
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 
 from nucliadb.ingest import SERVICE_NAME  # type: ignore

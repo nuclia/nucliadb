@@ -57,7 +57,6 @@ setup(
             "nucliadb_purge = nucliadb.purge:purge",
             "ndb_ingest = nucliadb.ingest.app:run",
             "ndb_purge = nucliadb.ingest.purge:run",
-            "ndb_curator = nucliadb.ingest.curator:run",
             "nucliadb_one = nucliadb.one:run",
             "extract-openapi-reader = nucliadb.reader.openapi:command_extract_openapi",
             "reader-metrics = nucliadb.reader.run:run_with_metrics",

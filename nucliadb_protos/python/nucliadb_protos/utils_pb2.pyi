@@ -183,7 +183,7 @@ class RelationNode(google.protobuf.message.Message):
 global___RelationNode = RelationNode
 
 @typing_extensions.final
-class JoinGraphCnx(google.protobuf.message.Message):
+class JoinGraphEdge(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SOURCE_FIELD_NUMBER: builtins.int
@@ -209,7 +209,7 @@ class JoinGraphCnx(google.protobuf.message.Message):
     def HasField(self, field_name: typing_extensions.Literal["metadata", b"metadata"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["metadata", b"metadata", "rsubtype", b"rsubtype", "rtype", b"rtype", "source", b"source", "target", b"target"]) -> None: ...
 
-global___JoinGraphCnx = JoinGraphCnx
+global___JoinGraphEdge = JoinGraphEdge
 
 @typing_extensions.final
 class JoinGraph(google.protobuf.message.Message):
@@ -238,12 +238,12 @@ class JoinGraph(google.protobuf.message.Message):
     @property
     def nodes(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___RelationNode]: ...
     @property
-    def edges(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___JoinGraphCnx]: ...
+    def edges(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___JoinGraphEdge]: ...
     def __init__(
         self,
         *,
         nodes: collections.abc.Mapping[builtins.int, global___RelationNode] | None = ...,
-        edges: collections.abc.Iterable[global___JoinGraphCnx] | None = ...,
+        edges: collections.abc.Iterable[global___JoinGraphEdge] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing_extensions.Literal["edges", b"edges", "nodes", b"nodes"]) -> None: ...
 

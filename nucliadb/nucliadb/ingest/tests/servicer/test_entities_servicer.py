@@ -27,7 +27,9 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_create_entities_group(grpc_servicer: IngestFixture):
+async def test_create_entities_group(
+    grpc_servicer: IngestFixture, entities_manager_mock
+):
     stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
 
     kb_id = str(uuid4())
@@ -49,7 +51,7 @@ async def test_create_entities_group(grpc_servicer: IngestFixture):
         ),
     )
     result = await stub.SetEntities(pb_ser)  # type: ignore
-    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+    assert result.status == writer_pb2.OpStatusWriter.OK
 
     pb_ger = writer_pb2.GetEntitiesRequest(
         kb=knowledgebox_pb2.KnowledgeBoxID(uuid=kb_id, slug="test"),

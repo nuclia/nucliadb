@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import traceback
 import uuid
 from io import BytesIO
 from typing import AsyncIterator, Optional
@@ -68,9 +67,10 @@ from nucliadb_protos.writer_pb2 import (
     GetWidgetsResponse,
     IndexResource,
     IndexStatus,
+    ListEntitiesGroupsRequest,
+    ListEntitiesGroupsResponse,
     ListMembersRequest,
     ListMembersResponse,
-    Member,
     OpStatusWriter,
     ResourceFieldExistsResponse,
     ResourceFieldId,
@@ -94,10 +94,11 @@ from nucliadb_protos.writer_pb2 import (
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
-from nucliadb.ingest.orm import NODES
+from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxObj
+from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.orm.shard import Shard
@@ -168,7 +169,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
             raise
 
@@ -204,7 +205,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
 
         return response
@@ -301,7 +302,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -321,7 +322,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -408,17 +409,54 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
     async def GetEntities(  # type: ignore
         self, request: GetEntitiesRequest, context=None
     ) -> GetEntitiesResponse:
+        response = GetEntitiesResponse()
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
-        response = GetEntitiesResponse()
-        if kbobj is not None:
-            await kbobj.get_entities(response)
+
+        if kbobj is None:
+            await txn.abort()
+            response.status = GetEntitiesResponse.Status.NOTFOUND
+            return response
+
+        entities_manager = EntitiesManager(kbobj, txn)
+        try:
+            await entities_manager.get_entities(response)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
+            response.status = GetEntitiesResponse.Status.ERROR
+        else:
             response.kb.uuid = kbobj.kbid
             response.status = GetEntitiesResponse.Status.OK
         await txn.abort()
-        if kbobj is None:
-            response.status = GetEntitiesResponse.Status.NOTFOUND
         return response
+
+    async def ListEntitiesGroups(  # type: ignore
+        self, request: ListEntitiesGroupsRequest, context=None
+    ) -> ListEntitiesGroupsResponse:
+        async with self.proc.driver.transaction() as txn:
+            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+            response = ListEntitiesGroupsResponse()
+
+            if kbobj is None:
+                response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
+                return response
+
+            entities_manager = EntitiesManager(kbobj, txn)
+            try:
+                entities_groups = await entities_manager.list_entities_groups()
+            except Exception as e:
+                if SENTRY:
+                    capture_exception(e)
+                    logger.error("Error in ingest gRPC servicer", exc_info=True)
+                    response.status = ListEntitiesGroupsResponse.Status.ERROR
+            else:
+                response.status = ListEntitiesGroupsResponse.Status.OK
+                for name, group in entities_groups.items():
+                    response.groups[name].CopyFrom(group)
+
+            return response
 
     async def GetEntitiesGroup(  # type: ignore
         self, request: GetEntitiesGroupRequest, context=None
@@ -426,13 +464,31 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         txn = await self.proc.driver.begin()
         kbobj = await self.proc.get_kb_obj(txn, request.kb)
         response = GetEntitiesGroupResponse()
-        if kbobj is not None:
-            await kbobj.get_entitiesgroup(request.group, response)
-            response.kb.uuid = kbobj.kbid
-            response.status = GetEntitiesGroupResponse.Status.OK
-        await txn.abort()
+
         if kbobj is None:
-            response.status = GetEntitiesGroupResponse.Status.NOTFOUND
+            await txn.abort()
+            response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
+            return response
+
+        entities_manager = EntitiesManager(kbobj, txn)
+        try:
+            entities_group = await entities_manager.get_entities_group(request.group)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
+            response.status = GetEntitiesGroupResponse.Status.ERROR
+        else:
+            if entities_group is None:
+                response.status = (
+                    GetEntitiesGroupResponse.Status.ENTITIES_GROUP_NOT_FOUND
+                )
+            else:
+                response.kb.uuid = kbobj.kbid
+                response.status = GetEntitiesGroupResponse.Status.OK
+                response.group.CopyFrom(entities_group)
+
+        await txn.abort()
         return response
 
     async def SetEntities(self, request: SetEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
@@ -443,9 +499,18 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.abort()
             response.status = OpStatusWriter.Status.NOTFOUND
             return response
-        await kbobj.set_entities(request.group, request.entities)
-        response.status = OpStatusWriter.Status.OK
-        await txn.commit(resource=False)
+        entities_manager = EntitiesManager(kbobj, txn)
+        try:
+            await entities_manager.set_entities(request.group, request.entities)
+        except Exception as e:
+            if SENTRY:
+                capture_exception(e)
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
+            response.status = OpStatusWriter.Status.ERROR
+            await txn.abort()
+        else:
+            response.status = OpStatusWriter.Status.OK
+            await txn.commit(resource=False)
         return response
 
     async def DelEntities(self, request: DelEntitiesRequest, context=None) -> OpStatusWriter:  # type: ignore
@@ -454,13 +519,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         response = OpStatusWriter()
         if kbobj is not None:
             try:
-                await kbobj.del_entities(request.group)
+                entities_manager = EntitiesManager(kbobj, txn)
+                await entities_manager.del_entities(request.group)
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -523,7 +589,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                traceback.print_exc()
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
         else:
@@ -549,7 +615,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                logger.exception(f"Errors getting synonyms")
+                logger.exception("Errors getting synonyms")
                 response.status.status = OpStatusWriter.Status.ERROR
                 return response
 
@@ -572,7 +638,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                logger.exception(f"Errors setting synonyms")
+                logger.exception("Errors setting synonyms")
                 response.status = OpStatusWriter.Status.ERROR
                 return response
 
@@ -595,7 +661,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             except Exception as e:
                 if SENTRY:
                     capture_exception(e)
-                logger.exception(f"Errors deleting synonyms")
+                logger.exception("Errors deleting synonyms")
                 response.status = OpStatusWriter.Status.ERROR
                 return response
 
@@ -620,16 +686,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListMembersRequest, context=None
     ) -> ListMembersResponse:
         response = ListMembersResponse()
-        for nodeid, node in NODES.items():
-            member = Member(
-                id=str(nodeid),
-                listen_address=node.address,
-                type=node.type.to_pb(),
-                load_score=node.load_score,
-                shard_count=node.shard_count,
-                dummy=node.dummy,
-            )
-            response.members.append(member)
+        response.members.extend(await Node.list_members())
         return response
 
     async def GetResourceId(  # type: ignore
@@ -752,7 +809,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except Exception as e:
             if SENTRY:
                 capture_exception(e)
-            traceback.print_exc()
+            logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
             raise
 

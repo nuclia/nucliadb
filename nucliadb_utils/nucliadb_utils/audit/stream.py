@@ -65,7 +65,9 @@ class StreamAuditStorage(AuditStorage):
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        logger.error("There was an error connecting to NATS audit: {}".format(e))
+        logger.error(
+            "There was an error connecting to NATS audit: {}".format(e), exc_info=True
+        )
 
     async def closed_cb(self):
         logger.info("Connection is closed on NATS")
@@ -125,7 +127,13 @@ class StreamAuditStorage(AuditStorage):
         )
         return res.seq
 
-    async def report(self, message: BrokerMessage, audit_type: AuditRequest.AuditType.Value, audit_fields: Optional[List[AuditField]] = None, counter: Optional[AuditShardCounter] = None):  # type: ignore
+    async def report(
+        self,
+        message: BrokerMessage,
+        audit_type: AuditRequest.AuditType.Value,  # type: ignore
+        audit_fields: Optional[List[AuditField]] = None,
+        counter: Optional[AuditShardCounter] = None,
+    ):
         # Reports MODIFIED / DELETED / NEW events
         auditrequest = AuditRequest()
         auditrequest.kbid = message.kbid

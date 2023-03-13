@@ -154,8 +154,8 @@ async def _parse_entities(request: SearchRequest, kbid: str, query: str):
     predict = get_predict()
     try:
         detected_entities = await predict.detect_entities(kbid, query)
-        request.relations.subgraph.entry_points.extend(detected_entities)
-        request.relations.subgraph.depth = 1
+        request.relation_subgraph.entry_points.extend(detected_entities)
+        request.relation_subgraph.depth = 1
     except SendToPredictError as ex:
         logger.warning(f"Errors on predict api detecting entities: {ex}")
 

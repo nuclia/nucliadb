@@ -74,6 +74,7 @@ async def set_entities(request: Request, kbid: str, group: str, item: EntitiesGr
         entitypb = pbrequest.entities.entities[key]
         entitypb.value = entity.value
         entitypb.merged = entity.merged
+        entitypb.deleted = False
         entitypb.represents.extend(entity.represents)
 
     set_info_on_span({"nuclia.kbid": kbid})

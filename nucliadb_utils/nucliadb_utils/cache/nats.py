@@ -142,7 +142,7 @@ class NatsPubsub(PubSubDriver):
         )
 
     async def error_cb(self, e):
-        logger.info("There was an error connecting to NATS {}".format(e))
+        logger.info("There was an error connecting to NATS {}".format(e), exc_info=True)
 
     async def closed_cb(self):
         logger.info("Connection is closed to NATS")

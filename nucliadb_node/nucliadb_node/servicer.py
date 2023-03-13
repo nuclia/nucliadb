@@ -37,7 +37,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
-from nucliadb_protos.nodewriter_pb2 import Counter, ShadowShardResponse
+from nucliadb_protos.nodesidecar_pb2 import Counter, ShadowShardResponse
 from sentry_sdk import capture_exception
 
 from nucliadb_node import logger, shadow_shards
@@ -45,10 +45,10 @@ from nucliadb_node.reader import Reader
 from nucliadb_node.sentry import SENTRY
 from nucliadb_node.shadow_shards import ShadowShardNotFound, ShadowShardsManager
 from nucliadb_node.writer import Writer
-from nucliadb_protos import nodewriter_pb2_grpc
+from nucliadb_protos import nodesidecar_pb2_grpc
 
 
-class SidecarServicer(nodewriter_pb2_grpc.NodeSidecarServicer):
+class SidecarServicer(nodesidecar_pb2_grpc.NodeSidecarServicer):
     def __init__(self, reader: Reader, writer: Writer):
         self.reader = reader
         self.writer = writer

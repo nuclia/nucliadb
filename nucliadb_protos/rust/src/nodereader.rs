@@ -395,8 +395,13 @@ pub struct SearchRequest {
     pub with_status: ::core::option::Option<i32>,
     /// if provided, search metadata for this nodes (nodes at distance
     /// one) and get the shortest path between nodes
+    #[deprecated]
     #[prost(message, optional, tag="19")]
     pub relations: ::core::option::Option<RelationSearchRequest>,
+    #[prost(message, optional, tag="20")]
+    pub relation_prefix: ::core::option::Option<RelationPrefixSearchRequest>,
+    #[prost(message, optional, tag="21")]
+    pub relation_subgraph: ::core::option::Option<EntitiesSubgraphRequest>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SuggestRequest {

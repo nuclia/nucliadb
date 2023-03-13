@@ -241,6 +241,36 @@ impl NodeReader {
             None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
         }
     }
+
+    pub fn relation_edges<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
+        self.reader.load_shard(&shard_id);
+        let response = self.reader.relation_edges(&shard_id);
+        match response.transpose() {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
+    }
+
+    pub fn relation_types<'p>(
+        &mut self,
+        request: RawProtos,
+        py: Python<'p>,
+    ) -> PyResult<&'p PyAny> {
+        let shard_id = ShardId::decode(&mut Cursor::new(request)).unwrap();
+        self.reader.load_shard(&shard_id);
+        let response = self.reader.relation_types(&shard_id);
+        match response.transpose() {
+            Some(Ok(response)) => Ok(PyList::new(py, response.encode_to_vec())),
+            Some(Err(e)) => Err(exceptions::PyTypeError::new_err(e.to_string())),
+            None => Err(exceptions::PyTypeError::new_err("Error loading shard")),
+        }
+    }
 }
 
 #[pyclass]

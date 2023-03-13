@@ -70,7 +70,7 @@ pub mod relation_node {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct JoinGraphCnx {
+pub struct JoinGraphEdge {
     #[prost(int32, tag="4")]
     pub source: i32,
     #[prost(int32, tag="1")]
@@ -87,7 +87,7 @@ pub struct JoinGraph {
     #[prost(map="int32, message", tag="1")]
     pub nodes: ::std::collections::HashMap<i32, RelationNode>,
     #[prost(message, repeated, tag="2")]
-    pub edges: ::prost::alloc::vec::Vec<JoinGraphCnx>,
+    pub edges: ::prost::alloc::vec::Vec<JoinGraphEdge>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExtractedText {

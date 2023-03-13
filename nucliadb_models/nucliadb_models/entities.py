@@ -18,15 +18,29 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Type, TypeVar
 
+from google.protobuf.json_format import MessageToDict
 from pydantic import BaseModel, Field
+
+from nucliadb_protos import knowledgebox_pb2
+
+_T = TypeVar("_T")
 
 
 class Entity(BaseModel):
     value: str
     merged: bool = False
     represents: List[str] = []
+
+    @classmethod
+    def from_message(cls: Type[_T], message: knowledgebox_pb2.Entity) -> _T:
+        entity = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        return cls(**entity)
 
 
 class EntitiesGroup(BaseModel):
@@ -37,6 +51,34 @@ class EntitiesGroup(BaseModel):
     custom: bool = Field(
         default=False, description="Denotes if it has been created by the user"
     )
+
+    @classmethod
+    def from_message(
+        cls: Type[_T],
+        message: knowledgebox_pb2.EntitiesGroup,
+    ) -> _T:
+        entitiesgroup = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        for name, entity in message.entities.items():
+            if not entity.deleted:
+                entitiesgroup["entities"][name] = Entity.from_message(entity)
+
+        return cls(**entitiesgroup)
+
+    @classmethod
+    def from_summary_message(
+        cls: Type[_T],
+        message: knowledgebox_pb2.EntitiesGroupSummary,
+    ) -> _T:
+        entitiesgroup = MessageToDict(
+            message,
+            preserving_proto_field_name=True,
+            including_default_value_fields=True,
+        )
+        return cls(**entitiesgroup)
 
 
 class KnowledgeBoxEntities(BaseModel):
