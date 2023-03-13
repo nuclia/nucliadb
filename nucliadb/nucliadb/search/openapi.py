@@ -60,7 +60,7 @@ def extract_openapi(application, version, commit_id):
     return document
 
 
-def command_extract_openapi():
+def command_extract_openapi():  # pragma: no cover
     from nucliadb.search.app import application
 
     openapi_json_path = sys.argv[1]
