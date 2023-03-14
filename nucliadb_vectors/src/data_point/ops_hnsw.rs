@@ -23,6 +23,9 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use nucliadb_core::thread::*;
 use ram_hnsw::*;
+use rand::distributions::Uniform;
+use rand::prelude::*;
+use rand::rngs::StdRng;
 
 use super::*;
 use crate::formula::Formula;
@@ -81,6 +84,8 @@ impl PartialOrd for Cnx {
 pub type Neighbours = Vec<(Address, f32)>;
 
 pub struct HnswOps<'a, DR> {
+    distribution: Uniform<f64>,
+    layer_rng: StdRng,
     tracker: &'a DR,
 }
 
@@ -97,6 +102,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
     fn cosine_similarity(&self, x: Address, y: Address) -> f32 {
         self.tracker.similarity(x, y)
+    }
+    fn get_random_layer(&mut self) -> usize {
+        let sample: f64 = self.layer_rng.sample(self.distribution);
+        let picked_level = -sample.ln() * params::level_factor();
+        picked_level.round() as usize
     }
     fn closest_up_node<L: Layer>(
         &'a self,
@@ -208,14 +218,14 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
         result
     }
-    pub fn insert(&self, x: Address, hnsw: &mut RAMHnsw) {
+    pub fn insert(&mut self, x: Address, hnsw: &mut RAMHnsw) {
         match hnsw.entry_point {
             None => {
-                let top_level = hnsw.get_random_layer();
+                let top_level = self.get_random_layer();
                 hnsw.increase_layers_with(x, top_level).update_entry_point();
             }
             Some(entry_point) => {
-                let level = hnsw.get_random_layer();
+                let level = self.get_random_layer();
                 hnsw.increase_layers_with(x, level);
                 let top_layer = std::cmp::min(entry_point.layer, level);
                 let ep = entry_point.node;
@@ -280,7 +290,11 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
     }
 
     pub fn new(tracker: &DR) -> HnswOps<'_, DR> {
-        HnswOps { tracker }
+        HnswOps {
+            tracker,
+            distribution: Uniform::new(0.0, 1.0),
+            layer_rng: StdRng::seed_from_u64(2),
+        }
     }
 }
 
