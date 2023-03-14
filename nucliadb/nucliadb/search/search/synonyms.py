@@ -47,7 +47,7 @@ async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
         synonyms_found.extend(term_synonyms.synonyms)
 
     if len(synonyms_found):
-        request.advanced_query = " ".join(advanced_query + synonyms_found)
+        request.advanced_query = " OR ".join(advanced_query + synonyms_found)
         request.ClearField("body")
 
 

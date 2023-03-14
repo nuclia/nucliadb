@@ -134,7 +134,7 @@ async def test_search_with_synonyms(
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
         json=dict(
-            features=["paragraph"],
+            features=["paragraph", "document"],
             query="planet",
             with_synonyms=True,
             highlight=True,
@@ -143,9 +143,10 @@ async def test_search_with_synonyms(
     assert resp.status_code == 200
     body = resp.json()
 
-    # Paragraph search should match on summary (term)
+    # Paragraph and fulltext search should match on summary (term)
     # and title (synonym) for the two resources
     assert len(body["paragraphs"]["results"]) == 4
+    assert len(body["fulltext"]["results"]) == 4
     assert body["resources"][planet_rid]
     assert body["resources"][sphere_rid]
     assert tomatoe_rid not in body["resources"]
@@ -153,11 +154,12 @@ async def test_search_with_synonyms(
     # Check that searching without synonyms matches only query term
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        json=dict(features=["paragraph"], query="planet"),
+        json=dict(features=["paragraph", "document"], query="planet"),
     )
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 1
+    assert len(body["fulltext"]["results"]) == 1
     assert body["resources"][planet_rid]
     assert sphere_rid not in body["resources"]
     assert tomatoe_rid not in body["resources"]
@@ -166,11 +168,16 @@ async def test_search_with_synonyms(
     # one that doesn't matches all of them
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/search",
-        json=dict(features=["paragraph"], query="planet tomatoe", with_synonyms=True),
+        json=dict(
+            features=["paragraph", "document"],
+            query="planet tomatoe",
+            with_synonyms=True,
+        ),
     )
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["paragraphs"]["results"]) == 5
+    assert len(body["fulltext"]["results"]) == 5
     assert body["resources"][planet_rid]
     assert body["resources"][sphere_rid]
     assert body["resources"][tomatoe_rid]
