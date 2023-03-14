@@ -45,4 +45,13 @@ class ExportType(str, Enum):
     FILESYSTEM = "FILESYSTEM"
 
 
-__all__ = ("NucliaDBDataset", "NucliaCloudDataset", "Task", "download_all_partitions")
+__all__ = (
+    "NucliaDBDataset",
+    "NucliaCloudDataset",
+    "Task",
+    "download_all_partitions",
+    "NUCLIA_GLOBAL",
+    "CLIENT_ID",
+    "DatasetType",
+    "ExportType",
+)
