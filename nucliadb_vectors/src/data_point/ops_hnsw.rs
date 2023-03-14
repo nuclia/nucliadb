@@ -25,7 +25,7 @@ use nucliadb_core::thread::*;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
 use rand::prelude::*;
-use rand::rngs::StdRng;
+use rand::rngs::SmallRng;
 
 use super::*;
 use crate::formula::Formula;
@@ -85,7 +85,7 @@ pub type Neighbours = Vec<(Address, f32)>;
 
 pub struct HnswOps<'a, DR> {
     distribution: Uniform<f64>,
-    layer_rng: StdRng,
+    layer_rng: SmallRng,
     tracker: &'a DR,
 }
 
@@ -293,7 +293,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         HnswOps {
             tracker,
             distribution: Uniform::new(0.0, 1.0),
-            layer_rng: StdRng::seed_from_u64(2),
+            layer_rng: SmallRng::seed_from_u64(2),
         }
     }
 }
