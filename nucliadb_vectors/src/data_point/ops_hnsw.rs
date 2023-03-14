@@ -24,7 +24,8 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use nucliadb_core::thread::*;
 use ram_hnsw::*;
 use rand::distributions::Uniform;
-use rand::{thread_rng, Rng};
+use rand::prelude::*;
+use rand::rngs::SmallRng;
 
 use super::*;
 use crate::formula::Formula;
@@ -83,7 +84,9 @@ impl PartialOrd for Cnx {
 pub type Neighbours = Vec<(Address, f32)>;
 
 pub struct HnswOps<'a, DR> {
-    pub tracker: &'a DR,
+    distribution: Uniform<f64>,
+    layer_rng: SmallRng,
+    tracker: &'a DR,
 }
 
 impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
@@ -97,15 +100,13 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         candidates.truncate(k_neighbours);
         candidates
     }
-    fn get_random_layer(&self) -> usize {
-        let mut rng = thread_rng();
-        let distribution = Uniform::new(0.0, 1.0);
-        let sample: f64 = rng.sample(distribution);
-        let picked_level = -sample.ln() * params::level_factor();
-        picked_level.round() as usize
-    }
     fn cosine_similarity(&self, x: Address, y: Address) -> f32 {
         self.tracker.similarity(x, y)
+    }
+    fn get_random_layer(&mut self) -> usize {
+        let sample: f64 = self.layer_rng.sample(self.distribution);
+        let picked_level = -sample.ln() * params::level_factor();
+        picked_level.round() as usize
     }
     fn closest_up_node<L: Layer>(
         &'a self,
@@ -217,7 +218,7 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
         }
         result
     }
-    pub fn insert(&self, x: Address, hnsw: &mut RAMHnsw) {
+    pub fn insert(&mut self, x: Address, hnsw: &mut RAMHnsw) {
         match hnsw.entry_point {
             None => {
                 let top_level = self.get_random_layer();
@@ -285,6 +286,14 @@ impl<'a, DR: DataRetriever> HnswOps<'a, DR> {
             filtered_result
         } else {
             Neighbours::default()
+        }
+    }
+
+    pub fn new(tracker: &DR) -> HnswOps<'_, DR> {
+        HnswOps {
+            tracker,
+            distribution: Uniform::new(0.0, 1.0),
+            layer_rng: SmallRng::seed_from_u64(2),
         }
     }
 }
