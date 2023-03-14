@@ -117,7 +117,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig):
     if kbobj.status == KnowledgeBoxResponseStatus.OK:
         return KnowledgeBoxObjID(uuid=kbobj.uuid)
     elif kbobj.status == KnowledgeBoxResponseStatus.NOTFOUND:
-        raise HTTPException(status_code=419, detail="Knowledge box does not exist")
+        raise HTTPException(status_code=404, detail="Knowledge box does not exist")
     elif kbobj.status == KnowledgeBoxResponseStatus.ERROR:
         raise HTTPException(status_code=500, detail="Error on creating knowledge box")
 
