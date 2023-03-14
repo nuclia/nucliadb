@@ -125,7 +125,12 @@ async def global_query_to_pb(
         await _parse_entities(request, kbid, query)
 
     if with_synonyms:
-        if features != [SearchOptions.PARAGRAPH]:
+        if advanced_query:
+            raise HTTPException(
+                status_code=422,
+                detail="Search with custom synonyms is not compatible with advanced serach",
+            )
+        if SearchOptions.VECTOR in features or SearchOptions.RELATIONS in features:
             raise HTTPException(
                 status_code=422,
                 detail="Search with custom synonyms is only supported on paragraph search",

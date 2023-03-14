@@ -24,18 +24,11 @@ from nucliadb_protos.nodereader_pb2 import SearchRequest
 
 from nucliadb.ingest.orm.synonyms import Synonyms
 from nucliadb.ingest.utils import get_driver
-from nucliadb.search import logger
 
 
 async def apply_synonyms_to_request(request: SearchRequest, kbid: str) -> None:
     if not request.body:
         # Nothing to do
-        return
-
-    if request.advanced_query:
-        logger.warning(
-            "Applying synonyms is not applicable when an advanced query is present"
-        )
         return
 
     synonyms = await get_kb_synonyms(kbid)

@@ -25,7 +25,7 @@ from nucliadb_protos.knowledgebox_pb2 import Synonyms
 from nucliadb.search.search.synonyms import apply_synonyms_to_request
 
 
-class Test_apply_synonyms_to_request:
+class TestApplySynonymsToRequest:
     @pytest.fixture
     def get_synonyms(self):
         with patch(
@@ -37,14 +37,8 @@ class Test_apply_synonyms_to_request:
             yield get_kb_synonyms
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "search_request",
-        [
-            Mock(body="", advanced_query=None),  # empty body
-            Mock(body="foo", advanced_query="bar"),  # advanced query present
-        ],
-    )
-    async def test_not_applies_request_conditions(self, get_synonyms, search_request):
+    async def test_not_applies_if_empty_body(self, get_synonyms):
+        search_request = Mock(body="")
         await apply_synonyms_to_request(search_request, "kbid")
 
         get_synonyms.assert_not_awaited()
@@ -53,7 +47,7 @@ class Test_apply_synonyms_to_request:
     @pytest.mark.asyncio
     async def test_not_applies_if_synonyms_object_not_found(self, get_synonyms):
         get_synonyms.return_value = None
-        request = Mock(body="planet", advanced_query=None)
+        request = Mock(body="planet")
 
         await apply_synonyms_to_request(request, "kbid")
 
@@ -62,7 +56,7 @@ class Test_apply_synonyms_to_request:
 
     @pytest.mark.asyncio
     async def test_not_applies_if_synonyms_not_found_for_query(self, get_synonyms):
-        request = Mock(body="foobar", advanced_query=None)
+        request = Mock(body="foobar")
 
         await apply_synonyms_to_request(request, "kbid")
 
