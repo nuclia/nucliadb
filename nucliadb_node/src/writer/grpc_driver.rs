@@ -18,15 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
 use std::time::Duration;
 
 use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    NewShardRequest, NewVectorSetRequest, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned,
-    ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
+    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, SetGraph,
+    ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
@@ -46,42 +45,9 @@ const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
-    ShardCreation(String),
+    ShardCreation(String, String),
     ShardDeletion(String),
     ParagraphCount(String, u64),
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct NodeWriterMetadata {
-    shards: HashMap<String, u64>,
-}
-
-impl NodeWriterMetadata {
-    pub fn load_score(&self) -> f32 {
-        self.shards.values().sum::<u64>() as f32
-    }
-
-    pub fn shard_count(&self) -> u64 {
-        self.shards.len() as u64
-    }
-
-    pub fn new_empty_shard(&mut self, shard_id: String) {
-        self.shards.insert(shard_id, 0);
-    }
-
-    pub fn new_shard(&mut self, shard_id: String, paragraphs: u64) {
-        self.shards.insert(shard_id, paragraphs);
-    }
-
-    pub fn delete_shard(&mut self, shard_id: String) {
-        self.shards.remove(&shard_id);
-    }
-
-    pub fn update_shard(&mut self, shard_id: String, paragraphs: u64) {
-        self.shards
-            .entry(shard_id)
-            .and_modify(|value| *value = paragraphs);
-    }
 }
 
 pub struct NodeWriterGRPCDriver {
@@ -170,7 +136,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .new_shard(&request)
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
         std::mem::drop(writer);
-        self.emit_event(NodeWriterEvent::ShardCreation(result.id.clone()));
+        self.emit_event(NodeWriterEvent::ShardCreation(
+            result.id.clone(),
+            request.kbid,
+        ));
         Ok(tonic::Response::new(result))
     }
 
@@ -540,6 +509,25 @@ impl NodeWriter for NodeWriterGRPCDriver {
                 let e = format!("Error receiving shard {}: {}", shard_id.id, e);
 
                 error!("{}", e);
+
+                Err(tonic::Status::internal(e))
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_metadata(
+        &self,
+        request: Request<EmptyQuery>,
+    ) -> Result<Response<NodeMetadata>, Status> {
+        self.instrument(&request);
+
+        match crate::node_metadata::NodeMetadata::load(&env::metadata_path()) {
+            Ok(node_metadata) => Ok(tonic::Response::new(node_metadata.into())),
+            Err(e) => {
+                let e = format!("Cannot get node metadata: {e}");
+
+                error!("{e}");
 
                 Err(tonic::Status::internal(e))
             }

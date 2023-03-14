@@ -25,6 +25,8 @@
 /// Shard metadata, defined at the moment of creation.
 mod shard_metadata;
 
+pub mod node_metadata;
+
 pub mod services;
 
 /// Global configuration enviromental variables

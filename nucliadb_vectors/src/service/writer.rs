@@ -265,7 +265,8 @@ impl WriterChild for VectorWriterService {
             }
             if !elems.is_empty() {
                 let similarity = index.metadata().similarity;
-                let new_dp = DataPoint::new(index.location(), elems, Some(temporal_mark), similarity)?;
+                let new_dp =
+                    DataPoint::new(index.location(), elems, Some(temporal_mark), similarity)?;
                 let lock = index.get_elock()?;
                 index.add(new_dp, &lock);
                 index.commit(lock)?;

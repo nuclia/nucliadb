@@ -38,6 +38,11 @@ pub fn data_path() -> PathBuf {
     }
 }
 
+/// Path for metadata file inside data folder
+pub fn metadata_path() -> PathBuf {
+    data_path().join("metadata.json")
+}
+
 /// Path for shards information inside data folder
 pub fn shards_path() -> PathBuf {
     data_path().join("shards")
