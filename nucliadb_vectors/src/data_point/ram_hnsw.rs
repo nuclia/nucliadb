@@ -38,7 +38,7 @@ pub struct Edge {
     pub dist: f32,
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone)]
 pub struct RAMLayer {
     pub out: HashMap<Address, Vec<(Address, Edge)>>,
 }
@@ -79,15 +79,14 @@ impl RAMLayer {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone)]
 pub struct RAMHnsw {
     pub entry_point: Option<EntryPoint>,
     pub layers: Vec<RAMLayer>,
 }
-
 impl RAMHnsw {
     pub fn new() -> RAMHnsw {
-        RAMHnsw::default()
+        Self::default()
     }
     pub fn increase_layers_with(&mut self, x: Address, level: usize) -> &mut Self {
         while self.layers.len() <= level {
