@@ -12,6 +12,7 @@ from nucliadb_protos.noderesources_pb2 import (
     IndexMetadata as IndexMetadata,
     IndexParagraph as IndexParagraph,
     IndexParagraphs as IndexParagraphs,
+    NodeMetadata as NodeMetadata,
     ParagraphMetadata as ParagraphMetadata,
     Position as Position,
     Resource as Resource,
@@ -91,6 +92,10 @@ class NodeWriterStub:
     AcceptShard: grpc.UnaryUnaryMultiCallable[
         nucliadb_protos.nodewriter_pb2.AcceptShardRequest,
         nucliadb_protos.noderesources_pb2.EmptyResponse,
+    ]
+    GetMetadata: grpc.UnaryUnaryMultiCallable[
+        nucliadb_protos.noderesources_pb2.EmptyQuery,
+        nucliadb_protos.noderesources_pb2.NodeMetadata,
     ]
 
 class NodeWriterServicer(metaclass=abc.ABCMeta):
@@ -184,5 +189,11 @@ class NodeWriterServicer(metaclass=abc.ABCMeta):
         request: nucliadb_protos.nodewriter_pb2.AcceptShardRequest,
         context: grpc.ServicerContext,
     ) -> nucliadb_protos.noderesources_pb2.EmptyResponse: ...
+    @abc.abstractmethod
+    def GetMetadata(
+        self,
+        request: nucliadb_protos.noderesources_pb2.EmptyQuery,
+        context: grpc.ServicerContext,
+    ) -> nucliadb_protos.noderesources_pb2.NodeMetadata: ...
 
 def add_NodeWriterServicer_to_server(servicer: NodeWriterServicer, server: grpc.Server) -> None: ...
