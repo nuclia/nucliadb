@@ -170,3 +170,43 @@ async def test_get_resource_field(
     body_by_rid = resp.json()
 
     assert body_by_slug == body_by_rid
+
+
+@pytest.mark.asyncio
+async def test_resource_creation_slug_conflicts(
+    nucliadb_writer: AsyncClient,
+    knowledgebox,
+    philosophy_books_kb,
+):
+    """
+    Test that creating two resources with the same slug raises a conflict error
+    """
+    slug = "myresource"
+    resources_path = f"/{KB_PREFIX}/{{knowledgebox}}/{RESOURCES_PREFIX}"
+    resp = await nucliadb_writer.post(
+        resources_path.format(knowledgebox=knowledgebox),
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": slug,
+        },
+    )
+    assert resp.status_code == 201
+
+    resp = await nucliadb_writer.post(
+        resources_path.format(knowledgebox=knowledgebox),
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": slug,
+        },
+    )
+    assert resp.status_code == 419
+
+    # Creating it in another KB should not raise conflict error
+    resp = await nucliadb_writer.post(
+        resources_path.format(knowledgebox=philosophy_books_kb),
+        headers={"X-Synchronous": "true"},
+        json={
+            "slug": slug,
+        },
+    )
+    assert resp.status_code == 201
