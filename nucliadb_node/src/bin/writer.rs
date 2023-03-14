@@ -20,7 +20,7 @@
 
 use std::fs;
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -28,15 +28,12 @@ use anyhow::{Context, Result};
 use futures::Stream;
 use nucliadb_cluster::{node, Key, Node, NodeHandle, NodeType};
 use nucliadb_core::protos::node_writer_server::NodeWriterServer;
-use nucliadb_core::protos::GetShardRequest;
 use nucliadb_core::tracing::*;
 use nucliadb_core::NodeResult;
 use nucliadb_node::env;
-use nucliadb_node::reader::NodeReaderService;
+use nucliadb_node::node_metadata::NodeMetadata;
 use nucliadb_node::telemetry::init_telemetry;
-use nucliadb_node::writer::grpc_driver::{
-    NodeWriterEvent, NodeWriterGRPCDriver, NodeWriterMetadata,
-};
+use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::writer::NodeWriterService;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
@@ -55,7 +52,8 @@ async fn main() -> NodeResult<()> {
 
     let start_bootstrap = Instant::now();
 
-    let node_metadata = get_node_metadata();
+    let metadata_path = env::metadata_path();
+    let node_metadata = NodeMetadata::load_or_create(&metadata_path).await?;
     let mut node_writer_service = NodeWriterService::new();
 
     std::fs::create_dir_all(env::shards_path())?;
@@ -90,7 +88,12 @@ async fn main() -> NodeResult<()> {
     nucliadb_telemetry::sync::start_telemetry_loop();
     tokio::spawn(start_grpc_service(grpc_driver));
     tokio::spawn(monitor_cluster(cluster_watcher));
-    tokio::spawn(watch_node_update(update_handle, receiver, node_metadata));
+    tokio::spawn(watch_node_update(
+        update_handle,
+        receiver,
+        node_metadata,
+        metadata_path,
+    ));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
@@ -155,25 +158,34 @@ async fn update_node_state<T: std::fmt::Display>(node: &NodeHandle, key: Key<T>,
 pub async fn watch_node_update(
     node: NodeHandle,
     mut receiver: UnboundedReceiver<NodeWriterEvent>,
-    mut metadata: NodeWriterMetadata,
+    mut node_metadata: NodeMetadata,
+    path: PathBuf,
 ) {
     info!("Start node update task");
 
     while let Some(event) = receiver.recv().await {
+        debug!("Receive node update event: {event:?}");
+
         match event {
-            NodeWriterEvent::ShardCreation(id) => {
-                metadata.new_empty_shard(id);
-                update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
+            NodeWriterEvent::ShardCreation(id, knowledge_box) => {
+                node_metadata.new_shard(id, knowledge_box, 0.0);
+                update_node_state(&node, SHARD_COUNT_KEY, node_metadata.shard_count()).await;
             }
             NodeWriterEvent::ShardDeletion(id) => {
-                metadata.delete_shard(id);
-                update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
-                update_node_state(&node, SHARD_COUNT_KEY, metadata.shard_count()).await;
+                node_metadata.delete_shard(id);
+                update_node_state(&node, LOAD_SCORE_KEY, node_metadata.load_score()).await;
+                update_node_state(&node, SHARD_COUNT_KEY, node_metadata.shard_count()).await;
             }
             NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
-                metadata.update_shard(id, paragraph_count);
-                update_node_state(&node, LOAD_SCORE_KEY, metadata.load_score()).await;
+                node_metadata.update_shard(id, paragraph_count);
+                update_node_state(&node, LOAD_SCORE_KEY, node_metadata.load_score()).await;
             }
+        }
+
+        if let Err(e) = node_metadata.save(&path) {
+            error!("Node metadata update failed: {e}");
+        } else {
+            info!("Node metadata file updated successfully");
         }
     }
 
@@ -215,36 +227,4 @@ pub fn read_or_create_host_key(host_key_path: &Path) -> Result<Uuid> {
     }
 
     Ok(host_key)
-}
-
-pub fn get_node_metadata() -> NodeWriterMetadata {
-    let mut node_reader = NodeReaderService::new();
-
-    let shards = match node_reader.iter_shards() {
-        Ok(shards) => shards,
-        Err(e) => {
-            error!("Cannot read shards folder: {e}");
-
-            return NodeWriterMetadata::default();
-        }
-    };
-
-    let mut node_metadata = NodeWriterMetadata::default();
-
-    for shard in shards {
-        let shard = match shard {
-            Ok(shard) => shard,
-            Err(e) => {
-                error!("Cannot load shard: {e}");
-                continue;
-            }
-        };
-
-        match shard.get_info(&GetShardRequest::default()) {
-            Ok(count) => node_metadata.new_shard(shard.id, count.paragraphs),
-            Err(e) => error!("Cannot get metrics for {}: {e:?}", shard.id),
-        }
-    }
-
-    node_metadata
 }

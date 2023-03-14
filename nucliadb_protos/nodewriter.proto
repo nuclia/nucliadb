@@ -84,4 +84,6 @@ service NodeWriter {
 
     rpc MoveShard(MoveShardRequest) returns (noderesources.EmptyResponse) {}
     rpc AcceptShard(AcceptShardRequest) returns (noderesources.EmptyResponse) {}
+
+    rpc GetMetadata(noderesources.EmptyQuery) returns (noderesources.NodeMetadata) {}
 }
