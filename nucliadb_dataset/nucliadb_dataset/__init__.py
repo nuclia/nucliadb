@@ -20,7 +20,12 @@
 from enum import Enum
 from typing import Dict
 
-from nucliadb_dataset.dataset import NucliaDBDataset, Task, download_all_partitions
+from nucliadb_dataset.dataset import (
+    NucliaCloudDataset,
+    NucliaDBDataset,
+    Task,
+    download_all_partitions,
+)
 from nucliadb_dataset.nuclia import NucliaDriver
 
 NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
@@ -40,4 +45,4 @@ class ExportType(str, Enum):
     FILESYSTEM = "FILESYSTEM"
 
 
-__all__ = ("NucliaDBDataset", "Task", "download_all_partitions")
+__all__ = ("NucliaDBDataset", "NucliaCloudDataset", "Task", "download_all_partitions")
