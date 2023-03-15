@@ -37,13 +37,21 @@ use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::writer::NodeWriterService;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use uuid::Uuid;
 
 const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
+
+type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
+
+#[derive(Debug)]
+pub enum NodeUpdate {
+    ShardCount(u64),
+    LoadScore(f32),
+}
 
 #[tokio::main]
 async fn main() -> NodeResult<()> {
@@ -61,8 +69,9 @@ async fn main() -> NodeResult<()> {
         node_writer_service.load_shards()?;
     }
 
-    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-    let grpc_sender = sender.clone();
+    let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let grpc_sender = metadata_sender.clone();
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(grpc_sender);
     let host_key_path = env::host_key_path();
     let public_ip = env::public_ip().await;
@@ -86,46 +95,61 @@ async fn main() -> NodeResult<()> {
     let update_handle = node.clone();
 
     nucliadb_telemetry::sync::start_telemetry_loop();
+
     tokio::spawn(start_grpc_service(grpc_driver));
-    tokio::spawn(monitor_cluster(cluster_watcher));
-    tokio::spawn(watch_node_update(
-        update_handle,
-        receiver,
+    tokio::spawn(update_node_metadata(
+        update_sender,
+        metadata_receiver,
         node_metadata,
         metadata_path,
     ));
+    let update_task = tokio::spawn(update_node_state(update_handle, update_receiver));
+    let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
 
     wait_for_sigkill().await?;
+
+    info!("Shutting down NucliaDB Writer Node...");
+    // abort all the tasks that hold a chitchat TCP/IP connection
+    monitor_task.abort();
+    update_task.abort();
+    let _ = monitor_task.await;
+    let _ = update_task.await;
+    // then close the chitchat TCP/IP connection
     node.shutdown().await?;
+    // wait some time to handle latest gRPC calls
+    tokio::time::sleep(env::shutdown_delay()).await;
+
     Ok(())
 }
 
 async fn wait_for_sigkill() -> NodeResult<()> {
     let mut sigterm = unix::signal(SignalKind::terminate())?;
     let mut sigquit = unix::signal(SignalKind::quit())?;
+
     tokio::select! {
         _ = sigterm.recv() => println!("Terminating on SIGTERM"),
         _ = sigquit.recv() => println!("Terminating on SIGQUIT"),
         _ = ctrl_c() => println!("Terminating on ctrl-c"),
     }
+
     Ok(())
 }
+
 pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
     let addr = env::writer_listen_address();
 
     info!("Listening for gRPC requests at: {:?}", addr);
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<NodeWriterServer<NodeWriterGRPCDriver>>()
-        .await;
+
+    health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
         .add_service(health_service)
-        .add_service(NodeWriterServer::new(grpc_driver))
+        .add_service(GrpcServer::new(grpc_driver))
         .serve(addr)
         .await
         .expect("Error starting gRPC service");
@@ -138,48 +162,66 @@ pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>
 
     loop {
         debug!("Wait for cluster update");
+
         if let Some(live_nodes) = cluster_watcher.next().await {
             let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
             if let Ok(snapshot) = serde_json::to_string(&cluster_snapshot) {
                 info!("Cluster update: {snapshot}");
-            };
-        } else {
-            error!("Cluster snapshot cannot be serialized");
+            } else {
+                error!("Cluster snapshot cannot be serialized");
+            }
         }
     }
 }
 
-async fn update_node_state<T: std::fmt::Display>(node: &NodeHandle, key: Key<T>, value: T) {
-    info!("Update node state: {key} = {value}");
-    node.update_state(key, value).await;
+async fn update_node_state(node: NodeHandle, mut metadata_receiver: UnboundedReceiver<NodeUpdate>) {
+    info!("Start node update task");
+
+    while let Some(event) = metadata_receiver.recv().await {
+        info!("Receive node update event: {event:?}");
+
+        match event {
+            NodeUpdate::ShardCount(count) => node.update_state(SHARD_COUNT_KEY, count).await,
+            NodeUpdate::LoadScore(load_score) => {
+                node.update_state(LOAD_SCORE_KEY, load_score).await
+            }
+        }
+    }
 }
 
-pub async fn watch_node_update(
-    node: NodeHandle,
-    mut receiver: UnboundedReceiver<NodeWriterEvent>,
+pub async fn update_node_metadata(
+    update_sender: UnboundedSender<NodeUpdate>,
+    mut metadata_receiver: UnboundedReceiver<NodeWriterEvent>,
     mut node_metadata: NodeMetadata,
     path: PathBuf,
 ) {
     info!("Start node update task");
 
-    while let Some(event) = receiver.recv().await {
-        debug!("Receive node update event: {event:?}");
+    while let Some(event) = metadata_receiver.recv().await {
+        debug!("Receive metadata update event: {event:?}");
 
-        match event {
+        let result = match event {
             NodeWriterEvent::ShardCreation(id, knowledge_box) => {
                 node_metadata.new_shard(id, knowledge_box, 0.0);
-                update_node_state(&node, SHARD_COUNT_KEY, node_metadata.shard_count()).await;
+                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
             }
             NodeWriterEvent::ShardDeletion(id) => {
                 node_metadata.delete_shard(id);
-                update_node_state(&node, LOAD_SCORE_KEY, node_metadata.load_score()).await;
-                update_node_state(&node, SHARD_COUNT_KEY, node_metadata.shard_count()).await;
+                update_sender
+                    .send(NodeUpdate::ShardCount(node_metadata.shard_count()))
+                    .and_then(|_| {
+                        update_sender.send(NodeUpdate::LoadScore(node_metadata.load_score()))
+                    })
             }
             NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
                 node_metadata.update_shard(id, paragraph_count);
-                update_node_state(&node, LOAD_SCORE_KEY, node_metadata.load_score()).await;
+                update_sender.send(NodeUpdate::LoadScore(node_metadata.load_score()))
             }
+        };
+
+        if let Err(e) = result {
+            warn!("Cannot send node update: {e:?}");
         }
 
         if let Err(e) = node_metadata.save(&path) {
