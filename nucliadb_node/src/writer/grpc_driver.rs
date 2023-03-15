@@ -18,15 +18,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
 use std::time::Duration;
 
 use async_std::sync::RwLock;
 use nucliadb_core::protos::node_writer_server::NodeWriter;
 use nucliadb_core::protos::{
     op_status, AcceptShardRequest, DeleteGraphNodes, EmptyQuery, EmptyResponse, MoveShardRequest,
-    NewShardRequest, NewVectorSetRequest, OpStatus, Resource, ResourceId, SetGraph, ShardCleaned,
-    ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
+    NewShardRequest, NewVectorSetRequest, NodeMetadata, OpStatus, Resource, ResourceId, SetGraph,
+    ShardCleaned, ShardCreated, ShardId, ShardIds, VectorSetId, VectorSetList,
 };
 use nucliadb_core::tracing::{self, *};
 use nucliadb_ftp::{Listener, Publisher, RetryPolicy};
@@ -46,42 +45,9 @@ const MAX_MOVE_SHARD_DURATION: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeWriterEvent {
-    ShardCreation(String),
+    ShardCreation(String, String),
     ShardDeletion(String),
     ParagraphCount(String, u64),
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct NodeWriterMetadata {
-    shards: HashMap<String, u64>,
-}
-
-impl NodeWriterMetadata {
-    pub fn load_score(&self) -> f32 {
-        self.shards.values().sum::<u64>() as f32
-    }
-
-    pub fn shard_count(&self) -> u64 {
-        self.shards.len() as u64
-    }
-
-    pub fn new_empty_shard(&mut self, shard_id: String) {
-        self.shards.insert(shard_id, 0);
-    }
-
-    pub fn new_shard(&mut self, shard_id: String, paragraphs: u64) {
-        self.shards.insert(shard_id, paragraphs);
-    }
-
-    pub fn delete_shard(&mut self, shard_id: String) {
-        self.shards.remove(&shard_id);
-    }
-
-    pub fn update_shard(&mut self, shard_id: String, paragraphs: u64) {
-        self.shards
-            .entry(shard_id)
-            .and_modify(|value| *value = paragraphs);
-    }
 }
 
 pub struct NodeWriterGRPCDriver {
@@ -109,7 +75,7 @@ impl NodeWriterGRPCDriver {
     // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
-    async fn shard_loading(&self, id: &ShardId) {
+    async fn load_shard(&self, id: &ShardId) {
         if env::lazy_loading() {
             let mut writer = self.inner.write().await;
             writer.load_shard(id);
@@ -139,7 +105,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let reader = self.inner.read().await;
         let result = reader.get_shard(&shard_id).is_some();
         std::mem::drop(reader);
@@ -170,7 +136,10 @@ impl NodeWriter for NodeWriterGRPCDriver {
             .new_shard(&request)
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
         std::mem::drop(writer);
-        self.emit_event(NodeWriterEvent::ShardCreation(result.id.clone()));
+        self.emit_event(NodeWriterEvent::ShardCreation(
+            result.id.clone(),
+            request.kbid,
+        ));
         Ok(tonic::Response::new(result))
     }
 
@@ -243,7 +212,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         let result = writer.set_resource(&shard_id, &resource);
         match result.transpose() {
@@ -286,6 +255,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
+        self.load_shard(shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
@@ -312,6 +282,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(mut status)) => {
@@ -343,7 +314,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             id: resource.shard_id.clone(),
         };
 
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         let result = writer.remove_resource(&shard_id, &resource);
 
@@ -385,7 +356,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let request = request.into_inner();
-        let shard_id = request.id.as_ref().and_then(|i| i.shard.clone());
+        let shard_id = request.id.as_ref().and_then(|i| i.shard.clone()).unwrap();
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
@@ -413,6 +385,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
+        self.load_shard(shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
@@ -547,13 +520,32 @@ impl NodeWriter for NodeWriterGRPCDriver {
     }
 
     #[tracing::instrument(skip_all)]
+    async fn get_metadata(
+        &self,
+        request: Request<EmptyQuery>,
+    ) -> Result<Response<NodeMetadata>, Status> {
+        self.instrument(&request);
+
+        match crate::node_metadata::NodeMetadata::load(&env::metadata_path()) {
+            Ok(node_metadata) => Ok(tonic::Response::new(node_metadata.into())),
+            Err(e) => {
+                let e = format!("Cannot get node metadata: {e}");
+
+                error!("{e}");
+
+                Err(tonic::Status::internal(e))
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
     async fn gc(&self, request: Request<ShardId>) -> Result<Response<EmptyResponse>, Status> {
         self.instrument(&request);
 
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         info!("Running garbage collection at {}", shard_id.id);
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         let result = writer.gc(&shard_id);
         std::mem::drop(writer);

@@ -16,42 +16,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
-from enum import Enum
-from typing import Dict
-
-from nucliadb_dataset.dataset import (
-    NucliaCloudDataset,
-    NucliaDBDataset,
-    Task,
-    download_all_partitions,
-)
-from nucliadb_dataset.nuclia import NucliaDriver
-
-NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
-
-CLIENT_ID = "CLIENT"
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.utils import get_driver
 
 
-class DatasetType(str, Enum):
-    FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
-    PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
-    SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
-    TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
-
-
-class ExportType(str, Enum):
-    DATASETS = "DATASETS"
-    FILESYSTEM = "FILESYSTEM"
-
-
-__all__ = (
-    "NucliaDBDataset",
-    "NucliaCloudDataset",
-    "Task",
-    "download_all_partitions",
-    "NUCLIA_GLOBAL",
-    "CLIENT_ID",
-    "DatasetType",
-    "ExportType",
-)
+async def resource_slug_exists(kbid: str, slug: str) -> bool:
+    driver = await get_driver()
+    async with driver.transaction() as txn:
+        return await KnowledgeBox.resource_slug_exists(txn, kbid, slug)

@@ -565,6 +565,13 @@ class KnowledgeBox:
                 key_ok = True
         return slug
 
+    @classmethod
+    async def resource_slug_exists(
+        self, txn: Transaction, kbid: str, slug: str
+    ) -> bool:
+        key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
+        return await txn.get(key) is not None
+
     async def add_resource(
         self, uuid: str, slug: str, basic: Optional[Basic] = None
     ) -> Resource:

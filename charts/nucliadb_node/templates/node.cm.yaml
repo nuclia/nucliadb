@@ -36,3 +36,5 @@ data:
   INDEX_JETSTREAM_STREAM: {{ .Values.indexing.index_jetstream_stream }}
 
   JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
+
+  SHUTDOWN_DELAY: {{ .Values.running.shutdown_delay }}

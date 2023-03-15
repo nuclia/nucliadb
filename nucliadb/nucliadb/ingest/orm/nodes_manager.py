@@ -58,9 +58,13 @@ class NodesManager:
         return [x for x in shards.shards]
 
     def choose_node(
-        self, shard: ShardObject, shards: Optional[List[str]] = None
+        self, shard: ShardObject, shard_replicas: Optional[List[str]] = None
     ) -> Tuple[Node, Optional[str], str]:
-        shards = shards or []
+        """Choose an arbitrary node storing `shard`. If passed, choose only between
+        nodes containing any of `shard_replicas`.
+
+        """
+        shard_replicas = shard_replicas or []
 
         if NODE_CLUSTER.local_node:
             return (
@@ -77,7 +81,7 @@ class NodesManager:
             if node_id in NODES:
                 node_obj = NODES[node_id]
                 shard_id = shard.replicas[node].shard.id
-                if len(shards) > 0 and shard_id not in shards:
+                if len(shard_replicas) > 0 and shard_id not in shard_replicas:
                     node_obj = None
                     shard_id = None
                 else:
@@ -98,7 +102,7 @@ class NodesManager:
         ops = []
 
         for shard_obj in shards:
-            node, shard_id, node_id = self.choose_node(shard_obj, shards)  # type: ignore
+            node, shard_id, node_id = self.choose_node(shard_obj)
             if shard_id is None:
                 raise ShardNotFound("Fount a node but not a shard")
 

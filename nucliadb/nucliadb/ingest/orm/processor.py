@@ -407,7 +407,7 @@ class Processor:
                     shard = await kb.get_resource_shard(shard_id, node_klass)
 
                 if shard is None:
-                    # Its a new resource
+                    # It's a new resource
                     # Check if we have enough resource to create a new shard
                     shard = await node_klass.actual_shard(txn, kbid)
                     if shard is None:

@@ -21,6 +21,7 @@ import re
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+from fastapi import HTTPException
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
     SearchRequest,
@@ -30,6 +31,7 @@ from nucliadb_protos.noderesources_pb2 import Resource
 
 from nucliadb.search import logger
 from nucliadb.search.predict import PredictVectorMissing, SendToPredictError
+from nucliadb.search.search.synonyms import apply_synonyms_to_request
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.search import (
@@ -64,6 +66,7 @@ async def global_query_to_pb(
     vectorset: Optional[str] = None,
     with_duplicates: bool = False,
     with_status: Optional[ResourceProcessingStatus] = None,
+    with_synonyms: bool = False,
 ) -> Tuple[SearchRequest, bool]:
     fields = fields or []
 
@@ -120,6 +123,19 @@ async def global_query_to_pb(
 
     if SearchOptions.RELATIONS in features:
         await _parse_entities(request, kbid, query)
+
+    if with_synonyms:
+        if advanced_query:
+            raise HTTPException(
+                status_code=422,
+                detail="Search with custom synonyms is not compatible with advanced serach",
+            )
+        if SearchOptions.VECTOR in features or SearchOptions.RELATIONS in features:
+            raise HTTPException(
+                status_code=422,
+                detail="Search with custom synonyms is only supported on paragraph search",
+            )
+        await apply_synonyms_to_request(request, kbid)
 
     return request, incomplete
 

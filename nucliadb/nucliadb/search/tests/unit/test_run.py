@@ -16,42 +16,22 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+from unittest.mock import patch
 
-from enum import Enum
-from typing import Dict
+import pytest
 
-from nucliadb_dataset.dataset import (
-    NucliaCloudDataset,
-    NucliaDBDataset,
-    Task,
-    download_all_partitions,
-)
-from nucliadb_dataset.nuclia import NucliaDriver
-
-NUCLIA_GLOBAL: Dict[str, NucliaDriver] = {}
-
-CLIENT_ID = "CLIENT"
+from nucliadb.search.app import application
+from nucliadb.search.run import run_with_metrics
 
 
-class DatasetType(str, Enum):
-    FIELD_CLASSIFICATION = "FIELD_CLASSIFICATION"
-    PARAGRAPH_CLASSIFICATION = "PARAGRAPH_CLASSIFICATION"
-    SENTENCE_CLASSIFICATION = "SENTENCE_CLASSIFICATION"
-    TOKEN_CLASSIFICATION = "TOKEN_CLASSIFICATION"
+@pytest.fixture(scope="function")
+def run_fastapi_with_metrics():
+    with patch("nucliadb.search.run.run_fastapi_with_metrics") as mocked:
+        yield mocked
 
 
-class ExportType(str, Enum):
-    DATASETS = "DATASETS"
-    FILESYSTEM = "FILESYSTEM"
+def test_run_with_metrics(run_fastapi_with_metrics):
+    run_with_metrics()
 
-
-__all__ = (
-    "NucliaDBDataset",
-    "NucliaCloudDataset",
-    "Task",
-    "download_all_partitions",
-    "NUCLIA_GLOBAL",
-    "CLIENT_ID",
-    "DatasetType",
-    "ExportType",
-)
+    run_fastapi_with_metrics.assert_called_once_with(application)

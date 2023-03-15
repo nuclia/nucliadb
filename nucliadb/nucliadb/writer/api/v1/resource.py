@@ -59,6 +59,7 @@ from nucliadb.writer.resource.basic import (
 )
 from nucliadb.writer.resource.field import extract_fields, parse_fields
 from nucliadb.writer.resource.origin import parse_origin
+from nucliadb.writer.resource.slug import resource_slug_exists
 from nucliadb.writer.resource.vectors import (
     create_vectorset,
     get_vectorsets,
@@ -133,6 +134,8 @@ async def create_resource(
     toprocess.source = Source.HTTP
 
     if item.slug:
+        if await resource_slug_exists(kbid, item.slug):
+            raise HTTPException(status_code=419, detail="Resource slug already exists")
         writer.slug = item.slug
         toprocess.slug = item.slug
 

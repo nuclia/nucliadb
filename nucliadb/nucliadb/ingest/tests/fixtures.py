@@ -247,7 +247,7 @@ async def fake_node(indexing_utility_ingest):
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_ingest(redis_driver: RedisDriver):
+async def knowledgebox_ingest(gcs_storage, redis_driver: RedisDriver):
     kbid = str(uuid.uuid4())
     kbslug = str(uuid.uuid4())
     txn = await redis_driver.begin()
