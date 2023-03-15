@@ -258,3 +258,29 @@ pub fn get_cluster_liveliness_interval_update() -> Duration {
         }
     }
 }
+
+pub fn shutdown_delay() -> Duration {
+    const SHUTDOWN_DELAY_KEY: &str = "SHUTDOWN_DELAY";
+    const SHUTDOWN_DELAY_PLACEHOLDER: &str = "5s";
+    const DEFAULT_SHUTDOWN_DELAY: Duration = Duration::from_secs(5);
+
+    match env::var(SHUTDOWN_DELAY_KEY) {
+        Ok(value) => {
+            if let Ok(duration) = parse_duration::parse(&value) {
+                duration
+            } else {
+                error!(
+                    "{SHUTDOWN_DELAY_KEY} defined incorrectly. Defaulting to \
+                     {SHUTDOWN_DELAY_PLACEHOLDER}"
+                );
+
+                DEFAULT_SHUTDOWN_DELAY
+            }
+        }
+        Err(_) => {
+            warn!("{SHUTDOWN_DELAY_KEY} not defined. Defaulting to {SHUTDOWN_DELAY_PLACEHOLDER}");
+
+            DEFAULT_SHUTDOWN_DELAY
+        }
+    }
+}
