@@ -318,7 +318,7 @@ async def delete_vectorset(request: Request, kbid: str, vectorset: str):
 
 @api.put(
     f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
-    status_code=200,
+    status_code=204,
     name="Set Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
@@ -344,7 +344,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
-    status_code=200,
+    status_code=204,
     name="Delete Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 3},
