@@ -199,7 +199,7 @@ async def test_resource_creation_slug_conflicts(
             "slug": slug,
         },
     )
-    assert resp.status_code == 419
+    assert resp.status_code == 409
 
     # Creating it in another KB should not raise conflict error
     resp = await nucliadb_writer.post(

@@ -1,2 +1,3 @@
 httpx
+requests
 nucliadb-models
