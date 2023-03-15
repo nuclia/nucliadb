@@ -1,4 +1,7 @@
 # Changelog
+## 0.7.1
+
+- load shard on join graph.
 
 ## 0.7.0
 
