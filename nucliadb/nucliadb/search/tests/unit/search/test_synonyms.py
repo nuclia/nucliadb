@@ -66,4 +66,4 @@ class TestApplySynonymsToRequest:
         await apply_synonyms_to_request(request, "kbid")
 
         request.ClearField.assert_called_once_with("body")
-        assert request.advanced_query == "planet earth globe"
+        assert request.advanced_query == "planet OR earth OR globe"
