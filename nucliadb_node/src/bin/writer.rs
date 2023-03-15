@@ -40,10 +40,14 @@ use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
+use tonic_health::proto::health_server::{Health, HealthServer};
+use tonic_health::server::HealthReporter;
 use uuid::Uuid;
 
 const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
+
+type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
 
 #[tokio::main]
 async fn main() -> NodeResult<()> {
@@ -86,9 +90,16 @@ async fn main() -> NodeResult<()> {
     let update_handle = node.clone();
 
     nucliadb_telemetry::sync::start_telemetry_loop();
-    tokio::spawn(start_grpc_service(grpc_driver));
-    tokio::spawn(monitor_cluster(cluster_watcher));
-    tokio::spawn(watch_node_update(
+
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+
+    tokio::spawn(start_grpc_service(
+        grpc_driver,
+        health_service,
+        health_reporter.clone(),
+    ));
+    let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
+    let update_task = tokio::spawn(watch_node_update(
         update_handle,
         receiver,
         node_metadata,
@@ -99,33 +110,50 @@ async fn main() -> NodeResult<()> {
     eprintln!("Running");
 
     wait_for_sigkill().await?;
+
+    info!("Shutting down NucliaDB Writer Node...");
+    // notify that the gRPC service is not serving anymore
+    health_reporter.set_not_serving::<GrpcServer>().await;
+    // abort all the tasks that hold a chitchat TCP/IP connection
+    monitor_task.abort();
+    update_task.abort();
+    let _ = monitor_task.await;
+    let _ = update_task.await;
+    // then close the chitchat TCP/IP connection
     node.shutdown().await?;
+    // wait some time to handle latest gRPC calls
+    tokio::time::sleep(env::shutdown_delay()).await;
+
     Ok(())
 }
 
 async fn wait_for_sigkill() -> NodeResult<()> {
     let mut sigterm = unix::signal(SignalKind::terminate())?;
     let mut sigquit = unix::signal(SignalKind::quit())?;
+
     tokio::select! {
         _ = sigterm.recv() => println!("Terminating on SIGTERM"),
         _ = sigquit.recv() => println!("Terminating on SIGQUIT"),
         _ = ctrl_c() => println!("Terminating on ctrl-c"),
     }
+
     Ok(())
 }
-pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
+
+pub async fn start_grpc_service(
+    grpc_driver: NodeWriterGRPCDriver,
+    health_service: HealthServer<impl Health>,
+    mut health_reporter: HealthReporter,
+) {
     let addr = env::writer_listen_address();
 
     info!("Listening for gRPC requests at: {:?}", addr);
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<NodeWriterServer<NodeWriterGRPCDriver>>()
-        .await;
+    health_reporter.set_serving::<GrpcServer>().await;
 
     Server::builder()
         .add_service(health_service)
-        .add_service(NodeWriterServer::new(grpc_driver))
+        .add_service(GrpcServer::new(grpc_driver))
         .serve(addr)
         .await
         .expect("Error starting gRPC service");
@@ -138,6 +166,7 @@ pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>
 
     loop {
         debug!("Wait for cluster update");
+
         if let Some(live_nodes) = cluster_watcher.next().await {
             let cluster_snapshot = node::cluster_snapshot(live_nodes).await;
 
