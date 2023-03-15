@@ -37,7 +37,7 @@ use nucliadb_node::writer::grpc_driver::{NodeWriterEvent, NodeWriterGRPCDriver};
 use nucliadb_node::writer::NodeWriterService;
 use tokio::signal::unix::SignalKind;
 use tokio::signal::{ctrl_c, unix};
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
 use tonic_health::proto::health_server::{Health, HealthServer};
@@ -48,6 +48,12 @@ const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
 const SHARD_COUNT_KEY: Key<u64> = Key::new("shard_count");
 
 type GrpcServer = NodeWriterServer<NodeWriterGRPCDriver>;
+
+#[derive(Debug)]
+pub enum NodeUpdate {
+    ShardCount(u64),
+    LoadScore(f32),
+}
 
 #[tokio::main]
 async fn main() -> NodeResult<()> {
@@ -65,8 +71,9 @@ async fn main() -> NodeResult<()> {
         node_writer_service.load_shards()?;
     }
 
-    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-    let grpc_sender = sender.clone();
+    let (metadata_sender, metadata_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let (update_sender, update_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let grpc_sender = metadata_sender.clone();
     let grpc_driver = NodeWriterGRPCDriver::from(node_writer_service).with_sender(grpc_sender);
     let host_key_path = env::host_key_path();
     let public_ip = env::public_ip().await;
@@ -98,13 +105,14 @@ async fn main() -> NodeResult<()> {
         health_service,
         health_reporter.clone(),
     ));
-    let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
-    let update_task = tokio::spawn(watch_node_update(
-        update_handle,
-        receiver,
+    tokio::spawn(update_node_metadata(
+        update_sender,
+        metadata_receiver,
         node_metadata,
         metadata_path,
     ));
+    let update_task = tokio::spawn(update_node_state(update_handle, update_receiver));
+    let monitor_task = tokio::spawn(monitor_cluster(cluster_watcher));
 
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
     eprintln!("Running");
@@ -179,36 +187,53 @@ pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>
     }
 }
 
-async fn update_node_state<T: std::fmt::Display>(node: &NodeHandle, key: Key<T>, value: T) {
-    info!("Update node state: {key} = {value}");
-    node.update_state(key, value).await;
+async fn update_node_state(node: NodeHandle, mut metadata_receiver: UnboundedReceiver<NodeUpdate>) {
+    info!("Start node update task");
+
+    while let Some(event) = metadata_receiver.recv().await {
+        info!("Receive node update event: {event:?}");
+
+        match event {
+            NodeUpdate::ShardCount(count) => node.update_state(SHARD_COUNT_KEY, count).await,
+            NodeUpdate::LoadScore(load_score) => {
+                node.update_state(LOAD_SCORE_KEY, load_score).await
+            }
+        }
+    }
 }
 
-pub async fn watch_node_update(
-    node: NodeHandle,
-    mut receiver: UnboundedReceiver<NodeWriterEvent>,
+pub async fn update_node_metadata(
+    update_sender: UnboundedSender<NodeUpdate>,
+    mut metadata_receiver: UnboundedReceiver<NodeWriterEvent>,
     mut node_metadata: NodeMetadata,
     path: PathBuf,
 ) {
     info!("Start node update task");
 
-    while let Some(event) = receiver.recv().await {
-        debug!("Receive node update event: {event:?}");
+    while let Some(event) = metadata_receiver.recv().await {
+        debug!("Receive metadata update event: {event:?}");
 
-        match event {
+        let result = match event {
             NodeWriterEvent::ShardCreation(id, knowledge_box) => {
                 node_metadata.new_shard(id, knowledge_box, 0.0);
-                update_node_state(&node, SHARD_COUNT_KEY, node_metadata.shard_count()).await;
+                update_sender.send(NodeUpdate::ShardCount(node_metadata.shard_count()))
             }
             NodeWriterEvent::ShardDeletion(id) => {
                 node_metadata.delete_shard(id);
-                update_node_state(&node, LOAD_SCORE_KEY, node_metadata.load_score()).await;
-                update_node_state(&node, SHARD_COUNT_KEY, node_metadata.shard_count()).await;
+                update_sender
+                    .send(NodeUpdate::ShardCount(node_metadata.shard_count()))
+                    .and_then(|_| {
+                        update_sender.send(NodeUpdate::LoadScore(node_metadata.load_score()))
+                    })
             }
             NodeWriterEvent::ParagraphCount(id, paragraph_count) => {
                 node_metadata.update_shard(id, paragraph_count);
-                update_node_state(&node, LOAD_SCORE_KEY, node_metadata.load_score()).await;
+                update_sender.send(NodeUpdate::LoadScore(node_metadata.load_score()))
             }
+        };
+
+        if let Err(e) = result {
+            warn!("Cannot send node update: {e:?}");
         }
 
         if let Err(e) = node_metadata.save(&path) {
