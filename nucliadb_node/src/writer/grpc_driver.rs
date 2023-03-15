@@ -75,7 +75,7 @@ impl NodeWriterGRPCDriver {
     // to memory if lazy loading is enabled. Otherwise all the
     // shards on disk would have been brought to memory before the driver is online.
     #[tracing::instrument(skip_all)]
-    async fn shard_loading(&self, id: &ShardId) {
+    async fn load_shard(&self, id: &ShardId) {
         if env::lazy_loading() {
             let mut writer = self.inner.write().await;
             writer.load_shard(id);
@@ -105,7 +105,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
 
         info!("{:?}: gRPC get_shard", request);
         let shard_id = request.into_inner();
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let reader = self.inner.read().await;
         let result = reader.get_shard(&shard_id).is_some();
         std::mem::drop(reader);
@@ -212,7 +212,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let shard_id = ShardId {
             id: resource.shard_id.clone(),
         };
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         let result = writer.set_resource(&shard_id, &resource);
         match result.transpose() {
@@ -255,6 +255,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard_id.as_ref().unwrap();
+        self.load_shard(shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.delete_relation_nodes(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
@@ -281,6 +282,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         let request = request.into_inner();
         let shard_id = request.shard_id.unwrap();
         let graph = request.graph.unwrap();
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.join_relations_graph(&shard_id, &graph).transpose() {
             Some(Ok(mut status)) => {
@@ -312,7 +314,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
             id: resource.shard_id.clone(),
         };
 
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         let result = writer.remove_resource(&shard_id, &resource);
 
@@ -354,7 +356,8 @@ impl NodeWriter for NodeWriterGRPCDriver {
     ) -> Result<Response<OpStatus>, Status> {
         self.instrument(&request);
         let request = request.into_inner();
-        let shard_id = request.id.as_ref().and_then(|i| i.shard.clone());
+        let shard_id = request.id.as_ref().and_then(|i| i.shard.clone()).unwrap();
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.add_vectorset(&request).transpose() {
             Some(Ok(mut status)) => {
@@ -382,6 +385,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         self.instrument(&request);
         let request = request.into_inner();
         let shard_id = request.shard.as_ref().unwrap();
+        self.load_shard(shard_id).await;
         let mut writer = self.inner.write().await;
         match writer.remove_vectorset(shard_id, &request).transpose() {
             Some(Ok(mut status)) => {
@@ -541,7 +545,7 @@ impl NodeWriter for NodeWriterGRPCDriver {
         send_telemetry_event(TelemetryEvent::GarbageCollect).await;
         let shard_id = request.into_inner();
         info!("Running garbage collection at {}", shard_id.id);
-        self.shard_loading(&shard_id).await;
+        self.load_shard(&shard_id).await;
         let mut writer = self.inner.write().await;
         let result = writer.gc(&shard_id);
         std::mem::drop(writer);

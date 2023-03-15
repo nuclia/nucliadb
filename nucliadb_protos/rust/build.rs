@@ -17,20 +17,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("cargo:rerun-if-changed=nucliadb_protos/knowledgebox.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/resources.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/noderesources.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/utils.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/writer.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/nodesidecar.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/nodewriter.proto");
-    println!("cargo:rerun-if-changed=nucliadb_protos/nodereader.proto");
+
+use std::io::Result;
+
+fn main() -> Result<()> {
+    println!("cargo:rerun-if-changed=../knowledgebox.proto");
+    println!("cargo:rerun-if-changed=../resources.proto");
+    println!("cargo:rerun-if-changed=../noderesources.proto");
+    println!("cargo:rerun-if-changed=../utils.proto");
+    println!("cargo:rerun-if-changed=../writer.proto");
+    println!("cargo:rerun-if-changed=../nodesidecar.proto");
+    println!("cargo:rerun-if-changed=../nodewriter.proto");
+    println!("cargo:rerun-if-changed=../nodereader.proto");
 
     let mut prost_config = prost_build::Config::default();
 
     prost_config
-        .out_dir("src/")
+        .out_dir("src")
         .compile_protos(
             &[
                 "nucliadb_protos/utils.proto",
@@ -42,20 +45,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "nucliadb_protos/nodereader.proto",
             ],
             &["../../"],
-        )
-        .unwrap();
+        )?;
 
     tonic_build::configure()
         .build_server(true)
-        .out_dir("src") // you can change the generated code's location
+        .out_dir("src")
         .compile(
             &[
                 "nucliadb_protos/nodewriter.proto",
                 "nucliadb_protos/nodereader.proto",
             ],
             &["../../"],
-        )
-        .unwrap();
+        )?;
 
     Ok(())
 }
