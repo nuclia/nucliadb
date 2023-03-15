@@ -45,7 +45,7 @@ storage:
 
 running:
   sentry_url:
-  shutdown_delay: "15s"
+  shutdown_delay: "5s"
 
 tracing:
   enabled: false
