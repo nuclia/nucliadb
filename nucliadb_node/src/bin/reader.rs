@@ -21,16 +21,22 @@ use std::time::Instant;
 
 use nucliadb_core::protos::node_reader_server::NodeReaderServer;
 use nucliadb_core::tracing::*;
+use nucliadb_core::NodeResult;
 use nucliadb_node::env;
 use nucliadb_node::reader::grpc_driver::NodeReaderGRPCDriver;
 use nucliadb_node::reader::NodeReaderService;
 use nucliadb_node::telemetry::init_telemetry;
+use tokio::signal::unix::SignalKind;
+use tokio::signal::{ctrl_c, unix};
 use tonic::transport::Server;
+use tonic_health::proto::health_server::{Health, HealthServer};
+use tonic_health::server::HealthReporter;
+
+type GrpcServer = NodeReaderServer<NodeReaderGRPCDriver>;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("NucliaDB Reader Node starting...");
-
     let _guard = init_telemetry()?;
 
     let start_bootstrap = Instant::now();
@@ -42,28 +48,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         node_reader_service.load_shards()?;
     }
 
-    let node_reader_service = NodeReaderGRPCDriver::from(node_reader_service);
-    let reader_task = tokio::spawn(async move {
-        let addr = env::reader_listen_address();
-        info!("Reader listening for gRPC requests at: {:?}", addr);
-        let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-        health_reporter
-            .set_serving::<NodeReaderServer<NodeReaderGRPCDriver>>()
-            .await;
+    let grpc_driver = NodeReaderGRPCDriver::from(node_reader_service);
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
 
-        Server::builder()
-            .add_service(health_service)
-            .add_service(NodeReaderServer::new(node_reader_service))
-            .serve(addr)
-            .await
-            .expect("Error starting gRPC writer");
-    });
+    tokio::spawn(start_grpc_service(
+        grpc_driver,
+        health_service,
+        health_reporter.clone(),
+    ));
+
     info!("Bootstrap complete in: {:?}", start_bootstrap.elapsed());
-
     eprintln!("Running");
-    tokio::try_join!(reader_task)?;
 
-    // node_reader_service.shutdown().await;
+    wait_for_sigkill().await?;
+
+    info!("Shutting down NucliaDB Reader Node...");
+    // notify that the gRPC service is not serving anymore
+    health_reporter.set_not_serving::<GrpcServer>().await;
+    // wait some time to handle latest gRPC calls
+    tokio::time::sleep(env::shutdown_delay()).await;
 
     Ok(())
+}
+
+async fn wait_for_sigkill() -> NodeResult<()> {
+    let mut sigterm = unix::signal(SignalKind::terminate())?;
+    let mut sigquit = unix::signal(SignalKind::quit())?;
+
+    tokio::select! {
+        _ = sigterm.recv() => println!("Terminating on SIGTERM"),
+        _ = sigquit.recv() => println!("Terminating on SIGQUIT"),
+        _ = ctrl_c() => println!("Terminating on ctrl-c"),
+    }
+
+    Ok(())
+}
+
+pub async fn start_grpc_service(
+    grpc_driver: NodeReaderGRPCDriver,
+    health_service: HealthServer<impl Health>,
+    mut health_reporter: HealthReporter,
+) {
+    let addr = env::reader_listen_address();
+
+    info!("Reader listening for gRPC requests at: {:?}", addr);
+
+    health_reporter.set_serving::<GrpcServer>().await;
+
+    Server::builder()
+        .add_service(health_service)
+        .add_service(GrpcServer::new(grpc_driver))
+        .serve(addr)
+        .await
+        .expect("Error starting gRPC reader");
 }
