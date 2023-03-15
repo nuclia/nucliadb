@@ -110,6 +110,6 @@ class IndexingUtility:
             self.nats_target.format(node=node), writer.SerializeToString()
         )
         logger.info(
-            f" - Pushed message to index {self.nats_target.format(node=node)}.  shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"
+            f" - Pushed message to index {self.nats_target.format(node=node)}.  shard: {writer.shard}, txid: {writer.txid}  seqid: {res.seq}"  # noqa
         )
         return res.seq

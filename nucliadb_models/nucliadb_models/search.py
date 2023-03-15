@@ -362,3 +362,4 @@ class SearchRequest(BaseModel):
     vectorset: Optional[str] = None
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
+    with_synonyms: bool = False

@@ -317,15 +317,15 @@ async def delete_vectorset(request: Request, kbid: str, vectorset: str):
 
 
 @api.put(
-    f"/{KB_PREFIX}/{{kbid}}/synonyms",
+    f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
     status_code=200,
-    name="Set Knowledge Box Synonyms",
+    name="Set Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 1},
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
+async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
     set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = SetSynonymsRequest()
@@ -343,15 +343,15 @@ async def set_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
 
 
 @api.delete(
-    f"/{KB_PREFIX}/{{kbid}}/synonyms",
+    f"/{KB_PREFIX}/{{kbid}}/custom-synonyms",
     status_code=200,
-    name="Delete Knowledge Box Synonyms",
+    name="Delete Knowledge Box Custom Synonyms",
     tags=["Knowledge Box Services"],
     openapi_extra={"x-operation_order": 3},
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_synonyms(request: Request, kbid: str):
+async def delete_custom_synonyms(request: Request, kbid: str):
     set_info_on_span({"nuclia.kbid": kbid})
     ingest = get_ingest()
     pbrequest = KnowledgeBoxID(uuid=kbid)
