@@ -40,8 +40,6 @@ use tokio::signal::{ctrl_c, unix};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_stream::StreamExt;
 use tonic::transport::Server;
-use tonic_health::proto::health_server::{Health, HealthServer};
-use tonic_health::server::HealthReporter;
 use uuid::Uuid;
 
 const LOAD_SCORE_KEY: Key<f32> = Key::new("load_score");
@@ -98,13 +96,7 @@ async fn main() -> NodeResult<()> {
 
     nucliadb_telemetry::sync::start_telemetry_loop();
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-
-    tokio::spawn(start_grpc_service(
-        grpc_driver,
-        health_service,
-        health_reporter.clone(),
-    ));
+    tokio::spawn(start_grpc_service(grpc_driver));
     tokio::spawn(update_node_metadata(
         update_sender,
         metadata_receiver,
@@ -120,8 +112,6 @@ async fn main() -> NodeResult<()> {
     wait_for_sigkill().await?;
 
     info!("Shutting down NucliaDB Writer Node...");
-    // notify that the gRPC service is not serving anymore
-    health_reporter.set_not_serving::<GrpcServer>().await;
     // abort all the tasks that hold a chitchat TCP/IP connection
     monitor_task.abort();
     update_task.abort();
@@ -148,14 +138,12 @@ async fn wait_for_sigkill() -> NodeResult<()> {
     Ok(())
 }
 
-pub async fn start_grpc_service(
-    grpc_driver: NodeWriterGRPCDriver,
-    health_service: HealthServer<impl Health>,
-    mut health_reporter: HealthReporter,
-) {
+pub async fn start_grpc_service(grpc_driver: NodeWriterGRPCDriver) {
     let addr = env::writer_listen_address();
 
     info!("Listening for gRPC requests at: {:?}", addr);
+
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
 
     health_reporter.set_serving::<GrpcServer>().await;
 
