@@ -128,7 +128,7 @@ async def global_query_to_pb(
         if advanced_query:
             raise HTTPException(
                 status_code=422,
-                detail="Search with custom synonyms is not compatible with providing advanced serach",
+                detail="Search with custom synonyms is not compatible with providing advanced search",
             )
         if SearchOptions.VECTOR in features or SearchOptions.RELATIONS in features:
             raise HTTPException(

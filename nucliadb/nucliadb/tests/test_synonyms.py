@@ -221,5 +221,5 @@ async def test_search_errors_if_advanced_query(
     assert resp.status_code == 422
     assert (
         resp.json()["detail"]
-        == "Search with custom synonyms is not compatible with providing advanced serach"
+        == "Search with custom synonyms is not compatible with providing advanced search"
     )
