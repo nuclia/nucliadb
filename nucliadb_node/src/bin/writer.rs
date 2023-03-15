@@ -143,9 +143,9 @@ pub async fn monitor_cluster(cluster_watcher: impl Stream<Item = Vec<NodeHandle>
 
             if let Ok(snapshot) = serde_json::to_string(&cluster_snapshot) {
                 info!("Cluster update: {snapshot}");
-            };
-        } else {
-            error!("Cluster snapshot cannot be serialized");
+            } else {
+                error!("Cluster snapshot cannot be serialized");
+            }
         }
     }
 }
