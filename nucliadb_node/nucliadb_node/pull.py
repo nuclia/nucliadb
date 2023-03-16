@@ -70,12 +70,19 @@ class Worker:
     async def finalize(self):
         if self.gc_task:
             self.gc_task.cancel()
+
         for subscription in self.subscriptions:
             try:
                 await subscription.drain()
             except nats.errors.ConnectionClosedError:
                 pass
         self.subscriptions = []
+
+        try:
+            await self.nc.close()
+        except (RuntimeError, AttributeError):  # pragma: no cover
+            pass
+
         transaction_utility = get_transaction()
         if transaction_utility:
             await transaction_utility.finalize()
