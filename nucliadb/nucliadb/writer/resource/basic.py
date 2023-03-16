@@ -228,8 +228,8 @@ def compute_title(item: CreateResourcePayload, resource_uuid: str) -> str:
     if len(item.links):
         link_field: LinkField = item.links.popitem()[1]
         return link_field.uri
-    title = None
+    filename = None
     if len(item.files):
         file_field: FileField = item.files.popitem()[1]
-        title = file_field.file.filename
-    return title or item.slug or resource_uuid
+        filename = file_field.file.filename
+    return filename or item.slug or resource_uuid
