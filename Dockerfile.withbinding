@@ -1,5 +1,7 @@
 FROM python:3.9 as python_rust
 
+ARG RUST_BUILD_PROFILE=release
+
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
@@ -29,20 +31,13 @@ RUN apt-get update -y && apt-get install --yes --no-install-recommends patchelf 
 
 RUN pip install maturin
 
-RUN set -eux; \
-    wget "https://github.com/tikv/client-py/archive/refs/tags/${CLIENT_VERSION}.tar.gz"; \
-    tar -xzf ${CLIENT_VERSION}.tar.gz; \
-    cd client-py-${CLIENT_VERSION}; \
-    maturin build --release; \
-    cp target/wheels/tikv_client-${CLIENT_VERSION}-*.whl /
-
 COPY . /nucliadb
 
 WORKDIR /nucliadb
 
 RUN set -eux; \
     cd nucliadb_node/binding; \
-    maturin build --release
+    maturin build --profile ${RUST_BUILD_PROFILE}
 
 
 FROM python:3.9
@@ -50,8 +45,8 @@ FROM python:3.9
 
 RUN ARCH="$(uname -m)"; \
     case "$ARCH" in \
-    aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_aarch64.whl;; \
-    x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-0.0.3-cp36-abi3-manylinux_2_31_x86_64.whl;; \
+    aarch64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-${CLIENT_VERSION}-cp36-abi3-manylinux_2_31_aarch64.whl;; \
+    x86_64) pip install https://storage.googleapis.com/stashify-cdn/python/tikv_client-${CLIENT_VERSION}-cp36-abi3-manylinux_2_31_x86_64.whl;; \
     esac;
 
 RUN mkdir -p /usr/src/app

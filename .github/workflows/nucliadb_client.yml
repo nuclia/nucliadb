@@ -77,7 +77,7 @@ jobs:
       - name: Build Nucliadb docker image (with compiled node bindings) for testing
         if: steps.filter.outputs.nucliadb_node_modified == 'true'
         run: |
-          docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .
+          docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding --build-arg RUST_BUILD_PROFILE=dev .
 
       - name: Build Nucliadb docker image (without bindings) for testing
         if: ${{ steps.filter.outputs.nucliadb_node_modified != 'true' && steps.filter.outputs.nucliadb_modified == 'true' }}
