@@ -4,27 +4,9 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_writer.yml"
-      - "charts/nucliadb_writer/**"
-      - "nucliadb/nucliadb/writer/**"
-      - "nucliadb_models/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb_utils/**"
-      - "nucliadb_telemetry/**"
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_writer.yml"
-      - "charts/nucliadb_writer/**"
-      - "nucliadb/nucliadb/writer/**"
-      - "nucliadb_models/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb_utils/**"
-      - "nucliadb_telemetry/**"
-      - "Dockerfile.writer"
-
 env:
   API_VERSION: 1
   COMPONENT: nucliadb-writer

@@ -7,10 +7,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_dataset.yml"
-      - "nucliadb_dataset/**"
-
 jobs:
   # Job to run pre-checks
   pre-checks:

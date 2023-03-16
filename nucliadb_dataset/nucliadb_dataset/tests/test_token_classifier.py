@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import tempfile
+import time
 
 import pyarrow as pa  # type: ignore
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -71,6 +72,10 @@ def test_live_token_classification(
         )
         partitions = fse.get_partitions()
         assert len(partitions) == 1
+
+        # TODO: remove after ticket sc-4488 is fixed
+        time.sleep(0.5)
+
         filename = fse.read_partition(partitions[0])
 
         with pa.memory_map(filename, "rb") as source:

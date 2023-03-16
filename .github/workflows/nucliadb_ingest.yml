@@ -4,32 +4,9 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_ingest.yml"
-      - "charts/nucliadb_ingest/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb_models/**"
-      - "nucliadb_utils/**"
-      - "nucliadb_telemetry/**"
-      - "test-requirements.txt"
-      - "Dockerfile"
-      - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/**"
-
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb_ingest.yml"
-      - "charts/nucliadb_ingest/**"
-      - "nucliadb/nucliadb/ingest/**"
-      - "nucliadb_models/**"
-      - "nucliadb_utils/**"
-      - "nucliadb_telemetry/**"
-      - "test-requirements.txt"
-      - "Dockerfile"
-      - "nucliadb_protos/python/**"
-      - "nucliadb_cluster/**"
 
 env:
   CONTAINER_REGISTRY: eu.gcr.io/${{ secrets.PROJECT_ID }}
