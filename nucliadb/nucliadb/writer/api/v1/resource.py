@@ -140,7 +140,7 @@ async def create_resource(
         toprocess.slug = item.slug
 
     parse_audit(writer.audit, request)
-    parse_basic(writer, item, toprocess)
+    parse_basic(writer, item, toprocess, resource_uuid=uuid)
 
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
