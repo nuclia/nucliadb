@@ -72,25 +72,26 @@ impl Node {
     }
 
     /// Loads the node from its view.
+    // NOTE: Turn the load score as an `u64` will fix these cast issues
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     async fn try_load(node: NodeView) -> Result<Node, Error> {
-        todo!()
+        let url = format!("http://{}", node.listen_address);
+        let mut grpc_client = GrpcClient::connect(url).await?;
 
-        // let url = format!("http://{}", node.listen_address);
-        // let mut grpc_client = GrpcClient::connect(url).await?;
+        let metadata = grpc_client
+            .get_metadata(Request::new(EmptyQuery {}))
+            .await?
+            .into_inner();
 
-        // let metadata = grpc_client
-        //     .get_metadata(Request::new(EmptyQuery {}))
-        //     .await?
-        //     .into_inner();
-
-        // Ok(Node {
-        //     id: node.id,
-        //     listen_address: node.listen_address,
-        //     shards: metadata
-        //         .into_iter()
-        //         .map(|(id, value)| Shard::new(id, value.load_score, value.kbid))
-        //         .collect(),
-        // })
+        Ok(Node {
+            id: node.id,
+            listen_address: node.listen_address,
+            shards: metadata
+                .shards
+                .into_iter()
+                .map(|(id, value)| Shard::new(id, value.load_score as u64, value.kbid))
+                .collect(),
+        })
     }
 
     /// Creates a new node.
