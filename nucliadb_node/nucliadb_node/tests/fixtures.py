@@ -21,7 +21,7 @@ import asyncio
 import os
 import tempfile
 import time
-from typing import AsyncIterable, Iterable
+from typing import AsyncIterable
 
 import docker  # type: ignore
 import pytest
@@ -229,8 +229,8 @@ def data_path():
 
 
 @pytest.fixture(scope="function")
-def shadow_folder(data_path) -> Iterable[str]:
-    yield shadow_shards.SHADOW_SHARDS_FOLDER.format(data_path=data_path)
+def shadow_folder(data_path) -> str:
+    return shadow_shards.SHADOW_SHARDS_FOLDER.format(data_path=data_path)
 
 
 @pytest.fixture(scope="function")
