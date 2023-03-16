@@ -29,7 +29,6 @@ on:
       - "nucliadb/nucliadb/search/**"
       - "nucliadb_models/**"
       - "nucliadb_protos/**"
-
 jobs:
   # Job to run pre-checks
   pre-checks:

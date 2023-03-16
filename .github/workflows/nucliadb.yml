@@ -8,18 +8,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - ".github/workflows/nucliadb.yml"
-      - "charts/nucliadb/**"
-      - "Dockerfile"
-      - "nucliadb/**"
-      - "nucliadb_utils/**"
-      - "nucliadb_fields_tantivy/**"
-      - "nucliadb_paragraphs_tantivy/**"
-      - "nucliadb_relations/**"
-      - "nucliadb_node/**"
-      - "nucliadb_vectors2/**"
-      - "nucliadb_protos/**"
   push:
     branches:
       - main
