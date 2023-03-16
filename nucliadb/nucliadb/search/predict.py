@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from enum import Enum
 from typing import List, Optional
 
 import aiohttp
@@ -24,6 +25,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
+from pydantic import BaseModel
 
 
 class SendToPredictError(Exception):
@@ -46,6 +48,23 @@ PUBLIC_PREDICT = "/api/v1/predict"
 PRIVATE_PREDICT = "/api/internal/predict"
 SENTENCE = "/sentence"
 TOKENS = "/tokens"
+
+
+class Author(str, Enum):
+    NUCLIA = "NUCLIA"
+    USER = "USER"
+
+
+class Message(BaseModel):
+    author: Author
+    text: str
+
+
+class ChatModel(BaseModel):
+    question: str
+    user_id: str
+    system: Optional[str] = None
+    context: List[Message] = []
 
 
 class PredictEngine:
@@ -76,6 +95,42 @@ class PredictEngine:
 
     async def finalize(self):
         await self.session.close()
+
+    async def chat_query(self, kbid: str, item: ChatModel) -> List[float]:
+        # If token is offered
+        if self.dummy:
+            self.calls.append(item)
+            return Q
+
+        if self.onprem is False:
+            # Upload the payload
+            resp = await self.session.get(
+                url=f"{self.cluster_url}{PRIVATE_PREDICT}{SENTENCE}?text={sentence}",
+                headers={"X-STF-KBID": kbid},
+            )
+            if resp.status == 200:
+                data = await resp.json()
+            else:
+                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        else:
+            if self.nuclia_service_account is None:
+                logger.warning(
+                    "Nuclia Service account is not defined so could not retrieve vectors for the query"
+                )
+                return []
+            # Upload the payload
+            headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
+            resp = await self.session.get(
+                url=f"{self.public_url}{PUBLIC_PREDICT}{SENTENCE}?text={sentence}",
+                headers=headers,
+            )
+            if resp.status == 200:
+                data = await resp.json()
+            else:
+                raise SendToPredictError(f"{resp.status}: {await resp.read()}")
+        if len(data["data"]) == 0:
+            raise PredictVectorMissing()
+        return data["data"]
 
     async def convert_sentence_to_vector(self, kbid: str, sentence: str) -> List[float]:
         # If token is offered
