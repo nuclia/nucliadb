@@ -90,6 +90,7 @@ async def test_creation(
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
+            "title": "My title",
             "slug": "myresource",
             "texts": {"text1": {"body": "My text"}},
         },
@@ -171,8 +172,11 @@ async def test_creation(
     request.metadata.text = True
     paragraph: TrainParagraph
     async for paragraph in nucliadb_train.GetParagraphs(request):  # type: ignore
-        assert paragraph.metadata.text == "My text"
-        assert paragraph.metadata.labels.paragraph[0].label == "title"
+        if paragraph.field.field == "title":
+            assert paragraph.metadata.text == "My title"
+        else:
+            assert paragraph.metadata.text == "My text"
+            assert paragraph.metadata.labels.paragraph[0].label == "title"
 
     # TRAINING REST API
     trainset = TrainSet()
