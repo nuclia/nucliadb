@@ -21,7 +21,7 @@ import asyncio
 import os
 import tempfile
 import time
-from typing import AsyncIterable
+from typing import AsyncIterable, Iterable
 
 import docker  # type: ignore
 import pytest
@@ -36,7 +36,7 @@ from pytest_docker_fixtures import images  # type: ignore
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
 
 from nucliadb_node import shadow_shards
-from nucliadb_node.app import main
+from nucliadb_node.app import App, main
 from nucliadb_node.settings import settings
 
 images.settings["nucliadb_node_reader"] = {
@@ -135,7 +135,7 @@ nucliadb_node_reader = nucliadbNodeReader()
 nucliadb_node_writer = nucliadbNodeWriter()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def node_single():
     docker_client = docker.from_env(version=BaseImage.docker_version)
     volume_node = docker_client.volumes.create(driver="local")
@@ -167,12 +167,27 @@ def node_single():
 
 
 @pytest.fixture(scope="function")
-async def sidecar(data_path, node_single, gcs_storage, natsd):
+async def writer_stub(node_single):
+    channel = aio.insecure_channel(settings.writer_listen_address)
+    stub = NodeWriterStub(channel)
+    yield stub
+
+
+@pytest.fixture(scope="function")
+async def sidecar(
+    node_single, writer_stub: NodeWriterStub, gcs_storage, natsd, data_path: str
+) -> AsyncIterable[App]:
     settings.force_host_id = "node1"
-    settings.data_path = "/tmp"
+    settings.data_path = data_path
     app = await main()
 
     yield app
+
+    # Cleanup all shards to be ready for following tests
+    shards = await writer_stub.ListShards(EmptyQuery())  # type: ignore
+    for shard in shards.ids:
+        deleted = await writer_stub.DeleteShard(shard)  # type: ignore
+        assert shard == deleted
 
     for finalizer in app.finalizers:
         if asyncio.iscoroutinefunction(finalizer):
@@ -182,20 +197,20 @@ async def sidecar(data_path, node_single, gcs_storage, natsd):
 
 
 @pytest.fixture(scope="function")
-async def sidecar_grpc_servicer(sidecar):
+async def sidecar_stub(sidecar):
     channel = aio.insecure_channel(settings.sidecar_listen_address)
-    yield channel
+    stub = NodeSidecarStub(channel)
+    yield stub
 
 
 @pytest.fixture(scope="function")
-async def shard() -> AsyncIterable[str]:
-    stub = NodeWriterStub(aio.insecure_channel(settings.writer_listen_address))
+async def shard(writer_stub: NodeWriterStub) -> AsyncIterable[str]:
     request = NewShardRequest(kbid="test")
-    shard: ShardCreated = await stub.NewShard(request)  # type: ignore
+    shard: ShardCreated = await writer_stub.NewShard(request)  # type: ignore
     yield shard.id
     sid = ShardId()
     sid.id = shard.id
-    await stub.DeleteShard(sid)  # type: ignore
+    await writer_stub.DeleteShard(sid)  # type: ignore
 
 
 @pytest.fixture(scope="function")
@@ -214,16 +229,17 @@ def data_path():
 
 
 @pytest.fixture(scope="function")
-def shadow_folder(data_path):
+def shadow_folder(data_path) -> Iterable[str]:
     yield shadow_shards.SHADOW_SHARDS_FOLDER.format(data_path=data_path)
 
 
 @pytest.fixture(scope="function")
-async def shadow_shard(shadow_folder) -> AsyncIterable[str]:
-    stub = NodeSidecarStub(aio.insecure_channel(settings.sidecar_listen_address))
-    resp = await stub.CreateShadowShard(EmptyQuery())  # type: ignore
+async def shadow_shard(
+    sidecar_stub: NodeSidecarStub, shadow_folder: str
+) -> AsyncIterable[str]:
+    resp = await sidecar_stub.CreateShadowShard(EmptyQuery())  # type: ignore
     assert resp.success
 
     yield resp.shard.id
 
-    await stub.DeleteShadowShard(resp.shard)  # type: ignore
+    await sidecar_stub.DeleteShadowShard(resp.shard)  # type: ignore

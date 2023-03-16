@@ -36,37 +36,12 @@ from nucliadb_utils.utilities import get_storage
 
 @pytest.mark.asyncio
 async def test_indexing(sidecar: App, shard: str):
-    # Upload a payload
+    node = settings.force_host_id
+    assert node is not None
 
-    pb = Resource()
-    pb.shard_id = shard
-    pb.resource.shard_id = shard
-    pb.resource.uuid = "1"
-    pb.metadata.modified.FromDatetime(datetime.now())
-    pb.metadata.created.FromDatetime(datetime.now())
-    pb.texts["title"].text = "My title"
-    pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
-    pb.texts["description"].text = "My description is amazing"
-    pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
-    pb.status = Resource.ResourceStatus.PROCESSED
-    pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
-    pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
-    pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
-    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
-        "title/0-10/0-10"
-    ].vector.extend([1.0] * 768)
-
-    # Create the message
-    storage = await get_storage(service_name=SERVICE_NAME)
-    assert settings.force_host_id is not None
-    index: IndexMessage = await storage.indexing(pb, settings.force_host_id, shard, 1)
-
-    # Push on stream
-    assert indexing_settings.index_jetstream_target is not None
-    await sidecar.worker.js.publish(
-        indexing_settings.index_jetstream_target.format(node=settings.force_host_id),
-        index.SerializeToString(),
-    )
+    resource = resource_payload(shard)
+    index = await create_indexing_message(resource, shard)
+    await send_indexing_message(sidecar, index, node)
 
     sipb = ShardId()
     sipb.id = shard
@@ -78,7 +53,7 @@ async def test_indexing(sidecar: App, shard: str):
         processed = False
 
     while processed is False:
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
         pbshard = await sidecar.reader.get_shard(sipb)
         if pbshard is not None and pbshard.resources > 0:
             processed = True
@@ -87,7 +62,7 @@ async def test_indexing(sidecar: App, shard: str):
 
     assert pbshard is not None
     assert pbshard.resources == 2
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.1)
 
     storage = await get_storage(service_name=SERVICE_NAME)
     with pytest.raises(KeyError):
@@ -96,40 +71,16 @@ async def test_indexing(sidecar: App, shard: str):
 
 @pytest.mark.asyncio
 async def test_indexing_not_found(sidecar: App):
-    # Upload a payload
+    node = settings.force_host_id
+    assert node is not None
 
-    pb = Resource()
-    pb.shard_id = "shard"
-    pb.resource.shard_id = "shard"
-    pb.resource.uuid = "1"
-    pb.metadata.modified.FromDatetime(datetime.now())
-    pb.metadata.created.FromDatetime(datetime.now())
-    pb.texts["title"].text = "My title"
-    pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
-    pb.texts["description"].text = "My description is amazing"
-    pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
-    pb.status = Resource.ResourceStatus.PROCESSED
-    pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
-    pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
-    pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
-    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
-        "title/0-10/0-10"
-    ].vector.extend([1.0] * 768)
-
-    # Create the message
-    storage = await get_storage(service_name=SERVICE_NAME)
-    assert settings.force_host_id is not None
-    index: IndexMessage = await storage.indexing(pb, settings.force_host_id, "shard", 1)
-
-    # Push on stream
-    assert indexing_settings.index_jetstream_target is not None
-    await sidecar.worker.js.publish(
-        indexing_settings.index_jetstream_target.format(node=settings.force_host_id),
-        index.SerializeToString(),
-    )
+    shard = "fake-shard"
+    resource = resource_payload(shard)
+    index = await create_indexing_message(resource, shard)
+    await send_indexing_message(sidecar, index, node)
 
     sipb = ShardId()
-    sipb.id = "shard"
+    sipb.id = shard
 
     with pytest.raises(AioRpcError):
         await sidecar.reader.get_shard(sipb)
@@ -138,24 +89,7 @@ async def test_indexing_not_found(sidecar: App):
 @pytest.mark.asyncio
 async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str):
     node_id = settings.force_host_id
-    # Upload a payload
-    pb = Resource()
-    pb.shard_id = shadow_shard
-    pb.resource.shard_id = shadow_shard
-    pb.resource.uuid = "1"
-    pb.metadata.modified.FromDatetime(datetime.now())
-    pb.metadata.created.FromDatetime(datetime.now())
-    pb.texts["title"].text = "My title"
-    pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
-    pb.texts["description"].text = "My description is amazing"
-    pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
-    pb.status = Resource.ResourceStatus.PROCESSED
-    pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
-    pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
-    pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
-    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
-        "title/0-10/0-10"
-    ].vector.extend([1.0] * 768)
+    pb = resource_payload(shadow_shard)
 
     # Add a set resource operation
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -202,3 +136,42 @@ async def test_indexing_shadow_shard(data_path, sidecar: App, shadow_shard: str)
     storage = await get_storage(service_name=SERVICE_NAME)
     with pytest.raises(KeyError):
         await storage.get_indexing(index)
+
+
+def resource_payload(shard: str) -> Resource:
+    pb = Resource()
+    pb.shard_id = shard
+    pb.resource.shard_id = shard
+    pb.resource.uuid = "1"
+    pb.metadata.modified.FromDatetime(datetime.now())
+    pb.metadata.created.FromDatetime(datetime.now())
+    pb.texts["title"].text = "My title"
+    pb.texts["title"].labels.extend(["/c/label1", "/c/label2"])
+    pb.texts["description"].text = "My description is amazing"
+    pb.texts["description"].labels.extend(["/c/label3", "/c/label4"])
+    pb.status = Resource.ResourceStatus.PROCESSED
+    pb.paragraphs["title"].paragraphs["title/0-10"].start = 0
+    pb.paragraphs["title"].paragraphs["title/0-10"].end = 10
+    pb.paragraphs["title"].paragraphs["title/0-10"].field = "title"
+    pb.paragraphs["title"].paragraphs["title/0-10"].sentences[
+        "title/0-10/0-10"
+    ].vector.extend([1.0] * 768)
+    return pb
+
+
+async def create_indexing_message(resource: Resource, shard: str) -> IndexMessage:
+    storage = await get_storage(service_name=SERVICE_NAME)
+    assert settings.force_host_id is not None
+    index: IndexMessage = await storage.indexing(
+        resource, settings.force_host_id, shard, 1
+    )
+    return index
+
+
+async def send_indexing_message(sidecar: App, index: IndexMessage, node: str):
+    # Push on stream
+    assert indexing_settings.index_jetstream_target is not None
+    await sidecar.worker.js.publish(
+        indexing_settings.index_jetstream_target.format(node=node),
+        index.SerializeToString(),
+    )

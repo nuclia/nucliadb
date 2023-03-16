@@ -23,18 +23,18 @@ from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 
 
 @pytest.mark.asyncio
-async def test_create_delete_shadow_shards(shadow_folder, sidecar_grpc_servicer):
-    stub = NodeSidecarStub(sidecar_grpc_servicer)
-
+async def test_create_delete_shadow_shards(
+    sidecar_stub: NodeSidecarStub, shadow_folder: str
+):
     # Create a shadow shard
-    response = await stub.CreateShadowShard(EmptyQuery())
+    response = await sidecar_stub.CreateShadowShard(EmptyQuery())  # type: ignore
     assert response.success
 
     # Delete now
     sipb = ShardId(id=response.shard.id)
-    response = await stub.DeleteShadowShard(sipb)
+    response = await sidecar_stub.DeleteShadowShard(sipb)  # type: ignore
     assert response.success
 
     # Deleting again should succed (not found)
-    response = await stub.DeleteShadowShard(sipb)
+    response = await sidecar_stub.DeleteShadowShard(sipb)  # type: ignore
     assert response.success
