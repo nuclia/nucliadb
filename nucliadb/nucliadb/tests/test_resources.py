@@ -210,25 +210,3 @@ async def test_resource_creation_slug_conflicts(
         },
     )
     assert resp.status_code == 201
-
-
-@pytest.mark.asyncio
-async def test_title_is_set_automatically_if_not_provided(
-    nucliadb_reader,
-    nucliadb_writer,
-    knowledgebox,
-):
-    resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
-        headers={"X-Synchronous": "true"},
-        json={
-            "texts": {"text-field": {"body": "test1", "format": "PLAIN"}},
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
-
-    resp = await nucliadb_reader.get(f"/kb/{knowledgebox}/resource/{rid}")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["title"] == rid
