@@ -25,6 +25,7 @@ from typing import List, Optional
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
+from nucliadb.search.requesters.utils import Method
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import SuggestResponse
 from nucliadb_protos.writer_pb2 import ShardObject
@@ -91,17 +92,8 @@ async def suggest_knowledgebox(
     highlight: bool = Query(False),
 ) -> KnowledgeboxSuggestResults:
     # We need the nodes/shards that are connected to the KB
-    nodemanager = get_nodes()
     audit = get_audit()
     start_time = time()
-
-    try:
-        shard_groups: List[ShardObject] = await nodemanager.get_shards_by_kbid(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
 
     # We need to query all nodes
     pb_query = await suggest_query_to_pb(
@@ -115,59 +107,9 @@ async def suggest_knowledgebox(
         range_modification_start,
         range_modification_end,
     )
-
-    incomplete_results = False
-    ops = []
-    queried_shards = []
-    for shard in shard_groups:
-        try:
-            node, shard_id, node_id = nodemanager.choose_node(shard)
-        except KeyError:
-            incomplete_results = True
-        else:
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                ops.append(suggest_shard(node, shard_id, pb_query))
-                queried_shards.append((node.label, shard_id, node_id))
-
-    if not ops:
-        await abort_transaction()
-        logger.info(f"No node found for any of this resources shards {kbid}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"No node found for any of this resources shards {kbid}",
-        )
-
-    try:
-        results: Optional[List[SuggestResponse]] = await asyncio.wait_for(  # type: ignore
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
-            timeout=settings.search_timeout,
-        )
-    except asyncio.TimeoutError as exc:
-        capture_exception(exc)
-        await abort_transaction()
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
-        else:
-            raise exc
-
-    if results is None:
-        await abort_transaction()
-        raise HTTPException(
-            status_code=500, detail=f"Error while executing shard queries"
-        )
-
-    for result in results:
-        if isinstance(result, Exception):
-            capture_exception(result)
-            await abort_transaction()
-            logger.exception("Error while querying shard data", exc_info=True)
-            raise HTTPException(
-                status_code=500, detail=f"Error while querying shard data"
-            )
+    results, incomplete_results, queried_nodes, queried_shards = await query(
+        kbid, Method.SEARCH, pb_query, []
+    )
 
     # We need to merge
     search_results = await merge_suggest_results(

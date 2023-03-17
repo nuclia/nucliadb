@@ -446,6 +446,22 @@ async def merge_relations_results(
     return relations
 
 
+async def find_merge_results(
+    search_responses: List[SearchResponse],
+    count: int,
+    page: int,
+    kbid: str,
+    show: List[ResourceProperties],
+    field_type_filter: List[FieldTypeName],
+    extracted: List[ExtractedDataTypeName],
+    sort: SortOptions,
+    requested_relations: EntitiesSubgraphRequest,
+    min_score: float = 0.85,
+    highlight: bool = False,
+) -> KnowledgeboxSearchResults:
+    pass
+
+
 async def merge_results(
     search_responses: List[SearchResponse],
     count: int,

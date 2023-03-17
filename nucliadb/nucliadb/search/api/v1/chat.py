@@ -17,16 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
+import base64
 from datetime import datetime
 from time import time
 from typing import List, Optional
 
 from fastapi import Body, Header, HTTPException, Query, Request, Response
+from nucliadb.search.predict import PredictEngine
+from nucliadb.search.requesters.relations import request_relations
+from nucliadb.search.requesters.utils import Method, query
+from starlette.responses import StreamingResponse
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
+from nucliadb.search.api.v1.find import find
 from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.nodereader_pb2 import SearchResponse
+from nucliadb_protos.nodereader_pb2 import (
+    RelationSearchRequest,
+    RelationSearchResponse,
+    SearchResponse,
+)
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from sentry_sdk import capture_exception
 
@@ -37,12 +46,17 @@ from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_nodes
+from nucliadb.search.utilities import get_nodes, get_predict
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
+    ChatModel,
+    ChatRequest,
+    FindRequest,
+    KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
+    Message,
     NucliaDBClientType,
     ResourceProperties,
     SearchOptions,
@@ -57,361 +71,108 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_audit
 
+END_OF_STREAM = "_END_"
 
-@api.get(
+CHAT_EXAMPLES = {
+    "search_and_chat": {
+        "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
+        "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "value": {
+            "query": "Noam Chomsky",
+            "filters": ["/n/i/application/pdf"],
+            "features": [SearchOptions.DOCUMENT],
+        },
+    },
+    "get_language_counts": {
+        "summary": "Get the number of documents for each language",
+        "description": "For a complete list of facets, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
+        "value": {
+            "page_size": 0,
+            "faceted": ["/s/p"],
+            "features": [SearchOptions.DOCUMENT],
+        },
+    },
+}
+
+
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/chat",
     status_code=200,
     name="Chat Knowledge Box",
     description="Chat on a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
-    response_model_exclude_unset=True,
     tags=["Search"],
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def search_knowledgebox(
+async def chat_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = Query(default=""),
-    advanced_query: Optional[str] = Query(default=None),
-    fields: List[str] = Query(default=[]),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: Optional[int] = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.DESC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    min_score: float = Query(default=0.70),
-    range_creation_start: Optional[datetime] = Query(default=None),
-    range_creation_end: Optional[datetime] = Query(default=None),
-    range_modification_start: Optional[datetime] = Query(default=None),
-    range_modification_end: Optional[datetime] = Query(default=None),
-    features: List[SearchOptions] = Query(
-        default=[
-            SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
-            SearchOptions.VECTOR,
-        ]
-    ),
-    reload: bool = Query(default=True),
-    debug: bool = Query(False),
-    highlight: bool = Query(default=False),
-    show: List[ResourceProperties] = Query([ResourceProperties.BASIC]),
-    field_type_filter: List[FieldTypeName] = Query(
-        list(FieldTypeName), alias="field_type"
-    ),
-    extracted: List[ExtractedDataTypeName] = Query(list(ExtractedDataTypeName)),
-    shards: List[str] = Query([]),
-    with_duplicates: bool = Query(default=False),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    with_synonyms: bool = Query(default=False),
+    item: ChatRequest = Body(examples=CHAT_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    item = SearchRequest(
-        query=query,
-        advanced_query=advanced_query,
-        fields=fields,
-        filters=filters,
-        faceted=faceted,
-        sort=(
-            SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-            if sort_field is not None
-            else None
-        ),
-        page_number=page_number,
-        page_size=page_size,
-        min_score=min_score,
-        range_creation_end=range_creation_end,
-        range_creation_start=range_creation_start,
-        range_modification_end=range_modification_end,
-        range_modification_start=range_modification_start,
-        features=features,
-        reload=reload,
-        debug=debug,
-        highlight=highlight,
-        show=show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
-        shards=shards,
-        with_duplicates=with_duplicates,
-        with_status=with_status,
-        with_synonyms=with_synonyms,
-    )
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
+) -> StreamingResponse:
+    predict = get_predict()
 
+    if len(item.context) > 0:
+        # There is context lets do a query
+        req = ChatModel()
+        req.context = item.context
+        # req.system = "You help creating new queries"
+        req.question = "Which question should be done to answer: " + item.query
 
-@api.get(
-    f"/{KB_PREFIX}/{{kbid}}/catalog",
-    status_code=200,
-    name="List resources of a Knowledge Box",
-    description="List resources of a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
-    response_model_exclude_unset=True,
-    tags=["Search"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def catalog(
-    request: Request,
-    response: Response,
-    kbid: str,
-    query: str = Query(default=""),
-    filters: List[str] = Query(default=[]),
-    faceted: List[str] = Query(default=[]),
-    sort_field: Optional[SortField] = Query(default=None),
-    sort_limit: int = Query(default=None, gt=0),
-    sort_order: SortOrder = Query(default=SortOrder.ASC),
-    page_number: int = Query(default=0),
-    page_size: int = Query(default=20),
-    shards: List[str] = Query([]),
-    with_status: Optional[ResourceProcessingStatus] = Query(default=None),
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    sort = None
-    if sort_field:
-        sort = SortOptions(field=sort_field, limit=sort_limit, order=sort_order)
-    item = SearchRequest(
-        query=query,
-        fields=["a/title"],
-        faceted=faceted,
-        filters=filters,
-        sort=sort,
-        page_number=page_number,
-        page_size=page_size,
-        features=[SearchOptions.DOCUMENT],
-        show=[ResourceProperties.BASIC],
-        shards=shards,
-        with_status=with_status,
-    )
-    return await search(
-        response,
-        kbid,
-        item,
-        x_ndb_client,
-        x_nucliadb_user,
-        x_forwarded_for,
-        do_audit=False,
-    )
+        new_query_elements = []
+        async for new_query_data in predict.chat_query(kbid, req):
+            new_query_elements.append(new_query_data)
 
-
-@api.post(
-    f"/{KB_PREFIX}/{{kbid}}/search",
-    status_code=200,
-    name="Search Knowledge Box",
-    description="Search on a Knowledge Box",
-    response_model=KnowledgeboxSearchResults,
-    response_model_exclude_unset=True,
-    tags=["Search"],
-)
-@requires(NucliaDBRoles.READER)
-@version(1)
-async def search_post_knowledgebox(
-    request: Request,
-    response: Response,
-    kbid: str,
-    item: SearchRequest = Body(examples=SEARCH_EXAMPLES),
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    # We need the nodes/shards that are connected to the KB
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
-    )
-
-
-async def search(
-    response: Response,
-    kbid: str,
-    item: SearchRequest,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-    do_audit: bool = True,
-) -> KnowledgeboxSearchResults:
-    nodemanager = get_nodes()
-    audit = get_audit()
-    start_time = time()
-
-    sort_options = parse_sort_options(item)
-
-    if item.query == "" and (item.vector is None or len(item.vector) == 0):
-        # If query is not defined we force to not return vector results
-        if SearchOptions.VECTOR in item.features:
-            item.features.remove(SearchOptions.VECTOR)
-
-    try:
-        shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
-
-    # We need to query all nodes
-    processed_query = pre_process_query(item.query)
-    pb_query, incomplete_results = await global_query_to_pb(
-        kbid,
-        features=item.features,
-        query=processed_query,
-        advanced_query=item.advanced_query,
-        filters=item.filters,
-        faceted=item.faceted,
-        sort=sort_options,
-        sort_ord=SortOrderMap[sort_options.order],
-        page_number=item.page_number,
-        page_size=item.page_size,
-        range_creation_start=item.range_creation_start,
-        range_creation_end=item.range_creation_end,
-        range_modification_start=item.range_modification_start,
-        range_modification_end=item.range_modification_end,
-        fields=item.fields,
-        reload=item.reload,
-        user_vector=item.vector,
-        vectorset=item.vectorset,
-        with_duplicates=item.with_duplicates,
-        with_status=item.with_status,
-        with_synonyms=item.with_synonyms,
-    )
-
-    ops = []
-    queried_shards = []
-    queried_nodes = []
-    for shard_obj in shard_groups:
-        try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_obj, item.shards)
-        except KeyError:
-            incomplete_results = True
-        else:
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                ops.append(query_shard(node, shard_id, pb_query))
-                queried_nodes.append((node.label, shard_id, node_id))
-                queried_shards.append(shard_id)
-
-    if not ops:
-        await abort_transaction()
-        logger.info(f"No node found for any of this resources shards {kbid}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"No node found for any of this resources shards {kbid}",
-        )
-
-    try:
-        results: Optional[List[SearchResponse]] = await asyncio.wait_for(  # type: ignore
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
-            timeout=settings.search_timeout,
-        )
-    except asyncio.TimeoutError as exc:
-        capture_exception(exc)
-        await abort_transaction()
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
-        else:
-            raise exc
-
-    if results is None:
-        await abort_transaction()
-        raise HTTPException(
-            status_code=500, detail=f"Error while executing shard queries"
-        )
-
-    for result in results:
-        if isinstance(result, Exception):
-            capture_exception(result)
-            await abort_transaction()
-            logger.exception("Error while querying shard data", exc_info=True)
-            raise HTTPException(
-                status_code=500, detail=f"Error while querying shard data"
-            )
-
-    # We need to merge
-    search_results = await merge_results(
-        results,
-        count=item.page_size,
-        page=item.page_number,
-        kbid=kbid,
-        show=item.show,
-        field_type_filter=item.field_type_filter,
-        extracted=item.extracted,
-        sort=sort_options,
-        requested_relations=pb_query.relation_subgraph,
-        min_score=item.min_score,
-        highlight=item.highlight,
-    )
-    await abort_transaction()
-
-    response.status_code = 206 if incomplete_results else 200
-
-    if audit is not None and do_audit:
-        await audit.search(
-            kbid,
-            x_nucliadb_user,
-            x_ndb_client.to_proto(),
-            x_forwarded_for,
-            pb_query,
-            time() - start_time,
-            len(search_results.resources),
-        )
-    if item.debug:
-        search_results.nodes = queried_nodes
-
-    search_results.shards = queried_shards
-    return search_results
-
-
-def parse_sort_options(item: SearchRequest) -> SortOptions:
-    if is_empty_query(item):
-        if item.sort is None:
-            sort_options = SortOptions(
-                field=SortField.CREATED,
-                order=SortOrder.DESC,
-                limit=None,
-            )
-        elif not is_valid_index_sort_field(item.sort.field):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Empty query can only be sorted by '{SortField.CREATED}' or"
-                    f" '{SortField.MODIFIED}' and sort limit won't be applied"
-                ),
-            )
-        else:
-            sort_options = item.sort
+        new_query = "".join(new_query_elements)
     else:
-        if item.sort is None:
-            sort_options = SortOptions(
-                field=SortField.SCORE,
-                order=SortOrder.DESC,
-                limit=None,
-            )
-        elif not is_valid_index_sort_field(item.sort.field) and item.sort.limit is None:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Sort by '{item.sort.field}' requires setting a sort limit",
-            )
-        else:
-            sort_options = item.sort
+        new_query = item.query
 
-    return sort_options
+    # ONLY PARAGRAPHS I VECTORS
+    find_request = FindRequest()
+    find_request.features = [
+        SearchOptions.PARAGRAPH,
+        SearchOptions.VECTOR,
+    ]
+    find_request.query = new_query
+    find_request.filters = item.filters
+    find_request.field_type_filter = item.field_type_filter
+    find_request.fields = item.fields
 
-
-def is_empty_query(request: SearchRequest) -> bool:
-    return len(request.query) == 0 and (
-        request.advanced_query is None or len(request.advanced_query) == 0
+    results = await find(
+        response, kbid, find_request, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
+    async def generate_answer(
+        results: KnowledgeboxFindResults, kbid: str, predict: PredictEngine
+    ):
+        results = base64.b64encode(results.json())
+        yield len(results).to_bytes(length=4, byteorder="big", signed=False)
+        yield results
 
-def is_valid_index_sort_field(field: SortField) -> bool:
-    return SortFieldMap[field] is not None
+        answer = []
+        async for data in predict.chat_query(kbid, item.context):
+            answer.append(data)
+            yield data
+        yield END_OF_STREAM
+
+        detected_entities = await predict.detect_entities(kbid, "".join(answer))
+        relation_request = RelationSearchRequest()
+        relation_request.subgraph.entry_points.extend(detected_entities)
+        relation_request.subgraph.depth = 1
+
+        relations_results: RelationSearchResponse
+        (
+            relations_results,
+            incomplete_results,
+            queried_nodes,
+            queried_shards,
+        ) = await query(kbid, Method.RELATIONS, relation_request, item.shards)
+        yield base64.b64encode(relations_results)
+
+    return StreamingResponse(
+        generate_answer(results, kbid, predict),
+        media_type="plain/text",
+    )

@@ -25,6 +25,7 @@ from typing import List, Optional
 from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
+from nucliadb.search.requesters.utils import Method, query
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import SearchResponse
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
@@ -33,7 +34,7 @@ from sentry_sdk import capture_exception
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
-from nucliadb.search.search.merge import merge_results
+from nucliadb.search.search.merge import find_merge_results, merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
 from nucliadb.search.search.shards import query_shard
 from nucliadb.search.settings import settings
@@ -42,6 +43,8 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
+    FindRequest,
+    KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     NucliaDBClientType,
     ResourceProperties,
@@ -57,7 +60,7 @@ from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.utilities import get_audit
 
-SEARCH_EXAMPLES = {
+FIND_EXAMPLES = {
     "filtering_by_icon": {
         "summary": "Search for pdf documents where the text 'Noam Chomsky' appears",
         "description": "For a complete list of filters, visit: https://github.com/nuclia/nucliadb/blob/main/docs/internal/SEARCH.md#filters-and-facets",  # noqa
@@ -112,7 +115,6 @@ async def find_knowledgebox(
     features: List[SearchOptions] = Query(
         default=[
             SearchOptions.PARAGRAPH,
-            SearchOptions.DOCUMENT,
             SearchOptions.VECTOR,
         ]
     ),
@@ -131,8 +133,8 @@ async def find_knowledgebox(
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
-) -> KnowledgeboxSearchResults:
-    item = SearchRequest(
+) -> KnowledgeboxFindResults:
+    item = FindRequest(
         query=query,
         advanced_query=advanced_query,
         fields=fields,
@@ -162,7 +164,7 @@ async def find_knowledgebox(
         with_status=with_status,
         with_synonyms=with_synonyms,
     )
-    return await search(
+    return await find(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
@@ -182,27 +184,26 @@ async def find_post_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    item: SearchRequest = Body(examples=SEARCH_EXAMPLES),
+    item: FindRequest = Body(examples=FIND_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults:
     # We need the nodes/shards that are connected to the KB
-    return await search(
+    return await find(
         response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
     )
 
 
-async def search(
+async def find(
     response: Response,
     kbid: str,
-    item: SearchRequest,
+    item: FindRequest,
     x_ndb_client: NucliaDBClientType,
     x_nucliadb_user: str,
     x_forwarded_for: str,
     do_audit: bool = True,
-) -> KnowledgeboxSearchResults:
-    nodemanager = get_nodes()
+) -> KnowledgeboxFindResults:
     audit = get_audit()
     start_time = time()
 
@@ -212,14 +213,6 @@ async def search(
         # If query is not defined we force to not return vector results
         if SearchOptions.VECTOR in item.features:
             item.features.remove(SearchOptions.VECTOR)
-
-    try:
-        shard_groups: List[PBShardObject] = await nodemanager.get_shards_by_kbid(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
 
     # We need to query all nodes
     processed_query = pre_process_query(item.query)
@@ -247,62 +240,12 @@ async def search(
         with_synonyms=item.with_synonyms,
     )
 
-    ops = []
-    queried_shards = []
-    queried_nodes = []
-    for shard_obj in shard_groups:
-        try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_obj, item.shards)
-        except KeyError:
-            incomplete_results = True
-        else:
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                ops.append(query_shard(node, shard_id, pb_query))
-                queried_nodes.append((node.label, shard_id, node_id))
-                queried_shards.append(shard_id)
-
-    if not ops:
-        await abort_transaction()
-        logger.info(f"No node found for any of this resources shards {kbid}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"No node found for any of this resources shards {kbid}",
-        )
-
-    try:
-        results: Optional[List[SearchResponse]] = await asyncio.wait_for(  # type: ignore
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
-            timeout=settings.search_timeout,
-        )
-    except asyncio.TimeoutError as exc:
-        capture_exception(exc)
-        await abort_transaction()
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
-        else:
-            raise exc
-
-    if results is None:
-        await abort_transaction()
-        raise HTTPException(
-            status_code=500, detail=f"Error while executing shard queries"
-        )
-
-    for result in results:
-        if isinstance(result, Exception):
-            capture_exception(result)
-            await abort_transaction()
-            logger.exception("Error while querying shard data", exc_info=True)
-            raise HTTPException(
-                status_code=500, detail=f"Error while querying shard data"
-            )
+    results, incomplete_results, queried_nodes, queried_shards = await query(
+        kbid, Method.SEARCH, pb_query, item.shards
+    )
 
     # We need to merge
-    search_results = await merge_results(
+    search_results = await find_merge_results(
         results,
         count=item.page_size,
         page=item.page_number,

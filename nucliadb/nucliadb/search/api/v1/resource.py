@@ -24,6 +24,7 @@ from typing import List, Optional
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 from grpc import StatusCode as GrpcStatusCode
+from nucliadb.search.requesters.utils import Method
 from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import ParagraphSearchResponse
 from sentry_sdk import capture_exception
@@ -101,17 +102,6 @@ async def search(
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
-    # We need the nodes/shards that are connected to the KB
-    nodemanager = get_nodes()
-
-    try:
-        shard_groups = await nodemanager.get_shards_by_kbid(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
-
     # We need to query all nodes
     pb_query = await paragraph_query_to_pb(
         [SearchOptions.PARAGRAPH],
@@ -130,58 +120,9 @@ async def search(
         sort=sort.value if sort else None,
     )
 
-    incomplete_results = False
-    ops = []
-    queried_nodes = []
-    queried_shards = []
-    for shard_obj in shard_groups:
-        try:
-            node, shard_id, node_id = nodemanager.choose_node(shard_obj, shards)
-        except KeyError:
-            incomplete_results = True
-        else:
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                ops.append(query_paragraph_shard(node, shard_id, pb_query))
-                queried_nodes.append((node.label, shard_id, node_id))
-                queried_shards.append(shard_id)
-
-    if not ops:
-        await abort_transaction()
-        raise HTTPException(
-            status_code=500, detail=f"No node found for any of this resources shards"
-        )
-
-    try:
-        results: Optional[List[ParagraphSearchResponse]] = await asyncio.wait_for(
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
-            timeout=settings.search_timeout,  # type: ignore
-        )
-    except asyncio.TimeoutError as exc:
-        capture_exception(exc)
-        await abort_transaction()
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
-        else:
-            raise exc
-
-    if results is None:
-        await abort_transaction()
-        raise HTTPException(
-            status_code=500, detail=f"Error while executing shard queries"
-        )
-
-    for result in results:
-        if isinstance(result, Exception):
-            capture_exception(result)
-            await abort_transaction()
-            logger.exception("Error while querying shard data", exc_info=True)
-            raise HTTPException(
-                status_code=500, detail=f"Error while querying shard data"
-            )
+    results, incomplete_results, queried_nodes, queried_shards = await query(
+        kbid, Method.SEARCH, pb_query, shards
+    )
 
     # We need to merge
     search_results = await merge_paragraphs_results(

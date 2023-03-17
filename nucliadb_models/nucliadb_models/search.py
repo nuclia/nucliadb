@@ -363,3 +363,86 @@ class SearchRequest(BaseModel):
     with_duplicates: bool = False
     with_status: Optional[ResourceProcessingStatus] = None
     with_synonyms: bool = False
+
+
+class Author(str, Enum):
+    NUCLIA = "NUCLIA"
+    USER = "USER"
+
+
+class Message(BaseModel):
+    author: Author
+    text: str
+
+
+class ChatModel(BaseModel):
+    question: str
+    user_id: str
+    system: Optional[str] = None
+    context: List[Message] = []
+
+
+class ChatRequest(BaseModel):
+    query: str = ""
+    fields: List[str] = []
+    filters: List[str] = []
+    sort: Optional[SortOptions] = None
+    min_score: float = 0.70
+    range_creation_start: Optional[datetime] = None
+    range_creation_end: Optional[datetime] = None
+    range_modification_start: Optional[datetime] = None
+    range_modification_end: Optional[datetime] = None
+    field_type_filter: List[FieldTypeName] = list(FieldTypeName)
+    extracted: List[ExtractedDataTypeName] = list(ExtractedDataTypeName)
+    shards: List[str] = []
+    context: Optional[List[Message]] = None
+
+
+class FindRequest(SearchRequest):
+    pass
+
+
+class SCORE_TYPE(str, Enum):
+    VECTOR = "VECTOR"
+    BM25 = "BM25"
+
+
+class FindTextPosition(BaseModel):
+    page_number: Optional[int]
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
+    index: int
+    start: int
+    end: int
+
+
+class FindParagraph(BaseModel):
+    score: float
+    score_type: SCORE_TYPE
+    text: str
+    labels: List[str] = []
+    position: Optional[TextPosition] = None
+
+
+class FindField(BaseModel):
+    field_type: str
+    field: str
+    paragraphs: List[FindParagraph]
+
+
+class FindResource(Resource):
+    fields: List[FindField]
+
+
+class KnowledgeboxFindResults(BaseModel):
+    resources: List[FindResource]
+    query: Optional[str] = None
+    total: int = 0
+    page_number: int = 0
+    page_size: int = 20
+    next_page: bool = False
+
+
+class FeedbackRequest(BaseModel):
+    # TODO
+    pass
