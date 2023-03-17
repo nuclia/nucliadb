@@ -87,9 +87,11 @@ from nucliadb_utils.utilities import (
 if TYPE_CHECKING:  # pragma: no cover
     SKIP_STORE_DEFAULT = False
     SYNC_CALL = False
+    X_NUCLIADB_USER = ""
 else:
     SKIP_STORE_DEFAULT = Header(False)
     SYNC_CALL = Header(False)
+    X_NUCLIADB_USER = Header("")
 
 
 @api.post(
@@ -226,6 +228,7 @@ async def modify_resource(
     rslug: Optional[str] = None,
     x_skip_store: bool = SKIP_STORE_DEFAULT,
     x_synchronous: bool = SYNC_CALL,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     transaction = get_transaction()
     processing = get_processing()
@@ -240,7 +243,7 @@ async def modify_resource(
         uuid=rid,
         kbid=kbid,
         partition=partition,
-        userid=request.headers.get("X-NUCLIADB-USER", ""),
+        userid=x_nucliadb_user,
         processing_options=item.processing_options,
     )
 
@@ -307,6 +310,7 @@ async def reprocess_resource(
     kbid: str,
     rid: Optional[str] = None,
     rslug: Optional[str] = None,
+    x_nucliadb_user: str = X_NUCLIADB_USER,
 ):
     transaction = get_transaction()
     processing = get_processing()
@@ -320,7 +324,7 @@ async def reprocess_resource(
         uuid=rid,
         kbid=kbid,
         partition=partition,
-        userid=request.headers.get("X-NUCLIADB-USER", ""),
+        userid=x_nucliadb_user,
     )
 
     toprocess.kbid = kbid
