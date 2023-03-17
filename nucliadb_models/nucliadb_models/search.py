@@ -399,7 +399,10 @@ class ChatRequest(BaseModel):
 
 
 class FindRequest(SearchRequest):
-    pass
+    features: List[SearchOptions] = [
+        SearchOptions.PARAGRAPH,
+        SearchOptions.VECTOR,
+    ]
 
 
 class SCORE_TYPE(str, Enum):
@@ -436,6 +439,7 @@ class FindResource(Resource):
 
 class KnowledgeboxFindResults(BaseModel):
     resources: List[FindResource]
+    facets: FacetsResult
     query: Optional[str] = None
     total: int = 0
     page_number: int = 0

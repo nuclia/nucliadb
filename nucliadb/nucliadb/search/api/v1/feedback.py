@@ -78,7 +78,6 @@ async def feedback_knowledgebox(
     x_forwarded_for: str = Header(""),
 ):
     predict = get_predict()
-    predict
-    return await search(
-        response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for
+    await predict.send_feedback(
+        kbid, item, x_nucliadb_user, x_ndb_client, x_forwarded_for
     )

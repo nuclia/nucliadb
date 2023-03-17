@@ -26,7 +26,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
-from pydantic import BaseModel
+import json
 
 
 class SendToPredictError(Exception):
@@ -82,15 +82,28 @@ class PredictEngine:
     async def finalize(self):
         await self.session.close()
 
-    async def send_feedback(self, kbid: str, item: FeedbackRequest):
+    async def send_feedback(
+        self,
+        kbid: str,
+        item: FeedbackRequest,
+        x_nucliadb_user: str,
+        x_ndb_client: str,
+        x_forwarded_for: str,
+    ):
         if self.dummy:
             self.calls.append(item)
             return
+
+        data = item.dict()
+        data["user"] = x_nucliadb_user
+        data["client"] = x_ndb_client
+        data["forwarded"] = x_forwarded_for
+
         if self.onprem is False:
             # Upload the payload
             resp = await self.session.post(
                 url=f"{self.cluster_url}{PRIVATE_PREDICT}{CHAT}",
-                json=item.json(),
+                json=json.dumps(data),
                 headers={"X-STF-KBID": kbid},
             )
             if resp.status != 200:
@@ -105,7 +118,7 @@ class PredictEngine:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.post(
                 url=f"{self.public_url}{PUBLIC_PREDICT}{CHAT}",
-                json=item.json(),
+                json=json.dumps(data),
                 headers=headers,
             )
             if resp.status != 200:
