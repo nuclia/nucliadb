@@ -261,7 +261,11 @@ class GCSStorageField(StorageField):
         return field
 
     @backoff.on_exception(
-        backoff.constant, RETRIABLE_EXCEPTIONS, interval=1, max_tries=4
+        backoff.constant,
+        RETRIABLE_EXCEPTIONS,
+        interval=1,
+        max_tries=4,
+        jitter=backoff.random_jitter,
     )
     async def _append(self, cf: CloudFile, data: bytes):
         if self.field is None:
