@@ -87,7 +87,7 @@ jobs:
       - name: Build local NucliaDB with Binding for testing
         if: steps.filter.outputs.nucliadb_node_modified == 'true'
         run: |
-          docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding .
+          docker build -t nuclia/nucliadb:latest -f Dockerfile.withbinding --build-arg RUST_BUILD_PROFILE=dev .
 
       - name: Run tests
         run: |
