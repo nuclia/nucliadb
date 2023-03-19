@@ -17,26 +17,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
-from grpc import StatusCode as GrpcStatusCode
-from nucliadb.search.requesters.utils import Method
-from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.nodereader_pb2 import ParagraphSearchResponse
-from sentry_sdk import capture_exception
 
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
-from nucliadb.search import SERVICE_NAME, logger
+from nucliadb.search import SERVICE_NAME
+from nucliadb.search.requesters.utils import Method
 from nucliadb.search.search.fetch import abort_transaction
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
-from nucliadb.search.search.shards import query_paragraph_shard
-from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_nodes
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -47,7 +39,6 @@ from nucliadb_models.search import (
     SortField,
 )
 from nucliadb_utils.authentication import requires_one
-from nucliadb_utils.exceptions import ShardsNotFound
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 

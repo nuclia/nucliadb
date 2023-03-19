@@ -1,11 +1,10 @@
+import asyncio
 from enum import Enum
 from typing import List, Optional, Tuple, Union
-from nucliadb.search.search.shards import (
-    query_paragraph_shard,
-    query_shard,
-    relations_shard,
-    suggest_shard,
-)
+
+from fastapi import HTTPException
+from grpc import StatusCode as GrpcStatusCode
+from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.nodereader_pb2 import (
     ParagraphSearchRequest,
     ParagraphSearchResponse,
@@ -17,18 +16,19 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb.search.utilities import get_nodes
-from nucliadb.search.search.fetch import abort_transaction  # type: ignore
-
-from nucliadb_utils.exceptions import ShardsNotFound
-from fastapi import HTTPException
-from nucliadb.search import logger
 from sentry_sdk import capture_exception
-from grpc.aio import AioRpcError  # type: ignore
-from grpc import StatusCode as GrpcStatusCode
-from nucliadb.search.settings import settings
 
-import asyncio
+from nucliadb.search import logger
+from nucliadb.search.search.fetch import abort_transaction  # type: ignore
+from nucliadb.search.search.shards import (
+    query_paragraph_shard,
+    query_shard,
+    relations_shard,
+    suggest_shard,
+)
+from nucliadb.search.settings import settings
+from nucliadb.search.utilities import get_nodes
+from nucliadb_utils.exceptions import ShardsNotFound
 
 
 class Method(Enum):
@@ -74,6 +74,7 @@ async def query(
     ops = []
     queried_shards = []
     queried_nodes = []
+    incomplete_results = False
     for shard_obj in shard_groups:
         try:
             node, shard_id, node_id = nodemanager.choose_node(shard_obj, shards)

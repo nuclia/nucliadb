@@ -17,13 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from google.protobuf.json_format import MessageToDict
 from nucliadb_protos.audit_pb2 import ClientType
-from nucliadb_protos.nodereader_pb2 import OrderBy
+from nucliadb_protos.nodereader_pb2 import DocumentScored, OrderBy
+from nucliadb_protos.nodereader_pb2 import ParagraphResult as PBParagraphResult
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
@@ -88,6 +90,8 @@ class TextPosition(BaseModel):
     index: int
     start: int
     end: int
+    start_seconds: Optional[List[int]] = None
+    end_seconds: Optional[List[int]] = None
 
 
 class Sentence(BaseModel):
@@ -423,28 +427,38 @@ class FindParagraph(BaseModel):
     score: float
     score_type: SCORE_TYPE
     text: str
+    id: str
     labels: List[str] = []
     position: Optional[TextPosition] = None
 
 
-class FindField(BaseModel):
-    field_type: str
+@dataclass
+class TempFindParagraph:
+    rid: str
     field: str
-    paragraphs: List[FindParagraph]
+    score: float
+    paragraph: Optional[FindParagraph] = None
+    vector_index: Optional[DocumentScored] = None
+    paragraph_index: Optional[PBParagraphResult] = None
+
+
+class FindField(BaseModel):
+    paragraphs: Dict[str, FindParagraph]
 
 
 class FindResource(Resource):
-    fields: List[FindField]
+    fields: Optional[Dict[str, FindField]]
 
 
 class KnowledgeboxFindResults(BaseModel):
-    resources: List[FindResource]
+    resources: Dict[str, FindResource]
     facets: FacetsResult
     query: Optional[str] = None
     total: int = 0
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
+    shards: Optional[List[str]]
 
 
 class FeedbackRequest(BaseModel):

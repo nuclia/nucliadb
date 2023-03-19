@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from collections import Counter
 import datetime
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -53,7 +52,6 @@ from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
     EntitySubgraph,
-    KnowledgeboxFindResults,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
@@ -446,49 +444,6 @@ async def merge_relations_results(
                     capture_message(error_msg, "error")
 
     return relations
-
-async def merge_paragraphs_vectors(paragraphs: List[ParagraphResult], vectors: List[DocumentScored]):
-    
-    
-
-async def find_merge_results(
-    search_responses: List[SearchResponse],
-    count: int,
-    page: int,
-    kbid: str,
-    show: List[ResourceProperties],
-    field_type_filter: List[FieldTypeName],
-    extracted: List[ExtractedDataTypeName],
-    sort: SortOptions,
-    requested_relations: EntitiesSubgraphRequest,
-    min_score: float = 0.85,
-    highlight: bool = False,
-) -> KnowledgeboxSearchResults:
-    paragraphs = []
-    vectors = []
-    relations = []
-
-    api_results = KnowledgeboxFindResults()
-    facets_counter = Counter()
-    bm25 = True
-    next_page = True
-    ematches = []
-    for response in search_responses:
-        # Merge facets
-        facets_counter.update(response.paragraph.facets)
-        ematches.extend(response.paragraph.ematches)
-        bm25 = bm25 and response.paragraph.bm25
-        next_page = next_page and response.paragraph.next_page
-
-        paragraphs.append(response.paragraph)
-        vectors.append(response.vector)
-
-        relations.append(response.relation)
-
-    api_results.facets.update
-    get_resource_cache(clear=True)
-
-    await merge_paragraphs_vectors(paragraphs, vectors)
 
 
 async def merge_results(

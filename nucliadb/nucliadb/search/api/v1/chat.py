@@ -18,58 +18,27 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from datetime import datetime
-from time import time
-from typing import List, Optional
 
-from fastapi import Body, Header, HTTPException, Query, Request, Response
-from nucliadb.search.predict import PredictEngine
-from nucliadb.search.requesters.relations import request_relations
-from nucliadb.search.requesters.utils import Method, query
-from starlette.responses import StreamingResponse
+from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
-from grpc import StatusCode as GrpcStatusCode
-from nucliadb.search.api.v1.find import find
-from grpc.aio import AioRpcError  # type: ignore
-from nucliadb_protos.nodereader_pb2 import (
-    RelationSearchRequest,
-    RelationSearchResponse,
-    SearchResponse,
-)
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from sentry_sdk import capture_exception
+from nucliadb_protos.nodereader_pb2 import RelationSearchRequest, RelationSearchResponse
+from starlette.responses import StreamingResponse
 
-from nucliadb.search import logger
+from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.search.fetch import abort_transaction  # type: ignore
-from nucliadb.search.search.merge import merge_results
-from nucliadb.search.search.query import global_query_to_pb, pre_process_query
-from nucliadb.search.search.shards import query_shard
-from nucliadb.search.settings import settings
-from nucliadb.search.utilities import get_nodes, get_predict
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.metadata import ResourceProcessingStatus
-from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
+from nucliadb.search.predict import PredictEngine
+from nucliadb.search.requesters.utils import Method, query
+from nucliadb.search.utilities import get_predict
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     ChatModel,
     ChatRequest,
     FindRequest,
     KnowledgeboxFindResults,
-    KnowledgeboxSearchResults,
-    Message,
     NucliaDBClientType,
-    ResourceProperties,
     SearchOptions,
-    SearchRequest,
-    SortField,
-    SortFieldMap,
-    SortOptions,
-    SortOrder,
-    SortOrderMap,
 )
 from nucliadb_utils.authentication import requires
-from nucliadb_utils.exceptions import ShardsNotFound
-from nucliadb_utils.utilities import get_audit
 
 END_OF_STREAM = "_END_"
 

@@ -17,16 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from enum import Enum
-from typing import AsyncGenerator, List, Optional
+import json
+from typing import AsyncIterator, List, Optional
 
 import aiohttp
-from nucliadb_models.search import ChatModel, FeedbackRequest
 from nucliadb_protos.utils_pb2 import RelationNode
 
 from nucliadb.ingest.tests.vectors import Q
 from nucliadb.search import logger
-import json
+from nucliadb_models.search import ChatModel, FeedbackRequest
 
 
 class SendToPredictError(Exception):
@@ -90,9 +89,6 @@ class PredictEngine:
         x_ndb_client: str,
         x_forwarded_for: str,
     ):
-        if self.dummy:
-            self.calls.append(item)
-            return
 
         data = item.dict()
         data["user"] = x_nucliadb_user
@@ -124,11 +120,8 @@ class PredictEngine:
             if resp.status != 200:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
-    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncGenerator[str]:
+    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncIterator[str]:
         # If token is offered
-        if self.dummy:
-            self.calls.append(item)
-            raise StopAsyncIteration()
 
         if self.onprem is False:
             # Upload the payload
@@ -141,10 +134,9 @@ class PredictEngine:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
         else:
             if self.nuclia_service_account is None:
-                logger.warning(
-                    "Nuclia Service account is not defined so could not retrieve vectors for the query"
-                )
-                return []
+                error = "Nuclia Service account is not defined so could not retrieve vectors for the query"
+                logger.warning(error)
+                raise SendToPredictError(error)
             # Upload the payload
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             resp = await self.session.post(

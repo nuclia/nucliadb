@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import re
 import string
 from contextvars import ContextVar
@@ -41,6 +42,10 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
     "rcache", default=None
 )
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
+
+global_rcache_lock = asyncio.Lock()
+
+RESOURCE_LOCKS: Dict[str, asyncio.Lock] = {}
 
 PRE_WORD = string.punctuation + " "
 
@@ -91,18 +96,27 @@ async def fetch_resources(
 
 
 async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
-    resouce_cache = get_resource_cache()
     orm_resource: Optional[ResourceORM] = None
-    if uuid not in resouce_cache:
-        transaction = await get_transaction()
-        storage = await get_storage(service_name=SERVICE_NAME)
-        cache = await get_cache()
-        kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
-        orm_resource = await kb.get(uuid)
+
+    async with global_rcache_lock:
+        resouce_cache = get_resource_cache()
+
+    await (RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock())).acquire()
+
+    try:
+        if uuid not in resouce_cache:
+            transaction = await get_transaction()
+            storage = await get_storage(service_name=SERVICE_NAME)
+            cache = await get_cache()
+            kb = KnowledgeBoxORM(transaction, storage, cache, kbid)
+            orm_resource = await kb.get(uuid)
+
         if orm_resource is not None:
             resouce_cache[uuid] = orm_resource
-    else:
-        orm_resource = resouce_cache.get(uuid)
+        else:
+            orm_resource = resouce_cache.get(uuid)
+    finally:
+        RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock()).release()
     return orm_resource
 
 
