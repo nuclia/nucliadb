@@ -17,9 +17,26 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import BaseSettings
+
+
+class DriverConfig(str, Enum):
+    redis = "redis"
+    tikv = "tikv"
+    pg = "pg"
+    local = "local"
+
+    @classmethod
+    def _missing_(cls, value):
+        """
+        allow case insensitive enum values
+        """
+        for member in cls:
+            if member.value == value.lower():
+                return member
 
 
 class Settings(BaseSettings):
@@ -28,14 +45,15 @@ class Settings(BaseSettings):
     inner_metrics_host: str = "0.0.0.0"
     inner_metrics_port: int = 8081
 
-    driver: str = "redis"  # redis | tikv
+    # allowing defaults is not ideal
+    # TODO: implement settings without defaults
+    driver: DriverConfig = DriverConfig.redis
     driver_redis_url: Optional[str] = None
     driver_tikv_url: Optional[List[str]] = []
     driver_local_url: Optional[str] = None
+    driver_pg_url: Optional[str] = None
 
-    partitions: List[str] = [
-        "1",
-    ]
+    partitions: List[str] = ["1"]
 
     pull_time: int = 100
 

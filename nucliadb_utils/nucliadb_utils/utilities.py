@@ -121,6 +121,14 @@ async def get_storage(
         await gcsutil.initialize(service_name)
         logger.info("Configuring GCS Storage")
 
+    elif storage_settings.file_backend == "pg" and Utility.STORAGE not in MAIN:
+        from nucliadb_utils.storages.pg import PostgresStorage
+
+        pgutil = PostgresStorage(storage_settings.driver_pg_url)  # type: ignore
+        set_utility(Utility.STORAGE, pgutil)
+        await pgutil.initialize()
+        logger.info("Configuring GCS Storage")
+
     elif (
         storage_settings.file_backend == "local"
         and Utility.STORAGE not in MAIN

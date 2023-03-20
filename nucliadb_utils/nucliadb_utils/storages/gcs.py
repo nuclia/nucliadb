@@ -595,7 +595,7 @@ class GCSStorage(Storage):
         )
         return bucket_name
 
-    async def create_kb(self, kbid: str):
+    async def create_kb(self, kbid: str) -> bool:
         bucket_name = self.get_bucket_name(kbid)
         created = False
         try:

@@ -73,4 +73,8 @@ setup(
         "Github": "https://github.com/nuclia/nucliadb",
         "Discord": "https://discord.gg/8EvQwmsbzf",
     },
+    extras_require={
+        "redis": ["redis>=4.3.4"],
+        "postgres": ["asyncpg>=0.27.0"],
+    },
 )

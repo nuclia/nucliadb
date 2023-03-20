@@ -18,6 +18,7 @@ message CloudFile {
         EXTERNAL = 4;
         EMPTY = 5;
         EXPORT = 6;
+        POSTGRES = 7;
     }
     Source source = 5;
     string filename = 6;

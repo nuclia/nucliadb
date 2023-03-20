@@ -47,6 +47,13 @@ except ImportError:  # pragma: no cover
 
 
 try:
+    from nucliadb.ingest.maindb.pg import PGDriver
+
+    PG = True
+except ImportError:  # pragma: no cover
+    PG = False
+
+try:
     from nucliadb.ingest.maindb.local import LocalDriver
 
     FILES = True
@@ -71,6 +78,14 @@ async def get_driver() -> Driver:
     ):
         tikv_driver = TiKVDriver(settings.driver_tikv_url)
         MAIN["driver"] = tikv_driver
+    elif (
+        settings.driver == "pg"
+        and PG
+        and "driver" not in MAIN
+        and settings.driver_pg_url is not None
+    ):
+        pg_driver = PGDriver(settings.driver_pg_url)
+        MAIN["driver"] = pg_driver
     elif (
         settings.driver == "local"
         and FILES

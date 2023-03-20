@@ -4,7 +4,7 @@ install-dev:
 	pip install -r ../code-requirements.txt
 	cd .. && pip install -r nucliadb_utils/requirements-sources.txt
 	pip install -r requirements.txt
-	pip install -e .[cache,storages,fastapi]
+	pip install -e .[cache,storages,fastapi,postgres]
 
 .PHONY: format
 format:

@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncpg
 import pytest
 
+from nucliadb.ingest.maindb.pg import PGDriver
 from nucliadb.ingest.maindb.redis import RedisDriver
 from nucliadb.ingest.maindb.tikv import TiKVDriver
 
@@ -34,6 +36,20 @@ async def test_redis_driver(redis):
 async def test_tikv_driver(tikvd):
     url = [f"{tikvd[0]}:{tikvd[2]}"]
     driver = TiKVDriver(url=url)
+    await driver_basic(driver)
+
+
+@pytest.mark.asyncio
+async def test_pg_driver(pg):
+    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    conn = await asyncpg.connect(url)
+    await conn.execute(
+        """
+DROP table IF EXISTS resources;
+"""
+    )
+    await conn.close()
+    driver = PGDriver(url=url)
     await driver_basic(driver)
 
 

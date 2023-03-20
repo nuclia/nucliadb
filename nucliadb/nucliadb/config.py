@@ -17,54 +17,50 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# Copyright (C) 2021 Bosutech XXI S.L.
-#
-# nucliadb is offered under the AGPL v3.0 and as commercial software.
-# For commercial licensing, contact us at info@nuclia.com.
-#
-# AGPL:
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
 
-from nucliadb.settings import Driver, Settings
+from nucliadb.settings import Settings
 
 
-def cleanup_config():
-    from nucliadb.ingest import settings as ingest_settings
-    from nucliadb.ingest.orm import NODE_CLUSTER
-    from nucliadb.train import settings as train_settings
-    from nucliadb.writer import settings as writer_settings
-    from nucliadb_utils import settings as utils_settings
-    from nucliadb_utils.cache import settings as cache_settings
+def config_standalone_driver(nucliadb_args: Settings):
+    from nucliadb.ingest.settings import DriverConfig
+    from nucliadb.ingest.settings import settings as ingest_settings
+    from nucliadb_utils.settings import storage_settings
 
-    ingest_settings.settings.parse_obj(ingest_settings.Settings())
-    train_settings.settings.parse_obj(train_settings.Settings())
-    writer_settings.settings.parse_obj(writer_settings.Settings())
-    cache_settings.settings.parse_obj(cache_settings.Settings())
+    if nucliadb_args.driver == DriverConfig.local:
+        ingest_settings.driver = DriverConfig.local
+        ingest_settings.driver_local_url = nucliadb_args.maindb
+        if not os.path.isdir(nucliadb_args.maindb):
+            os.makedirs(nucliadb_args.maindb, exist_ok=True)
+    elif nucliadb_args.driver == DriverConfig.redis:
+        ingest_settings.driver = DriverConfig.redis
+        ingest_settings.driver_redis_url = nucliadb_args.maindb
+    elif nucliadb_args.driver == DriverConfig.pg:
+        ingest_settings.driver = DriverConfig.pg
+        storage_settings.file_backend = "pg"
+        ingest_settings.driver_pg_url = (
+            storage_settings.driver_pg_url
+        ) = nucliadb_args.maindb
 
-    utils_settings.audit_settings.parse_obj(utils_settings.AuditSettings())
-    utils_settings.indexing_settings.parse_obj(utils_settings.IndexingSettings())
-    utils_settings.transaction_settings.parse_obj(utils_settings.TransactionSettings())
-    utils_settings.nucliadb_settings.parse_obj(utils_settings.NucliaDBSettings())
-    utils_settings.nuclia_settings.parse_obj(utils_settings.NucliaSettings())
-    utils_settings.storage_settings.parse_obj(utils_settings.StorageSettings())
+    if nucliadb_args.driver != DriverConfig.pg:
+        storage_settings.file_backend = "local"
 
-    NODE_CLUSTER.local_node = None
+        if not os.path.isdir(nucliadb_args.blob):
+            os.makedirs(nucliadb_args.blob, exist_ok=True)
+        storage_settings.local_files = nucliadb_args.blob
+
+    os.environ["DATA_PATH"] = nucliadb_args.node
+    if not os.path.isdir(nucliadb_args.node):
+        os.makedirs(nucliadb_args.node, exist_ok=True)
 
 
 def config_nucliadb(nucliadb_args: Settings):
+    """
+    Standalone nucliadb configuration forces us to
+    use some specific settings.
+    """
+
     from nucliadb.ingest.orm import NODE_CLUSTER
     from nucliadb.ingest.orm.local_node import LocalNode
     from nucliadb.ingest.settings import settings as ingest_settings
@@ -78,7 +74,6 @@ def config_nucliadb(nucliadb_args: Settings):
         nuclia_settings,
         nucliadb_settings,
         running_settings,
-        storage_settings,
         transaction_settings,
     )
 
@@ -102,24 +97,7 @@ def config_nucliadb(nucliadb_args: Settings):
     train_settings.grpc_port = nucliadb_args.train
     ingest_settings.grpc_port = nucliadb_args.grpc
 
-    if nucliadb_args.driver == Driver.LOCAL:
-        ingest_settings.driver = "local"
-        ingest_settings.driver_local_url = nucliadb_args.maindb
-        if not os.path.isdir(nucliadb_args.maindb):
-            os.makedirs(nucliadb_args.maindb, exist_ok=True)
-    elif nucliadb_args.driver == Driver.REDIS:
-        ingest_settings.driver = "redis"
-        ingest_settings.driver_redis_url = nucliadb_args.maindb
-
-    storage_settings.file_backend = "local"
-
-    if not os.path.isdir(nucliadb_args.blob):
-        os.makedirs(nucliadb_args.blob, exist_ok=True)
-    storage_settings.local_files = nucliadb_args.blob
-
-    os.environ["DATA_PATH"] = nucliadb_args.node
-    if not os.path.isdir(nucliadb_args.node):
-        os.makedirs(nucliadb_args.node, exist_ok=True)
+    config_standalone_driver(nucliadb_args)
 
     if nucliadb_args.key is None:
         if os.environ.get("NUA_API_KEY"):

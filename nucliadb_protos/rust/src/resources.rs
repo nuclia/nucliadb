@@ -40,6 +40,7 @@ pub mod cloud_file {
         External = 4,
         Empty = 5,
         Export = 6,
+        Postgres = 7,
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -22,6 +22,8 @@ from typing import Optional
 
 import pydantic
 
+from nucliadb.ingest.settings import DriverConfig
+
 
 class LogLevel(str, Enum):
     INFO = "INFO"
@@ -29,13 +31,10 @@ class LogLevel(str, Enum):
     DEBUG = "DEBUG"
 
 
-class Driver(str, Enum):
-    REDIS = "REDIS"
-    LOCAL = "LOCAL"
-
-
 class Settings(pydantic.BaseSettings):
-    driver: Driver = pydantic.Field(Driver.LOCAL, description="Main DB Path string")
+    driver: DriverConfig = pydantic.Field(
+        DriverConfig.local, description="Main DB Path string"
+    )
     maindb: str = pydantic.Field("./data/main", description="Main DB Path string")
     blob: str = pydantic.Field("./data/blob", description="Blob Path string")
     key: Optional[str] = pydantic.Field(

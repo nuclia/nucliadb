@@ -16,6 +16,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
+import asyncpg
+import pytest
+
+from nucliadb_utils.storages.pg import PostgresStorage
+from nucliadb_utils.store import MAIN
 
 pytest_plugins = [
     "pytest_docker_fixtures",
@@ -25,3 +30,23 @@ pytest_plugins = [
     "nucliadb_utils.tests.local",
     "nucliadb_utils.tests.clandestined",
 ]
+
+
+@pytest.fixture(scope="function")
+async def pg_storage(pg):
+    dsn = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
+    storage = PostgresStorage(dsn)
+    MAIN["storage"] = storage
+    conn = await asyncpg.connect(dsn)
+    await conn.execute(
+        """
+DROP table IF EXISTS kb_files;
+DROP table IF EXISTS kb_files_fileparts;
+"""
+    )
+    await conn.close()
+    await storage.initialize()
+    yield storage
+    await storage.finalize()
+    if "storage" in MAIN:
+        del MAIN["storage"]

@@ -60,8 +60,6 @@ proto-clean-py:
 	rm -rf nucliadb_protos/nucliadb_protos/*_pb2_grpc.pyi
 
 python-code-lint:
-	make -C nucliadb_utils/ format
-
 	isort --profile black nucliadb_node
 	isort --profile black nucliadb_telemetry
 	isort --profile black nucliadb_dataset
@@ -93,6 +91,9 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_models
 	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
 	MYPYPATH=./mypy_stubs mypy nucliadb
+
+	make -C nucliadb_utils/ format
+	make -C nucliadb_utils/ lint
 
 rust-code-lint:
 	cargo +nightly fmt -p nucliadb_node
