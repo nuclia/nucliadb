@@ -52,7 +52,7 @@ def test_filesystem(knowledgebox: KnowledgeBox, upload_data_field_classification
             with pa.memory_map(f"{tmpdirname}/{filename}", "rb") as source:
                 loaded_array = pa.ipc.open_stream(source).read_all()
                 # We multiply by two due to auto-generated title field
-                assert len(loaded_array) == 2
+                assert len(loaded_array) == 2 * 2
 
 
 def run_dataset_export(requests_mock, knowledgebox, trainset):
@@ -123,7 +123,7 @@ def test_live_field_classification(
         with pa.memory_map(filename, "rb") as source:
             loaded_array = pa.ipc.open_stream(source).read_all()
             # We multiply by two due to auto-generated title field
-            assert len(loaded_array) == 2
+            assert len(loaded_array) == 2 * 2
 
 
 def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
@@ -153,4 +153,4 @@ def test_datascientist(knowledgebox: KnowledgeBox, temp_folder):
         with pa.memory_map(filename, "rb") as source:
             loaded_array = pa.ipc.open_stream(source).read_all()
             # We multiply by two due to auto-generated title field
-            assert len(loaded_array) == 3
+            assert len(loaded_array) == 3 * 2

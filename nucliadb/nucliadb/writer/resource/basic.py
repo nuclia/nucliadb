@@ -37,6 +37,8 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.ingest.processing import ProcessingInfo, PushPayload
 from nucliadb_models.common import FIELD_TYPES_MAP_REVERSE
+from nucliadb_models.file import FileField
+from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     ParagraphAnnotation,
     RelationNodeTypeMap,
@@ -177,6 +179,10 @@ def parse_basic(bm: BrokerMessage, item: CreateResourcePayload, toprocess: PushP
             bm.basic.metadata.languages.extend(item.metadata.languages)
         # basic.metadata.useful = item.metadata.useful
         # basic.metadata.status = item.metadata.status
+
+    if item.title is None:
+        item.title = compute_title(item, bm.uuid)
+
     parse_basic_modify(bm, item, toprocess)
 
 
@@ -207,3 +213,16 @@ def validate_classifications(paragraph: ParagraphAnnotation):
         raise HTTPException(
             status_code=422, detail="Paragraph classifications need to be unique"
         )
+
+
+def compute_title(item: CreateResourcePayload, rid: str) -> str:
+    link_field: LinkField
+    for link_field in item.links.values():
+        return link_field.uri
+
+    file_field: FileField
+    for file_field in item.files.values():
+        if file_field.file.filename:
+            return file_field.file.filename
+
+    return item.slug or rid
