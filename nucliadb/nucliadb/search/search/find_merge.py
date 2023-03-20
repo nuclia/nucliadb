@@ -176,7 +176,7 @@ async def fetch_find_metadata(
                 find_resources=find_resources,
             )
         )
-    await asyncio.gather(*operations)
+    await asyncio.wait(*operations)
 
 
 async def merge_paragraphs_vectors(

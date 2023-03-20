@@ -43,8 +43,6 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
 )
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 
-global_rcache_lock = asyncio.Lock()
-
 RESOURCE_LOCKS: Dict[str, asyncio.Lock] = {}
 
 PRE_WORD = string.punctuation + " "
@@ -98,8 +96,7 @@ async def fetch_resources(
 async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]:
     orm_resource: Optional[ResourceORM] = None
 
-    async with global_rcache_lock:
-        resouce_cache = get_resource_cache()
+    resouce_cache = get_resource_cache()
 
     await RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock()).acquire()
 
