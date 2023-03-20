@@ -96,6 +96,10 @@ the justification of a thorny piece of code.
 
 ## Tests
 
+> Warning
+> Below is a description of the ideas of our project testing strategy. It does NOT necessarily
+> reflect the current state of things.
+
 Test do not need to match the same quality as the original code.
 
 When a bug is encountered, it is ok to introduce a test that seems weirdly
@@ -104,45 +108,32 @@ overfitted to the specific issue. A comment should then add a link to the issue.
 Unit test should run fast, and if possible they should not do any IO.
 Code should be structured to make unit testing possible.
 
-Some of our unit tests would not be considered good unit tests in some companies, and that's ok.
-
-Here are the controversial bits:
-
 ### Not just for spotting regression
 
-Our unit tests are not here just to spot regression.
-They are also here to check the correctness of our code.
+Our unit tests are not here just to spot regression. They are here to check the correctness of our code and that things are wired up correctly.
 
-### Not just testing public API
+### Unit vs Integration tests
 
-Unit test do not only test public API.
-Complex code often calls half a dozen smaller functions.
-
-The cardinality of the corner case of the complex code
-can make it difficult to test all corner case.
-
-On the other hand, the smaller functions could be tested
-exhaustively.
-
-For this reason, testing internal private functions is actually encouraged.
-
-### Not always "unit" tests
-
-Ideally, unit tests should be testing one thing and one thing only, but if they don't and it helps cover more ground, this is ok.
-
-### Not necessarily deterministic.
-
-Finally, unit tests are not necessarily deterministic. We really like proptests.
-When proptesting, make sure to reduce as much as possible the space of exploration to get the most out of it.
+Limit the number of integration tests you write. Less is more. Integration tests are slow and difficult to maintain.
 
 ### Functional testing.
 
-Testing all the architecture is complex and packages like `nucliadb_one` and `nucliadb_search` starts all dependency layers on a distributed way with SWIM
-protocol, testing the real environment. Takes some time to fire all dependencies but provides a good real integration and functional test.
+Testing all the architecture is complex and packages like `nucliadb_one` and `nucliadb_search` starts all dependency layers on a distributed way with chitchat protocol, testing the real environment. Takes some time to fire all dependencies but provides a good real integration and functional test.
+
+### Beware of too many complex shared fixtures
+Shared fixtures are something that need to be supported across potentially many tests. As more logic is shoved into shared fixture, it is increasingly difficult to maintain.
+
+Prefer local test file or test class fixtures over genericly shared fixtures.
+
+### It's okay to repeat yourself
+
+If there is a problem with a test, it needs to be easy to understand all the fixtures and code involved in the setup of the test.
+
+The more layers of fixtures/setup you have, the more difficult it is to read and maintain a test because you can't quickly see what a test is actually doing.
+
+Prefer repeating yourself instead of trying to maintain generic fixtures. That way, it's easier to grok individual tests and if a test needs to be adjusted or deleted and rewritten, it can be done without needing to adjust shared fixtures.
 
 ## async vs sync
 
 Your async code should block for at most 500 microseconds.
 If you are unsure whether your code blocks for 500 microseconds, or if it is a non-trivial question, it should run via `asyncio.run_in_executor`.
-
-(thanks to quickwit for it!)
