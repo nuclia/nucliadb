@@ -39,6 +39,17 @@ def capture_exception(error: BaseException) -> Optional[str]:
     return None
 
 
+def capture_message(
+    error_msg: str,
+    level: Optional[str] = None,
+    scope: Optional[Any] = None,
+    **scope_args: Any
+) -> Optional[str]:
+    if SENTRY:
+        return sentry_sdk.capture_message(error_msg, level, scope, **scope_args)
+    return None
+
+
 class NoopScope:
     def __enter__(self):
         return self
