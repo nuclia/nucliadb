@@ -216,11 +216,13 @@ def validate_classifications(paragraph: ParagraphAnnotation):
 
 
 def compute_title(item: CreateResourcePayload, rid: str) -> str:
-    if len(item.links):
-        link_field: LinkField = item.links.popitem()[1]
+    link_field: LinkField
+    for link_field in item.links.values():
         return link_field.uri
-    filename = None
-    if len(item.files):
-        file_field: FileField = item.files.popitem()[1]
-        filename = file_field.file.filename
-    return filename or item.slug or rid
+
+    file_field: FileField
+    for file_field in item.files.values():
+        if file_field.file.filename:
+            return file_field.file.filename
+
+    return item.slug or rid

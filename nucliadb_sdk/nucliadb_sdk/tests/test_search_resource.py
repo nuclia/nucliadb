@@ -250,8 +250,8 @@ def test_search_resource(knowledgebox: KnowledgeBox):
     assert len(knowledgebox) == 50
     labels = knowledgebox.get_uploaded_labels()
 
-    assert labels["emoji"].count == 50
-    assert labels["emoji"].labels["0"] == 9
+    assert labels["emoji"].count == 50 * 2
+    assert labels["emoji"].labels["0"] == 9 * 2
 
     resources = knowledgebox.search(text="love")
     assert resources.fulltext.total == 5
@@ -259,11 +259,11 @@ def test_search_resource(knowledgebox: KnowledgeBox):
 
     resources = knowledgebox.search(filter=[Label(labelset="emoji", label="0")])
 
-    assert resources.fulltext.total == 9
+    assert resources.fulltext.total == 9 * 2
 
     resources = knowledgebox.search(filter=["emoji/0"])
 
-    assert resources.fulltext.total == 9
+    assert resources.fulltext.total == 9 * 2
 
     vector_q = [1.0, 2.0, 3.0, 2.0]
     resources = knowledgebox.search(

@@ -53,7 +53,8 @@ def test_datascientist_tokens(knowledgebox: KnowledgeBox, temp_folder):
     for filename in arrow_filenames:
         with pa.memory_map(filename, "rb") as source:
             loaded_array = pa.ipc.open_stream(source).read_all()
-            assert len(loaded_array) == 3
+            # We multiply by two due to auto-generated title field
+            assert len(loaded_array) == 3 * 2
 
 
 def test_live_token_classification(
