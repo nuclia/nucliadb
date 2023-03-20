@@ -25,6 +25,11 @@ from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware  # type: 
 from opentelemetry.instrumentation.fastapi import _get_route_details  # type: ignore
 from opentelemetry.trace import Span  # type: ignore
 
+try:
+    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+except ImportError:  # pragma: no cover
+    SentryAsgiMiddleware = None  # type: ignore
+
 
 class ExcludeList:
 
@@ -50,6 +55,9 @@ def instrument_app(
     client_response_hook: _ClientResponseHookT = None,
     tracer_provider=None,
 ):
+    if SentryAsgiMiddleware is not None:
+        app.add_middleware(SentryAsgiMiddleware)
+
     excluded_urls_obj = ExcludeList(excluded_urls)
 
     app.add_middleware(
