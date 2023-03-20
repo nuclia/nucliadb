@@ -39,13 +39,10 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsResponse,
 )
 
-from nucliadb.sentry import SENTRY
 from nucliadb.train.settings import settings
 from nucliadb.train.utils import get_nodes_manager
 from nucliadb_protos import train_pb2_grpc
-
-if SENTRY:
-    from sentry_sdk import capture_exception
+from nucliadb_telemetry import errors
 
 
 class TrainServicer(train_pb2_grpc.TrainServicer):
@@ -100,8 +97,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         try:
             await entities_manager.get_entities(response)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             traceback.print_exc()
             response.status = GetEntitiesResponse.Status.ERROR
         else:

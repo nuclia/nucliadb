@@ -26,16 +26,17 @@ import uuid
 from asyncio import tasks
 from typing import Callable, List
 
+import pkg_resources
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
 from nucliadb_node import SERVICE_NAME, logger
 from nucliadb_node.pull import Worker
 from nucliadb_node.reader import Reader
-from nucliadb_node.sentry import SENTRY, set_sentry
 from nucliadb_node.service import start_grpc
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.settings import running_settings
 
@@ -130,12 +131,7 @@ def _cancel_all_tasks(loop):
 
 
 def run():
-    if running_settings.sentry_url and SENTRY:
-        set_sentry(
-            running_settings.sentry_url,
-            running_settings.running_environment,
-            running_settings.logging_integration,
-        )
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb_node").version)
 
     logging.basicConfig(
         level=logging.INFO,

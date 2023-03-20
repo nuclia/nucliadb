@@ -21,7 +21,7 @@ import asyncio
 import logging
 import sys
 
-from sentry_sdk import capture_exception
+import pkg_resources
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
@@ -32,8 +32,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     KnowledgeBox,
 )
 from nucliadb.ingest.utils import get_driver
-from nucliadb.sentry import SENTRY, set_sentry
-from nucliadb_utils.settings import running_settings
+from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_storage
 
 
@@ -59,20 +58,20 @@ async def main():
             await KnowledgeBox.purge(driver, kbid)
             logger.info(f"  √ Successfully Purged {kbid}")
         except ShardNotFound as exc:
-            capture_exception(exc)
+            errors.capture_exception(exc)
             logger.info(
                 f"  X At least one shard was unavailable while purging {kbid}, skipping"
             )
             continue
         except NodeError as exc:
-            capture_exception(exc)
+            errors.capture_exception(exc)
             logger.info(
                 f"  X At least one node was unavailable while purging {kbid}, skipping"
             )
             continue
 
         except Exception as exc:
-            capture_exception(exc)
+            errors.capture_exception(exc)
             logger.info(
                 f"  X ERROR while executing KnowledgeBox.purge of {kbid}, skipping: {exc.__class__.__name__} {exc}"
             )
@@ -86,7 +85,7 @@ async def main():
             await txn.commit(resource=False)
             logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
-            capture_exception(exc)
+            errors.capture_exception(exc)
             logger.info(f"  X Error while deleting key {key_to_purge}")
             await txn.abort()
 
@@ -127,7 +126,7 @@ async def main():
                 await txn.delete(key)
                 logger.info(f"  √ Deleted storage deletion marker {key}")
             except Exception as exc:
-                capture_exception(exc)
+                errors.capture_exception(exc)
                 logger.info(f"  X Error while deleting key {key}")
                 await txn.abort()
             else:
@@ -138,12 +137,7 @@ async def main():
 
 
 def run() -> int:
-    if running_settings.sentry_url and SENTRY:
-        set_sentry(
-            running_settings.sentry_url,
-            running_settings.running_environment,
-            running_settings.logging_integration,
-        )
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     logging.basicConfig(
         level=logging.INFO,

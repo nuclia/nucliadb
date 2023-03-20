@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# abstract advanced error handling into its own module to prevent
+# code from handling sentry integration everywhere
 import logging
 from typing import Any, ContextManager, Optional
 

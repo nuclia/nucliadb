@@ -17,12 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pkg_resources
 import prometheus_client  # type: ignore
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -34,9 +34,9 @@ from nucliadb.one.lifecycle import finalize, initialize
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
-from nucliadb.sentry import SENTRY, set_sentry
 from nucliadb.train.api.v1.router import api as api_train_v1
 from nucliadb.writer.api.v1.router import api as api_writer_v1
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import STFAuthenticationBackend
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
@@ -57,13 +57,7 @@ middleware = [
 ]
 
 
-if running_settings.sentry_url and SENTRY:
-    set_sentry(
-        running_settings.sentry_url,
-        running_settings.running_environment,
-        running_settings.logging_integration,
-    )
-    middleware.append(Middleware(SentryAsgiMiddleware))
+errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
 
 on_startup = [initialize]

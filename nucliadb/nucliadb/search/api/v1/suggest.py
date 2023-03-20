@@ -37,6 +37,7 @@ from nucliadb_models.search import (
     ResourceProperties,
     SuggestOptions,
 )
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_audit
 

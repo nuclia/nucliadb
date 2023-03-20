@@ -37,7 +37,6 @@ from nucliadb_protos.noderesources_pb2 import ShardId
 from nucliadb_protos.nodewriter_pb2 import SetGraph
 from nucliadb_protos.utils_pb2 import JoinGraph, RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
-from sentry_sdk import capture_exception
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.maindb.driver import Transaction
@@ -52,7 +51,7 @@ from nucliadb.ingest.orm.node import Node
 from nucliadb.ingest.orm.nodes_manager import NodesManager
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_cache
 
 
@@ -172,8 +171,7 @@ class EntitiesManager:
         )
         for result in results:
             if isinstance(result, Exception):
-                if SENTRY:
-                    capture_exception(result)
+                errors.capture_exception(result)
                 raise NodeError("Error while querying relation index")
 
         entities = {}
@@ -247,8 +245,7 @@ class EntitiesManager:
         )
         for result in results:
             if isinstance(result, Exception):
-                if SENTRY:
-                    capture_exception(result)
+                errors.capture_exception(result)
                 raise NodeError("Error while looking for relations types")
 
         for relation_types in results:

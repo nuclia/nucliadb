@@ -36,7 +36,7 @@ from nucliadb.ingest.orm.exceptions import (
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.processor import Processor
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.audit.audit import AuditStorage
@@ -45,9 +45,6 @@ from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_transaction
-
-if SENTRY:
-    from sentry_sdk import capture_exception
 
 
 class PullWorker:
@@ -241,8 +238,7 @@ class PullWorker:
             except DeadletteredError as e:
                 # Messages that have been sent to deadletter at some point
                 # We don't want to process it again so it's ack'd
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     f"A copy of the message has been stored on {self.processor.storage.deadletter_bucket}. "
@@ -253,8 +249,7 @@ class PullWorker:
                 # Any messages that for some unexpected inconsistency have failed and won't be tried again
                 # as we cannot do anything about it
                 # - ShardsNotFound: /kb/{id}/shards key or the whole /kb/{kbid} is missing
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     f"This message has been dropped and won't be retried again"
@@ -263,8 +258,7 @@ class PullWorker:
                 await msg.ack()
             except Exception as e:
                 # Unhandled exceptions that need to be retried after a small delay
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.info(
                     f"An error happend while processing a message from {message_source}. "
                     "Message has not been ACKd and will be retried. "
@@ -281,8 +275,7 @@ class PullWorker:
             try:
                 await self.initialize()
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.exception("Exception on initializing worker", exc_info=e)
                 await asyncio.sleep(10)
 
@@ -298,8 +291,7 @@ class PullWorker:
                 logger.info("Exiting...")
                 break
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.exception("Exception on worker", exc_info=e)
                 await asyncio.sleep(10)
 
@@ -376,8 +368,7 @@ class PullWorker:
                                             transaction_check=False,
                                         )
                                 except Exception as e:
-                                    if SENTRY:
-                                        capture_exception(e)
+                                    errors.capture_exception(e)
                                     logger.exception(
                                         "Error while pulling and forwarding proxy message to nucliadb nats"
                                     )

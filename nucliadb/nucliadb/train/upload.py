@@ -24,9 +24,11 @@ import sys
 from asyncio import tasks
 from typing import Callable, List
 
-from nucliadb.sentry import SENTRY, set_sentry
+import pkg_resources
+
 from nucliadb.train import logger
 from nucliadb.train.uploader import start_upload
+from nucliadb_telemetry import errors
 from nucliadb_utils.settings import running_settings
 
 
@@ -73,12 +75,7 @@ def _cancel_all_tasks(loop):
 
 
 def run() -> None:
-    if running_settings.sentry_url and SENTRY:
-        set_sentry(
-            running_settings.sentry_url,
-            running_settings.running_environment,
-            running_settings.logging_integration,
-        )
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     logging.basicConfig(
         level=logging.INFO,

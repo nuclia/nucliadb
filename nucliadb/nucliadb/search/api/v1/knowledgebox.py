@@ -28,7 +28,6 @@ from grpc.aio import AioRpcError  # type: ignore
 from nucliadb_protos.noderesources_pb2 import Shard
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_protos.writer_pb2 import Shards
-from sentry_sdk import capture_exception
 
 from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG_BASE
 from nucliadb.search import logger
@@ -39,6 +38,7 @@ from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_driver, get_nodes
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxShards
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.exceptions import ShardsNotFound
@@ -136,7 +136,7 @@ async def knowledgebox_counters(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
-        capture_exception(exc)
+        errors.capture_exception(exc)
         await abort_transaction()
         raise HTTPException(status_code=503, detail=f"Data query took too long")
     except AioRpcError as exc:
@@ -154,7 +154,7 @@ async def knowledgebox_counters(
 
     for shard in results:
         if isinstance(shard, Exception):
-            capture_exception(shard)
+            errors.capture_exception(shard)
             await abort_transaction()
             raise HTTPException(
                 status_code=500, detail=f"Error while geting shard data"
@@ -175,7 +175,7 @@ async def knowledgebox_counters(
         ):
             resource_count += 1
     except Exception as exc:
-        capture_exception(exc)
+        errors.capture_exception(exc)
         raise HTTPException(
             status_code=500, detail="Couldn't retrieve counters right now"
         )

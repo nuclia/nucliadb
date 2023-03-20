@@ -38,6 +38,7 @@ from nucliadb_models.search import (
     SearchOptions,
     SortField,
 )
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires_one
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
