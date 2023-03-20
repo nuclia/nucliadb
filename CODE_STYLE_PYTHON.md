@@ -112,6 +112,16 @@ Code should be structured to make unit testing possible.
 
 Our unit tests are not here just to spot regression. They are here to check the correctness of our code and that things are wired up correctly.
 
+### Test file naming
+
+1. Integration and unit tests should be separated into their own folders
+2. Test file names should match the modules they are testing
+
+Example:
+
+- `nucliadb_utils/tests/unit/storages/test_pg.py` has tests that target `nucliadb_utils/storages/pg.py`
+
+
 ### Unit vs Integration tests
 
 Limit the number of integration tests you write. Less is more. Integration tests are slow and difficult to maintain.
