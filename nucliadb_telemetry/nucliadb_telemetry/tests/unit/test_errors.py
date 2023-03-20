@@ -39,6 +39,24 @@ def test_capture_exception_no_sentry() -> None:
         mock_sentry_sdk.capture_exception.assert_not_called()
 
 
+def test_capture_message() -> None:
+    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
+        errors, "SENTRY", True
+    ):
+        errors.capture_message("error_msg", "level", "scope")
+        mock_sentry_sdk.capture_message.assert_called_once_with(
+            "error_msg", "level", "scope"
+        )
+
+
+def test_capture_message_no_sentry() -> None:
+    with patch.object(errors, "SENTRY", False), patch(
+        "nucliadb_telemetry.errors.sentry_sdk"
+    ) as mock_sentry_sdk:
+        errors.capture_message("error_msg", "level", "scope")
+        mock_sentry_sdk.capture_message.assert_not_called()
+
+
 def test_setup_error_handling(monkeypatch):
     monkeypatch.setenv("sentry_url", "sentry_url")
     monkeypatch.setenv("logging_integration", "True")
