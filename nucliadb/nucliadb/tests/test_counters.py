@@ -34,6 +34,7 @@ async def test_counters(
     resp = await nucliadb_writer.post(
         f"/kb/{knowledgebox}/resources",
         json={
+            "title": "My title",
             "slug": "myresource",
             "usermetadata": {
                 "classifications": [{"labelset": "type", "label": "Book"}]
@@ -58,5 +59,5 @@ async def test_counters(
 
     assert resp.status_code == 200
     assert resp.json()["resources"] == 3
-    assert resp.json()["paragraphs"] == 2
-    assert resp.json()["fields"] == 2
+    assert resp.json()["paragraphs"] == 3
+    assert resp.json()["fields"] == 3
