@@ -23,7 +23,9 @@ from nucliadb_telemetry import errors
 
 
 def test_capture_exception() -> None:
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk:
+    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
+        errors, "SENTRY", True
+    ):
         ex = Exception("test")
         errors.capture_exception(ex)
         mock_sentry_sdk.capture_exception.assert_called_once_with(ex)
@@ -41,7 +43,9 @@ def test_setup_error_handling(monkeypatch):
     monkeypatch.setenv("sentry_url", "sentry_url")
     monkeypatch.setenv("logging_integration", "True")
     monkeypatch.setenv("environment", "environment")
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk:
+    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
+        errors, "SENTRY", True
+    ), patch("nucliadb_telemetry.errors.LoggingIntegration") as LoggingIntegration:
         errors.setup_error_handling("1.0.0")
         mock_sentry_sdk.init.assert_called_once_with(
             release="1.0.0",
@@ -50,6 +54,7 @@ def test_setup_error_handling(monkeypatch):
             integrations=[ANY],
             default_integrations=False,
         )
+        LoggingIntegration.assert_called_once()
 
 
 def test_setup_error_handling_no_sentry(monkeypatch):
@@ -59,7 +64,9 @@ def test_setup_error_handling_no_sentry(monkeypatch):
 
 
 def test_push_scope() -> None:
-    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk:
+    with patch("nucliadb_telemetry.errors.sentry_sdk") as mock_sentry_sdk, patch.object(
+        errors, "SENTRY", True
+    ):
         with errors.push_scope() as scope:
             scope.set_extra("key", "value")
         mock_sentry_sdk.push_scope.assert_called_once_with()
