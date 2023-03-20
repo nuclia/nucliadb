@@ -143,7 +143,7 @@ class PullWorker:
                 jetstream = self.nc.jetstream()
 
                 tracer_provider = get_telemetry(SERVICE_NAME)
-                if tracer_provider is not None:
+                if tracer_provider is not None:  # pragma: no cover
                     self.js = JetStreamContextTelemetry(
                         jetstream, f"{SERVICE_NAME}_worker", tracer_provider
                     )

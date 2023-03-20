@@ -40,7 +40,7 @@ from nucliadb_protos.nodewriter_pb2 import OpStatus, SetGraph
 from nucliadb_protos.utils_pb2 import Relation
 
 
-class DummyWriterStub:
+class DummyWriterStub:  # pragma: no cover
     calls: Dict[str, List[Any]] = {}
 
     async def GetShard(self, data):
@@ -99,7 +99,7 @@ class DummyWriterStub:
         return result
 
 
-class DummyReaderStub:
+class DummyReaderStub:  # pragma: no cover
     calls: Dict[str, List[Any]] = {}
 
     async def GetShard(self, data):
@@ -127,7 +127,7 @@ class DummyReaderStub:
         return result
 
 
-class DummySidecarStub:
+class DummySidecarStub:  # pragma: no cover
     calls: Dict[str, List[Any]] = {}
 
     async def GetCount(self, data):

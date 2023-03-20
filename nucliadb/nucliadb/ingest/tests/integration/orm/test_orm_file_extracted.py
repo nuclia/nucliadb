@@ -17,14 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 from os.path import dirname, getsize
+from typing import Optional
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile
-from nucliadb_protos.resources_pb2 import FieldFile as PBFieldFile
-from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.resources_pb2 import (
+    CloudFile,
+    FieldType,
+    FileExtractedData,
+    RowsPreview,
+)
 
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -32,37 +35,49 @@ from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_field_file(
+async def test_create_resource_orm_file_extracted(
     local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
-    filename = f"{dirname(__file__)}/assets/file.png"
 
+    filename = f"{dirname(__file__)}/assets/file.png"
     cf1 = CloudFile(
         uri="file.png",
         source=CloudFile.Source.LOCAL,
-        bucket_name="/orm/assets",
+        bucket_name="/integration/orm/assets",
         size=getsize(filename),
         content_type="image/png",
         filename="file.png",
     )
 
-    t2 = PBFieldFile(
-        language="es",
+    ex1 = FileExtractedData()
+    ex1.md5 = "ASD"
+    ex1.language = "ca"
+    ex1.metadata["asd"] = "asd"
+    ex1.nested["asd"] = "asd"
+    ex1.file_generated["asd"].CopyFrom(cf1)
+    ex1.file_rows_previews["asd"].sheets["Tab1"].rows.append(
+        RowsPreview.Sheet.Row(cell="hola")
     )
-    t2.added.FromDatetime(datetime.now())
-    t2.file.CopyFrom(cf1)
+    ex1.file_preview.CopyFrom(cf1)
+    ex1.file_thumbnail.CopyFrom(cf1)
+    ex1.file_pages_previews.pages.append(cf1)
+    ex1.field = "file1"
 
-    await r.set_field(FieldType.FILE, "file1", t2)
+    field_obj: File = await r.get_field(ex1.field, FieldType.FILE, load=False)
+    await field_obj.set_file_extracted_data(ex1)
 
-    filefield: File = await r.get_field("file1", FieldType.FILE, load=True)
-    assert filefield.value.file == t2.file
-
-    assert filefield.value.file.source == CloudFile.Source.GCS
-    data = await gcs_storage.downloadbytescf(filefield.value.file)
+    ex2: Optional[FileExtractedData] = await field_obj.get_file_extracted_data()
+    assert ex2 is not None
+    assert ex2.md5 == ex1.md5
+    assert ex2.file_generated["asd"].source == CloudFile.Source.GCS
+    assert ex2.file_preview.source == CloudFile.Source.GCS
+    assert ex2.file_thumbnail.source == CloudFile.Source.GCS
+    assert ex1.file_pages_previews.pages[0].source == CloudFile.Source.GCS
+    data = await gcs_storage.downloadbytescf(ex1.file_pages_previews.pages[0])
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     assert data.read() == data2

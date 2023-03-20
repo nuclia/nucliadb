@@ -86,6 +86,8 @@ class Driver:
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
     ) -> AsyncGenerator[str, None]:
         raise NotImplementedError()
+        # mypy is funny in some cases and wants a yield to detect the type properly
+        yield
 
     @asynccontextmanager
     async def transaction(self) -> AsyncGenerator[Transaction, None]:

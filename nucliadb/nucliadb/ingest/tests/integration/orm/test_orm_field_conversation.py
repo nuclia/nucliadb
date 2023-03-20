@@ -96,7 +96,7 @@ async def test_create_resource_orm_field_conversation_file(
     cf1 = CloudFile(
         uri="file.png",
         source=CloudFile.Source.LOCAL,
-        bucket_name="/orm/assets",
+        bucket_name="/integration/orm/assets",
         size=getsize(filename),
         content_type="image/png",
         filename="file.png",

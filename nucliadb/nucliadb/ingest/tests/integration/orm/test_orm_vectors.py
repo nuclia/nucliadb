@@ -24,12 +24,11 @@ from uuid import uuid4
 import pytest
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
-    Entity,
+    ExtractedVectorsWrapper,
     FieldID,
     FieldType,
-    LargeComputedMetadata,
-    LargeComputedMetadataWrapper,
 )
+from nucliadb_protos.utils_pb2 import Vector, VectorObject, Vectors
 
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -37,7 +36,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_large_metadata(
+async def test_create_resource_orm_vector(
     gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
@@ -45,26 +44,23 @@ async def test_create_resource_orm_large_metadata(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
-    ex1 = LargeComputedMetadataWrapper()
+    ex1 = ExtractedVectorsWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
-    en1 = Entity(token="tok1", root="tok", type="NAME")
-    en2 = Entity(token="tok2", root="tok2", type="NAME")
-    ex1.real.metadata.entities.append(en1)
-    ex1.real.metadata.entities.append(en2)
-    ex1.real.metadata.tokens["tok"] = 3
+    v1 = Vector(start=1, end=2, vector=b"ansjkdn")
+    ex1.vectors.vectors.vectors.append(v1)
 
     field_obj: Text = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
     )
-    await field_obj.set_large_field_metadata(ex1)
+    await field_obj.set_vectors(ex1)
 
-    ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
+    ex2: Optional[VectorObject] = await field_obj.get_vectors()
     assert ex2 is not None
-    assert ex2.metadata.tokens["tok"] == ex1.real.metadata.tokens["tok"]
+    assert ex2.vectors.vectors[0].vector == ex1.vectors.vectors.vectors[0].vector
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_large_metadata_file(
+async def test_create_resource_orm_vector_file(
     local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
@@ -72,39 +68,70 @@ async def test_create_resource_orm_large_metadata_file(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
-    ex1 = LargeComputedMetadataWrapper()
+    ex1 = ExtractedVectorsWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
 
-    en1 = Entity(token="tok1", root="tok", type="NAME")
-    en2 = Entity(token="tok2", root="tok2", type="NAME")
-    real = LargeComputedMetadata()
-    real.metadata.entities.append(en1)
-    real.metadata.entities.append(en2)
-    real.metadata.tokens["tok"] = 3
-    real.metadata.tokens["adeu"] = 5
-
-    filename = f"{dirname(__file__)}/assets/largemetadata.pb"
-    with open(filename, "wb") as testfile:
-        testfile.write(real.SerializeToString())
+    filename = f"{dirname(__file__)}/assets/vectors.pb"
     cf1 = CloudFile(
-        uri="largemetadata.pb",
+        uri="vectors.pb",
         source=CloudFile.Source.LOCAL,
-        bucket_name="/orm/assets",
         size=getsize(filename),
+        bucket_name="/integration/orm/assets",
         content_type="application/octet-stream",
-        filename="largemetadata.pb",
+        filename="vectors.pb",
     )
     ex1.file.CopyFrom(cf1)
 
     field_obj: Text = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
     )
-    await field_obj.set_large_field_metadata(ex1)
+    await field_obj.set_vectors(ex1)
 
-    ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
-    assert ex2 is not None
-    ex3 = LargeComputedMetadata()
+    ex2: Optional[VectorObject] = await field_obj.get_vectors()
+    ex3 = VectorObject()
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     ex3.ParseFromString(data2)
-    assert ex3.metadata.tokens["tok"] == ex2.metadata.tokens["tok"]
+    assert ex2 is not None
+
+    assert ex3.vectors.vectors[0].vector == ex2.vectors.vectors[0].vector
+
+
+@pytest.mark.asyncio
+async def test_create_resource_orm_vector_split(
+    gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+):
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
+    r = await kb_obj.add_resource(uuid=uuid, slug="slug")
+    assert r is not None
+
+    ex1 = ExtractedVectorsWrapper()
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    v1 = Vector(start=1, vector=b"ansjkdn")
+    vs1 = Vectors()
+    vs1.vectors.append(v1)
+    ex1.vectors.split_vectors["es1"].vectors.append(v1)
+    ex1.vectors.split_vectors["es2"].vectors.append(v1)
+
+    field_obj: Text = await r.get_field(
+        ex1.field.field, ex1.field.field_type, load=False
+    )
+    await field_obj.set_vectors(ex1)
+
+    ex1 = ExtractedVectorsWrapper()
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
+    v1 = Vector(start=1, vector=b"ansjkdn")
+    vs1 = Vectors()
+    vs1.vectors.append(v1)
+    ex1.vectors.split_vectors["es3"].vectors.append(v1)
+    ex1.vectors.split_vectors["es2"].vectors.append(v1)
+
+    field_obj2: Text = await r.get_field(
+        ex1.field.field, ex1.field.field_type, load=False
+    )
+    await field_obj2.set_vectors(ex1)
+
+    ex2: Optional[VectorObject] = await field_obj2.get_vectors()
+    assert ex2 is not None
+    assert len(ex2.split_vectors) == 3

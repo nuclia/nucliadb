@@ -19,52 +19,50 @@
 #
 from datetime import datetime
 from os.path import dirname, getsize
-from typing import Optional
 from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import CloudFile, FieldType, LinkExtractedData
+from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_protos.resources_pb2 import FieldFile as PBFieldFile
+from nucliadb_protos.resources_pb2 import FieldType
 
-from nucliadb.ingest.fields.link import Link
+from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_link_extracted(
+async def test_create_resource_orm_field_file(
     local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
-
-    ex1 = LinkExtractedData()
-    ex1.date.FromDatetime(datetime.now())
-    ex1.language = "ca"
-    ex1.title = "My Title"
-    ex1.field = "link1"
-
     filename = f"{dirname(__file__)}/assets/file.png"
+
     cf1 = CloudFile(
         uri="file.png",
         source=CloudFile.Source.LOCAL,
-        bucket_name="/orm/assets",
+        bucket_name="/integration/orm/assets",
         size=getsize(filename),
         content_type="image/png",
         filename="file.png",
     )
-    ex1.link_preview.CopyFrom(cf1)
-    ex1.link_thumbnail.CopyFrom(cf1)
 
-    field_obj: Link = await r.get_field(ex1.field, FieldType.LINK, load=False)
-    await field_obj.set_link_extracted_data(ex1)
+    t2 = PBFieldFile(
+        language="es",
+    )
+    t2.added.FromDatetime(datetime.now())
+    t2.file.CopyFrom(cf1)
 
-    ex2: Optional[LinkExtractedData] = await field_obj.get_link_extracted_data()
-    assert ex2 is not None
-    assert ex2.title == ex1.title
-    assert ex2.link_preview.source == CloudFile.Source.GCS
-    data = await gcs_storage.downloadbytescf(ex2.link_preview)
+    await r.set_field(FieldType.FILE, "file1", t2)
+
+    filefield: File = await r.get_field("file1", FieldType.FILE, load=True)
+    assert filefield.value.file == t2.file
+
+    assert filefield.value.file.source == CloudFile.Source.GCS
+    data = await gcs_storage.downloadbytescf(filefield.value.file)
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     assert data.read() == data2

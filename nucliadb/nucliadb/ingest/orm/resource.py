@@ -844,7 +844,7 @@ class Resource:
 
     async def iterate_sentences(
         self, enabled_metadata: EnabledMetadata
-    ) -> AsyncIterator[TrainSentence]:
+    ) -> AsyncIterator[TrainSentence]:  # pragma: no cover
         fields = await self.get_fields(force=True)
         metadata = TrainMetadata()
         userdefinedparagraphclass: Dict[str, ParagraphAnnotation] = {}

@@ -24,10 +24,11 @@ from uuid import uuid4
 import pytest
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
-    ExtractedText,
-    ExtractedTextWrapper,
+    Entity,
     FieldID,
     FieldType,
+    LargeComputedMetadata,
+    LargeComputedMetadataWrapper,
 )
 
 from nucliadb.ingest.fields.text import Text
@@ -36,7 +37,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 @pytest.mark.asyncio
-async def test_create_resource_orm_extracted(
+async def test_create_resource_orm_large_metadata(
     gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
 ):
     uuid = str(uuid4())
@@ -44,95 +45,66 @@ async def test_create_resource_orm_extracted(
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
     assert r is not None
 
-    ex1 = ExtractedTextWrapper()
+    ex1 = LargeComputedMetadataWrapper()
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
-    ex1.body.text = "My Text"
-
-    field_obj: Optional[Text] = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
-    assert field_obj is not None
-    await field_obj.set_extracted_text(ex1)
-
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
-    assert ex2 is not None
-    assert ex2.text == ex1.body.text
-
-
-@pytest.mark.asyncio
-async def test_create_resource_orm_extracted_file(
-    local_files,
-    gcs_storage: Storage,
-    txn,
-    cache,
-    fake_node,
-    knowledgebox_ingest: str,
-):
-    uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
-    r = await kb_obj.add_resource(uuid=uuid, slug="slug")
-    assert r is not None
-
-    ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
-
-    filename = f"{dirname(__file__)}/assets/text.pb"
-    cf1 = CloudFile(
-        uri="text.pb",
-        source=CloudFile.Source.LOCAL,
-        bucket_name="/orm/assets",
-        size=getsize(filename),
-        content_type="application/octet-stream",
-        filename="text.pb",
-    )
-    ex1.file.CopyFrom(cf1)
-
-    field_obj: Optional[Text] = await r.get_field(
-        ex1.field.field, ex1.field.field_type, load=False
-    )
-    assert field_obj is not None
-    await field_obj.set_extracted_text(ex1)
-
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
-    assert ex2 is not None
-    ex3 = ExtractedText()
-    with open(filename, "rb") as testfile:
-        data2 = testfile.read()
-    ex3.ParseFromString(data2)
-    assert ex3.text == ex2.text
-
-
-@pytest.mark.asyncio
-async def test_create_resource_orm_extracted_delta(
-    gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
-):
-    uuid = str(uuid4())
-    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
-    r = await kb_obj.add_resource(uuid=uuid, slug="slug")
-    assert r is not None
-    ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
-    ex1.body.split_text["ident1"] = "My text"
-    ex1.body.text = "all text"
+    en1 = Entity(token="tok1", root="tok", type="NAME")
+    en2 = Entity(token="tok2", root="tok2", type="NAME")
+    ex1.real.metadata.entities.append(en1)
+    ex1.real.metadata.entities.append(en2)
+    ex1.real.metadata.tokens["tok"] = 3
 
     field_obj: Text = await r.get_field(
         ex1.field.field, ex1.field.field_type, load=False
     )
-    await field_obj.set_extracted_text(ex1)
+    await field_obj.set_large_field_metadata(ex1)
 
-    ex2: Optional[ExtractedText] = await field_obj.get_extracted_text()
+    ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
     assert ex2 is not None
-    assert ex2.text == ex1.body.text
+    assert ex2.metadata.tokens["tok"] == ex1.real.metadata.tokens["tok"]
 
-    ex1 = ExtractedTextWrapper()
-    ex1.field.CopyFrom(FieldID(field_type=FieldType.LAYOUT, field="text1"))
-    ex1.body.split_text["ident2"] = "My text"
-    ex1.body.text = "all text 2"
 
-    field_obj = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
-    await field_obj.set_extracted_text(ex1)
+@pytest.mark.asyncio
+async def test_create_resource_orm_large_metadata_file(
+    local_files, gcs_storage: Storage, txn, cache, fake_node, knowledgebox_ingest: str
+):
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, gcs_storage, cache, kbid=knowledgebox_ingest)
+    r = await kb_obj.add_resource(uuid=uuid, slug="slug")
+    assert r is not None
 
-    ex2 = await field_obj.get_extracted_text()
+    ex1 = LargeComputedMetadataWrapper()
+    ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
+
+    en1 = Entity(token="tok1", root="tok", type="NAME")
+    en2 = Entity(token="tok2", root="tok2", type="NAME")
+    real = LargeComputedMetadata()
+    real.metadata.entities.append(en1)
+    real.metadata.entities.append(en2)
+    real.metadata.tokens["tok"] = 3
+    real.metadata.tokens["adeu"] = 5
+
+    filename = f"{dirname(__file__)}/assets/largemetadata.pb"
+    with open(filename, "wb") as testfile:
+        testfile.write(real.SerializeToString())
+    cf1 = CloudFile(
+        uri="largemetadata.pb",
+        source=CloudFile.Source.LOCAL,
+        bucket_name="/integration/orm/assets",
+        size=getsize(filename),
+        content_type="application/octet-stream",
+        filename="largemetadata.pb",
+    )
+    ex1.file.CopyFrom(cf1)
+
+    field_obj: Text = await r.get_field(
+        ex1.field.field, ex1.field.field_type, load=False
+    )
+    await field_obj.set_large_field_metadata(ex1)
+
+    ex2: Optional[LargeComputedMetadata] = await field_obj.get_large_field_metadata()
     assert ex2 is not None
-    assert ex2.text == ex1.body.text
-    assert len(ex2.split_text) == 2
+    ex3 = LargeComputedMetadata()
+    with open(filename, "rb") as testfile:
+        data2 = testfile.read()
+    ex3.ParseFromString(data2)
+    assert ex3.metadata.tokens["tok"] == ex2.metadata.tokens["tok"]

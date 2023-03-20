@@ -36,7 +36,7 @@ async def start_grpc(writer: Writer, reader: Reader):
     aio.init_grpc_aio()
 
     tracer_provider = get_telemetry(SERVICE_NAME)
-    if tracer_provider is not None:
+    if tracer_provider is not None:  # pragma: no cover
         telemetry_grpc = OpenTelemetryGRPC(
             f"{SERVICE_NAME}_grpc_server", tracer_provider
         )

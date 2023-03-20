@@ -17,21 +17,24 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import AsyncMock
+
+from uuid import uuid4
 
 import pytest
-from nucliadb_protos.resources_pb2 import FileExtractedData, PagePositions
 
-from nucliadb.ingest.orm.resource import get_file_page_positions
+from nucliadb.ingest.tests.fixtures import IngestFixture
+from nucliadb_protos import knowledgebox_pb2, writer_pb2_grpc
 
 
 @pytest.mark.asyncio
-async def test_get_file_page_positions():
-    extracted_data = FileExtractedData()
-    extracted_data.file_pages_previews.positions.extend(
-        [PagePositions(start=0, end=10), PagePositions(start=11, end=20)]
-    )
-    file_field = AsyncMock(
-        get_file_extracted_data=AsyncMock(return_value=extracted_data)
-    )
-    assert await get_file_page_positions(file_field) == {0: (0, 10), 1: (11, 20)}
+async def test_clean_and_upgrade_kb_index(grpc_servicer: IngestFixture):
+    stub = writer_pb2_grpc.WriterStub(grpc_servicer.channel)
+
+    kb_id = str(uuid4())
+    pb = knowledgebox_pb2.KnowledgeBoxNew(slug="test", forceuuid=kb_id)
+    pb.config.title = "My Title"
+    result = await stub.NewKnowledgeBox(pb)  # type: ignore
+    assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
+
+    req = knowledgebox_pb2.KnowledgeBoxID(uuid=kb_id)
+    result = await stub.CleanAndUpgradeKnowledgeBoxIndex(req)  # type: ignore

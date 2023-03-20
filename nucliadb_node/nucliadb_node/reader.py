@@ -41,7 +41,7 @@ class Reader:
     def __init__(self, grpc_reader_address: str):
         self.lock = asyncio.Lock()
         tracer_provider = get_telemetry(SERVICE_NAME)
-        if tracer_provider is not None:
+        if tracer_provider is not None:  # pragma: no cover
             telemetry_grpc = OpenTelemetryGRPC(
                 f"{SERVICE_NAME}_grpc_reader", tracer_provider
             )

@@ -66,7 +66,6 @@ python-code-lint:
 	isort --profile black nucliadb_client
 	isort --profile black nucliadb_sdk
 	isort --profile black nucliadb_models
-	isort --profile black nucliadb
 
 	black nucliadb_node
 	black nucliadb_telemetry
@@ -74,7 +73,6 @@ python-code-lint:
 	black nucliadb_client
 	black nucliadb_sdk
 	black nucliadb_models
-	black nucliadb
 
 	flake8  --config nucliadb_node/setup.cfg nucliadb_node/nucliadb_node
 	flake8  --config nucliadb_telemetry/setup.cfg nucliadb_telemetry/nucliadb_telemetry
@@ -82,7 +80,6 @@ python-code-lint:
 	flake8  --config nucliadb_client/setup.cfg nucliadb_client/nucliadb_client
 	flake8  --config nucliadb_sdk/setup.cfg nucliadb_sdk/nucliadb_sdk
 	flake8  --config nucliadb_models/setup.cfg nucliadb_models/nucliadb_models
-	flake8  --config nucliadb/setup.cfg nucliadb/nucliadb
 
 	MYPYPATH=./mypy_stubs mypy nucliadb_telemetry
 	MYPYPATH=./mypy_stubs mypy nucliadb_node
@@ -90,10 +87,12 @@ python-code-lint:
 	MYPYPATH=./mypy_stubs mypy nucliadb_client
 	MYPYPATH=./mypy_stubs mypy nucliadb_models
 	MYPYPATH=./mypy_stubs mypy nucliadb_sdk
-	MYPYPATH=./mypy_stubs mypy nucliadb
 
 	make -C nucliadb_utils/ format
 	make -C nucliadb_utils/ lint
+
+	make -C nucliadb/ format
+	make -C nucliadb/ lint
 
 rust-code-lint:
 	cargo +nightly fmt -p nucliadb_node
