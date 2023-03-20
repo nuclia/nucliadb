@@ -25,7 +25,7 @@ from fastapi import Header, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.requesters.utils import Method
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
@@ -96,11 +96,12 @@ async def suggest_knowledgebox(
         range_modification_start,
         range_modification_end,
     )
-    results, incomplete_results, queried_nodes, queried_shards = await query(
+    results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, []
     )
 
     # We need to merge
+
     search_results = await merge_suggest_results(
         results,
         kbid=kbid,

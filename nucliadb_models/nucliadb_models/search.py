@@ -447,7 +447,7 @@ class FindField(BaseModel):
 
 
 class FindResource(Resource):
-    fields: Optional[Dict[str, FindField]]
+    fields: Dict[str, FindField]
 
 
 class KnowledgeboxFindResults(BaseModel):
@@ -458,6 +458,7 @@ class KnowledgeboxFindResults(BaseModel):
     page_number: int = 0
     page_size: int = 20
     next_page: bool = False
+    nodes: Optional[List[Tuple[str, str, str]]]
     shards: Optional[List[str]]
 
 

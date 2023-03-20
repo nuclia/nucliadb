@@ -25,7 +25,7 @@ from fastapi_versioning import version
 
 from nucliadb.ingest.serialize import get_resource_uuid_by_slug
 from nucliadb.search import SERVICE_NAME
-from nucliadb.search.requesters.utils import Method
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
@@ -111,7 +111,7 @@ async def search(
         sort=sort.value if sort else None,
     )
 
-    results, incomplete_results, queried_nodes, queried_shards = await query(
+    results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, shards
     )
 

@@ -226,7 +226,11 @@ async def generate_token_classification_payloads(
     batch = TokenClassificationBatch()
     async for field_item in node.stream_get_fields(request):
         _, field_type, field = field_item.field.split("/")
-        (split_text, ordered_positions, split_paragaphs,) = await get_field_text(
+        (
+            split_text,
+            ordered_positions,
+            split_paragaphs,
+        ) = await get_field_text(
             kbid,
             field_item.uuid,
             field,

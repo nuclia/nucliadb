@@ -27,7 +27,7 @@ from starlette.responses import StreamingResponse
 from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
-from nucliadb.search.requesters.utils import Method, query
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -84,7 +84,7 @@ async def chat_post_knowledgebox(
 ) -> StreamingResponse:
     predict = get_predict()
 
-    if len(item.context) > 0:
+    if item.context is not None and len(item.context) > 0:
         # There is context lets do a query
         req = ChatModel()
         req.context = item.context
@@ -117,9 +117,9 @@ async def chat_post_knowledgebox(
     async def generate_answer(
         results: KnowledgeboxFindResults, kbid: str, predict: PredictEngine
     ):
-        results = base64.b64encode(results.json())
-        yield len(results).to_bytes(length=4, byteorder="big", signed=False)
-        yield results
+        bytes_results = base64.b64encode(results.json().encode())
+        yield len(bytes_results).to_bytes(length=4, byteorder="big", signed=False)
+        yield bytes_results
 
         answer = []
         async for data in predict.chat_query(kbid, item.context):
@@ -138,7 +138,7 @@ async def chat_post_knowledgebox(
             incomplete_results,
             queried_nodes,
             queried_shards,
-        ) = await query(kbid, Method.RELATIONS, relation_request, item.shards)
+        ) = await node_query(kbid, Method.RELATIONS, relation_request, item.shards)
         yield base64.b64encode(relations_results)
 
     return StreamingResponse(

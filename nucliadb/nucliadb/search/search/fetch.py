@@ -101,7 +101,7 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
     async with global_rcache_lock:
         resouce_cache = get_resource_cache()
 
-    await (RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock())).acquire()
+    await RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock()).acquire()
 
     try:
         if uuid not in resouce_cache:

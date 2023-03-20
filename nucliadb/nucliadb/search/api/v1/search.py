@@ -25,7 +25,7 @@ from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.requesters.utils import Method, query
+from nucliadb.search.requesters.utils import Method, node_query
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query import global_query_to_pb, pre_process_query
@@ -284,7 +284,7 @@ async def search(
         with_synonyms=item.with_synonyms,
     )
 
-    results, incomplete_results, queried_nodes, queried_shards = await query(
+    results, incomplete_results, queried_nodes, queried_shards = await node_query(
         kbid, Method.SEARCH, pb_query, item.shards
     )
     # We need to merge

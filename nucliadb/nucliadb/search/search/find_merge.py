@@ -44,7 +44,6 @@ from nucliadb_models.search import (
     FindParagraph,
     FindResource,
     KnowledgeboxFindResults,
-    KnowledgeboxSearchResults,
     ResourceProperties,
     SortOptions,
     TempFindParagraph,
@@ -147,23 +146,24 @@ async def fetch_find_metadata(
     resources = []
     operations = []
     for result_paragraph in result_paragraphs:
-        find_resources.setdefault(
-            result_paragraph.rid, FindResource(id=result_paragraph.rid, fields={})
-        ).fields.setdefault(
-            result_paragraph.field, FindField(paragraphs={})
-        ).paragraphs[
-            result_paragraph.paragraph.id
-        ] = result_paragraph.paragraph
+        if result_paragraph.paragraph is not None:
+            find_resources.setdefault(
+                result_paragraph.rid, FindResource(id=result_paragraph.rid, fields={})
+            ).fields.setdefault(
+                result_paragraph.field, FindField(paragraphs={})
+            ).paragraphs[
+                result_paragraph.paragraph.id
+            ] = result_paragraph.paragraph
 
-        operations.append(
-            set_text_value(
-                kbid=kbid,
-                result_paragraph=result_paragraph,
-                highlight=highlight,
-                ematches=ematches,
+            operations.append(
+                set_text_value(
+                    kbid=kbid,
+                    result_paragraph=result_paragraph,
+                    highlight=highlight,
+                    ematches=ematches,
+                )
             )
-        )
-        resources.append(result_paragraph.rid)
+            resources.append(result_paragraph.rid)
 
     for resource in set(resources):
         operations.append(
@@ -284,9 +284,9 @@ async def find_merge_results(
     requested_relations: EntitiesSubgraphRequest,
     min_score: float = 0.85,
     highlight: bool = False,
-) -> KnowledgeboxSearchResults:
-    paragraphs = []
-    vectors = []
+) -> KnowledgeboxFindResults:
+    paragraphs: List[List[ParagraphResult]] = []
+    vectors: List[List[DocumentScored]] = []
     relations = []
 
     facets_counter = Counter()
@@ -324,7 +324,7 @@ async def find_merge_results(
     )
 
     await fetch_find_metadata(
-        api_results,
+        api_results.resources,
         result_paragraphs,
         kbid,
         show,

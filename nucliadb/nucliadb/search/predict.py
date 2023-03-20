@@ -89,7 +89,6 @@ class PredictEngine:
         x_ndb_client: str,
         x_forwarded_for: str,
     ):
-
         data = item.dict()
         data["user"] = x_nucliadb_user
         data["client"] = x_ndb_client
