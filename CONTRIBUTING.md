@@ -31,14 +31,5 @@ The process is simple and fast. Upon your first pull request, you will be prompt
 ### Setup & run tests NucliaDB
 
 1. Install Python > 3.9 with a virtualenv with your prefered tool (pyenv, conda, pipenv,...)
-2. Install NucliaDB Rust code `pip install maturin; maturin build -m nucliadb_node/binding/Cargo.toml --release; pip install target/wheels/nucliadb_node_binding-0.1.0-cp39-cp39-*.whl --force`
-3. Install NucliaDB Python code `pip install -r nucliadb/requirements-sources.txt -r nucliadb/requirements-test.txt -r nucliadb/requirements.txt -e nucliadb`
-4. Run `pytest nucliadb`
-
-### Run with Redis
-
-TODO
-
-### Run with Jaegger
-
-TODO
+2. Install NucliaDB Dev Dependencies `make install`
+3. Run `pytest nucliadb`
