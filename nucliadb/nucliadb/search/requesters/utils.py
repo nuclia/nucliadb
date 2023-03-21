@@ -35,7 +35,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
 )
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from sentry_sdk import capture_exception
 
 from nucliadb.search import logger
 from nucliadb.search.search.fetch import abort_transaction  # type: ignore
@@ -47,6 +46,7 @@ from nucliadb.search.search.shards import (
 )
 from nucliadb.search.settings import settings
 from nucliadb.search.utilities import get_nodes
+from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import ShardsNotFound
 
 
@@ -165,7 +165,7 @@ async def node_query(
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
-        capture_exception(exc)
+        errors.capture_exception(exc)
         await abort_transaction()
         raise HTTPException(status_code=503, detail=f"Data query took too long")
     except AioRpcError as exc:
@@ -182,7 +182,7 @@ async def node_query(
 
     for result in results:
         if isinstance(result, Exception):
-            capture_exception(result)
+            errors.capture_exception(result)
             await abort_transaction()
             logger.exception("Error while querying shard data", exc_info=True)
             raise HTTPException(

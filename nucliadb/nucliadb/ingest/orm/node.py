@@ -36,7 +36,6 @@ from nucliadb_protos.writer_pb2 import Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
@@ -50,7 +49,7 @@ from nucliadb.ingest.orm.grpc_node_dummy import (  # type: ignore
 )
 from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.settings import settings
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.grpc import OpenTelemetryGRPC
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.keys import KB_SHARDS
@@ -190,8 +189,7 @@ class Node(AbstractNode):
             ]
             node_ids = NODE_CLUSTER.find_nodes(exclude_nodes=kb_nodes)
         except NodeClusterSmall as err:
-            if SENTRY:
-                capture_exception(err)
+            errors.capture_exception(err)
             logger.error(
                 f"Shard creation for kbid={kbid} failed: Replication requirements could not be met."
             )
@@ -215,8 +213,7 @@ class Node(AbstractNode):
                 replica.shard.CopyFrom(shard_created)
                 shard.replicas.append(replica)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error creating new shard")
             await cls.rollback_shard(shard)
             raise e
@@ -239,8 +236,7 @@ class Node(AbstractNode):
                 try:
                     await node.delete_shard(replica_id)
                 except Exception as rollback_error:
-                    if SENTRY:
-                        capture_exception(rollback_error)
+                    errors.capture_exception(rollback_error)
                     logger.error(
                         f"New shard rollback error. Node: {node_id} Shard: {replica_id}"
                     )

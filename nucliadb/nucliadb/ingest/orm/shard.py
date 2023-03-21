@@ -22,7 +22,6 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-import sentry_sdk
 from lru import LRU  # type: ignore
 from nucliadb_protos.noderesources_pb2 import (
     Resource as PBBrainResource,  # type: ignore
@@ -36,7 +35,7 @@ from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb.ingest import SERVICE_NAME  # type: ignore
 from nucliadb.ingest.orm import NODES
 from nucliadb.ingest.orm.abc import AbstractShard, ShardCounter
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import get_indexing, get_storage
 
 SHARDS = LRU(100)
@@ -106,8 +105,7 @@ class Shard(AbstractShard):
                     paragraphs=counter.paragraphs,
                 )
             except Exception as exc:
-                if SENTRY:
-                    sentry_sdk.capture_exception(exc)
+                errors.capture_exception(exc)
         return shard_counter
 
     async def clean_and_upgrade(self) -> Dict[str, PBShardCleaned]:

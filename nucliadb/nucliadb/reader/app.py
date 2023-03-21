@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import pkg_resources
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
@@ -24,8 +25,6 @@ from opentelemetry.instrumentation.aiohttp_client import (  # type: ignore
 )
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-from sentry_sdk import capture_exception
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -36,10 +35,10 @@ from starlette_prometheus import PrometheusMiddleware
 from nucliadb.reader import API_PREFIX, SERVICE_NAME
 from nucliadb.reader.api.v1.router import api as api_v1
 from nucliadb.reader.lifecycle import finalize, initialize
-from nucliadb.sentry import SENTRY, set_sentry
+from nucliadb_telemetry import errors
+from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.authentication import STFAuthenticationBackend
-from nucliadb_utils.fastapi.instrumentation import instrument_app
 from nucliadb_utils.fastapi.openapi import extend_openapi
 from nucliadb_utils.fastapi.versioning import VersionedFastAPI
 from nucliadb_utils.settings import http_settings, running_settings
@@ -58,23 +57,14 @@ middleware = [
     ),
 ]
 
-
-if running_settings.sentry_url and SENTRY:
-    set_sentry(
-        running_settings.sentry_url,
-        running_settings.running_environment,
-        running_settings.logging_integration,
-    )
-    middleware.append(Middleware(SentryAsgiMiddleware))
-
+errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
 on_startup = [initialize]
 on_shutdown = [finalize]
 
 
 async def global_exception_handler(request: Request, exc: Exception):
-    if SENTRY:
-        capture_exception(exc)
+    errors.capture_exception(exc)
     return JSONResponse(
         status_code=500,
         content={"detail": "Something went wrong, please contact your administrator"},

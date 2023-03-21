@@ -22,7 +22,6 @@ from typing import get_args as typing_get_args
 
 from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
-from sentry_sdk import capture_exception
 
 import nucliadb_models as models
 from nucliadb.ingest.fields.conversation import Conversation
@@ -51,6 +50,7 @@ from nucliadb_models.resource import (
 )
 from nucliadb_models.search import ResourceProperties
 from nucliadb_protos import resources_pb2
+from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_cache, get_storage
 
@@ -121,7 +121,7 @@ async def list_resources(
         is_last_page = current_key_index <= max_items_to_iterate
 
     except Exception as exc:
-        capture_exception(exc)
+        errors.capture_exception(exc)
         raise HTTPException(
             status_code=500, detail="Couldn't retrieve list of resources right now"
         )

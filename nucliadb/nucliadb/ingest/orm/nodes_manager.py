@@ -23,13 +23,12 @@ from typing import Any, Awaitable, Callable, List, Optional, Tuple
 
 from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_protos.writer_pb2 import Shards as PBShards
-from sentry_sdk import capture_exception
 
 from nucliadb.ingest.maindb.driver import Driver
 from nucliadb.ingest.orm import NODE_CLUSTER, NODES
 from nucliadb.ingest.orm.exceptions import NodeError, ShardNotFound
 from nucliadb.ingest.orm.node import Node
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_utils.exceptions import ShardsNotFound
 from nucliadb_utils.keys import KB_SHARDS
 
@@ -114,8 +113,7 @@ class NodesManager:
                 timeout=timeout,
             )
         except asyncio.TimeoutError as exc:
-            if SENTRY:
-                capture_exception(exc)
+            errors.capture_exception(exc)
             raise NodeError("Node unavailable for relation search") from exc
 
         return results

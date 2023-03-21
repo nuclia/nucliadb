@@ -38,14 +38,13 @@
 
 from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodesidecar_pb2 import Counter, ShadowShardResponse
-from sentry_sdk import capture_exception
 
 from nucliadb_node import logger, shadow_shards
 from nucliadb_node.reader import Reader
-from nucliadb_node.sentry import SENTRY
 from nucliadb_node.shadow_shards import ShadowShardNotFound, ShadowShardsManager
 from nucliadb_node.writer import Writer
 from nucliadb_protos import nodesidecar_pb2_grpc
+from nucliadb_telemetry import errors
 
 
 class SidecarServicer(nodesidecar_pb2_grpc.NodeSidecarServicer):
@@ -76,8 +75,7 @@ class SidecarServicer(nodesidecar_pb2_grpc.NodeSidecarServicer):
             response.success = True
             response.shard.id = shard_id
         except Exception as exc:
-            if SENTRY:
-                capture_exception(exc)
+            errors.capture_exception(exc)
             logger.warning(f"Error creating shadow shard: {shard_id}")
         finally:
             return response
@@ -97,8 +95,7 @@ class SidecarServicer(nodesidecar_pb2_grpc.NodeSidecarServicer):
             )
             response.success = True
         except Exception as exc:
-            if SENTRY:
-                capture_exception(exc)
+            errors.capture_exception(exc)
             logger.warning(f"Error deleting shadow shard: {shard_id}")
         finally:
             return response

@@ -27,11 +27,8 @@ from typing import Dict, List, Optional, Union
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.node import ClusterMember, NodeType, chitchat_update_node
 from nucliadb.ingest.settings import settings
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_utils.utilities import Utility, set_utility
-
-if SENTRY:
-    from sentry_sdk import capture_exception
 
 
 async def start_chitchat(service_name: str) -> Optional[ChitchatNucliaDB]:
@@ -119,9 +116,7 @@ class ChitchatNucliaDB:
                         break
             except IOError as e:
                 logger.exception("Failed on chitchat", stack_info=True)
-                if SENTRY:
-                    capture_exception(e)
-                logger.exception(f"error while reading update from unix socket: {e}")
+                errors.capture_exception(e)
 
     async def close(self):
         self.chitchat_update_srv.close()

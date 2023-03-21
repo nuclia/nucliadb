@@ -29,13 +29,12 @@ from nats.aio.client import Msg
 from nats.aio.subscription import Subscription
 from nucliadb_protos.noderesources_pb2 import Resource, ResourceID, ShardIds
 from nucliadb_protos.nodewriter_pb2 import IndexMessage, OpStatus
-from sentry_sdk import capture_exception
 
 from nucliadb_node import SERVICE_NAME, logger, shadow_shards
 from nucliadb_node.reader import Reader
-from nucliadb_node.sentry import SENTRY
 from nucliadb_node.settings import settings
 from nucliadb_node.writer import Writer
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 from nucliadb_telemetry.utils import get_telemetry
 from nucliadb_utils.settings import indexing_settings
@@ -98,7 +97,7 @@ class Worker:
         logger.info("Got reconnected to NATS {url}".format(url=self.nc.connected_url))
 
     async def error_cb(self, e):
-        capture_exception(e)
+        errors.capture_exception(e)
         logger.error(
             "There was an error on the worker, check sentry: {}".format(e),
             exc_info=True,
@@ -226,24 +225,19 @@ class Worker:
                 if grpc_error.code() == StatusCode.NOT_FOUND:
                     logger.error(f"Shard does not exit {pb.shard}")
                 else:
-                    event_id: Optional[str] = None
-                    if SENTRY:
-                        event_id = capture_exception(grpc_error)
+                    event_id = errors.capture_exception(grpc_error)
                     logger.error(
                         f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                     )
                     raise grpc_error
 
             except KeyError as storage_error:
-                if SENTRY:
-                    capture_exception(storage_error)
+                errors.capture_exception(storage_error)
                 logger.warn(
                     "Error retrieving the indexing payload we do not block as that means its already deleted"
                 )
             except Exception as e:
-                event_id = None
-                if SENTRY:
-                    event_id = capture_exception(e)
+                event_id = errors.capture_exception(e)
                 logger.error(
                     f"An error on subscription_worker. Check sentry for more details. Event id: {event_id}"
                 )
@@ -254,8 +248,7 @@ class Worker:
             self.event.set()
             await storage.delete_indexing(pb)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error(
                 f"An error on subscription_worker. Check sentry for more details."
             )

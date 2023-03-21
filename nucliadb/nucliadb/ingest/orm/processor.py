@@ -31,7 +31,6 @@ from nucliadb_protos.knowledgebox_pb2 import (
 from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldType, Notification
 from pydantic import BaseModel
-from sentry_sdk import capture_exception
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Driver, Transaction
@@ -45,7 +44,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.shard import Shard, ShardCounter
 from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb.ingest.settings import settings
-from nucliadb.sentry import SENTRY
+from nucliadb_telemetry import errors
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.cache.utility import Cache
 from nucliadb_utils.storages.storage import Storage
@@ -644,8 +643,7 @@ class Processor:
             )
         except Exception as e:
             await txn.abort()
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             raise e
 
         if not failed:

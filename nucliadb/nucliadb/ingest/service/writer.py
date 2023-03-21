@@ -105,8 +105,8 @@ from nucliadb.ingest.orm.shard import Shard
 from nucliadb.ingest.orm.utils import get_node_klass
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import get_driver
-from nucliadb.sentry import SENTRY
 from nucliadb_protos import writer_pb2_grpc
+from nucliadb_telemetry import errors
 from nucliadb_utils.cache import KB_COUNTER_CACHE
 from nucliadb_utils.keys import KB_SHARDS
 from nucliadb_utils.storages.storage import Storage, StorageField
@@ -117,9 +117,6 @@ from nucliadb_utils.utilities import (
     get_storage,
     get_transaction,
 )
-
-if SENTRY:
-    from sentry_sdk import capture_exception
 
 
 class WriterServicer(writer_pb2_grpc.WriterServicer):
@@ -167,8 +164,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.commit(resource=False)
             return CleanedKnowledgeBoxResponse()
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
             raise
@@ -203,8 +199,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await field.set_vectors(evw)
             await txn.commit(resource=False)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
 
@@ -300,8 +295,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
@@ -320,8 +314,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
@@ -422,8 +415,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             await entities_manager.get_entities(response)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             response.status = GetEntitiesResponse.Status.ERROR
         else:
@@ -447,10 +439,9 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             try:
                 entities_groups = await entities_manager.list_entities_groups()
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
-                    logger.error("Error in ingest gRPC servicer", exc_info=True)
-                    response.status = ListEntitiesGroupsResponse.Status.ERROR
+                errors.capture_exception(e)
+                logger.error("Error in ingest gRPC servicer", exc_info=True)
+                response.status = ListEntitiesGroupsResponse.Status.ERROR
             else:
                 response.status = ListEntitiesGroupsResponse.Status.OK
                 for name, group in entities_groups.items():
@@ -474,8 +465,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             entities_group = await entities_manager.get_entities_group(request.group)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             response.status = GetEntitiesGroupResponse.Status.ERROR
         else:
@@ -503,8 +493,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             await entities_manager.set_entities(request.group, request.entities)
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             response.status = OpStatusWriter.Status.ERROR
             await txn.abort()
@@ -524,8 +513,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
@@ -587,8 +575,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 await txn.commit(resource=False)
                 response.status = OpStatusWriter.Status.OK
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.error("Error in ingest gRPC servicer", exc_info=True)
                 response.status = OpStatusWriter.Status.ERROR
                 await txn.abort()
@@ -613,8 +600,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status.status = OpStatusWriter.Status.OK
                 return response
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.exception("Errors getting synonyms")
                 response.status.status = OpStatusWriter.Status.ERROR
                 return response
@@ -636,8 +622,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.OK
                 return response
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.exception("Errors setting synonyms")
                 response.status = OpStatusWriter.Status.ERROR
                 return response
@@ -659,8 +644,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = OpStatusWriter.Status.OK
                 return response
             except Exception as e:
-                if SENTRY:
-                    capture_exception(e)
+                errors.capture_exception(e)
                 logger.exception("Errors deleting synonyms")
                 response.status = OpStatusWriter.Status.ERROR
                 return response
@@ -807,8 +791,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.abort()
             return response
         except Exception as e:
-            if SENTRY:
-                capture_exception(e)
+            errors.capture_exception(e)
             logger.error("Error in ingest gRPC servicer", exc_info=True)
             await txn.abort()
             raise
@@ -892,9 +875,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.commit(resource=False)
             response.success = True
         except Exception as e:
-            event_id: Optional[str] = None
-            if SENTRY:
-                event_id = capture_exception(e)
+            event_id = errors.capture_exception(e)
             logger.error(
                 f"Error creating shadow shard. Check sentry for more details. Event id: {event_id}"
             )
@@ -912,9 +893,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await txn.commit(resource=False)
             response.success = True
         except Exception as exc:
-            event_id: Optional[str] = None
-            if SENTRY:
-                event_id = capture_exception(exc)
+            event_id = errors.capture_exception(exc)
             logger.error(
                 f"Error deleting shadow shard. Check sentry for more details. Event id: {event_id}"
             )

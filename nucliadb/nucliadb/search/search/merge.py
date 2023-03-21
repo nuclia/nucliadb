@@ -33,7 +33,6 @@ from nucliadb_protos.nodereader_pb2 import (
     SuggestResponse,
     VectorSearchResponse,
 )
-from sentry_sdk import capture_message, push_scope
 
 from nucliadb.search import logger
 from nucliadb.search.search.fetch import (
@@ -71,6 +70,7 @@ from nucliadb_models.search import (
     SortOrder,
     TextPosition,
 )
+from nucliadb_telemetry import errors
 
 Bm25Score = Tuple[int, int]
 TimestampScore = datetime.datetime
@@ -437,11 +437,11 @@ async def merge_relations_results(
             else:
                 error_msg = "Relation search is returning an edge unrelated with queried entities"
                 logger.error(error_msg)
-                with push_scope() as scope:
+                with errors.push_scope() as scope:
                     scope.set_extra("relations_responses", relations_responses)
                     scope.set_extra("query", query)
                     scope.set_extra("relation", relation)
-                    capture_message(error_msg, "error")
+                    errors.capture_message(error_msg, "error")
 
     return relations
 

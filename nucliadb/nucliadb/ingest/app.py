@@ -24,6 +24,7 @@ import sys
 from asyncio import tasks
 from typing import Callable, List, Optional, Union
 
+import pkg_resources
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 
@@ -34,7 +35,7 @@ from nucliadb.ingest.metrics import start_metrics
 from nucliadb.ingest.partitions import assign_partitions
 from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
-from nucliadb.sentry import SENTRY, set_sentry
+from nucliadb_telemetry import errors
 from nucliadb_telemetry.utils import get_telemetry, init_telemetry
 from nucliadb_utils.indexing import IndexingUtility
 from nucliadb_utils.settings import (
@@ -193,12 +194,7 @@ def set_logging():
 
 
 def run() -> None:
-    if running_settings.sentry_url and SENTRY:
-        set_sentry(
-            running_settings.sentry_url,
-            running_settings.running_environment,
-            running_settings.logging_integration,
-        )
+    errors.setup_error_handling(pkg_resources.get_distribution("nucliadb").version)
 
     if asyncio._get_running_loop() is not None:
         raise RuntimeError("cannot be called from a running event loop")
