@@ -19,7 +19,7 @@
 
 import asyncio
 from enum import Enum
-from typing import List, Optional, Tuple, Union, overload
+from typing import List, Optional, Tuple, TypeVar, Union, overload
 
 from fastapi import HTTPException
 from grpc import StatusCode as GrpcStatusCode
@@ -64,9 +64,17 @@ METHODS = {
     Method.RELATIONS: relations_shard,
 }
 
-REQUEST_PARAMETER = Union[
+REQUEST_TYPE = Union[
     SuggestRequest, ParagraphSearchRequest, SearchRequest, RelationSearchRequest
 ]
+
+T = TypeVar(
+    "T",
+    SuggestResponse,
+    ParagraphSearchResponse,
+    SearchResponse,
+    RelationSearchResponse,
+)
 
 
 @overload
@@ -112,9 +120,9 @@ async def node_query(
 async def node_query(
     kbid: str,
     method: Method,
-    pb_query: RelationSearchRequest,
+    pb_query: REQUEST_TYPE,
     shards: Optional[List[str]] = None,
-) -> Tuple[List[RelationSearchResponse], bool, List[Tuple[str, str, str]], List[str]]:
+) -> Tuple[List[T], bool, List[Tuple[str, str, str]], List[str]]:
     nodemanager = get_nodes()
 
     try:

@@ -221,7 +221,7 @@ class KnowledgeboxSearchResults(BaseModel):
 class KnowledgeboxSuggestResults(BaseModel):
     paragraphs: Optional[Paragraphs] = None
     entities: Optional[RelatedEntities] = None
-    shards: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
 
 
 class KnowledgeboxCounters(BaseModel):
@@ -229,7 +229,7 @@ class KnowledgeboxCounters(BaseModel):
     paragraphs: int
     fields: int
     sentences: int
-    shards: Optional[List[Tuple[str, str, str]]]
+    shards: Optional[List[str]]
 
 
 class SortField(str, Enum):

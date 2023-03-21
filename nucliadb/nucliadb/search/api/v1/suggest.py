@@ -112,7 +112,7 @@ async def suggest_knowledgebox(
     await abort_transaction()
 
     response.status_code = 206 if incomplete_results else 200
-    if debug:
+    if debug and queried_shards:
         search_results.shards = queried_shards
 
     if audit is not None:

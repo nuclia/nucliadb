@@ -23,6 +23,7 @@ import string
 from contextvars import ContextVar
 from typing import Dict, List, Optional, Tuple
 
+from lru import LRU  # type: ignore
 from nucliadb_protos.nodereader_pb2 import DocumentResult, ParagraphResult
 from nucliadb_protos.resources_pb2 import Paragraph
 
@@ -43,7 +44,7 @@ rcache: ContextVar[Optional[Dict[str, ResourceORM]]] = ContextVar(
 )
 txn: ContextVar[Optional[Transaction]] = ContextVar("txn", default=None)
 
-RESOURCE_LOCKS: Dict[str, asyncio.Lock] = {}
+RESOURCE_LOCKS: Dict[str, asyncio.Lock] = LRU(1000)
 
 PRE_WORD = string.punctuation + " "
 
@@ -98,7 +99,12 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
 
     resouce_cache = get_resource_cache()
 
-    await RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock()).acquire()
+    if uuid not in RESOURCE_LOCKS:
+        lock = asyncio.Lock()
+        RESOURCE_LOCKS[uuid] = lock
+        await lock.acquire()
+    else:
+        await RESOURCE_LOCKS[uuid].acquire()
 
     try:
         if uuid not in resouce_cache:
@@ -113,7 +119,7 @@ async def get_resource_from_cache(kbid: str, uuid: str) -> Optional[ResourceORM]
         else:
             orm_resource = resouce_cache.get(uuid)
     finally:
-        RESOURCE_LOCKS.setdefault(uuid, asyncio.Lock()).release()
+        RESOURCE_LOCKS[uuid].release()
     return orm_resource
 
 

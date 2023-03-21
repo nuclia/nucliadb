@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+from typing import List
 
 from fastapi import Body, Header, Request, Response
 from fastapi_versioning import version
@@ -28,6 +29,7 @@ from nucliadb.search.api.v1.find import find
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.requesters.utils import Method, node_query
+from nucliadb.search.search.merge import merge_relations_results
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -122,7 +124,7 @@ async def chat_post_knowledgebox(
         yield bytes_results
 
         answer = []
-        async for data in predict.chat_query(kbid, item.context):
+        async for data in predict.chat_query(kbid, ChatModel(context=item.context)):
             answer.append(data)
             yield data
         yield END_OF_STREAM
@@ -132,14 +134,22 @@ async def chat_post_knowledgebox(
         relation_request.subgraph.entry_points.extend(detected_entities)
         relation_request.subgraph.depth = 1
 
-        relations_results: RelationSearchResponse
+        relations_results: List[RelationSearchResponse]
         (
             relations_results,
             incomplete_results,
             queried_nodes,
             queried_shards,
         ) = await node_query(kbid, Method.RELATIONS, relation_request, item.shards)
-        yield base64.b64encode(relations_results)
+        yield base64.b64encode(
+            (
+                await merge_relations_results(
+                    relations_results, relation_request.subgraph
+                )
+            )
+            .json()
+            .encode()
+        )
 
     return StreamingResponse(
         generate_answer(results, kbid, predict),

@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from collections import Counter
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from nucliadb_protos.nodereader_pb2 import (
     DocumentScored,
@@ -289,21 +288,22 @@ async def find_merge_results(
     vectors: List[List[DocumentScored]] = []
     relations = []
 
-    facets_counter = Counter()
+    # facets_counter = Counter()
     next_page = True
-    ematches = []
+    ematches: List[str] = []
     real_query = ""
     for response in search_responses:
         # Iterate over answers from different logic shards
 
         # Merge facets
-        facets_counter.update(response.paragraph.facets)
+        # TODO
+        # facets_counter.update(response.paragraph.facets)
         ematches.extend(response.paragraph.ematches)
         real_query = response.paragraph.query
         next_page = next_page and response.paragraph.next_page
 
-        paragraphs.append(response.paragraph.results)
-        vectors.append(response.vector.documents)
+        paragraphs.append(cast(List[ParagraphResult], response.paragraph.results))
+        vectors.append(cast(List[DocumentScored], response.vector.documents))
 
         relations.append(response.relation)
 
