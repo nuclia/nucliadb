@@ -99,7 +99,8 @@ async def chat_post_knowledgebox(
         async for new_query_data in predict.chat_query(kbid, req):
             new_query_elements.append(new_query_data)
 
-        new_query = "".join(new_query_elements)
+        new_query = (b"".join(new_query_elements)).decode()
+
     else:
         new_query = item.query
 
@@ -126,10 +127,14 @@ async def chat_post_knowledgebox(
             for paragraph in field.paragraphs.values()
         ]
     )
-    item.context.append(Message(author=Author.NUCLIA, text=flattened_text))
+    if item.context is None:
+        context = []
+    else:
+        context = item.context
+    context.append(Message(author=Author.NUCLIA, text=flattened_text))
 
     chat_model = ChatModel(
-        user_id=x_nucliadb_user, context=item.context, question=item.query
+        user_id=x_nucliadb_user, context=context, question=item.query
     )
 
     async def generate_answer(
@@ -148,7 +153,9 @@ async def chat_post_knowledgebox(
             yield data
         yield END_OF_STREAM
 
-        detected_entities = await predict.detect_entities(kbid, b"".join(answer))
+        text_answer = b"".join(answer)
+
+        detected_entities = await predict.detect_entities(kbid, text_answer.decode())
         relation_request = RelationSearchRequest()
         relation_request.subgraph.entry_points.extend(detected_entities)
         relation_request.subgraph.depth = 1

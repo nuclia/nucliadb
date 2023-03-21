@@ -119,7 +119,7 @@ class PredictEngine:
             if resp.status != 200:
                 raise SendToPredictError(f"{resp.status}: {await resp.read()}")
 
-    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncIterator[str]:
+    async def chat_query(self, kbid: str, item: ChatModel) -> AsyncIterator[bytes]:
         # If token is offered
 
         if self.onprem is False:
