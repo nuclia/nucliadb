@@ -17,26 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-import math
 import os
 from typing import Callable
 
 import pytest
 from httpx import AsyncClient
-from nucliadb_protos.nodereader_pb2 import (
-    DocumentSearchRequest,
-    ParagraphSearchRequest,
-    VectorSearchRequest,
-)
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
-from nucliadb.ingest.orm import NODES
-from nucliadb.ingest.tests.vectors import Q
-from nucliadb.ingest.utils import get_driver
-from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
+from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_utils.keys import KB_SHARDS
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 

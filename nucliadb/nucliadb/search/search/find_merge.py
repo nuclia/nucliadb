@@ -56,44 +56,37 @@ async def get_text_find_paragraph(
     field: str,
     start: int,
     end: int,
-    max_operations: asyncio.Semaphore,
     split: Optional[str] = None,
     highlight: bool = False,
     ematches: Optional[List[str]] = None,
     matches: Optional[List[str]] = None,
 ) -> str:
-    await max_operations.acquire()
+    orm_resource = await get_resource_from_cache(kbid, rid)
 
-    try:
-        orm_resource = await get_resource_from_cache(kbid, rid)
+    if orm_resource is None:
+        logger.error(f"{rid} does not exist on DB")
+        return ""
 
-        if orm_resource is None:
-            logger.error(f"{rid} does not exist on DB")
-            return ""
+    field_type, field = field.split("/")
+    field_type_int = KB_REVERSE[field_type]
+    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    extracted_text = await field_obj.get_extracted_text()
+    if extracted_text is None:
+        logger.warn(
+            f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
+        )
+        return ""
 
-        field_type, field = field.split("/")
-        field_type_int = KB_REVERSE[field_type]
-        field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-        extracted_text = await field_obj.get_extracted_text()
-        if extracted_text is None:
-            logger.warn(
-                f"{rid} {field} {field_type_int} extracted_text does not exist on DB"
-            )
-            return ""
+    if split not in (None, ""):
+        text = extracted_text.split_text[split]
+        splitted_text = text[start:end]
+    else:
+        splitted_text = extracted_text.text[start:end]
 
-        if split not in (None, ""):
-            text = extracted_text.split_text[split]
-            splitted_text = text[start:end]
-        else:
-            splitted_text = extracted_text.text[start:end]
-
-        if highlight:
-            splitted_text = highlight_paragraph(
-                splitted_text, words=matches, ematches=ematches  # type: ignore
-            )
-    finally:
-        max_operations.release()
-
+    if highlight:
+        splitted_text = highlight_paragraph(
+            splitted_text, words=matches, ematches=ematches  # type: ignore
+        )
     return splitted_text
 
 
@@ -121,7 +114,7 @@ async def set_text_value(
             matches=[],  # TODO
         )
     finally:
-        await max_operations.release()
+        max_operations.release()
 
 
 async def set_resource_metadata_value(
@@ -131,16 +124,22 @@ async def set_resource_metadata_value(
     field_type_filter: List[FieldTypeName],
     extracted: List[ExtractedDataTypeName],
     find_resources: Dict[str, FindResource],
+    max_operations: asyncio.Semaphore,
 ):
-    serialized_resource = await serialize(
-        kbid,
-        resource,
-        show,
-        field_type_filter=field_type_filter,
-        extracted=extracted,
-        service_name=SERVICE_NAME,
-    )
-    find_resources[resource].parse_obj(serialized_resource)
+    await max_operations.acquire()
+
+    try:
+        serialized_resource = await serialize(
+            kbid,
+            resource,
+            show,
+            field_type_filter=field_type_filter,
+            extracted=extracted,
+            service_name=SERVICE_NAME,
+        )
+        find_resources[resource].parse_obj(serialized_resource)
+    finally:
+        max_operations.release()
 
 
 async def fetch_find_metadata(
