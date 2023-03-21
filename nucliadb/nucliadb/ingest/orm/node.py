@@ -32,10 +32,11 @@ from nucliadb_protos.noderesources_pb2 import EmptyQuery, ShardId
 from nucliadb_protos.nodesidecar_pb2_grpc import NodeSidecarStub
 from nucliadb_protos.nodewriter_pb2_grpc import NodeWriterStub
 from nucliadb_protos.utils_pb2 import VectorSimilarity
-from nucliadb_protos.writer_pb2 import Member
+from nucliadb_protos.writer_pb2 import ListMembersRequest, Member
 from nucliadb_protos.writer_pb2 import ShardObject as PBShard
 from nucliadb_protos.writer_pb2 import ShardReplica
 from nucliadb_protos.writer_pb2 import Shards as PBShards
+from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.maindb.driver import Transaction
@@ -360,8 +361,12 @@ class Node(AbstractNode):
 
     @classmethod
     async def load_active_nodes(cls):
-        members = await cls.list_members()
-        for member in members:
+        from nucliadb_utils.settings import nucliadb_settings
+
+        stub = WriterStub(aio.insecure_channel(nucliadb_settings.nucliadb_ingest))
+        request = ListMembersRequest()
+        members = await stub.ListMembers(request)
+        for member in members.members:
             NODES[member.id] = Node(
                 member.listen_address,
                 NodeType.from_pb(member.type),
