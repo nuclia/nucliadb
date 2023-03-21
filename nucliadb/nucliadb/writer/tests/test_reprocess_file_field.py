@@ -21,18 +21,26 @@ from typing import AsyncIterator, Tuple
 from unittest.mock import AsyncMock
 
 import pytest
+from nucliadb_protos.writer_pb2 import ResourceFieldId
 
+from nucliadb.ingest.processing import ProcessingInfo
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX
 from nucliadb.writer.tests.utils import load_file_as_FileB64_payload
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.resource import NucliaDBRoles, QueueType
+from nucliadb_utils.utilities import get_ingest
 
 
 @pytest.fixture(scope="function")
 def processing_mock(mocker):
     processing = get_processing()
-    original = processing.send_to_process
-    mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
+    mocker.patch.object(
+        processing,
+        "send_to_process",
+        AsyncMock(
+            return_value=ProcessingInfo(seqid=0, account_seq=0, queue=QueueType.SHARED)
+        ),
+    )
     yield processing
 
 
@@ -65,10 +73,6 @@ async def file_field(
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
 
-        from nucliadb_protos.writer_pb2 import ResourceFieldId
-
-        from nucliadb_utils.utilities import get_ingest
-
         ingest = get_ingest()
         pbrequest = ResourceFieldId()
         pbrequest.kbid = kbid
@@ -97,9 +101,6 @@ async def test_reprocess_nonexistent_file_field(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
-            headers={
-                # "X-FILE-PASSWORD": password,
-            },
         )
         assert resp.status_code == 404
 
@@ -133,7 +134,6 @@ async def test_reprocess_file_field_without_password(
     async with writer_api(roles=[NucliaDBRoles.WRITER]) as client:
         resp = await client.post(
             f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}/reprocess",
-            headers={},
         )
         assert resp.status_code == 202
 
