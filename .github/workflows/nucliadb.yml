@@ -214,9 +214,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Get safe branch name
+        id: branch_name
+        run: |-
+          BRANCH_NAME=`echo $GITHUB_HEAD_REF | sed 's$/$-$g'`
+          echo "::set-output name=branch_name::$BRANCH_NAME"
+
       - name: Docker - Build
         run: |-
-          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${GITHUB_HEAD_REF} . -f Dockerfile
+          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${{ steps.branch_name.outputs.branch_name }} . -f Dockerfile
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
@@ -231,4 +237,4 @@ jobs:
 
       - name: Docker - Push latest
         run: |-
-          docker push $CONTAINER_REGISTRY/$COMPONENT:${GITHUB_HEAD_REF}
+          docker push $CONTAINER_REGISTRY/$COMPONENT:${{ steps.branch_name.outputs.branch_name }}
