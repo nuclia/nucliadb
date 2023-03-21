@@ -70,7 +70,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage.xml
+          file: ./nucliadb/coverage.xml
           flags: ingest
 
   # PR workflows END here
