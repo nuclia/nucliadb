@@ -225,14 +225,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Extract branch name
-        shell: bash
-        run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >>$GITHUB_OUTPUT
-        id: extract_branch
-
       - name: Docker - Build
         run: |-
-          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${{ steps.extract_branch.outputs.branch }} . -f Dockerfile
+          docker build -t $CONTAINER_REGISTRY/$COMPONENT:${GITHUB_REF##*/} . -f Dockerfile
 
       - name: Setup gcloud CLI
         uses: google-github-actions/auth@v0
@@ -247,4 +242,4 @@ jobs:
 
       - name: Docker - Push latest
         run: |-
-          docker push $CONTAINER_REGISTRY/$COMPONENT:${{ steps.extract_branch.outputs.branch }}
+          docker push $CONTAINER_REGISTRY/$COMPONENT:${GITHUB_REF##*/}
